@@ -2,30 +2,44 @@
 
 ## Goals
 
-The main goal is to ensure the continuity of user flow. A typical use case is that the user has funds in the **committed** block and she wants to send them to an external address. But for this, she needs to wait for the verification of the block where she receives the funds, then the block where she performs the withdrawal operation. So swift exit allows requesting an immediate withdrawal of users' funds to any ethereum address, indicating his withdrawal transaction. Since the validators can guarantee to include a certain sequence of transactions in a block at some height, they can act as lenders and provide their funds for an immediate withdrawal on Layer 1.
+The main goal is to ensure the continuity of user flow. A typical use case is that the user has funds in the **committed** block and she wants to send them to an external address. But for this, she needs to wait for the verification of the block where she receives the funds, then the block where she performs the withdrawal operation. So swift exit allows requesting an immediate withdrawal of users' funds to any ethereum address, indicating his withdrawal operatioin. Since the validators can guarantee to include a certain sequence of operatioin in a block at some height, they can act as lenders and provide their funds for an immediate withdrawal on Layer 1.
 
 ## Structure
 
-Main contracts:
-- `SwiftExitsInternal` - contains the main internal landing methods that are responsible for the operation of the entire swift exits system, the processing of transaction, as well as for the storage of validators funds. This contract contains only internal methods common for `SwiftExitsEther` and `SwiftExitsErc20`. These methods are called from public methods of these contracts. The contract also contains non-implementing methods for receiving and sending funds, the implementation of which depends on whether the funds are *Ether* or *ERC-20* token. Methods are redefined and implemented in the respective contracts (`SwiftExitsEther` and `SwiftExitsErc20`).
-- `SwiftExitsEther` - wraps an underlying `SwiftExitsInternal`, provides an interface for Ether transactions
-- `SwiftExitsErc20` - wraps an underlying `SwiftExitsInternal`, provides an interface for ERC-20 tokens transactions
-- `Rollup` - the main rollup contract, it processes withdraw operations
-- `BlsVerifier` - the library for verifying BLS signatures over BN256 curve
+Main components:
+- `SwiftExits` contract - contains the main  methods that are responsible for the operation of the entire swift exits system, the processing of transaction, as well as for the storage of validators funds.
+- `Rollup` contract - the main rollup contract, it processes withdraw operations
+- `BlsVerifier` library - the library for verifying BLS signatures over BN256 curve
+- `Compound` contract - money market, allowes validatorss to borrow Ethereum assets for providing swift exit operation
 
-## Work algorithm
+## Swift exit algorithm
+
+![Algorithm scheme](https://i.imgur.com/5D1H486.png)
 
 1. While creating an **withdraw operation**, the user can create and sign a request for a **swift exit for this operation**. To indicate this operation, its hash will be used.
-2. Since validators are responsible for including a user’s operation in a block, they can take responsibility for processing this request. Validators can **verify the user's signature**, as well as to **sign this request** themselves. When the required number of signatures is collected (**2/3 of the total number of validators**), they are aggregated and validated on the `BlsVerifier` contract.
-3. Depending on the amount of free validators funds on the `SwiftExitsInternal` contract, there they will be processed as **immediate swift exit** or **deffered swift exit**. Thus, the swift exit will be executed either **immediately**, using **available funds** on the contract, or a **deffered exit order** will be created for which **validators can supply additional funds** to the `SwiftExitsInternal` contract.
-4. After sending funds to the recipient address via swift exit, on `Rollup` contract specified recipient balance will be reduced by the operation amount. So **after processing swift exit and validating the block** with this operation, **the resulting recipient balance on `Rollup` contract will not change**.
-5. **If funds are not sent via swift exit**, they will be charged on the `Rollup` contract as a result of a normal withdrawal operation - **the user will not lose her funds**.
-6. If **swift exit succeeded** and the block with the corresponding operation passed verification, **the funds borrowed from validators, including fees, will be sent from the `Rollup` contract to `SwiftExitsInternal` contract**.
-7. **Validators** can create a **request to withdraw** their funds from `SwiftExitsInternal` contract. With a sufficient amount of free funds, this request will be satisfied immediately, or a withdrawal order will be created, which is gradually executed when available funds appear on the contract.
+2. Since validators are responsible for including a user’s operation in a block, they can take responsibility for processing this request. Validators can **verify the user's signature**, as well as to **sign this request** themselves. When the required number of signatures is collected (**2/3 of the total number of validators**), validators send to `newSwiftExit` method of `SwiftExits` contract following data:
+   - SwiftExitRequest (sender, recepient, token, amount)
+   - Aggregated signature
+   - List of validators addresses
+   - Swift exit block number and identifier
+3. There will be following checks:
+   - There are enough free validators funds on contract (in Matter tokens)
+   - Specified block isn't validated yet
+   - Signature verification using `BlsVerifier` library `verify` method
+4. If all checks passed, then current rate and collateral factor for token will be taken from `Compound` contract.
+5. Using this info the compound processing fees will be calculated on `SwiftExits` contract, as well as validator fees and systems (Matter) fee.
+6. `FeeOrder`s will be stored on `SwiftExits` contract.
+7. `SwiftExit` will be stored on `SwiftExits` contract
+8. The required amount of validators funds will be borrowed on `SwiftExits` contract
+9. A loan of tokens from `Compound` contract to `SwiftExits` contract will occurred
+10. Tokens will be sent to the recipient from `SwiftExits` contract
+11. New `RepaymentRequest` will be created on `Rollup` contract.
+12. When a new block is commited on `Rollup` contract, it will mark relevant `RepaymentRequest`s as `committed`
+13. When a block is verified on `Rollup` contract, it will check relevant `RepaymentRequest`s for `committed` mark and send required number of tokens to `SwiftExits` contract.
+14. `SwiftExits` contract will repay a debt to `Compound` and will get validators tokens.
+15. Fees will be charged to validators, and borrowed funds will also be released
 
-// TODO: - стоит ли в эту схему припиливать компаунд? Не думаю что нужно прикручивать. Это добавит сильно ответственности на контракте за выполнение обязательств компаунду в случае колебаний курса, внесет проблемы в расчет комиссий, добавит дополнительных комиссий. Занять деньги могут и сами валидаторы
-
-## Contract creation
+<!-- ## Contract creation
 
 The `SwiftExitsEther` and `SwiftExitsErc20` contract constructors include the creation of the `SwiftExitsInternal` contract.
 To create a contract, you must specify:
@@ -106,9 +120,9 @@ Upon verification of the next `Rollup` block, its borrow orders will be deleted,
 
 ### Swift exit repayment
 
-Funds will be transferred to the SwiftExits contract through the call of `repayBorrow(amount)` method from the Rollup contract. This call is supposed to be made during verification of the corresponding `Rollup` block.
+Funds will be transferred to the SwiftExits contract through the call of `repayBorrow(amount)` method from the Rollup contract. This call is supposed to be made during verification of the corresponding `Rollup` block. -->
 
-## Interest Rate calculations
+<!-- ## Interest Rate calculations
 
 Utilization ratio: 
 `u = totalBorrowed / (totalSupply + totatBorrowed)`
@@ -129,5 +143,5 @@ Owner (Matter) fee:
 `ownerFee = borrowerFee - validatorsFees`
 
 Single validator fee:
-`fee = validatorsFees * (validatorsSupplies[validatorId] / totalSupply)`
+`fee = validatorsFees * (validatorsSupplies[validatorId] / totalSupply)` -->
 
