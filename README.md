@@ -11,9 +11,6 @@ Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md
 ## Setup local dev environment
 
 
-(TODO(furkhat): remove when this step is implented and merged with https://github.com/matter-labs/franklin/pull/104) On a fresh copy of a project, run this once to generate test contracts:
-```./bin/prepare-test-contracts.sh```
-
 Setup:
 
 ```franklin init```
@@ -22,8 +19,11 @@ To completely reset the dev environment:
 
 - Stop services:
 ```franklin dev-down```
-- Remove mounted container data:
-```rm -rf ./volumes```
+- Remove containers data:
+```
+ssh minikube
+rm -r /data/*
+```
 - Repeat the setup procedure above
 
 # (Re)deploy db and contraсts:
@@ -45,26 +45,11 @@ Switch between configurations:
 ## Monitoring & management:
 
 Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
-Geth: ```geth attach http://localhost:8545```
+Geth: ```geth attach $(bin/dev-geth-url)```
 
 NOTE: if you are resetting geth, each Metamask account must be manually reset via Settings > Advanced > Reset account.
 
-# Blockscout (local blockchain explorer)
-
-It generates quite some CPU load, but might be useful to visualize blockchain activity. Use with caution.
-
-- Migrate blockscout (do this once to setup database):
-```franklin blockscout-migrate```
-
-- Start:
-```franklin blockscout-up```
-
-- Stop:
-```franklin blockscout-down```
-
-Blockscout will be available at http://localhost:4000/txs
-
-## Build and run server + prover locally:
+## Build and run server + prover locally for development:
 
 Run server:
 ```
@@ -96,20 +81,23 @@ Client UI will be available at http://localhost:8080.
 Make sure you have environment variables set right, you can check it by running:
 ```franklin env```. You should see `* dev` in output.
 
-## Start server and prover as local docker containers:
+## Start server and prover in minikube (this setup is closest to prod):
+
+- Prerequisite: ```franklin init```
 
 - Start:
 ```franklin start```
 
 - Watch logs:
-```franklin logs```
+Server: ```franklin log-server```
+Prover: ```franklin log-prover```
 
 - Stop:
 ```franklin stop```
 
 ## Build and push images to dockerhub:
 
-```franklin push```
+```franklin dockerhub-push```
 
 # Development
 
@@ -154,5 +142,5 @@ So you need to rebuild the code on every change (to be automated).
 ### Publish source code on etherscan
 
 ```
-franklin flatten source
+franklin publish-source
 ```
