@@ -25,7 +25,7 @@ Main components:
 3. There will be following **checks**:
    - There are enough free validators funds on contract (in Matter tokens)
    - Specified block isn't validated yet
-   - Signature verification using `BlsVerifier` library `verify` method
+   - **Signature verification using `BlsVerifier` library `verify` method**
 4. If all checks passed, then current rate and collateral factor for token will be taken from `Compound` contract.
 5. Using this info the **compound processing fee, validators fees and systems (Matter) fee will be calculated**.
 6. **`FeeOrder`s will be stored** on `SwiftExits` contract.
