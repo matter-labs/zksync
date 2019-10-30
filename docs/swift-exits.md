@@ -17,27 +17,27 @@ Main components:
 ![Algorithm scheme](https://i.imgur.com/5D1H486.png)
 
 1. While creating an **withdraw operation**, the user can create and sign a request for a **swift exit for this operation**. To indicate this operation, its hash will be used.
-2. Since validators are responsible for including a user’s operation in a block, they can take responsibility for processing this request. Validators can **verify the user's signature**, as well as to **sign this request** themselves. When the required number of signatures is collected (**2/3 of the total number of validators**), validators send to `newSwiftExit` method of `SwiftExits` contract following data:
+2. Since validators are responsible for including a user’s operation in a block, they can take responsibility for processing this request. Validators can **verify the user's signature**, as well as to **sign this request** themselves. When the required number of signatures is collected (**2/3 of the total number of validators**), **validators send to `newSwiftExit` method of `SwiftExits`** contract following data:
    - SwiftExitRequest (sender, recepient, token, amount)
    - Aggregated signature
    - List of validators addresses
    - Swift exit block number and identifier
-3. There will be following checks:
+3. There will be following **checks**:
    - There are enough free validators funds on contract (in Matter tokens)
    - Specified block isn't validated yet
    - Signature verification using `BlsVerifier` library `verify` method
 4. If all checks passed, then current rate and collateral factor for token will be taken from `Compound` contract.
-5. Using this info the compound processing fees will be calculated on `SwiftExits` contract, as well as validator fees and systems (Matter) fee.
-6. `FeeOrder`s will be stored on `SwiftExits` contract.
-7. `SwiftExit` will be stored on `SwiftExits` contract
-8. The required amount of validators funds will be borrowed on `SwiftExits` contract
-9. A loan of tokens from `Compound` contract to `SwiftExits` contract will occurred
-10. Tokens will be sent to the recipient from `SwiftExits` contract
-11. New `RepaymentRequest` will be created on `Rollup` contract.
+5. Using this info the **compound processing fees** will be calculated on `SwiftExits` contract, as well as **validator fees** and **systems (Matter) fee**.
+6. **`FeeOrder`s will be stored** on `SwiftExits` contract.
+7. **`SwiftExit` will be stored** on `SwiftExits` contract
+8. The required amount of **validators funds will be borrowed** on `SwiftExits` contract
+9. **A borrow of tokens from `Compound` contract** to `SwiftExits` contract will occurred
+10. **Tokens will be sent to the recipient** from `SwiftExits` contract
+11. **New `RepaymentRequest`** will be created **on `Rollup` contract**.
 12. When a new block is commited on `Rollup` contract, it will mark relevant `RepaymentRequest`s as `committed`
-13. When a block is verified on `Rollup` contract, it will check relevant `RepaymentRequest`s for `committed` mark and send required number of tokens to `SwiftExits` contract.
-14. `SwiftExits` contract will repay a debt to `Compound` and will get validators tokens.
-15. Fees will be charged to validators, and borrowed funds will also be released
+13. When a block is verified on **`Rollup` contract**, it will check relevant `RepaymentRequest`s for `committed` mark and **send required number of tokens to `SwiftExits` contract**.
+14. **`SwiftExits` contract will repay a debt to `Compound`** and will get validators tokens.
+15. **Fees will be charged to validators**, and **borrowed funds will** also **be released**
 
 <!-- ## Contract creation
 
