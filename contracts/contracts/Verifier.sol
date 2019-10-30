@@ -1,5 +1,5 @@
 // from https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
-pragma solidity ^0.5.8;
+pragma solidity 0.5.10;
 
 import "./VerificationKey.sol";
 

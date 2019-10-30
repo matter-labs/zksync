@@ -147,27 +147,21 @@ build-contracts: confirm_action
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
-# deploy-contracts: confirm_action
-# 	@bin/deploy-contracts
 
-# flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
-# define flatten_file
-# 	@echo flattening $(1)
-# 	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
-# endef
+flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
+define flatten_file
+	@echo flattening $(1)
+	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) --solc-paths "solc --allow-paths /home/contracts/node_modules/openzeppelin-solidity/ openzeppelin-solidity=/home/contracts/node_modules/openzeppelin-solidity" /home/contracts/contracts/$(1)'
+	perl -pi -e 's/solidity \^0.4.13/solidity 0.5.10/g' contracts/flat/$(1); # https://github.com/BlockCatIO/solidity-flattener/issues/36
+endef
 
-# # Flatten contract source
-# flatten:
-# 	@mkdir -p contracts/flat
-# 	$(call flatten_file,FranklinProxy.sol)
-# 	$(call flatten_file,Depositor.sol)
-# 	$(call flatten_file,Exitor.sol)
-# 	$(call flatten_file,Transactor.sol)
-
-# Publish source to etherscan.io
-source: #flatten
-	@node contracts/scripts/publish-source.js
-	@echo sources published
+# Flatten contract source
+flatten:
+	@mkdir -p contracts/flat
+	$(call flatten_file,Franklin.sol)
+	$(call flatten_file,Governance.sol)
+	$(call flatten_file,PriorityQueue.sol)
+	$(call flatten_file,Verifier.sol)
 
 # testing
 price:

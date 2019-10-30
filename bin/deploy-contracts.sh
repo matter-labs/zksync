@@ -10,8 +10,9 @@
 # cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
 echo redeploying for the db $DATABASE_URL
+franklin flatten;
 cd contracts
-yarn deploy  | tee ../deploy.log
+yarn deploy_flat  | tee ../deploy.log
 cd ..
 
 CONTRACT_ADDR_NEW_VALUE=`grep "CONTRACT_ADDR" deploy.log`
