@@ -11,12 +11,6 @@
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
-        <b-navbar-nav class="ml-auto">
-            <b-nav-item-dropdown :text="store.network" class="capitalize" right>
-                <b-dropdown-item href="https://mainnet.matter-labs.io" target="blanc">Mainnet</b-dropdown-item>
-                <b-dropdown-item href="https://rinkeby.matter-labs.io" target="blanc">Rinkeby</b-dropdown-item>
-            </b-nav-item-dropdown>
-        </b-navbar-nav>
         </b-collapse>
     </b-container>
     </b-navbar>
