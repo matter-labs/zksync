@@ -13,7 +13,10 @@ Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md
 
 Setup:
 
-```franklin init```
+```
+franklin dev-up
+franklin init
+```
 
 To completely reset the dev environment:
 
@@ -45,7 +48,7 @@ Switch between configurations:
 ## Monitoring & management:
 
 Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
-Geth: ```geth attach $(bin/dev-geth-url)```
+Geth: ```geth attach $(bin/kube-geth-url)```
 
 NOTE: if you are resetting geth, each Metamask account must be manually reset via Settings > Advanced > Reset account.
 
@@ -83,7 +86,7 @@ Make sure you have environment variables set right, you can check it by running:
 
 ## Start server and prover in minikube (this setup is closest to prod):
 
-- Prerequisite: ```franklin init```
+- Prerequisite: ```franklin dev-up; franklin init```
 
 - Start:
 ```franklin start```

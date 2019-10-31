@@ -183,7 +183,7 @@ endif
 start-local:
 	@kubectl apply -f ./etc/kube/minikube/server.yaml
 	@kubectl apply -f ./etc/kube/minikube/prover.yaml
-	./bin/dev-update-server-vars
+	./bin/kube-update-server-vars
 	@kubectl apply -f ./etc/kube/minikube/postgres.yaml
 	@kubectl apply -f ./etc/kube/minikube/geth.yaml
 
@@ -271,11 +271,13 @@ dev-up:
 	@kubectl apply -f ./etc/kube/minikube/postgres.yaml
 	@kubectl create configmap tesseracts-config --from-file=./etc/tesseracts/tesseracts.toml
 	@kubectl apply -f ./etc/kube/minikube/geth.yaml
+	./bin/update-services-url-env-vars
 
 dev-down:
 	@kubectl delete -f ./etc/kube/minikube/postgres.yaml
 	@kubectl delete -f ./etc/kube/minikube/geth.yaml
 	@kubectl delete configmap tesseracts-config
+	./bin/reset-services-url-env-vars
 
 # Auxillary docker containers for dev environment (usually no need to build, just use images from dockerhub)
 

@@ -4,6 +4,10 @@
 
 Install docker.
 
+## Minikube
+
+https://kubernetes.io/docs/tasks/tools/install-minikube
+
 ## Node & Yarn
 
 Install Node.
