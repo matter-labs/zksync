@@ -1,7 +1,7 @@
 pragma solidity ^0.5.8;
 
-import "./BN256G2.sol";
-import "./Bytes.sol";
+import "../bls_verification/BN256G2.sol";
+import "../common/Bytes.sol";
 
 library BlsOperations {
     struct G1Point {
@@ -144,25 +144,6 @@ library BlsOperations {
         });
     }
 
-    // function messageToG11(bytes memory _message) internal view returns (uint256, uint256) {
-    //     uint256 h = uint256(keccak256(_message));
-    //     return (mulG1(generatorG1(), h).x, mulG1(generatorG1(), h).y);
-    // }
-
-    // function messageToG12(bytes memory _message) internal view returns (uint256, uint256) {
-    //     uint256 message = uint256(keccak256(_message));
-    //     uint256 beta = 0;
-    //     uint256 y = 0;
-    //     uint256 x = message % BN256G2.fieldModulus();
-    //     while( true ) {
-    //         (beta, y) = findYforX(x);
-    //         if(beta == mulmod(y, y, BN256G2.fieldModulus())) {
-    //             return (x, y);
-    //         }
-    //         x = addmod(x, 1, BN256G2.fieldModulus());
-    //     }
-    // }
-
     function messageToG1(bytes memory _message) internal view returns (G1Point memory) {
         uint256 message = uint256(keccak256(_message));
         uint256 beta = 0;
@@ -211,70 +192,67 @@ library BlsOperations {
         return result[0];
     }
 
-    // function messageToG2(bytes memory _message) internal view returns (G2Point memory) {
-    //     uint256 hash = uint256(keccak256(_message));
-    //     G2Point memory g2 = generatorG2();
-    //     uint256 x1;
-    //     uint256 x2;
-    //     uint256 y1;
-    //     uint256 y2;
-    //     (x1, x2, y1, y2) = BN256G2.ECTwistMul(
-    //         hash,
-    //         g2.x[1],
-    //         g2.x[0],
-    //         g2.y[1],
-    //         g2.y[0]
-    //     );
-    //     return G2Point({
-    //         x: [
-    //             x2,
-    //             x1
-    //         ],
-    //         y: [
-    //             y2,
-    //             y1
-    //         ]
-    //     });
-    // }
+    function hashG2(G2Point memory point) internal pure returns (uint256) {
+        return uint256(keccak256(abi.encodePacked([point.x[0], point.x[1], point.y[0], point.y[1]])));
+    }
+
+    function negate(uint256 value) internal pure returns (uint256) {
+        uint256 field_modulus = BN256G2.fieldModulus();
+        return field_modulus - (value % field_modulus);
+    }
 
     function negate(G1Point memory _point) internal pure returns (G1Point memory) {
-        uint256 field_modulus = BN256G2.fieldModulus();
         if (_point.x == 0 && _point.y == 0) {
             return G1Point(0, 0);
         }
-        return G1Point(_point.x, field_modulus - (_point.y % field_modulus));
+        return G1Point(_point.x, negate(_point.y));
+    }
+
+    function negate(G2Point memory _point) internal pure returns (G2Point memory) {
+        uint256 zero = 0;
+        if (_point.x[0] == 0 && _point.x[1] == 0 && _point.y[0] == 0 && _point.y[1] == 0) {
+            return G2Point({
+                x: [
+                    zero,
+                    zero
+                ],
+                y: [
+                    zero,
+                    zero
+                ]
+            });
+        }
+        return G2Point(
+            [
+                _point.x[0],
+                _point.x[1]],
+            [
+                negate(_point.y[0]),
+                negate(_point.y[1])
+            ]
+        );
     }
 
     function pairing(
-        G1Point[] memory _g1points,
-        G2Point[] memory _g2points
+        G1Point memory _g1point1,
+        G2Point memory _g2point1,
+        G1Point memory _g1point2,
+        G2Point memory _g2point2
     ) internal view returns (bool) {
-        require(
-            _g1points.length == _g2points.length,
-            "mvy1"
-        ); // bspg1 - G1 and G2 points counts must be equal
-        
-        uint256 points = _g1points.length;
-        uint256 inputSize = 6 * points;
-        uint[] memory input = new uint256[](inputSize);
-
-        for (uint i = 0; i < points; i++) {
-            input[i * 6 + 0] = _g1points[i].x;
-            input[i * 6 + 1] = _g1points[i].y;
-            input[i * 6 + 2] = _g2points[i].x[0];
-            input[i * 6 + 3] = _g2points[i].x[1];
-            input[i * 6 + 4] = _g2points[i].y[0];
-            input[i * 6 + 5] = _g2points[i].y[1];
-        }
-
-        uint256[1] memory output;
+        uint256[12] memory input = [
+            _g1point1.x, _g1point1.y,
+            _g2point1.x[0], _g2point1.x[1], _g2point1.y[0], _g2point1.y[1],
+            _g1point2.x, _g1point2.y,
+            _g2point2.x[0], _g2point2.x[1], _g2point2.y[0], _g2point2.y[1]
+        ];
+        uint[1] memory output;
         assembly {
             if iszero(
                 staticcall(
                     sub(gas, 2000),
                     8,
-                    add(input, 0x20),
-                    mul(inputSize, 0x20),
+                    input,
+                    0x180,
                     output,
                     0x20
                 )
@@ -282,21 +260,6 @@ library BlsOperations {
                 invalid()
             }
         }
-        return output[0] == 1;
-    }
-
-    function twoPointsPairing(
-        G1Point memory _g1point1,
-        G1Point memory _g1point2,
-        G2Point memory _g2point1,
-        G2Point memory _g2point2
-    ) internal view returns (bool) {
-        G1Point[] memory g1points = new G1Point[](2);
-        G2Point[] memory g2points = new G2Point[](2);
-        g1points[0] = _g1point1;
-        g1points[1] = _g1point2;
-        g2points[0] = _g2point1;
-        g2points[1] = _g2point2;
-        return pairing(g1points, g2points);
+        return output[0] != 0;
     }
 }
