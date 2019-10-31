@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: geth
+  name: geth
+spec:
+  containers:
+  - image: gluk64/franklin:geth
+    name: geth
+    ports:
+    - containerPort: 8545
+    - containerPort: 8546
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: geth
+spec:
+  type: NodePort
+  ports:
+  - port: 8545
+    nodePort: 31753
+    protocol: TCP
+    targetPort: 8545
+  selector:
+    run: geth
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: tesseracts
+  name: tesseracts
+spec:
+  containers:
+  - image: adria0/tesseracts
+    name: tesseracts
+    ports:
+    - containerPort: 8000
+    args: ["--cfg", "/config/tesseracts.toml", "-vvv"]
+    volumeMounts:
+    - name: config-volume
+      mountPath: /config
+    - name: data-dir
+      mountPath: /var/lib/tesseracts/data
+  volumes:
+  - name: config-volume
+    configMap:
+      name: tessaracts-config
+      items:
+      - key: tesseracts.toml
+        path: tesseracts.toml
+  - name: data-dir
+    hostPath:
+      path: /data/tesseracts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tesseracts
+spec:
+  type: NodePort
+  ports:
+  - port: 8000
+    protocol: TCP
+    targetPort: 8000
+  selector:
+    run: tesseracts

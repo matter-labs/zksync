@@ -29,12 +29,7 @@ then
     set +o allexport
 
     # Postprocessing for all configs
-
     export KUBECONFIG=etc/kube/clusters/kubeconfig-main.yaml
-
-    # if [[ $FIXMODE ]]; then
-    #     export WEB3_URL=http://localhost:8545
-    # fi
 
     popd > /dev/null
 fi

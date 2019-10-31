@@ -213,7 +213,7 @@ fn handle_get_blocks(
     data: web::Data<AppState>,
     query: web::Query<HandleBlocksQuery>,
 ) -> ActixResult<HttpResponse> {
-    let max_block = query.max_block.unwrap_or(999999999);
+    let max_block = query.max_block.unwrap_or(999_999_999);
     let limit = query.limit.unwrap_or(20);
     if limit > 100 {
         return Err(HttpResponse::BadRequest().finish().into());
@@ -320,7 +320,7 @@ fn decode_action_type(action_type: &str) -> Result<ActionType, HttpResponse> {
     } else if action_type == "verify" {
         Ok(ActionType::VERIFY)
     } else {
-        Err(HttpResponse::BadRequest().finish().into())
+        Err(HttpResponse::BadRequest().finish())
     }
 }
 

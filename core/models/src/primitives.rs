@@ -302,56 +302,8 @@ pub fn unpack_as_big_decimal(
     exponent_len: usize,
     mantissa_len: usize,
 ) -> Option<BigDecimal> {
-    let bool_vec: Vec<bool> = bytes_into_be_bits(bytes);
-    let amount_u128: u128 = parse_float_to_u128(bool_vec, exponent_len, mantissa_len, 10)?;
+    let amount_u128: u128 = unpack_float(bytes, exponent_len, mantissa_len)?;
     BigDecimal::from_str(&amount_u128.to_string()).ok()
-}
-
-pub fn parse_float_to_u128(
-    bool_vec: Vec<bool>,
-    exponent_length: usize,
-    mantissa_length: usize,
-    exponent_base: u32,
-) -> Option<u128> {
-    if exponent_length + mantissa_length != bool_vec.len() {
-        return None;
-    }
-
-    let exponent_base: u128 = u128::from(exponent_base);
-    let mut exponent_power_of_two = exponent_base;
-    let mut exponent: u128 = 1;
-    for i in 0..exponent_length {
-        if bool_vec[i] {
-            let max_exponent: u128 = 1 + (u128::max_value() / exponent_power_of_two);
-            if exponent >= max_exponent {
-                return None;
-            }
-            exponent = exponent.checked_mul(exponent_power_of_two)?;
-        }
-        exponent_power_of_two = exponent_power_of_two.checked_mul(exponent_power_of_two)?;
-    }
-
-    let mut max_mantissa: u128 = u128::max_value();
-    if exponent != 1 {
-        max_mantissa = 1 + (u128::max_value() / exponent);
-    }
-
-    let mut mantissa_power_of_two: u128 = 1;
-    let mut mantissa: u128 = 0;
-    for i in exponent_length..(exponent_length + mantissa_length) {
-        if bool_vec[i] {
-            let _max_mantissa: u128 = 1 + (max_mantissa / 2);
-            if mantissa >= _max_mantissa {
-                return None;
-            }
-            mantissa = mantissa.checked_add(mantissa_power_of_two)?;
-        }
-        mantissa_power_of_two = mantissa_power_of_two.checked_mul(2)?;
-    }
-
-    let result = mantissa.checked_mul(exponent)?;
-
-    Some(result)
 }
 
 pub fn convert_to_float(
@@ -376,9 +328,7 @@ pub fn convert_to_float(
     }
 
     let mut exponent: usize = 0;
-    let mut mantissa = integer;
-
-    if integer > max_mantissa {
+    let mantissa = if integer > max_mantissa {
         // always try best precision
         let exponent_guess = integer / max_mantissa;
         let mut exponent_temp = exponent_guess;
@@ -387,22 +337,24 @@ pub fn convert_to_float(
             if exponent_temp < exponent_base {
                 break;
             }
-            exponent_temp = exponent_temp / exponent_base;
+            exponent_temp /= exponent_base;
             exponent += 1;
         }
 
         exponent_temp = 1u128;
         for _ in 0..exponent {
-            exponent_temp = exponent_temp * exponent_base;
+            exponent_temp *= exponent_base;
         }
 
         if exponent_temp * max_mantissa < integer {
             exponent += 1;
-            exponent_temp = exponent_temp * exponent_base;
+            exponent_temp *= exponent_base;
         }
 
-        mantissa = integer / exponent_temp;
-    }
+        integer / exponent_temp
+    } else {
+        integer
+    };
 
     // encode into bits. First bits of mantissa in LE order
 
@@ -448,8 +400,7 @@ pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     let hash_fr = hasher.hash_bits(msg_bits.into_iter());
     let mut hash_bits = Vec::new();
     append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
-    let result = pack_bits_into_bytes(hash_bits);
-    result
+    pack_bits_into_bytes(hash_bits)
 }
 
 /// Its important to use this, instead of bit_decimal.to_u128()
@@ -464,7 +415,7 @@ pub fn u128_to_bigdecimal(n: u128) -> BigDecimal {
 
 pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {
     let size = bytes.len();
-    let mut vec: Vec<u8> = bytes.clone().to_vec();
+    let mut vec: Vec<u8> = bytes.to_vec();
     vec.reverse();
     for _ in 0..4 - size {
         vec.push(0);
@@ -476,7 +427,7 @@ pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {
 
 pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
     let size = bytes.len();
-    let mut vec: Vec<u8> = bytes.clone().to_vec();
+    let mut vec: Vec<u8> = bytes.to_vec();
     vec.reverse();
     for _ in 0..2 - size {
         vec.push(0);
@@ -488,7 +439,7 @@ pub fn bytes_slice_to_uint16(bytes: &[u8]) -> Option<u16> {
 
 pub fn bytes_slice_to_uint128(bytes: &[u8]) -> Option<u128> {
     let size = bytes.len();
-    let mut vec: Vec<u8> = bytes.clone().to_vec();
+    let mut vec: Vec<u8> = bytes.to_vec();
     vec.reverse();
     for _ in 0..16 - size {
         vec.push(0);

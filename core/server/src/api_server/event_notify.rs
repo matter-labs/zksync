@@ -236,7 +236,7 @@ impl OperationNotifier {
                     if let Some(channels) = subs {
                         let receipt = TxReceiptResponse {
                             tx_hash: hex::encode(hash.as_ref()),
-                            block_number: op.block.block_number as i64,
+                            block_number: i64::from(op.block.block_number),
                             success: tx.success,
                             fail_reason: tx.fail_reason,
                             verified: op.action.get_type() == ActionType::VERIFY,
@@ -253,7 +253,7 @@ impl OperationNotifier {
                     if let Some(channels) = subs {
                         let prior_op_status = PriorityOpStatus {
                             executed: true,
-                            block: Some(op.block.block_number as i64),
+                            block: Some(i64::from(op.block.block_number)),
                         };
 
                         for ch in channels {
@@ -265,29 +265,26 @@ impl OperationNotifier {
         }
 
         for (id, update) in &op.accounts_updated {
-            match update {
-                AccountUpdate::Create { address, .. } => {
-                    if let Some(subscription) = self
-                        .account_subs_unknown_id
-                        .remove(&(address.clone(), action))
-                    {
-                        let subscription = self
-                            .account_subs_known_id
-                            .remove(&(*id, action))
-                            .map(|mut id_sub| {
-                                id_sub
-                                    .listeners
-                                    .extend(subscription.listeners.clone().into_iter());
-                                id_sub.account = None;
-                                id_sub
-                            })
-                            .unwrap_or_else(|| subscription);
+            if let AccountUpdate::Create { address, .. } = update {
+                if let Some(subscription) = self
+                    .account_subs_unknown_id
+                    .remove(&(address.clone(), action))
+                {
+                    let subscription = self
+                        .account_subs_known_id
+                        .remove(&(*id, action))
+                        .map(|mut id_sub| {
+                            id_sub
+                                .listeners
+                                .extend(subscription.listeners.clone().into_iter());
+                            id_sub.account = None;
+                            id_sub
+                        })
+                        .unwrap_or_else(|| subscription);
 
-                        self.account_subs_known_id
-                            .insert((*id, action), subscription);
-                    }
+                    self.account_subs_known_id
+                        .insert((*id, action), subscription);
                 }
-                _ => {}
             }
         }
 

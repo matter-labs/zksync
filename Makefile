@@ -18,7 +18,6 @@ init:
 yarn:
 	@cd js/franklin_lib && yarn
 	@cd js/client && yarn
-	@cd js/loadtest && yarn
 	@cd js/explorer && yarn
 	@cd contracts && yarn
 
@@ -49,7 +48,7 @@ db-insert-contract:
 update-frontend-contract:
 	@bin/update-frontend-contract.sh
 
-db-reset: confirm_action db-drop db-setup db-insert-contract update-frontend-contract
+db-reset: confirm_action db-wait db-drop db-setup db-insert-contract update-frontend-contract
 	@echo database is ready
 
 db-migrate: confirm_action
@@ -70,17 +69,17 @@ genesis: confirm_action db-reset
 # Frontend clients
 
 dist-config:
-	bin/.gen_js_config > js/client_js/src/env-config.js
+	bin/.gen_js_config > js/client/src/env-config.js
 	bin/.gen_js_config > js/explorer/src/env-config.js
 
-client: dist-config
-	@cd js/client && yarn dev
+client:
+	@cd js/client && yarn serve
 
 explorer: dist-config
 	@cd js/explorer && yarn dev
 
-dist-client: dist-config
-	@cd js/client_js && yarn && yarn build
+dist-client:
+	@cd js/client && yarn build
 
 dist-explorer: dist-config
 	@cd js/explorer && yarn build
@@ -91,13 +90,7 @@ image-nginx: dist-client dist-explorer
 push-image-nginx: image-nginx
 	docker push "${NGINX_DOCKER_IMAGE}"
 
-explorer-up: #dist-explorer
-	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
-	@docker-compose up -d nginx
-
-
-# Rust: cross-platform rust builder for linus
-
+# Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
@@ -117,6 +110,7 @@ server:
 sandbox:
 	@cargo run --bin sandbox
 
+# See more more at https://github.com/emk/rust-musl-builder#caching-builds
 build-target:
 	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
 	$(rust-musl-builder) cargo build --release
@@ -141,32 +135,15 @@ push-image-rust: image-rust
 deploy-contracts: confirm_action
 	@bin/deploy-contracts.sh
 
-test-contracts: confirm_action
-	@bin/prepare-test-contracts.sh
+test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
 build-contracts: confirm_action
+	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
-# deploy-contracts: confirm_action
-# 	@bin/deploy-contracts
-
-# flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
-# define flatten_file
-# 	@echo flattening $(1)
-# 	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) /home/contracts/contracts/$(1)'
-# endef
-
-# # Flatten contract source
-# flatten:
-# 	@mkdir -p contracts/flat
-# 	$(call flatten_file,FranklinProxy.sol)
-# 	$(call flatten_file,Depositor.sol)
-# 	$(call flatten_file,Exitor.sol)
-# 	$(call flatten_file,Transactor.sol)
-
 # Publish source to etherscan.io
-source: #flatten
+publish-source:
 	@node contracts/scripts/publish-source.js
 	@echo sources published
 
@@ -191,15 +168,24 @@ deposit: confirm_action
 # Devops: main
 
 # (Re)deploy contracts and database
+ifeq (dev,$(FRANKLIN_ENV))
+redeploy: confirm_action stop deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
+else
 redeploy: confirm_action stop deploy-contracts db-insert-contract
+endif
 
+ifeq (dev,$(FRANKLIN_ENV))
+init-deploy: confirm_action deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
+else
 init-deploy: confirm_action deploy-contracts db-insert-contract
-
-dev-ready = docker ps | grep -q "$(GETH_DOCKER_IMAGE)"
+endif
 
 start-local:
-	@docker ps | grep -q "$(GETH_DOCKER_IMAGE)" || { echo "Dev env not ready. Try: 'franklin dev-up'" && exit 1; }
-	@docker-compose up -d --scale prover=1 server prover nginx
+	@kubectl apply -f ./etc/kube/minikube/server.yaml
+	@kubectl apply -f ./etc/kube/minikube/prover.yaml
+	./bin/dev-update-server-vars
+	@kubectl apply -f ./etc/kube/minikube/postgres.yaml
+	@kubectl apply -f ./etc/kube/minikube/geth.yaml
 
 dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
@@ -226,7 +212,14 @@ endif
 
 ifeq (dev,$(FRANKLIN_ENV))
 stop: confirm_action
-	@docker-compose stop server prover
+	@kubectl delete deployments --selector=app=dev-server
+	@kubectl delete deployments --selector=app=dev-prover
+	@kubectl delete deployments --selector=app=dev-nginx
+	@kubectl delete svc --selector=app=dev-server
+	@kubectl delete svc --selector=app=dev-nginx
+	# not deleting postgres, geth and tesseract resources assuming they are being used for development too.
+else ifeq (ci,$(FRANKLIN_ENV))
+stop:
 else
 stop: confirm_action stop-prover stop-server stop-nginx
 endif
@@ -256,9 +249,6 @@ stop-nginx:
 status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
 
-log-dc:
-	@docker-compose logs -f server prover
-
 log-server:
 	kubectl logs -f deployments/$(FRANKLIN_ENV)-server
 
@@ -277,27 +267,15 @@ nodes:
 # Dev environment
 
 dev-up:
-	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
-	@docker-compose up -d postgres geth
-	@docker-compose up -d tesseracts
+	@{ kubectl get po | grep -q "postgres" && echo "Dev env already running" && exit 1; } || echo -n
+	@kubectl apply -f ./etc/kube/minikube/postgres.yaml
+	@kubectl create configmap tesseracts-config --from-file=./etc/tesseracts/tesseracts.toml
+	@kubectl apply -f ./etc/kube/minikube/geth.yaml
 
 dev-down:
-	@docker-compose stop postgres geth
-	@docker-compose stop tesseracts
-
-geth-up: geth
-	@docker-compose up geth
-
-blockscout-migrate:
-	@docker-compose up -d blockscout_postgres
-	@docker-compose run blockscout /bin/sh -c "echo $MIX_ENV && mix do ecto.drop --force, ecto.create, ecto.migrate"
-
-blockscout-up:
-	@docker-compose up -d blockscout_postgres blockscout
-
-blockscout-down:
-	@docker-compose stop blockscout blockscout_postgres
-
+	@kubectl delete -f ./etc/kube/minikube/postgres.yaml
+	@kubectl delete -f ./etc/kube/minikube/geth.yaml
+	@kubectl delete configmap tesseracts-config
 
 # Auxillary docker containers for dev environment (usually no need to build, just use images from dockerhub)
 
@@ -312,7 +290,6 @@ dev-push-geth:
 
 dev-push-flattener:
 	@docker push "${FLATTENER_DOCKER_IMAGE}"
-
 # Key generator 
 
 make-keys:

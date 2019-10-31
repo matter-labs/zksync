@@ -219,9 +219,8 @@ mod test {
 
             println!("{}", cs.num_constraints());
 
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
+            if let Some(err) = cs.which_is_unsatisfied() {
+                panic!("ERROR satisfying in {}", err);
             }
         }
     }

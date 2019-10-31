@@ -3,7 +3,7 @@ use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
 use crate::franklin_ops::FranklinOpsBlock;
 use crate::helpers::DataRestoreError;
-use models::node::{AccountMap, AccountUpdates};
+use models::node::{AccountMap, AccountUpdate};
 use std::convert::TryFrom;
 use storage::{
     ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
@@ -36,7 +36,7 @@ use web3::types::H256;
 ///
 pub fn update_tree_state(
     block_number: u32,
-    account_updates: &AccountUpdates,
+    account_updates: &[(u32, AccountUpdate)],
     connection_pool: ConnectionPool,
 ) -> Result<(), DataRestoreError> {
     let storage = connection_pool.access_storage().map_err(|_| {
@@ -58,14 +58,14 @@ pub fn update_tree_state(
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn save_events_state(
-    events: &Vec<EventData>,
+    events: &[EventData],
     connection_pool: ConnectionPool,
 ) -> Result<(), DataRestoreError> {
     let mut new_events: Vec<NewBlockEvent> = vec![];
     for event in events {
-        new_events.push(block_event_into_stored_block_event(event).ok_or(
-            DataRestoreError::Storage("cant perform bock event into stored".to_string()),
-        )?);
+        new_events.push(block_event_into_stored_block_event(event).ok_or_else(|| {
+            DataRestoreError::Storage("cant perform bock event into stored".to_string())
+        })?);
     }
     let storage = connection_pool.access_storage().map_err(|_| {
         DataRestoreError::Storage("db connection failed for data restore save events".to_string())
@@ -101,7 +101,7 @@ pub fn block_event_into_stored_block_event(event: &EventData) -> Option<NewBlock
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn save_last_watched_block_number(
-    number: &u64,
+    number: u64,
     connection_pool: ConnectionPool,
 ) -> Result<(), DataRestoreError> {
     let block_number = NewLastWatchedEthBlockNumber {
@@ -158,7 +158,7 @@ pub fn save_storage_state(
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn save_franklin_ops_blocks(
-    blocks: &Vec<FranklinOpsBlock>,
+    blocks: &[FranklinOpsBlock],
     connection_pool: ConnectionPool,
 ) -> Result<(), DataRestoreError> {
     let storage = connection_pool.access_storage().map_err(|_| {
@@ -371,9 +371,8 @@ pub fn get_events_state_from_storage(
     })?;
     let mut committed_events: Vec<EventData> = vec![];
     for event in committed {
-        let block_event = stored_block_event_into_block_event(event.clone()).ok_or(
-            DataRestoreError::Unknown("block events db is broken".to_string()),
-        )?;
+        let block_event = stored_block_event_into_block_event(event.clone())
+            .ok_or_else(|| DataRestoreError::Unknown("block events db is broken".to_string()))?;
         committed_events.push(block_event);
     }
 
@@ -382,9 +381,8 @@ pub fn get_events_state_from_storage(
     })?;
     let mut verified_events: Vec<EventData> = vec![];
     for event in verified {
-        let block_event = stored_block_event_into_block_event(event.clone()).ok_or(
-            DataRestoreError::Unknown("block events db is broken".to_string()),
-        )?;
+        let block_event = stored_block_event_into_block_event(event.clone())
+            .ok_or_else(|| DataRestoreError::Unknown("block events db is broken".to_string()))?;
         verified_events.push(block_event);
     }
 

@@ -1,0 +1,6 @@
+#!/bin/bash
+
+# Updating server deployments environment variables. Ussually executed on new contract deploy and related changes.
+kubectl set env deployments/dev-server CONTRACT_ADDR=$(grep "CONTRACT_ADDR" deploy.log| sed 's/CONTRACT_ADDR=//')
+kubectl set env deployments/dev-server GOVERNANCE_ADDR=$(grep "GOVERNANCE_ADDR" deploy.log| sed 's/GOVERNANCE_ADDR=//')
+kubectl set env deployments/dev-server PRIORITY_QUEUE_ADDR=$(grep "PRIORITY_QUEUE_ADDR" deploy.log| sed 's/PRIORITY_QUEUE_ADDR=//')

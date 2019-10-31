@@ -1,0 +1,117 @@
+kind: pipeline
+type: docker
+name: default
+
+steps:
+- name: restore-cache
+  image: drillster/drone-volume-cache
+  volumes:
+  - name: cache
+    path: /cache
+  settings:
+    restore: true
+    mount:
+      - ./contracts/node_modules
+      - ./js/client/node_modules
+      - ./js/explorer/node_modules
+      - ./js/franklin_lib/node_modules
+      - ./target/cargo
+
+- name: init
+  image: matterlabs/ci
+  commands:
+  - export FRANKLIN_HOME=`pwd`
+  - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - franklin env ci
+  - franklin yarn
+  - franklin db-wait
+  - franklin db-setup
+  depends_on:
+  - restore-cache
+
+- name: build-contracts
+  image: matterlabs/ci
+  commands:
+  - export FRANKLIN_HOME=`pwd`
+  - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - franklin build-contracts
+  depends_on:
+  - init
+
+- name: rust-checks
+  image: matterlabs/ci
+  commands:
+  - export FRANKLIN_HOME=`pwd`
+  - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - cargo fmt -- --check
+  - cargo clippy --tests --benches -- -D warnings
+  depends_on:
+  - build-contracts
+
+- name: rust-tests
+  image: matterlabs/ci
+  commands:
+  - export FRANKLIN_HOME=`pwd`
+  - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - cargo test
+  depends_on:
+  - rust-checks
+
+- name: deploy-test
+  image: matterlabs/ci
+  commands:
+  - export FRANKLIN_HOME=`pwd`
+  - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - franklin genesis
+  - franklin redeploy
+  depends_on:
+  - rust-tests
+
+- name: contract-test
+  image: matterlabs/ci
+  commands:
+  - export FRANKLIN_HOME=`pwd`
+  - export PATH=$FRANKLIN_HOME/bin:$PATH
+  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - franklin test-contracts
+  depends_on:
+  - build-contracts
+
+
+- name: rebuild-cache
+  image: drillster/drone-volume-cache
+  volumes:
+  - name: cache
+    path: /cache
+  settings:
+    rebuild: true
+    mount:
+      - ./contracts/node_modules
+      - ./js/client/node_modules
+      - ./js/explorer/node_modules
+      - ./js/franklin_lib/node_modules
+      - ./target/cargo
+  depends_on:
+     - init
+     - rust-checks
+
+
+volumes:
+  - name: cache
+    host:
+      path: /tmp/cache
+
+services:
+  - name: geth
+    image: gluk64/franklin:geth
+  - name: postgres
+    image: postgres:10.4
+
+trigger:
+  event:
+  - pull_request

@@ -39,7 +39,7 @@ where
     let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
-    let is_valid_signature =
+    let _is_valid_signature =
         pk.verify_musig_pedersen(&message_bytes, &signature.clone(), p_g, params);
 
     // TODO: handle the case where it is not valid
@@ -72,8 +72,7 @@ where
     signature_r_y_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
     signature_r_y_be_bits.reverse();
     let mut sig_r_packed_bits = vec![];
-    sig_r_packed_bits
-        .push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1].clone());
+    sig_r_packed_bits.push(signature_r_x_be_bits[franklin_constants::FR_BIT_WIDTH_PADDED - 1]);
     sig_r_packed_bits.extend(signature_r_y_be_bits[1..].iter());
     let sig_r_packed_bits = reverse_bytes(&sig_r_packed_bits);
 
@@ -258,7 +257,7 @@ where
     for (i, e) in bits.iter().enumerate() {
         let element = Boolean::from(AllocatedBit::alloc(
             cs.namespace(|| format!("path element{}", i)),
-            e.clone(),
+            *e,
         )?);
         allocated.push(element);
     }

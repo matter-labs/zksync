@@ -346,20 +346,33 @@ export class Wallet {
         this.address = `0x${pubkeyToAddress(this.walletKeys.publicKey).toString("hex")}`;
     }
 
-    async deposit(tokenLike: TokenLike, amount: utils.BigNumberish, fee: utils.BigNumberish = utils.parseEther("0.001")): Promise<DepositTransactionHandle> {
-        let token = await this.provider.resolveToken(tokenLike);
+    protected async depositETH(amount: utils.BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractInterface, this.ethWallet);
-        let contractTx;
+        return await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: utils.bigNumberify("200000")});
+    }
+
+    protected async approveERC20(token: Token, amount: utils.BigNumberish, options?: Object) {
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractInterface, this.ethWallet);
+        const erc20DeployedToken = new Contract(token.address, IERC20ConractInterface, this.ethWallet);
+        return await erc20DeployedToken.approve(franklinDeployedContract.address, amount, options);
+    }
+
+    protected async depositApprovedERC20(token: Token, amount: utils.BigNumberish, options?: Object) {
+        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractInterface, this.ethWallet);
+        const erc20DeployedToken = new Contract(token.address, IERC20ConractInterface, this.ethWallet);
+        return await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
+            Object.assign({gasLimit: utils.bigNumberify("300000"), value: utils.parseEther("0.05")}, options));
+    }
+
+    async deposit(token: Token, amount: utils.BigNumberish) {
+        let contract_tx;
         if (token.id == 0) {
-            let totalAmount = utils.bigNumberify(amount).add(fee);
-            contractTx = await franklinDeployedContract.depositETH(amount, this.address, {value: totalAmount, gasLimit: utils.bigNumberify("200000")});
+            contract_tx = await this.depositETH(amount);
         } else {
-            const erc20DeployedToken = new Contract(token.address, IERC20ConractInterface, this.ethWallet);
-            await erc20DeployedToken.approve(franklinDeployedContract.address, amount);
-            const contractTx = await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
-                {gasLimit: utils.bigNumberify("300000"), value: fee});
+            await this.approveERC20(token, amount);
+            contract_tx = await this.depositApprovedERC20(token, amount);
         }
-        return new DepositTransactionHandle(contractTx, {to: this.address, amount, token}, this.provider);
+        return new DepositTransactionHandle(contract_tx, {to: this.address, amount, token}, this.provider);
     }
 
     async widthdrawOnchain(tokenLike: TokenLike, amount: utils.BigNumberish): Promise<ContractTransaction> {

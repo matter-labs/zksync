@@ -19,8 +19,6 @@ pub struct RuntimeConfig {
     pub tx_batch_size: usize,
     pub max_outstanding_txs: u32,
     pub contract_addr: String,
-    pub data_restore_http_endpoint_string: String,
-    pub data_restore_franklin_contract_address: String,
 }
 
 impl RuntimeConfig {
@@ -36,10 +34,6 @@ impl RuntimeConfig {
                 .ok()
                 .and_then(|v| v.parse::<u32>().ok())
                 .expect("MAX_OUTSTANDING_TXS env var not set"),
-            data_restore_http_endpoint_string: env::var("DATA_RESTORE_ENDPOINT")
-                .expect("DATA_RESTORE_ENDPOINT env missing"),
-            data_restore_franklin_contract_address: env::var("DATA_RESTORE_CONTRACT_ADDR")
-                .expect("DATA_RESTORE_CONTRACT_ADDR env missing"),
         }
     }
 }

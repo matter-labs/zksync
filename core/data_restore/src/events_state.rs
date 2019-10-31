@@ -18,6 +18,12 @@ pub struct EventsState {
     pub last_watched_eth_block_number: u64,
 }
 
+impl Default for EventsState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Set new
 /// Get last block
 /// Get blocks till last - delta, set last watching block
@@ -29,8 +35,8 @@ impl EventsState {
     pub fn new() -> Self {
         let genesis_block_number = DATA_RESTORE_CONFIG.genesis_block_number;
         Self {
-            committed_events: vec![],
-            verified_events: vec![],
+            committed_events: Vec::new(),
+            verified_events: Vec::new(),
             last_watched_eth_block_number: genesis_block_number,
         }
     }
@@ -103,11 +109,13 @@ impl EventsState {
 
         let from_block_number_u64 = last_watched_block_number + 1;
 
-        let mut to_block_number_u64 = from_block_number_u64 + eth_blocks_delta;
+        let to_block_number_u64 =
         // if (latest eth block < last watched + delta) then choose it
         if from_block_number_u64 + eth_blocks_delta >= latest_eth_block_minus_delta {
-            to_block_number_u64 = latest_eth_block_minus_delta;
-        }
+            latest_eth_block_minus_delta
+        } else {
+            from_block_number_u64 + eth_blocks_delta
+        };
 
         let to_block_number = BlockNumber::Number(U64::from(to_block_number_u64));
         let from_block_number = BlockNumber::Number(U64::from(from_block_number_u64));

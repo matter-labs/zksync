@@ -23,6 +23,7 @@ Cargo.lock
 
 /etc/env/*
 !/etc/env/dev.env.example
+!/etc/env/ci.env
 /contracts/yarn-error.log
 /deploy.log
 /test.log
@@ -31,3 +32,5 @@ Cargo.lock
 /tmp
 /volumes
 /logs
+
+/js/franklin_lib/build

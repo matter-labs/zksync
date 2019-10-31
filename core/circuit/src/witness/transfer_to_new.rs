@@ -1,7 +1,7 @@
 use super::utils::*;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use ff::{BitIterator, Field, PrimeField};
+use ff::{Field, PrimeField};
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
@@ -440,10 +440,10 @@ mod test {
     use super::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use models::params as franklin_constants;
+    use models::primitives::bytes_into_be_bits;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
-    use models::primitives::bytes_into_be_bits;
 
     use ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
@@ -465,27 +465,26 @@ mod test {
         let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
 
         let validator_address_number = 7;
-        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+        let _validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let phasher = PedersenHasher::<Bn256>::default();
 
-        let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+        let tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
 
         let capacity = tree.capacity();
         assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
 
         let from_sk = PrivateKey::<Bn256>(rng.gen());
         let from_pk = PublicKey::from_private(&from_sk, p_g, params);
-        let from_pub_key_hash = pub_key_hash_fe(&from_pk, &phasher);
+        let _from_pub_key_hash = pub_key_hash_fe(&from_pk, &phasher);
         let (from_x, from_y) = from_pk.0.into_xy();
         println!("x = {}, y = {}", from_x, from_y);
 
-        let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
-            generate_sig_data(&[true; 1], &phasher, &from_sk, params);
+        let _ = generate_sig_data(&[true; 1], &phasher, &from_sk, params);
 
         let packed_public_key = PackedPublicKey(from_pk);
         let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
         packed_public_key_bytes.reverse();
-        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+        let _signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
@@ -587,7 +586,7 @@ mod test {
         let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
             generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
         let packed_public_key = PackedPublicKey(from_pk);
-        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
         let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))
@@ -635,9 +634,8 @@ mod test {
 
             println!("{}", cs.num_constraints());
 
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
+            if let Some(err) = cs.which_is_unsatisfied() {
+                panic!("ERROR satisfying in {}", err);
             }
         }
     }

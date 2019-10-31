@@ -177,20 +177,17 @@ impl StoredExecutedTransaction {
                 fail_reason: None,
                 block_index: Some(self.block_index.expect("Block idx should be set") as u32),
             })
+        } else if let Some(stored_tx) = stored_tx {
+            let tx: FranklinTx = serde_json::from_value(stored_tx.tx).expect("Unparsable tx in db");
+            Ok(ExecutedTx {
+                tx,
+                success: false,
+                op: None,
+                fail_reason: self.fail_reason,
+                block_index: None,
+            })
         } else {
-            if let Some(stored_tx) = stored_tx {
-                let tx: FranklinTx =
-                    serde_json::from_value(stored_tx.tx).expect("Unparsable tx in db");
-                Ok(ExecutedTx {
-                    tx,
-                    success: false,
-                    op: None,
-                    fail_reason: self.fail_reason,
-                    block_index: None,
-                })
-            } else {
-                bail!("Unsuccessful tx was lost from db.");
-            }
+            bail!("Unsuccessful tx was lost from db.");
         }
     }
 }
@@ -706,9 +703,9 @@ impl StorageProcessor {
             self.save_block_transactions(block)?;
 
             let new_block = StorageBlock {
-                number: block.block_number as i64,
+                number: i64::from(block.block_number),
                 root_hash: block.new_root_hash.to_hex(),
-                fee_account_id: block.fee_account as i64,
+                fee_account_id: i64::from(block.fee_account),
                 unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
                 unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
             };
@@ -745,6 +742,130 @@ impl StorageProcessor {
         }
         Ok(())
     }
+
+    // TODO: dvush - revive it later
+    //    pub fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
+    //        // TODO: jazzandrock maybe use one db query(?).
+    //        let stored_executed_prior_op = executed_priority_operations::table
+    //            .filter(executed_priority_operations::priority_op_serialid.eq(op_id))
+    //            .first::<StoredExecutedPriorityOperation>(self.conn())
+    //            .optional()?;
+    //
+    //        match stored_executed_prior_op {
+    //            Some(stored_executed_prior_op) => {
+    //                let prover_run: Option<ProverRun> = prover_runs::table
+    //                    .filter(prover_runs::block_number.eq(stored_executed_prior_op.block_number))
+    //                    .first::<ProverRun>(self.conn())
+    //                    .optional()?;
+    //
+    //                let commit = operations::table
+    //                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
+    //                    .filter(operations::action_type.eq("Commit"))
+    //                    .first::<StoredOperation>(self.conn())
+    //                    .optional()?;
+    //
+    //                let confirm = operations::table
+    //                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
+    //                    .filter(operations::action_type.eq("Verify"))
+    //                    .first::<StoredOperation>(self.conn())
+    //                    .optional()?;
+    //
+    //                Ok(PriorityOpReceiptResponse {
+    //                    committed: commit.is_some(),
+    //                    verified: confirm.is_some(),
+    //                    prover_run,
+    //                })
+    //            }
+    //            None => Ok(PriorityOpReceiptResponse {
+    //                committed: false,
+    //                verified: false,
+    //                prover_run: None,
+    //            }),
+    //        }
+    //    }
+
+    // TODO: dvush - revive it later
+    //    pub fn get_account_transactions_history(
+    //        &self,
+    //        address: &AccountAddress,
+    //        offset: i64,
+    //        limit: i64,
+    //    ) -> QueryResult<Vec<TransactionsHistoryItem>> {
+    //        // TODO: txs are not ordered
+    //        let query = format!(
+    //            "
+    //            select
+    //                encode(hash, 'hex') as hash,
+    //                pq_id,
+    //                tx,
+    //                success,
+    //                fail_reason,
+    //                coalesce(commited, false) as commited,
+    //                coalesce(verified, false) as verified
+    //            from (
+    //                select
+    //                    *
+    //                from (
+    //                    select
+    //                        tx,
+    //                        hash,
+    //                        null as pq_id,
+    //                        success,
+    //                        fail_reason,
+    //                        block_number
+    //                    from
+    //                        mempool
+    //                    left join
+    //                        executed_transactions
+    //                    on
+    //                        tx_hash = hash
+    //                    where
+    //                        encode(primary_account_address, 'hex') = '{address}'
+    //                        or
+    //                        tx->>'to' = '0x{address}'
+    //                    union all
+    //                    select
+    //                        operation as tx,
+    //                        null as hash,
+    //                        priority_op_serialid as pq_id,
+    //                        null as success,
+    //                        null as fail_reason,
+    //                        block_number
+    //                    from
+    //                        executed_priority_operations
+    //                    where
+    //                        operation->'priority_op'->>'account' = '0x{address}') t
+    //                order by
+    //                    block_number desc
+    //                offset
+    //                    {offset}
+    //                limit
+    //                    {limit}
+    //            ) t
+    //            left join
+    //                crosstab($$
+    //                    select
+    //                        block_number as rowid,
+    //                        action_type as category,
+    //                        true as values
+    //                    from
+    //                        operations
+    //                    order by
+    //                        block_number
+    //                    $$) t3 (
+    //                        block_number bigint,
+    //                        commited boolean,
+    //                        verified boolean)
+    //            using
+    //                (block_number)
+    //            ",
+    //            address = hex::encode(address.data),
+    //            offset = offset,
+    //            limit = limit
+    //        );
+    //
+    //        diesel::sql_query(query).load::<TransactionsHistoryItem>(self.conn())
+    //    }
 
     pub fn get_account_transactions(
         &self,
@@ -809,7 +930,7 @@ impl StorageProcessor {
 
     pub fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>> {
         let stored_block = if let Some(block) = blocks::table
-            .find(block as i64)
+            .find(i64::from(block))
             .first::<StorageBlock>(self.conn())
             .optional()?
         {
@@ -841,20 +962,20 @@ impl StorageProcessor {
 
             let stored_executed_txs: Vec<_> = executed_transactions::table
                 .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
-                .filter(executed_transactions::block_number.eq(block as i64))
+                .filter(executed_transactions::block_number.eq(i64::from(block)))
                 .load::<(StoredExecutedTransaction, Option<ReadTx>)>(self.conn())?;
             let executed_txs = stored_executed_txs
                 .into_iter()
                 .filter_map(|(stored_exec, stored_tx)| stored_exec.into_executed_tx(stored_tx).ok())
-                .map(ExecutedOperations::Tx);
+                .map(|tx| ExecutedOperations::Tx(Box::new(tx)));
             executed_operations.extend(executed_txs);
 
             let stored_executed_prior_ops: Vec<_> = executed_priority_operations::table
-                .filter(executed_priority_operations::block_number.eq(block as i64))
+                .filter(executed_priority_operations::block_number.eq(i64::from(block)))
                 .load::<StoredExecutedPriorityOperation>(self.conn())?;
             let executed_prior_ops = stored_executed_prior_ops
                 .into_iter()
-                .map(|op| ExecutedOperations::PriorityOp(op.into()));
+                .map(|op| ExecutedOperations::PriorityOp(Box::new(op.into())));
             executed_operations.extend(executed_prior_ops);
 
             executed_operations.sort_by_key(|exec_op| {
@@ -880,7 +1001,9 @@ impl StorageProcessor {
         priority_op_id: u32,
     ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
         executed_priority_operations::table
-            .filter(executed_priority_operations::priority_op_serialid.eq(priority_op_id as i64))
+            .filter(
+                executed_priority_operations::priority_op_serialid.eq(i64::from(priority_op_id)),
+            )
             .first::<StoredExecutedPriorityOperation>(self.conn())
             .optional()
     }
@@ -1476,7 +1599,7 @@ impl StorageProcessor {
                     success: tx.success,
                     verified,
                     fail_reason: tx.fail_reason,
-                    prover_run: prover_run,
+                    prover_run,
                 }))
             } else {
                 Ok(None)
@@ -1773,7 +1896,7 @@ impl StorageProcessor {
                     .collect();
                 StoredFranklinOpsBlock {
                     block_num: block_num as u32,
-                    ops: ops,
+                    ops,
                     fee_account: fee_account as u32,
                 }
             })
@@ -1784,7 +1907,7 @@ impl StorageProcessor {
     pub fn update_tree_state(
         &self,
         block_number: BlockNumber,
-        updates: &AccountUpdates,
+        updates: &[(u32, AccountUpdate)],
     ) -> QueryResult<()> {
         self.commit_state_update(block_number, &updates)?;
         self.apply_state_update(block_number)?;

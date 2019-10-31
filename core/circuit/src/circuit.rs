@@ -1,7 +1,7 @@
 use crate::account::AccountContent;
 use crate::account::AccountWitness;
 use crate::allocated_structures::*;
-use crate::element::{CircuitElement, CircuitPubkey};
+use crate::element::CircuitElement;
 use crate::operation::Operation;
 use crate::signature::*;
 use crate::utils::{

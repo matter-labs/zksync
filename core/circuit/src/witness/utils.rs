@@ -58,8 +58,8 @@ pub fn generate_dummy_sig_data(
 
 pub fn generate_sig_witness(
     bits: &[bool],
-    phasher: &PedersenHasher<Bn256>,
-    params: &AltJubjubBn256,
+    _phasher: &PedersenHasher<Bn256>,
+    _params: &AltJubjubBn256,
 ) -> (Fr, Fr, Fr) {
     let mut sig_bits_to_hash = bits.to_vec();
     assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);

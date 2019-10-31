@@ -187,7 +187,7 @@ impl PlasmaStateKeeper {
                             true
                         } else {
                             // Try filling 4/5 of a block;
-                            if chunks_left < (1 * BLOCK_SIZE_CHUNKS) / 5 {
+                            if chunks_left < BLOCK_SIZE_CHUNKS / 5 {
                                 self.block_tries = 0;
                                 true
                             } else {
@@ -367,7 +367,7 @@ impl PlasmaStateKeeper {
                 priority_op,
                 block_index,
             };
-            ops.push(ExecutedOperations::PriorityOp(exec_result));
+            ops.push(ExecutedOperations::PriorityOp(Box::new(exec_result)));
             self.current_unprocessed_priority_op += 1;
         }
 
@@ -400,7 +400,7 @@ impl PlasmaStateKeeper {
                         fail_reason: None,
                         block_index: Some(block_index),
                     };
-                    ops.push(ExecutedOperations::Tx(exec_result));
+                    ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
                 }
                 Err(e) => {
                     error!("Failed to execute transaction: {:?}, {}", tx, e);
@@ -411,7 +411,7 @@ impl PlasmaStateKeeper {
                         fail_reason: Some(e.to_string()),
                         block_index: None,
                     };
-                    ops.push(ExecutedOperations::Tx(exec_result));
+                    ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
                 }
             };
         }
