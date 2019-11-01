@@ -1,6 +1,7 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
 mod event_notify;
+pub mod rpc_server;
 
 use actix_cors::Cors;
 use actix_web::{
