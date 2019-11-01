@@ -1,0 +1,29 @@
+version: '3.2'
+services:
+  postgres:
+    image: "postgres:10.4"
+    ports:
+      - "5432:5432"
+    volumes:
+    - type: bind
+      source: ./volumes/postgres
+      target: /var/lib/postgresql/data
+  geth:
+    image: "gluk64/franklin:geth"
+    ports:
+      - "8545:8545"
+      - "8546:8546"
+    volumes:
+    - type: bind
+      source: ./volumes/geth
+      target: /var/lib/geth/data
+  tesseracts:
+    image: "adria0/tesseracts"
+    command: --cfg /tesseracts.toml -vvv
+    ports:
+      - "8000:8000"
+    volumes:
+    - ./etc/tesseracts/tesseracts.toml:/tesseracts.toml
+    - type: bind
+      source: ./volumes/tesseracts
+      target: /var/lib/tesseracts/data
