@@ -8,6 +8,7 @@ check_tool() {
 
 echo Checking environment
 
+check_tool minikube
 check_tool yarn
 check_tool node
 node --version | grep "v10.*" > /dev/null  || (echo "Node version 10 is supported" && exit 1)
