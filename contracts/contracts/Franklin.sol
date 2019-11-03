@@ -6,8 +6,7 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./PriorityQueue.sol";
 import "./Bytes.sol";
-import "./LendingEther.sol";
-import "./LendingErc20.sol";
+import "./SwiftExits.sol";
 
 // GLOBAL TODOS:
 // - check overflows

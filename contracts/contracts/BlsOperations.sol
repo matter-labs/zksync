@@ -1,7 +1,7 @@
 pragma solidity ^0.5.8;
 
-import "../bls_verification/BN256G2.sol";
-import "../common/Bytes.sol";
+import "./BN256G2.sol";
+import "./Bytes.sol";
 
 library BlsOperations {
     struct G1Point {

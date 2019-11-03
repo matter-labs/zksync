@@ -1,6 +1,6 @@
 pragma solidity ^0.5.8;
 
-import "../bls_verification/BlsOperations.sol";
+import "./BlsOperations.sol";
 
 contract BlsVerifier {
 
@@ -36,18 +36,13 @@ contract BlsVerifier {
         return aggrSignature;
     }
 
-    function verify(
-        BlsOperations.G1Point[] memory _signatures,
+    function verifyBlsSignature(
+        BlsOperations.G1Point memory _signature,
         BlsOperations.G2Point[] memory _pubKeys,
         bytes memory _message
     ) internal view returns (bool) {
-        require(
-            _signatures.length == _pubKeys.length,
-            "osvy1"
-        ); // osas2 - signatures count must equal to pubkeys count
         BlsOperations.G1Point memory mpoint = BlsOperations.messageToG1(_message);
         BlsOperations.G2Point memory aggrPubkey = aggregatePubkeys(_pubKeys);
-        BlsOperations.G1Point memory aggrSignature = aggregateSignatures(_signatures);
-        return BlsOperations.pairing(mpoint, aggrPubkey, aggrSignature, BlsOperations.negate(BlsOperations.generatorG2()));
+        return BlsOperations.pairing(mpoint, aggrPubkey, _signature, BlsOperations.negate(BlsOperations.generatorG2()));
     }
 }
