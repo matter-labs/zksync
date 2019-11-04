@@ -16,6 +16,7 @@
     </b-navbar>
     <br>
     <b-container>
+        <ClosableJumbotron></ClosableJumbotron>
         <b-card bg-variant="light" >
             <h4>Matter Testnet Block Explorer</h4> 
             <b-form @submit.stop.prevent="search">
@@ -113,6 +114,11 @@ body {
 
 import store from './store'
 import client from './client'
+
+import ClosableJumbotron from './ClosableJumbotron.vue'
+const components = { 
+    ClosableJumbotron 
+}
 
 export default {
     name: 'home',
@@ -229,5 +235,6 @@ export default {
             ],
         }
     },
+    components,
 }
 </script>

@@ -22,6 +22,13 @@
                         ></CompleteOperationButton>
                 </template>
             </b-table>
+            <span v-if="disabledReason != 'Not loaded yet.'">
+                You can get some 
+                <a href="https://faucet.rinkeby.io/" target="_blank">ETH</a>
+                or
+                <a href="https://erc20faucet.com/" target="_blank">ERC20</a>
+                tokens to play with.
+            </span>
         </b-col>
     </b-card>
 </template>
