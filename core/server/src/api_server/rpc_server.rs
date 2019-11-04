@@ -15,25 +15,25 @@ pub struct AccountInfoResp {
     verified: Account,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlockInfo {
-    block_number: i64,
-    commited: bool,
-    verified: bool,
+    pub block_number: i64,
+    pub commited: bool,
+    pub verified: bool,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TransactionInfoResp {
-    executed: bool,
-    success: Option<bool>,
-    fail_reason: Option<String>,
-    block: Option<BlockInfo>,
+    pub executed: bool,
+    pub success: Option<bool>,
+    pub fail_reason: Option<String>,
+    pub block: Option<BlockInfo>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ETHOpInfoResp {
-    executed: bool,
-    block: Option<BlockInfo>,
+    pub executed: bool,
+    pub block: Option<BlockInfo>,
 }
 
 #[rpc]

@@ -1,6 +1,6 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
 
-mod event_notify;
+pub mod event_notify;
 pub mod rpc_server;
 
 use actix_cors::Cors;
@@ -545,11 +545,11 @@ pub fn start_api_server(
 
             start_server(state.clone(), bind_to.clone());
             start_status_interval(state.clone());
-            start_sub_notifier(
-                connection_pool.clone(),
-                op_notify_receiver,
-                event_sub_receiver,
-            );
+            //            start_sub_notifier(
+            //                connection_pool.clone(),
+            //                op_notify_receiver,
+            //                event_sub_receiver,
+            //            );
 
             runtime.run().unwrap_or_default();
         })

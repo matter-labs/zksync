@@ -2,40 +2,55 @@ use super::PriorityOpStatus;
 use actix::FinishStream;
 use futures::{
     sync::{mpsc, oneshot},
-    Future, Stream,
+    Future, Sink as FuturesSink, Stream,
 };
+use im::HashMap;
 use itertools::Itertools;
+use jsonrpc_core::Params;
+use jsonrpc_pubsub::{
+    typed::{Sink, Subscriber},
+    SubscriptionId,
+};
+use models::node::tx::TxHash;
 use models::{
     node::block::ExecutedOperations,
     node::{Account, AccountAddress, AccountId, AccountUpdate},
     ActionType, Operation,
 };
 use std::collections::BTreeMap;
-use storage::{ConnectionPool, TxReceiptResponse};
+use storage::ConnectionPool;
+use tokio::spawn;
 
-const MAX_LISTENERS_PER_ENTITY: usize = 4096;
+use super::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
+
+const MAX_LISTENERS_PER_ENTITY: usize = 2048;
 
 pub enum EventSubscribe {
     Transaction {
-        hash: Box<[u8; 32]>,
+        hash: TxHash,
         action: ActionType,
-        notify: oneshot::Sender<TxReceiptResponse>,
+        subscriber: Subscriber<TransactionInfoResp>,
     },
     PriorityOp {
         serial_id: u64,
         action: ActionType,
-        notify: oneshot::Sender<PriorityOpStatus>,
+        subscriber: Subscriber<ETHOpInfoResp>,
     },
     Account {
         address: AccountAddress,
         action: ActionType,
-        notify: mpsc::Sender<Account>,
+        subscriber: Subscriber<Account>,
     },
+}
+
+pub enum EventNotifierRequest {
+    Sub(EventSubscribe),
+    Unsub(SubscriptionId),
 }
 
 enum BlockNotifierInput {
     NewOperationCommited(Operation),
-    EventSubscription(EventSubscribe),
+    EventNotifiyRequest(EventNotifierRequest),
 }
 
 struct AccountSubscriptionState {
@@ -43,15 +58,21 @@ struct AccountSubscriptionState {
     listeners: Vec<mpsc::Sender<Account>>,
 }
 
+struct SubscriptionSender<T> {
+    id: SubscriptionId,
+    sink: Sink<T>,
+}
+
 struct OperationNotifier {
     db_pool: ConnectionPool,
-    /// (tx_hash, action) -> subscriber channels
-    tx_subs: BTreeMap<([u8; 32], ActionType), Vec<oneshot::Sender<TxReceiptResponse>>>,
-    /// (tx_hash, action) -> subscriber channels
-    prior_op_subs: BTreeMap<(u64, ActionType), Vec<oneshot::Sender<PriorityOpStatus>>>,
+    tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
+    prior_op_subs: BTreeMap<(u64, ActionType), Vec<SubscriptionSender<ETHOpInfoResp>>>,
+    account_subs:
+        BTreeMap<(AccountId, ActionType), (Option<Account>, Vec<SubscriptionSender<Account>>)>,
+}
 
-    account_subs_unknown_id: BTreeMap<(AccountAddress, ActionType), AccountSubscriptionState>,
-    account_subs_known_id: BTreeMap<(AccountId, ActionType), AccountSubscriptionState>,
+fn send_once<T: serde::Serialize>(sink: Sink<T>, val: T) {
+    spawn(sink.notify(Ok(val)).map(drop).map_err(drop));
 }
 
 impl OperationNotifier {
@@ -61,34 +82,49 @@ impl OperationNotifier {
     ) -> impl Future<Item = (), Error = ()> {
         input_stream
             .map(move |input| match input {
-                BlockNotifierInput::EventSubscription(sub) => self.handle_subscription(sub),
+                BlockNotifierInput::EventNotifiyRequest(sub) => self.handle_notify_req(sub),
                 BlockNotifierInput::NewOperationCommited(op) => self.handle_new_block(op),
             })
             .finish()
     }
 
-    // TODO: remove sub after timeout.
-    fn handle_subscription(&mut self, new_sub: EventSubscribe) {
-        let sub_result = match new_sub {
-            EventSubscribe::Transaction {
-                hash,
-                action,
-                notify,
-            } => self.handle_transaction_sub(hash, action, notify),
-            EventSubscribe::PriorityOp {
-                serial_id,
-                action,
-                notify,
-            } => self.handle_priority_op_sub(serial_id, action, notify),
-            EventSubscribe::Account {
-                address,
-                action,
-                notify,
-            } => self.handle_account_update_sub(address, action, notify),
-        };
+    fn handle_notify_req(&mut self, new_sub: EventNotifierRequest) {
+        match EventNotifierRequest {
+            EventNotifierRequest::Sub(event_sub) => {
+                let sub_result = match event_sub {
+                    EventSubscribe::Transaction {
+                        hash,
+                        action,
+                        subscriber,
+                    } => self.handle_transaction_sub(hash, action, subscriber),
+                    EventSubscribe::PriorityOp {
+                        serial_id,
+                        action,
+                        subscriber,
+                    } => self.handle_priority_op_sub(serial_id, action, subscriber),
+                    EventSubscribe::Account {
+                        address,
+                        action,
+                        subscriber,
+                    } => self.handle_account_update_sub(address, action, subscriber),
+                };
 
-        if let Err(e) = sub_result {
-            warn!("Failed to subscribe for notification: {}", e);
+                if let Err(e) = sub_result {
+                    warn!("Failed to subscribe for notification: {}", e);
+                }
+            }
+            EventNotifierRequest::Unsub(sub_id) => {
+                if let Some(sub) = self
+                    .account_subs_known_id
+                    .iter()
+                    .find(|(id, _, _)| id == sub_id)
+                    .clone()
+                {
+                    self.account_subs_known_id.remove(&sub.0);
+                }
+                // TODO: check if valid then copy paste
+                unimplemented!();
+            }
         }
     }
 
@@ -96,8 +132,16 @@ impl OperationNotifier {
         &mut self,
         serial_id: u64,
         action: ActionType,
-        notify: oneshot::Sender<PriorityOpStatus>,
+        sub: Subscriber<ETHOpInfoResp>,
     ) -> Result<(), failure::Error> {
+        let sub_id = SubscriptionId::String(format!("eosub{}", rand::thread_rng().get::<u64>()));
+
+        // TODO: tmp
+        let rec = ETHOpInfoResp {
+            executed: true,
+            block: None,
+        };
+
         // Maybe it was executed already
         let storage = self.db_pool.access_storage()?;
         let executed_op = storage.get_executed_priority_op(serial_id as u32)?;
@@ -108,7 +152,9 @@ impl OperationNotifier {
             };
             match action {
                 ActionType::COMMIT => {
-                    notify.send(prior_op_status).unwrap_or_default();
+                    let sink = sub.assign_id(sub_id)?;
+                    // TODO:
+                    send_once(sink, rec);
                     return Ok(());
                 }
                 ActionType::VERIFY => {
@@ -117,7 +163,9 @@ impl OperationNotifier {
                         ActionType::VERIFY,
                     ) {
                         if block_verify.confirmed {
-                            notify.send(prior_op_status).unwrap_or_default();
+                            let sink = sub.assign_id(sub_id)?;
+                            // TODO:
+                            send_once(sink, rec);
                             return Ok(());
                         }
                     }
@@ -125,46 +173,61 @@ impl OperationNotifier {
             }
         }
 
-        let mut listeners = self
+        let mut subs = self
             .prior_op_subs
             .remove(&(serial_id, action))
             .unwrap_or_default();
-        if listeners.len() < MAX_LISTENERS_PER_ENTITY {
-            listeners.push(notify);
-        }
-        self.prior_op_subs.insert((serial_id, action), listeners);
-
+        if subs.len() < MAX_LISTENERS_PER_ENTITY {
+            let sink = sub.assign_id(sub_id)?;
+            subs.push(SubscriptionSender { id, sink });
+        };
+        self.prior_op_subs.insert((serial_id, action), subs);
         Ok(())
     }
 
     fn handle_transaction_sub(
         &mut self,
-        hash: Box<[u8; 32]>,
+        hash: TxHash,
         action: ActionType,
-        notify: oneshot::Sender<TxReceiptResponse>,
+        sub: Subscriber<TransactionInfoResp>,
     ) -> Result<(), failure::Error> {
         // Maybe tx was executed already.
         let receipt = self.db_pool.access_storage()?.tx_receipt(hash.as_ref())?;
+        // TODO: change to good.
+        let rec = TransactionInfoResp {
+            executed: true,
+            success: None,
+            fail_reason: None,
+            block: None,
+        };
+        let id = SubscriptionId::String(format!("txsub{}", rand::thread_rng().get::<u64>()));
+
         if let Some(receipt) = receipt {
             match action {
                 ActionType::COMMIT => {
-                    notify.send(receipt).unwrap_or_default();
+                    let sink = sub.assign_id(id)?;
+                    // TODO:
+                    send_once(sink, rec);
                     return Ok(());
                 }
                 ActionType::VERIFY => {
                     if receipt.verified {
-                        notify.send(receipt).unwrap_or_default();
+                        let sink = sub.assign_id(id)?;
+                        // TODO:
+                        send_once(sink, rec);
                         return Ok(());
                     }
                 }
             }
         }
 
-        let mut listeners = self.tx_subs.remove(&(*hash, action)).unwrap_or_default();
-        if listeners.len() < MAX_LISTENERS_PER_ENTITY {
-            listeners.push(notify);
+        let mut subs = self.tx_subs.remove(&(hash, action)).unwrap_or_default();
+        if subs.len() < MAX_LISTENERS_PER_ENTITY {
+            let sink = sub.assign_id(id)?;
+            subs.push(SubscriptionSender { id, sink });
         }
-        self.tx_subs.insert((*hash, action), listeners);
+        self.tx_subs
+            .insert((hash, action), SubscriptionSender { id, sink });
         Ok(())
     }
 
@@ -172,56 +235,47 @@ impl OperationNotifier {
         &mut self,
         address: AccountAddress,
         action: ActionType,
-        mut notify: mpsc::Sender<Account>,
+        sub: Subscriber<Account>,
     ) -> Result<(), failure::Error> {
         let account_state = self
             .db_pool
             .access_storage()?
             .account_state_by_address(&address)?;
 
-        let resolved_account = match action {
-            ActionType::COMMIT => account_state.commited,
-            ActionType::VERIFY => account_state.verified,
+        let account_id = if let Some(id) = account_state.commited.map(|(id, _)| id) {
+            id
+        } else {
+            bail!("AccountId is unkwown");
         };
 
-        let initial_account_state = resolved_account
-            .clone()
-            .map(|(_, a)| a)
-            .unwrap_or_else(|| Account::default_with_address(&address));
-        notify.try_send(initial_account_state).unwrap_or_default();
+        let sub_id = SubscriptionId::String(format!("acsub{}", rand::thread_rng().get::<u64>()));
 
-        if let Some((resolved_id, account)) = resolved_account {
-            let mut subscription = self
-                .account_subs_known_id
-                .remove(&(resolved_id, action))
-                .unwrap_or_else(|| AccountSubscriptionState {
-                    account: Some(account),
-                    listeners: Vec::new(),
-                });
-            if subscription.listeners.len() < MAX_LISTENERS_PER_ENTITY {
-                subscription.listeners.push(notify);
-            }
-            debug!("Inserting listender for id: {}", resolved_id);
-            self.account_subs_known_id
-                .insert((resolved_id, action), subscription);
-        } else {
-            let mut subscription = self
-                .account_subs_unknown_id
-                .remove(&(address.clone(), action))
-                .unwrap_or_else(|| AccountSubscriptionState {
-                    account: None,
-                    listeners: Vec::new(),
-                });
+        let account_state = match action {
+            ActionType::COMMIT => account_state.commited,
+            ActionType::VERIFY => account_state.verified,
+        }
+        .map(|(_, a)| a);
 
-            if subscription.listeners.len() < MAX_LISTENERS_PER_ENTITY {
-                subscription.listeners.push(notify);
-            }
+        let (acc, mut subs) = self
+            .account_subs
+            .remove(&(account_id, action))
+            .unwrap_or_default();
+        if subs.len() < MAX_LISTENERS_PER_ENTITY {
+            let account_state = if acc.is_some() { acc } else { account_state };
 
-            debug!("Inserting listender for address: {}", address.to_hex());
-            self.account_subs_unknown_id
-                .insert((address, action), subscription);
+            let sink = sub.assign_id(sub_id)?;
+
+            let initial_account_state = account_state
+                .clone()
+                .unwrap_or_else(|| Account::default_with_address(&address));
+            // TODO: SEND INITIAL ACCOUNT STATE
+            send_once(sink.clone(), initial_account_state);
+
+            subs.push(SubscriptionSender { id: sub_id, sink });
         }
 
+        self.account_subs
+            .insert((account_id, action), (account_state, subs));
         Ok(())
     }
 
@@ -232,58 +286,31 @@ impl OperationNotifier {
             match tx {
                 ExecutedOperations::Tx(tx) => {
                     let hash = tx.tx.hash();
-                    let subs = self.tx_subs.remove(&(*hash, action));
-                    if let Some(channels) = subs {
-                        let receipt = TxReceiptResponse {
-                            tx_hash: hex::encode(hash.as_ref()),
-                            block_number: i64::from(op.block.block_number),
-                            success: tx.success,
-                            fail_reason: tx.fail_reason,
-                            verified: op.action.get_type() == ActionType::VERIFY,
-                            prover_run: None,
+                    if let Some(subs) = self.tx_subs.remove(&(*hash, action)) {
+                        // TODO: change to good.
+                        let rec = TransactionInfoResp {
+                            executed: true,
+                            success: None,
+                            fail_reason: None,
+                            block: None,
                         };
-                        for ch in channels {
-                            ch.send(receipt.clone()).unwrap_or_default();
+                        for sub in subs {
+                            send_once(sub.sink, rec.clone());
                         }
                     }
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
                     let id = prior_op.priority_op.serial_id;
-                    let subs = self.prior_op_subs.remove(&(id, action));
-                    if let Some(channels) = subs {
-                        let prior_op_status = PriorityOpStatus {
+                    if let Some(sink) = self.prior_op_subs.remove(&(id, action)) {
+                        // TODO: tmp
+                        let rec = ETHOpInfoResp {
                             executed: true,
-                            block: Some(i64::from(op.block.block_number)),
+                            block: None,
                         };
-
-                        for ch in channels {
-                            ch.send(prior_op_status.clone()).unwrap_or_default();
+                        for sub in subs {
+                            send_once(sub.sink, rec.clone());
                         }
                     }
-                }
-            }
-        }
-
-        for (id, update) in &op.accounts_updated {
-            if let AccountUpdate::Create { address, .. } = update {
-                if let Some(subscription) = self
-                    .account_subs_unknown_id
-                    .remove(&(address.clone(), action))
-                {
-                    let subscription = self
-                        .account_subs_known_id
-                        .remove(&(*id, action))
-                        .map(|mut id_sub| {
-                            id_sub
-                                .listeners
-                                .extend(subscription.listeners.clone().into_iter());
-                            id_sub.account = None;
-                            id_sub
-                        })
-                        .unwrap_or_else(|| subscription);
-
-                    self.account_subs_known_id
-                        .insert((*id, action), subscription);
                 }
             }
         }
@@ -301,15 +328,13 @@ impl OperationNotifier {
             .collect::<Vec<_>>();
 
         for (id, updates) in updates.into_iter() {
-            if let Some(mut sub) = self.account_subs_known_id.remove(&(id, action)) {
-                if let Some(account) = Account::apply_updates(sub.account.take(), &updates) {
-                    sub.listeners = sub
-                        .listeners
-                        .into_iter()
-                        .filter_map(|mut ch| ch.try_send(account.clone()).ok().map(|_| ch))
-                        .collect();
-                    sub.account = Some(account);
-                    self.account_subs_known_id.insert((id, action), sub);
+            if let Some((acc, subs)) = self.account_subs.remove(&(id, action)) {
+                if let Some(account) = Account::apply_updates(acc, &updates) {
+                    for sub in &subs {
+                        sub.sink.notify(Ok(account));
+                    }
+                    self.account_subs
+                        .insert(&(id, action), (Some(account), sub));
                 }
             }
         }
@@ -322,17 +347,16 @@ pub fn start_sub_notifier<BStream, SStream>(
     subscription_stream: SStream,
 ) where
     BStream: Stream<Item = Operation, Error = ()> + 'static,
-    SStream: Stream<Item = EventSubscribe, Error = ()> + 'static,
+    SStream: Stream<Item = EventNotifierRequest, Error = ()> + 'static,
 {
     let notifier = OperationNotifier {
         db_pool,
         tx_subs: BTreeMap::new(),
         prior_op_subs: BTreeMap::new(),
-        account_subs_known_id: BTreeMap::new(),
-        account_subs_unknown_id: BTreeMap::new(),
+        account_subs: BTreeMap::new(),
     };
     let input_stream = new_block_stream
         .map(BlockNotifierInput::NewOperationCommited)
-        .select(subscription_stream.map(BlockNotifierInput::EventSubscription));
-    actix::System::with_current(move |_| actix::spawn(notifier.run(input_stream)));
+        .select(subscription_stream.map(BlockNotifierInput::EventNotifiyRequest));
+    spawn(move || notifier.run(input_stream));
 }

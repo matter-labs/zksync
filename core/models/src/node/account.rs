@@ -42,10 +42,7 @@ impl AccountAddress {
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
         ensure!(s.starts_with("0x"), "Address should start with 0x");
         let bytes = hex::decode(&s[2..])?;
-        ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
-        Ok(AccountAddress {
-            data: bytes.as_slice().try_into().unwrap(),
-        })
+        Self::from_bytes(&bytes)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {

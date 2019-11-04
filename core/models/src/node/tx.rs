@@ -28,7 +28,54 @@ use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
 use franklin_crypto::eddsa::{PublicKey, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::convert::TryInto;
 use web3::types::Address;
+
+pub struct TxHash {
+    data: [u8; 32],
+}
+
+impl AsRef<[u8]> for TxHash {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl TxHash {
+    pub fn to_hex(&self) -> String {
+        format!("0x{}", hex::encode(&self.data))
+    }
+
+    pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
+        ensure!(s.starts_with("0x"), "TxHash should start with 0x");
+        let bytes = hex::decode(&s[2..])?;
+        ensure!(bytes.len() == 32, "Size mismatch");
+        Ok(TxHash {
+            data: bytes.as_slice().try_into().unwrap(),
+        })
+    }
+}
+
+impl Serialize for TxHash {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_hex())
+    }
+}
+
+impl<'de> Deserialize<'de> for TxHash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        String::deserialize(deserializer).and_then(|string| {
+            Self::from_hex(&string).map_err(|err| Error::custom(err.to_string()))
+        })
+    }
+}
 
 /// Signed by user.
 
@@ -241,7 +288,7 @@ pub enum FranklinTx {
 }
 
 impl FranklinTx {
-    pub fn hash(&self) -> Box<[u8; 32]> {
+    pub fn hash(&self) -> TxHash {
         let bytes = match self {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
@@ -252,7 +299,7 @@ impl FranklinTx {
         hasher.input(&bytes);
         let mut out = [0u8; 32];
         hasher.result(&mut out);
-        Box::new(out)
+        TxHash { data: out }
     }
 
     pub fn account(&self) -> AccountAddress {
