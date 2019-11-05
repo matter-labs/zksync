@@ -81,6 +81,7 @@ contract LendingToken is BlsVerifier {
     /// @member validator Borrow orders' recipient (validator)
     struct BorrowOrder {
         uint256 borrowed;
+        uint256 fee;
         address validator;
     }
 
@@ -324,7 +325,7 @@ contract LendingToken is BlsVerifier {
             );
         } else {
             // Get amount to borrow
-            uint256 amountToExchange = getAmountToExchange(_tokenId, _tokenAmount);
+            (uint256 amountToExchange, uint256 validatorsFee, uint256 ownerFee) = getAmountToExchange(_tokenId, _tokenAmount);
 
             // Create Exit orer
             ExitOrder order = ExitOrder(
@@ -340,7 +341,7 @@ contract LendingToken is BlsVerifier {
 
             if (amountToExchange <= (totalSupply - totalBorrowed)) {
                 // If amount to borrow <= borrowable amount - immediate swift exit
-                immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToExchange);
+                immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToExchange, validatorsFee, ownerFee);
             } else {
                 // If amount to borrow > borrowable amount - deffered swift exit order
                 exitOrders[_withdrawOpHash].status = ExitOrderState.Deffered;
@@ -377,11 +378,11 @@ contract LendingToken is BlsVerifier {
         ExitOrder order = exitOrders[_withdrawOpHash];
 
         uint256 updatedAmount = 0;
-        uint256 amountToExchange = getAmountToExchange(order.tokenId, order.tokenAmount);
+        (uint256 amountToExchange, uint256 validatorsFee, uint256 ownerFee) = getAmountToExchangeAndFees(order.tokenId, order.tokenAmount);
 
         if (amountToExchange <= (totalSupply - totalBorrowed)) {
             // If amount to borrow <= borrowable amount - immediate swift exit
-            immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToExchange);
+            immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToExchange, validatorsFee, ownerFee);
         } else {
             // If amount to borrow > borrowable amount - emit update deffered swift exit order event
             updatedAmount = (amountToExchange * possiblePriceRisingCoeff) - totalSupply + totalBorrowed;
@@ -398,10 +399,14 @@ contract LendingToken is BlsVerifier {
     /// @param _blockNumber Rollup block number
     /// @param _withdrawOpHash Withdraw operation hash
     /// @param _amountToExchange Amount to borrow from validators and exchange with compound
+    /// @param _validatorsFee Amount of validators fee
+    /// @param _ownerFee Amount of owner fee
     function immediateSwiftExit(
         uint32 _blockNumber,
         uint256 _withdrawOpHash,
-        uint256 _amountToExchange
+        uint256 _amountToExchange,
+        uint256 _validatorsFee,
+        uint256 _ownerFee
     ) internal {
         ExitOrder order = exitOrders[_withdrawOpHash];
 
@@ -409,7 +414,7 @@ contract LendingToken is BlsVerifier {
         
         exchangeWithRecipient(order.recipient, order.tokenId, recievedTokenAmount);
 
-        createBorrowOrders(_withdrawOpHash, _amountToExchange);
+        createBorrowOrders(_withdrawOpHash, _amountToExchange, _validatorsFee, _ownerFee);
 
         rollup.orderSwiftExit(_blockNumber, order.withdrawOpOffset, _withdrawOpHash);
 
@@ -451,38 +456,54 @@ contract LendingToken is BlsVerifier {
         // exchange possible value
     }
 
-    /// @notice Returns amound of validators supply to exchange for token
+    /// @notice Returns amound of validators supply to exchange for token, calculates fees
     /// @param _tokenId Token id
     /// @param _tokenAmount Token amount
-    function getAmountToExchange(
+    function getAmountToExchangeAndFees(
         uint16 _tokenId,
         uint256 _tokenAmount
-    ) internal returns (uint256 amountToExchange) {
+    ) internal returns (uint256 amountToExchange, uint256 validatorsFee, uint256 ownerFee) {
         address tokenAddress = governance.tokenAddresses(_tokenId);
         address matterAddress = governance.tokenAddresses(matterToken);
 
         uint256 collateralFactor = compound.takeCollateralFactor(matterAddress);
 
         uint256 tokenPrice = compound.takePrice(tokenAddress);
+        
+        uint256 fullAmount = _tokenAmount * tokenPrice / collateralFactor;
 
-        amountToExchange = _tokenAmount * tokenPrice / collateralFactor;
+        amountToExchange = 0.9 * fullAmount;
+        validatorsFee = 0.095 * _tokenAmount;
+        ownerFee = 0.095 * _tokenAmount;
     }
 
     /// @notice Creates borrow orders for specified exit request
     /// @param _withdrawOpHash Withdraw operation hash
     /// @param _amountToBorrow Amount of validators supply to borrow
+    /// @param _validatorsFee Amount of validators fee
+    /// @param _ownerFee Amount of owner fee
     function createBorrowOrders(
         uint256 _withdrawOpHash,
-        uint256 _amountToBorrow
+        uint256 _amountToBorrow,
+        uint256 _validatorsFee,
+        uint256 _ownerFee
     ) internal {
         for (uint32 i = 0; i <= validatorCount; i++) {
             uint32 currentBorrowOrdersCount = borrowOrdersCount[_withdrawOpHash];
             BorrowOrders[_withdrawOpHash][currentBorrowOrdersCount] = BorrowOrder({
                 borrowed: _amountToBorrow * (validatorsInfo[validators[i]].supply / totalSupply),
+                fee: _validatorsFee * (validatorsInfo[validators[i]].supply / totalSupply),
                 validator: validators[i]
             });
             borrowOrdersCount[_withdrawOpHash]++;
         }
+        uint32 currentBorrowOrdersCount = borrowOrdersCount[_withdrawOpHash];
+        BorrowOrders[_withdrawOpHash][currentBorrowOrdersCount] = BorrowOrder({
+            borrowed: 0,
+            fee: _ownerFee,
+            validator: validators[owner]
+        });
+        borrowOrdersCount[_withdrawOpHash]++;
     }
 
     /// @notice Called by Rollup contract when a new block is verified. Completes swift orders process
@@ -514,7 +535,7 @@ contract LendingToken is BlsVerifier {
     }
 
     /// @notice Fulfills all succeeded orders
-    /// @dev Repays to compound and reduces total borrowed
+    /// @dev Repays to compound and reduces total borrowed, sends fee to validators balance on compound
     /// @param _succeededHashes Succeeded orders hashes
     function fulfillSuccededOrders(uint256[] memory _succeededHashes) internal {
         for (uint32 i = 0; i < _succeededHashes.length; i++) {
@@ -523,6 +544,7 @@ contract LendingToken is BlsVerifier {
             for (uint32 k = 0; k < borrowOrdersCount[_succeededHashes[i]]; k++) {
                 BorrowOrder order = BorrowOrders[_succeededHashes[i]][k];
                 totalBorrowed -= order.borrowed;
+                sendFeeToRollup(order.validator, exitOrder.tokenId, order.fee);
             }
         }
     }
