@@ -19,8 +19,8 @@ Simplified swift exit process without special cases of early verified block and 
 
 All process we can divide into 3 parts:
 - Sidechain: user creates operation and swift exit request, consensus signs it
-- Processing exit request on contracts: validating swift exit request, borrowing tokens for it, sending tokens to recipient
-- Repaying borrow on contract: on blocks commit checks if request exists, on blocks verify repay borrow to compound or punish validators if there is no request verification
+- Processing exit request on contracts: validating swift exit request, borrowing tokens for it, calculating fees, sending tokens to recipient
+- Repaying borrow on contract: on blocks commit checks if request exists, on blocks verify repay borrow to compound and consummate fees or punish validators if there is no request verification
 
 ### Sidechain
 
@@ -36,7 +36,7 @@ All process we can divide into 3 parts:
 1. Verification of validators signature using `BlsVerifier` library `verify` method
 2. If the specified block is validated and contains indicated withdraw operation - an instant withdraw to Layer 1 will occure if there is enough tokens on corresponding balance on `Rollup` contract. EARLY VALIDATED BLOCK - EXIT ALGORITHM
 3. If the specified block is not validated yet, there will be a check for enough free validators tokens on `SwiftExits` contract (in Matter tokens)
-4. Current rate and collateral factor for the token will be taken from `Compound` contract to calculate validators supply tokens amount.
+4. Current rate and collateral factor for the token will be taken from `Compound` contract to calculate validators supply tokens amount and fees
 5. `SwiftExitRequest`, that contains swift exit information, will be stored on `SwiftExits` contract
 6. The required amount of validators tokens will be borrowed on `SwiftExits` contract to support borrow from compound
 7. A borrow of tokens from `Compound` contract to `SwiftExits` contract for validators tokens will occurre
@@ -47,7 +47,7 @@ All process we can divide into 3 parts:
 
 1. When the specified block is committed on `Rollup` contract (or if it has been already committed), the relevant `RepaymentRequest`s will be marked as `committed`
 2. When the specified block is verified on `Rollup` contract, it will check relevant `RepaymentRequest`s for `committed` mark and send required number of tokens to `SwiftExits` contract.
-3. `SwiftExits` contract will repay a debt to `Compound` and will get validators tokens
+3. `SwiftExits` contract will repay a debt to `Compound` and will get validators tokens, fees will be sent to validators accounts on `Rollup` contract
 4. If the verified block does not have the corresponding withdrawal operation, but `RepaymentRequest` for it created, the punishment process will start. An intersection of the validators who signed the swift exit request and the validators who verified the block without corresponding withdraw operation will be found. The borrowed amount will be held from them in no return. The rest of the validators will receive their tokens
 
 Full swift exit process without special cases of early verified block and punishment of validators. Contains complete inner contracts logic:
