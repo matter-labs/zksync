@@ -16,20 +16,11 @@ contract LendingToken is BlsVerifier {
     /// @notice Possible price change coeff on Compound
     uint256 constant possiblePriceRisingCoeff = 110/100;
 
-    /// @notice Multiplier is used in calculation of borrowing interest rate
-    uint256 constant MULTIPLIER = 45;
-
-    /// @notice Base rate is used in calculation of borrowing interest rate
-    uint256 constant BASE_RATE = 5;
-
-    /// @notice Spread represents the economic profit of the protocol
-    uint256 constant SPREAD = 10;
-
     /// @notice Owner of the contract (Matter Labs)
     address internal owner;
 
     /// @notice Matter token contract address
-    uint16 internal matterToken;
+    address internal matterToken;
 
     /// @notice blsVerifier contract
     BlsVerifier internal blsVerifier;
@@ -72,7 +63,7 @@ contract LendingToken is BlsVerifier {
 
     /// @notice Borrow orders by Swift Exits hashes (withdraw op hash)
     mapping(uint256 => mapping(uint32 => BorrowOrder)) internal BorrowOrders;
-    /// @notice BOrrow orders in Swift Exits count
+    /// @notice Borrow orders in Swift Exits count
     mapping(uint256 => uint32) internal borrowOrdersCount;
 
     /// @notice Container for information about validator
@@ -87,11 +78,9 @@ contract LendingToken is BlsVerifier {
 
     /// @notice Container for information about borrow order
     /// @member borrowed This orders' borrow
-    /// @member fee This orders' fee
-    /// @member borrowed Borrow orders' recipient (validator)
+    /// @member validator Borrow orders' recipient (validator)
     struct BorrowOrder {
         uint256 borrowed;
-        uint256 fee;
         address validator;
     }
 
@@ -117,13 +106,13 @@ contract LendingToken is BlsVerifier {
     );
 
     /// @notice Construct swift exits contract
-    /// @param _matterTokenId The id of Matter token
+    /// @param _matterTokenAddress The address of Matter token
     /// @param _governanceAddress The address of Governance contract
     /// @param _rollupAddress The address of Rollup contract
     /// @param _blsVerifierAddress The address of Bls Verifier contract
     /// @param _owner The address of this contracts owner (Matter Labs)
     constructor(
-        uint16 _matterTokenId,
+        address _matterTokenAddress,
         address _governanceAddress,
         address _rollupAddress,
         address _blsVerifierAddress,
@@ -144,10 +133,9 @@ contract LendingToken is BlsVerifier {
 
     /// @notice Transfers specified amount of ERC20 token into contract
     /// @param _from Sender address
-    /// @param _token ERC20 token id
+    /// @param _tokenAddress ERC20 token address
     /// @param _amount Amount in ERC20 tokens
-    function transferInERC20(address _from, uint16 _tokenId, uint256 _amount) internal {
-        address tokenAddr = governance.tokenAddresses(_tokenId);
+    function transferInERC20(address _from, address _tokenAddress, uint256 _amount) internal {
         require(
             IERC20(tokenAddr).transferFrom(_from, address(this), _amount),
             "sst011"
@@ -157,29 +145,28 @@ contract LendingToken is BlsVerifier {
     /// @notice Transfers specified amount of Ether or ERC20 token to external address
     /// @dev If token id == 0 -> transfers ether
     /// @param _to Receiver address
-    /// @param _tokenId ERC20 token id
+    /// @param _tokenAddress ERC20 token address
     /// @param _amount Amount in ERC20 tokens
-    function transferOut(address _to, uint16 _tokenId, uint256 _amount) internal {
-        if (_tokenId == 0) {
+    function transferOut(address _to, uint16 _tokenAddress, uint256 _amount) internal {
+        if (_tokenAddress == address(0)) {
             _to.transfer(_amount);
         } else {
-            address tokenAddr = governance.tokenAddresses(_tokenId);
             require(
-                IERC20(tokenAddr).transfer(_to, _amount),
-                "lctt11"
-            ); // lctt11 - token transfer out failed
+                IERC20(_tokenAddress).transfer(_to, _amount),
+                "sstt11"
+            ); // sstt11 - token transfer out failed
         }
     }
     
     /// @notice Adds new validator
     /// @dev Only owner can add new validator
-    /// @param _addr Validator address
+    /// @param _address Validator address
     /// @param _pbkxx Validator pubkey xx
     /// @param _pbkxy Validator pubkey xy
     /// @param _pbkyx Validator pubkey yx
     /// @param _pbkyy Validator pubkey yy
     function addValidator(
-        address _addr,
+        address _address,
         uint256 _pbkxx,
         uint256 _pbkxy,
         uint256 _pbkyx,
@@ -187,11 +174,11 @@ contract LendingToken is BlsVerifier {
     ) external {
         requireOwner();
         require(
-            !validatorsInfo[_addr].exists,
-            "osar11"
-        ); // osar11 - operator exists
-        validatorsInfo[_addr].exists = true;
-        validatorsInfo[_addr].pubkey = BlsOperations.G2Point({
+            !validatorsInfo[_address].exists,
+            "ssar11"
+        ); // ssar11 - operator exists
+        validatorsInfo[_address].exists = true;
+        validatorsInfo[_address].pubkey = BlsOperations.G2Point({
                 x: [
                     _pbkxx,
                     _pbkxy
@@ -206,10 +193,10 @@ contract LendingToken is BlsVerifier {
 
     /// @notice Gets allowed withdraw amount for validator
     /// @dev Requires validators' existance
-    /// @param _addr Validator address
-    function getAllowedWithdrawAmount(address _addr) public returns (uint256) {
-        if (totalSupply-totalBorrowed >= validatorsInfo[_addr].supply) {
-            return validatorsInfo[_addr].supply;
+    /// @param _address Validator address
+    function getAllowedWithdrawAmount(address _address) public returns (uint256) {
+        if (totalSupply-totalBorrowed >= validatorsInfo[_address].supply) {
+            return validatorsInfo[_address].supply;
         } else {
             return totalSupply-totalBorrowed;
         }
@@ -221,8 +208,8 @@ contract LendingToken is BlsVerifier {
     function withdrawForValidator(uint256 _amount) external {
         require(
             getAllowedWithdrawAmount(msg.sender) >= _amount,
-            "osar11"
-        ); // osar11 - wrong amount
+            "sswr11"
+        ); // sswr11 - wrong amount
         immediateWithdraw(amount);
     }
 
@@ -238,8 +225,8 @@ contract LendingToken is BlsVerifier {
     function immediateWithdraw(uint256 _amount) internal {
         require(
             _amount > 0,
-            "osar11"
-        ); // osar11 - wrong amount
+            "ssir11"
+        ); // ssir11 - wrong amount
         transferOut(msg.sender, matterToken, _amount);
         totalSupply -= _amount;
         validatorsInfo[msg.sender].supply -= _amount;
@@ -247,21 +234,21 @@ contract LendingToken is BlsVerifier {
 
     /// @notice Removes validator for current processing list
     /// @dev Requires owner as sender and validators' existance
-    /// @param _addr Validator address
+    /// @param _address Validator address
     function removeValidator(
-        address _addr
+        address _address
     ) external {
         requireOwner();
         require(
-            validatorsInfo[_addr].exists,
-            "osar11"
-        ); // osar11 - operator does not exists
+            validatorsInfo[_address].exists,
+            "ssrr11"
+        ); // ssrr11 - operator does not exists
 
-        validatorsInfo[_addr].exists = false;
+        validatorsInfo[_address].exists = false;
 
         bool found = false;
         for (uint32 i = 0; i < validatorsCount-2; i++){
-            if (found || validators[i] == _addr) {
+            if (found || validators[i] == _address) {
                 found = true;
                 validators[i] = validators[i+1];
             }
@@ -272,16 +259,16 @@ contract LendingToken is BlsVerifier {
 
     /// @notice Supplies specified amount of tokens from validator
     /// @dev Calls transferIn function of specified token and fulfillDefferedWithdrawOrders to fulfill deffered withdraw orders
-    /// @param _addr Validator account address
+    /// @param _address Validator account address
     /// @param _amount Token amount
-    function supplyValidator(address _addr, uint256 _amount) public {
+    function supplyValidator(address _address, uint256 _amount) public {
         require(
-            validatorsInfo[_addr].exists,
-            "ossy11"
-        ); // ossy11 - operator does not exists
-        transferInERC20(_addr, matterToken, _amount);
-        totalSupply = _addr.add(_amount);
-        validatorsInfo[_addr] += _amount;
+            validatorsInfo[_address].exists,
+            "sssr11"
+        ); // sssr11 - operator does not exists
+        transferInERC20(_address, matterToken, _amount);
+        totalSupply = _address.add(_amount);
+        validatorsInfo[_address] += _amount;
     }
 
     /// @notice Returns validators pubkeys for specified validators addresses
@@ -321,12 +308,12 @@ contract LendingToken is BlsVerifier {
                 G1Point(_aggrSignatureX, _aggrSignatureY),
                 getValidatorsPubkeys(_validators)
             ),
-            "ltct11"
-        ); // "ltwl11" - wrong signature
+            "ssat11"
+        ); // "ssat11" - wrong signature
         require(
             exitOrders[_withdrawOpHash].status == ExitOrderState.None,
-            "ltct11"
-        ); // "ltwl11" - request exists
+            "ssat12"
+        ); // "ssat12" - request exists
         
         if (_blockNumber <= _lastVerifiedBlock) {
             // If block is already verified - try to send requested funds to recipient on rollup contract
@@ -337,30 +324,30 @@ contract LendingToken is BlsVerifier {
             );
         } else {
             // Get amount to borrow
-            (uint256 amountForFees, uint256 amountToBorrow) = getAmountNeeded(_tokenId, _tokenAmount);
+            uint256 amountToExchange = getAmountToExchange(_tokenId, _tokenAmount);
 
             // Create Exit orer
             ExitOrder order = ExitOrder(
                 ExitOrderState.None,
                 _withdrawOpOffset,
                 _tokenId,
-                0,
+                _tokenAmount,
                 _recipient
             );
             exitOrdersHashes[_blockNumber][exitOrdersCount[_blockNumber]] = _withdrawOpHash;
             exitOrders[_withdrawOpHash] = order;
             exitOrdersCount[_blockNumber]++;
 
-            if (amountToBorrow <= (totalSupply - totalBorrowed)) {
+            if (amountToExchange <= (totalSupply - totalBorrowed)) {
                 // If amount to borrow <= borrowable amount - immediate swift exit
-                immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToBorrow, amountForFees);
+                immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToExchange);
             } else {
                 // If amount to borrow > borrowable amount - deffered swift exit order
                 exitOrders[_withdrawOpHash].status = ExitOrderState.Deffered;
                 emit UpdatedExitOrder(
                     _blockNumber,
                     _withdrawOpHash,
-                    (amountToBorrow * possiblePriceRisingCoeff) - totalSupply + totalBorrowed
+                    (amountToExchange * possiblePriceRisingCoeff) - totalSupply + totalBorrowed
                 );
             }
         }
@@ -378,25 +365,26 @@ contract LendingToken is BlsVerifier {
     ) external {
         require(
             _blockNumber > lastVerifiedBlock,
-            "ltfl12"
-        ); // "ltfl12" - block is already verified
+            "ssfl11"
+        ); // "ssfl11" - block is already verified
         require(
             exitOrders[_withdrawOpHash].status == ExitOrderState.Deffered,
-            "ltfl12"
-        ); // "ltfl12" - not deffered
+            "ssfl12"
+        ); // "ssfl12" - not deffered order
 
         supplyValidator(msg.sender, _sendingAmount);
         
         ExitOrder order = exitOrders[_withdrawOpHash];
 
         uint256 updatedAmount = 0;
-        (uint256 amountToBorrow, uint256 amountForFees) = getAmountNeeded(order.tokenId, order.tokenAmount);
-        if (amountToBorrow <= (totalSupply - totalBorrowed)) {
+        uint256 amountToExchange = getAmountToExchange(order.tokenId, order.tokenAmount);
+
+        if (amountToExchange <= (totalSupply - totalBorrowed)) {
             // If amount to borrow <= borrowable amount - immediate swift exit
-            immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToBorrow, amountForFees);
+            immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToExchange);
         } else {
             // If amount to borrow > borrowable amount - emit update deffered swift exit order event
-            updatedAmount = (amountToBorrow * possiblePriceRisingCoeff) - totalSupply + totalBorrowed;
+            updatedAmount = (amountToExchange * possiblePriceRisingCoeff) - totalSupply + totalBorrowed;
         }
         emit UpdatedExitOrder(
             _blockNumber,
@@ -406,99 +394,104 @@ contract LendingToken is BlsVerifier {
     }
 
     /// @notice Processes immediatly swift exit
-    /// @dev Creates fee orders, exhanges tokens with compound, transfers token to recepient and creades swift order on rollup contract
+    /// @dev Exhanges tokens with compound, transfers token to recepient and creades swift order on rollup contract
     /// @param _blockNumber Rollup block number
     /// @param _withdrawOpHash Withdraw operation hash
-    /// @param _amountToBorrow Amount to borrow from validators
-    /// @param _amountForFees Amount to calculate fees for validators
+    /// @param _amountToExchange Amount to borrow from validators and exchange with compound
     function immediateSwiftExit(
         uint32 _blockNumber,
         uint256 _withdrawOpHash,
-        uint256 _amountToBorrow,
-        uint256 _amountForFees
+        uint256 _amountToExchange
     ) internal {
         ExitOrder order = exitOrders[_withdrawOpHash];
 
-        createBorrowOrders(_withdrawOpHash, _amountToBorrow, _amountForFees);
+        uint256 recievedTokenAmount = borrowFromCompound(order.tokenId, _amountToExchange);
+        
+        exchangeWithRecipient(order.recipient, order.tokenId, recievedTokenAmount);
 
-        uint256 tokenAmountToWithdraw = exchangeWithCompound(order.tokenId, _amountToBorrow);
-
-        transferOut(order.receiver, tokenAddr, tokenAmountToWithdraw);
+        createBorrowOrders(_withdrawOpHash, _amountToExchange);
 
         rollup.orderSwiftExit(_blockNumber, order.withdrawOpOffset, _withdrawOpHash);
 
-        exitOrders[_withdrawOpHash].tokenAmount = tokenAmountToWithdraw;
+        exitOrders[_withdrawOpHash].tokenAmount = recievedTokenAmount;
         exitOrders[_withdrawOpHash].status = ExitOrderState.Fulfilled;
-        totalBorrowed += _amountToBorrow;
+        totalBorrowed += _amountToExchange;
     }
 
-    function exchangeWithCompound(
+    /// @notice Exchanges specified amount of token with recipient
+    /// @param _recipient Recipient address
+    /// @param _tokenId Token id
+    /// @param _amount Token amount
+    function exchangeWithRecipient(address _recipient, uint16 _tokenId, uint256 _amount) internal {
+        address tokenAddress = governance.tokenAddresses(_tokenId);
+        transferOut(_recipient, tokenAddress, _amount);
+    }
+
+    /// @notice Borrows specified amount from compound
+    /// @param _tokenId Token id
+    /// @param _amount Amount of validators supply to exchange for token
+    function borrowFromCompound(
         uint16 _tokenId,
-        uint256 _amountToExchange
+        uint256 _amount
     ) internal returns (uint256 tokenAmount) {
         address tokenAddress = governance.tokenAddresses(_tokenId);
         // register token on compount if needed
         // exchange possible value
     }
 
-    function getAmountNeeded(
+    /// @notice Repays specified amount to compound
+    /// @param _tokenId Token id
+    /// @param _amount Amount of validators supply to exchange for token
+    function repayToCompound(
         uint16 _tokenId,
-        uint256 _tokenAmount
-    ) internal returns (uint256 amountToBorrow, uint256 amountForFees) {
+        uint256 _amount
+    ) internal {
         address tokenAddress = governance.tokenAddresses(_tokenId);
-        // get token rate and calculate fees its amount
-        // get amount of supply for complete exchange for this token amount
-        // multiply by 3 to get complete amount to possible punishment
+        // register token on compount if needed
+        // exchange possible value
     }
 
+    /// @notice Returns amound of validators supply to exchange for token
+    /// @param _tokenId Token id
+    /// @param _tokenAmount Token amount
+    function getAmountToExchange(
+        uint16 _tokenId,
+        uint256 _tokenAmount
+    ) internal returns (uint256 amountToExchange) {
+        address tokenAddress = governance.tokenAddresses(_tokenId);
+        address matterAddress = governance.tokenAddresses(matterToken);
+
+        uint256 collateralFactor = compound.takeCollateralFactor(matterAddress);
+
+        uint256 tokenPrice = compound.takePrice(tokenAddress);
+
+        amountToExchange = _tokenAmount * tokenPrice / collateralFactor;
+    }
+
+    /// @notice Creates borrow orders for specified exit request
+    /// @param _withdrawOpHash Withdraw operation hash
+    /// @param _amountToBorrow Amount of validators supply to borrow
     function createBorrowOrders(
         uint256 _withdrawOpHash,
-        uint256 _amountToBorrow,
-        uint256 _amountForFees
+        uint256 _amountToBorrow
     ) internal {
-        (uint256 bir, uint256 sir) = getCurrentInterestRates();
-
-        (uint256 borrowerFee, uint256 validatorsFees, uint256 ownerFee) = calculateFees(_amountForFees, bir, sir);
-
         for (uint32 i = 0; i <= validatorCount; i++) {
             uint32 currentBorrowOrdersCount = borrowOrdersCount[_withdrawOpHash];
             BorrowOrders[_withdrawOpHash][currentBorrowOrdersCount] = BorrowOrder({
                 borrowed: _amountToBorrow * (validatorsInfo[validators[i]].supply / totalSupply),
-                fee: validatorsFees * (validatorsInfo[validators[i]].supply / totalSupply),
                 validator: validators[i]
             });
             borrowOrdersCount[_withdrawOpHash]++;
         }
-        uint32 currentBorrowOrdersCount = borrowOrdersCount[_withdrawOpHash];
-        BorrowOrders[_withdrawOpHash][currentBorrowOrdersCount] = BorrowOrder({
-            borrowed: _amountToBorrow * (validatorsInfo[owner].supply / totalSupply),
-            fee: ownerFee + validatorsFees * (validatorsInfo[owner].supply / totalSupply),
-            validator: owner
-        });
-        borrowOrdersCount[_withdrawOpHash]++;
     }
 
-    function calculateFees(
-        uint256 _amount,
-        uint256 _borrowingInterestRate,
-        uint256 _supplyInterestRate
-    ) internal pure returns (uint256 borrowerFee, uint256 validatorsFees, uint256 ownerFee) {
-        borrowerFee = bir * _amount;
-        validatorsFees = borrowerFee * sir;
-        ownerFee = borrowerFee - validatorsFees;
-    }
-
-    function getCurrentInterestRates() public pure returns (uint256 _borrowing, uint256 _supply) {
-        uint256 u = totalBorrowed / (totalSupply + totalBorrowed);
-        _borrowing = MULTIPLIER * u + BASE_RATE;
-        _supply = _borrowing * u * (1 - SPREAD);
-    }
-
-    /// @notice Called by Rollup contract when a new block is verified. Fulfills swift orders process
-    /// @dev Requires Rollup contract as caller. Repays for compound, consummate fees, fulfills deffered orders, punishes for failed exits
+    /// @notice Called by Rollup contract when a new block is verified. Completes swift orders process
+    /// @dev Requires Rollup contract as caller. Transacts tokens and ether, repays for compound, fulfills deffered orders, punishes for failed exits
     /// @param _blockNumber The number of verified block
     /// @param _succeededHashes The succeeds exists hashes list
     /// @param _failedHashes The failed exists hashes list
+    /// @param _tokenAddresses Repaid tokens
+    /// @param _tokenAmounts Repaid tokens amounts
     function newVerifiedBlock(
         uint32 _blockNumber,
         address[] calldata _validators,
@@ -510,8 +503,8 @@ contract LendingToken is BlsVerifier {
         requireRollup();
         require(
             _tokenAddresses.length == _tokenAmounts.length,
-            "ltfl12"
-        ); // "ltfl12" - not deffered
+            "ssnk11"
+        ); // "ssnk11" - token addresses array length must be equal token amounts array length
         for (uint i = 0; i < token.length; i++) {
             transferInERC20(msg.sender, _tokenAddresses[i], _tokenAmounts[i]);
         }
@@ -525,7 +518,7 @@ contract LendingToken is BlsVerifier {
     function repayCompoundSucceded(uint256[] memory _succeededHashes) internal {
         for (uint32 i = 0; i < _succeededHashes.length; i++) {
             ExitOrder order = exitOrders[_succeededHashes[i]];
-            // repay compound
+            repayToCompound(order.tokenId, order.tokenAmount);
         }
     }
 
@@ -533,8 +526,6 @@ contract LendingToken is BlsVerifier {
         for (uint32 i = 0; i < _succeededHashes.length; i++) {
             for (uint32 k = 0; k < borrowOrdersCount[_succeededHashes[i]]; k++) {
                 BorrowOrder order = BorrowOrders[_succeededHashes[i]][k];
-                validatorsInfo[order.validator].supply += order.fee;
-                totalSupply += order.fee;
                 totalBorrowed -= order.borrowed;
             }
         }
@@ -557,37 +548,26 @@ contract LendingToken is BlsVerifier {
          for (uint32 i = 0; i < _failedHashes.length; i++) {
             for (uint32 k = 0; k < borrowOrdersCount[_failedHashes[i]]; k++) {
                 BorrowOrder order = BorrowOrders[_succeededHashes[i]][k];
-                validatorsInfo[order.validator].supply -= borrowed;
+                validatorsInfo[order.validator].supply -= order.borrowed;
                 totalSupply -= order.borrowed;
                 totalBorrowed -= order.borrowed;
             }
         }
     }
 
-    // function getIntersection(address[] memory _orderValidators, address[] memory _blockValidators) internal returns (address[] memory intersection) {
-    //     for (uint32 i = 0; i < _orderValidators.length; i++) {
-    //         for (uint32 j = 0; j < _blockValidators.length; j++) {
-    //             if (_orderValidators[i] == _blockValidators[j]) {
-    //                 intersection.push(_orderValidators[i]);
-    //                 break;
-    //             }
-    //         }
-    //     }
-    // }
-
     /// @notice Check if the sender is rollup contract
     function requireRollup() internal view {
         require(
             msg.sender == rollupAddress,
-            "ltrn11"
-        ); // ltrn11 - only by rollup
+            "ssrp11"
+        ); // ssrp11 - only by rollup
     }
 
     /// @notice Check if the sender is owner contract
     function requireOwner() internal view {
         require(
             msg.sender == owner,
-            "ltrr11"
-        ); // ltrr11 - only by owner
+            "ssrr21"
+        ); // ssrr21 - only by owner
     }
 }
