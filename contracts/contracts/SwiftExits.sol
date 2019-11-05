@@ -305,16 +305,22 @@ contract LendingToken is BlsVerifier {
     ) external {
         requireOwner();
         require(
-            blsVerifier.verifyBlsSignature(
-                G1Point(_aggrSignatureX, _aggrSignatureY),
-                getValidatorsPubkeys(_validators)
-            ),
+            _validators.length > 0,
             "ssat11"
-        ); // "ssat11" - wrong signature
+        ); // "ssat11" - validators count must be > 0
+        if (_validators.length > 1) {
+            require(
+                blsVerifier.verifyBlsSignature(
+                    G1Point(_aggrSignatureX, _aggrSignatureY),
+                    getValidatorsPubkeys(_validators)
+                ),
+                "ssat12"
+            ); // "ssat12" - wrong signature
+        }
         require(
             exitOrders[_withdrawOpHash].status == ExitOrderState.None,
-            "ssat12"
-        ); // "ssat12" - request exists
+            "ssat13"
+        ); // "ssat13" - request exists
         
         if (_blockNumber <= _lastVerifiedBlock) {
             // If block is already verified - try to send requested funds to recipient on rollup contract
@@ -549,6 +555,16 @@ contract LendingToken is BlsVerifier {
         }
     }
 
+    /// @notice Sends fees to rollup
+    /// @param _validator Validator address
+    /// @param _tokenId Token id
+    /// @param _amount Token amount
+    function sendFeeToRollup(address _validator, uint16 _tokenId, uint256 _fee) internal {
+        if (_fee > 0) {
+            franklin.depositOnchain(_validator, _tokenId, _fee);
+        }
+    }
+
     /// @notice Fulfills all deffered orders
     /// @dev Instantly sends from rollup to recipient for all deffered orders from specified block
     /// @param _blockNumber Block number
@@ -572,9 +588,11 @@ contract LendingToken is BlsVerifier {
          for (uint32 i = 0; i < _failedHashes.length; i++) {
             for (uint32 k = 0; k < borrowOrdersCount[_failedHashes[i]]; k++) {
                 BorrowOrder order = BorrowOrders[_succeededHashes[i]][k];
-                validatorsInfo[order.validator].supply -= order.borrowed;
-                totalSupply -= order.borrowed;
-                totalBorrowed -= order.borrowed;
+                if (order.borrowed > 0) {
+                    validatorsInfo[order.validator].supply -= order.borrowed;
+                    totalSupply -= order.borrowed;
+                    totalBorrowed -= order.borrowed;
+                }
             }
         }
     }

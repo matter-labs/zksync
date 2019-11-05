@@ -15,7 +15,7 @@ Main components:
 ## Swift exit algorithm
 
 Simplified swift exit process without special cases of early verified block and punishment of validators:
-![Algorithm scheme](https://i.imgur.com/FkLM2GN.png)
+![Algorithm scheme](https://i.imgur.com/6nHBY2f.png)
 
 All process we can divide into 3 parts:
 - Sidechain: user creates operation and swift exit request, consensus signs it
@@ -50,8 +50,8 @@ All process we can divide into 3 parts:
 3. `SwiftExits` contract will repay a debt to `Compound` and will get validators tokens, fees will be sent to validators accounts on `Rollup` contract
 4. If the verified block does not have the corresponding withdrawal operation, but `RepaymentRequest` for it created, the punishment process will start. An intersection of the validators who signed the swift exit request and the validators who verified the block without corresponding withdraw operation will be found. The borrowed amount will be held from them in no return. The rest of the validators will receive their tokens
 
-Full swift exit process without special cases of early verified block and punishment of validators. Contains complete inner contracts logic:
-[Algorithm scheme](https://i.imgur.com/5UDLLGi.png)
+<!-- Full swift exit process without special cases of early verified block and punishment of validators. Contains complete inner contracts logic:
+[Algorithm scheme](https://i.imgur.com/5UDLLGi.png) -->
 
 <!-- ## Contract creation
 
