@@ -509,21 +509,18 @@ contract LendingToken is BlsVerifier {
             transferInERC20(msg.sender, _tokenAddresses[i], _tokenAmounts[i]);
         }
         lastVerifiedBlock = _blockNumber;
-        repayCompoundSucceded(_succeededHashes);
         fulfillSuccededOrders(_succeededHashes);
         punishForFailedOrders(_failedHashes, _validators);
         fulfillDefferedExitOrders(_blockNumber);
     }
 
-    function repayCompoundSucceded(uint256[] memory _succeededHashes) internal {
-        for (uint32 i = 0; i < _succeededHashes.length; i++) {
-            ExitOrder order = exitOrders[_succeededHashes[i]];
-            repayToCompound(order.tokenId, order.tokenAmount);
-        }
-    }
-
+    /// @notice Fulfills all succeeded orders
+    /// @dev Repays to compound and reduces total borrowed
+    /// @param _succeededHashes Succeeded orders hashes
     function fulfillSuccededOrders(uint256[] memory _succeededHashes) internal {
         for (uint32 i = 0; i < _succeededHashes.length; i++) {
+            ExitOrder exitOrder = exitOrders[_succeededHashes[i]];
+            repayToCompound(exitOrder.tokenId, exitOrder.tokenAmount);
             for (uint32 k = 0; k < borrowOrdersCount[_succeededHashes[i]]; k++) {
                 BorrowOrder order = BorrowOrders[_succeededHashes[i]][k];
                 totalBorrowed -= order.borrowed;
@@ -531,6 +528,9 @@ contract LendingToken is BlsVerifier {
         }
     }
 
+    /// @notice Fulfills all deffered orders
+    /// @dev Instantly sends from rollup to recipient for all deffered orders from specified block
+    /// @param _blockNumber Block number
     function fulfillDefferedExitOrders(uint32 _blockNumber) internal {
         for (uint32 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
             ExitOrder order = exitOrders[exitOrdersHashes[i]];
@@ -544,6 +544,9 @@ contract LendingToken is BlsVerifier {
         }
     }
 
+    /// @notice Punishes for failed orders
+    /// @dev Reduces validators supplies for failed orders, reduces total borrow
+    /// @param _succeededHashes Succeeded orders hashes
     function punishForFailed(uint256[] memory _failedHashes) internal {
          for (uint32 i = 0; i < _failedHashes.length; i++) {
             for (uint32 k = 0; k < borrowOrdersCount[_failedHashes[i]]; k++) {
