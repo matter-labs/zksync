@@ -494,7 +494,6 @@ contract LendingToken is BlsVerifier {
     /// @param _tokenAmounts Repaid tokens amounts
     function newVerifiedBlock(
         uint32 _blockNumber,
-        address[] calldata _validators,
         uint256[] calldata _succeededHashes,
         uint256[] calldata _failedHashes,
         address[] calldata _tokenAddresses,
@@ -510,7 +509,7 @@ contract LendingToken is BlsVerifier {
         }
         lastVerifiedBlock = _blockNumber;
         fulfillSuccededOrders(_succeededHashes);
-        punishForFailedOrders(_failedHashes, _validators);
+        punishForFailedOrders(_failedHashes);
         fulfillDefferedExitOrders(_blockNumber);
     }
 
