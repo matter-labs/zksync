@@ -97,10 +97,10 @@ pub struct CommitRequest {
     pub accounts_updated: AccountUpdates,
 }
 
-pub const ACTION_COMMIT: &str = "Commit";
-pub const ACTION_VERIFY: &str = "Verify";
+pub const ACTION_COMMIT: &str = "COMMIT";
+pub const ACTION_VERIFY: &str = "VERIFY";
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Serialize, Deserialize)]
 pub enum ActionType {
     COMMIT,
     VERIFY,
@@ -111,6 +111,21 @@ impl std::string::ToString for ActionType {
         match self {
             ActionType::COMMIT => ACTION_COMMIT.to_owned(),
             ActionType::VERIFY => ACTION_VERIFY.to_owned(),
+        }
+    }
+}
+
+impl std::str::FromStr for ActionType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            ACTION_COMMIT => Ok(Self::COMMIT),
+            ACTION_VERIFY => Ok(Self::VERIFY),
+            _ => Err(format!(
+                "Should be either: {} or {}",
+                ACTION_COMMIT, ACTION_VERIFY
+            )),
         }
     }
 }

@@ -1,101 +1,213 @@
-use crate::ThreadPanicNotify;
-use futures::Future;
-use jsonrpc_core::{IoHandler, MetaIoHandler, BoxFuture, Params};
-use jsonrpc_core::{Error, Result, ErrorCode};
-use jsonrpc_derive::rpc;
-use jsonrpc_http_server::ServerBuilder;
-use models::node::{Account, AccountAddress, AccountId, FranklinTx};
-use std::sync::{mpsc, Arc, Mutex};
-use futures::sync::mpsc as fmpsc;
-use storage::{ConnectionPool, StorageProcessor, Token, TxAddError};
+#![allow(clippy::needless_return)]
 
-use jsonrpc_pubsub::{PubSubHandler, Session, typed::Subscriber, SubscriptionId};
+use super::event_notify::{start_sub_notifier, EventSubscribe};
+use crate::api_server::event_notify::EventNotifierRequest;
+use crate::api_server::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
+use crate::ThreadPanicNotify;
+use futures::sync::mpsc as fmpsc;
+use futures::Future;
+use jsonrpc_core::MetaIoHandler;
+use jsonrpc_core::Result;
+use jsonrpc_derive::rpc;
+use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
-use serde_json::Value;
-use models::StateKeeperRequest;
-use super::event_notify::EventSubscribe;
-use rand::Rng;
+use models::node::tx::TxHash;
+use models::node::{Account, AccountAddress};
+use models::{ActionType, Operation};
+use std::net::SocketAddr;
+use std::sync::{mpsc, Arc};
+use storage::ConnectionPool;
 
 #[rpc]
 pub trait RpcPubSub {
     type Metadata;
 
-    /// Hello subscription
-    #[pubsub(subscription = "hello", subscribe, name = "hello_subscribe", alias("hello_sub"))]
-    fn subscribe(&self, meta: Self::Metadata, subscriber: Subscriber<Account>, param: AccountAddress);
+    #[pubsub(subscription = "tx", subscribe, name = "tx_subscribe", alias("tx_sub"))]
+    fn subscribe_tx(
+        &self,
+        meta: Self::Metadata,
+        subscriber: Subscriber<TransactionInfoResp>,
+        hash: TxHash,
+        action_type: ActionType,
+    );
+    #[pubsub(subscription = "tx", unsubscribe, name = "tx_unsubscribe")]
+    fn unsubscribe_tx(
+        &self,
+        meta: Option<Self::Metadata>,
+        subscription: SubscriptionId,
+    ) -> Result<bool>;
 
-    /// Unsubscribe from hello subscription.
-    #[pubsub(subscription = "hello", unsubscribe, name = "hello_unsubscribe")]
-    fn unsubscribe(&self, meta: Option<Self::Metadata>, subscription: SubscriptionId) -> Result<bool>;
+    #[pubsub(
+        subscription = "eth_op",
+        subscribe,
+        name = "ethop_subscribe",
+        alias("ethop_sub")
+    )]
+    fn subscribe_ethop(
+        &self,
+        meta: Self::Metadata,
+        subscriber: Subscriber<ETHOpInfoResp>,
+        serial_id: u64,
+        action_type: ActionType,
+    );
+    #[pubsub(subscription = "eth_op", unsubscribe, name = "ethop_unsubscribe")]
+    fn unsubscribe_ethop(
+        &self,
+        meta: Option<Self::Metadata>,
+        subscription: SubscriptionId,
+    ) -> Result<bool>;
+
+    #[pubsub(
+        subscription = "account",
+        subscribe,
+        name = "account_subscribe",
+        alias("account_sub")
+    )]
+    fn subscribe_account(
+        &self,
+        meta: Self::Metadata,
+        subscriber: Subscriber<Account>,
+        addr: AccountAddress,
+        action_type: ActionType,
+    );
+    #[pubsub(subscription = "account", unsubscribe, name = "account_unsubscribe")]
+    fn unsubscribe_account(
+        &self,
+        meta: Option<Self::Metadata>,
+        subscription: SubscriptionId,
+    ) -> Result<bool>;
 }
 
-impl RpcSubApp {
-}
+impl RpcSubApp {}
 
 impl RpcPubSub for RpcSubApp {
     type Metadata = Arc<Session>;
 
-
     // subscribe - sub id, sink
     // unsub - sub id
 
-    fn subscribe(&self, _meta: Self::Metadata, subscriber: Subscriber<Acount>, param: AccountAddress) {
-        let sub_id = rand::thread_rng().gen::<u64>();
-//            if param != 10 {
-//                subscriber
-//                    .reject(Error {
-//                        code: ErrorCode::InvalidParams,
-//                        message: "Rejecting subscription - invalid parameters provided.".into(),
-//                        data: None,
-//                    })
-//                    .unwrap();
-//                return;
-//            }
-
-
-
-//        let id = self.uid.fetch_add(1, atomic::Ordering::SeqCst);
-//        let sub_id = SubscriptionId::Number(id as u64);
-//        let sink = subscriber.assign_id(sub_id.clone()).unwrap();
-//        self.active.write().unwrap().insert(sub_id, sink);
+    fn subscribe_tx(
+        &self,
+        _meta: Self::Metadata,
+        subscriber: Subscriber<TransactionInfoResp>,
+        hash: TxHash,
+        action: ActionType,
+    ) {
+        self.event_sub_sender
+            .clone()
+            .try_send(EventNotifierRequest::Sub(
+                EventSubscribe::Transaction {
+                    hash,
+                    action,
+                    subscriber,
+                }, //TODO PRINT ERR
+            ))
+            .unwrap_or_default();
+    }
+    fn unsubscribe_tx(&self, _meta: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
+        self.event_sub_sender
+            .clone()
+            .try_send(EventNotifierRequest::Unsub(id))
+            .unwrap_or_default();
+        Ok(true)
     }
 
-    fn unsubscribe(&self, _meta: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
+    fn subscribe_ethop(
+        &self,
+        _meta: Self::Metadata,
+        subscriber: Subscriber<ETHOpInfoResp>,
+        serial_id: u64,
+        action: ActionType,
+    ) {
+        self.event_sub_sender
+            .clone()
+            .try_send(EventNotifierRequest::Sub(
+                EventSubscribe::PriorityOp {
+                    serial_id,
+                    action,
+                    subscriber,
+                }, //TODO PRINT ERR
+            ))
+            .unwrap_or_default();
+    }
+    fn unsubscribe_ethop(&self, _meta: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
+        self.event_sub_sender
+            .clone()
+            .try_send(EventNotifierRequest::Unsub(id))
+            .unwrap_or_default();
         Ok(true)
-//        let removed = self.active.write().unwrap().remove(&id);
-//        if removed.is_some() {
-//            Ok(true)
-//        } else {
-//            Err(Error {
-//                code: ErrorCode::InvalidParams,
-//                message: "Invalid subscription.".into(),
-//                data: None,
-//            })
-//        }
+    }
+
+    fn subscribe_account(
+        &self,
+        _meta: Self::Metadata,
+        subscriber: Subscriber<Account>,
+        address: AccountAddress,
+        action: ActionType,
+    ) {
+        self.event_sub_sender
+            .clone()
+            .try_send(EventNotifierRequest::Sub(
+                EventSubscribe::Account {
+                    address,
+                    action,
+                    subscriber,
+                }, //TODO PRINT ERR
+            ))
+            .unwrap_or_default();
+    }
+
+    fn unsubscribe_account(
+        &self,
+        _meta: Option<Self::Metadata>,
+        id: SubscriptionId,
+    ) -> Result<bool> {
+        self.event_sub_sender
+            .clone()
+            .try_send(EventNotifierRequest::Unsub(id))
+            .unwrap_or_default();
+        Ok(true)
     }
 }
 
 struct RpcSubApp {
-    event_sub_req: fmpsc::Sender<EventSubscribe>,
+    event_sub_sender: fmpsc::Sender<EventNotifierRequest>,
 }
 
-fn start_ws_server() {
-//    let (event_sub_sender, event_sub_receiver) = fmpsc::channel(2048);
+pub fn start_ws_server(
+    op_recv: fmpsc::Receiver<Operation>,
+    db_pool: ConnectionPool,
+    addr: SocketAddr,
+    panic_notify: mpsc::Sender<bool>,
+) {
+    let (event_sub_sender, event_sub_receiver) = fmpsc::channel(2048);
 
     let mut io = PubSubHandler::new(MetaIoHandler::default());
 
-    let rpc_sub_app = RpcSubApp;
+    let req_rpc_app = super::rpc_server::RpcApp {
+        connection_pool: db_pool.clone(),
+    };
+    req_rpc_app.extend(&mut io);
+
+    let rpc_sub_app = RpcSubApp { event_sub_sender };
 
     io.extend_with(rpc_sub_app.to_delegate());
 
+    start_sub_notifier(db_pool, op_recv, event_sub_receiver, panic_notify.clone());
+
     std::thread::Builder::new()
-        .name("json_rpc_ws".to_string()).spawn(move || {
-        let server =
-            jsonrpc_ws_server::ServerBuilder::with_meta_extractor(io, |context: &RequestContext| std::sync::Arc::new(Session::new(context.sender())))
-                .start(&"127.0.0.1:3031".parse().unwrap())
-                .expect("Unable to start RPC ws server");
+        .name("json_rpc_ws".to_string())
+        .spawn(move || {
+            let _panic_sentinel = ThreadPanicNotify(panic_notify);
 
-        server.wait();
-    }).expect("JSON RPC ws thread");
+            let server = jsonrpc_ws_server::ServerBuilder::with_meta_extractor(
+                io,
+                |context: &RequestContext| std::sync::Arc::new(Session::new(context.sender())),
+            )
+            .start(&addr)
+            .expect("Unable to start RPC ws server");
+
+            server.wait().expect("rpc ws server start");
+        })
+        .expect("JSON RPC ws thread");
 }
-

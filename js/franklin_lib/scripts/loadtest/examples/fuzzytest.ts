@@ -1,5 +1,5 @@
 /**
- * Here we create a lot of wallets, 
+ * Here we create a lot of wallets,
  * assign a lot of totally random operations to them,
  * and watch the server struggle.
  */
@@ -8,7 +8,7 @@ import fs, { exists } from 'fs';
 async function test(): Promise<void> {
     const tester: Tester = await Tester.new({
         initNumWallets: 10,
-        randomSeed: 'whateverstring'
+        randomSeed: 'whateverstring',
     });
 
     const exit = () => {
@@ -16,7 +16,7 @@ async function test(): Promise<void> {
         console.log(`saving result to ${path} and exiting`);
         fs.writeFileSync(path, tester.dump());
         process.exit(0);
-    }
+    };
 
     process.once('SIGINT', exit);
 
@@ -29,4 +29,4 @@ async function test(): Promise<void> {
     exit();
 }
 
-test()
+test();

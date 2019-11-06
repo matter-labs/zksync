@@ -1,6 +1,6 @@
 /**
  * Here we create a lot of wallets,
- * every 
+ * every
  */
 import { Tester } from '../Tester';
 import fs, { exists } from 'fs';
@@ -9,7 +9,7 @@ import { bigNumberify, BigNumber, BigNumberish } from 'ethers/utils';
 async function test(): Promise<void> {
     const tester: Tester = await Tester.new({
         initNumWallets: 3,
-        randomSeed: 'whateverstring'
+        randomSeed: 'whateverstring',
     });
 
     const exit = async () => {
@@ -17,15 +17,31 @@ async function test(): Promise<void> {
         console.log(`saving result to ${path} and exiting`);
         fs.writeFileSync(path, await tester.dump());
         process.exit(0);
-    }
+    };
 
     process.once('SIGINT', exit);
 
     tester.wallets.forEach(w => {
-        tester.addOperation(tester.randomReceiveMoneyOperation({wallet: w, token: tester.tokens[0], amount: bigNumberify('1' + '0'.repeat(20))}));
-        tester.addOperation(tester.randomReceiveMoneyOperation({wallet: w, token: tester.tokens[1], amount: bigNumberify('1' + '0'.repeat(7))}));
-        tester.addOperation(tester.randomDepositOperation({wallet: w, token: tester.tokens[0], amount: bigNumberify('100000')}));
-        tester.addOperation(tester.randomDepositOperation({wallet: w, token: tester.tokens[1], amount: bigNumberify('100000')}));
+        tester.addOperation(
+            tester.randomReceiveMoneyOperation({
+                wallet: w,
+                token: tester.tokens[0],
+                amount: bigNumberify('1' + '0'.repeat(20)),
+            }),
+        );
+        tester.addOperation(
+            tester.randomReceiveMoneyOperation({
+                wallet: w,
+                token: tester.tokens[1],
+                amount: bigNumberify('1' + '0'.repeat(7)),
+            }),
+        );
+        tester.addOperation(
+            tester.randomDepositOperation({ wallet: w, token: tester.tokens[0], amount: bigNumberify('100000') }),
+        );
+        tester.addOperation(
+            tester.randomDepositOperation({ wallet: w, token: tester.tokens[1], amount: bigNumberify('100000') }),
+        );
         // tester.addOperation(tester.randomWithdrawOperation({walletr: w, token: tester.tokens[0], amount: bigNumberify('100000')}));
     });
 
@@ -42,4 +58,4 @@ async function test(): Promise<void> {
     exit();
 }
 
-test()
+test();

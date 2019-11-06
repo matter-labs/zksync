@@ -1,13 +1,13 @@
-import { AbstractOperation } from './AbstractOperation'
+import { AbstractOperation } from './AbstractOperation';
 import { Wallet, Token } from '../../src/wallet';
 import { LocalWallet } from './LocalWallet';
 import { BigNumberish, BigNumber } from 'ethers/utils';
 
 interface DepositOperationKwargs {
-    wallet: LocalWallet,
-    token: Token,
-    amount: BigNumber,
-    fee: BigNumber
+    wallet: LocalWallet;
+    token: Token;
+    amount: BigNumber;
+    fee: BigNumber;
 }
 
 export class DepositOperation extends AbstractOperation {

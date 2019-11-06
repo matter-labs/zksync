@@ -212,11 +212,11 @@ endif
 
 ifeq (dev,$(FRANKLIN_ENV))
 stop: confirm_action
-	@kubectl delete deployments --selector=app=dev-server
-	@kubectl delete deployments --selector=app=dev-prover
-	@kubectl delete deployments --selector=app=dev-nginx
-	@kubectl delete svc --selector=app=dev-server
-	@kubectl delete svc --selector=app=dev-nginx
+	#@kubectl delete deployments --selector=app=dev-server
+	#@kubectl delete deployments --selector=app=dev-prover
+	#@kubectl delete deployments --selector=app=dev-nginx
+	#@kubectl delete svc --selector=app=dev-server
+	#@kubectl delete svc --selector=app=dev-nginx
 	# not deleting postgres, geth and tesseract resources assuming they are being used for development too.
 else ifeq (ci,$(FRANKLIN_ENV))
 stop:

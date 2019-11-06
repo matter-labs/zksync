@@ -94,7 +94,7 @@ struct StorageBalance {
     pub balance: BigDecimal,
 }
 
-#[derive(Insertable, QueryableByName, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Clone, Insertable, QueryableByName, Queryable, Serialize, Deserialize)]
 #[table_name = "tokens"]
 pub struct Token {
     pub id: i32,
@@ -152,7 +152,7 @@ impl NewExecutedTransaction {
     fn prepare_stored_tx(exec_tx: &ExecutedTx, block: BlockNumber) -> Self {
         Self {
             block_number: i64::from(block),
-            tx_hash: exec_tx.tx.hash().to_vec(),
+            tx_hash: exec_tx.tx.hash().as_ref().to_vec(),
             operation: exec_tx.op.clone().map(|o| serde_json::to_value(o).unwrap()),
             success: exec_tx.success,
             fail_reason: exec_tx.fail_reason.clone(),
@@ -640,8 +640,12 @@ pub struct StorageProcessor {
 fn restore_account(
     stored_account: StorageAccount,
     stored_balances: Vec<StorageBalance>,
+    tokens: &[Token],
 ) -> (AccountId, Account) {
     let mut account = Account::default();
+    for t in tokens {
+        account.set_balance(t.id as TokenId, BigDecimal::from(0));
+    }
     for b in stored_balances.into_iter() {
         assert_eq!(b.account_id, stored_account.id);
         account.set_balance(b.coin_id as TokenId, b.balance);
@@ -1182,6 +1186,7 @@ impl StorageProcessor {
             let balances: Vec<Vec<StorageBalance>> = StorageBalance::belonging_to(&accounts)
                 .load(self.conn())?
                 .grouped_by(&accounts);
+            let tokens = self.load_tokens()?;
 
             let last_block = accounts
                 .iter()
@@ -1193,7 +1198,7 @@ impl StorageProcessor {
                 .into_iter()
                 .zip(balances.into_iter())
                 .map(|(stored_account, balances)| {
-                    let (id, account) = restore_account(stored_account, balances);
+                    let (id, account) = restore_account(stored_account, balances, &tokens);
                     (id, account)
                 })
                 .collect();
@@ -1529,14 +1534,26 @@ impl StorageProcessor {
             {
                 let balances: Vec<StorageBalance> =
                     StorageBalance::belonging_to(&account).load(self.conn())?;
+                let tokens = self.load_tokens()?;
 
                 let last_block = account.last_block;
-                let (_, account) = restore_account(account, balances);
+                let (_, account) = restore_account(account, balances, &tokens);
                 Ok((last_block, Some(account)))
             } else {
                 Ok((0, None))
             }
         })
+    }
+
+    pub fn default_account_with_address(
+        &self,
+        address: &AccountAddress,
+    ) -> QueryResult<models::node::Account> {
+        let mut acc = models::node::Account::default_with_address(address);
+        for t in self.load_tokens()? {
+            acc.set_balance(t.id as TokenId, BigDecimal::from(0));
+        }
+        Ok(acc)
     }
 
     // Verified, commited states.
@@ -1983,7 +2000,7 @@ impl StorageProcessor {
         }
 
         let tx_failed = executed_transactions::table
-            .filter(executed_transactions::tx_hash.eq(tx.hash().to_vec()))
+            .filter(executed_transactions::tx_hash.eq(tx.hash().as_ref().to_vec()))
             .filter(executed_transactions::success.eq(false))
             .first::<StoredExecutedTransaction>(self.conn())
             .optional()?;
@@ -1997,7 +2014,7 @@ impl StorageProcessor {
             // TODO Check tx and add only txs with valid nonce.
             insert_into(mempool::table)
                 .values(&InsertTx {
-                    hash: tx.hash().to_vec(),
+                    hash: tx.hash().as_ref().to_vec(),
                     primary_account_address: tx.account().data.to_vec(),
                     nonce: i64::from(tx.nonce()),
                     tx: serde_json::to_value(tx).unwrap(),

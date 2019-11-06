@@ -1,14 +1,14 @@
-import { AbstractOperation } from './AbstractOperation'
+import { AbstractOperation } from './AbstractOperation';
 import { Wallet, Token } from '../../src/wallet';
 import { LocalWallet } from './LocalWallet';
 import { BigNumberish, BigNumber } from 'ethers/utils';
 
 interface TransferOperationKwargs {
-    wallet1: LocalWallet,
-    wallet2: LocalWallet,
-    token: Token,
-    amount: BigNumber,
-    fee: BigNumber
+    wallet1: LocalWallet;
+    wallet2: LocalWallet;
+    token: Token;
+    amount: BigNumber;
+    fee: BigNumber;
 }
 
 export class TransferOperation extends AbstractOperation {
@@ -18,6 +18,11 @@ export class TransferOperation extends AbstractOperation {
 
     public async action(): Promise<void> {
         this.logStart(`trying transfer (${this.kwargs.token.id} | ${this.kwargs.amount.toString()})`);
-        await this.kwargs.wallet1.sendTransaction(this.kwargs.wallet2, this.kwargs.token, this.kwargs.amount, this.kwargs.fee);
+        await this.kwargs.wallet1.sendTransaction(
+            this.kwargs.wallet2,
+            this.kwargs.token,
+            this.kwargs.amount,
+            this.kwargs.fee,
+        );
     }
 }

@@ -1,10 +1,12 @@
 use crate::ThreadPanicNotify;
 use futures::Future;
-use jsonrpc_core::IoHandler;
 use jsonrpc_core::{Error, Result};
+use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
+use models::node::tx::TxHash;
 use models::node::{Account, AccountAddress, AccountId, FranklinTx};
+use std::net::SocketAddr;
 use std::sync::mpsc;
 use storage::{ConnectionPool, StorageProcessor, Token, TxAddError};
 
@@ -36,6 +38,12 @@ pub struct ETHOpInfoResp {
     pub block: Option<BlockInfo>,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ChainInfoResp {
+    pub contract_address: String,
+    pub tokens: Vec<Token>,
+}
+
 #[rpc]
 pub trait Rpc {
     #[rpc(name = "account_info")]
@@ -43,15 +51,21 @@ pub trait Rpc {
     #[rpc(name = "ethop_info")]
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp>;
     #[rpc(name = "tx_info")]
-    fn tx_info(&self, hash: String) -> Result<TransactionInfoResp>;
+    fn tx_info(&self, hash: TxHash) -> Result<TransactionInfoResp>;
     #[rpc(name = "tx_submit")]
-    fn tx_submit(&self, tx: FranklinTx) -> Result<String>;
-    #[rpc(name = "chain_tokens")]
-    fn chain_tokens(&self) -> Result<Vec<Token>>;
+    fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash>;
+    #[rpc(name = "chain_info")]
+    fn chain_info(&self) -> Result<ChainInfoResp>;
 }
 
-struct RpcApp {
-    connection_pool: ConnectionPool,
+pub struct RpcApp {
+    pub connection_pool: ConnectionPool,
+}
+
+impl RpcApp {
+    pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
+        io.extend_with(self.to_delegate())
+    }
 }
 
 impl RpcApp {
@@ -68,17 +82,30 @@ impl Rpc for RpcApp {
         let account = storage
             .account_state_by_address(&addr)
             .map_err(|_| Error::internal_error())?;
-        let default_account = || Account::default_with_address(&addr);
+        let get_default_account = || {
+            storage
+                .default_account_with_address(&addr)
+                .map_err(|_| Error::internal_error())
+        };
+
+        let id = account.commited.as_ref().map(|(id, _)| *id);
+
+        let commited = if let Some((_, account)) = account.commited {
+            account
+        } else {
+            get_default_account()?
+        };
+
+        let verified = if let Some((_, account)) = account.verified {
+            account
+        } else {
+            get_default_account()?
+        };
+
         Ok(AccountInfoResp {
-            id: account.commited.as_ref().map(|(id, _)| *id),
-            commited: account
-                .commited
-                .map(|(_, acc)| acc)
-                .unwrap_or_else(default_account),
-            verified: account
-                .verified
-                .map(|(_, acc)| acc)
-                .unwrap_or_else(default_account),
+            id,
+            commited,
+            verified,
         })
     }
 
@@ -105,11 +132,10 @@ impl Rpc for RpcApp {
         })
     }
 
-    fn tx_info(&self, tx_hash: String) -> Result<TransactionInfoResp> {
-        let hash = decode_hash(&tx_hash)?;
+    fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
         let storage = self.access_storage()?;
         let stored_receipt = storage
-            .tx_receipt(&hash)
+            .tx_receipt(tx_hash.as_ref())
             .map_err(|_| Error::internal_error())?;
         Ok(if let Some(stored_receipt) = stored_receipt {
             TransactionInfoResp {
@@ -132,15 +158,14 @@ impl Rpc for RpcApp {
         })
     }
 
-    fn tx_submit(&self, tx: FranklinTx) -> Result<String> {
-        let hash = hex::encode(tx.hash().as_ref());
+    fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash> {
         let storage = self.access_storage()?;
 
         let tx_add_result = storage
             .mempool_add_tx(&tx)
             .map_err(|_| Error::internal_error())?;
 
-        tx_add_result.map(|_| hash).map_err(|e| {
+        tx_add_result.map(|_| tx.hash()).map_err(|e| {
             let code = match &e {
                 TxAddError::NonceTooLow => 101,
                 TxAddError::InvalidSignature => 102,
@@ -154,39 +179,43 @@ impl Rpc for RpcApp {
         })
     }
 
-    fn chain_tokens(&self) -> Result<Vec<Token>> {
-        Ok(self
+    fn chain_info(&self) -> Result<ChainInfoResp> {
+        let storage = self.access_storage()?;
+        let contract_address = storage
+            .load_config()
+            .map_err(|_| Error::internal_error())?
+            .contract_addr
+            .expect("contract_addr missing");
+
+        let tokens = self
             .access_storage()?
             .load_tokens()
-            .map_err(|_| Error::internal_error())?)
+            .map_err(|_| Error::internal_error())?;
+
+        Ok(ChainInfoResp {
+            contract_address,
+            tokens,
+        })
     }
 }
 
-fn decode_hash(hash: &str) -> Result<Vec<u8>> {
-    let vec = hex::decode(hash).map_err(|e| Error::invalid_params(e.to_string()))?;
-    if vec.len() == 32 {
-        Ok(vec)
-    } else {
-        Err(Error::invalid_params("hash len mismatch"))
-    }
-}
-
-pub fn start_rpc_server(connection_pool: ConnectionPool, panic_notify: mpsc::Sender<bool>) {
+pub fn start_rpc_server(
+    addr: SocketAddr,
+    connection_pool: ConnectionPool,
+    panic_notify: mpsc::Sender<bool>,
+) {
     std::thread::Builder::new()
-        .name("json_rpc".to_string())
+        .name("json_rpc_http".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
             let mut io = IoHandler::new();
 
             let rpc_app = RpcApp { connection_pool };
-            io.extend_with(rpc_app.to_delegate());
+            rpc_app.extend(&mut io);
 
-            let server = ServerBuilder::new(io)
-                .threads(1)
-                .start_http(&"127.0.0.1:3030".parse().unwrap())
-                .unwrap();
+            let server = ServerBuilder::new(io).threads(1).start_http(&addr).unwrap();
 
             server.wait();
         })
-        .expect("JSON rpc thread");
+        .expect("JSON-RPC http thread");
 }

@@ -1,222 +1,232 @@
 import BN = require('bn.js');
-import Axios from 'axios';
 import {
     privateKeyFromSeed,
     privateKeyToPublicKey,
-    pubkeyToAddress, serializePointPacked, signTransactionBytes,
+    pubkeyToAddress,
+    serializePointPacked,
+    signTransactionBytes,
 } from './crypto';
-import {Contract, ContractTransaction, ethers, utils} from 'ethers';
-import {packAmount, packFee} from "./utils";
-import {curve} from "elliptic";
-import EventSource from 'eventsource';
+import { Contract, ContractTransaction, ethers, utils } from 'ethers';
+import { packAmount, packFee } from './utils';
+import { curve } from 'elliptic';
+import {
+    Address,
+    CloseTx,
+    DepositTx,
+    ETHAccountState,
+    FullExitReq,
+    Nonce,
+    SidechainAccountState,
+    TokenLike,
+    TransferTx,
+    WithdrawTx,
+} from './types';
+import { SidechainProvider } from './provider';
 
-const IERC20ConractInterface = new utils.Interface(require("../abi/IERC20.json").interface);
-const franklinContractInterface = new utils.Interface(require("../abi/Franklin.json").interface);
-const priorityQueueInterface = new utils.Interface(require("../abi/PriorityQueue.json").interface);
+const IERC20ConractInterface = new utils.Interface(require('../abi/IERC20.json').interface);
+const sidechainMainContractInterface = new utils.Interface(require('../abi/Franklin.json').interface);
+const priorityQueueInterface = new utils.Interface(require('../abi/PriorityQueue.json').interface);
 
-export type Address = string;
+export class Wallet {
+    address: Address;
+    walletKeys: WalletKeys;
 
-export interface Token {
-    id: number,
-    address: string,
-    symbol?: string,
-}
-// token, symbol/eth erc20 contract address, token id
-export type TokenLike = Token | string | number;
-export type Nonce= number | "commited" | "pending";
-
-export interface FranklinAccountBalanceState {
-    address: Address,
-    nonce: number,
-    balances: any[],
-}
-
-export interface FranklinAccountState {
-    id?: number,
-    commited: FranklinAccountBalanceState,
-    verified: FranklinAccountBalanceState,
-    pending_txs: any[],
-}
-
-interface ETHAccountState {
-    onchainBalances: utils.BigNumber[],
-    contractBalances: utils.BigNumber[],
-}
-
-export class FranklinProvider {
-    cachedTokens: [Token];
-    constructor(public providerAddress: string = 'http://127.0.0.1:3000', public contractAddress: string = process.env.CONTRACT_ADDR){}
-
-    static prepareTransferRequestForNode(tx: TransferTx, signature) {
-        let req: any = tx;
-        req.type = "Transfer";
-        req.from = tx.from;
-        req.to = tx.to;
-        req.amount = utils.bigNumberify(tx.amount).toString();
-        req.fee = utils.bigNumberify(tx.fee).toString();
-        req.signature = signature;
-        return req;
+    constructor(seed: Buffer, public provider: SidechainProvider, public ethWallet: ethers.Signer) {
+        const { privateKey } = privateKeyFromSeed(seed);
+        this.walletKeys = new WalletKeys(privateKey);
+        this.address = `0x${pubkeyToAddress(this.walletKeys.publicKey).toString('hex')}`;
     }
 
-    static prepareWithdrawRequestForNode(tx: WithdrawTx, signature) {
-        let req: any = tx;
-        req.type = "Withdraw";
-        req.account = tx.account;
-        req.amount = utils.bigNumberify(tx.amount).toString();
-        req.fee = utils.bigNumberify(tx.fee).toString();
-        req.signature = signature;
-        return req;
+    protected async depositETH(amount: utils.BigNumberish, maxFee: utils.BigNumberish) {
+        const mainSidechainContract = new Contract(
+            this.provider.sideChainInfo.contract_address,
+            sidechainMainContractInterface,
+            this.ethWallet,
+        );
+        return await mainSidechainContract.depositETH(amount, this.address, {
+            value: utils.bigNumberify(amount).add(maxFee),
+            gasLimit: utils.bigNumberify('200000'),
+        });
     }
 
-    static prepareCloseRequestForNode(tx: CloseTx, signature) {
-        let req: any = tx;
-        req.type = "Close";
-        req.account = tx.account;
-        req.signature = signature;
-        return req;
+    protected async approveERC20(tokenLike: TokenLike, amount: utils.BigNumberish, options?: Object) {
+        const token = await this.provider.resolveToken(tokenLike);
+        const erc20contract = new Contract(token.address, IERC20ConractInterface, this.ethWallet);
+        return await erc20contract.approve(this.provider.sideChainInfo.contract_address, amount, options);
     }
 
-    async submitTx(tx) {
-        return await Axios.post(this.providerAddress + '/api/v0.1/submit_tx', tx)
-            .then(reps => reps.data)
+    protected async depositApprovedERC20(
+        tokenLike: TokenLike,
+        amount: utils.BigNumberish,
+        maxEthFee: utils.BigNumberish,
+        options?: Object,
+    ) {
+        const token = await this.provider.resolveToken(tokenLike);
+        const mainSidechainContract = new Contract(
+            this.provider.sideChainInfo.contract_address,
+            sidechainMainContractInterface,
+            this.ethWallet,
+        );
+        return await mainSidechainContract.depositERC20(
+            token.address,
+            amount,
+            this.address,
+            Object.assign({ gasLimit: utils.bigNumberify('250000'), value: maxEthFee }, options),
+        );
     }
 
-    async getTokens() {
-        return await Axios.get(this.providerAddress + '/api/v0.1/tokens')
-            .then(reps => reps.data)
+    async deposit(tokenLike: TokenLike, amount: utils.BigNumberish, maxEthFee: utils.BigNumberish) {
+        const token = await this.provider.resolveToken(tokenLike);
+        let contractTx;
+        if (token.id === 0) {
+            contractTx = await this.depositETH(amount, maxEthFee);
+        } else {
+            await this.approveERC20(token, amount);
+            contractTx = await this.depositApprovedERC20(token, amount, maxEthFee);
+        }
+        return new DepositTransactionHandle(contractTx, { to: this.address, amount, token }, this.provider);
     }
 
-    async getTransactionsHistory(address: Address) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + address + '/transactions')
-            .then(reps => reps.data)
+    async withdrawFromContractToETHAddress(
+        tokenLike: TokenLike,
+        amount: utils.BigNumberish,
+    ): Promise<ContractTransaction> {
+        const token = await this.provider.resolveToken(tokenLike);
+        const sidechainMainContract = new Contract(
+            this.provider.sideChainInfo.contract_address,
+            sidechainMainContractInterface,
+            this.ethWallet,
+        );
+        if (token.id === 0) {
+            return await sidechainMainContract.withdrawETH(amount, { gasLimit: 200000 });
+        } else {
+            return await sidechainMainContract.withdrawERC20(token.address, amount, {
+                gasLimit: utils.bigNumberify('150000'),
+            });
+        }
     }
 
-    async getState(address: Address): Promise<FranklinAccountState> {
-        return await Axios.get(this.providerAddress + '/api/v0.1/account/' + address)
-            .then(reps => reps.data)
+    async withdrawFromSidechainToContract(
+        tokenLike: TokenLike,
+        amount: utils.BigNumberish,
+        fee: utils.BigNumberish,
+        nonce: Nonce = 'commited',
+    ): Promise<TransactionHandle> {
+        const token = await this.provider.resolveToken(tokenLike);
+        const tx = {
+            account: this.address,
+            eth_address: await this.ethWallet.getAddress(),
+            token: token.id,
+            amount,
+            fee,
+            nonce: await this.getNonce(nonce),
+        };
+        const signature = this.walletKeys.signWithdraw(tx);
+        const tx_req = SidechainProvider.prepareWithdrawTxForApi(tx, signature);
+
+        const submitResponse = await this.provider.submitTx(tx_req);
+        return new TransactionHandle(tx, submitResponse, this.provider);
     }
 
-    async getTxReceipt(tx_hash) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/transactions/' + tx_hash)
-            .then(reps => reps.data)
+    async emergencyWithdraw(tokenLike: TokenLike, nonce: Nonce = 'commited') {
+        const token = await this.provider.resolveToken(tokenLike);
+        const sidechainMainContract = new Contract(
+            this.provider.sideChainInfo.contract_address,
+            sidechainMainContractInterface,
+            this.ethWallet,
+        );
+        const nonceNumber = await this.getNonce(nonce);
+        const signature = this.walletKeys.signFullExit({
+            token: token.id,
+            eth_address: await this.ethWallet.getAddress(),
+            nonce: nonceNumber,
+        });
+        const tx = await sidechainMainContract.fullExit(
+            serializePointPacked(this.walletKeys.publicKey),
+            token.address,
+            signature,
+            nonceNumber,
+            { gasLimit: utils.bigNumberify('500000'), value: utils.parseEther('0.02') },
+        );
+        return tx.hash;
     }
 
-    async getPriorityOpStatus(opId: number) {
-        return await Axios.get(this.providerAddress + '/api/v0.1/priority_op/' + opId)
-            .then(reps => reps.data)
+    async transfer(
+        to: Address,
+        tokenLike: TokenLike,
+        amount: utils.BigNumberish,
+        fee: utils.BigNumberish,
+        nonce: Nonce = 'commited',
+    ): Promise<TransactionHandle> {
+        const token = await this.provider.resolveToken(tokenLike);
+        const tx = {
+            from: this.address,
+            to,
+            token: token.id,
+            amount,
+            fee,
+            nonce: await this.getNonce(nonce),
+        };
+        const signature = this.walletKeys.signTransfer(tx);
+        const tx_req = SidechainProvider.prepareTransferTxForApi(tx, signature);
+
+        const submitResponse = await this.provider.submitTx(tx_req);
+        return new TransactionHandle(tx, submitResponse, this.provider);
     }
 
-    async notifyPriorityOp(opId: number, action: "commit" | "verify") {
-        return await Axios.get(this.providerAddress + `/api/v0.1/priority_op_notify/${action}/${opId}`)
-            .then(reps => reps.data)
+    async close(): Promise<TransactionHandle> {
+        const tx = {
+            account: this.address,
+            nonce: await this.getNonce(),
+        };
+
+        const signature = this.walletKeys.signClose(tx);
+        const tx_req = SidechainProvider.prepareCloseRequestForApi(tx, signature);
+
+        const submitResponse = await this.provider.submitTx(tx_req);
+        return new TransactionHandle(tx, submitResponse, this.provider);
     }
 
-    async notifyTransaction(hash: string, action: "commit" | "verify") {
-        return await Axios.get(this.providerAddress + `/api/v0.1/tx_notify/${action}/${hash}`)
-            .then(reps => reps.data)
+    async getNonce(nonce: Nonce = 'commited'): Promise<number> {
+        if (nonce == 'commited') {
+            return (await this.provider.getState(this.address)).commited.nonce;
+        } else if (typeof nonce == 'number') {
+            return nonce;
+        }
     }
 
-    getAccountUpdates(address: Address, action: "commit" | "verify"): EventSource {
-        console.log("curl " + this.providerAddress + `/api/v0.1/account_updates/${action}/${address}`);
-        return new EventSource(this.providerAddress + `/api/v0.1/account_updates/${action}/${address}`);
+    static async fromEthWallet(ethWallet: ethers.Signer, sidechainProvider: SidechainProvider) {
+        const seed = (await ethWallet.signMessage('Matter login')).substr(2);
+        return new Wallet(Buffer.from(seed, 'hex'), sidechainProvider, ethWallet);
     }
 
-    async resolveToken(token: TokenLike): Promise<Token> {
-        function findToken(tokens: [Token]): Token {
-            if(typeof(token) == "string") {
-                let resolvedToken = tokens.find( (t, idx, arr) => {return t.symbol == token || t.address == token});
-                if (resolvedToken) {
-                    return resolvedToken;
-                } else {
-                    throw new Error("Token address or symbol not found");
-                }
-            } else if (typeof(token) == "number") {
-                let resolvedToken = tokens.find( (t, idx, arr) => {return t.id == token});
-                if (resolvedToken) {
-                    return resolvedToken;
-                } else {
-                    throw Error("Token id not found");
-                }
+    async getETHBalances(): Promise<ETHAccountState> {
+        const tokens = this.provider.sideChainInfo.tokens;
+        const onchainBalances = new Array<utils.BigNumber>(tokens.length);
+        const contractBalances = new Array<utils.BigNumber>(tokens.length);
+
+        const sidechainMainContract = new Contract(
+            this.provider.sideChainInfo.contract_address,
+            sidechainMainContractInterface,
+            this.ethWallet,
+        );
+        const ethAddress = await this.ethWallet.getAddress();
+        for (const token of tokens) {
+            if (token.id == 0) {
+                onchainBalances[token.id] = await this.ethWallet.provider.getBalance(ethAddress);
             } else {
-                return token;
+                const erc20token = new Contract(token.address, IERC20ConractInterface, this.ethWallet);
+                onchainBalances[token.id] = await erc20token.balanceOf(ethAddress);
             }
+            contractBalances[token.id] = await sidechainMainContract.balancesToWithdraw(ethAddress, token.id);
         }
-        // search cached tokens
 
-        try {
-            return findToken(this.cachedTokens);
-        } catch (e) {
-            this.cachedTokens = await this.getTokens();
-            return findToken(this.cachedTokens);
-        }
+        return { onchainBalances, contractBalances };
     }
-}
 
-export interface DepositTx {
-    to: Address,
-    amount: utils.BigNumberish,
-    token: Token,
-}
-
-export interface TransferTx {
-    from: Address,
-    to: Address,
-    token: number,
-    amount: utils.BigNumberish,
-    fee: utils.BigNumberish,
-    nonce: number,
-}
-
-export interface WithdrawTx {
-    account: Address,
-    eth_address: string,
-    token: number,
-    amount: utils.BigNumberish,
-    fee: utils.BigNumberish,
-    nonce: number,
-}
-
-export interface CloseTx {
-    account: Address,
-    nonce: number,
-}
-
-export interface FullExitReq {
-    token: number,
-    eth_address: string
-    nonce: number,
-}
-
-
-// Franklin or eth address
-function serializeAddress(address: Address | string): Buffer {
-    return Buffer.from(address.substr(2), "hex");
-}
-function serializeTokenId(tokenId: number): Buffer {
-    const buffer = Buffer.alloc(2);
-    buffer.writeUInt16BE(tokenId, 0);
-    return buffer;
-}
-
-function serializeAmountPacked(amount: utils.BigNumberish): Buffer {
-    let bnAmount = new BN(utils.bigNumberify(amount).toString() );
-    return packAmount(bnAmount);
-}
-
-function serializeAmountFull(amount: utils.BigNumberish): Buffer {
-    let bnAmount = new BN(utils.bigNumberify(amount).toString() );
-    return bnAmount.toArrayLike(Buffer, "be", 16);
-}
-
-function serializeFeePacked(fee: utils.BigNumberish): Buffer {
-    let bnFee = new BN(utils.bigNumberify(fee).toString());
-    return packFee(bnFee);
-}
-
-function serializeNonce(nonce: number): Buffer {
-    let buff = Buffer.alloc(4);
-    buff.writeUInt32BE(nonce, 0);
-    return buff
+    async getAccountState(): Promise<SidechainAccountState> {
+        return this.provider.getState(this.address);
+    }
 }
 
 export class WalletKeys {
@@ -227,259 +237,142 @@ export class WalletKeys {
     }
 
     signTransfer(tx: TransferTx) {
-        let type = Buffer.from([5]); // tx type
-        let from = serializeAddress(tx.from);
-        let to = serializeAddress(tx.to);
-        let token = serializeTokenId(tx.token);
-        let amount = serializeAmountPacked(tx.amount);
-        let fee = serializeFeePacked(tx.fee);
-        let nonce = serializeNonce(tx.nonce);
-        let msg = Buffer.concat([type, from, to, token, amount, fee, nonce]);
+        const type = Buffer.from([5]); // tx type
+        const from = serializeAddress(tx.from);
+        const to = serializeAddress(tx.to);
+        const token = serializeTokenId(tx.token);
+        const amount = serializeAmountPacked(tx.amount);
+        const fee = serializeFeePacked(tx.fee);
+        const nonce = serializeNonce(tx.nonce);
+        const msg = Buffer.concat([type, from, to, token, amount, fee, nonce]);
         return signTransactionBytes(this.privateKey, msg);
     }
 
     signWithdraw(tx: WithdrawTx) {
-        let type = Buffer.from([3]);
-        let account = serializeAddress(tx.account);
-        let eth_address = serializeAddress(tx.eth_address);
-        let token = serializeTokenId(tx.token);
-        let amount = serializeAmountFull(tx.amount);
-        let fee = serializeFeePacked(tx.fee);
-        let nonce = serializeNonce(tx.nonce);
-        let msg = Buffer.concat([type, account, eth_address, token, amount, fee, nonce]);
+        const type = Buffer.from([3]);
+        const account = serializeAddress(tx.account);
+        const eth_address = serializeAddress(tx.eth_address);
+        const token = serializeTokenId(tx.token);
+        const amount = serializeAmountFull(tx.amount);
+        const fee = serializeFeePacked(tx.fee);
+        const nonce = serializeNonce(tx.nonce);
+        const msg = Buffer.concat([type, account, eth_address, token, amount, fee, nonce]);
         return signTransactionBytes(this.privateKey, msg);
     }
 
     signClose(tx: CloseTx) {
-        let type = Buffer.from([4]);
-        let account = serializeAddress(tx.account);
-        let nonce = serializeNonce(tx.nonce);
+        const type = Buffer.from([4]);
+        const account = serializeAddress(tx.account);
+        const nonce = serializeNonce(tx.nonce);
 
-        let msg = Buffer.concat([type, account, nonce]);
+        const msg = Buffer.concat([type, account, nonce]);
         return signTransactionBytes(this.privateKey, msg);
     }
 
     signFullExit(op: FullExitReq) {
-        let type = Buffer.from([6]);
-        let packed_pubkey = serializePointPacked(this.publicKey);
-        let eth_address = serializeAddress(op.eth_address);
-        let token = serializeTokenId(op.token);
-        let nonce = serializeNonce(op.nonce);
-        let msg = Buffer.concat([type, packed_pubkey, eth_address, token, nonce]);
-        return Buffer.from(signTransactionBytes(this.privateKey, msg).sign, "hex");
+        const type = Buffer.from([6]);
+        const packed_pubkey = serializePointPacked(this.publicKey);
+        const eth_address = serializeAddress(op.eth_address);
+        const token = serializeTokenId(op.token);
+        const nonce = serializeNonce(op.nonce);
+        const msg = Buffer.concat([type, packed_pubkey, eth_address, token, nonce]);
+        return Buffer.from(signTransactionBytes(this.privateKey, msg).sign, 'hex');
     }
 }
 
+// Franklin or eth address
+function serializeAddress(address: Address | string): Buffer {
+    return Buffer.from(address.substr(2), 'hex');
+}
+function serializeTokenId(tokenId: number): Buffer {
+    const buffer = Buffer.alloc(2);
+    buffer.writeUInt16BE(tokenId, 0);
+    return buffer;
+}
+
+function serializeAmountPacked(amount: utils.BigNumberish): Buffer {
+    const bnAmount = new BN(utils.bigNumberify(amount).toString());
+    return packAmount(bnAmount);
+}
+
+function serializeAmountFull(amount: utils.BigNumberish): Buffer {
+    const bnAmount = new BN(utils.bigNumberify(amount).toString());
+    return bnAmount.toArrayLike(Buffer, 'be', 16);
+}
+
+function serializeFeePacked(fee: utils.BigNumberish): Buffer {
+    const bnFee = new BN(utils.bigNumberify(fee).toString());
+    return packFee(bnFee);
+}
+
+function serializeNonce(nonce: number): Buffer {
+    const buff = Buffer.alloc(4);
+    buff.writeUInt32BE(nonce, 0);
+    return buff;
+}
+
 class DepositTransactionHandle {
-    state: "Sent" | "Mined" | "Commited" | "Verified";
+    state: 'Sent' | 'Mined' | 'Commited' | 'Verified';
     priorityOpId?: utils.BigNumber;
 
-    constructor(public ethTx: ContractTransaction, public depositTx: DepositTx, public franklinProvider: FranklinProvider) {
-        this.state = "Sent";
+    constructor(
+        public ethTx: ContractTransaction,
+        public depositTx: DepositTx,
+        public sidechainProvider: SidechainProvider,
+    ) {
+        this.state = 'Sent';
     }
 
     async waitTxMine() {
-        if (this.state != "Sent") return;
+        if (this.state != 'Sent') return;
 
-        let txReceipt =  await this.ethTx.wait();
-        for (let log of txReceipt.logs) {
-            let priorityQueueLog = priorityQueueInterface.parseLog(txReceipt.logs[0]);
+        const txReceipt = await this.ethTx.wait();
+        for (const log of txReceipt.logs) {
+            const priorityQueueLog = priorityQueueInterface.parseLog(txReceipt.logs[0]);
             if (priorityQueueLog) {
                 this.priorityOpId = priorityQueueLog.values.serialId;
             }
         }
         if (!this.priorityOpId) {
-            throw "Failed to parse tx logs";
+            throw new Error('Failed to parse tx logs');
         }
 
-        this.state = "Mined"
+        this.state = 'Mined';
     }
 
     async waitCommit() {
         await this.waitTxMine();
-        if(this.state != "Mined") return;
-        await this.franklinProvider.notifyPriorityOp(this.priorityOpId.toNumber(), "commit");
-        this.state = "Commited";
+        if (this.state != 'Mined') return;
+        await this.sidechainProvider.notifyPriorityOp(this.priorityOpId.toNumber(), 'COMMIT');
+        this.state = 'Commited';
     }
 
     async waitVerify() {
         await this.waitCommit();
-        if(this.state != "Commited") return;
+        if (this.state != 'Commited') return;
 
-        await this.franklinProvider.notifyPriorityOp(this.priorityOpId.toNumber(), "verify");
-        this.state = "Verified";
+        await this.sidechainProvider.notifyPriorityOp(this.priorityOpId.toNumber(), 'VERIFY');
+        this.state = 'Verified';
     }
 }
 
 class TransactionHandle {
-    state: "Sent" | "Commited" | "Verified";
+    state: 'Sent' | 'Commited' | 'Verified';
 
-    constructor(public txData, public txHash: string, public franklinProvider: FranklinProvider) {
-        this.state = "Sent";
+    constructor(public txData, public txHash: string, public sidechainProvider: SidechainProvider) {
+        this.state = 'Sent';
     }
 
     async waitCommit() {
-        if (this.state != "Sent") return;
+        if (this.state !== 'Sent') return;
 
-        await this.franklinProvider.notifyTransaction(this.txHash, "commit");
-        this.state = "Commited";
+        await this.sidechainProvider.notifyTransaction(this.txHash, 'COMMIT');
+        this.state = 'Commited';
     }
 
     async waitVerify() {
         await this.waitCommit();
-        await this.franklinProvider.notifyTransaction(this.txHash, "verify");
-        this.state = "Verified"
-    }
-}
-
-export class Wallet {
-    address: Address;
-    walletKeys: WalletKeys;
-
-    franklinState: FranklinAccountState;
-    ethState: ETHAccountState;
-    pendingNonce: number;
-
-    constructor(seed: Buffer, public provider: FranklinProvider, public ethWallet: ethers.Signer, public ethAddress: string) {
-        let {privateKey} = privateKeyFromSeed(seed);
-        this.walletKeys = new WalletKeys(privateKey);
-        this.address = `0x${pubkeyToAddress(this.walletKeys.publicKey).toString("hex")}`;
-    }
-
-    protected async depositETH(amount: utils.BigNumberish) {
-        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractInterface, this.ethWallet);
-        return await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: utils.bigNumberify("200000")});
-    }
-
-    protected async approveERC20(token: Token, amount: utils.BigNumberish, options?: Object) {
-        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractInterface, this.ethWallet);
-        const erc20DeployedToken = new Contract(token.address, IERC20ConractInterface, this.ethWallet);
-        return await erc20DeployedToken.approve(franklinDeployedContract.address, amount, options);
-    }
-
-    protected async depositApprovedERC20(token: Token, amount: utils.BigNumberish, options?: Object) {
-        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractInterface, this.ethWallet);
-        const erc20DeployedToken = new Contract(token.address, IERC20ConractInterface, this.ethWallet);
-        return await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
-            Object.assign({gasLimit: utils.bigNumberify("300000"), value: utils.parseEther("0.05")}, options));
-    }
-
-    async deposit(token: Token, amount: utils.BigNumberish) {
-        let contract_tx;
-        if (token.id == 0) {
-            contract_tx = await this.depositETH(amount);
-        } else {
-            await this.approveERC20(token, amount);
-            contract_tx = await this.depositApprovedERC20(token, amount);
-        }
-        return new DepositTransactionHandle(contract_tx, {to: this.address, amount, token}, this.provider);
-    }
-
-    async widthdrawOnchain(tokenLike: TokenLike, amount: utils.BigNumberish): Promise<ContractTransaction> {
-        let token = await this.provider.resolveToken(tokenLike);
-        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractInterface, this.ethWallet);
-        if (token.id == 0) {
-            return await franklinDeployedContract.withdrawETH(amount, {gasLimit: 200000});
-        } else {
-            return await franklinDeployedContract.withdrawERC20(token.address, amount, {gasLimit: utils.bigNumberify("150000")});
-        }
-    }
-
-    async widthdrawOffchain(tokenLike: TokenLike, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: Nonce = "commited"): Promise<TransactionHandle> {
-        let token = await this.provider.resolveToken(tokenLike);
-        let tx = {
-            account: this.address,
-            eth_address: await this.ethWallet.getAddress(),
-            token: token.id,
-            amount,
-            fee,
-            nonce: await this.getNonce(nonce),
-        };
-        let signature = this.walletKeys.signWithdraw(tx);
-        let tx_req = FranklinProvider.prepareWithdrawRequestForNode(tx, signature);
-
-        let submitResponse = await this.provider.submitTx(tx_req);
-        return new TransactionHandle(tx, submitResponse.hash, this.provider);
-    }
-
-    async emergencyWithdraw(tokenLike: TokenLike, nonce: Nonce = "commited") {
-        let token = await this.provider.resolveToken(tokenLike);
-        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractInterface, this.ethWallet);
-        let nonceNumber = await this.getNonce(nonce);
-        let signature = this.walletKeys.signFullExit({token: token.id, eth_address: await this.ethWallet.getAddress(), nonce: nonceNumber});
-        let tx = await franklinDeployedContract.fullExit(serializePointPacked(this.walletKeys.publicKey), token.address,  signature, nonceNumber,
-            {gasLimit: utils.bigNumberify("500000"), value: utils.parseEther("0.02")});
-        return tx.hash;
-    }
-
-    async transfer(to: Address, tokenLike: TokenLike, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: Nonce = "commited"): Promise<TransactionHandle> {
-        let token = await this.provider.resolveToken(tokenLike);
-        let tx = {
-            from: this.address,
-            to,
-            token: token.id,
-            amount,
-            fee,
-            nonce: await this.getNonce(nonce),
-        };
-        let signature = this.walletKeys.signTransfer(tx);
-        let tx_req = FranklinProvider.prepareTransferRequestForNode(tx, signature);
-
-        let submitResponse = await this.provider.submitTx(tx_req).catch(e => console.log(e));
-        return new TransactionHandle(tx, submitResponse.hash, this.provider);
-    }
-
-    async close(): Promise<TransactionHandle> {
-        let tx = {
-            account: this.address,
-            nonce: await this.getNonce()
-        };
-
-        let signature = this.walletKeys.signClose(tx);
-        let tx_req = FranklinProvider.prepareCloseRequestForNode(tx, signature);
-
-        let submitResponse = await this.provider.submitTx(tx_req);
-        return new TransactionHandle(tx, submitResponse.hash, this.provider);
-    }
-
-    async getNonce(nonce: Nonce = "commited"): Promise<number> {
-        if (nonce == "commited") {
-            return (await this.provider.getState(this.address)).commited.nonce;
-        } else if (typeof(nonce) == "number") {
-            return nonce;
-        } else if (nonce == "pending") {
-            let state = await this.provider.getState(this.address);
-            return state.commited.nonce + state.pending_txs.length;
-        }
-    }
-
-    static async fromEthWallet(wallet: ethers.Signer, franklinProvider: FranklinProvider = new FranklinProvider()) {
-        let seed = (await wallet.signMessage('Matter login')).substr(2);
-        let ethAddress = await wallet.getAddress();
-        let frankinWallet = new Wallet(Buffer.from(seed, 'hex'), franklinProvider, wallet, ethAddress);
-        return frankinWallet;
-    }
-
-    async getOnchainBalances() {
-        let tokens = await this.provider.getTokens();
-        let onchainBalances = new Array<utils.BigNumber>(tokens.length);
-        let contractBalances = new Array<utils.BigNumber>(tokens.length);
-
-        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractInterface, this.ethWallet);
-        for (let token of tokens) {
-            if (token.id == 0) {
-                onchainBalances[token.id] = await this.ethWallet.provider.getBalance(this.ethAddress);
-            } else {
-                const erc20DeployedToken = new Contract(token.address, IERC20ConractInterface, this.ethWallet);
-                onchainBalances[token.id] = await erc20DeployedToken.balanceOf(this.ethAddress).then(n => n.toString());
-            }
-            contractBalances[token.id] = await franklinDeployedContract.balancesToWithdraw(this.ethAddress, token.id);
-        }
-
-        return {onchainBalances, contractBalances};
-    }
-
-    async getAccountState(): Promise<FranklinAccountState> {
-        return this.provider.getState(this.address);
+        await this.sidechainProvider.notifyTransaction(this.txHash, 'VERIFY');
+        this.state = 'Verified';
     }
 }

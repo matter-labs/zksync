@@ -16,7 +16,6 @@ use models::{node::config, StateKeeperRequest};
 use storage::ConnectionPool;
 
 use clap::{App, Arg};
-use server::api_server::rpc_server::start_rpc_server;
 
 fn main() {
     env_logger::init();
@@ -94,12 +93,10 @@ fn main() {
         stop_signal_sender.clone(),
     );
     start_api_server(
-        tx_for_state.clone(),
         ops_notify_receiver,
         connection_pool.clone(),
         stop_signal_sender.clone(),
     );
-    start_rpc_server(connection_pool.clone(), stop_signal_sender.clone());
 
     // Simple timer, pings every 100 ms
     thread::Builder::new()

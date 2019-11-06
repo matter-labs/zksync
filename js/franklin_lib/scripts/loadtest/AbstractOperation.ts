@@ -1,17 +1,17 @@
 import { LocalWallet } from './LocalWallet';
 interface AbstractOperationLog {
-    operationId: string,
-    start: string,
-    logs: string[],
-    finish: string,
-    success: boolean,
-    balanceAtStart: string[],
-    balanceAtEnd: string[]
+    operationId: string;
+    start: string;
+    logs: string[];
+    finish: string;
+    success: boolean;
+    balanceAtStart: string[];
+    balanceAtEnd: string[];
 }
 export abstract class AbstractOperation {
     private static getOperationId = (counter => () => String(++counter).padStart(3, '0'))(0);
     private info: AbstractOperationLog;
-    
+
     public constructor(public mainWallet: LocalWallet) {
         this.info = {
             operationId: `${mainWallet.franklinWallet.address.toString('hex')} ${AbstractOperation.getOperationId()}`,
@@ -20,7 +20,7 @@ export abstract class AbstractOperation {
             finish: null,
             success: null,
             balanceAtStart: null,
-            balanceAtEnd: null
+            balanceAtEnd: null,
         };
     }
 
@@ -37,9 +37,9 @@ export abstract class AbstractOperation {
         return JSON.stringify(this.info, null, 4);
     }
     public static humanReadableLogsFromJSON(json: string): string {
-        let info: AbstractOperationLog = JSON.parse(json);
-        
-        let logs = info.logs;
+        const info: AbstractOperationLog = JSON.parse(json);
+
+        const logs = info.logs;
         logs.unshift(info.start);
         logs.push(info.finish);
 
@@ -62,7 +62,7 @@ export abstract class AbstractOperation {
             this.mainWallet.resetNonce();
             this.log(`failed with ${err.message}`);
         }
-        let balanceStrings = await this.mainWallet.getBalanceForTokenAsString(this.kwargs.token);
+        const balanceStrings = await this.mainWallet.getBalanceForTokenAsString(this.kwargs.token);
         balanceStrings.forEach(this.log.bind(this));
         this.info.balanceAtEnd = balanceStrings;
         this.logFinish(`finished.`);

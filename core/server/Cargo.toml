@@ -34,9 +34,10 @@ itertools = "0.8"
 clap = "2.33.0"
 jsonrpc-core = "14.0.3"
 jsonrpc-core-client = "14.0.3"
+jsonrpc-pubsub = "14.0.3"
+jsonrpc-ws-server = "14.0.3"
 jsonrpc-http-server = "14.0.3"
 jsonrpc-derive = "14.0.3"
-jsonrpc-pubsub = "14.0.3"
 
 
 im = "12.2.0"

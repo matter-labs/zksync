@@ -31,6 +31,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
 use web3::types::Address;
 
+#[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct TxHash {
     data: [u8; 32],
 }
