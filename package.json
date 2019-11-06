@@ -33,10 +33,10 @@
     "typescript": "^3.5.3"
   },
   "scripts": {
-    "lint:ts": "tslint -c tslint.json {scripts,test,src}/**/*.ts",
-    "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test,src}/**/*.ts",
+    "lint:ts": "tslint -c tslint.json {examples,test,src}/**/*.ts",
+    "lint:ts-fix": "tslint -c tslint.json --fix {examples,test,src}/**/*.ts",
     "test": "mocha -r ts-node/register tests/**/*.test.ts",
-    "fmt": "prettier --parser typescript --write \"{src,tests,scripts}/*.ts\"",
+    "fmt": "prettier --parser typescript --write \"{src,tests,examples}/*.ts\"",
     "build": "tsc",
     "spec-test": "ts-node tests/spec-test.ts"
   }
