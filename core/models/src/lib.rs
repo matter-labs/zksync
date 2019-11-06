@@ -64,10 +64,7 @@ impl Action {
 
 impl std::string::ToString for Action {
     fn to_string(&self) -> String {
-        match self {
-            Action::Commit => "Commit".to_owned(),
-            Action::Verify { .. } => "Verify".to_owned(),
-        }
+        self.get_type().to_string()
     }
 }
 

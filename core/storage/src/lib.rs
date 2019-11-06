@@ -774,13 +774,13 @@ impl StorageProcessor {
     //
     //                let commit = operations::table
     //                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-    //                    .filter(operations::action_type.eq("Commit"))
+    //                    .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
     //                    .first::<StoredOperation>(self.conn())
     //                    .optional()?;
     //
     //                let confirm = operations::table
     //                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-    //                    .filter(operations::action_type.eq("Verify"))
+    //                    .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
     //                    .first::<StoredOperation>(self.conn())
     //                    .optional()?;
     //
@@ -920,7 +920,7 @@ impl StorageProcessor {
                     res.fail_reason = executed_tx.fail_reason;
                 }
                 if let Some(operation) = operation {
-                    if operation.action_type == "Commit" {
+                    if operation.action_type == ActionType::COMMIT.to_string() {
                         res.committed = operation.confirmed;
                     } else {
                         res.verified = operation.confirmed;
@@ -928,7 +928,7 @@ impl StorageProcessor {
                 }
                 if let Some((_mempool_tx, _executed_tx, operation)) = group_iter.next() {
                     if let Some(operation) = operation {
-                        if operation.action_type == "Commit" {
+                        if operation.action_type == ActionType::COMMIT.to_string() {
                             res.committed = operation.confirmed;
                         } else {
                             res.verified = operation.confirmed;
@@ -1349,9 +1349,9 @@ impl StorageProcessor {
             	verified.created_at as verified_at
             from blocks
             inner join eth_ops commited on
-            	commited.block_number = blocks.number and commited.action_type = 'Commit'
+            	commited.block_number = blocks.number and commited.action_type = 'COMMIT'
             left join eth_ops verified on
-            	verified.block_number = blocks.number and verified.action_type = 'Verify'
+            	verified.block_number = blocks.number and verified.action_type = 'VERIFY'
             where
             	blocks.number <= {max_block}
             order by blocks.number desc
@@ -1386,9 +1386,9 @@ impl StorageProcessor {
             	verified.created_at as verified_at
             from blocks
             inner join eth_ops commited on
-            	commited.block_number = blocks.number and commited.action_type = 'Commit'
+            	commited.block_number = blocks.number and commited.action_type = 'COMMIT'
             left join eth_ops verified on
-            	verified.block_number = blocks.number and verified.action_type = 'Verify'
+            	verified.block_number = blocks.number and verified.action_type = 'VERIFY'
             where false
                 or lower(commited.tx_hash) = $1
                 or lower(verified.tx_hash) = $1
@@ -1509,11 +1509,11 @@ impl StorageProcessor {
             let ops: Vec<StoredOperation> = diesel::sql_query(
                 "
                 SELECT * FROM operations
-                WHERE action_type = 'Commit'
+                WHERE action_type = 'COMMIT'
                 AND block_number > (
                     SELECT COALESCE(max(block_number), 0)  
                     FROM operations 
-                    WHERE action_type = 'Verify'
+                    WHERE action_type = 'VERIFY'
                 )
             ",
             )
@@ -1596,7 +1596,7 @@ impl StorageProcessor {
             if let Some(tx) = tx {
                 let commited = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
-                    .filter(operations::action_type.eq("Commit"))
+                    .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
                     .first::<StoredOperation>(self.conn())
                     .optional()?
                     .map(|c| c.confirmed)
@@ -1609,7 +1609,7 @@ impl StorageProcessor {
 
                 let verified = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
-                    .filter(operations::action_type.eq("Verify"))
+                    .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
                     .first::<StoredOperation>(self.conn())
                     .optional()?
                     .map(|v| v.confirmed)
@@ -1736,9 +1736,9 @@ impl StorageProcessor {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
                     SELECT min(block_number) as integer_value FROM operations o
-                    WHERE action_type = 'Commit'
+                    WHERE action_type = 'COMMIT'
                     AND block_number >
-                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'Verify')
+                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
                     AND NOT EXISTS 
                         (SELECT * FROM proofs WHERE block_number = o.block_number)
                     AND NOT EXISTS
