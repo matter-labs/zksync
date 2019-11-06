@@ -1,0 +1,468 @@
+{
+  "interface": [
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "totalOnchainOps",
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_amount",
+          "type": "uint128"
+        },
+        {
+          "name": "_franklinAddr",
+          "type": "bytes"
+        }
+      ],
+      "name": "depositETH",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_tokenId",
+          "type": "uint16"
+        },
+        {
+          "name": "_owner",
+          "type": "address"
+        },
+        {
+          "name": "_amount",
+          "type": "uint128"
+        },
+        {
+          "name": "_proof",
+          "type": "uint256[8]"
+        }
+      ],
+      "name": "exit",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "exodusMode",
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "totalBlocksVerified",
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_pubKey",
+          "type": "bytes"
+        },
+        {
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "name": "_signature",
+          "type": "bytes"
+        },
+        {
+          "name": "_nonce",
+          "type": "uint32"
+        }
+      ],
+      "name": "fullExit",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "name": "",
+          "type": "address"
+        },
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ],
+      "name": "exited",
+      "outputs": [
+        {
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "name": "",
+          "type": "uint64"
+        }
+      ],
+      "name": "onchainOps",
+      "outputs": [
+        {
+          "name": "opType",
+          "type": "uint8"
+        },
+        {
+          "name": "pubData",
+          "type": "bytes"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "name": "",
+          "type": "address"
+        },
+        {
+          "name": "",
+          "type": "uint16"
+        }
+      ],
+      "name": "balancesToWithdraw",
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint128"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "name": "_amount",
+          "type": "uint128"
+        },
+        {
+          "name": "_franklinAddr",
+          "type": "bytes"
+        }
+      ],
+      "name": "depositERC20",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "blocks",
+      "outputs": [
+        {
+          "name": "validator",
+          "type": "address"
+        },
+        {
+          "name": "committedAtBlock",
+          "type": "uint32"
+        },
+        {
+          "name": "operationStartId",
+          "type": "uint64"
+        },
+        {
+          "name": "onchainOperations",
+          "type": "uint64"
+        },
+        {
+          "name": "priorityOperations",
+          "type": "uint64"
+        },
+        {
+          "name": "commitment",
+          "type": "bytes32"
+        },
+        {
+          "name": "stateRoot",
+          "type": "bytes32"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_blockNumber",
+          "type": "uint32"
+        },
+        {
+          "name": "_proof",
+          "type": "uint256[8]"
+        }
+      ],
+      "name": "verifyBlock",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_blockNumber",
+          "type": "uint32"
+        },
+        {
+          "name": "_feeAccount",
+          "type": "uint24"
+        },
+        {
+          "name": "_newRoot",
+          "type": "bytes32"
+        },
+        {
+          "name": "_publicData",
+          "type": "bytes"
+        }
+      ],
+      "name": "commitBlock",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_amount",
+          "type": "uint128"
+        }
+      ],
+      "name": "withdrawETH",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_token",
+          "type": "address"
+        },
+        {
+          "name": "_amount",
+          "type": "uint128"
+        }
+      ],
+      "name": "withdrawERC20",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "totalBlocksCommitted",
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "name": "_governanceAddress",
+          "type": "address"
+        },
+        {
+          "name": "_verifierAddress",
+          "type": "address"
+        },
+        {
+          "name": "_priorityQueueAddress",
+          "type": "address"
+        },
+        {
+          "name": "_genesisAccAddress",
+          "type": "address"
+        },
+        {
+          "name": "_genesisRoot",
+          "type": "bytes32"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "constructor"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "name": "blockNumber",
+          "type": "uint32"
+        }
+      ],
+      "name": "BlockCommitted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "name": "blockNumber",
+          "type": "uint32"
+        }
+      ],
+      "name": "BlockVerified",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "name": "tokenId",
+          "type": "uint16"
+        },
+        {
+          "indexed": false,
+          "name": "amount",
+          "type": "uint128"
+        }
+      ],
+      "name": "OnchainWithdrawal",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "name": "tokenId",
+          "type": "uint16"
+        },
+        {
+          "indexed": false,
+          "name": "amount",
+          "type": "uint128"
+        },
+        {
+          "indexed": false,
+          "name": "fee",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "name": "franklinAddress",
+          "type": "bytes"
+        }
+      ],
+      "name": "OnchainDeposit",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "name": "totalBlocksVerified",
+          "type": "uint32"
+        },
+        {
+          "indexed": true,
+          "name": "totalBlocksCommitted",
+          "type": "uint32"
+        }
+      ],
+      "name": "BlocksReverted",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [],
+      "name": "ExodusMode",
+      "type": "event"
+    }
+  ]
+}

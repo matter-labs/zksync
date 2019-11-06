@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "esModuleInterop": true,
+    "lib": [ "es2015", "es5", "dom" ],
+    "module": "commonjs",
+    "target": "es5",
+    "moduleResolution": "node",
+
+    "outDir": "./build",
+
+    "declaration": true,
+
+    "preserveSymlinks": true,
+
+    "preserveWatchOutput": true,
+    "pretty": false
+
+  },
+  "files": [
+    "./src/wallet.ts",
+    "./src/utils.ts",
+    "./src/crypto.ts"
+  ]
+}
