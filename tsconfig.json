@@ -17,8 +17,6 @@
 
   },
   "files": [
-    "./src/wallet.ts",
-    "./src/utils.ts",
-    "./src/crypto.ts"
+    "./src/index.ts"
   ]
 }
