@@ -729,7 +729,7 @@ contract Franklin {
             "fvk13"
         ); // fvk13 - verification failed
 
-        consummateOnchainOps(_blockNumber);
+        consummateOnchainOpsAndSwiftExits(_blockNumber);
 
         collectValidatorsFeeAndDeleteRequests(
             blocks[_blockNumber].priorityOperations,
@@ -745,11 +745,26 @@ contract Franklin {
     // (user must have possibility to withdraw funds if withdrawed)
     // Params:
     // - _blockNumber - number of block
-    function consummateOnchainOps(uint32 _blockNumber) internal {
+    function consummateOnchainOpsAndSwiftExits(uint32 _blockNumber) internal {
         uint64 start = blocks[_blockNumber].operationStartId;
         uint64 end = start + blocks[_blockNumber].onchainOperations;
+
+        uint256[] memory failed;
+        uint64 failedCount;
+
+        uint256[] memory succeeded;
+        uint64 succeededCount;
+
+        uint16[] memory tokensIds;
+        uint126[] memory tokensAmounts;
+
         for (uint64 current = start; current < end; ++current) {
             OnchainOperation memory op = onchainOps[current];
+            SwiftExit memory se = swiftExits[_blockNumber][current];
+            if (se.withdrawOpHash != uint256(keccak256(op.pubData)) && se.withdrawHash != 0) {
+                failed[failedCount] = se.withdrawOpHash;
+                failedCount++;
+            }
             if (op.opType == OpType.PartialExit) {
                 // partial exit was successful, accrue balance
                 bytes memory tokenBytes = new bytes(TOKEN_BYTES);
@@ -764,12 +779,20 @@ contract Franklin {
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
-                bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
-                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
+                if (se.withdrawOpHash == uint256(keccak256(op.pubData))) {
+                    succeeded[succeededCount] = se.withdrawOpHash;
+                    succeededCount++;
+
+                    tokensIds[succeededCount] = tokenId;
+                    tokensAmounts[succeededCount] = amount;
+                } else {
+                    bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
+                    for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
+                        ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
+                    }
+                    address ethAddr = Bytes.bytesToAddress(ethAddress);
+                    balancesToWithdraw[ethAddr][tokenId] += amount;
                 }
-                address ethAddr = Bytes.bytesToAddress(ethAddress);
-                balancesToWithdraw[ethAddr][tokenId] += amount;
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
@@ -793,6 +816,19 @@ contract Franklin {
             }
             delete onchainOps[current];
         }
+
+        // Fulfill swift exits
+        for (uint64 i = 0; i < succeededCount; i++) {
+            address tokenAddr = governance.tokenAddresses(tokensIds[i]);
+            uint256 allowence = IERC20(tokenAddr).allowence(address(this), address(swiftExits));
+            if (allowence < uint256(tokensAmounts[i])) {
+                require(
+                    IERC20(tokenAddr).approve(address(swiftExits), 1000000000000),
+                    "fw011"
+                ); // fw011 - token approve failed
+            }
+        }
+        swiftExits.newVerifiedBlock(_blockNumber, succeeded, failed, tokensIds, tokensAmounts);
     }
 
     // Checks that commitment is expired and revert blocks

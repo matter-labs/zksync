@@ -529,7 +529,7 @@ contract LendingToken is BlsVerifier {
         uint32 _blockNumber,
         uint256[] calldata _succeededHashes,
         uint256[] calldata _failedHashes,
-        address[] calldata _tokenAddresses,
+        uint16[] calldata _tokenIds,
         uint256[] calldata _tokenAmounts
     ) external payable {
         requireRollup();
@@ -538,7 +538,8 @@ contract LendingToken is BlsVerifier {
             "ssnk11"
         ); // "ssnk11" - token addresses array length must be equal token amounts array length
         for (uint i = 0; i < token.length; i++) {
-            transferInERC20(msg.sender, _tokenAddresses[i], _tokenAmounts[i]);
+            address tokenAddress = governance.tokenAddresses(_tokenIds[i]);
+            transferInERC20(msg.sender, tokenAddress, _tokenAmounts[i]);
         }
         lastVerifiedBlock = _blockNumber;
         fulfillSuccededOrders(_succeededHashes);
