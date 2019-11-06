@@ -1,0 +1,17 @@
+# about codeowners:
+# https://help.github.com/articles/about-codeowners/
+
+# notify gluk64 about changes in codeowners file
+/.github/       @gluk64
+
+# notify gluk64 about changes in docs
+/docs/          @gluk64
+*.md            @gluk64
+
+# notify dvush about any circuit, prover and server changes
+/core/circuit/  @dvush
+/core/server/   @dvush
+/core/prover/   @dvush
+
+# notify BaldyAsh and dvush about contracts changes
+/contracts/     @dvush @BaldyAsh

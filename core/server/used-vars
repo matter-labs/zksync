@@ -1,0 +1,43 @@
+# By folder:
+
+## server
+
+BIND_TO
+PORT
+CONTRACT_ADDR
+WEB3_URL
+GOVERNANCE_ADDR
+PRIORITY_QUEUE_ADDR
+OPERATOR_FRANKLIN_ADDRESS
+
+## eth_client
+
+CONTRACT_ADDR
+OPERATOR_PRIVATE_KEY
+OPERATOR_ETH_ADDRESS
+CHAIN_ID
+GAS_PRICE_FACTOR
+
+## models
+
+TX_BATCH_SIZE
+CONTRACT_ADDR
+MAX_OUTSTANDING_TXS
+
+# storage
+
+DATABASE_URL
+DB_POOL_SIZE
+
+
+# Vars to dynamically update:
+
+CONTRACT_ADDR - changes often, on each contract build
+GOVERNANCE_ADDR - changes on contract deploy
+PRIORITY_QUEUE_ADDR - changes on contract deploy
+
+
+# Vars pointing to external services:
+
+WEB3_URL
+DATABASE_URL

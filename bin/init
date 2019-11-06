@@ -2,7 +2,8 @@
 
 set -e
 
-franklin dev-up
+check-environment.sh
+
 franklin env
 franklin yarn || true # It can fail.
 franklin db-wait
@@ -10,3 +11,4 @@ franklin db-setup
 franklin build-contracts
 franklin genesis
 franklin redeploy
+echo done.

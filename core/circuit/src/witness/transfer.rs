@@ -7,7 +7,6 @@ use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::params as franklin_constants;
-use num_traits::cast::ToPrimitive;
 use pairing::bn256::*;
 
 use models::node::TransferOp;
@@ -356,6 +355,7 @@ mod test {
     use super::*;
     use franklin_crypto::eddsa::{PrivateKey, PublicKey};
     use models::params as franklin_constants;
+    use models::primitives::bytes_into_be_bits;
 
     use crate::circuit::FranklinCircuit;
     use bellman::Circuit;
@@ -371,7 +371,6 @@ mod test {
     use models::circuit::utils::*;
     use models::merkle_tree::PedersenHasher;
     use models::node::tx::PackedPublicKey;
-    use models::primitives::bytes_into_be_bits;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     #[ignore]
@@ -424,7 +423,7 @@ mod test {
 
         let mut from_leaf_number: u32 = rng.gen();
         from_leaf_number %= capacity;
-        let from_leaf_number_fe = Fr::from_str(&from_leaf_number.to_string()).unwrap();
+        let _from_leaf_number_fe = Fr::from_str(&from_leaf_number.to_string()).unwrap();
 
         let mut to_leaf_number: u32 = rng.gen();
         to_leaf_number %= capacity;
@@ -450,7 +449,7 @@ mod test {
         )
         .unwrap();
 
-        let transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
+        let _transfer_amount_encoded: Fr = le_bit_vector_into_field_element(&transfer_amount_bits);
 
         let fee: u128 = 7;
 
@@ -462,10 +461,10 @@ mod test {
         )
         .unwrap();
 
-        let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
+        let _fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
         let token: u32 = 2;
-        let token_fe = Fr::from_str(&token.to_string()).unwrap();
+        let _token_fe = Fr::from_str(&token.to_string()).unwrap();
         let block_number = Fr::from_str("1").unwrap();
         // prepare state, so that we could make transfer
         let mut from_balance_tree =
@@ -517,7 +516,7 @@ mod test {
             generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
 
         let packed_public_key = PackedPublicKey(from_pk);
-        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
         let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))
@@ -566,11 +565,9 @@ mod test {
 
             println!("{}", cs.num_constraints());
 
-            let err = cs.which_is_unsatisfied();
-            if err.is_some() {
-                panic!("ERROR satisfying in {}", err.unwrap());
+            if let Some(err) = cs.which_is_unsatisfied() {
+                panic!("ERROR satisfying in {}", err);
             }
         }
     }
-
 }

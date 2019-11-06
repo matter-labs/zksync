@@ -78,8 +78,9 @@ impl DataRestoreDriver {
                         self.connection_pool.clone(),
                     )?;
                     // Update operations
-                    let new_ops_blocks =
-                        storage_interactor::get_ops_blocks_from_storage(self.connection_pool.clone())?;
+                    let new_ops_blocks = storage_interactor::get_ops_blocks_from_storage(
+                        self.connection_pool.clone(),
+                    )?;
                     // Update tree
                     self.update_tree_state(new_ops_blocks)?;
                 }
@@ -90,7 +91,7 @@ impl DataRestoreDriver {
             // If state is unknown then its empty or broken - start from beginning
             let genesis_acc_map = get_genesis_state()?;
             self.accounts_state = FranklinAccountsState::load(genesis_acc_map.0, genesis_acc_map.1);
-            return Ok(());
+            Ok(())
         }
     }
 
@@ -124,10 +125,9 @@ impl DataRestoreDriver {
     }
 
     fn update_events_state(&mut self) -> Result<(), DataRestoreError> {
-        let events = self.events_state.update_events_state(
-            self.eth_blocks_delta.clone(),
-            self.end_eth_blocks_delta.clone(),
-        )?;
+        let events = self
+            .events_state
+            .update_events_state(self.eth_blocks_delta, self.end_eth_blocks_delta)?;
         info!("Got new events");
 
         // Store events

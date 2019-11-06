@@ -4,6 +4,10 @@
 
 Install docker.
 
+## Minikube
+
+https://kubernetes.io/docs/tasks/tools/install-minikube
+
 ## Node & Yarn
 
 Install Node.
@@ -31,7 +35,7 @@ brew link --force gettext
 
 ## Rust
 
-Install the latest rust version (>= 1.32):
+Install the latest rust version (>= 1.32) https://www.rust-lang.org/tools/install:
 
 ```
 rustc --version

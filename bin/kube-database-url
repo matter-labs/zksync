@@ -1,0 +1,4 @@
+#!/bin/bash
+
+# For more details see service configuration at <project>/etc/kube/minikube/postgres.yaml
+echo postgres://postgres@$(bin/cluster-ip):$(kubectl get svc postgres -o=jsonpath='{.spec.ports[0].nodePort}')/plasma

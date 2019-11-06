@@ -28,13 +28,10 @@ then
     eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
     set +o allexport
 
-    # Postprocessing for all configs
-
-    export KUBECONFIG=etc/kube/clusters/kubeconfig-main.yaml
-
-    # if [[ $FIXMODE ]]; then
-    #     export WEB3_URL=http://localhost:8545
-    # fi
+    if [ "dev" != "$FRANKLIN_ENV" ]
+    then
+        export KUBECONFIG=etc/kube/clusters/kubeconfig-main.yaml
+    fi
 
     popd > /dev/null
 fi
