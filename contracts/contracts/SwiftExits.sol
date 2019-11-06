@@ -107,24 +107,29 @@ contract LendingToken is BlsVerifier {
     );
 
     /// @notice Construct swift exits contract
+    /// @param _owner The address of this contracts owner (Matter Labs)
+    constructor(address _owner) public {
+        owner = _owner;
+    }
+
+    /// @notice Add addresses of related contracts
+    /// @dev Requires owner
     /// @param _matterTokenAddress The address of Matter token
     /// @param _governanceAddress The address of Governance contract
     /// @param _rollupAddress The address of Rollup contract
     /// @param _blsVerifierAddress The address of Bls Verifier contract
-    /// @param _owner The address of this contracts owner (Matter Labs)
-    constructor(
+    function setupRelatedContracts(
         address _matterTokenAddress,
         address _governanceAddress,
         address _rollupAddress,
-        address _blsVerifierAddress,
-        address _owner
-    ) public {
+        address _blsVerifierAddress
+    ) external {
+        requireOwner();
         governance = Governance(_governanceAddress);
         rollup = Franklin(_rollupAddress);
         lastVerifiedBlock = rollup.totalBlocksVerified;
         blsVerifier = BlsVerifier(_blsVerifierAddress);
         matterToken = _matterTokenId;
-        owner = _owner;
     }
 
     /// @notice Fallback function always reverts
@@ -327,7 +332,8 @@ contract LendingToken is BlsVerifier {
             rollup.trySwiftExitWithdraw(
                 _blockNumber,
                 _withdrawOpOffset,
-                _withdrawOpHash
+                _withdrawOpHash,
+                _recipient
             );
         } else {
             // Get amount to borrow
@@ -401,7 +407,7 @@ contract LendingToken is BlsVerifier {
     }
 
     /// @notice Processes immediatly swift exit
-    /// @dev Exhanges tokens with compound, transfers token to recepient and creades swift order on rollup contract
+    /// @dev Exhanges tokens with compound, transfers token to recipient and creades swift order on rollup contract
     /// @param _blockNumber Rollup block number
     /// @param _withdrawOpHash Withdraw operation hash
     /// @param _amountToExchange Amount to borrow from validators and exchange with compound
@@ -422,7 +428,7 @@ contract LendingToken is BlsVerifier {
 
         createBorrowOrders(_withdrawOpHash, _amountToExchange, _validatorsFee, _ownerFee);
 
-        rollup.orderSwiftExit(_blockNumber, order.withdrawOpOffset, _withdrawOpHash);
+        rollup.orderSwiftExit(_blockNumber, order.withdrawOpOffset, _withdrawOpHash, order.recipient);
 
         exitOrders[_withdrawOpHash].tokenAmount = recievedTokenAmount;
         exitOrders[_withdrawOpHash].status = ExitOrderState.Fulfilled;
@@ -561,7 +567,14 @@ contract LendingToken is BlsVerifier {
     /// @param _amount Token amount
     function sendFeeToRollup(address _validator, uint16 _tokenId, uint256 _fee) internal {
         if (_fee > 0) {
-            franklin.depositOnchain(_validator, _tokenId, _fee);
+            address tokenAddr = governance.tokenAddresses(tokenId);
+            if (tokenId > 0) {
+                require(
+                    IERC20(tokenAddr).approve(address(rollup), _fee),
+                    "fw011"
+                ); // fw011 - token approve failed
+            }
+            rollup.depositOnchain(_validator, _tokenId, _fee);
         }
     }
 
@@ -575,7 +588,8 @@ contract LendingToken is BlsVerifier {
                 rollup.trySwiftExitWithdraw(
                     _blockNumber,
                     order.withdrawOpOffset,
-                    order.withdrawOpHash
+                    order.withdrawOpHash,
+                    order.recipient
                 );
             }
         }

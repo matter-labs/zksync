@@ -12,6 +12,8 @@ import "./SwiftExits.sol";
 // - check overflows
 
 contract Franklin {
+    // Swift exits contract
+    SwiftExits internal swiftExits;
     // Verifier contract
     Verifier internal verifier;
     // Governance contract
@@ -147,8 +149,7 @@ contract Franklin {
         PartialExit,
         CloseAccount,
         Transfer,
-        FullExit,
-        Lending
+        FullExit
     }
 
     // Onchain operations -- processed inside blocks (see docs)
@@ -187,19 +188,19 @@ contract Franklin {
 
     // mapping (uint32 => bool) tokenMigrated;
 
-    // // Lendings
-    mapping(uint16 => address) internal ledingsAddresses;
+    // SwiftExits
+    mapping(uint32 => mapping(uint64 => SwiftExit)) internal swiftExits;
 
-    struct BorrowRequest{
-        bool processed;
-        uint24 from;
-        uint16 tokenId;
-        uint128 amount;
+    struct SwiftExit{
+        uint256 withdrawOpHash;
+        address recipient;
     }
 
-    event WithdrawAvailableForBorrow(
-        uint64 index,
-        bytes pubData
+    event NewSwiftExit(
+        uint32 blockNumber,
+        uint64 withdrawOpOffset,
+        uint256 withdrawOpHash,
+        address recipient
     );
 
     // MARK: - CONSTRUCTOR
@@ -207,12 +208,14 @@ contract Franklin {
     // Inits verifier, verification key and governance contracts instances,
     // sets genesis root
     constructor(
+        address _swiftExitsAddress,
         address _governanceAddress,
         address _verifierAddress,
         address _priorityQueueAddress,
         address _genesisAccAddress,
         bytes32 _genesisRoot
     ) public {
+        swiftExits = SwiftExits(_swiftExitsAddress);
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
         priorityQueue = PriorityQueue(_priorityQueueAddress);
@@ -307,9 +310,10 @@ contract Franklin {
     // Withdraw ETH
     // Params:
     // - _amount - amount to withdraw
-    function withdrawETH(uint128 _amount) external {
-        registerWithdrawal(0, _amount);
-        msg.sender.transfer(_amount);
+    // - _to - recipient
+    function withdrawETH(uint128 _amount, address _to) external {
+        registerWithdrawal(msg.sender, 0, _amount);
+        _to.transfer(_amount);
     }
 
     // Deposit ERC20 token
@@ -352,11 +356,12 @@ contract Franklin {
     // Params:
     // - _token - token address
     // - _amount - amount to withdraw
-    function withdrawERC20(address _token, uint128 _amount) external {
+    // - _to - recipient
+    function withdrawERC20(address _token, uint128 _amount, address _to) external {
         uint16 tokenId = governance.validateTokenAddress(_token);
-        registerWithdrawal(tokenId, _amount);
+        registerWithdrawal(msg.sender, tokenId, _amount);
         require(
-            IERC20(_token).transfer(msg.sender, _amount),
+            IERC20(_token).transfer(_to, _amount),
             "fw011"
         ); // fw011 - token transfer failed withdraw
     }
@@ -451,18 +456,19 @@ contract Franklin {
 
     // Register withdrawal
     // Params:
+    // - _from - from account
     // - _token - token by id
     // - _amount - token amount
-    function registerWithdrawal(uint16 _token, uint128 _amount) internal {
+    function registerWithdrawal(address _from, uint16 _token, uint128 _amount) internal {
         require(
-            balancesToWithdraw[msg.sender][_token] >= _amount,
+            balancesToWithdraw[_from][_token] >= _amount,
             "frw11"
         ); // frw11 - insufficient balance withdraw
 
-        balancesToWithdraw[msg.sender][_token] -= _amount;
+        balancesToWithdraw[_from][_token] -= _amount;
 
         emit OnchainWithdrawal(
-            msg.sender,
+            _from,
             _token,
             _amount
         );
@@ -614,7 +620,6 @@ contract Franklin {
                 OpType.PartialExit,
                 pubData
             );
-            emit withdrawAvailableForBorrow(_currentOnchainOp, pubData);
             return (PARTIAL_EXIT_LENGTH, 1, 0);
         }
 
@@ -745,35 +750,6 @@ contract Franklin {
         uint64 end = start + blocks[_blockNumber].onchainOperations;
         for (uint64 current = start; current < end; ++current) {
             OnchainOperation memory op = onchainOps[current];
-            if (op.opType == OpType.Lending) {
-                bytes memory tokenBytes = new bytes(TOKEN_BYTES);
-                for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-                    tokenBytes[i] = op.pubData[ACC_NUM_BYTES + i];
-                }
-                uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
-
-                address lendingAddr = ledingsAddresses[tokenId];
-
-                bytes memory amountBytes = new bytes(AMOUNT_BYTES);
-                for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
-                    amountBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + i];
-                }
-                uint128 amount = Bytes.bytesToUInt128(amountBytes);
-                
-                address lendingAddr = lendingsAddresses[tokenId];
-
-                if (lendingAddr != address(0)) {
-                    repayBorrow(lendingAddr, tokenId, amount);
-                } else {
-                    bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
-                    for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                        ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
-                    }
-                    address ethAddr = Bytes.bytesToAddress(ethAddress);
-
-                    balancesToWithdraw[ethAddr][tokenId] += amount;
-                }
-            }
             if (op.opType == OpType.PartialExit) {
                 // partial exit was successful, accrue balance
                 bytes memory tokenBytes = new bytes(TOKEN_BYTES);
@@ -793,13 +769,7 @@ contract Franklin {
                     ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
                 }
                 address ethAddr = Bytes.bytesToAddress(ethAddress);
-                
-                address lendingAddr = lendingsAddresses[tokenId];
-                if (lendingAddr != address(0)) {
-                    repayBorrow(lendingAddr, tokenId, amount);
-                } else {
-                    balancesToWithdraw[ethAddr][tokenId] += amount;
-                }
+                balancesToWithdraw[ethAddr][tokenId] += amount;
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
@@ -915,39 +885,32 @@ contract Franklin {
         exited[_owner][_tokenId] == false;
     }
 
-    // MARK: - Lending
+    // MARK: - Swift Exits
 
-    // Governor can add lending address
-    // Params:
-    // - _tokenId - token id
-    // - _lendingAddress - lending address
-    function addLending(uint16 _tokenId, address _lendingAddress) external {
-        governance.requireGovernor();
-        lendingsAddresses[_tokenId] = _lendingAddress;
-    }
+    function trySwiftExitWithdraw(
+        uint32 _blockNumber,
+        uint64 _withdrawOpOffset,
+        uint256 _withdrawOpHash,
+        address _recipient
+    ) external {
+        requireSwiftExits();
+        require(
+            _blockNumber >= totalBlocksVerified,
+            "ftw11"
+        ); // wrong block number
+        Block memory fblock = blocks[_blockNumber];
+        require(
+            fblock.onchainOperations > _withdrawOpOffset,
+            "ftw11"
+        ); // fet13 - wrong op id
+        uint64 startId = fblock.operationStartId;
+        OnchainOperation op = onchainOps[startId + _withdrawOpOffset];
+        require(
+            _withdrawOpHash == uint256(keccak256(op.pubData)),
+            "ftw11"
+        ); // fet13 - wrong operation hash
 
-    // Verify borrow request
-    // Params:
-    // - _onchainOpNumber - onchain op number
-    // - _borrower - borrower id
-    // - _receiver - receiver address
-    // - _tokenId - token id
-    // - _amount - token amount
-    function verifyBorrowRequest(
-        uint64 _onchainOpNumber,
-        uint24 _borrower,
-        address receiver,
-        uint16 _tokenId,
-        uint256 _amount
-    ) external view returns (bool) {
-        OnchainOperation op = onchainOps[_onchainOpNumber];
-
-        bytes memory fromBytes = new bytes(ACC_NUM_BYTES);
-        for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-            fromBytes[i] = _pubData[ACC_NUM_BYTES + i];
-        }
-        uint24 fromId = Bytes.bytesToUInt24(tokenBytes);
-
+        // Parse operation
         bytes memory tokenBytes = new bytes(TOKEN_BYTES);
         for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
             tokenBytes[i] = op.pubData[ACC_NUM_BYTES + i];
@@ -965,54 +928,64 @@ contract Franklin {
             ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
         }
         address ethAddr = Bytes.bytesToAddress(ethAddress);
-
-        return op.opType == OpType.PartialExit &&
-            fromId == _borrower &&
-            ethAddr == _receiver &&
-            tokenId == _tokenId &&
-            amount == _amount;
-    }
-
-    // Changes onchain op type from withdraw to lending
-    // Params:
-    // - _lendingToken - lending token id
-    // - _onchainOpNumber - onchain op number
-    function withdrawOpToLending(
-        uint16 _lendingToken,
-        uint64 _onchainOpNumber
-    ) external {
+        
         require(
-            lendingsAddresses[_tokenId] != address(0),
-            "fwg11"
-        ); // fwg11 - cant approve token
+            _withdrawOpHash == uint256(keccak256(op.pubData)),
+            "ftw11"
+        ); // fet13 - wrong operation hash
         require(
-            onchainOps[_onchainOpNumber].opType == OpType.PartialExit,
-            "fwg12"
-        ); // fwg12 - not withdraw op
-        onchainOps[_onchainOpNumber] = OpType.Lending;
-    }
+            balancesToWithdraw[ethAddr][tokenId] >= amount,
+            "ftw11"
+        ); // fet13 - already made withdraw
 
-    // Repays borrow in lending
-    // Params:
-    // - _lendingAddr - lending
-    // - _tokenId - token id
-    // - _amount - token amount
-    function repayBorrow(
-        address _lendingAddr,
-        uint16 _tokenId,
-        uint256 _amount
-    ) internal {
-        if (_tokenId == 0) {
-            LendingEther lending = LendingEther(_lendingAddr);
-            lending.repayBorrow.value(_amount)();
+
+        registerWithdrawal(ethAddr, tokenId, amount);
+        if (tokenId == 0) { // ether
+            _recipient.transfer(amount);
         } else {
-            LendingErc20 lending = LendingErc20(_lendingAddr);
-            address tokenAddr = governance.tokenAddresses[_tokenId];
+            address tokenAddr = governance.tokenAddresses(tokenId);
             require(
-                IERC20(tokenAddr).approve(_lendingAddr, _amount),
-                "fcs21"
-            ); // fcs21 - cant approve token
-            lending.repayBorrow(_amount);
+                IERC20(tokenAddr).transfer(_recipient, _amount),
+                "fw011"
+            ); // fw011 - token transfer failed withdraw
         }
+    }
+
+    function depositOnchain(address _validator, uint16 _tokenId, uint256 _fee) external {
+        requireSwiftExits();
+        address tokenAddr = governance.tokenAddresses(tokenId);
+        require(
+            IERC20(tokenAddr).transferFrom(msg.sender, address(this), _fee),
+            "fw011"
+        ); // fw011 - token transfer from failed
+        balancesToWithdraw[_validator][_tokenId] += fee;
+    }
+
+    function orderSwiftExit(
+        uint32 _blockNumber,
+        uint64 _withdrawOpOffset,
+        uint256 _withdrawOpHash,
+        address _recipient
+    ) external {
+        requireSwiftExits();
+        require(
+            swiftExits[_blockNumber][_withdrawOpOffset].withdrawOpHash == 0,
+            "fw011"
+        ); // fw011 - swift exit already exists
+        swiftExits[_blockNumber][_withdrawOpOffset] = SwiftExit(_withdrawOpHash, _recipient);
+        emit NewSwiftExit(
+            _blockNumber,
+            _withdrawOpOffset,
+            _withdrawOpHash,
+            _recipient
+        );
+    }
+
+    /// @notice Check if the sender is SwiftExits contract
+    function requireSwiftExits() internal view {
+        require(
+            msg.sender == address(swiftExits),
+            "ssrs21"
+        ); // ssrr21 - only by swiftExits
     }
 }
