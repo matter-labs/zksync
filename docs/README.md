@@ -1,2 +1,3 @@
-# Initial page
+# Sync: ZK Rollup
 
+Welcome to Sync
