@@ -1,5 +1,8 @@
-# Getting started with Sync
+# Getting Started
 
-{% hint style="info" %} These docs are still work in progress {% endhint %}
+{% hint style="info" %}
+These docs are still work in progress
+{% endhint %}
 
 Welcome to Sync.
+
