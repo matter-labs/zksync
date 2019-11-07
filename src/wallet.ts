@@ -342,7 +342,7 @@ export class WalletKeys {
   }
 }
 
-// Franklin or eth address
+// Sync or eth address
 function serializeAddress(address: Address | string): Buffer {
   return Buffer.from(address.substr(2), "hex");
 }
