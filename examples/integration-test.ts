@@ -5,12 +5,6 @@ import { bigNumberify, formatEther, parseEther } from "ethers/utils";
 import { SidechainProvider } from "../src/provider";
 import { WSTransport } from "../src/transport";
 
-function sleep(ms) {
-  return new Promise(resolve => {
-    setTimeout(resolve, ms);
-  });
-}
-
 async function main() {
   const ethersProvider = new ethers.providers.JsonRpcProvider(
     process.env.WEB3_URL
@@ -112,14 +106,14 @@ async function main() {
   console.log("==================================");
   console.log("Wallet 2 withdraw ETH to contract");
   console.log(
-    "Wallet 2 ETH sidechain balance",
-    formatEther((await wallet2.getAccountState()).commited.balances[ethTokenId])
+      "Wallet 2 ETH sidechain balance",
+      formatEther((await wallet2.getAccountState()).commited.balances[ethTokenId])
   );
   console.log(
-    "Wallet 2 ETH balance on contract",
-    formatEther(
-      (await wallet2.getETHBalances()).contractBalances[ethTokenId].toString()
-    )
+      "Wallet 2 ETH balance",
+      formatEther(
+          (await wallet2.getETHBalances()).onchainBalances[ethTokenId].toString()
+      )
   );
   const withdrawOffchainHandle = await wallet2.withdrawFromSidechainToContract(
     "ETH",
@@ -133,46 +127,10 @@ async function main() {
     formatEther((await wallet2.getAccountState()).commited.balances[ethTokenId])
   );
   console.log(
-    "Wallet 2 ETH balance on contract",
-    formatEther(
-      (await wallet2.getETHBalances()).contractBalances[ethTokenId].toString()
-    )
-  );
-
-  console.log("==================================");
-  console.log(
-    "Wallet 2 Transfer ETH from contract to balance: ",
-    depositAmount
-  );
-  console.log(
-    "Wallet 2 ETH balance",
-    formatEther(
-      (await wallet2.getETHBalances()).onchainBalances[ethTokenId].toString()
-    )
-  );
-  console.log(
-    "Wallet 2 ETH balance on contract",
-    formatEther(
-      (await wallet2.getETHBalances()).contractBalances[ethTokenId].toString()
-    )
-  );
-  const onchainWithdrawHandle = await wallet2.withdrawFromContractToETHAddress(
-    "ETH",
-    ethers.utils.parseEther(depositAmount)
-  );
-  await onchainWithdrawHandle.wait();
-  console.log(`Onchain withdraw successful ${onchainWithdrawHandle.hash}`);
-  console.log(
-    "Wallet 2 ETH balance",
-    formatEther(
-      (await wallet2.getETHBalances()).onchainBalances[ethTokenId].toString()
-    )
-  );
-  console.log(
-    "Wallet 2 ETH balance on contract",
-    formatEther(
-      (await wallet2.getETHBalances()).contractBalances[ethTokenId].toString()
-    )
+      "Wallet 2 ETH balance",
+      formatEther(
+          (await wallet2.getETHBalances()).onchainBalances[ethTokenId].toString()
+      )
   );
 
   await (wsSidechainProvider.transport as WSTransport).ws.close();
