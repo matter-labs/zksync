@@ -722,6 +722,18 @@ contract Franklin {
         emit BlockVerified(_blockNumber);
     }
 
+    // TODO: Temp. solution.
+    // When withdraw is verified we move funds to the user immediately, so that withdraw can be completed with one op.
+    function payoutWithdrawNow(address _to, uint16 _tokenId, uint128 _amount) internal {
+        if (_tokenId == 0) {
+            address payable to = address(uint160(_to));
+            to.transfer(_amount);
+        } else if (_tokenId < governance.totalTokens() + 1) {
+            address tokenAddr = governance.tokenAddresses(_tokenId);
+            IERC20(tokenAddr).transfer(_to, _amount);
+        }
+    }
+
     // If block is verified the onchain operations from it must be completed
     // (user must have possibility to withdraw funds if withdrawed)
     // Params:
@@ -749,7 +761,7 @@ contract Franklin {
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
                 }
-                balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
+                payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
@@ -769,7 +781,7 @@ contract Franklin {
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_LEN + i];
                 }
-                balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
+                payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
             }
             delete onchainOps[current];
         }
