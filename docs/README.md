@@ -1,3 +1,5 @@
-# Sync: ZK Rollup
+# Getting started with Sync
 
-Welcome to Sync
+{% hint style="info" %} These docs are still work in progress {% endhint %}
+
+Welcome to Sync.
