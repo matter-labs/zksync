@@ -504,7 +504,7 @@ contract SwiftExits is BlsVerifier {
         rollup.orderSwiftExit(_blockNumber, order.withdrawOpOffset, _withdrawOpHash, order.recipient);
 
         exitOrders[_withdrawOpHash].status = ExitOrderState.Fulfilled;
-        totalBorrowed = totalBorrowed.add(order.supplyAmount);
+        totalBorrowed += order.supplyAmount;
     }
 
     /// @notice Exchanges specified amount of token with recipient

@@ -626,7 +626,7 @@ contract SwiftExitsSingle {
             }
             BorrowOrder bOrder = borrowOrders[_succeededHashes[i]];
             borrows[exitOrder.supplyTokenId] -= bOrder.borrowed;
-            supplies[exitOrder.tokenId] += bOrder.fee;
+            supplies[exitOrder.tokenId] = upplies[exitOrder.tokenId].add(bOrder.fee);
         }
     }
 
