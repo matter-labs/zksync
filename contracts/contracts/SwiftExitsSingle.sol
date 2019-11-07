@@ -9,8 +9,8 @@ import "./Governance.sol";
 import "./Franklin.sol";
 import "./SafeMath.sol";
 
-/// @title Lending Token Contract
-/// @notice Inner logic for LendingEther and LendingErc20 token contracts
+/// @title Swift Exits contract
+/// @notice Single validator version
 /// @author Matter Labs
 contract SwiftExitsSingle {
     

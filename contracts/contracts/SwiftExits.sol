@@ -12,6 +12,7 @@ import "./SafeMath.sol";
 import "./BlsOperations.sol";
 
 /// @title Swift Exits Contract
+/// @notice Consensus version
 /// @author Matter Labs
 contract SwiftExits is BlsVerifier {
     
