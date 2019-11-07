@@ -14,13 +14,31 @@ export const franklinContractCode = require('../build/Franklin');
 export const verifierContractCode = require('../build/Verifier');
 export const governanceContractCode = require('../build/Governance');
 export const priorityQueueContractCode = require('../build/PriorityQueue');
-export const signersContractCode = require('../build/Signers');
+// export const signersContractCode = require('../build/Signers');
 
 export const franklinTestContractCode = require('../build/FranklinTest');
 export const verifierTestContractCode = require('../build/VerifierTest');
 export const governanceTestContractCode = require('../build/GovernanceTest');
 export const priorityQueueTestContractCode = require('../build/PriorityQueueTest');
-export const signersTestContractCode = require('../build/SignersTest');
+// export const signersTestContractCode = require('../build/SignersTest');
+
+export const comptrollerContractCode = require('../build/Comptroller');
+
+export async function deployComptroller(
+    wallet,
+    comptrollerCode
+    ) {
+    try {
+        let comptroller = await deployContract(wallet, comptrollerCode, [], {
+            gasLimit: 8000000,
+        });
+        console.log(`COMPTROLLER_ADDR=${comptroller.address}`);
+
+        return comptroller
+    } catch (err) {
+        console.log("Comptroller deploy error:" + err);
+    }
+}
 
 export async function deployGovernance(
     wallet,
@@ -105,30 +123,30 @@ export async function deployFranklin(
     }
 }
 
-export async function deploySigners(
-    wallet,
-    ownerAddress,
-    minSigsPercent,
-    signersCode,
-) {
-    try {
-        let contract = await deployContract(
-            wallet,
-            signersCode,
-            [
-                ownerAddress,
-                minSigsPercent
-            ],
-            {
-                gasLimit: 6600000,
-            });
-        console.log(`SIGNERS_CONTRACT_ADDR=${contract.address}`);
+// export async function deploySigners(
+//     wallet,
+//     ownerAddress,
+//     minSigsPercent,
+//     signersCode,
+// ) {
+//     try {
+//         let contract = await deployContract(
+//             wallet,
+//             signersCode,
+//             [
+//                 ownerAddress,
+//                 minSigsPercent
+//             ],
+//             {
+//                 gasLimit: 6600000,
+//             });
+//         console.log(`SIGNERS_CONTRACT_ADDR=${contract.address}`);
 
-        return contract
-    } catch (err) {
-        console.log("Signers deploy error:" + err);
-    }
-}
+//         return contract
+//     } catch (err) {
+//         console.log("Signers deploy error:" + err);
+//     }
+// }
 
 export async function postContractToTesseracts(contractCode, contractName: string, address: string) {
     let req = {

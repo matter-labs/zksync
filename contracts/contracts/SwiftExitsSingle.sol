@@ -147,7 +147,7 @@ contract SwiftExitsSingle {
     }
 
     /// @notice Fallback function always reverts
-    function() external {
+    function() external payable {
         revert("Cant accept ether through fallback function");
     }
 
@@ -242,13 +242,20 @@ contract SwiftExitsSingle {
     /// @dev Calls transferIn function of specified token and fulfillDefferedWithdrawOrders to fulfill deffered withdraw orders
     /// @param _amount Token amount
     /// @param _tokenId Specified token id
-    function supply(address _address,
-                    uint256 _amount,
-                    uint256 _tokenId)
+    function supplyErc20(uint256 _amount,
+                         uint256 _tokenId)
     public
     {
-        transferInERC20(_address, governance.tokenAddress(_tokenId), _amount);
+        transferInERC20(msg.sender, governance.tokenAddress(_tokenId), _amount);
         supplies[_tokenId] = supplies[_tokenId].add(_amount);
+    }
+
+    /// @notice Function to accept ether payments
+    function supplyEther()
+    external
+    payable
+    {
+        supplies[0] = supplies[0].add(msg.value);
     }
 
     /// @notice Adds new swift exit

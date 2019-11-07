@@ -334,7 +334,7 @@ contract SwiftExits is BlsVerifier {
             validatorsInfo[_address].exists,
             "sssr11"
         ); // sssr11 - operator does not exists
-        transferInERC20(_address, matterTokenAddress, _amount);
+        transferInERC20(msg.sender, matterTokenAddress, _amount);
         totalSupply = totalSupply.add(_amount);
         validatorsInfo[_address] = validatorsInfo[_address].add(_amount);
     }
