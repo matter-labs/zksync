@@ -1,5 +1,10 @@
 pragma solidity ^0.5.8;
 
+import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import "compound-protocol/contracts/CEther.sol";
+import "compound-protocol/contracts/CErc20.sol";
+import "compound-protocol/contracts/Comptroller.sol";
+
 import "./Governance.sol";
 import "./Franklin.sol";
 import "./BlsVerifier.sol";
@@ -15,8 +20,8 @@ contract SwiftExits is BlsVerifier {
     /// @notice Possible price change coeff on Compound
     uint256 constant possiblePriceRisingCoeff = 110;
 
-    /// @notice Validators fee
-    uint256 constant validatorsFeeCoeff = 95;
+    /// @notice Validators fee coeff
+    uint256 constant validatorsFeeCoeff = 5;
 
     /// @notice Owner of the contract (Matter Labs)
     address internal owner;
@@ -39,13 +44,13 @@ contract SwiftExits is BlsVerifier {
     /// @notice Comptroller contract
     Comptroller internal comptroller;
 
-    /// @notice last verified Fraklin block
+    /// @notice Last verified Fraklin block
     uint256 internal lastVerifiedBlock;
 
-    /// @notice total funds supply on contract
+    /// @notice Total funds supply on contract
     uint256 internal totalSupply;
 
-    /// @notice total funds borrowed on contract
+    /// @notice Total funds borrowed on contract
     uint256 internal totalBorrowed;
 
     /// @notice Validators addresses list
@@ -148,8 +153,7 @@ contract SwiftExits is BlsVerifier {
         matterTokenAddress = _matterTokenAddress;
         
         cMatterTokenAddress = governance.cTokenAddresses(_matterTokenAddress);
-        cEtherAddress = governance.cTokenAddresses(address(0));
-
+        address cEtherAddress = governance.cTokenAddresses(address(0));
 
         address[] memory ctokens = new address[](2);
         ctokens[0] = cMatterTokenAddress;
@@ -357,17 +361,15 @@ contract SwiftExits is BlsVerifier {
     /// @param _aggrSignatureX Aggregated validators signature x
     /// @param _aggrSignatureY Aggregated validators signature y
     /// @param _validators Validators addresses list
-    function addSwiftExit(
-        uint32 _blockNumber,
-        uint64 _withdrawOpOffset,
-        uint256 _withdrawOpHash,
-        uint16 _tokenId,
-        uint256 _tokenAmount,
-        address _recipient,
-        uint256 _aggrSignatureX,
-        uint256 _aggrSignatureY,
-        address[] calldata _validators
-    )
+    function addSwiftExit(uint32 _blockNumber,
+                          uint64 _withdrawOpOffset,
+                          uint256 _withdrawOpHash,
+                          uint16 _tokenId,
+                          uint256 _tokenAmount,
+                          address _recipient,
+                          uint256 _aggrSignatureX,
+                          uint256 _aggrSignatureY,
+                          address[] calldata _validators)
     external
     {
         requireOwner();
@@ -399,12 +401,10 @@ contract SwiftExits is BlsVerifier {
             );
         } else {
             // Get amount to borrow
-            (
-                uint256 amountTokenSupply,
-                uint256 amountTokenBorrow,
-                uint256 validatorsFee,
-                uint256 ownerFee
-            ) = getAmountsAndFees(_tokenId, _tokenAmount);
+            (uint256 amountTokenSupply,
+            uint256 amountTokenBorrow,
+            uint256 validatorsFee,
+            uint256 ownerFee) = getAmountsAndFees(_tokenId, _tokenAmount);
 
             // Create Exit orer
             ExitOrder order = ExitOrder(
@@ -459,12 +459,10 @@ contract SwiftExits is BlsVerifier {
         ExitOrder order = exitOrders[_withdrawOpHash];
 
         uint256 updatedAmount = 0;
-        (
-            uint256 amountTokenSupply,
-            uint256 amountTokenBorrow,
-            uint256 validatorsFee,
-            uint256 ownerFee
-        ) = getAmountsAndFees(order.tokenId, order.initTokenAmount);
+        (uint256 amountTokenSupply,
+        uint256 amountTokenBorrow,
+        uint256 validatorsFee,
+        uint256 ownerFee) = getAmountsAndFees(order.tokenId, order.initTokenAmount);
         order.borrowAmount = amountTokenBorrow;
         order.supplyAmount = amountTokenSupply;
 
@@ -617,8 +615,8 @@ contract SwiftExits is BlsVerifier {
     function getAmountsAndFees(uint16 _tokenId,
                                uint256 _tokenAmount)
     internal
-    returns (uint256 amountToExchange,
-             uint256 expectedBorrowAmount,
+    returns (uint256 amountTokenSupply,
+             uint256 amountTokenBorrow,
              uint256 validatorsFee,
              uint256 ownerFee)
     {
