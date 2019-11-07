@@ -819,13 +819,15 @@ contract Franklin {
 
         // Fulfill swift exits
         for (uint64 i = 0; i < succeededCount; i++) {
-            address tokenAddr = governance.tokenAddresses(tokensIds[i]);
-            uint256 allowence = IERC20(tokenAddr).allowence(address(this), address(swiftExits));
-            if (allowence < uint256(tokensAmounts[i])) {
-                require(
-                    IERC20(tokenAddr).approve(address(swiftExits), 1000000000000),
-                    "fw011"
-                ); // fw011 - token approve failed
+            if (tokensIds[i] > 0) {
+                address tokenAddr = governance.tokenAddresses(tokensIds[i]);
+                uint256 allowence = IERC20(tokenAddr).allowence(address(this), address(swiftExits));
+                if (allowence < uint256(tokensAmounts[i])) {
+                    require(
+                        IERC20(tokenAddr).approve(address(swiftExits), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                        "fw011"
+                    ); // fw011 - token approve failed
+                }
             }
         }
         swiftExits.newVerifiedBlock(_blockNumber, succeeded, failed, tokensIds, tokensAmounts);

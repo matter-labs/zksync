@@ -16,6 +16,9 @@ contract LendingToken is BlsVerifier {
     /// @notice Possible price change coeff on Compound
     uint256 constant possiblePriceRisingCoeff = 110/100;
 
+    /// @notice Validators fee
+    uint256 constant validatorsFeeCoeff = 95 / 100;
+
     /// @notice Owner of the contract (Matter Labs)
     address internal owner;
 
@@ -30,6 +33,9 @@ contract LendingToken is BlsVerifier {
 
     /// @notice Rollup contract
     Franklin internal rollup;
+
+    /// @notice Comptroller contract
+    Comptroller internal comptroller;
 
     /// @notice last verified Fraklin block
     uint256 internal lastVerifiedBlock;
@@ -90,12 +96,14 @@ contract LendingToken is BlsVerifier {
     /// @member withdrawOpOffset Withdraw operation offset in block
     /// @member tokenId Order token id
     /// @member tokenAmount Order token amount
+    /// @member supplyAmount Order supply amount
     /// @member recipient Recipient address
     struct ExitOrder {
         ExitOrderState status;
         uint64 withdrawOpOffset;
         uint16 tokenId;
         uint256 tokenAmount;
+        uint256 supplyAmount;
         address recipient;
     }
 
@@ -118,18 +126,38 @@ contract LendingToken is BlsVerifier {
     /// @param _governanceAddress The address of Governance contract
     /// @param _rollupAddress The address of Rollup contract
     /// @param _blsVerifierAddress The address of Bls Verifier contract
+    /// @param _comptrollerAddress The address of Comptroller contract
     function setupRelatedContracts(
         address _matterTokenAddress,
         address _governanceAddress,
         address _rollupAddress,
-        address _blsVerifierAddress
+        address _blsVerifierAddress,
+        address _comptrollerAddress
     ) external {
         requireOwner();
         governance = Governance(_governanceAddress);
         rollup = Franklin(_rollupAddress);
         lastVerifiedBlock = rollup.totalBlocksVerified;
         blsVerifier = BlsVerifier(_blsVerifierAddress);
-        matterToken = _matterTokenId;
+        comptroller = Comptroller(_comptrollerAddress);
+        matterToken = _matterTokenAddress;
+
+        address cMatterTokenAddress = governance.cTokenAddresses(_matterTokenAddress);
+
+        address[] memory ctokens = new address[](2);
+        ctokens[0] = cMatterTokenAddress; // matter token
+        ctokens[1] = governance.cTokenAddresses(address(0)); // ether
+
+        uint[] memory errors = comptroller.enterMarkets(ctokens);
+        require(
+            errors[0] == 0 && errors[1] == 0,
+            "fw011"
+        ); // fw011 - cant enter markets
+
+        require(
+            IERC20(_matterTokenAddress).approve(cMatterTokenAddress, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+            "fw011"
+        ); // fw011 - token approve failed
     }
 
     /// @notice Fallback function always reverts
@@ -153,7 +181,7 @@ contract LendingToken is BlsVerifier {
     /// @param _to Receiver address
     /// @param _tokenAddress ERC20 token address
     /// @param _amount Amount in ERC20 tokens
-    function transferOut(address _to, uint16 _tokenAddress, uint256 _amount) internal {
+    function transferOut(address _to, address _tokenAddress, uint256 _amount) internal {
         if (_tokenAddress == address(0)) {
             _to.transfer(_amount);
         } else {
@@ -337,30 +365,31 @@ contract LendingToken is BlsVerifier {
             );
         } else {
             // Get amount to borrow
-            (uint256 amountToExchange, uint256 validatorsFee, uint256 ownerFee) = getAmountToExchange(_tokenId, _tokenAmount);
+            (uint256 amountTokenSupply, uint256 amountTokenBorrow, uint256 validatorsFee, uint256 ownerFee) = getAmountsAndFees(_tokenId, _tokenAmount);
 
             // Create Exit orer
             ExitOrder order = ExitOrder(
                 ExitOrderState.None,
                 _withdrawOpOffset,
                 _tokenId,
-                _tokenAmount,
+                0,
+                0,
                 _recipient
             );
             exitOrdersHashes[_blockNumber][exitOrdersCount[_blockNumber]] = _withdrawOpHash;
             exitOrders[_withdrawOpHash] = order;
             exitOrdersCount[_blockNumber]++;
 
-            if (amountToExchange <= (totalSupply - totalBorrowed)) {
+            if (amountTokenSupply <= (totalSupply - totalBorrowed)) {
                 // If amount to borrow <= borrowable amount - immediate swift exit
-                immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToExchange, validatorsFee, ownerFee);
+                immediateSwiftExit(_blockNumber, _withdrawOpHash, amountTokenSupply, amountTokenBorrow, validatorsFee, ownerFee);
             } else {
                 // If amount to borrow > borrowable amount - deffered swift exit order
                 exitOrders[_withdrawOpHash].status = ExitOrderState.Deffered;
                 emit UpdatedExitOrder(
                     _blockNumber,
                     _withdrawOpHash,
-                    (amountToExchange * possiblePriceRisingCoeff) - totalSupply + totalBorrowed
+                    (amountTokenSupply * possiblePriceRisingCoeff) - totalSupply + totalBorrowed
                 );
             }
         }
@@ -390,14 +419,14 @@ contract LendingToken is BlsVerifier {
         ExitOrder order = exitOrders[_withdrawOpHash];
 
         uint256 updatedAmount = 0;
-        (uint256 amountToExchange, uint256 validatorsFee, uint256 ownerFee) = getAmountToExchangeAndFees(order.tokenId, order.tokenAmount);
+        (uint256 amountTokenSupply, uint256 amountTokenBorrow, uint256 validatorsFee, uint256 ownerFee) = getAmountsAndFees(order.tokenId, order.tokenAmount);
 
-        if (amountToExchange <= (totalSupply - totalBorrowed)) {
+        if (amountTokenSupply <= (totalSupply - totalBorrowed)) {
             // If amount to borrow <= borrowable amount - immediate swift exit
-            immediateSwiftExit(_blockNumber, _withdrawOpHash, amountToExchange, validatorsFee, ownerFee);
+            immediateSwiftExit(_blockNumber, _withdrawOpHash, amountTokenSupply, amountTokenBorrow, validatorsFee, ownerFee);
         } else {
             // If amount to borrow > borrowable amount - emit update deffered swift exit order event
-            updatedAmount = (amountToExchange * possiblePriceRisingCoeff) - totalSupply + totalBorrowed;
+            updatedAmount = (amountTokenSupply * possiblePriceRisingCoeff) - totalSupply + totalBorrowed;
         }
         emit UpdatedExitOrder(
             _blockNumber,
@@ -410,29 +439,32 @@ contract LendingToken is BlsVerifier {
     /// @dev Exhanges tokens with compound, transfers token to recipient and creades swift order on rollup contract
     /// @param _blockNumber Rollup block number
     /// @param _withdrawOpHash Withdraw operation hash
-    /// @param _amountToExchange Amount to borrow from validators and exchange with compound
+    /// @param _amountTokenSupply Amount to borrow from validators and exchange with compound
+    /// @param _amountTokenBorrow Amount to get from compound
     /// @param _validatorsFee Amount of validators fee
     /// @param _ownerFee Amount of owner fee
     function immediateSwiftExit(
         uint32 _blockNumber,
         uint256 _withdrawOpHash,
-        uint256 _amountToExchange,
+        uint256 _amountTokenSupply,
+        uint256 _amountTokenBorrow,
         uint256 _validatorsFee,
         uint256 _ownerFee
     ) internal {
         ExitOrder order = exitOrders[_withdrawOpHash];
 
-        uint256 recievedTokenAmount = borrowFromCompound(order.tokenId, _amountToExchange);
+        borrowFromCompound(_amountTokenSupply, order.tokenId, _amountTokenBorrow);
         
-        exchangeWithRecipient(order.recipient, order.tokenId, recievedTokenAmount);
+        exchangeWithRecipient(order.recipient, order.tokenId, _amountTokenBorrow);
 
-        createBorrowOrders(_withdrawOpHash, _amountToExchange, _validatorsFee, _ownerFee);
+        createBorrowOrders(_withdrawOpHash, _amountTokenSupply, _validatorsFee, _ownerFee);
 
         rollup.orderSwiftExit(_blockNumber, order.withdrawOpOffset, _withdrawOpHash, order.recipient);
 
-        exitOrders[_withdrawOpHash].tokenAmount = recievedTokenAmount;
+        exitOrders[_withdrawOpHash].tokenAmount = _amountTokenBorrow;
+        exitOrders[_withdrawOpHash].supplyAmount = _amountTokenSupply;
         exitOrders[_withdrawOpHash].status = ExitOrderState.Fulfilled;
-        totalBorrowed += _amountToExchange;
+        totalBorrowed += _amountTokenSupply;
     }
 
     /// @notice Exchanges specified amount of token with recipient
@@ -446,47 +478,121 @@ contract LendingToken is BlsVerifier {
 
     /// @notice Borrows specified amount from compound
     /// @param _tokenId Token id
-    /// @param _amount Amount of validators supply to exchange for token
+    /// @param _amountTokenSupply Amount to borrow from validators and exchange with compound
+    /// @param _amountTokenBorrow Amount to get from compound
     function borrowFromCompound(
         uint16 _tokenId,
-        uint256 _amount
-    ) internal returns (uint256 tokenAmount) {
+        uint256 _amountTokenSupply,
+        uint256 _amountTokenBorrow
+    ) internal {
+        address cMatterTokenAddress = governance.cTokenAddresses(matterToken);
+
+        uint256 allowence = IERC20(matterToken).allowence(address(this), address(cMatterTokenAddress));
+        if (allowence < _amountTokenSupply) {
+            require(
+                IERC20(matterToken).approve(address(cMatterTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                "fw011"
+            ); // fw011 - token approve failed
+        }
+        
+        CErc20 cMatterToken = CErc20(cMatterTokenAddress);
+        require(
+            cMatterToken.mint(_amountTokenSupply) == 0,
+            "fw011"
+        ); // fw011 - token mint failed
+
         address tokenAddress = governance.tokenAddresses(_tokenId);
-        // register token on compount if needed
-        // exchange possible value
+        address cTokenAddress = governance.cTokenAddresses(tokenAddress);
+
+        address[] memory ctokens = new address[](1);
+        ctokens[0] = governance.cTokenAddresses(cTokenAddress);
+        uint[] memory errors = comptroller.enterMarkets(ctokens);
+        require(
+            errors[0] == 0,
+            "fw011"
+        );  // fw011 - token approve failed
+
+        if (_tokenId == 0) {
+            CEther cToken = CEther(cTokenAddress);
+            require(
+                cToken.borrow.value(_amountTokenBorrow)() == 0,
+                "got collateral?"
+            );
+        } else {
+            CErc20 cToken = CErc20(cTokenAddress);
+            require(
+                cToken.borrow(_amountTokenBorrow) == 0,
+                "got collateral?"
+            );
+        }
     }
 
     /// @notice Repays specified amount to compound
     /// @param _tokenId Token id
-    /// @param _amount Amount of validators supply to exchange for token
+    /// @param _borrowAmount Amount of tokens to repay
+    /// @param _supplyAmount Amount of supplied tokens
     function repayToCompound(
         uint16 _tokenId,
-        uint256 _amount
+        uint256 _borrowAmount,
+        uint256 _supplyAmount
     ) internal {
         address tokenAddress = governance.tokenAddresses(_tokenId);
-        // register token on compount if needed
-        // exchange possible value
+        address cTokenAddress = governance.cTokenAddresses(tokenAddress);
+
+        if (_tokenId == 0) {
+            CEther cToken = CEther(cTokenAddress);
+            require(
+                cToken.repayBorrow.value(_borrowAmount)() == 0,
+                "transfer approved?"
+            );
+        } else {
+            uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(cTokenAddress));
+            if (allowence < _borrowAmount) {
+                require(
+                    IERC20(tokenAddress).approve(address(cTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                    "fw011"
+                ); // fw011 - token approve failed
+            }
+            CErc20 cToken = CErc20(cTokenAddress);
+            require(
+                cToken.repayBorrow(_borrowAmount) == 0,
+                "transfer approved?"
+            );
+        }
+
+        address cMatterTokenAddress = governance.cTokenAddresses(matterToken);
+        CErc20 cToken = CErc20(cMatterTokenAddress);
+        require(
+            cToken.redeemUnderlying(_borrowAmount) == 0,
+            "something went wrong"
+        );
     }
 
     /// @notice Returns amound of validators supply to exchange for token, calculates fees
     /// @param _tokenId Token id
     /// @param _tokenAmount Token amount
-    function getAmountToExchangeAndFees(
+    function getAmountsAndFees(
         uint16 _tokenId,
         uint256 _tokenAmount
-    ) internal returns (uint256 amountToExchange, uint256 validatorsFee, uint256 ownerFee) {
-        address tokenAddress = governance.tokenAddresses(_tokenId);
-        address matterAddress = governance.tokenAddresses(matterToken);
+    ) internal returns (uint256 amountToExchange, uint256 expectedBorrowAmount, uint256 validatorsFee, uint256 ownerFee) {
+        // address tokenAddress = governance.tokenAddresses(_tokenId);
+        // address cTokenAddress = governance.cTokenAddresses(tokenAddress);
+        // address cMatterAddress = governance.cTokenAddresses(matterToken);
 
-        uint256 collateralFactor = compound.takeCollateralFactor(matterAddress);
+        // (bool isListed, uint collateralFactorMantissa) = comptroller.markets(cTokenAddress);
 
-        uint256 tokenPrice = compound.takePrice(tokenAddress);
+        // CErc20 cToken = CToken(cTokenAddress);
+        // uint256 exchangeRateMantissa = cToken.exchangeRateCurrent();
+
+        // uint256 collateralFactor = comptroller.takeCollateralFactor(matterAddress);
+
+        // uint256 tokenPrice = comptroller.takePrice(tokenAddress);
         
-        uint256 fullAmount = _tokenAmount * tokenPrice / collateralFactor;
+        // uint256 fullAmount = _tokenAmount * tokenPrice / collateralFactor;
 
-        amountToExchange = 0.9 * fullAmount;
-        validatorsFee = 0.095 * _tokenAmount;
-        ownerFee = 0.095 * _tokenAmount;
+        // amountToExchange = 0.9 * fullAmount;
+        // validatorsFee = 0.095 * _tokenAmount;
+        // ownerFee = 0.095 * _tokenAmount;
     }
 
     /// @notice Creates borrow orders for specified exit request
@@ -553,7 +659,7 @@ contract LendingToken is BlsVerifier {
     function fulfillSuccededOrders(uint256[] memory _succeededHashes) internal {
         for (uint32 i = 0; i < _succeededHashes.length; i++) {
             ExitOrder exitOrder = exitOrders[_succeededHashes[i]];
-            repayToCompound(exitOrder.tokenId, exitOrder.tokenAmount);
+            repayToCompound(exitOrder.tokenId, exitOrder.tokenAmount, exitOrder.supplyAmount);
             for (uint32 k = 0; k < borrowOrdersCount[_succeededHashes[i]]; k++) {
                 BorrowOrder order = BorrowOrders[_succeededHashes[i]][k];
                 totalBorrowed -= order.borrowed;
@@ -568,12 +674,15 @@ contract LendingToken is BlsVerifier {
     /// @param _amount Token amount
     function sendFeeToRollup(address _validator, uint16 _tokenId, uint256 _fee) internal {
         if (_fee > 0) {
-            address tokenAddr = governance.tokenAddresses(tokenId);
             if (tokenId > 0) {
-                require(
-                    IERC20(tokenAddr).approve(address(rollup), _fee),
-                    "fw011"
-                ); // fw011 - token approve failed
+                address tokenAddr = governance.tokenAddresses(tokenId);
+                uint256 allowence = IERC20(tokenAddr).allowence(address(this), address(rollup));
+                if (allowence < _fee) {
+                    require(
+                        IERC20(tokenAddr).approve(address(rollup), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                        "fw011"
+                    ); // fw011 - token approve failed
+                }
             }
             rollup.depositOnchain(_validator, _tokenId, _fee);
         }

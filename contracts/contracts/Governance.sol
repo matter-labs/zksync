@@ -11,6 +11,15 @@ contract Governance {
         uint16 tokenId
     );
 
+    // cToken added to Franklin net
+    // Structure:
+    // - cToken - added cToken address
+    // - token - corresponding token address
+    event cTokenAdded(
+        address cToken,
+        address token
+    );
+
     // Address which will excercise governance over the network
     // i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
@@ -21,6 +30,9 @@ contract Governance {
 
     // List of registered tokens by tokenId
     mapping(uint16 => address) public tokenAddresses;
+
+    // List of registered cTokens by corresponding token address
+    mapping(address => address) public cTokenAddresses;
 
     // List of registered tokens by address
     mapping(address => uint16) public tokenIds;
@@ -53,6 +65,19 @@ contract Governance {
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
         emit TokenAdded(_token, totalTokens);
+    }
+
+    // Add cToken for token to the list of possible cTokens
+    // Params:
+    // - _token - token address
+    function addToken(address _cToken, address _token) external {
+        requireGovernor();
+        require(
+            tokenIds[_token] != 0,
+            "gan11"
+        ); // gan11 - token doenst exists
+        cTokenAddresses[_token] = _cToken;
+        emit cTokenAdded(_cToken, _token);
     }
 
     // Set validator status
