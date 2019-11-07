@@ -2,14 +2,13 @@ pragma solidity ^0.5.8;
 
 import "./Governance.sol";
 import "./Franklin.sol";
-import "./BlsVerifier.sol";
 import "./SafeMath.sol";
 import "./BlsOperations.sol";
 
 /// @title Lending Token Contract
 /// @notice Inner logic for LendingEther and LendingErc20 token contracts
 /// @author Matter Labs
-contract SwiftExits is BlsVerifier {
+contract SwiftExitsSingle {
     
     using SafeMath for uint256;
 
@@ -25,9 +24,6 @@ contract SwiftExits is BlsVerifier {
     /// @notice Matter token contract address
     address internal matterToken;
 
-    /// @notice blsVerifier contract
-    BlsVerifier internal blsVerifier;
-
     /// @notice Governance contract
     Governance internal governance;
 
@@ -40,18 +36,8 @@ contract SwiftExits is BlsVerifier {
     /// @notice last verified Fraklin block
     uint256 internal lastVerifiedBlock;
 
-    /// @notice total funds supply on contract
-    uint256 internal totalSupply;
-
-    /// @notice total funds borrowed on contract
-    uint256 internal totalBorrowed;
-
-    /// @notice Validators addresses list
-    mapping(uint32 => address) internal validators;
-    /// @notice Each validators' info
-    mapping(address => ValidatorInfo) internal validatorsInfo;
-    /// @notice validators count
-    uint32 internal validatorsCount;
+    mapping(uint16 => uint256) internal supplies;
+    mapping(uint16 => uint256) internal borrows;
 
     /// @dev Possible exit order states
     enum ExitOrderState {
@@ -68,27 +54,14 @@ contract SwiftExits is BlsVerifier {
     mapping(uint256 => ExitOrder) internal exitOrders;
 
     /// @notice Borrow orders by Swift Exits hashes (withdraw op hash)
-    mapping(uint256 => mapping(uint32 => BorrowOrder)) internal borrowOrders;
-    /// @notice Borrow orders in Swift Exits count
-    mapping(uint256 => uint32) internal borrowOrdersCount;
-
-    /// @notice Container for information about validator
-    /// @member exists Flag for validator existance in current lending process
-    /// @member pubkey Validators' pubkey
-    /// @member supply Validators' supplied funds
-    struct ValidatorInfo {
-        bool exists;
-        BlsOperations.G2Point pubkey;
-        uint256 supply;
-    }
+    mapping(uint256 => BorrowOrder) internal borrowOrders;
 
     /// @notice Container for information about borrow order
     /// @member borrowed This orders' borrow
-    /// @member validator Borrow orders' recipient (validator)
     struct BorrowOrder {
+        uint16 tokenId;
         uint256 borrowed;
         uint256 fee;
-        address validator;
     }
 
     /// @notice Container for information about Swift Exit Order
@@ -103,6 +76,7 @@ contract SwiftExits is BlsVerifier {
         uint64 withdrawOpOffset;
         uint16 tokenId;
         uint256 tokenAmount;
+        uint16 tokenSupplyId;
         uint256 supplyAmount;
         address recipient;
     }
@@ -131,33 +105,14 @@ contract SwiftExits is BlsVerifier {
         address _matterTokenAddress,
         address _governanceAddress,
         address _rollupAddress,
-        address _blsVerifierAddress,
         address _comptrollerAddress
     ) external {
         requireOwner();
         governance = Governance(_governanceAddress);
         rollup = Franklin(_rollupAddress);
         lastVerifiedBlock = rollup.totalBlocksVerified;
-        blsVerifier = BlsVerifier(_blsVerifierAddress);
         comptroller = Comptroller(_comptrollerAddress);
         matterToken = _matterTokenAddress;
-
-        address cMatterTokenAddress = governance.cTokenAddresses(_matterTokenAddress);
-
-        address[] memory ctokens = new address[](2);
-        ctokens[0] = cMatterTokenAddress; // matter token
-        ctokens[1] = governance.cTokenAddresses(address(0)); // ether
-
-        uint[] memory errors = comptroller.enterMarkets(ctokens);
-        require(
-            errors[0] == 0 && errors[1] == 0,
-            "fw011"
-        ); // fw011 - cant enter markets
-
-        require(
-            IERC20(_matterTokenAddress).approve(cMatterTokenAddress, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-            "fw011"
-        ); // fw011 - token approve failed
     }
 
     /// @notice Fallback function always reverts
@@ -191,127 +146,55 @@ contract SwiftExits is BlsVerifier {
             ); // sstt11 - token transfer out failed
         }
     }
-    
-    /// @notice Adds new validator
-    /// @dev Only owner can add new validator
-    /// @param _address Validator address
-    /// @param _pbkxx Validator pubkey xx
-    /// @param _pbkxy Validator pubkey xy
-    /// @param _pbkyx Validator pubkey yx
-    /// @param _pbkyy Validator pubkey yy
-    function addValidator(
-        address _address,
-        uint256 _pbkxx,
-        uint256 _pbkxy,
-        uint256 _pbkyx,
-        uint256 _pbkyy
-    ) external {
-        requireOwner();
-        require(
-            !validatorsInfo[_address].exists,
-            "ssar11"
-        ); // ssar11 - operator exists
-        validatorsInfo[_address].exists = true;
-        validatorsInfo[_address].pubkey = BlsOperations.G2Point({
-                x: [
-                    _pbkxx,
-                    _pbkxy
-                ],
-                y: [
-                    _pbkyx,
-                    _pbkyy
-                ]
-        });
-        validatorsCount++;
-    }
 
-    /// @notice Gets allowed withdraw amount for validator
-    /// @dev Requires validators' existance
-    /// @param _address Validator address
-    function getAllowedWithdrawAmount(address _address) public returns (uint256) {
-        if (totalSupply-totalBorrowed >= validatorsInfo[_address].supply) {
-            return validatorsInfo[_address].supply;
-        } else {
-            return totalSupply-totalBorrowed;
-        }
+    /// @notice Gets allowed withdraw amount
+    /// @param _tokenId Specified token id
+    function getAllowedWithdrawAmount(uint256 _tokenId) public returns (uint256) {
+        requireOwner();
+        return supplies[_tokenId]-borrows[_tokenId];
     }
 
     /// @notice Withdraws specified amount from validators supply
     /// @dev Requires validators' existance and allowed amount is >= specified amount, which should not be equal to 0
     /// @param _amount Specified amount
-    function withdrawForValidator(uint256 _amount) external {
+    /// @param _tokenId Specified token id
+    function withdraw(uint256 _amount, uint256 _tokenId) external {
+        requireOwner();
         require(
-            getAllowedWithdrawAmount(msg.sender) >= _amount,
+            getAllowedWithdrawAmount(_tokenId) >= _amount,
             "sswr11"
         ); // sswr11 - wrong amount
-        immediateWithdraw(_amount);
+        immediateWithdraw(_amount, _tokenId);
     }
 
     /// @notice Withdraws possible amount from validators supply
     /// @dev Requires validators' existance and allowed amount > 0
-    function withdrawPossibleForValidator() external {
-        uint256 amount = getAllowedWithdrawAmount(msg.sender);
-        immediateWithdraw(amount);
+    /// @param _tokenId Specified token id
+    function withdrawPossible(uint256 _tokenId) external {
+        requireOwner();
+        uint256 amount = getAllowedWithdrawAmount(_tokenId);
+        immediateWithdraw(amount, _tokenId);
     }
 
     /// @notice The specified amount of funds will be withdrawn from validators supply
     /// @param _amount Specified amount
-    function immediateWithdraw(uint256 _amount) internal {
+    /// @param _tokenId Specified token id
+    function immediateWithdraw(uint256 _amount, uint256 _tokenId) internal {
         require(
             _amount > 0,
             "ssir11"
         ); // ssir11 - wrong amount
-        transferOut(msg.sender, matterToken, _amount);
-        totalSupply -= _amount;
-        validatorsInfo[msg.sender].supply -= _amount;
-    }
-
-    /// @notice Removes validator for current processing list
-    /// @dev Requires owner as sender and validators' existance
-    /// @param _address Validator address
-    function removeValidator(
-        address _address
-    ) external {
-        requireOwner();
-        require(
-            validatorsInfo[_address].exists,
-            "ssrr11"
-        ); // ssrr11 - operator does not exists
-
-        validatorsInfo[_address].exists = false;
-
-        bool found = false;
-        for (uint32 i = 0; i < validatorsCount-2; i++){
-            if (found || validators[i] == _address) {
-                found = true;
-                validators[i] = validators[i+1];
-            }
-        }
-        delete validators[validatorsCount-1];
-        validatorsCount--;
+        transferOut(msg.sender, governance.tokenAddress(_tokenId), _amount);
+        supplies[_tokenId] -= _amount;
     }
 
     /// @notice Supplies specified amount of tokens from validator
     /// @dev Calls transferIn function of specified token and fulfillDefferedWithdrawOrders to fulfill deffered withdraw orders
-    /// @param _address Validator account address
     /// @param _amount Token amount
-    function supplyValidator(address _address, uint256 _amount) public {
-        require(
-            validatorsInfo[_address].exists,
-            "sssr11"
-        ); // sssr11 - operator does not exists
-        transferInERC20(_address, matterToken, _amount);
-        totalSupply = totalSupply.add(_amount);
-        validatorsInfo[_address] += _amount;
-    }
-
-    /// @notice Returns validators pubkeys for specified validators addresses
-    /// @param _validators Validators addresses
-    function getValidatorsPubkeys(address[] memory _validators) internal returns (BlsOperations.G2Point[] memory pubkeys) {
-        for (uint32 i = 0; i < _validators.length; i++) {
-            pubkeys[i] = validatorsInfo[_validators[i]].pubkey;
-        }
-        return pubkeys;
+    /// @param _tokenId Specified token id
+    function supply(address _address, uint256 _amount, uint256 _tokenId) public {
+        transferInERC20(_address, governance.tokenAddress(_tokenId), _amount);
+        supplies[_tokenId] = supplies[_tokenId].add(_amount);
     }
 
     /// @notice Adds new swift exit
@@ -338,19 +221,6 @@ contract SwiftExits is BlsVerifier {
     ) external {
         requireOwner();
         require(
-            _validators.length > 0,
-            "ssat11"
-        ); // "ssat11" - validators count must be > 0
-        if (_validators.length > 1) {
-            require(
-                blsVerifier.verifyBlsSignature(
-                    G1Point(_aggrSignatureX, _aggrSignatureY),
-                    getValidatorsPubkeys(_validators)
-                ),
-                "ssat12"
-            ); // "ssat12" - wrong signature
-        }
-        require(
             exitOrders[_withdrawOpHash].status == ExitOrderState.None,
             "ssat13"
         ); // "ssat13" - request exists
@@ -365,31 +235,32 @@ contract SwiftExits is BlsVerifier {
             );
         } else {
             // Get amount to borrow
-            (uint256 amountTokenSupply, uint256 amountTokenBorrow, uint256 validatorsFee, uint256 ownerFee) = getAmountsAndFees(_tokenId, _tokenAmount);
+            (uint16 tokenSupplyId, uint256 amountTokenSupply, uint256 amountTokenBorrow, uint256 ownerFee) = getAmountsAndFees(_tokenId, _tokenAmount);
 
             // Create Exit orer
             ExitOrder order = ExitOrder(
                 ExitOrderState.None,
                 _withdrawOpOffset,
                 _tokenId,
-                0,
-                0,
+                amountTokenBorrow,
+                tokenSupplyId,
+                amountTokenSupply,
                 _recipient
             );
             exitOrdersHashes[_blockNumber][exitOrdersCount[_blockNumber]] = _withdrawOpHash;
             exitOrders[_withdrawOpHash] = order;
             exitOrdersCount[_blockNumber]++;
 
-            if (amountTokenSupply <= (totalSupply - totalBorrowed)) {
+            if (amountTokenSupply <= (supplies[tokenSupplyId] - borrows[tokenSupplyId])) {
                 // If amount to borrow <= borrowable amount - immediate swift exit
-                immediateSwiftExit(_blockNumber, _withdrawOpHash, amountTokenSupply, amountTokenBorrow, validatorsFee, ownerFee);
+                immediateSwiftExit(_blockNumber, _withdrawOpHash, ownerFee);
             } else {
                 // If amount to borrow > borrowable amount - deffered swift exit order
                 exitOrders[_withdrawOpHash].status = ExitOrderState.Deffered;
                 emit UpdatedExitOrder(
                     _blockNumber,
                     _withdrawOpHash,
-                    (amountTokenSupply * possiblePriceRisingCoeff) - totalSupply + totalBorrowed
+                    (amountTokenSupply * possiblePriceRisingCoeff) - supplies[tokenSupplyId] + borrows[tokenSupplyId]
                 );
             }
         }
@@ -419,14 +290,18 @@ contract SwiftExits is BlsVerifier {
         ExitOrder order = exitOrders[_withdrawOpHash];
 
         uint256 updatedAmount = 0;
-        (uint256 amountTokenSupply, uint256 amountTokenBorrow, uint256 validatorsFee, uint256 ownerFee) = getAmountsAndFees(order.tokenId, order.tokenAmount);
+        (uint16 tokenSupplyId, uint256 amountTokenSupply, uint256 amountTokenBorrow, uint256 ownerFee) = getAmountsAndFees(order.tokenId, order.tokenAmount);
 
-        if (amountTokenSupply <= (totalSupply - totalBorrowed)) {
+        exitOrders[_withdrawOpHash].tokenSupplyId = tokenSupplyId;
+        exitOrders[_withdrawOpHash].tokenAmount = amountTokenBorrow;
+        exitOrders[_withdrawOpHash].supplyAmount = amountTokenSupply;
+
+        if (amountTokenSupply <= (supplies[tokenSupplyId] - borrows[tokenSupplyId])) {
             // If amount to borrow <= borrowable amount - immediate swift exit
-            immediateSwiftExit(_blockNumber, _withdrawOpHash, amountTokenSupply, amountTokenBorrow, validatorsFee, ownerFee);
+            immediateSwiftExit(_blockNumber, _withdrawOpHash, ownerFee);
         } else {
             // If amount to borrow > borrowable amount - emit update deffered swift exit order event
-            updatedAmount = (amountTokenSupply * possiblePriceRisingCoeff) - totalSupply + totalBorrowed;
+            updatedAmount = (amountTokenSupply * possiblePriceRisingCoeff) - supplies[tokenSupplyId] + borrows[tokenSupplyId];
         }
         emit UpdatedExitOrder(
             _blockNumber,
@@ -439,32 +314,24 @@ contract SwiftExits is BlsVerifier {
     /// @dev Exhanges tokens with compound, transfers token to recipient and creades swift order on rollup contract
     /// @param _blockNumber Rollup block number
     /// @param _withdrawOpHash Withdraw operation hash
-    /// @param _amountTokenSupply Amount to borrow from validators and exchange with compound
-    /// @param _amountTokenBorrow Amount to get from compound
-    /// @param _validatorsFee Amount of validators fee
     /// @param _ownerFee Amount of owner fee
     function immediateSwiftExit(
         uint32 _blockNumber,
         uint256 _withdrawOpHash,
-        uint256 _amountTokenSupply,
-        uint256 _amountTokenBorrow,
-        uint256 _validatorsFee,
         uint256 _ownerFee
     ) internal {
         ExitOrder order = exitOrders[_withdrawOpHash];
 
-        borrowFromCompound(_amountTokenSupply, order.tokenId, _amountTokenBorrow);
+        borrowFromCompound(order.supplyTokenId, order.supplyAmount, order.tokenId, order.tokenAmount);
         
-        exchangeWithRecipient(order.recipient, order.tokenId, _amountTokenBorrow);
+        exchangeWithRecipient(order.recipient, order.tokenId, order.tokenAmount);
 
-        createBorrowOrders(_withdrawOpHash, _amountTokenSupply, _validatorsFee, _ownerFee);
+        createBorrowOrder(_withdrawOpHash, order.supplyTokenId, order.supplyAmount, _ownerFee);
 
         rollup.orderSwiftExit(_blockNumber, order.withdrawOpOffset, _withdrawOpHash, order.recipient);
 
-        exitOrders[_withdrawOpHash].tokenAmount = _amountTokenBorrow;
-        exitOrders[_withdrawOpHash].supplyAmount = _amountTokenSupply;
         exitOrders[_withdrawOpHash].status = ExitOrderState.Fulfilled;
-        totalBorrowed += _amountTokenSupply;
+        borrows[order.tokenSupplyId] += order.supplyAmount;
     }
 
     /// @notice Exchanges specified amount of token with recipient
@@ -477,42 +344,53 @@ contract SwiftExits is BlsVerifier {
     }
 
     /// @notice Borrows specified amount from compound
-    /// @param _tokenId Token id
+    /// @param _tokenSupplyId Token supply id
     /// @param _amountTokenSupply Amount to borrow from validators and exchange with compound
+    /// @param _tokenBorrowId Token borrow id
     /// @param _amountTokenBorrow Amount to get from compound
     function borrowFromCompound(
-        uint16 _tokenId,
+        uint16 _tokenSupplyId,
         uint256 _amountTokenSupply,
+        uint16 _tokenBorrowId,
         uint256 _amountTokenBorrow
     ) internal {
-        address cMatterTokenAddress = governance.cTokenAddresses(matterToken);
+        address supplyTokenAddress = governance.tokenAddresses(_tokenSupplyId);
+        address cSupplyTokenAddress = governance.cTokenAddresses(supplyTokenAddress);
 
-        uint256 allowence = IERC20(matterToken).allowence(address(this), address(cMatterTokenAddress));
-        if (allowence < _amountTokenSupply) {
-            require(
-                IERC20(matterToken).approve(address(cMatterTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                "fw011"
-            ); // fw011 - token approve failed
-        }
-        
-        CErc20 cMatterToken = CErc20(cMatterTokenAddress);
-        require(
-            cMatterToken.mint(_amountTokenSupply) == 0,
-            "fw011"
-        ); // fw011 - token mint failed
-
-        address tokenAddress = governance.tokenAddresses(_tokenId);
+        address tokenAddress = governance.tokenAddresses(_tokenBorrowId);
         address cTokenAddress = governance.cTokenAddresses(tokenAddress);
 
-        address[] memory ctokens = new address[](1);
-        ctokens[0] = governance.cTokenAddresses(cTokenAddress);
+        address[] memory ctokens = new address[](2);
+        ctokens[0] = governance.cTokenAddresses(cSupplyTokenAddress);
+        ctokens[1] = governance.cTokenAddresses(cTokenAddress);
         uint[] memory errors = comptroller.enterMarkets(ctokens);
         require(
-            errors[0] == 0,
+            errors[0] == 0 && errors[1] == 0,
             "fw011"
         );  // fw011 - token approve failed
 
-        if (_tokenId == 0) {
+        if (_tokenSupplyId == 0) {
+            CEther cToken = CEther(cSupplyTokenAddress);
+            require(
+                cToken.mint.value(_amountTokenSupply)() == 0,
+                "got collateral?"
+            );
+        } else {
+            uint256 allowence = IERC20(supplyTokenAddress).allowence(address(this), address(cSupplyTokenAddress));
+            if (allowence < _amountTokenSupply) {
+                require(
+                    IERC20(supplyTokenAddress).approve(address(cSupplyTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                    "fw011"
+                ); // fw011 - token approve failed
+            }
+            CErc20 cToken = CErc20(cSupplyTokenAddress);
+            require(
+                cToken.mint(_amountTokenSupply) == 0,
+                "fw011"
+            ); // fw011 - token mint failed
+        }
+
+        if (_tokenBorrowId == 0) {
             CEther cToken = CEther(cTokenAddress);
             require(
                 cToken.borrow.value(_amountTokenBorrow)() == 0,
@@ -528,18 +406,20 @@ contract SwiftExits is BlsVerifier {
     }
 
     /// @notice Repays specified amount to compound
-    /// @param _tokenId Token id
+    /// @param _tokenBorrowId Token borrow id
     /// @param _borrowAmount Amount of tokens to repay
+    /// @param _tokenSupplyId Token supply id
     /// @param _supplyAmount Amount of supplied tokens
     function repayToCompound(
-        uint16 _tokenId,
+        uint16 _tokenBorrowId,
         uint256 _borrowAmount,
+        uint16 _tokenSupplyId,
         uint256 _supplyAmount
     ) internal {
-        address tokenAddress = governance.tokenAddresses(_tokenId);
+        address tokenAddress = governance.tokenAddresses(_tokenBorrowId);
         address cTokenAddress = governance.cTokenAddresses(tokenAddress);
 
-        if (_tokenId == 0) {
+        if (_tokenBorrowId == 0) {
             CEther cToken = CEther(cTokenAddress);
             require(
                 cToken.repayBorrow.value(_borrowAmount)() == 0,
@@ -560,12 +440,22 @@ contract SwiftExits is BlsVerifier {
             );
         }
 
-        address cMatterTokenAddress = governance.cTokenAddresses(matterToken);
-        CErc20 cToken = CErc20(cMatterTokenAddress);
-        require(
-            cToken.redeemUnderlying(_supplyAmount) == 0,
-            "something went wrong"
-        );
+        address supplyTokenAddress = governance.tokenAddresses(_tokenSupplyId);
+        address cSupplyTokenAddress = governance.cTokenAddresses(supplyTokenAddress);
+
+        if (_tokenSupplyId == 0) {
+            CEther cToken = CEther(cSupplyTokenAddress);
+            require(
+                cToken.redeemUnderlying(_supplyAmount) == 0,
+                "got collateral?"
+            );
+        } else {
+            CErc20 cToken = CErc20(cSupplyTokenAddress);
+            require(
+                cToken.redeemUnderlying(_supplyAmount) == 0,
+                "got collateral?"
+            );
+        }
     }
 
     /// @notice Returns amound of validators supply to exchange for token, calculates fees
@@ -574,7 +464,7 @@ contract SwiftExits is BlsVerifier {
     function getAmountsAndFees(
         uint16 _tokenId,
         uint256 _tokenAmount
-    ) internal returns (uint256 amountToExchange, uint256 expectedBorrowAmount, uint256 validatorsFee, uint256 ownerFee) {
+    ) internal returns (uint16 tokenSupplyId, uint256 amountTokenSupply, uint256 amountTokenBorrow, uint256 ownerFee) {
         // address tokenAddress = governance.tokenAddresses(_tokenId);
         // address cTokenAddress = governance.cTokenAddresses(tokenAddress);
         // address cMatterAddress = governance.cTokenAddresses(matterToken);
@@ -597,31 +487,21 @@ contract SwiftExits is BlsVerifier {
 
     /// @notice Creates borrow orders for specified exit request
     /// @param _withdrawOpHash Withdraw operation hash
-    /// @param _amountToBorrow Amount of validators supply to borrow
+    /// @param _tokenSupplyId Token supply id
+    /// @param _amountToSupply Amount of validators supply to borrow
     /// @param _validatorsFee Amount of validators fee
     /// @param _ownerFee Amount of owner fee
     function createBorrowOrders(
         uint256 _withdrawOpHash,
-        uint256 _amountToBorrow,
-        uint256 _validatorsFee,
+        uint16 _tokenSupplyId,
+        uint256 _amountToSupply,
         uint256 _ownerFee
     ) internal {
-        for (uint32 i = 0; i <= validatorCount; i++) {
-            uint32 currentBorrowOrdersCount = borrowOrdersCount[_withdrawOpHash];
-            borrowOrders[_withdrawOpHash][currentBorrowOrdersCount] = BorrowOrder({
-                borrowed: _amountToBorrow * (validatorsInfo[validators[i]].supply / totalSupply),
-                fee: _validatorsFee * (validatorsInfo[validators[i]].supply / totalSupply),
-                validator: validators[i]
-            });
-            borrowOrdersCount[_withdrawOpHash]++;
-        }
-        uint32 currentBorrowOrdersCount = borrowOrdersCount[_withdrawOpHash];
-        borrowOrders[_withdrawOpHash][currentBorrowOrdersCount] = BorrowOrder({
-            borrowed: 0,
-            fee: _ownerFee,
-            validator: validators[owner]
+        borrowOrders[_withdrawOpHash] = BorrowOrder({
+            tokenId: _tokenSupplyId,
+            borrowed: _amountToSupply,
+            fee: _ownerFee
         });
-        borrowOrdersCount[_withdrawOpHash]++;
     }
 
     /// @notice Called by Rollup contract when a new block is verified. Completes swift orders process
@@ -659,32 +539,10 @@ contract SwiftExits is BlsVerifier {
     function fulfillSuccededOrders(uint256[] memory _succeededHashes) internal {
         for (uint32 i = 0; i < _succeededHashes.length; i++) {
             ExitOrder exitOrder = exitOrders[_succeededHashes[i]];
-            repayToCompound(exitOrder.tokenId, exitOrder.tokenAmount, exitOrder.supplyAmount);
-            for (uint32 k = 0; k < borrowOrdersCount[_succeededHashes[i]]; k++) {
-                BorrowOrder order = borrowOrders[_succeededHashes[i]][k];
-                totalBorrowed -= order.borrowed;
-                sendFeeToRollup(order.validator, exitOrder.tokenId, order.fee);
-            }
-        }
-    }
-
-    /// @notice Sends fees to rollup
-    /// @param _validator Validator address
-    /// @param _tokenId Token id
-    /// @param _amount Token amount
-    function sendFeeToRollup(address _validator, uint16 _tokenId, uint256 _fee) internal {
-        if (_fee > 0) {
-            if (tokenId > 0) {
-                address tokenAddr = governance.tokenAddresses(tokenId);
-                uint256 allowence = IERC20(tokenAddr).allowence(address(this), address(rollup));
-                if (allowence < _fee) {
-                    require(
-                        IERC20(tokenAddr).approve(address(rollup), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                        "fw011"
-                    ); // fw011 - token approve failed
-                }
-            }
-            rollup.depositOnchain(_validator, _tokenId, _fee);
+            repayToCompound(exitOrder.tokenId, exitOrder.tokenAmount, exitOrder.tokenSupplyId, exitOrder.supplyAmount);
+            BorrowOrder bOrder = borrowOrders[_succeededHashes[i]];
+            borrows[exitOrder.supplyTokenId] -= bOrder.borrowed;
+            supplies[exitOrder.tokenId] += bOrder.fee;
         }
     }
 
@@ -710,14 +568,9 @@ contract SwiftExits is BlsVerifier {
     /// @param _succeededHashes Succeeded orders hashes
     function punishForFailed(uint256[] memory _failedHashes) internal {
          for (uint32 i = 0; i < _failedHashes.length; i++) {
-            for (uint32 k = 0; k < borrowOrdersCount[_failedHashes[i]]; k++) {
-                BorrowOrder order = borrowOrders[_succeededHashes[i]][k];
-                if (order.borrowed > 0) {
-                    validatorsInfo[order.validator].supply -= order.borrowed;
-                    totalSupply -= order.borrowed;
-                    totalBorrowed -= order.borrowed;
-                }
-            }
+            BorrowOrder bOrder = borrowOrders[_failedHashes[i]];
+            borrows[exitOrder.supplyTokenId] -= bOrder.borrowed;
+            supplies[exitOrder.supplyTokenId] -= bOrder.borrowed;
         }
     }
 
