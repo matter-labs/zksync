@@ -13,10 +13,7 @@ contract SwiftExitsSingle {
     using SafeMath for uint256;
 
     /// @notice Possible price change coeff on Compound
-    uint256 constant possiblePriceRisingCoeff = 110/100;
-
-    /// @notice Validators fee
-    uint256 constant validatorsFeeCoeff = 95 / 100;
+    uint256 constant possiblePriceRisingCoeff = 110;
 
     /// @notice Owner of the contract (Matter Labs)
     address internal owner;
@@ -260,7 +257,7 @@ contract SwiftExitsSingle {
                 emit UpdatedExitOrder(
                     _blockNumber,
                     _withdrawOpHash,
-                    (amountTokenSupply * possiblePriceRisingCoeff) - supplies[tokenSupplyId] + borrows[tokenSupplyId]
+                    (amountTokenSupply * possiblePriceRisingCoeff / 100) - supplies[tokenSupplyId] + borrows[tokenSupplyId]
                 );
             }
         }
@@ -301,7 +298,7 @@ contract SwiftExitsSingle {
             immediateSwiftExit(_blockNumber, _withdrawOpHash, ownerFee);
         } else {
             // If amount to borrow > borrowable amount - emit update deffered swift exit order event
-            updatedAmount = (amountTokenSupply * possiblePriceRisingCoeff) - supplies[tokenSupplyId] + borrows[tokenSupplyId];
+            updatedAmount = (amountTokenSupply * possiblePriceRisingCoeff / 100) - supplies[tokenSupplyId] + borrows[tokenSupplyId];
         }
         emit UpdatedExitOrder(
             _blockNumber,
