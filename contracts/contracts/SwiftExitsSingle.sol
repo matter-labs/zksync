@@ -63,25 +63,15 @@ contract SwiftExitsSingle {
     /// @notice Swift Exits by its hash (withdraw op hash)
     mapping(uint256 => ExitOrder) internal exitOrders;
 
-    /// @notice Borrow orders by Swift Exits hashes (withdraw op hash)
-    mapping(uint256 => BorrowOrder) internal borrowOrders;
-
-    /// @notice Container for information about borrow order
-    /// @member borrowed This orders' borrow
-    struct BorrowOrder {
-        uint16 tokenId;
-        uint256 borrowed;
-        uint256 fee;
-    }
-
     /// @notice Container for information about Swift Exit Order
     /// @member status Order status
     /// @member withdrawOpOffset Withdraw operation offset in block
     /// @member tokenId Order token id
     /// @member initTokenAmount Initial token amount
-    /// @member borrowAmount Initial token amount minus fee
+    /// @member borrowAmount Initial token amount minus fees
     /// @member tokenSupplyId Order supplied token id
     /// @member supplyAmount Order supply amount
+    /// @member fee Owner fee
     /// @member recipient Recipient address
     struct ExitOrder {
         ExitOrderState status;
@@ -91,6 +81,7 @@ contract SwiftExitsSingle {
         uint256 borrowAmount;
         uint16 tokenSupplyId;
         uint256 supplyAmount;
+        uint256 fee;
         address recipient;
     }
 
@@ -364,6 +355,7 @@ contract SwiftExitsSingle {
         exitOrders[_withdrawOpHash].tokenSupplyId = tokenSupplyId;
         exitOrders[_withdrawOpHash].borrowAmount = amountTokenBorrow;
         exitOrders[_withdrawOpHash].supplyAmount = amountTokenSupply;
+        exitOrders[_withdrawOpHash].fee = ownerFee;
 
         if (amountTokenSupply <= (supplies[tokenSupplyId] - borrows[tokenSupplyId])) {
             // If amount to borrow <= borrowable amount - immediate swift exit
@@ -397,8 +389,6 @@ contract SwiftExitsSingle {
         }
         
         exchangeWithRecipient(order.recipient, order.tokenId, order.borrowAmount);
-
-        createBorrowOrder(_withdrawOpHash, order.supplyTokenId, order.supplyAmount, _ownerFee);
 
         rollup.orderSwiftExit(_blockNumber, order.withdrawOpOffset, _withdrawOpHash, order.recipient);
 
@@ -572,24 +562,6 @@ contract SwiftExitsSingle {
         }
     }
 
-    /// @notice Creates borrow orders for specified exit request
-    /// @param _withdrawOpHash Withdraw operation hash
-    /// @param _tokenSupplyId Token supply id
-    /// @param _amountToSupply Amount of validators supply to borrow
-    /// @param _ownerFee Amount of owner fee
-    function createBorrowOrders(uint256 _withdrawOpHash,
-                                uint16 _tokenSupplyId,
-                                uint256 _amountToSupply,
-                                uint256 _ownerFee)
-    internal
-    {
-        borrowOrders[_withdrawOpHash] = BorrowOrder({
-            tokenId: _tokenSupplyId,
-            borrowed: _amountToSupply,
-            fee: _ownerFee
-        });
-    }
-
     /// @notice Called by Rollup contract when a new block is verified. Completes swift orders process
     /// @dev Requires Rollup contract as caller. Transacts tokens and ether, repays for compound, fulfills deffered orders, punishes for failed exits
     /// @param _blockNumber The number of verified block
@@ -631,9 +603,7 @@ contract SwiftExitsSingle {
             if (exitOrder.tokenId != exitOrder.tokenSupplyId) {
                 repayToCompound(exitOrder.tokenId, exitOrder.tokenAmount, exitOrder.tokenSupplyId, exitOrder.supplyAmount);
             }
-            BorrowOrder bOrder = borrowOrders[_succeededHashes[i]];
-            borrows[exitOrder.supplyTokenId] -= bOrder.borrowed;
-            supplies[exitOrder.tokenId] = upplies[exitOrder.tokenId].add(bOrder.fee);
+            supplies[exitOrder.tokenId] = supplies[exitOrder.tokenId].add(exitOrder.fee);
         }
     }
 
@@ -663,9 +633,9 @@ contract SwiftExitsSingle {
     internal
     {
          for (uint32 i = 0; i < _failedHashes.length; i++) {
-            BorrowOrder bOrder = borrowOrders[_failedHashes[i]];
-            borrows[exitOrder.supplyTokenId] -= bOrder.borrowed;
-            supplies[exitOrder.supplyTokenId] -= bOrder.borrowed;
+            ExitOrder exitOrder = exitOrders[_failedHashes[i]];
+            borrows[exitOrder.supplyTokenId] -= exitOrder.supplyAMount;
+            supplies[exitOrder.supplyTokenId] -= exitOrder.supplyAMount;
         }
     }
 
