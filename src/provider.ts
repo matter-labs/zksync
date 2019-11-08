@@ -9,10 +9,9 @@ import {
   TransferTx,
   WithdrawTx
 } from "./types";
-import { Token } from "./types";
 
 export class SidechainProvider {
-  sideChainInfo: SidechainInfo;
+  contractAddress: string;
 
   static async newWebsocketProvider(
     address: string = "ws://127.0.0.1:3031"

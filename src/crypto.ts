@@ -3,7 +3,7 @@ import { curve } from "elliptic";
 import EdwardsPoint = curve.edwards.EdwardsPoint;
 import { sha256 } from "js-sha256";
 import edwards = curve.edwards;
-import { HmacSHA512 } from "crypto-js";
+import { Signature } from "./types";
 
 const blake2b = require("blake2b");
 const elliptic = require("elliptic");
@@ -290,7 +290,7 @@ function pedersenHStar(input: Buffer): BN {
   return p_hash_star_fe;
 }
 
-export function musigSHA256(priv_key: BN, msg: Buffer) {
+export function musigSHA256(priv_key: BN, msg: Buffer): Signature {
   const msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
   msg.copy(msgToHash);
   msg = pedersenHash(msgToHash, "be")
@@ -321,11 +321,11 @@ export function musigSHA256(priv_key: BN, msg: Buffer) {
     serializePointPacked(r_g),
     s.toArrayLike(Buffer, "le", 32)
   ]).toString("hex");
-  const pubkey = serializePointPacked(pub_key).toString("hex");
-  return { pub_key: pubkey, sign: signature };
+  const publicKey = serializePointPacked(pub_key).toString("hex");
+  return { publicKey, signature };
 }
 
-export function musigPedersen(priv_key: BN, msg: Buffer) {
+export function musigPedersen(priv_key: BN, msg: Buffer): Signature {
   const msgToHash = Buffer.alloc(PAD_MSG_BEFORE_HASH_BYTES_LEN, 0);
   msg.copy(msgToHash);
   msg = pedersenHash(msgToHash, "be")
@@ -359,8 +359,8 @@ export function musigPedersen(priv_key: BN, msg: Buffer) {
     serializePointPacked(r_g),
     s.toArrayLike(Buffer, "le", 32)
   ]).toString("hex");
-  const pubkey = serializePointPacked(pub_key).toString("hex");
-  return { pub_key: pubkey, sign: signature };
+  const publicKey = serializePointPacked(pub_key).toString("hex");
+  return { publicKey, signature };
 }
 
 export function privateKeyToPublicKey(pk: BN): edwards.EdwardsPoint {
@@ -394,14 +394,24 @@ export function serializePointPacked(point: edwards.EdwardsPoint): Buffer {
   return y_buff;
 }
 
-export function signTransactionBytes(privKey: BN, bytes: Buffer) {
+export function signTransactionBytes(privKey: BN, bytes: Buffer): Signature {
   return musigPedersen(privKey, bytes);
 }
 
-export function privateKeyFromSeed(seed: Buffer) {
-  const privateKey = wrapScalar(
-    new BN(HmacSHA512(seed.toString("hex"), "Matter seed").toString(), "hex")
-  );
-  const publicKey = privateKeyToPublicKey(privateKey);
-  return { privateKey, publicKey };
+export function privateKeyFromSeed(seed: Buffer): BN {
+  if (seed.length < 32) {
+    throw new Error("Seed is too short");
+  }
+  let effectiveSeed = new Uint8Array(seed);
+  while (true) {
+    const hasher = sha256.create();
+    hasher.update(effectiveSeed);
+    const hashResult = new Uint8Array(hasher.arrayBuffer());
+    const privateKey = new BN(hashResult);
+    if (privateKey.gte(fsModulus)) {
+      effectiveSeed = hashResult;
+      continue;
+    }
+    return privateKey;
+  }
 }

@@ -106,14 +106,14 @@ async function main() {
   console.log("==================================");
   console.log("Wallet 2 withdraw ETH to contract");
   console.log(
-      "Wallet 2 ETH sidechain balance",
-      formatEther((await wallet2.getAccountState()).commited.balances[ethTokenId])
+    "Wallet 2 ETH sidechain balance",
+    formatEther((await wallet2.getAccountState()).commited.balances[ethTokenId])
   );
   console.log(
-      "Wallet 2 ETH balance",
-      formatEther(
-          (await wallet2.getETHBalances()).onchainBalances[ethTokenId].toString()
-      )
+    "Wallet 2 ETH balance",
+    formatEther(
+      (await wallet2.getETHBalances()).onchainBalances[ethTokenId].toString()
+    )
   );
   const withdrawOffchainHandle = await wallet2.withdrawFromSidechainToContract(
     "ETH",
@@ -127,10 +127,10 @@ async function main() {
     formatEther((await wallet2.getAccountState()).commited.balances[ethTokenId])
   );
   console.log(
-      "Wallet 2 ETH balance",
-      formatEther(
-          (await wallet2.getETHBalances()).onchainBalances[ethTokenId].toString()
-      )
+    "Wallet 2 ETH balance",
+    formatEther(
+      (await wallet2.getETHBalances()).onchainBalances[ethTokenId].toString()
+    )
   );
 
   await (wsSidechainProvider.transport as WSTransport).ws.close();

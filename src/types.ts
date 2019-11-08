@@ -1,71 +1,51 @@
 import { utils } from "ethers";
 
-export type Address = string;
+export type SyncAddress = string;
 
-export interface Token {
-  id: number;
-  address: string;
-  symbol?: string;
-}
-// token, symbol/eth erc20 contract address, token id
-export type TokenLike = Token | string | number;
+// ETH or ERC20 address
+export type Token = "ETH" | string;
 
-export type Nonce = number | "commited";
-
-export interface SidechainAccountBalance {
-  address: Address;
-  nonce: number;
-  balances: any[];
-}
-
-export interface SidechainAccountState {
-  id?: number;
-  commited: SidechainAccountBalance;
-  verified: SidechainAccountBalance;
-  pending_txs: any[];
+export interface SyncAccountState {
+  address: SyncAddress;
+  commited: {
+    balances: {
+      [token: string]: utils.BigNumberish;
+    };
+    nonce: number;
+  };
+  verified: {
+    balances: {
+      [token: string]: utils.BigNumberish;
+    };
+    nonce: number;
+  };
 }
 
-export interface ETHAccountState {
-  onchainBalances: utils.BigNumber[];
-  contractBalances: utils.BigNumber[];
+export interface Signature {
+  publicKey: string;
+  signature: string;
 }
 
-export interface SidechainInfo {
-  contract_address: string;
-  tokens: [Token];
-}
-
-export interface DepositTx {
-  to: Address;
-  amount: utils.BigNumberish;
+export interface SyncTransfer {
+  from: SyncAddress;
+  to: SyncAddress;
   token: Token;
+  amount: utils.BigNumberish;
+  fee: utils.BigNumberish;
+  nonce: number;
+  signature: Signature;
 }
 
-export interface TransferTx {
-  from: Address;
-  to: Address;
-  token: number;
+export interface SyncWithdraw {
+  account: SyncAddress;
+  ethAddress: string;
+  token: Token;
   amount: utils.BigNumberish;
   fee: utils.BigNumberish;
   nonce: number;
 }
 
-export interface WithdrawTx {
-  account: Address;
-  eth_address: string;
-  token: number;
-  amount: utils.BigNumberish;
-  fee: utils.BigNumberish;
-  nonce: number;
-}
-
-export interface CloseTx {
-  account: Address;
-  nonce: number;
-}
-
-export interface FullExitReq {
-  token: number;
-  eth_address: string;
+export interface SyncCloseAccount {
+  account: SyncAddress;
   nonce: number;
 }

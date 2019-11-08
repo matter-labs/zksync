@@ -31,7 +31,7 @@ export function floatToInteger(
   return exponent.mul(mantissa);
 }
 
-export function bitsIntoBytesInOrder(bits: boolean[]): Buffer {
+export function bitsIntoBytesInBEOrder(bits: boolean[]): Buffer {
   if (bits.length % 8 != 0) {
     throw new Error("wrong number of bits to pack");
   }
@@ -110,12 +110,12 @@ export function integerToFloat(
     }
   }
 
-  return Buffer.from(bitsIntoBytesInOrder(encoding.reverse()).reverse());
+  return Buffer.from(bitsIntoBytesInBEOrder(encoding.reverse()).reverse());
 }
 
 export function reverseBits(buffer: Buffer): Buffer {
   const reversed = Buffer.from(buffer.reverse());
-  reversed.map((b, i, a) => {
+  reversed.map(b => {
     // reverse bits in byte
     b = ((b & 0xf0) >> 4) | ((b & 0x0f) << 4);
     b = ((b & 0xcc) >> 2) | ((b & 0x33) << 2);
@@ -125,12 +125,23 @@ export function reverseBits(buffer: Buffer): Buffer {
   return reversed;
 }
 
-export function packAmount(amount: BN): Buffer {
+function packAmount(amount: BN): Buffer {
   return reverseBits(integerToFloat(amount, 5, 19, 10));
 }
 
-export function packFee(amount: BN): Buffer {
+function packFee(amount: BN): Buffer {
   return reverseBits(integerToFloat(amount, 6, 10, 10));
+}
+
+
+export function packAmountChecked(amount: BN): Buffer {
+  // TODO: check is amount is packable;
+  return packAmount(amount);
+}
+
+export function packFeeChecked(amount: BN): Buffer {
+  // TODO: check is amount is packable;
+  return packFee(amount);
 }
 
 /**
