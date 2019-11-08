@@ -989,15 +989,15 @@ contract Franklin {
         }
     }
 
-    function depositOnchain(address _validator, uint16 _tokenId, uint256 _fee) external {
-        requireSwiftExits();
-        address tokenAddr = governance.tokenAddresses(tokenId);
-        require(
-            IERC20(tokenAddr).transferFrom(msg.sender, address(this), _fee),
-            "fw011"
-        ); // fw011 - token transfer from failed
-        balancesToWithdraw[_validator][_tokenId] += fee;
-    }
+    // function depositOnchain(address _validator, uint16 _tokenId, uint256 _fee) external {
+    //     requireSwiftExits();
+    //     address tokenAddr = governance.tokenAddresses(tokenId);
+    //     require(
+    //         IERC20(tokenAddr).transferFrom(msg.sender, address(this), _fee),
+    //         "fw011"
+    //     ); // fw011 - token transfer from failed
+    //     balancesToWithdraw[_validator][_tokenId] += fee;
+    // }
 
     function orderSwiftExit(
         uint32 _blockNumber,
