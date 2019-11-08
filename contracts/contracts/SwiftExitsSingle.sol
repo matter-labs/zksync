@@ -25,6 +25,9 @@ contract SwiftExitsSingle {
     /// @notice Owner of the contract (Matter Labs)
     address internal owner;
 
+    /// @notice Matter token id
+    address internal matterTokenId;
+
     /// @notice Matter token contract address
     address internal matterTokenAddress;
 
@@ -116,18 +119,17 @@ contract SwiftExitsSingle {
         rollup = Franklin(_rollupAddress);
         lastVerifiedBlock = rollup.totalBlocksVerified;
         comptroller = Comptroller(_comptrollerAddress);
+
         matterTokenAddress = _matterTokenAddress;
-
+        matterTokenId = governance.tokenIds(_matterTokenAddress);
         cMatterTokenAddress = governance.cTokenAddresses(_matterTokenAddress);
-        address cEtherAddress = governance.cTokenAddresses(address(0));
 
-        address[] memory ctokens = new address[](2);
+        address[] memory ctokens = new address[](1);
         ctokens[0] = cMatterTokenAddress;
-        ctokens[1] = cEtherAddress;
 
         uint[] memory errors = comptroller.enterMarkets(ctokens);
         require(
-            errors[0] == 0 && errors[1] == 0,
+            errors[0] == 0,
             "sess11"
         ); // sess11 - cant enter markets
 
