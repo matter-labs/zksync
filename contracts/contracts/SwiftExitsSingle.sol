@@ -41,7 +41,7 @@ contract SwiftExitsSingle {
     Franklin internal rollup;
 
     /// @notice Comptroller contract
-    Comptroller internal comptroller;
+    Unitroller internal comptroller;
 
     /// @notice Last verified Fraklin block
     uint256 internal lastVerifiedBlock;
@@ -118,7 +118,7 @@ contract SwiftExitsSingle {
         governance = Governance(_governanceAddress);
         rollup = Franklin(_rollupAddress);
         lastVerifiedBlock = rollup.totalBlocksVerified;
-        comptroller = Comptroller(_comptrollerAddress);
+        comptroller = Unitroller(_comptrollerAddress);
 
         matterTokenAddress = _matterTokenAddress;
         matterTokenId = governance.tokenIds(_matterTokenAddress);
@@ -543,24 +543,22 @@ contract SwiftExitsSingle {
             amountTokenBorrow = (1-ownerFeeCoeff/100)*_tokenAmount;
             ownerFee = (ownerFeeCoeff/100)*_tokenAmount;
         } else {
-            // address tokenAddress = governance.tokenAddresses(_tokenId);
-            // address cTokenAddress = governance.cTokenAddresses(tokenAddress);
-            // address cMatterAddress = governance.cTokenAddresses(matterTokenAddress);
+            address borrowTokenAddress = governance.tokenAddresses(_tokenId);
+            address cBorrowTokenAddress = governance.cTokenAddresses(borrowTokenAddress);
 
-            // (bool isListed, uint collateralFactorMantissa) = comptroller.markets(cTokenAddress);
+            ownerFee = _tokenAmount * ownerFeeCoeff / 100;
+            amountTokenBorrow = _tokenAmount - ownerFee;
 
-            // CErc20 cToken = CToken(cTokenAddress);
-            // uint256 exchangeRateMantissa = cToken.exchangeRateCurrent();
+            uint256 borrowTokenPrice = getUnderlyingPrice(cBorrowTokenAddress);
+            uint256 supplyTokenPrice = getUnderlyingPrice(cMatterTokenAddress);
 
-            // uint256 collateralFactor = comptroller.takeCollateralFactor(matterAddress);
+            uint256 preAmountTokenSupply = amountTokenBorrow * borrowTokenPrice / supplyTokenPrice;
 
-            // uint256 tokenPrice = comptroller.takePrice(tokenAddress);
-            
-            // uint256 fullAmount = _tokenAmount * tokenPrice / collateralFactor;
+            (bool _, uint collateralFactorMantissa) = comptroller.markets(cTokenAddress);
 
-            // amountToExchange = 0.9 * fullAmount;
-            // validatorsFee = 0.095 * _tokenAmount;
-            // ownerFee = 0.095 * _tokenAmount;
+            amountTokenSupply = preAmountTokenSupply / collateralFactorMantissa;
+
+            tokenSupplyId = matterTokenId;
         }
     }
 
