@@ -9,7 +9,7 @@ import {
 import {utils} from "ethers";
 import {packAmountChecked, packFeeChecked} from "./utils";
 import BN = require("bn.js");
-import {SyncAddress, SyncTransfer} from "./types";
+import {Signature, SyncAddress, SyncCloseAccount, SyncTransfer, SyncWithdraw} from "./types";
 
 const MAX_NUMBER_OF_TOKENS= 4096;
 
@@ -26,27 +26,37 @@ export class SyncSigner {
         return `0x${pubkeyToAddress(this.publicKey)}`
     }
 
-    signTransfer(transfer: {from: SyncAddress, to: SyncAddress, tokenId: number, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: number}): SyncTransfer {
+    signSyncTransfer(transfer: {to: SyncAddress, tokenId: number, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: number}): SyncTransfer {
         const type = Buffer.from([5]); // tx type
-        const from = serializeAddress(transfer.from);
+        const from = serializeAddress(this.address());
         const to = serializeAddress(transfer.to);
         const token = serializeTokenId(transfer.tokenId);
         const amount = serializeAmountPacked(transfer.amount);
         const fee = serializeFeePacked(transfer.fee);
         const nonce = serializeNonce(transfer.nonce);
-        const msg = Buffer.concat([type, from, to, token, amount, fee, nonce]);
-        const signature = signTransactionBytes(this.privateKey, msg);
+        const msgBytes = Buffer.concat([type, from, to, token, amount, fee, nonce]);
+
+        const signature = signTransactionBytes(this.privateKey, msgBytes);
+
+        return {
+          from: this.address(),
+          to: transfer.to,
+          token: transfer.tokenId,
+          amount: utils.bigNumberify(transfer.amount).toString(),
+          fee: utils.bigNumberify(transfer.fee).toString(),
+          nonce: transfer.nonce,
+          signature
+        };
     }
 
-    signWithdraw(ethAddress: string, tokenId: number, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: number) {
-        // serialize message
+    signSyncWithdraw(withdraw: {ethAddress: string, tokenId: number, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: number}): SyncWithdraw {
         const typeBytes = Buffer.from([3]);
         const accountBytes = serializeAddress(this.address());
-        const ethAddressBytes = serializeAddress(ethAddress);
-        const tokenIdBytes = serializeTokenId(tokenId);
-        const amountBytes = serializeAmountFull(amount);
-        const feeBytes = serializeFeePacked(fee);
-        const nonceBytes = serializeNonce(nonce);
+        const ethAddressBytes = serializeAddress(withdraw.ethAddress);
+        const tokenIdBytes = serializeTokenId(withdraw.tokenId);
+        const amountBytes = serializeAmountFull(withdraw.amount);
+        const feeBytes = serializeFeePacked(withdraw.fee);
+        const nonceBytes = serializeNonce(withdraw.nonce);
         const msgBytes = Buffer.concat([
             typeBytes,
             accountBytes,
@@ -56,37 +66,50 @@ export class SyncSigner {
             feeBytes,
             nonceBytes
         ]);
-
-        let signature =
-
-        return signTransactionBytes(this.privateKey, msg);
+        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        return {
+            account: this.address(),
+            ethAddress: withdraw.ethAddress,
+            token: withdraw.tokenId,
+            amount: utils.bigNumberify(withdraw.amount).toString(),
+            fee: utils.bigNumberify(withdraw.fee).toString(),
+            nonce: withdraw.nonce,
+            signature
+        };
     }
 
-    signClose(tx: CloseTx) {
+    signSyncCloseAccount(close: {nonce: number}): SyncCloseAccount {
         const type = Buffer.from([4]);
-        const account = serializeAddress(tx.account);
-        const nonce = serializeNonce(tx.nonce);
+        const account = serializeAddress(this.address());
+        const nonce = serializeNonce(close.nonce);
 
         const msg = Buffer.concat([type, account, nonce]);
-        return signTransactionBytes(this.privateKey, msg);
+        const signature = signTransactionBytes(this.privateKey, msg);
+
+        return {
+            account: this.address(),
+            nonce: close.nonce,
+            signature
+        };
     }
 
-    signFullExit(op: FullExitReq) {
+
+    signSyncEmergencyWithdraw(fullExit: {ethAddress: string, tokenId: number, nonce: number}): Buffer {
         const type = Buffer.from([6]);
         const packed_pubkey = serializePointPacked(this.publicKey);
-        const eth_address = serializeAddress(op.eth_address);
-        const token = serializeTokenId(op.token);
-        const nonce = serializeNonce(op.nonce);
+        const eth_address = serializeAddress(fullExit.ethAddress);
+        const token = serializeTokenId(fullExit.tokenId);
+        const nonce = serializeNonce(fullExit.nonce);
         const msg = Buffer.concat([type, packed_pubkey, eth_address, token, nonce]);
-        return Buffer.from(signTransactionBytes(this.privateKey, msg).sign, "hex");
+        return Buffer.from(signTransactionBytes(this.privateKey, msg).signature, "hex");
     }
 
-    static fromPrivateKey(pk: BN): WalletKeys {
-        return new WalletKeys(pk);
+    static fromPrivateKey(pk: BN): SyncSigner {
+        return new SyncSigner(pk);
     }
 
-    static fromSeed(seed: Buffer) : WalletKeys {
-        return new WalletKeys(privateKeyFromSeed(seed));
+    static fromSeed(seed: Buffer) : SyncSigner {
+        return new SyncSigner(privateKeyFromSeed(seed));
     }
 }
 

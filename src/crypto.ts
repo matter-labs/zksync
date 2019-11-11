@@ -322,7 +322,7 @@ export function musigSHA256(priv_key: BN, msg: Buffer): Signature {
     s.toArrayLike(Buffer, "le", 32)
   ]).toString("hex");
   const publicKey = serializePointPacked(pub_key).toString("hex");
-  return { publicKey, signature };
+  return { pubKey: publicKey, signature };
 }
 
 export function musigPedersen(priv_key: BN, msg: Buffer): Signature {
@@ -360,7 +360,7 @@ export function musigPedersen(priv_key: BN, msg: Buffer): Signature {
     s.toArrayLike(Buffer, "le", 32)
   ]).toString("hex");
   const publicKey = serializePointPacked(pub_key).toString("hex");
-  return { publicKey, signature };
+  return { pubKey: publicKey, signature };
 }
 
 export function privateKeyToPublicKey(pk: BN): edwards.EdwardsPoint {

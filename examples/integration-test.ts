@@ -2,14 +2,14 @@ import BN = require("bn.js");
 import { Wallet } from "../src/wallet";
 import { ethers } from "ethers";
 import { bigNumberify, formatEther, parseEther } from "ethers/utils";
-import { SidechainProvider } from "../src/provider";
+import { SyncProvider } from "../src/provider";
 import { WSTransport } from "../src/transport";
 
 async function main() {
   const ethersProvider = new ethers.providers.JsonRpcProvider(
     process.env.WEB3_URL
   );
-  const wsSidechainProvider = await SidechainProvider.newWebsocketProvider();
+  const wsSidechainProvider = await SyncProvider.newWebsocketProvider();
 
   console.log(
     "Contract address: ",

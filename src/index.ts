@@ -1,5 +1,5 @@
 import { Wallet } from "./wallet";
 import { WSTransport, HTTPTransport } from "./transport";
-import { SidechainProvider } from "./provider";
+import { SyncProvider } from "./provider";
 
-export { Wallet, SidechainProvider, WSTransport, HTTPTransport };
+export { Wallet, SyncProvider, WSTransport, HTTPTransport };

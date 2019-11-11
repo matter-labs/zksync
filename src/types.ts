@@ -7,6 +7,7 @@ export type Token = "ETH" | string;
 
 export interface SyncAccountState {
   address: SyncAddress;
+  id?: number;
   commited: {
     balances: {
       [token: string]: utils.BigNumberish;
@@ -22,14 +23,14 @@ export interface SyncAccountState {
 }
 
 export interface Signature {
-  publicKey: string;
+  pubKey: string;
   signature: string;
 }
 
 export interface SyncTransfer {
   from: SyncAddress;
   to: SyncAddress;
-  token: Token;
+  token: number;
   amount: utils.BigNumberish;
   fee: utils.BigNumberish;
   nonce: number;
@@ -39,13 +40,15 @@ export interface SyncTransfer {
 export interface SyncWithdraw {
   account: SyncAddress;
   ethAddress: string;
-  token: Token;
+  token: number;
   amount: utils.BigNumberish;
   fee: utils.BigNumberish;
   nonce: number;
+  signature: Signature;
 }
 
 export interface SyncCloseAccount {
   account: SyncAddress;
   nonce: number;
+  signature: Signature;
 }

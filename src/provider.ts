@@ -4,29 +4,29 @@ import {
   Address,
   CloseTx,
   SidechainAccountState,
-  SidechainInfo,
+  SidechainInfo, Token,
   TokenLike,
   TransferTx,
   WithdrawTx
 } from "./types";
 
-export class SidechainProvider {
+export class SyncProvider {
   contractAddress: string;
 
   static async newWebsocketProvider(
     address: string = "ws://127.0.0.1:3031"
-  ): Promise<SidechainProvider> {
+  ): Promise<SyncProvider> {
     const transport = await WSTransport.connect(address);
-    const provider = new SidechainProvider(transport);
+    const provider = new SyncProvider(transport);
     await provider.updateSidechainInfo();
     return provider;
   }
 
   static async newHttpProvider(
     address: string = "http://127.0.0.1:3030"
-  ): Promise<SidechainProvider> {
+  ): Promise<SyncProvider> {
     const transport = new HTTPTransport(address);
-    const provider = new SidechainProvider(transport);
+    const provider = new SyncProvider(transport);
     await provider.updateSidechainInfo();
     return provider;
   }
@@ -116,27 +116,11 @@ export class SidechainProvider {
     });
   }
 
-  async resolveToken(token: TokenLike): Promise<Token> {
-    if (typeof token == "string") {
-      const resolvedToken = this.sideChainInfo.tokens.find(t => {
-        return t.symbol == token || t.address == token;
-      });
-      if (resolvedToken) {
-        return resolvedToken;
+  async resolveTokenId(token: Token): Promise<number> {
+      if (token == "ETH") {
+        return 0;
       } else {
-        throw new Error("Token address or symbol not found");
+        throw new Error("not implemented");
       }
-    } else if (typeof token == "number") {
-      const resolvedToken = this.sideChainInfo.tokens.find(t => {
-        return t.id == token;
-      });
-      if (resolvedToken) {
-        return resolvedToken;
-      } else {
-        throw Error("Token id not found");
-      }
-    } else {
-      return token;
-    }
   }
 }
