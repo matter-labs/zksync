@@ -266,6 +266,12 @@ impl Account {
             },
         }
     }
+
+    pub fn get_nonzero_balances(&self) -> HashMap<TokenId, BigDecimal> {
+        let mut balances = self.balances.clone();
+        balances.retain(|_, v| v != &BigDecimal::from(0));
+        balances
+    }
 }
 
 #[cfg(test)]

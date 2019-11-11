@@ -339,7 +339,7 @@ impl BabyProver {
                             signature_data,
                             signer_packed_key_bits,
                         ) = prepare_sig_data(
-                            &transfer.tx.signature.sign.serialize_packed().unwrap(),
+                            &transfer.tx.signature.signature.serialize_packed().unwrap(),
                             &transfer.tx.get_bytes(),
                             &transfer.tx.signature.pub_key,
                         );
@@ -368,7 +368,7 @@ impl BabyProver {
                             &transfer_to_new
                                 .tx
                                 .signature
-                                .sign
+                                .signature
                                 .serialize_packed()
                                 .unwrap(),
                             &transfer_to_new.tx.get_bytes(),
@@ -398,7 +398,7 @@ impl BabyProver {
                             signature_data,
                             signer_packed_key_bits,
                         ) = prepare_sig_data(
-                            &withdraw.tx.signature.sign.serialize_packed().unwrap(),
+                            &withdraw.tx.signature.signature.serialize_packed().unwrap(),
                             &withdraw.tx.get_bytes(),
                             &withdraw.tx.signature.pub_key,
                         );
@@ -425,7 +425,7 @@ impl BabyProver {
                             signature_data,
                             signer_packed_key_bits,
                         ) = prepare_sig_data(
-                            &close.tx.signature.sign.serialize_packed().unwrap(),
+                            &close.tx.signature.signature.serialize_packed().unwrap(),
                             &close.tx.get_bytes(),
                             &close.tx.signature.pub_key,
                         );

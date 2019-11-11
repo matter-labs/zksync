@@ -5,16 +5,46 @@ use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::node::tx::TxHash;
-use models::node::{Account, AccountAddress, AccountId, FranklinTx};
+use models::node::{Account, AccountAddress, AccountId, FranklinTx, TokenId, Nonce};
 use std::net::SocketAddr;
 use std::sync::mpsc;
 use storage::{ConnectionPool, StorageProcessor, Token, TxAddError};
+use std::collections::HashMap;
+use bigdecimal::BigDecimal;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ResponseAccountState {
+    balances: HashMap<String, BigDecimal>,
+    nonce: Nonce,
+}
+
+impl ResponseAccountState {
+    fn try_to_restore(account: Account, tokens: &HashMap<TokenId, Token>) -> Result<Self> {
+        let mut balances = HashMap::new();
+        for (token_id, balance) in account.get_nonzero_balances() {
+            if token_id == 0 {
+                balances.insert("ETH".to_string(), balance);
+            } else {
+                let token = tokens.get(&token_id).ok_or_else(|| Error::internal_error())?;
+                balances.insert(token.address.clone(), balance);
+            }
+        }
+
+        Ok(
+            Self{
+                balances,
+                nonce: account.nonce,
+            }
+        )
+    }
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct AccountInfoResp {
+    address: AccountAddress,
     id: Option<AccountId>,
-    commited: Account,
-    verified: Account,
+    commited: ResponseAccountState,
+    verified: ResponseAccountState,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -38,12 +68,6 @@ pub struct ETHOpInfoResp {
     pub block: Option<BlockInfo>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ChainInfoResp {
-    pub contract_address: String,
-    pub tokens: Vec<Token>,
-}
-
 #[rpc]
 pub trait Rpc {
     #[rpc(name = "account_info")]
@@ -54,8 +78,8 @@ pub trait Rpc {
     fn tx_info(&self, hash: TxHash) -> Result<TransactionInfoResp>;
     #[rpc(name = "tx_submit")]
     fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash>;
-    #[rpc(name = "chain_info")]
-    fn chain_info(&self) -> Result<ChainInfoResp>;
+    #[rpc(name = "contract_address")]
+    fn contract_address(&self) -> Result<String>;
 }
 
 pub struct RpcApp {
@@ -77,32 +101,29 @@ impl RpcApp {
 }
 
 impl Rpc for RpcApp {
-    fn account_info(&self, addr: AccountAddress) -> Result<AccountInfoResp> {
+    fn account_info(&self, address: AccountAddress) -> Result<AccountInfoResp> {
         let storage = self.access_storage()?;
         let account = storage
-            .account_state_by_address(&addr)
+            .account_state_by_address(&address)
             .map_err(|_| Error::internal_error())?;
-        let get_default_account = || {
-            storage
-                .default_account_with_address(&addr)
-                .map_err(|_| Error::internal_error())
-        };
+        let tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
 
         let id = account.commited.as_ref().map(|(id, _)| *id);
 
         let commited = if let Some((_, account)) = account.commited {
-            account
+            ResponseAccountState::try_to_restore(account, &tokens)?
         } else {
-            get_default_account()?
+            ResponseAccountState::default()
         };
 
         let verified = if let Some((_, account)) = account.verified {
-            account
+            ResponseAccountState::try_to_restore(account, &tokens)?
         } else {
-            get_default_account()?
+            ResponseAccountState::default()
         };
 
         Ok(AccountInfoResp {
+            address,
             id,
             commited,
             verified,
@@ -179,7 +200,7 @@ impl Rpc for RpcApp {
         })
     }
 
-    fn chain_info(&self) -> Result<ChainInfoResp> {
+    fn contract_address(&self) -> Result<String> {
         let storage = self.access_storage()?;
         let contract_address = storage
             .load_config()
@@ -187,15 +208,7 @@ impl Rpc for RpcApp {
             .contract_addr
             .expect("contract_addr missing");
 
-        let tokens = self
-            .access_storage()?
-            .load_tokens()
-            .map_err(|_| Error::internal_error())?;
-
-        Ok(ChainInfoResp {
-            contract_address,
-            tokens,
-        })
+        Ok(contract_address)
     }
 }
 

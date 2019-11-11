@@ -88,6 +88,7 @@ pub enum TxType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Transfer {
     pub from: AccountAddress,
     pub to: AccountAddress,
@@ -176,12 +177,11 @@ impl Transfer {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Withdraw {
-    // TODO: derrive account address from signature
     pub account: AccountAddress,
     pub eth_address: Address,
     pub token: TokenId,
-    /// None -> withdraw all
     pub amount: BigDecimal,
     pub fee: BigDecimal,
     pub nonce: Nonce,
@@ -243,6 +243,7 @@ impl Withdraw {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Close {
     pub account: AccountAddress,
     pub nonce: Nonce,
@@ -281,7 +282,7 @@ impl Close {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[serde(untagged)]
 pub enum FranklinTx {
     Transfer(Transfer),
     Withdraw(Withdraw),
@@ -345,16 +346,17 @@ impl FranklinTx {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TxSignature {
     pub pub_key: PackedPublicKey,
-    pub sign: PackedSignature,
+    pub signature: PackedSignature,
 }
 
 impl TxSignature {
     pub fn default() -> Self {
         Self {
             pub_key: PackedPublicKey::deserialize_packed(&[0; 32]).unwrap(),
-            sign: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
+            signature: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
         }
     }
 
@@ -362,7 +364,7 @@ impl TxSignature {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_pedersen(
             &hashed_msg,
-            &self.sign.0,
+            &self.signature.0,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );
@@ -377,7 +379,7 @@ impl TxSignature {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_sha256(
             &hashed_msg,
-            &self.sign.0,
+            &self.signature.0,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );
@@ -392,7 +394,7 @@ impl TxSignature {
 impl std::fmt::Debug for TxSignature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let hex_pk = hex::encode(&self.pub_key.serialize_packed().unwrap());
-        let hex_sign = hex::encode(&self.sign.serialize_packed().unwrap());
+        let hex_sign = hex::encode(&self.signature.serialize_packed().unwrap());
         write!(f, "{{ pub_key: {}, sign: {} }}", hex_pk, hex_sign)
     }
 }
