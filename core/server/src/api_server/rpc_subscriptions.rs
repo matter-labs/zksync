@@ -2,7 +2,7 @@
 
 use super::event_notify::{start_sub_notifier, EventSubscribe};
 use crate::api_server::event_notify::EventNotifierRequest;
-use crate::api_server::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
+use crate::api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp};
 use crate::ThreadPanicNotify;
 use futures::sync::mpsc as fmpsc;
 use futures::Future;
@@ -12,7 +12,7 @@ use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
 use models::node::tx::TxHash;
-use models::node::{Account, AccountAddress};
+use models::node::AccountAddress;
 use models::{ActionType, Operation};
 use std::net::SocketAddr;
 use std::sync::{mpsc, Arc};
@@ -66,7 +66,7 @@ pub trait RpcPubSub {
     fn subscribe_account(
         &self,
         meta: Self::Metadata,
-        subscriber: Subscriber<Account>,
+        subscriber: Subscriber<ResponseAccountState>,
         addr: AccountAddress,
         action_type: ActionType,
     );
@@ -141,7 +141,7 @@ impl RpcPubSub for RpcSubApp {
     fn subscribe_account(
         &self,
         _meta: Self::Metadata,
-        subscriber: Subscriber<Account>,
+        subscriber: Subscriber<ResponseAccountState>,
         address: AccountAddress,
         action: ActionType,
     ) {

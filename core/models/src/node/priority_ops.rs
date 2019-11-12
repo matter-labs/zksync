@@ -127,7 +127,10 @@ impl FullExit {
                 return None;
             };
 
-        let restored_signature = TxSignature { pub_key, signature: sign };
+        let restored_signature = TxSignature {
+            pub_key,
+            signature: sign,
+        };
 
         restored_signature
             .verify_musig_pedersen(&self.get_bytes())

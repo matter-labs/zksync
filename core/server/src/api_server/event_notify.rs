@@ -1,4 +1,5 @@
 use super::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
+use crate::api_server::rpc_server::ResponseAccountState;
 use crate::ThreadPanicNotify;
 use actix::FinishStream;
 use failure::{bail, format_err};
@@ -10,7 +11,7 @@ use jsonrpc_pubsub::{
 use models::node::tx::TxHash;
 use models::{
     node::block::ExecutedOperations,
-    node::{Account, AccountAddress, AccountId},
+    node::{AccountAddress, AccountId},
     ActionType, Operation,
 };
 use std::collections::BTreeMap;
@@ -36,7 +37,7 @@ pub enum EventSubscribe {
     Account {
         address: AccountAddress,
         action: ActionType,
-        subscriber: Subscriber<Account>,
+        subscriber: Subscriber<ResponseAccountState>,
     },
 }
 
@@ -59,7 +60,7 @@ struct OperationNotifier {
     db_pool: ConnectionPool,
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
     prior_op_subs: BTreeMap<(u64, ActionType), Vec<SubscriptionSender<ETHOpInfoResp>>>,
-    account_subs: BTreeMap<(AccountId, ActionType), Vec<SubscriptionSender<Account>>>,
+    account_subs: BTreeMap<(AccountId, ActionType), Vec<SubscriptionSender<ResponseAccountState>>>,
 }
 
 fn send_once<T: serde::Serialize>(sink: Sink<T>, val: T) {
@@ -287,12 +288,10 @@ impl OperationNotifier {
         &mut self,
         address: AccountAddress,
         action: ActionType,
-        sub: Subscriber<Account>,
+        sub: Subscriber<ResponseAccountState>,
     ) -> Result<(), failure::Error> {
-        let account_state = self
-            .db_pool
-            .access_storage()?
-            .account_state_by_address(&address)?;
+        let storage = self.db_pool.access_storage()?;
+        let account_state = storage.account_state_by_address(&address)?;
 
         let account_id = if let Some(id) = account_state.commited.as_ref().map(|(id, _)| id) {
             *id
@@ -314,11 +313,10 @@ impl OperationNotifier {
         }
         .map(|(_, a)| a)
         {
-            account
+            let tokens = storage.load_tokens()?;
+            ResponseAccountState::try_to_restore(account, &tokens)?
         } else {
-            self.db_pool
-                .access_storage()?
-                .default_account_with_address(&address)?
+            ResponseAccountState::default()
         };
 
         let mut subs = self
@@ -339,6 +337,7 @@ impl OperationNotifier {
     }
 
     fn handle_new_block(&mut self, op: Operation) -> Result<(), failure::Error> {
+        let storage = self.db_pool.access_storage()?;
         let action = op.action.get_type();
 
         for tx in op.block.block_transactions {
@@ -375,18 +374,25 @@ impl OperationNotifier {
         }
 
         let updated_accounts = op.accounts_updated.iter().map(|(id, _)| *id);
+        let tokens = storage.load_tokens()?;
 
         for id in updated_accounts {
             if let Some(subs) = self.account_subs.remove(&(id, action)) {
-                let storage = self.db_pool.access_storage()?;
-
                 let stored_account = match action {
                     ActionType::COMMIT => storage.last_committed_state_for_account(id)?,
                     ActionType::VERIFY => storage.last_verified_state_for_account(id)?,
                 };
 
                 let account = if let Some(account) = stored_account {
-                    account
+                    if let Ok(result) = ResponseAccountState::try_to_restore(account, &tokens) {
+                        result
+                    } else {
+                        warn!(
+                            "Failed to restore resp account state: id: {}, block: {}",
+                            id, op.block.block_number
+                        );
+                        continue;
+                    }
                 } else {
                     warn!(
                         "Account is updated but not stored in DB, id: {}, block: {}",

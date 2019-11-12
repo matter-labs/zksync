@@ -1,16 +1,16 @@
 use crate::ThreadPanicNotify;
+use bigdecimal::BigDecimal;
 use futures::Future;
 use jsonrpc_core::{Error, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::node::tx::TxHash;
-use models::node::{Account, AccountAddress, AccountId, FranklinTx, TokenId, Nonce};
+use models::node::{Account, AccountAddress, AccountId, FranklinTx, Nonce, TokenId};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::mpsc;
 use storage::{ConnectionPool, StorageProcessor, Token, TxAddError};
-use std::collections::HashMap;
-use bigdecimal::BigDecimal;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ResponseAccountState {
@@ -19,23 +19,23 @@ pub struct ResponseAccountState {
 }
 
 impl ResponseAccountState {
-    fn try_to_restore(account: Account, tokens: &HashMap<TokenId, Token>) -> Result<Self> {
+    pub fn try_to_restore(account: Account, tokens: &HashMap<TokenId, Token>) -> Result<Self> {
         let mut balances = HashMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
             if token_id == 0 {
                 balances.insert("ETH".to_string(), balance);
             } else {
-                let token = tokens.get(&token_id).ok_or_else(|| Error::internal_error())?;
+                let token = tokens
+                    .get(&token_id)
+                    .ok_or_else(|| Error::internal_error())?;
                 balances.insert(token.address.clone(), balance);
             }
         }
 
-        Ok(
-            Self{
-                balances,
-                nonce: account.nonce,
-            }
-        )
+        Ok(Self {
+            balances,
+            nonce: account.nonce,
+        })
     }
 }
 
