@@ -14,12 +14,12 @@ library BlsOperations {
         uint256[2] y;
     }
 
-    function generatorG1() internal pure returns (G1Point memory) {
-        return G1Point({
-            x: 1,
-            y: 2
-        });
-    }
+    // function generatorG1() internal pure returns (G1Point memory) {
+    //     return G1Point({
+    //         x: 1,
+    //         y: 2
+    //     });
+    // }
 
     function generatorG2() internal pure returns (G2Point memory) {
         return G2Point({
@@ -34,84 +34,84 @@ library BlsOperations {
         });
     }
 
-    function mulG1(
-        G1Point memory _point,
-        uint256 _scalar
-    ) internal view returns (G1Point memory output) {
-        uint256[3] memory input = [
-            _point.x,
-            _point.y,
-            _scalar
-        ];
-        assembly {
-            if iszero(
-                staticcall(
-                    sub(gas, 2000),
-                    7,
-                    input,
-                    0x80,
-                    output,
-                    0x60
-                )
-            ) {
-                invalid()
-            }
-        }
-    }
+    // function mulG1(
+    //     G1Point memory _point,
+    //     uint256 _scalar
+    // ) internal view returns (G1Point memory output) {
+    //     uint256[3] memory input = [
+    //         _point.x,
+    //         _point.y,
+    //         _scalar
+    //     ];
+    //     assembly {
+    //         if iszero(
+    //             staticcall(
+    //                 sub(gas, 2000),
+    //                 7,
+    //                 input,
+    //                 0x80,
+    //                 output,
+    //                 0x60
+    //             )
+    //         ) {
+    //             invalid()
+    //         }
+    //     }
+    // }
 
-    function mulG2(
-        G2Point memory _point,
-        uint256 _scalar
-    ) internal view returns (G2Point memory) {
-        (
-            uint256 pt2xx,
-            uint256 pt2xy,
-            uint256 pt2yx,
-            uint256 pt2yy
-        ) = BN256G2.ECTwistMul(
-            _scalar,
-            _point.x[0],
-            _point.x[1],
-            _point.y[0],
-            _point.y[1]
-        );
-        return G2Point ({
-            x: [
-                pt2xx,
-                pt2xy
-            ],
-            y: [
-                pt2yx,
-                pt2yy
-            ]
-        });
-    }
+    // function mulG2(
+    //     G2Point memory _point,
+    //     uint256 _scalar
+    // ) internal view returns (G2Point memory) {
+    //     (
+    //         uint256 pt2xx,
+    //         uint256 pt2xy,
+    //         uint256 pt2yx,
+    //         uint256 pt2yy
+    //     ) = BN256G2.ECTwistMul(
+    //         _scalar,
+    //         _point.x[0],
+    //         _point.x[1],
+    //         _point.y[0],
+    //         _point.y[1]
+    //     );
+    //     return G2Point ({
+    //         x: [
+    //             pt2xx,
+    //             pt2xy
+    //         ],
+    //         y: [
+    //             pt2yx,
+    //             pt2yy
+    //         ]
+    //     });
+    // }
 
-    function addG1(
-        G1Point memory _point1,
-        G1Point memory _point2
-    ) internal view returns (G1Point memory output) {
-        uint256[4] memory input = [
-            _point1.x,
-            _point1.y,
-            _point2.x,
-            _point2.y
-        ];
-        assembly {
-            if iszero(
-                staticcall(
-                    sub(gas, 2000),
-                    6,
-                    input,
-                    0xc0,
-                    output,
-                    0x60
-                )
-            ) {
-                invalid()
-            }
-        }
-    }
+    // function addG1(
+    //     G1Point memory _point1,
+    //     G1Point memory _point2
+    // ) internal view returns (G1Point memory output) {
+    //     uint256[4] memory input = [
+    //         _point1.x,
+    //         _point1.y,
+    //         _point2.x,
+    //         _point2.y
+    //     ];
+    //     assembly {
+    //         if iszero(
+    //             staticcall(
+    //                 sub(gas, 2000),
+    //                 6,
+    //                 input,
+    //                 0xc0,
+    //                 output,
+    //                 0x60
+    //             )
+    //         ) {
+    //             invalid()
+    //         }
+    //     }
+    // }
 
     function addG2(
         G2Point memory _point1,
@@ -144,11 +144,10 @@ library BlsOperations {
         });
     }
 
-    function messageToG1(bytes memory _message) internal view returns (G1Point memory) {
-        uint256 message = uint256(keccak256(_message));
+    function messageHashToG1(uint256 _messageHash) internal view returns (G1Point memory) {
         uint256 beta = 0;
         uint256 y = 0;
-        uint256 x = message % BN256G2.fieldModulus();
+        uint256 x = _messageHash % BN256G2.fieldModulus();
         while( true ) {
             (beta, y) = findYforX(x);
             if(beta == mulmod(y, y, BN256G2.fieldModulus())) {
@@ -192,21 +191,21 @@ library BlsOperations {
         return result[0];
     }
 
-    function hashG2(G2Point memory point) internal pure returns (uint256) {
-        return uint256(keccak256(abi.encodePacked([point.x[0], point.x[1], point.y[0], point.y[1]])));
-    }
+    // function hashG2(G2Point memory point) internal pure returns (uint256) {
+    //     return uint256(keccak256(abi.encodePacked([point.x[0], point.x[1], point.y[0], point.y[1]])));
+    // }
 
     function negate(uint256 value) internal pure returns (uint256) {
         uint256 field_modulus = BN256G2.fieldModulus();
         return field_modulus - (value % field_modulus);
     }
 
-    function negate(G1Point memory _point) internal pure returns (G1Point memory) {
-        if (_point.x == 0 && _point.y == 0) {
-            return G1Point(0, 0);
-        }
-        return G1Point(_point.x, negate(_point.y));
-    }
+    // function negate(G1Point memory _point) internal pure returns (G1Point memory) {
+    //     if (_point.x == 0 && _point.y == 0) {
+    //         return G1Point(0, 0);
+    //     }
+    //     return G1Point(_point.x, negate(_point.y));
+    // }
 
     function negate(G2Point memory _point) internal pure returns (G2Point memory) {
         uint256 zero = 0;

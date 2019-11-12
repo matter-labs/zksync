@@ -7,9 +7,7 @@ import "compound-protocol/contracts/Unitroller.sol";
 
 import "./Governance.sol";
 import "./Franklin.sol";
-import "./BlsVerifier.sol";
 import "./SafeMath.sol";
-import "./BlsOperations.sol";
 
 /// @title Swift Exits Contract
 /// @notice Consensus version
@@ -18,17 +16,8 @@ contract SwiftExits is BlsVerifier {
     
     using SafeMath for uint256;
 
-    /// @notice Possible price change coeff on Compound
-    uint256 constant possiblePriceRisingCoeff = 110;
-
     /// @notice Validators fee coeff
-    uint256 constant validatorsFeeCoeff = 5;
-
-    /// @notice Owner fee coeff
-    uint256 constant ownerFeeCoeff = 1;
-
-    /// @notice Owner of the contract (Matter Labs)
-    address internal owner;
+    uint256 constant VALIDATORS_FEE_COEFF = 5;
 
     /// @notice Matter token id
     address internal matterTokenId;
@@ -38,6 +27,9 @@ contract SwiftExits is BlsVerifier {
 
     /// @notice cMatter token contract address
     address internal cMatterTokenAddress;
+
+    /// @notice cEther token contract address
+    address internal cEtherAddress;
 
     /// @notice blsVerifier contract
     BlsVerifier internal blsVerifier;
@@ -54,108 +46,54 @@ contract SwiftExits is BlsVerifier {
     /// @notice Last verified Fraklin block
     uint256 internal lastVerifiedBlock;
 
-    /// @notice Funds on contract
-    mapping(uint16 => Funds) internal funds;
-
-    struct Funds{
-        uint256 supply;
-        uint256 borrow;
-    }
-
-    /// @notice Validators addresses list
-    mapping(uint32 => address) internal validators;
-    /// @notice Each validators' supplies
-    mapping(address => mapping(uint16 => uint256)) internal validatorsBalances;
-    /// @notice Each validators' info
-    mapping(address => ValidatorInfo) internal validatorsInfo;
-    /// @notice validators count
-    uint32 internal validatorsCount;
-
-    /// @dev Possible exit order states
-    enum ExitOrderState {
-        None,
-        Deffered,
-        Fulfilled
-    }
-
-    /// @notice Swift Exits hashes (withdraw op hash) by Rollup block number
-    mapping(uint32 => mapping(uint32 => uint256)) internal exitOrdersHashes;
-    /// @notice Swift Exits in blocks count
-    mapping(uint32 => uint32) internal exitOrdersCount;
-    /// @notice Swift Exits by its hash (withdraw op hash)
-    mapping(uint256 => ExitOrder) internal exitOrders;
-
-    /// @notice Borrow orders by Swift Exits hashes (withdraw op hash)
-    mapping(uint256 => mapping(uint32 => BorrowOrder)) internal borrowOrders;
-    /// @notice Borrow orders in Swift Exits count
-    mapping(uint256 => uint32) internal borrowOrdersCount;
-
-    /// @notice Container for information about validator
-    /// @member exists Flag for validator existance in current lending process
-    /// @member pubkey Validators' pubkey
-    /// @member supply Validators' supplied funds
-    struct ValidatorInfo {
-        bool exists;
-        BlsOperations.G2Point pubkey;
-    }
-
-    /// @notice Container for information about borrow order
-    /// @member borrowed This orders' borrow
-    /// @member fee This orders' fee
-    /// @member validator Borrow orders' recipient (validator)
-    struct BorrowOrder {
-        uint256 borrowed;
-        uint256 fee;
-        address validator;
-    }
+    /// @notice Swift Exits hashes (withdraw op hash) by Rollup block number (block number -> order number -> order)
+    mapping(uint32 => mapping(uint64 => ExitOrder)) internal exitOrders;
+    /// @notice Swift Exits in blocks count (block number -> orders count)
+    mapping(uint32 => uint64) internal exitOrdersCount;
+    /// @notice Swift Exits existance in block with specified operation number (block number -> op number -> existance)
+    mapping(uint32 => mapping(uint64 => bool)) internal exitOrdersExistance;
 
     /// @notice Container for information about Swift Exit Order
-    /// @member status Order status
-    /// @member withdrawOpOffset Withdraw operation offset in block
+    /// @member onchainOpNumber Withdraw operation offset in block
     /// @member tokenId Order token id
     /// @member initTokenAmount Initial token amount
     /// @member borrowAmount Initial token amount minus fees
     /// @member supplyAmount Order supply amount (in Matter tokens)
     /// @member recipient Recipient address
     struct ExitOrder {
-        ExitOrderState status;
-        uint64 withdrawOpOffset;
+        uint64 onchainOpNumber;
+        uint256 opHash;
         uint16 tokenId;
-        uint256 initTokenAmount;
-        uint256 borrowAmount;
+        uint256 sendingAmount;
+        uint256 creationCost;
+        uint256 validatorsFee;
+        address validatorSender;
+        uint256 signersBitmask;
+        uint256 signersCount;
+        uint16 supplyTokenId;
         uint256 supplyAmount;
-        address recipient;
     }
 
-    /// @notice Emitted when a new swift exit order occurs
-    event UpdatedExitOrder(
-        uint32 blockNumber,
-        uint32 orderNumber,
-        uint256 expectedAmountToSupply
-    );
-
     /// @notice Construct swift exits contract
-    /// @param _owner The address of this contracts owner (Matter Labs)
-    constructor(address _owner) public {
-        owner = _owner;
+    /// @param _governanceAddress The address of Governance contract
+    constructor(address _governanceAddress) public {
+        governance = Governance(_governanceAddress);
     }
 
     /// @notice Add addresses of related contracts
-    /// @dev Requires owner
+    /// @dev Requires governor
     /// @param _matterTokenAddress The address of Matter token
-    /// @param _governanceAddress The address of Governance contract
     /// @param _rollupAddress The address of Rollup contract
     /// @param _blsVerifierAddress The address of Bls Verifier contract
     /// @param _comptrollerAddress The address of Comptroller contract
     function setupRelatedContracts(address _matterTokenAddress,
-                                   address _governanceAddress,
                                    address _rollupAddress,
                                    address _blsVerifierAddress,
                                    address _comptrollerAddress)
     external
     {
-        requireOwner();
-        governance = Governance(_governanceAddress);
+        governance.requireGovernor();
+
         rollup = Franklin(_rollupAddress);
         lastVerifiedBlock = rollup.totalBlocksVerified;
         blsVerifier = BlsVerifier(_blsVerifierAddress);
@@ -165,12 +103,15 @@ contract SwiftExits is BlsVerifier {
         matterTokenId = governance.tokenIds(_matterTokenAddress);
         cMatterTokenAddress = governance.cTokenAddresses(_matterTokenAddress);
 
-        address[] memory ctokens = new address[](1);
+        cEtherAddress = governance.cTokenAddresses(address(0));
+
+        address[] memory ctokens = new address[](2);
         ctokens[0] = cMatterTokenAddress;
+        ctokens[1] = cEtherAddress;
 
         uint256[] memory errors = comptroller.enterMarkets(ctokens);
         require(
-            errors[0] == 0,
+            errors[0] == 0 && errors[1] == 0,
             "ssss11"
         ); // ssss11 - cant enter markets
 
@@ -180,395 +121,268 @@ contract SwiftExits is BlsVerifier {
         ); // ssss12 - token approve failed
     }
 
-    /// @notice Fallback function always reverts
+    /// @notice Fallback function
     function()
     external
+    payable
     {
-        revert("Cant accept ether through fallback function");
-    }
-
-    /// @notice Transfers specified amount of ERC20 token into contract
-    /// @param _from Sender address
-    /// @param _tokenAddress ERC20 token address
-    /// @param _amount Amount in ERC20 tokens
-    function transferInERC20(address _from,
-                             address _tokenAddress,
-                             uint256 _amount)
-    internal
-    {
-        require(
-            IERC20(tokenAddr).transferFrom(_from, address(this), _amount),
-            "sst011"
-        ); // sst011 - token transfer in failed
-    }
-
-    /// @notice Transfers specified amount of Ether or ERC20 token to external address
-    /// @dev If token address == 0 -> transfers ether
-    /// @param _to Receiver address
-    /// @param _tokenAddress ERC20 token address
-    /// @param _amount Amount in ERC20 tokens
-    function transferOut(address _to,
-                         address _tokenAddress,
-                         uint256 _amount)
-    internal
-    {
-        if (_tokenAddress == address(0)) {
-            _to.transfer(_amount);
-        } else {
-            require(
-                IERC20(_tokenAddress).transfer(_to, _amount),
-                "sstt11"
-            ); // sstt11 - token transfer out failed
+        if (msg.sender != address(governance) ||
+            msg.sender != address(rollup) ||
+            msg.sender != cEtherAddress) {
+            revert("Cant accept from unexpected contract");
         }
-    }
-    
-    /// @notice Adds new validator
-    /// @dev Only owner can add new validator
-    /// @param _address Validator address
-    /// @param _pbkxx Validator pubkey xx
-    /// @param _pbkxy Validator pubkey xy
-    /// @param _pbkyx Validator pubkey yx
-    /// @param _pbkyy Validator pubkey yy
-    function addValidator(address _address,
-                          uint256 _pbkxx,
-                          uint256 _pbkxy,
-                          uint256 _pbkyx,
-                          uint256 _pbkyy)
-    external
-    {
-        requireOwner();
-        require(
-            !validatorsInfo[_address].exists,
-            "ssar11"
-        ); // ssar11 - operator exists
-        validatorsInfo[_address].exists = true;
-        validatorsInfo[_address].pubkey = BlsOperations.G2Point({
-                x: [
-                    _pbkxx,
-                    _pbkxy
-                ],
-                y: [
-                    _pbkyx,
-                    _pbkyy
-                ]
-        });
-        validatorsCount++;
-    }
-
-    /// @notice Gets allowed withdraw amount for validator
-    /// @dev Requires validators' existance
-    /// @param _address Validator address
-    /// @param _tokenId Token id
-    function getAllowedWithdrawAmount(address _address,
-                                      uint16 _tokenId)
-    public
-    returns (uint256)
-    {
-        if (funds[_tokenId].supply-funds[_tokenId].borrow >= validatorsBalances[_address][_tokenId]) {
-            return validatorsBalances[_address][_tokenId];
-        } else {
-            return funds[_tokenId].supply-funds[_tokenId].borrow;
-        }
-    }
-
-    /// @notice Withdraws specified amount from validators supply
-    /// @dev Requires validators' existance and allowed amount is >= specified amount, which should not be equal to 0
-    /// @param _amount Specified amount
-    /// @param _tokenId Token id
-    function withdrawForValidator(uint256 _amount,
-                                  uint16 _tokenId)
-    external
-    {
-        require(
-            getAllowedWithdrawAmount(msg.sender, _tokenId) >= _amount,
-            "sswr11"
-        ); // sswr11 - wrong amount
-        immediateWithdrawForValidator(_amount, _tokenId);
-    }
-
-    /// @notice Withdraws possible amount from validators supply
-    /// @dev Requires validators' existance and allowed amount > 0
-    /// @param _tokenId Token id
-    function withdrawPossibleForValidator(uint16 _tokenId)
-    external
-    {
-        uint256 amount = getAllowedWithdrawAmount(msg.sender, _tokenId);
-        immediateWithdrawForValidator(amount, _tokenId);
-    }
-
-    /// @notice The specified amount of funds will be withdrawn from validators supply
-    /// @param _amount Specified amount
-    /// @param _tokenId Token id
-    function immediateWithdrawForValidator(uint256 _amount,
-                                           uint16 _tokenId)
-    internal
-    {
-        require(
-            _amount > 0,
-            "ssir11"
-        ); // ssir11 - wrong amount
-        address tokenAddr = governance.tokenAddresses(_tokenId);
-        transferOut(msg.sender, tokenAddr, _amount);
-        funds[_tokenId].supply -= _amount;
-        validatorsBalances[msg.sender][_tokenId] -= _amount;
-    }
-
-    /// @notice Removes validator for current processing list
-    /// @dev Requires owner as sender and validators' existance
-    /// @param _address Validator address
-    function removeValidator(address _address)
-    external
-    {
-        requireOwner();
-        require(
-            validatorsInfo[_address].exists,
-            "ssrr11"
-        ); // ssrr11 - operator does not exists
-
-        validatorsInfo[_address].exists = false;
-
-        bool found = false;
-        for (uint32 i = 0; i < validatorsCount-2; i++){
-            if (found || validators[i] == _address) {
-                found = true;
-                validators[i] = validators[i+1];
-            }
-        }
-        delete validators[validatorsCount-1];
-        validatorsCount--;
-    }
-
-    /// @notice Supplies specified amount of tokens from validator
-    /// @dev Calls transferIn function of specified token and fulfillDefferedWithdrawOrders to fulfill deffered withdraw orders
-    /// @param _address Validator account address
-    /// @param _amount Token amount
-    function supplyValidator(address _address,
-                             uint256 _amount)
-    public
-    {
-        require(
-            validatorsInfo[_address].exists,
-            "sssr11"
-        ); // sssr11 - operator does not exists
-        transferInERC20(msg.sender, matterTokenAddress, _amount);
-        funds[matterTokenId].supply = funds[matterTokenId].supply.add(_amount);
-        validatorsBalances[_address][matterTokenId] = validatorsBalances[_address][matterTokenId].add(_amount);
-    }
-
-    /// @notice Returns validators pubkeys for specified validators addresses
-    /// @param _validators Validators addresses
-    function getValidatorsPubkeys(address[] memory _validators)
-    internal
-    returns (BlsOperations.G2Point[] memory pubkeys)
-    {
-        for (uint32 i = 0; i < _validators.length; i++) {
-            pubkeys[i] = validatorsInfo[_validators[i]].pubkey;
-        }
-        return pubkeys;
     }
 
     /// @notice Adds new swift exit
-    /// @dev Only owner can send this order, validates validators signature, requires that order must be new (status must be None)
+    /// @dev Only governor can send this order, validates validators signature, requires that order must be new (status must be None)
     /// @param _blockNumber Rollup block number
-    /// @param _withdrawOpOffset Withdraw operation offset in block
+    /// @param _onchainOpNumber Withdraw operation offset in block
     /// @param _withdrawOpHash Withdraw operation hash
     /// @param _tokenId Token id
     /// @param _tokenAmount Token amount
     /// @param _recipient Swift exit recipient
     /// @param _aggrSignatureX Aggregated validators signature x
     /// @param _aggrSignatureY Aggregated validators signature y
-    /// @param _validators Validators addresses list
-    function addSwiftExit(uint32 _blockNumber,
-                          uint64 _withdrawOpOffset,
-                          uint256 _withdrawOpHash,
-                          uint16 _tokenId,
-                          uint256 _tokenAmount,
-                          address _recipient,
+    /// @param _signersBitmask Validators-signers bitmask
+    function addSwiftExit(bytes memory _swiftExit,
                           uint256 _aggrSignatureX,
                           uint256 _aggrSignatureY,
-                          address[] calldata _validators)
+                          uint256 _signersBitmask)
     external
     {
-        requireOwner();
+        // Swift Exit data
+        (uint32 blockNumber,
+        uint64 onchainOpNumber,
+        uint24 accNumber,
+        uint16 tokenId,
+        uint256 tokenAmount,
+        uint16 feeAmount,
+        address recipient) = parceSwiftExit(_swiftExit);
+
+        // Swift Exit creation cost
+        uint256 creationCost = getCreationCostForToken(_tokenId);
+
+        // Swift Exit hash
+        uint256 swiftExitHash = uint256(keccak256(_swiftExit));
+
+        // Operation hash
+        uint256 opHash = uint256(keccak256(abi.encodePacked(accNumber,
+                                                            tokenId,
+                                                            tokenAmount,
+                                                            feeAmount,
+                                                            recipient)));
+
+        // Checks
         require(
-            _validators.length > 0,
-            "ssat11"
-        ); // "ssat11" - validators count must be > 0
-        if (_validators.length > 1) {
-            require(
-                blsVerifier.verifyBlsSignature(
-                    G1Point(_aggrSignatureX, _aggrSignatureY),
-                    getValidatorsPubkeys(_validators)
-                ),
-                "ssat12"
-            ); // "ssat12" - wrong signature
-        }
-        require(
-            exitOrders[_withdrawOpHash].status == ExitOrderState.None,
+            !exitOrdersExistance[blockNumber][onchainOpNumber],
             "ssat13"
         ); // "ssat13" - request exists
-        
-        if (_blockNumber <= _lastVerifiedBlock) {
-            // If block is already verified - try to send requested funds to recipient on rollup contract
-            rollup.trySwiftExitWithdraw(
-                _blockNumber,
-                _withdrawOpOffset,
-                _withdrawOpHash,
-                _recipient
-            );
-        } else {
-            // Get amount to borrow
-            (uint256 amountTokenSupply,
-            uint256 amountTokenBorrow,
-            uint256 validatorsFee,
-            uint256 ownerFee) = getAmountsAndFees(_tokenId, _tokenAmount);
-
-            // Create Exit orer
-            ExitOrder order = ExitOrder(
-                ExitOrderState.None,
-                _withdrawOpOffset,
-                _tokenId,
-                _tokenAmount,
-                amountTokenBorrow,
-                amountTokenSupply,
-                _recipient
-            );
-            exitOrdersHashes[_blockNumber][exitOrdersCount[_blockNumber]] = _withdrawOpHash;
-            exitOrders[_withdrawOpHash] = order;
-            exitOrdersCount[_blockNumber]++;
-
-            if (amountTokenSupply <= (funds[matterTokenId].supply - funds[matterTokenId].borrow)) {
-                // If amount to borrow <= borrowable amount - immediate swift exit
-                immediateSwiftExit(_blockNumber, _withdrawOpHash, validatorsFee, ownerFee);
-            } else {
-                // If amount to borrow > borrowable amount - deffered swift exit order
-                exitOrders[_withdrawOpHash].status = ExitOrderState.Deffered;
-                emit UpdatedExitOrder(
-                    _blockNumber,
-                    _withdrawOpHash,
-                    (amountTokenSupply * possiblePriceRisingCoeff / 100) - (funds[matterTokenId].supply - funds[matterTokenId].borrow)
-                );
-            }
-        }
-    }
-
-    /// @notice Supplies validators balance and immediatly fulfills swift exit order if possible
-    /// @dev Requires that order must be deffered (status must be Deffered) and block must be unverified
-    /// @param _blockNumber Rollup block number
-    /// @param _withdrawOpHash Withdraw operation hash
-    /// @param _sendingAmount Sending amount
-    function supplyAndFulfillSwiftExitOrder(uint32 _blockNumber,
-                                            uint32 _withdrawOpHash,
-                                            uint256 _sendingAmount)
-    external
-    {
         require(
-            _blockNumber > lastVerifiedBlock,
-            "ssfl11"
-        ); // "ssfl11" - block is already verified
+            governance.isActiveValidator(msg.sender),
+            "sst011"
+        ); // sst011 - not active validator
+        uint256 validatorId = governance.getValidatorId(msg.sender);
         require(
-            exitOrders[_withdrawOpHash].status == ExitOrderState.Deffered,
-            "ssfl12"
-        ); // "ssfl12" - not deffered order
-
-        supplyValidator(msg.sender, _sendingAmount);
-
-        ExitOrder order = exitOrders[_withdrawOpHash];
-
-        uint256 updatedAmount = 0;
-        (uint256 amountTokenSupply,
-        uint256 amountTokenBorrow,
-        uint256 validatorsFee,
-        uint256 ownerFee) = getAmountsAndFees(order.tokenId, order.initTokenAmount);
-        order.borrowAmount = amountTokenBorrow;
-        order.supplyAmount = amountTokenSupply;
-
-        if (amountTokenSupply <= (funds[matterTokenId].supply - funds[matterTokenId].borrow)) {
-            // If amount to borrow <= borrowable amount - immediate swift exit
-            immediateSwiftExit(_blockNumber, _withdrawOpHash, validatorsFee, ownerFee);
-        } else {
-            // If amount to borrow > borrowable amount - emit update deffered swift exit order event
-            updatedAmount = (amountTokenSupply * possiblePriceRisingCoeff / 100) - (funds[matterTokenId].supply - funds[matterTokenId].borrow);
-        }
-        emit UpdatedExitOrder(
-            _blockNumber,
-            _withdrawOpHash,
-            updatedAmount
+            (_signersBitmask >> validatorId) & 1 > 0,
+            "sst011"
+        ); // sst011 - sender is not in validators bitmask
+        (uint256 signersCount, bool signResult) = governance.verifyBlsSignature(
+            _aggrSignatureX,
+            _aggrSignatureY,
+            _signersBitmask,
+            swiftExitHash
         );
+        require(
+            signResult,
+            "ssat12"
+        ); // "ssat12" - wrong signature
+
+        // get last verified block
+        lastVerifiedBlock = rollup.totalBlocksVerified;
+
+        if (blockNumber <= lastVerifiedBlock) {
+            // Get fees
+            uint256 validatorsFee = tokenAmount * LATE_VALIDATORS_FEE_COEFF / 100;
+
+            // Check if tokenAmount is higher than sum of fees
+            require(
+                creationCost + validatorsFee < tokenAmount,
+                "ssat12"
+            ); // "ssat12" - wrong amount
+
+            // Sending amount
+            uint256 sendingAmount = tokenAmount - (creationCost + validatorsFee);
+
+            // TODO: Check existance
+            // Try withdraw from rollup
+            rollup.withdrawFunds(
+                tokenId,
+                sendingAmount,
+                recipient
+            );
+
+            // Freeze funds on rollup
+            rollup.freezeFunds(
+                tokenId,
+                creationCost + validatorsFee,
+                recipient
+            );
+
+            // Create Exit order
+            ExitOrder order = ExitOrder(
+                onchainOpNumber,
+                opHash,
+                tokenId,
+                0,
+                creationCost,
+                validatorsFee,
+                msg.sender,
+                _signersBitmask,
+                signersCount,
+                0,
+                0
+            );
+            exitOrders[_blockNumber][exitOrdersCount[_blockNumber]] = order;
+            exitOrdersCount[_blockNumber]++;
+            exitOrdersExistance[_blockNumber][_onchainOpNumber] = true;
+
+        } else  {
+            // Get fees
+            uint256 validatorsFee = tokenAmount * VALIDATORS_FEE_COEFF / 100;
+            
+            // Check if tokenAmount is higher than sum of fees
+            require(
+                creationCost + validatorsFee < tokenAmount,
+                "ssat12"
+            ); // "ssat12" - wrong amount
+
+            // Freeze funds on rollup
+            rollup.freezeFunds(
+                tokenId,
+                tokenAmount,
+                recipient
+            );
+
+            // Sending amount
+            uint256 sendingAmount = tokenAmount - (creationCost + validatorsFee);
+
+            // Borrow from validators and exchange with compound if needed
+            (uint16 supplyTokenId, uint256 supplyAmount) = exchangeTokens(tokenId, sendingAmount);
+
+            // Send to recepient
+            sendTokensToRecipient(recipient, tokenId, sendingAmount);
+
+            // Create Exit order
+            ExitOrder order = ExitOrder(
+                onchainOpNumber,
+                opHash,
+                tokenId,
+                sendingAmount,
+                creationCost,
+                validatorsFee,
+                msg.sender,
+                _signersBitmask,
+                signersCount,
+                supplyTokenId,
+                supplyAmount
+            );
+            exitOrders[_blockNumber][exitOrdersCount[_blockNumber]] = order;
+            exitOrdersCount[_blockNumber]++;
+            exitOrdersExistance[_blockNumber][_onchainOpNumber] = true;
+        }
     }
 
-    /// @notice Processes immediatly swift exit
-    /// @dev Exhanges tokens with compound, transfers token to recipient and creades swift order on rollup contract
-    /// @param _blockNumber Rollup block number
-    /// @param _withdrawOpHash Withdraw operation hash
-    /// @param _validatorsFee Amount of validators fee
-    /// @param _ownerFee Amount of owner fee
-    function immediateSwiftExit(uint32 _blockNumber,
-                                uint256 _withdrawOpHash,
-                                uint256 _validatorsFee,
-                                uint256 _ownerFee)
+    function getCreationCostForToken(uint16 _tokenId)
     internal
+    returns (uint256)
     {
-        ExitOrder order = exitOrders[_withdrawOpHash];
+        uint256 etherGasCost = SWIFT_EXIT_CREATION_GAS * tx.gasprice; // NEED TO GET FIXED GAS PRICE
 
-        borrowFromCompound(order.supplyAmount, order.tokenId, order.borrowAmount);
-        
-        exchangeWithRecipient(order.recipient, order.tokenId, order.borrowAmount);
+        address tokenAddress = governance.validateTokenId(_tokenId);
+        address cTokenAddress = governance.cTokenAddresses(tokenAddress);
+        address cEtherAddress = governance.cTokenAddresses(address(0));
 
-        createBorrowOrders(_withdrawOpHash, order.supplyAmount, _validatorsFee, _ownerFee);
+        uint256 etherUnderlyingPrice = priceOracle.getUnderlyingPrice(cEtherAddress);
+        uint256 tokenUnderlyingPrice = priceOracle.getUnderlyingPrice(cTokenAddress);
 
-        rollup.orderSwiftExit(_blockNumber, order.withdrawOpOffset, _withdrawOpHash, order.recipient);
-
-        exitOrders[_withdrawOpHash].status = ExitOrderState.Fulfilled;
-        funds[matterTokenId].borrow += order.supplyAmount;
+        return etherGasCost * (tokenUnderlyingPrice / etherUnderlyingPrice);
     }
 
-    /// @notice Exchanges specified amount of token with recipient
-    /// @param _recipient Recipient address
-    /// @param _tokenId Token id
-    /// @param _amount Token amount
-    function exchangeWithRecipient(address _recipient,
-                                   uint16 _tokenId,
-                                   uint256 _amount)
+    function exchangeTokens(uint16 _tokenId, uint256 _amount)
     internal
+    returns (uint16 supplyTokenId, uint256 supplyAmount)
     {
-        address tokenAddress = governance.tokenAddresses(_tokenId);
-        transferOut(_recipient, tokenAddress, _amount);
+        address tokenAddress = governance.validateTokenId(_tokenId);
+        // try borrow directly specified token from validators
+        if (governance.borrowToTrustedAddress(tokenAddress, _amount)) {
+            return (_tokenId, _amount);
+        }
+
+        // borrow matter token if previous failed
+        address cTokenAddress = governance.cTokenAddresses(tokenAddress);
+
+        uint256 tokenPrice = priceOracle.getUnderlyingPrice(cTokenAddress);
+        uint256 matterTokenPrice = priceOracle.getUnderlyingPrice(cMatterTokenAddress);
+
+        (bool listed, uint256 collateralFactorMantissa) = comptroller.markets(cTokenAddress);
+        require(
+            listed,
+            "dfsdjfk"
+        );
+
+        uint256 matterTokenAmount = _amount * (matterTokenPrice / tokenPrice) / collateralFactorMantissa;
+        require(
+            governance.borrowToTrustedAddress(matterTokenAddress, matterTokenAmount),
+            "dsf"
+        );
+
+        // exchange with compound
+        borrowFromCompound(matterTokenId, matterTokenAmount, _tokenId, _amount);
+
+        return (matterTokenId, matterTokenAmount);
     }
 
-    /// @notice Borrows specified amount from compound
-    /// @param _amountTokenSupply Amount to borrow from validators and exchange with compound
-    /// @param _tokenBorrowId Token id
-    /// @param _amountTokenBorrow Amount to get from compound
-    function borrowFromCompound(uint256 _amountTokenSupply,
+    function borrowFromCompound(uint16 _tokenSupplyId,
+                                uint256 _amountTokenSupply,
                                 uint16 _tokenBorrowId,
                                 uint256 _amountTokenBorrow)
     internal
     {
-        uint256 allowence = IERC20(matterTokenAddress).allowence(address(this), cMatterTokenAddress);
-        if (allowence < _amountTokenSupply) {
-            require(
-                IERC20(matterTokenAddress).approve(cMatterTokenAddress, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                "ssbd11"
-            ); // ssbd11 - token approve failed
-        }
-        
-        CErc20 cMatterToken = CErc20(cMatterTokenAddress);
-        require(
-            cMatterToken.mint(_amountTokenSupply) == 0,
-            "ssbd12"
-        ); // ssbd12 - token mint failed
+        address supplyTokenAddress = governance.validateTokenId(_tokenSupplyId);
+        address cSupplyTokenAddress = governance.cTokenAddresses(supplyTokenAddress);
 
-        address borrowTokenAddress = governance.tokenAddresses(_tokenBorrowId);
+        address borrowTokenAddress = governance.validateTokenId(_tokenBorrowId);
         address cBorrowTokenAddress = governance.cTokenAddresses(borrowTokenAddress);
 
-        address[] memory ctokens = new address[](1);
-        ctokens[0] = governance.cTokenAddresses(cBorrowTokenAddress);
+        address[] memory ctokens = new address[](2);
+        ctokens[0] = governance.cTokenAddresses(cSupplyTokenAddress);
+        ctokens[1] = governance.cTokenAddresses(cBorrowTokenAddress);
         uint[] memory errors = comptroller.enterMarkets(ctokens);
         require(
-            errors[0] == 0,
-            "ssbd13"
-        );  // ssbd13 - enter market failed
+            errors[0] == 0 && errors[1] == 0,
+            "sebd11"
+        ); // sebd11 - enter market failed
+
+        if (_tokenSupplyId == 0) {
+            CEther cToken = CEther(cSupplyTokenAddress);
+            require(
+                cToken.mint.value(_amountTokenSupply)() == 0,
+                "sebd12"
+            ); // sebd12 - token mint failed
+        } else {
+            uint256 allowence = IERC20(supplyTokenAddress).allowence(address(this), address(cSupplyTokenAddress));
+            if (allowence < _amountTokenSupply) {
+                require(
+                    IERC20(supplyTokenAddress).approve(address(cSupplyTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                    "sebd13"
+                ); // sebd13 - token approve failed
+            }
+            CErc20 cToken = CErc20(cSupplyTokenAddress);
+            require(
+                cToken.mint(_amountTokenSupply) == 0,
+                "sebd14"
+            ); // sebd14 - token mint failed
+        }
 
         if (_tokenBorrowId == 0) {
             CEther cToken = CEther(cBorrowTokenAddress);
@@ -586,11 +400,13 @@ contract SwiftExits is BlsVerifier {
     }
 
     /// @notice Repays specified amount to compound
-    /// @param _tokenBorrowId Token id
+    /// @param _tokenBorrowId Token borrow id
     /// @param _borrowAmount Amount of tokens to repay
+    /// @param _tokenSupplyId Token supply id
     /// @param _supplyAmount Amount of supplied tokens
     function repayToCompound(uint16 _tokenBorrowId,
                              uint256 _borrowAmount,
+                             uint16 _tokenSupplyId,
                              uint256 _supplyAmount)
     internal
     {
@@ -601,215 +417,150 @@ contract SwiftExits is BlsVerifier {
             CEther cToken = CEther(cTokenAddress);
             require(
                 cToken.repayBorrow.value(_borrowAmount)() == 0,
-                "ssrd11"
-            );  // ssrd11 - token repay failed
+                "serd11"
+            );  // serd11 - token repay failed
         } else {
             uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(cTokenAddress));
             if (allowence < _borrowAmount) {
                 require(
                     IERC20(tokenAddress).approve(address(cTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                    "ssrd12"
-            );  // ssrd12 - token approve failed
+                    "serd12"
+            );  // serd12 - token approve failed
             }
             CErc20 cToken = CErc20(cTokenAddress);
             require(
                 cToken.repayBorrow(_borrowAmount) == 0,
-                "ssrd13"
-            );  // ssrd13 - token repay failed
+                "serd13"
+            );  // serd13 - token repay failed
         }
 
-        CErc20 cToken = CErc20(cMatterTokenAddress);
-        require(
-            cToken.redeemUnderlying(_supplyAmount) == 0,
-            "ssrd14"
-        );  // ssrd14 - token redeem failed
+        address supplyTokenAddress = governance.tokenAddresses(_tokenSupplyId);
+        address cSupplyTokenAddress = governance.cTokenAddresses(supplyTokenAddress);
+
+        if (_tokenSupplyId == 0) {
+            CEther cToken = CEther(cSupplyTokenAddress);
+            require(
+                cToken.redeemUnderlying(_supplyAmount) == 0,
+                "serd14"
+        );  // serd14 - token redeem failed
+        } else {
+            CErc20 cToken = CErc20(cSupplyTokenAddress);
+            require(
+                cToken.redeemUnderlying(_supplyAmount) == 0,
+                "serd15"
+            );  // serd15 - token redeem failed
+        }
     }
 
-    /// @notice Returns amound of validators supply to exchange for token, calculates fees
+    /// @notice Sends specified amount of token to recipient
+    /// @param _recipient Recipient address
     /// @param _tokenId Token id
-    /// @param _tokenAmount Token amount
-    function getAmountsAndFees(uint16 _tokenId,
-                               uint256 _tokenAmount)
-    internal
-    returns (uint256 amountTokenSupply,
-             uint256 amountTokenBorrow,
-             uint256 validatorsFee,
-             uint256 ownerFee)
-    {
-        address borrowTokenAddress = governance.tokenAddresses(_tokenId);
-        address cBorrowTokenAddress = governance.cTokenAddresses(borrowTokenAddress);
-
-        validatorsFee = _tokenAmount * validatorsFeeCoeff / 100;
-        ownerFee = _tokenAmount * validatorsFeeCoeff / 100;
-
-        amountTokenBorrow = _tokenAmount - (validatorsFee + ownerFee);
-
-        uint256 borrowTokenPrice = getUnderlyingPrice(cBorrowTokenAddress);
-        uint256 supplyTokenPrice = getUnderlyingPrice(cMatterTokenAddress);
-
-        uint256 preAmountTokenSupply = amountTokenBorrow * borrowTokenPrice / supplyTokenPrice;
-
-        (bool _, uint collateralFactorMantissa) = comptroller.markets(cTokenAddress);
-
-        amountTokenSupply = preAmountTokenSupply / collateralFactorMantissa;
-    }
-
-    /// @notice Creates borrow orders for specified exit request
-    /// @param _withdrawOpHash Withdraw operation hash
-    /// @param _amountToBorrow Amount of validators supply to borrow
-    /// @param _validatorsFee Amount of validators fee
-    /// @param _ownerFee Amount of owner fee
-    function createBorrowOrders(uint256 _withdrawOpHash,
-                                uint256 _amountToBorrow,
-                                uint256 _validatorsFee,
-                                uint256 _ownerFee)
+    /// @param _amount Token amount
+    function sendTokensToRecipient(address _recipient,
+                                   uint16 _tokenId,
+                                   uint256 _amount)
     internal
     {
-        for (uint32 i = 0; i <= validatorCount; i++) {
-            uint32 currentBorrowOrdersCount = borrowOrdersCount[_withdrawOpHash];
-            borrowOrders[_withdrawOpHash][currentBorrowOrdersCount] = BorrowOrder({
-                borrowed: _amountToBorrow * (validatorsBalances[validators[i]][matterTokenId] / funds[matterTokenId].supply),
-                fee: _validatorsFee * (validatorsBalances[validators[i]][matterTokenId] / funds[matterTokenId].supply),
-                validator: validators[i]
-            });
-            borrowOrdersCount[_withdrawOpHash]++;
+        address tokenAddress = governance.validateTokenId(_tokenId);
+        if (tokenAddress == address(0)) {
+            _recipient.transfer(_amount);
+        } else {
+            require(
+                IERC20(tokenAddress).transfer(_recipient, _amount),
+                "sstt11"
+            ); // sstt11 - token transfer out failed
         }
-        uint32 currentBorrowOrdersCount = borrowOrdersCount[_withdrawOpHash];
-        borrowOrders[_withdrawOpHash][currentBorrowOrdersCount] = BorrowOrder({
-            borrowed: 0,
-            fee: _ownerFee,
-            validator: validators[owner]
-        });
-        borrowOrdersCount[_withdrawOpHash]++;
     }
 
-    /// @notice Called by Rollup contract when a new block is verified. Completes swift orders process
-    /// @dev Requires Rollup contract as caller. Transacts tokens and ether, repays for compound, fulfills deffered orders, punishes for failed exits
-    /// @param _blockNumber The number of verified block
-    /// @param _succeededHashes The succeeds exists hashes list
-    /// @param _failedHashes The failed exists hashes list
-    /// @param _tokenAddresses Repaid tokens
-    /// @param _tokenAmounts Repaid tokens amounts
-    function newVerifiedBlock(uint32 _blockNumber,
-                              uint256[] calldata _succeededHashes,
-                              uint256[] calldata _failedHashes,
-                              uint16[] calldata _tokenIds,
-                              uint256[] calldata _tokenAmounts)
+    function fulfillBlock(uint32 _blockNumber)
     external
-    payable
     {
-        requireRollup();
         require(
-            _tokenAddresses.length == _tokenAmounts.length,
-            "ssnk11"
-        ); // "ssnk11" - token addresses array length must be equal token amounts array length
-        for (uint i = 0; i < token.length; i++) {
-            address tokenAddress = governance.tokenAddresses(_tokenIds[i]);
-            transferInERC20(msg.sender, tokenAddress, _tokenAmounts[i]);
+            rollup.totalBlocksVerified >= totalBlocksVerified,
+            "sfadfdaf"
+        );
+        uint64 onchainOpsStartIdInBlock = rollup.blocks[_blockNumber].startId;
+        uint64 onchainOpsInBlock = rollup.blocks[_blockNumber].onchainOperations;
+        for (uint64 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
+            ExitOrder order = exitOrders[_blockNumber][i];
+            if (order.onchainOpNumber >= onchainOpsInBlock) {
+                punishForFailedOrder(order);
+            }
+            uint256 realOpHash = uint256(keccak256(rollup.onchainOps[onchainOpsStartIdInBlock + order.onchainOpNumber].pubData));
+            uint256 expectedOpHash = order.opHash;
+            if (realOpHash == expectedOpHash) {
+                fulfillSuccededOrder(order);
+            } else {
+                punishForFailedOrder(order);
+            }
         }
-        lastVerifiedBlock = _blockNumber;
-        fulfillSuccededOrders(_succeededHashes);
-        punishForFailedOrders(_failedHashes);
-        fulfillDefferedExitOrders(_blockNumber);
     }
 
     /// @notice Fulfills all succeeded orders
     /// @dev Repays to compound and reduces total borrowed, sends fee to validators balance on compound
-    /// @param _succeededHashes Succeeded orders hashes
-    function fulfillSuccededOrders(uint256[] memory _succeededHashes)
+    function fulfillSuccededOrder(ExitOrder _order)
     internal
     {
-        for (uint32 i = 0; i < _succeededHashes.length; i++) {
-            ExitOrder exitOrder = exitOrders[_succeededHashes[i]];
-            repayToCompound(exitOrder.tokenId, exitOrder.borrowAmount, exitOrder.supplyAmount);
-            for (uint32 k = 0; k < borrowOrdersCount[_succeededHashes[i]]; k++) {
-                BorrowOrder order = borrowOrders[_succeededHashes[i]][k];
-                funds[matterTokenId].borrow -= order.borrowed;
-                validatorsBalances[order.validator][exitOrder.tokenId] = validatorsBalances[order.validator][exitOrder.tokenId].add(order.fee);
+        // Withdraw from rollup
+        rollup.withdrawToTrustedAddress(_order.tokenId, _order.sendingAmount + _order.creationCost + _order.validatorsFee);
+        address supplyTokenAddress = governance.verifyTokenId(_order.supplyTokenId);
+        address sendingTokenAddress = governance.verifyTokenId(_order.tokenId);
+        
+        // Repay to compound and governance if needed
+        if (_order.supplyAmount > 0) {
+            if (_order.tokenId != _order.supplyTokenId) {
+                repayToCompound(_order.tokenId, _order.sendingAmount, _order.supplyTokenId, _order.supplyAmount);
+            }
+            if (_order.supplyTokenId == 0) {
+                governance.repayBorrowInEther.value(_order.supplyAmount);
+            } else {
+                governance.repayBorrowInERC20(supplyTokenAddress, _order.supplyAmount);
             }
         }
-    }
 
-    // /// @notice Sends fees to rollup
-    // /// @param _validator Validator address
-    // /// @param _tokenId Token id
-    // /// @param _amount Token amount
-    // function sendFeeToRollup(address _validator,
-    //                          uint16 _tokenId,
-    //                          uint256 _fee)
-    // internal
-    // {
-    //     if (_fee > 0) {
-    //         if (_tokenId > 0) {
-    //             address tokenAddr = governance.tokenAddresses(_tokenId);
-    //             uint256 allowence = IERC20(tokenAddr).allowence(address(this), address(rollup));
-    //             if (allowence < _fee) {
-    //                 require(
-    //                     IERC20(tokenAddr).approve(address(rollup), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-    //                     "sssp11"
-    //                 ); // sssp11 - token approve failed
-    //             }
-    //         }
-    //         rollup.depositOnchain(_validator, _tokenId, _fee);
-    //     }
-    // }
-
-    /// @notice Fulfills all deffered orders
-    /// @dev Instantly sends from rollup to recipient for all deffered orders from specified block
-    /// @param _blockNumber Block number
-    function fulfillDefferedExitOrders(uint32 _blockNumber)
-    internal
-    {
-        for (uint32 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
-            ExitOrder order = exitOrders[exitOrdersHashes[_blockNumber][i]];
-            if (order.status == ExitOrderState.Deffered) {
-                rollup.trySwiftExitWithdraw(
-                    _blockNumber,
-                    order.withdrawOpOffset,
-                    order.withdrawOpHash,
-                    order.recipient
-                );
+        // Consummate fees
+        for(uint8 i = 0; i < 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; i++)
+        {
+            if( (_order.signersBitmask >> i) & 1 > 0 ) {
+                address validator = governance.validators(i);
+                if (_order.tokenId == 0) {
+                    governance.supplyEther.value(_order.validatorsFee / _order.signersCount)(validator);
+                } else {
+                    governance.supplyErc20(sendingTokenAddress, _order.validatorsFee / _order.signersCount, validator);
+                }
             }
+        }
+
+        // Consummate gas cost
+        if (_order.tokenId == 0) {
+            governance.supplyEther.value(_order.creationCost)(order.validatorSender);
+        } else {
+            governance.supplyErc20(sendingTokenAddress, _order.creationCost, order.validatorSender);
         }
     }
 
     /// @notice Punishes for failed orders
     /// @dev Reduces validators supplies for failed orders, reduces total borrow
     /// @param _succeededHashes Succeeded orders hashes
-    function punishForFailed(uint256[] memory _failedHashes)
+    function punishForFailedOrder(ExitOrder _order)
     internal
     {
-         for (uint32 i = 0; i < _failedHashes.length; i++) {
-            for (uint32 k = 0; k < borrowOrdersCount[_failedHashes[i]]; k++) {
-                BorrowOrder order = borrowOrders[_succeededHashes[i]][k];
-                if (order.borrowed > 0) {
-                    validatorsInfo[order.validator].supply -= order.borrowed;
-                    funds[matterTokenId].borrow -= order.borrowed;
-                    funds[matterTokenId].supply -= order.borrowed;
-                }
+        address supplyTokenAddress = governance.verifyTokenId(_order.supplyTokenId);
+
+        // Defrost funds on rollup
+        rollup.defrostFunds(
+            _order.tokenId,
+            _order.sendingAmount + _order.creationCost + _order.validatorsFee,
+            recipient
+        );
+
+        // Punish signers
+        for(uint8 i = 0; i < 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; i++)
+        {
+            if( (_order.signersBitmask >> i) & 1 > 0 ) {
+                address validator = governance.validators(i);
+                governance.punishValidator(validator, supplyTokenAddress, _order.supplyAmount / _order.signersCount);
             }
         }
-    }
-
-    /// @notice Check if the sender is rollup contract
-    function requireRollup()
-    internal
-    view
-    {
-        require(
-            msg.sender == rollupAddress,
-            "ssrp11"
-        ); // ssrp11 - only by rollup
-    }
-
-    /// @notice Check if the sender is owner contract
-    function requireOwner()
-    internal
-    view
-    {
-        require(
-            msg.sender == owner,
-            "ssrr21"
-        ); // ssrr21 - only by owner
     }
 }
