@@ -20,7 +20,7 @@ contract SwiftExits is BlsVerifier {
     uint256 constant VALIDATORS_FEE_COEFF = 5;
 
     /// @notice Matter token id
-    address internal matterTokenId;
+    uint256 internal matterTokenId;
 
     /// @notice Matter token contract address
     address internal matterTokenAddress;
@@ -31,9 +31,6 @@ contract SwiftExits is BlsVerifier {
     /// @notice cEther token contract address
     address internal cEtherAddress;
 
-    /// @notice blsVerifier contract
-    BlsVerifier internal blsVerifier;
-
     /// @notice Governance contract
     Governance internal governance;
 
@@ -42,9 +39,6 @@ contract SwiftExits is BlsVerifier {
 
     /// @notice Comptroller contract
     Unitroller internal comptroller;
-
-    /// @notice Last verified Fraklin block
-    uint256 internal lastVerifiedBlock;
 
     /// @notice Swift Exits hashes (withdraw op hash) by Rollup block number (block number -> order number -> order)
     mapping(uint32 => mapping(uint64 => ExitOrder)) internal exitOrders;
@@ -76,7 +70,9 @@ contract SwiftExits is BlsVerifier {
 
     /// @notice Construct swift exits contract
     /// @param _governanceAddress The address of Governance contract
-    constructor(address _governanceAddress) public {
+    constructor(address _governanceAddress)
+    public
+    {
         governance = Governance(_governanceAddress);
     }
 
@@ -84,41 +80,22 @@ contract SwiftExits is BlsVerifier {
     /// @dev Requires governor
     /// @param _matterTokenAddress The address of Matter token
     /// @param _rollupAddress The address of Rollup contract
-    /// @param _blsVerifierAddress The address of Bls Verifier contract
     /// @param _comptrollerAddress The address of Comptroller contract
     function setupRelatedContracts(address _matterTokenAddress,
                                    address _rollupAddress,
-                                   address _blsVerifierAddress,
                                    address _comptrollerAddress)
     external
     {
         governance.requireGovernor();
 
         rollup = Franklin(_rollupAddress);
-        lastVerifiedBlock = rollup.totalBlocksVerified;
-        blsVerifier = BlsVerifier(_blsVerifierAddress);
         comptroller = Unitroller(_comptrollerAddress);
 
         matterTokenAddress = _matterTokenAddress;
-        matterTokenId = governance.tokenIds(_matterTokenAddress);
-        cMatterTokenAddress = governance.cTokenAddresses(_matterTokenAddress);
+        matterTokenId = governance.validateTokenAddress(_matterTokenAddress);
+        cMatterTokenAddress = governance.getCTokenAddress(matterTokenId);
 
-        cEtherAddress = governance.cTokenAddresses(address(0));
-
-        address[] memory ctokens = new address[](2);
-        ctokens[0] = cMatterTokenAddress;
-        ctokens[1] = cEtherAddress;
-
-        uint256[] memory errors = comptroller.enterMarkets(ctokens);
-        require(
-            errors[0] == 0 && errors[1] == 0,
-            "ssss11"
-        ); // ssss11 - cant enter markets
-
-        require(
-            IERC20(_matterTokenAddress).approve(cMatterTokenAddress, 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-            "ssss12"
-        ); // ssss12 - token approve failed
+        cEtherAddress = governance.getCTokenAddress(0);
     }
 
     /// @notice Fallback function
@@ -177,16 +154,8 @@ contract SwiftExits is BlsVerifier {
             !exitOrdersExistance[blockNumber][onchainOpNumber],
             "ssat13"
         ); // "ssat13" - request exists
-        require(
-            governance.isActiveValidator(msg.sender),
-            "sst011"
-        ); // sst011 - not active validator
-        uint256 validatorId = governance.getValidatorId(msg.sender);
-        require(
-            (_signersBitmask >> validatorId) & 1 > 0,
-            "sst011"
-        ); // sst011 - sender is not in validators bitmask
-        (uint256 signersCount, bool signResult) = governance.verifyBlsSignature(
+        (uint256 signersCount, bool signResult) = governance.verifySenderAndBlsSignature(
+            msg.sender,
             _aggrSignatureX,
             _aggrSignatureY,
             _signersBitmask,
@@ -198,7 +167,7 @@ contract SwiftExits is BlsVerifier {
         ); // "ssat12" - wrong signature
 
         // get last verified block
-        lastVerifiedBlock = rollup.totalBlocksVerified;
+        uint32 lastVerifiedBlock = rollup.totalBlocksVerified;
 
         if (blockNumber <= lastVerifiedBlock) {
             // Get fees
@@ -213,7 +182,14 @@ contract SwiftExits is BlsVerifier {
             // Sending amount
             uint256 sendingAmount = tokenAmount - (creationCost + validatorsFee);
 
-            // TODO: Check existance
+            // Check existance
+            uint64 onchainOpsStartIdInBlock = rollup.blocks[_blockNumber].startId;
+            uint256 realOpHash = uint256(keccak256(rollup.onchainOps[onchainOpsStartIdInBlock + onchainOpNumber].pubData));
+            require(
+                realOpHash == opHash,
+                "ssat12"
+            ); // "ssat12" - wrong amount
+            
             // Try withdraw from rollup
             rollup.withdrawFunds(
                 tokenId,
@@ -298,9 +274,7 @@ contract SwiftExits is BlsVerifier {
     {
         uint256 etherGasCost = SWIFT_EXIT_CREATION_GAS * tx.gasprice; // NEED TO GET FIXED GAS PRICE
 
-        address tokenAddress = governance.validateTokenId(_tokenId);
-        address cTokenAddress = governance.cTokenAddresses(tokenAddress);
-        address cEtherAddress = governance.cTokenAddresses(address(0));
+        address cTokenAddress = governance.getCTokenAddress(_tokenId);
 
         uint256 etherUnderlyingPrice = priceOracle.getUnderlyingPrice(cEtherAddress);
         uint256 tokenUnderlyingPrice = priceOracle.getUnderlyingPrice(cTokenAddress);
@@ -308,18 +282,19 @@ contract SwiftExits is BlsVerifier {
         return etherGasCost * (tokenUnderlyingPrice / etherUnderlyingPrice);
     }
 
-    function exchangeTokens(uint16 _tokenId, uint256 _amount)
+    function exchangeTokens(uint16 _tokenId,
+                            uint256 _amount)
     internal
-    returns (uint16 supplyTokenId, uint256 supplyAmount)
+    returns (uint16 supplyTokenId,
+             uint256 supplyAmount)
     {
-        address tokenAddress = governance.validateTokenId(_tokenId);
         // try borrow directly specified token from validators
-        if (governance.borrowToTrustedAddress(tokenAddress, _amount)) {
+        if (governance.borrowToTrustedAddress(_tokenId, _amount)) {
             return (_tokenId, _amount);
         }
 
         // borrow matter token if previous failed
-        address cTokenAddress = governance.cTokenAddresses(tokenAddress);
+        address cTokenAddress = governance.getCTokenAddress(_tokenId);
 
         uint256 tokenPrice = priceOracle.getUnderlyingPrice(cTokenAddress);
         uint256 matterTokenPrice = priceOracle.getUnderlyingPrice(cMatterTokenAddress);
@@ -332,7 +307,7 @@ contract SwiftExits is BlsVerifier {
 
         uint256 matterTokenAmount = _amount * (matterTokenPrice / tokenPrice) / collateralFactorMantissa;
         require(
-            governance.borrowToTrustedAddress(matterTokenAddress, matterTokenAmount),
+            governance.borrowToTrustedAddress(matterTokenId, matterTokenAmount),
             "dsf"
         );
 
@@ -349,14 +324,13 @@ contract SwiftExits is BlsVerifier {
     internal
     {
         address supplyTokenAddress = governance.validateTokenId(_tokenSupplyId);
-        address cSupplyTokenAddress = governance.cTokenAddresses(supplyTokenAddress);
+        address cSupplyTokenAddress = governance.getCTokenAddress(_tokenSupplyId);
 
-        address borrowTokenAddress = governance.validateTokenId(_tokenBorrowId);
-        address cBorrowTokenAddress = governance.cTokenAddresses(borrowTokenAddress);
+        address cBorrowTokenAddress = governance.getCTokenAddress(_tokenSupplyId);
 
         address[] memory ctokens = new address[](2);
-        ctokens[0] = governance.cTokenAddresses(cSupplyTokenAddress);
-        ctokens[1] = governance.cTokenAddresses(cBorrowTokenAddress);
+        ctokens[0] = cSupplyTokenAddress;
+        ctokens[1] = cBorrowTokenAddress;
         uint[] memory errors = comptroller.enterMarkets(ctokens);
         require(
             errors[0] == 0 && errors[1] == 0,
@@ -410,8 +384,8 @@ contract SwiftExits is BlsVerifier {
                              uint256 _supplyAmount)
     internal
     {
-        address tokenAddress = governance.tokenAddresses(_tokenBorrowId);
-        address cTokenAddress = governance.cTokenAddresses(tokenAddress);
+        address tokenAddress = governance.validateTokenId(_tokenBorrowId);
+        address cTokenAddress = governance.getCTokenAddress(_tokenBorrowId);
 
         if (_tokenBorrowId == 0) {
             CEther cToken = CEther(cTokenAddress);
@@ -434,8 +408,7 @@ contract SwiftExits is BlsVerifier {
             );  // serd13 - token repay failed
         }
 
-        address supplyTokenAddress = governance.tokenAddresses(_tokenSupplyId);
-        address cSupplyTokenAddress = governance.cTokenAddresses(supplyTokenAddress);
+        address cSupplyTokenAddress = governance.getCTokenAddress(_tokenSupplyId);
 
         if (_tokenSupplyId == 0) {
             CEther cToken = CEther(cSupplyTokenAddress);
@@ -480,12 +453,8 @@ contract SwiftExits is BlsVerifier {
             "sfadfdaf"
         );
         uint64 onchainOpsStartIdInBlock = rollup.blocks[_blockNumber].startId;
-        uint64 onchainOpsInBlock = rollup.blocks[_blockNumber].onchainOperations;
         for (uint64 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
             ExitOrder order = exitOrders[_blockNumber][i];
-            if (order.onchainOpNumber >= onchainOpsInBlock) {
-                punishForFailedOrder(order);
-            }
             uint256 realOpHash = uint256(keccak256(rollup.onchainOps[onchainOpsStartIdInBlock + order.onchainOpNumber].pubData));
             uint256 expectedOpHash = order.opHash;
             if (realOpHash == expectedOpHash) {
@@ -503,8 +472,6 @@ contract SwiftExits is BlsVerifier {
     {
         // Withdraw from rollup
         rollup.withdrawToTrustedAddress(_order.tokenId, _order.sendingAmount + _order.creationCost + _order.validatorsFee);
-        address supplyTokenAddress = governance.verifyTokenId(_order.supplyTokenId);
-        address sendingTokenAddress = governance.verifyTokenId(_order.tokenId);
         
         // Repay to compound and governance if needed
         if (_order.supplyAmount > 0) {
@@ -514,7 +481,7 @@ contract SwiftExits is BlsVerifier {
             if (_order.supplyTokenId == 0) {
                 governance.repayBorrowInEther.value(_order.supplyAmount);
             } else {
-                governance.repayBorrowInERC20(supplyTokenAddress, _order.supplyAmount);
+                governance.repayBorrowInERC20(_order.supplyTokenId, _order.supplyAmount);
             }
         }
 
@@ -526,7 +493,7 @@ contract SwiftExits is BlsVerifier {
                 if (_order.tokenId == 0) {
                     governance.supplyEther.value(_order.validatorsFee / _order.signersCount)(validator);
                 } else {
-                    governance.supplyErc20(sendingTokenAddress, _order.validatorsFee / _order.signersCount, validator);
+                    governance.supplyErc20(_order.tokenId, _order.validatorsFee / _order.signersCount, validator);
                 }
             }
         }
@@ -535,7 +502,7 @@ contract SwiftExits is BlsVerifier {
         if (_order.tokenId == 0) {
             governance.supplyEther.value(_order.creationCost)(order.validatorSender);
         } else {
-            governance.supplyErc20(sendingTokenAddress, _order.creationCost, order.validatorSender);
+            governance.supplyErc20(_order.tokenId, _order.creationCost, order.validatorSender);
         }
     }
 
