@@ -386,7 +386,7 @@ contract Governance {
     /// @notice Transfers specified amount of ERC20 token into contract
     /// @param _tokenAddress ERC20 token address
     /// @param _amount Amount in ERC20 tokens
-    function repayInERC20(uint16 _tokenId,
+    function repayInErc20(uint16 _tokenId,
                           uint256 _amount,
                           uint16 _validatorsCount,
                           uint16 _excludedValidatorsBitmask)

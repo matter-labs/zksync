@@ -492,6 +492,14 @@ contract SwiftExits is BlsVerifier {
                                              (_order.suppliersCount,
                                               0);
             } else {
+                address tokenAddress = governance.validateTokenId(supplyTokenId);
+                uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
+                if (allowence < _order.supplyAmount) {
+                    require(
+                        IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                        "sebd13"
+                    ); // sebd13 - token approve failed
+                }
                 governance.repayInErc20(_order.supplyTokenId,
                                         _order.supplyAmount,
                                         _order.suppliersCount,
@@ -532,6 +540,14 @@ contract SwiftExits is BlsVerifier {
                                              (_order.suppliersCount,
                                               _order.signersBitmask);
             } else {
+                address tokenAddress = governance.validateTokenId(supplyTokenId);
+                uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
+                if (allowence < _order.supplyAmount) {
+                    require(
+                        IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                        "sebd13"
+                    ); // sebd13 - token approve failed
+                }
                 governance.repayInErc20(_order.supplyTokenId,
                                         _order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF,
                                         _order.suppliersCounts,
