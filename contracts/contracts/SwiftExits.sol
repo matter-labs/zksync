@@ -215,16 +215,11 @@ contract SwiftExits {
                 "ssat14"
             ); // "ssat14" - expected hash is not equal to real withdraw operation hash
 
-            // Try withdraw from rollup
-            rollup.withdrawFunds(
+            // Try withdraw from rollup and freeze transaction cost
+            rollup.swiftExitWithdraw(
+                blockNumber,
                 tokenId,
                 sendingAmount,
-                recipient
-            );
-
-            // Freeze transaction cost in token on specified account on rollup
-            rollup.freezeFunds(
-                tokenId,
                 creationCost,
                 recipient
             );
@@ -262,6 +257,7 @@ contract SwiftExits {
 
             // Freeze tokenAmount on rollup
             rollup.freezeFunds(
+                _blockNumber,
                 tokenId,
                 tokenAmount,
                 recipient
@@ -565,14 +561,36 @@ contract SwiftExits {
         }
     }
 
-    /// @notice Anyone can fulfill specified block Exit Orders - repay tokens to validators or punish them
-    /// @param _blockNumber Recipient address
-    function fulfillBlock(uint32 _blockNumber) external {
+    /// @notice Returns order token id, amount, recipient
+    /// @param _blockNumber Block number
+    /// @param _orderNumber Order number
+    function getOrderInfo(uint32 _blockNumber, uint64 _orderNumber) external returns (uint16 tokenId, uint256 amount, address recipient) {
+        // Can be called only from Rollup contract
+        require(
+            msg.sender == address(rollup),
+            "fnds11"
+        ); // fnds11 - wrong address
+        ExitOrder order = exitOrders[_blockNumber][_orderNumber];
+        return (
+            order.tokenId,
+            order.sendingAmount + order.creationCost + order.validatorsFee,
+            order.recipient
+        );
+    }
+
+    /// @notice Get orders success status for block
+    /// @param _blockNumber Block number
+    function getOrdersSuccessStatusList(uint32 _blockNumber) external returns (bytes memory succeeded) {
+        // Can be called only from Rollup contract
+        require(
+            msg.sender == address(rollup),
+            "fnds11"
+        ); // fnds11 - wrong address
         // Requires verified blocks count is higher than specified block number
         require(
             rollup.totalBlocksVerified >= _blockNumber,
-            "ssfk11"
-        ); // ssfk11 - wrong block number
+            "fnds12"
+        ); // fnds12 - wrong block number
         // Get onchain operations start id in this block from Rollup contract
         uint64 onchainOpsStartIdInBlock = rollup.blocks[_blockNumber].startId;
         // Go into loop for all exit orders in block
@@ -585,40 +603,44 @@ contract SwiftExits {
             uint256 expectedOpHash = order.opHash;
 
             if (realOpHash == expectedOpHash) {
-                // If hashes are equal - return all funds to validators and pay fees
-                fulfillSuccededOrder(order);
+                // If hashes are equal - add 1
+                succeeded[i] = 1;
             } else {
-                // If hashes aren't equal - punish validators
-                punishForFailedOrder(order);
+                // If hashes aren't equal - add 0
+                succeeded[i] = 0;
             }
         }
     }
 
     /// @notice Fulfills succeeded order
-    /// @dev Withdraws frozen tokens from Rollup contract, repays to compound (if needed) and validators, consummates fees
-    /// @param _order - ExitOrder structure
-    function fulfillSuccededOrder(ExitOrder _order) internal {
-        // Withdraw frozen tokens from rollup
-        rollup.withdrawToTrustedAddress(
-            _order.tokenId,
-            _order.sendingAmount + _order.creationCost + _order.validatorsFee
-        );
+    /// @dev Repays to compound (if needed) and validators, consummates fees
+    /// @param _blockNumber - Rollup block number
+    /// @param _orderNumber - Swift Exit order number
+    function fulfillSucceededOrder(uint32 _blockNumber, uint64 _orderNumber) internal {
+        // Can be called only from Rollup contract
+        require(
+            msg.sender == address(rollup),
+            "fnds11"
+        ); // fnds11 - wrong address
+
+        // Get exit order
+        ExitOrder order = exitOrders[_blockNumber][_orderNumber];
         
         // If supplyAmount > 0 - returns borrowed validators funds
-        if (_order.supplyAmount > 0) {
-            if (_order.tokenId != _order.supplyTokenId) {
+        if (order.supplyAmount > 0) {
+            if (order.tokenId != order.supplyTokenId) {
                 // If order token id is not equal to supplied token id - need to repay borrow to compound
                 repayToCompound(
-                    _order.tokenId,
-                    _order.sendingAmount,
-                    _order.supplyTokenId,
-                    _order.supplyAmount / BORROWING_COEFF
+                    order.tokenId,
+                    order.sendingAmount,
+                    order.supplyTokenId,
+                    order.supplyAmount / BORROWING_COEFF
                 );
             }
 
-            if (_order.supplyTokenId == 0) {
+            if (order.supplyTokenId == 0) {
                 // If supplied token id is 0 - repay validators in Ether
-                governance.repayInEther.value(_order.supplyAmount)(_order.suppliersCount, 0);
+                governance.repayInEther.value(order.supplyAmount)(order.suppliersCount, 0);
             } else {
                 // If supplied token id is not 0 - repay validators in ERC20
 
@@ -628,7 +650,7 @@ contract SwiftExits {
                 // Check for enouth allowence value for this token for repay to Governance contract
                 uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
                 // Allowence must be >= supply amount
-                if (allowence < _order.supplyAmount) {
+                if (allowence < order.supplyAmount) {
                     // If allowence value is not anouth - approve max possible value for this token for repay to Governance contract
                     require(
                         IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
@@ -638,29 +660,29 @@ contract SwiftExits {
 
                 // Repay to Governance in Ether
                 governance.repayInErc20(
-                    _order.supplyTokenId,
-                    _order.supplyAmount,
-                    _order.suppliersCount,
+                    order.supplyTokenId,
+                    order.supplyAmount,
+                    v.suppliersCount,
                     0
                 );
             }
         }
 
         // Consummate fees
-        if (_order.tokenId == 0) {
+        if (order.tokenId == 0) {
             // If order token id is 0 - pay validators fee and creation cost in Ether
-            governance.repayInEther.value(_order.validatorsFee);
-            governance.supplyEther.value(_order.creationCost)(order.validatorSender);
+            governance.repayInEther.value(order.validatorsFee);
+            governance.supplyEther.value(order.creationCost)(order.validatorSender);
         } else {
             // If order token id is 0 - pay validators fee and creation cost in ERC20
 
             // Validate token id - get token address
-            address tokenAddress = governance.validateTokenId(_order.tokenId);
+            address tokenAddress = governance.validateTokenId(order.tokenId);
 
             // Check for enouth allowence value for this token for pay fees to Governance contract
             uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
             // Allowence must be >= validators fee + creation cost
-            if (allowence < _order.validatorsFee + _order.creationCost) {
+            if (allowence < order.validatorsFee + order.creationCost) {
                 // If allowence value is not anouth - approve max possible value for this token for repay to Governance contract
                 require(
                     IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
@@ -670,49 +692,52 @@ contract SwiftExits {
 
             // Pay fees
             governance.repayInErc20(
-                _order.tokenId,
-                _order.validatorsFee,
-                _order.suppliersCount,
+                order.tokenId,
+                order.validatorsFee,
+                order.suppliersCount,
                 0
             );
 
             // Pay creation cost
             governance.supplyErc20(
-                _order.tokenId,
-                _order.creationCost,
+                order.tokenId,
+                order.creationCost,
                 order.validatorSender
             );
         }
     }
 
     /// @notice Punishes validators-signers for failed order
-    /// @dev Defrost tokens on Rollup contract, repay unsent amount of supply to validators, that haven't signed order
-    /// @param _order - ExitOrder structure
-    function punishForFailedOrder(ExitOrder _order) internal {
-        // Defrost funds on rollup
-        rollup.defrostFunds(
-            _order.tokenId,
-            _order.sendingAmount + _order.creationCost + _order.validatorsFee,
-            recipient
-        );
+    /// @dev Repay unsent amount of supply to validators, that haven't signed order
+    /// @param _blockNumber - Rollup block number
+    /// @param _orderNumber - Swift Exit order number
+    function punishForFailedOrder(uint32 _blockNumber, uint64 _orderNumber) internal {
+        // Can be called only from Rollup contract
+        require(
+            msg.sender == address(rollup),
+            "fnds11"
+        ); // fnds11 - wrong address
+
+        // Get exit order
+        ExitOrder order = exitOrders[_blockNumber][_orderNumber];
 
         // Repay unsent amount of supply to validators, that haven't signed order if supplied amount is > 0
-        if (_order.supplyAmount > 0) {
-            if (_order.supplyTokenId == 0) {
+        if (order.supplyAmount > 0) {
+            if (order.supplyTokenId == 0) {
                 // Repay in Ether if supply token id == 0
 
                 // Repayment value is supplied value minus = supply amount * (borrowing coeff - 1) / borrowing coeff
-                uint356 value = _order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF;
+                uint356 value = order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF;
                 // Repay in Ether to validators possible value, excluding (punish) validators-signers
                 governance.repayInEther.value(value)(
-                    _order.suppliersCount,
-                    _order.signersBitmask
+                    order.suppliersCount,
+                    order.signersBitmask
                 );
             } else {
                 // Repay in ERC20 if supply token id != 0
 
                 // Repayment value is supplied value minus = supply amount * (borrowing coeff - 1) / borrowing coeff
-                uint356 value = _order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF;
+                uint356 value = order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF;
                 
                 // Get token address
                 address tokenAddress = governance.validateTokenId(supplyTokenId);
@@ -729,10 +754,10 @@ contract SwiftExits {
 
                 // Repay in ERC20 to validators possible value, excluding (punish) validators-signers
                 governance.repayInErc20(
-                    _order.supplyTokenId,
-                    _order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF,
-                    _order.suppliersCounts,
-                    _order.signersBitmask
+                    order.supplyTokenId,
+                    order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF,
+                    order.suppliersCounts,
+                    order.signersBitmask
                 );
             }
         }

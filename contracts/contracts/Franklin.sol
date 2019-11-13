@@ -2,6 +2,7 @@ pragma solidity ^0.5.8;
 
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
+import "./SwiftExits.sol";
 import "./Governance.sol";
 import "./Verifier.sol";
 import "./PriorityQueue.sol";
@@ -11,8 +12,8 @@ import "./Bytes.sol";
 // - check overflows
 
 contract Franklin {
-    // Swift exits contract address
-    address internal swiftExits;
+    // Swift exits contract
+    SwiftExits internal swiftExits;
     // Verifier contract
     Verifier internal verifier;
     // Governance contract
@@ -111,6 +112,9 @@ contract Franklin {
     // Root-chain balances (per owner and token id) to withdraw
     mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
 
+    // Frozen balances
+    mapping(address => mapping(uint16 => uint128)) public frozenBalances;
+
     // Total number of verified blocks
     // i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
     uint32 public totalBlocksVerified;
@@ -192,12 +196,14 @@ contract Franklin {
     // Inits verifier, verification key and governance contracts instances,
     // sets genesis root
     constructor(
+        address _swiftExitsAddress,
         address _governanceAddress,
         address _verifierAddress,
         address _priorityQueueAddress,
         address _genesisAccAddress,
         bytes32 _genesisRoot
     ) public {
+        swiftExits = SwiftExits(_swiftExits);
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
         priorityQueue = PriorityQueue(_priorityQueueAddress);
@@ -293,7 +299,7 @@ contract Franklin {
     // Params:
     // - _amount - amount to withdraw
     // - _to - recipient
-    function withdrawETH(uint128 _amount, address _to) external {
+    function withdrawETH(uint128 _amount, address _to) public {
         registerWithdrawal(msg.sender, 0, _amount);
         _to.transfer(_amount);
     }
@@ -339,7 +345,7 @@ contract Franklin {
     // - _token - token address
     // - _amount - amount to withdraw
     // - _to - recipient
-    function withdrawERC20(address _token, uint128 _amount, address _to) external {
+    function withdrawERC20(address _token, uint128 _amount, address _to) public {
         uint16 tokenId = governance.validateTokenAddress(_token);
         registerWithdrawal(msg.sender, tokenId, _amount);
         require(
@@ -443,7 +449,7 @@ contract Franklin {
     // - _amount - token amount
     function registerWithdrawal(address _from, uint16 _token, uint128 _amount) internal {
         require(
-            balancesToWithdraw[_from][_token] >= _amount,
+            balancesToWithdraw[_from][_token] - frozenBalances[_from][_token] >= _amount,
             "frw11"
         ); // frw11 - insufficient balance withdraw
 
@@ -858,5 +864,103 @@ contract Franklin {
 
         balancesToWithdraw[_owner][_tokenId] += _amount;
         exited[_owner][_tokenId] == false;
+    }
+
+    // MARK: - Swift Exits
+
+    // Immediate withdraw for swift exit, that is created for withdraw op in already verified block
+    function swiftExitWithdraw(
+        uint32 _blockNumber,
+        uint16 _tokenId,
+        uint128 _tokenAmount,
+        uint128 _fee,
+        address _recipient
+    ) external {
+        require(
+            msg.sender == address(swiftExits),
+            "fnsw11"
+        ); // sender must be swift exits contract
+        require(
+            totalBlocksVerified >= _blockNumber,
+            "fnsw12"
+        ); // fnsw12 - wrong block number
+        require(
+            balancesToWithdraw[_recipient][_tokenId] >= _tokenAmount + _fee,
+            "fnsw13"
+        ); // fnsw13 - not enouth balance
+
+        // Withdraw
+        registerWithdrawal(_recipient, _tokenId, _tokenAmount);
+
+        if (_tokenId == 0) {
+            _recipient.transfer(_tokenAmount);
+        } else {
+            address tokenAddress = governance.validateTokenId(_tokenId);
+            require(
+                IERC20(tokenAddress).transfer(_recipient, _tokenAmount),
+                "fnsw14"
+            ); // fnsw14 - token transfer failed withdraw
+        }
+
+        // Freeze fee
+        frozenBalances[_recipient][_tokenId] += _fee;
+    }
+
+    // Freeze balances for unverified block
+    function freezeFunds(
+        uint32 _blockNumber,
+        uint16 _tokenId,
+        uint128 _tokenAmount,
+        address _recipient
+    ) external {
+        require(
+            msg.sender == address(swiftExits),
+            "fnsw11"
+        ); // sender must be swift exits contract
+        require(
+            totalBlocksVerified < _blockNumber,
+            "fnsw12"
+        ); // fnsw12 - wrong block number
+        frozenBalances[_recipient][_tokenId] += _tokenAmount;
+    }
+
+    // Fulfill swift exits in block
+    function fulfillSwiftExits(uint32 _blockNumber) external {
+        // Can be called only by active validator
+        governance.requireActiveValidator(msg.sender);
+        // Requires verified blocks count is higher than specified block number
+        require(
+            totalBlocksVerified >= _blockNumber,
+            "fnds11"
+        ); // fnds11 - wrong block number
+
+        // Get orders statuses (withdraw op existance or not existance in verified block)
+        bytes memory orders = swiftExits.getOrdersSuccessStatusList(_blockNumber);
+        // Loop orders list
+        for (uint64 i = 0; i < orders.length; i++) {
+            // Get info about order
+            (uint16 tokenId, uint256 amount, address recipient) = swiftExits.getOrderInfo(_blockNumber, i);
+            // Anyway unfroze balance
+            frozenBalances[recipient][tokenId] -= amount;
+
+            if (orders[i] > 0) {
+                // If withdraw op is correct - withdraw necessary amount to swift exits contract
+                registerWithdrawal(recipient, tokenId, _amount);
+                if (tokenId == 0){
+                    address(swiftExits).transfer(amount);
+                } else {
+                    address tokenAddress = governance.validateTokenId(tokenId);
+                    require(
+                        IERC20(tokenAddress).transfer(address(swiftExits), amount),
+                        "fnds12"
+                    ); // fnds12 - token transfer failed
+                }
+                // Fulfill succeded order
+                fulfillSucceededOrder(_blockNumber, i);
+            } else {
+                // Punish for failed order
+                punishForFailedOrder(_blockNumber, i);
+            }
+        }
     }
 }
