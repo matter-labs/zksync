@@ -12,6 +12,7 @@ use server::eth_watch::start_eth_watch;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 use server::{eth_sender, ThreadPanicNotify};
 
+use futures::sync::mpsc as fmpsc;
 use models::{node::config, StateKeeperRequest};
 use storage::ConnectionPool;
 
@@ -81,16 +82,21 @@ fn main() {
         tx_for_ops.clone(),
         stop_signal_sender.clone(),
     );
-    let (tx_for_eth, ops_notify_receiver) =
-        eth_sender::start_eth_sender(connection_pool.clone(), stop_signal_sender.clone());
+    let (op_notify_sender, op_notify_receiver) = fmpsc::channel(512);
+    let tx_for_eth = eth_sender::start_eth_sender(
+        connection_pool.clone(),
+        stop_signal_sender.clone(),
+        op_notify_sender.clone(),
+    );
     start_committer(
         rx_for_ops,
         tx_for_eth,
+        op_notify_sender,
         connection_pool.clone(),
         stop_signal_sender.clone(),
     );
     start_api_server(
-        ops_notify_receiver,
+        op_notify_receiver,
         connection_pool.clone(),
         stop_signal_sender.clone(),
     );

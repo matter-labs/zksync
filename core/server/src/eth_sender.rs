@@ -17,7 +17,7 @@ use eth_client::{ETHClient, SignedCallResult};
 use ff::{PrimeField, PrimeFieldRepr};
 use futures::{sync::mpsc as fmpsc, Future};
 use models::abi::FRANKLIN_CONTRACT;
-use models::{Action, Operation};
+use models::{Action, ActionType, Operation};
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -210,10 +210,13 @@ impl<T: Transport> ETHSender<T> {
                     if !success {
                         panic!("Operation failed");
                     }
-                    op_notify
-                        .try_send(op)
-                        .map_err(|e| warn!("Failed notify about op confirmation: {}", e))
-                        .unwrap_or_default();
+                    if op.action.get_type() == ActionType::VERIFY {
+                        // we notify about verify only when commit is confirmed on the ethereum
+                        op_notify
+                            .try_send(op)
+                            .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
+                            .unwrap_or_default();
+                    }
                 } else {
                     self.unconfirmed_ops.push_front((op, op_state));
                     break;
@@ -483,9 +486,9 @@ impl<T: Transport> ETHSender<T> {
 pub fn start_eth_sender(
     pool: ConnectionPool,
     panic_notify: Sender<bool>,
-) -> (Sender<Operation>, fmpsc::Receiver<Operation>) {
+    op_notify_sender: fmpsc::Sender<Operation>,
+) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
-    let (op_notify_sender, op_notify_receiver) = fmpsc::channel(256);
 
     std::thread::Builder::new()
         .name("eth_sender".to_string())
@@ -500,5 +503,5 @@ pub fn start_eth_sender(
         })
         .expect("Eth sender thread");
 
-    (tx_for_eth, op_notify_receiver)
+    tx_for_eth
 }

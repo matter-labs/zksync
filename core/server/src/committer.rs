@@ -1,4 +1,5 @@
 use crate::ThreadPanicNotify;
+use futures::sync::mpsc as fmpsc;
 use models::{Action, CommitRequest, Operation};
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
@@ -8,6 +9,7 @@ use storage::ConnectionPool;
 pub fn start_committer(
     rx_for_ops: Receiver<CommitRequest>,
     tx_for_eth: Sender<Operation>,
+    op_notify_sender: fmpsc::Sender<Operation>,
     pool: ConnectionPool,
     panic_notify: Sender<bool>,
 ) {
@@ -15,7 +17,7 @@ pub fn start_committer(
         .name("committer".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
-            run_committer(rx_for_ops, tx_for_eth, pool);
+            run_committer(rx_for_ops, tx_for_eth, op_notify_sender, pool);
         })
         .expect("thread creation failed");
 }
@@ -23,6 +25,7 @@ pub fn start_committer(
 fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
     tx_for_eth: Sender<Operation>,
+    mut op_notify_sender: fmpsc::Sender<Operation>,
     pool: ConnectionPool,
 ) {
     info!("committer started");
@@ -61,8 +64,14 @@ fn run_committer(
                 .expect("committer must commit the op into db");
 
             tx_for_eth
-                .send(op)
+                .send(op.clone())
                 .expect("must send an operation for commitment to ethereum");
+
+            // we notify about commit operation as soon as it is executed, we don't wait for eth confirmations
+            op_notify_sender
+                .try_send(op)
+                .map_err(|e| warn!("Failed notify about commit op confirmation: {}", e))
+                .unwrap_or_default();
             continue;
         } else {
             // there was a timeout, so check for the new ready proofs
