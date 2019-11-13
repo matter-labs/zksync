@@ -119,7 +119,7 @@ export class Wallet {
     ) {
         const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
         const seed = Buffer.from(seedHex, "hex");
-        let signer = SyncSigner.fromSeed(seed);
+        const signer = SyncSigner.fromSeed(seed);
         return new Wallet(signer, sidechainProvider);
     }
 

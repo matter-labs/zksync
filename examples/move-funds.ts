@@ -64,7 +64,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     await logETHBalance(ethWallet, "ETH");
     await logSyncBalance(wallet, "ETH", "verified");
 
-    let depositHandle = await depositFromETH(
+    const depositHandle = await depositFromETH(
         ethWallet,
         wallet,
         "ETH",
