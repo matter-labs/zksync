@@ -18,7 +18,7 @@ async function main() {
             'Content-Type': 'application/x-www-form-urlencoded'
         }
     };
-    await Axios.post(`${process.env.TESSERACTS_URL}/0xc56e79caa94c96de01ef36560ac215cc7a4f0f47/contract`, qs.stringify(req), config);
+    await Axios.post(`http://localhost:8000/0xc56e79caa94c96de01ef36560ac215cc7a4f0f47/contract`, qs.stringify(req), config);
 }
 
 main();

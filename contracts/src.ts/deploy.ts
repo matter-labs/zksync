@@ -252,7 +252,7 @@ export async function postContractToTesseracts(contractCode, contractName: strin
             'Content-Type': 'application/x-www-form-urlencoded'
         }
     };
-    await Axios.post(`${process.env.TESSERACTS_URL}/${address}/contract`, qs.stringify(req), config);
+    await Axios.post(`http://localhost:8000/${address}/contract`, qs.stringify(req), config);
 }
 
 export async function addTestERC20Token(wallet, governance) {
