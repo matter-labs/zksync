@@ -134,6 +134,15 @@ contract Governance {
         validatorsInfo[_address].isActive = _active;
     }
 
+    /// @notice Checks if validator is active
+    /// @param _address Validator address
+    function requireActiveValidator(address _address) public {
+        require(
+            validatorsInfo[_address].isActive,
+            "geir11"
+        ); // geir11 - validator is not active
+    }
+
     /// @notice Add new validator with pubkey
     /// @dev Only governor can add new validator
     /// @param _address Validator address
@@ -180,10 +189,7 @@ contract Governance {
         for(uint8 i = 0; i < validatorsCount; i++) {
             if( (bitmask >> i) & 1 > 0 ) {
                 address addr = validators[i];
-                require(
-                    validatorsInfo[addr].isActive,
-                    "gegy11"
-                ); // gegy11 - not active validator
+                requireActiveValidator(addr);
                 BlsOperations.G2Point memory pubkey = validatorsInfo[addr].pubkey;
                 aggrPubkey = BlsOperations.addG2(aggrPubkey, pubkey);
                 signersCount++;

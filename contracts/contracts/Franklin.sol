@@ -6,13 +6,12 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./PriorityQueue.sol";
 import "./Bytes.sol";
-import "./SwiftExits.sol";
 
 // GLOBAL TODOS:
 // - check overflows
 
 contract Franklin {
-    // Swift exits contract
+    // Swift exits contract address
     address internal swiftExits;
     // Verifier contract
     Verifier internal verifier;
@@ -474,10 +473,7 @@ contract Franklin {
             _blockNumber == totalBlocksCommitted + 1,
             "fck11"
         ); // fck11 - only commit next block
-        require(
-            governance.isValidator(msg.sender),
-            "fck12"
-        ); // fck12 - not a validator in commit
+        governance.requireActiveValidator(msg.sender);
         if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
             require(
                 totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
@@ -702,10 +698,7 @@ contract Franklin {
             _blockNumber == totalBlocksVerified + 1,
             "fvk11"
         ); // fvk11 - only verify next block
-        require(
-            governance.isValidator(msg.sender),
-            "fvk12"
-        ); // fvk12 - not a validator in verify
+        governance.requireActiveValidator(msg.sender);
 
         require(
             verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment),
