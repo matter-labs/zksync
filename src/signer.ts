@@ -1,4 +1,4 @@
-import {curve} from "elliptic";
+import { curve } from "elliptic";
 import {
     privateKeyFromSeed,
     privateKeyToPublicKey,
@@ -6,12 +6,18 @@ import {
     serializePointPacked,
     signTransactionBytes
 } from "./crypto";
-import {utils} from "ethers";
-import {packAmountChecked, packFeeChecked} from "./utils";
+import { utils } from "ethers";
+import { packAmountChecked, packFeeChecked } from "./utils";
 import BN = require("bn.js");
-import {Signature, SyncAddress, SyncCloseAccount, SyncTransfer, SyncWithdraw} from "./types";
+import {
+    Signature,
+    SyncAddress,
+    SyncCloseAccount,
+    SyncTransfer,
+    SyncWithdraw
+} from "./types";
 
-const MAX_NUMBER_OF_TOKENS= 4096;
+const MAX_NUMBER_OF_TOKENS = 4096;
 
 export class SyncSigner {
     readonly privateKey: BN;
@@ -23,10 +29,16 @@ export class SyncSigner {
     }
 
     address(): SyncAddress {
-        return `0x${pubkeyToAddress(this.publicKey)}`
+        return `0x${pubkeyToAddress(this.publicKey).toString("hex")}`;
     }
 
-    signSyncTransfer(transfer: {to: SyncAddress, tokenId: number, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: number}): SyncTransfer {
+    signSyncTransfer(transfer: {
+        to: SyncAddress;
+        tokenId: number;
+        amount: utils.BigNumberish;
+        fee: utils.BigNumberish;
+        nonce: number;
+    }): SyncTransfer {
         const type = Buffer.from([5]); // tx type
         const from = serializeAddress(this.address());
         const to = serializeAddress(transfer.to);
@@ -34,22 +46,36 @@ export class SyncSigner {
         const amount = serializeAmountPacked(transfer.amount);
         const fee = serializeFeePacked(transfer.fee);
         const nonce = serializeNonce(transfer.nonce);
-        const msgBytes = Buffer.concat([type, from, to, token, amount, fee, nonce]);
+        const msgBytes = Buffer.concat([
+            type,
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            nonce
+        ]);
 
         const signature = signTransactionBytes(this.privateKey, msgBytes);
 
         return {
-          from: this.address(),
-          to: transfer.to,
-          token: transfer.tokenId,
-          amount: utils.bigNumberify(transfer.amount).toString(),
-          fee: utils.bigNumberify(transfer.fee).toString(),
-          nonce: transfer.nonce,
-          signature
+            from: this.address(),
+            to: transfer.to,
+            token: transfer.tokenId,
+            amount: utils.bigNumberify(transfer.amount).toString(),
+            fee: utils.bigNumberify(transfer.fee).toString(),
+            nonce: transfer.nonce,
+            signature
         };
     }
 
-    signSyncWithdraw(withdraw: {ethAddress: string, tokenId: number, amount: utils.BigNumberish, fee: utils.BigNumberish, nonce: number}): SyncWithdraw {
+    signSyncWithdraw(withdraw: {
+        ethAddress: string;
+        tokenId: number;
+        amount: utils.BigNumberish;
+        fee: utils.BigNumberish;
+        nonce: number;
+    }): SyncWithdraw {
         const typeBytes = Buffer.from([3]);
         const accountBytes = serializeAddress(this.address());
         const ethAddressBytes = serializeAddress(withdraw.ethAddress);
@@ -78,7 +104,7 @@ export class SyncSigner {
         };
     }
 
-    signSyncCloseAccount(close: {nonce: number}): SyncCloseAccount {
+    signSyncCloseAccount(close: { nonce: number }): SyncCloseAccount {
         const type = Buffer.from([4]);
         const account = serializeAddress(this.address());
         const nonce = serializeNonce(close.nonce);
@@ -93,22 +119,34 @@ export class SyncSigner {
         };
     }
 
-
-    signSyncEmergencyWithdraw(fullExit: {ethAddress: string, tokenId: number, nonce: number}): Buffer {
+    signSyncEmergencyWithdraw(fullExit: {
+        ethAddress: string;
+        tokenId: number;
+        nonce: number;
+    }): Buffer {
         const type = Buffer.from([6]);
         const packed_pubkey = serializePointPacked(this.publicKey);
         const eth_address = serializeAddress(fullExit.ethAddress);
         const token = serializeTokenId(fullExit.tokenId);
         const nonce = serializeNonce(fullExit.nonce);
-        const msg = Buffer.concat([type, packed_pubkey, eth_address, token, nonce]);
-        return Buffer.from(signTransactionBytes(this.privateKey, msg).signature, "hex");
+        const msg = Buffer.concat([
+            type,
+            packed_pubkey,
+            eth_address,
+            token,
+            nonce
+        ]);
+        return Buffer.from(
+            signTransactionBytes(this.privateKey, msg).signature,
+            "hex"
+        );
     }
 
     static fromPrivateKey(pk: BN): SyncSigner {
         return new SyncSigner(pk);
     }
 
-    static fromSeed(seed: Buffer) : SyncSigner {
+    static fromSeed(seed: Buffer): SyncSigner {
         return new SyncSigner(privateKeyFromSeed(seed));
     }
 }
@@ -123,7 +161,7 @@ function serializeAddress(address: SyncAddress | string): Buffer {
 }
 function serializeTokenId(tokenId: number): Buffer {
     if (tokenId < 0) {
-        throw new Error("Negative tokenId")
+        throw new Error("Negative tokenId");
     }
     if (tokenId >= MAX_NUMBER_OF_TOKENS) {
         throw new Error("TokenId is too big");

@@ -36,8 +36,7 @@
     "lint:ts": "tslint -c tslint.json {examples,test,src}/**/*.ts",
     "lint:ts-fix": "tslint -c tslint.json --fix {examples,test,src}/**/*.ts",
     "test": "mocha -r ts-node/register tests/**/*.test.ts",
-    "fmt": "prettier --parser typescript --write \"{src,tests,examples}/*.ts\"",
-    "build": "tsc",
-    "spec-test": "ts-node tests/spec-test.ts"
+    "fmt": "prettier --tab-width 4 --parser typescript --write \"{src,tests,examples}/*.ts\"",
+    "build": "tsc"
   }
 }

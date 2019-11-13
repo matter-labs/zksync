@@ -1,219 +1,273 @@
 import BN = require("bn.js");
 import {
-  privateKeyFromSeed,
-  privateKeyToPublicKey,
-  pubkeyToAddress,
-  serializePointPacked,
-  signTransactionBytes
+    privateKeyFromSeed,
+    privateKeyToPublicKey,
+    pubkeyToAddress,
+    serializePointPacked,
+    signTransactionBytes
 } from "./crypto";
 import { Contract, ContractTransaction, ethers, utils } from "ethers";
 import { curve } from "elliptic";
 import { SyncProvider } from "./provider";
-import {SyncSigner} from "./signer";
-import {SyncAccountState, SyncAddress, SyncWithdraw, Token} from "./types";
+import { SyncSigner } from "./signer";
+import { SyncAccountState, SyncAddress, SyncWithdraw, Token } from "./types";
 
 const IERC20ConractInterface = new utils.Interface(
-  require("../abi/IERC20.json").interface
+    require("../abi/IERC20.json").interface
 );
 const sidechainMainContractInterface = new utils.Interface(
-  require("../abi/SidechainMain.json").interface
+    require("../abi/SidechainMain.json").interface
 );
 const priorityQueueInterface = new utils.Interface(
-  require("../abi/PriorityQueue.json").interface
+    require("../abi/PriorityQueue.json").interface
 );
 
 export class Wallet {
-  constructor(public signer: SyncSigner, public provider: SyncProvider) {}
+    constructor(public signer: SyncSigner, public provider: SyncProvider) {}
 
-  async syncTransfer(
-    to: SyncAddress,
-    token: Token,
-    amount: utils.BigNumberish,
-    fee: utils.BigNumberish,
-    nonce: "commited" | number = "commited"
-  ): Promise<TransactionHandle> {
-    const tokenId = await this.provider.resolveTokenId(token);
-    const transaxtionData = {
-      to,
-      tokenId,
-      amount,
-      fee,
-      nonce: await this.getNonce(nonce)
-    };
-    const signedTransferTransaction = this.signer.signSyncTransfer(transaxtionData);
+    async syncTransfer(
+        to: SyncAddress,
+        token: Token,
+        amount: utils.BigNumberish,
+        fee: utils.BigNumberish,
+        nonce: "commited" | number = "commited"
+    ): Promise<TransactionHandle> {
+        const tokenId = await this.provider.resolveTokenId(token);
+        const transaxtionData = {
+            to,
+            tokenId,
+            amount,
+            fee,
+            nonce: await this.getNonce(nonce)
+        };
+        const signedTransferTransaction = this.signer.signSyncTransfer(
+            transaxtionData
+        );
 
-    const transactionHash = await this.provider.submitTx(signedTransferTransaction);
-    return new TransactionHandle(signedTransferTransaction, transactionHash, this.provider);
-  }
-
-  async withdrawTo(
-      ethAddress: string,
-      token: Token,
-      amount: utils.BigNumberish,
-      fee: utils.BigNumberish,
-      nonce: "commited" | number = "commited"
-  ): Promise<TransactionHandle> {
-    const tokenId = await this.provider.resolveTokenId(token);
-    const transactionData = {
-      ethAddress,
-      tokenId,
-      amount,
-      fee,
-      nonce: await this.getNonce(nonce)
-    };
-    const signedWithdrawTransaction = this.signer.signSyncWithdraw(transactionData);
-
-    const submitResponse = await this.provider.submitTx(signedWithdrawTransaction);
-    return new TransactionHandle(signedWithdrawTransaction, submitResponse, this.provider);
-  }
-
-  async close(nonce: "commited" | number = "commited"): Promise<TransactionHandle> {
-    const signerdCloseTransaction = this.signer.signSyncCloseAccount({nonce: await this.getNonce()});
-
-    const transactionHash = await this.provider.submitTx(signerdCloseTransaction);
-    return new TransactionHandle(signerdCloseTransaction, transactionHash, this.provider);
-  }
-
-  async getNonce(nonce: "commited" | number = "commited"): Promise<number> {
-    if (nonce == "commited") {
-      return (await this.provider.getState(this.signer.address())).commited.nonce;
-    } else if (typeof nonce == "number") {
-      return nonce;
+        const transactionHash = await this.provider.submitTx(
+            signedTransferTransaction
+        );
+        return new TransactionHandle(
+            signedTransferTransaction,
+            transactionHash,
+            this.provider
+        );
     }
-  }
 
-  address(): SyncAddress {
-    return this.signer.address();
-  }
+    async withdrawTo(
+        ethAddress: string,
+        token: Token,
+        amount: utils.BigNumberish,
+        fee: utils.BigNumberish,
+        nonce: "commited" | number = "commited"
+    ): Promise<TransactionHandle> {
+        const tokenId = await this.provider.resolveTokenId(token);
+        const transactionData = {
+            ethAddress,
+            tokenId,
+            amount,
+            fee,
+            nonce: await this.getNonce(nonce)
+        };
+        const signedWithdrawTransaction = this.signer.signSyncWithdraw(
+            transactionData
+        );
 
-  static async fromEthWallet(
-    ethWallet: ethers.Signer,
-    sidechainProvider: SyncProvider
-  ) {
-    const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
-    const seed = Buffer.from(seedHex, "hex");
-    let signer = SyncSigner.fromSeed(seed);
-    return new Wallet(signer, sidechainProvider);
-  }
+        const submitResponse = await this.provider.submitTx(
+            signedWithdrawTransaction
+        );
+        return new TransactionHandle(
+            signedWithdrawTransaction,
+            submitResponse,
+            this.provider
+        );
+    }
 
-  async getAccountState(): Promise<SyncAccountState> {
-    return this.provider.getState(this.signer.address());
-  }
+    async close(
+        nonce: "commited" | number = "commited"
+    ): Promise<TransactionHandle> {
+        const signerdCloseTransaction = this.signer.signSyncCloseAccount({
+            nonce: await this.getNonce()
+        });
+
+        const transactionHash = await this.provider.submitTx(
+            signerdCloseTransaction
+        );
+        return new TransactionHandle(
+            signerdCloseTransaction,
+            transactionHash,
+            this.provider
+        );
+    }
+
+    async getNonce(nonce: "commited" | number = "commited"): Promise<number> {
+        if (nonce == "commited") {
+            return (await this.provider.getState(this.signer.address()))
+                .commited.nonce;
+        } else if (typeof nonce == "number") {
+            return nonce;
+        }
+    }
+
+    address(): SyncAddress {
+        return this.signer.address();
+    }
+
+    static async fromEthWallet(
+        ethWallet: ethers.Signer,
+        sidechainProvider: SyncProvider
+    ) {
+        const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
+        const seed = Buffer.from(seedHex, "hex");
+        let signer = SyncSigner.fromSeed(seed);
+        return new Wallet(signer, sidechainProvider);
+    }
+
+    async getAccountState(): Promise<SyncAccountState> {
+        return this.provider.getState(this.signer.address());
+    }
+
+    async getBalance(
+        token: Token,
+        type: "commited" | "verified" = "commited"
+    ): Promise<utils.BigNumber> {
+        const accountState = await this.getAccountState();
+        let balance;
+        if (type == "commited") {
+            balance = accountState.commited.balances[token] || "0";
+        } else {
+            balance = accountState.verified.balances[token] || "0";
+        }
+        return utils.bigNumberify(balance);
+    }
 }
 
-export async function depositFromETH( depositFrom: ethers.Signer, depositTo: Wallet, token: Token, amount: utils.BigNumberish, maxFeeInETHCurrenty: utils.BigNumberish) {
-   const mainSidechainContract = new Contract(
-       depositTo.provider.contractAddress,
-       sidechainMainContractInterface,
-       depositFrom
-   );
+export async function depositFromETH(
+    depositFrom: ethers.Signer,
+    depositTo: Wallet,
+    token: Token,
+    amount: utils.BigNumberish,
+    maxFeeInETHCurrenty: utils.BigNumberish
+) {
+    const mainSidechainContract = new Contract(
+        depositTo.provider.contractAddress,
+        sidechainMainContractInterface,
+        depositFrom
+    );
 
-   let ethTransaction;
+    let ethTransaction;
 
-   if (token == "ETH") {
-     ethTransaction = mainSidechainContract.depositETH(amount, depositTo.address(), {
-       value: utils.bigNumberify(amount).add(maxFeeInETHCurrenty),
-       gasLimit: utils.bigNumberify("200000")
-     });
-   } else {
-     // ERC20 token deposit
-     const erc20contract = new Contract(
-         token,
-         IERC20ConractInterface,
-         depositFrom
-     );
-     const approveTx = await erc20contract.approve(
-         depositTo.provider.contractAddress,
-         amount
-     );
-     ethTransaction = await mainSidechainContract.depositERC20(
-         token,
-         amount,
-         depositTo.address(),
-         { gasLimit: utils.bigNumberify("250000"), value: maxFeeInETHCurrenty, nonce: (approveTx.nonce + 1) },
-     );
-   }
+    if (token == "ETH") {
+        ethTransaction = await mainSidechainContract.depositETH(
+            amount,
+            depositTo.address(),
+            {
+                value: utils.bigNumberify(amount).add(maxFeeInETHCurrenty),
+                gasLimit: utils.bigNumberify("200000")
+            }
+        );
+    } else {
+        // ERC20 token deposit
+        const erc20contract = new Contract(
+            token,
+            IERC20ConractInterface,
+            depositFrom
+        );
+        const approveTx = await erc20contract.approve(
+            depositTo.provider.contractAddress,
+            amount
+        );
+        ethTransaction = await mainSidechainContract.depositERC20(
+            token,
+            amount,
+            depositTo.address(),
+            {
+                gasLimit: utils.bigNumberify("250000"),
+                value: maxFeeInETHCurrenty,
+                nonce: approveTx.nonce + 1
+            }
+        );
+    }
 
-   return new DepositTransactionHandle(ethTransaction, depositTo.provider);
+    return new DepositTransactionHandle(ethTransaction, depositTo.provider);
 }
 
 class DepositTransactionHandle {
-  state: "Sent" | "Mined" | "Commited" | "Verified";
-  priorityOpId?: utils.BigNumber;
+    state: "Sent" | "Mined" | "Commited" | "Verified";
+    priorityOpId?: utils.BigNumber;
 
-  constructor(
-    public ethTx: ContractTransaction,
-    public sidechainProvider: SyncProvider
-  ) {
-    this.state = "Sent";
-  }
-
-  async waitTxMine() {
-    if (this.state != "Sent") return;
-
-    const txReceipt = await this.ethTx.wait();
-    for (const log of txReceipt.logs) {
-      const priorityQueueLog = priorityQueueInterface.parseLog(
-        txReceipt.logs[0]
-      );
-      if (priorityQueueLog) {
-        this.priorityOpId = priorityQueueLog.values.serialId;
-      }
-    }
-    if (!this.priorityOpId) {
-      throw new Error("Failed to parse tx logs");
+    constructor(
+        public ethTx: ContractTransaction,
+        public sidechainProvider: SyncProvider
+    ) {
+        this.state = "Sent";
     }
 
-    this.state = "Mined";
-  }
+    async waitTxMine() {
+        if (this.state != "Sent") return;
 
-  async waitCommit() {
-    await this.waitTxMine();
-    if (this.state != "Mined") return;
-    await this.sidechainProvider.notifyPriorityOp(
-      this.priorityOpId.toNumber(),
-      "COMMIT"
-    );
-    this.state = "Commited";
-  }
+        const txReceipt = await this.ethTx.wait();
+        for (const log of txReceipt.logs) {
+            const priorityQueueLog = priorityQueueInterface.parseLog(
+                txReceipt.logs[0]
+            );
+            if (priorityQueueLog) {
+                this.priorityOpId = priorityQueueLog.values.serialId;
+            }
+        }
+        if (!this.priorityOpId) {
+            throw new Error("Failed to parse tx logs");
+        }
 
-  async waitVerify() {
-    await this.waitCommit();
-    if (this.state != "Commited") return;
+        this.state = "Mined";
+    }
 
-    await this.sidechainProvider.notifyPriorityOp(
-      this.priorityOpId.toNumber(),
-      "VERIFY"
-    );
-    this.state = "Verified";
-  }
+    async waitCommit() {
+        await this.waitTxMine();
+        if (this.state != "Mined") return;
+        await this.sidechainProvider.notifyPriorityOp(
+            this.priorityOpId.toNumber(),
+            "COMMIT"
+        );
+        this.state = "Commited";
+    }
+
+    async waitVerify() {
+        await this.waitCommit();
+        if (this.state != "Commited") return;
+
+        await this.sidechainProvider.notifyPriorityOp(
+            this.priorityOpId.toNumber(),
+            "VERIFY"
+        );
+        this.state = "Verified";
+    }
 }
 
 class TransactionHandle {
-  state: "Sent" | "Commited" | "Verified";
+    state: "Sent" | "Commited" | "Verified";
 
-  constructor(
-    public txData,
-    public txHash: string,
-    public sidechainProvider: SyncProvider
-  ) {
-    this.state = "Sent";
-  }
+    constructor(
+        public txData,
+        public txHash: string,
+        public sidechainProvider: SyncProvider
+    ) {
+        this.state = "Sent";
+    }
 
-  async waitCommit() {
-    if (this.state !== "Sent") return;
+    async waitCommit() {
+        if (this.state !== "Sent") return;
 
-    await this.sidechainProvider.notifyTransaction(this.txHash, "COMMIT");
-    this.state = "Commited";
-  }
+        await this.sidechainProvider.notifyTransaction(this.txHash, "COMMIT");
+        this.state = "Commited";
+    }
 
-  async waitVerify() {
-    await this.waitCommit();
-    await this.sidechainProvider.notifyTransaction(this.txHash, "VERIFY");
-    this.state = "Verified";
-  }
+    async waitVerify() {
+        await this.waitCommit();
+        await this.sidechainProvider.notifyTransaction(this.txHash, "VERIFY");
+        this.state = "Verified";
+    }
 }
-
 
 // async emergencyWithdraw(token: Token, nonce: "commited" | number = "commited") {
 //   const tokenId = await this.provider.resolveTokenId(token);
