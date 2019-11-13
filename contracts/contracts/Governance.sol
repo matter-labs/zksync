@@ -3,32 +3,30 @@ pragma solidity ^0.5.8;
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./BlsOperations.sol";
 
+/// @title Governance Contract
+/// @author Matter Labs
 contract Governance {
 
-    // Token added to Franklin net
-    // Structure:
-    // - token - added token address
-    // - tokenId - added token id
+    /// @notice Token added to Franklin net
+    /// @member token Token address
+    /// @member tokenId Token id
     event TokenAdded(
         address token,
         uint16 tokenId
     );
 
-    // cToken added to Franklin net
-    // Structure:
-    // - cToken - added cToken address
-    // - token - corresponding token address
+    /// @notice cToken added to Franklin net
+    /// @member cToken cToken address
+    /// @member token Token id
     event cTokenAdded(
         address cToken,
-        address token
+        uint16 tokenId
     );
 
-    // Address which will excercise governance over the network
-    // i.e. add tokens, change validator set, conduct upgrades
+    /// @notice Address which will excercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
 
-    // Total number of ERC20 tokens registered in the network
-    // (excluding ETH, which is hardcoded as tokenId = 0)
+    /// @notice Total number of ERC20 tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
     uint16 public totalTokens;
 
     /// @notice validators count
@@ -40,8 +38,8 @@ contract Governance {
     /// @notice List of registered tokens by tokenId
     mapping(uint16 => address) public tokenAddresses;
 
-    /// @notice List of registered cTokens by corresponding token address
-    mapping(address => address) public cTokenAddresses;
+    /// @notice List of registered cTokens by corresponding token id
+    mapping(uint16 => address) public cTokenAddresses;
 
     /// @notice List of registered tokens by address
     mapping(address => uint16) public tokenIds;
@@ -68,86 +66,71 @@ contract Governance {
         BlsOperations.G2Point pubkey;
     }
 
-    constructor(address _networkGovernor)
-    public
-    {
+    /// @notice Construct Governance contract
+    /// @param _networkGovernor The address of governor
+    constructor(address _networkGovernor) external {
         networkGovernor = _networkGovernor;
     }
 
     /// @notice Fallback function
-    function()
-    external
-    payable
-    {
+    /// @dev Reverts all payments in Ether
+    function() external payable {
         revert("Cant accept ether in fallback function");
     }
 
-    // Change current governor
-    // _newGovernor - address of the new governor
-    function changeGovernor(address _newGovernor)
-    external
-    {
+    /// @notice Change current governor
+    /// @param _newGovernor Address of the new governor
+    function changeGovernor(address _newGovernor) external {
         requireGovernor();
         networkGovernor = _newGovernor;
     }
 
-    // Add token to the list of possible tokens
-    // Params:
-    // - _token - token address
-    function addToken(address _token)
-    external
-    {
+    /// @notice Add token to the list of possible tokens
+    /// @param _token Token address
+    function addToken(address _token) external {
         requireGovernor();
         require(
             tokenIds[_token] == 0,
-            "gan11"
-        ); // gan11 - token exists
+             "gean11"
+        ); // gean11 - token exists
         tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
         emit TokenAdded(_token, totalTokens);
     }
 
-    // Add cToken for token to the list of possible cTokens
-    // Params:
-    // - _token - token address
-    function addCToken(address _cToken,
-                       address _token)
-    external
-    {
+    /// @notice Add cToken for token to the list of possible cTokens
+    /// @param _cToken cToken address
+    /// @param _token Token address
+    function addCToken(address _cToken, uint16 _tokenId) external {
         requireGovernor();
         require(
-            tokenIds[_token] != 0,
-            "gan11"
-        ); // gan11 - token doenst exists
-        cTokenAddresses[_token] = _cToken;
-        emit cTokenAdded(_cToken, _token);
+            validateTokenId(_tokenId) != address(0),
+             "gean21"
+        ); // gean21 - token with specified id doenst exists
+        cTokenAddresses[_tokenId] = _cToken;
+        emit cTokenAdded(_cToken, _tokenId);
     }
 
-    function getCTokenAddress(uint16 _tokenId)
-    external
-    returns (address)
-    {
-        address tokenAddress = tokenAddresses[_tokenId];
-        return cTokenAddresses[tokenAddress];
+    /// @notice Returns cToken address for specified token
+    /// @param _tokenId Token id
+    function getCTokenAddress(uint16 _tokenId) external returns (address) {
+        return cTokenAddresses[_tokenId];
     }
 
     /// @notice Change validator status
     /// @dev Only governor can add new validator
     /// @param _address Validator address
     /// @param _active Active flag
-    function setValidatorStatus(address _address,
-                                bool _active)
-    external
-    {
+    function setValidatorStatus(address _address, bool _active) external {
         requireGovernor();
         require(
             validatorsInfo[_address].pubkey.x[0] != 0 &&
             validatorsInfo[_address].pubkey.x[1] != 0 &&
             validatorsInfo[_address].pubkey.y[0] != 0 &&
             validatorsInfo[_address].pubkey.y[1] != 0,
-            "ssar11"
-        ); // ssar11 - operator pubkey must exist
+            "gess11"
+        ); // gess11 - operator pubkey must exist
         validatorsInfo[_address].isActive = _active;
     }
 
@@ -158,18 +141,20 @@ contract Governance {
     /// @param _pbkxy Validator pubkey xy
     /// @param _pbkyx Validator pubkey yx
     /// @param _pbkyy Validator pubkey yy
-    function addValidator(address _address,
-                          uint256 _pbkxx,
-                          uint256 _pbkxy,
-                          uint256 _pbkyx,
-                          uint256 _pbkyy)
-    external
+    function addValidator(
+        address _address,
+        uint256 _pbkxx,
+        uint256 _pbkxy,
+        uint256 _pbkyx,
+        uint256 _pbkyy
+    )
+        external
     {
         requireGovernor();
         require(
             !validatorsInfo[_address].isActive,
-            "ssar11"
-        ); // ssar11 - operator exists
+            "gear11"
+        ); // gear11 - operator exists
         validatorsInfo[_address].isActive = true;
         validatorsInfo[_address].id = validatorsCount;
         validatorsInfo[_address].pubkey = BlsOperations.G2Point({
@@ -186,21 +171,19 @@ contract Governance {
         validatorsCount++;
     }
 
-    /// @notice Returns validators aggregated pubkey for specified validators bitmask
-    /// @param _validators Validators addresses
-    function getValidatorsAggrPubkey(uint16 _bitmask)
-    internal
-    view
-    returns (BlsOperations.G2Point memory aggrPubkey,
-             uint16 signersCount)
-    {
+    /// @notice Returns validators aggregated pubkey and their count for specified validators bitmask
+    /// @param _bitmask Validators bitmask
+    function getValidatorsAggrPubkey(uint16 _bitmask) internal view returns (
+        BlsOperations.G2Point memory aggrPubkey,
+        uint16 signersCount
+    ) {
         for(uint8 i = 0; i < validatorsCount; i++) {
             if( (bitmask >> i) & 1 > 0 ) {
                 address addr = validators[i];
                 require(
                     validatorsInfo[addr].isActive,
-                    "sst011"
-                ); // sst011 - not active validator
+                    "gegy11"
+                ); // gegy11 - not active validator
                 BlsOperations.G2Point memory pubkey = validatorsInfo[addr].pubkey;
                 aggrPubkey = BlsOperations.addG2(aggrPubkey, pubkey);
                 signersCount++;
@@ -208,78 +191,73 @@ contract Governance {
         }
     }
 
-    function verifySenderAndBlsSignature(address _sender,
-                                         uint256 _aggrSignatureX,
-                                         uint256 _aggrSignatureY,
-                                         uint256 _signersBitmask,
-                                         uint256 _messageHash)
-    external
-    view
-    returns (bool result)
+    /// @notice Verifies sender presence in bitmask and aggregated signature
+    /// @param _sender Sender of the request
+    /// @param _aggrSignatureX Aggregated signature X
+    /// @param _aggrSignatureY Aggregated signature Y
+    /// @param _signersBitmask Signers bitmask
+    /// @param _messageHash Message hash
+    function verifySenderAndBlsSignature(
+        address _sender,
+        uint256 _aggrSignatureX,
+        uint256 _aggrSignatureY,
+        uint256 _signersBitmask,
+        uint256 _messageHash
+    )
+        external
+        view
+        returns (bool result)
     {
         uint16 validatorId = validatorsInfo[_sender].id;
         require(
             (_signersBitmask >> validatorId) & 1 > 0,
-            "sst011"
-        ); // sst011 - sender is not in validators bitmask
+            "geve11"
+        ); // geve11 - sender is not in validators bitmask
         BlsOperations.G1Point memory signature = BlsOperations.G1Point(_aggrSignatureX, _aggrSignatureY);
         BlsOperations.G1Point memory mpoint = BlsOperations.messageHashToG1(_messageHash);
         (BlsOperations.G2Point memory aggrPubkey, uint16 signersCount) = getValidatorsAggrPubkey(_signersBitmask);
         require(
             signersCount >= 2 * validatorsCount / 3,
-            "sst011"
-        ); // sst011 - not enouth validators count
+            "geve12"
+        ); // geve12 - not enouth validators count
         return BlsOperations.pairing(mpoint, aggrPubkey, signature, BlsOperations.negate(BlsOperations.generatorG2()));
     }
 
-    // Validate token address
-    function validateTokenAddress(address _tokenAddr)
-    public
-    view
-    returns (uint16)
-    {
+    /// @notice Validate token address and returns its id
+    /// @param _tokenAddr Token address
+    function validateTokenAddress(address _tokenAddr) public view returns (uint16) {
         uint16 tokenId = tokenIds[_tokenAddr];
         require(
             tokenAddresses[tokenId] == _tokenAddr,
-            "gvs11"
-        ); // gvs11 - unknown ERC20 token address
+             "gevs11"
+        ); // gevs11 - unknown ERC20 token address
         return tokenId;
     }
 
-    // Validate token id
-    function validateTokenId(uint16 _tokenId)
-    public
-    view
-    returns (address)
-    {
+    /// @notice Validate token id and returns its address
+    /// @param _tokenId Token id
+    function validateTokenId(uint16 _tokenId) public view returns (address) {
         uint16 tokenAddr = tokenAddresses[_tokenId];
         require(
             tokenIds[tokenAddr] == _tokenId,
-            "gvs11"
-        ); // gvs11 - unknown ERC20 token id
+             "gevs11"
+        ); // gevs11 - unknown ERC20 token id
         return tokenAddr;
     }
 
-    // Check if the sender is governor
-    function requireGovernor()
-    public
-    view
-    {
+    /// @notice Check if the sender is governor
+    function requireGovernor() public view {
         require(
             msg.sender == networkGovernor,
-            "grr11"
-        ); // grr11 - only by governor
+             "gerr11"
+        ); // gerr11 - only by governor
     }
     
     /// @notice Gets allowed withdraw amount for validator
     /// @dev Requires validators' existance
     /// @param _address Validator address
     /// @param _tokenId Token id
-    function getAllowedWithdrawAmount(address _address,
-                                      uint16 _tokenId)
-    public
-    returns (uint256)
-    {
+    function getAllowedWithdrawAmount(address _address, uint16 _tokenId) public returns (uint256) {
         uint256 supply = funds[_tokenId];
         uint256 balance = validatorsBalances[_address][_tokenId];
         if (supply >= balance) {
@@ -290,76 +268,73 @@ contract Governance {
     }
 
     /// @notice Withdraws specified amount from validators supply
-    /// @dev Requires validators' existance and allowed amount is >= specified amount, which should not be equal to 0
+    /// @dev Requires allowed amount is >= specified amount, which should be > 0
     /// @param _tokenAddress Token address
     /// @param _amount Specified amount
-    function withdraw(address _tokenAddress,
-                      uint256 _amount)
-    external
-    {
+    function withdraw(address _tokenAddress, uint256 _amount) external {
         require(
             _amount > 0,
-            "ssir11"
-        ); // ssir11 - amount must be > 0
+            "geww11"
+        ); // geww11 - amount must be > 0
         address tokenId = validateTokenAddress(_tokenAddress);
         require(
             getAllowedWithdrawAmount(msg.sender, tokenId) >= _amount,
-            "sswr11"
-        ); // sswr11 - wrong amount - higher than allowed
+            "geww12"
+        ); // geww12 - wrong amount - higher than allowed
         if (tokenId == 0) {
             msg.sender.transfer(_amount); // transfer ether
         } else {
             require(
                 IERC20(_tokenAddress).transfer(msg.sender, _amount),
-                "sstt11"
-            ); // sstt11 - token transfer out failed
+                "geww13"
+            ); // geww13 - token transfer out failed
         }
         funds[tokenId] -= _amount;
         validatorsBalances[msg.sender][tokenId] -= _amount;
     }
-    /// @notice Supplies specified amount of ERC20 tokens from validator
-    /// @dev Calls transferIn function of specified token and fulfillDefferedWithdrawOrders to fulfill deffered withdraw orders
-    /// @param _tokenAddress Token address
+
+    /// @notice Supplies specified amount of ERC20 tokens to validator balance
+    /// @param _tokenId Token id
     /// @param _amount Token amount
-    function supplyErc20(uint16 _tokenId,
-                         uint256 _amount,
-                         address _validator)
-    external
+    /// @param _validator Validator address
+    function supplyErc20(
+        uint16 _tokenId,
+        uint256 _amount,
+        address _validator
+    )
+        external
     {
         address tokenAddress = validateTokenId(_tokenId);
         require(
             IERC20(tokenAddress).transferFrom(msg.sender, address(this), _amount),
-            "sst011"
-        ); // sst011 - token transfer in failed
+            "get011"
+        ); // get011 - token transfer in failed
         funds[tokenId] += _amount;
         validatorsBalances[_validator][tokenId] += _amount;
     }
 
-    /// @notice Function to accept ether payments
-    function supplyEther(address _validator)
-    external
-    payable
-    {
+    /// @notice Supplies specified amount of Ether tokens to validator balance
+    /// @param _validator Validator address
+    function supplyEther(address _validator) external payable {
         funds[0] += msg.value;
         validatorsBalances[_validator][0] += _amount;
     }
 
-    function setTrustedAddress(address _address)
-    external
-    {
+    /// @notice Set new trusted address
+    /// @param _address Trusted address
+    function setTrustedAddress(address _address) external {
         requireGovernor();
         trustedAddresses[_address] = true;
     }
 
-    function borrowToTrustedAddress(uint16 _tokenId,
-                                    uint256 _amount)
-    external
-    returns(uint16 suppliersCount)
-    {
+    /// @notice Borrows validators funds to trusted address and returns suppliers count
+    /// @param _tokenId Token id
+    /// @param _amount Token amount
+    function borrowToTrustedAddress(uint16 _tokenId, uint256 _amount) external returns(uint16 suppliersCount) {
         require(
             trustedAddresses[msg.sender],
-            "grr11"
-        ); // grr11 - not trusted address
+             "gerr11"
+        ); // gerr11 - not trusted address
 
         address tokenAddress = validateTokenId(_tokenId);
 
@@ -372,8 +347,8 @@ contract Governance {
         } else {
             require(
                 IERC20(tokenAddress).transfer(swiftExits, _amount),
-                "sstt11"
-            ); // sstt11 - token transfer out failed
+                "gett11"
+            ); // gett11 - token transfer out failed
         }
 
         for(uint16 i = 0; i < validatorsCount; i++) {
@@ -383,25 +358,29 @@ contract Governance {
         return validatorsCount;
     }
 
-    /// @notice Transfers specified amount of ERC20 token into contract
-    /// @param _tokenAddress ERC20 token address
-    /// @param _amount Amount in ERC20 tokens
-    function repayInErc20(uint16 _tokenId,
-                          uint256 _amount,
-                          uint16 _validatorsCount,
-                          uint16 _excludedValidatorsBitmask)
-    external
+    /// @notice Repays specified amount of ERC20 token into contract
+    /// @param _tokenId Token id
+    /// @param _amount Token aount
+    /// @param _validatorsCount Suppliers
+    /// @param _excludedValidatorsBitmask Excluded validators bitmask
+    function repayInErc20(
+        uint16 _tokenId,
+        uint256 _amount,
+        uint16 _validatorsCount,
+        uint16 _excludedValidatorsBitmask
+    )
+        external
     {
         require(
             trustedAddresses[msg.sender],
-            "grr11"
-        ); // grr11 - not trusted address
+             "gerr11"
+        ); // gerr11 - not trusted address
 
         address tokenAddress = validateTokenId(_tokenId);
         require(
             IERC20(tokenAddress).transferFrom(msg.sender, address(this), _amount),
-            "sst011"
-        ); // sst011 - token transfer in failed
+            "get011"
+        ); // get011 - token transfer in failed
 
         for(uint8 i = 0; i < _validatorsCount; i++) {
             if( (_excludedValidatorsBitmask >> i) & 1 == 0 ) {
@@ -411,17 +390,14 @@ contract Governance {
         funds[_tokenId] += _amount;
     }
 
-    /// @notice Transfers specified amount of ERC20 token into contract
-    /// @param _amount Amount in ERC20 tokens
-    function repayInEther(uint16 _validatorsCount,
-                          uint16 _excludedValidatorsBitmask)
-    external
-    payable
-    {
+    /// @notice Repays specified amount of Ether token into contract
+    /// @param _validatorsCount Suppliers
+    /// @param _excludedValidatorsBitmask Excluded validators bitmask
+    function repayInEther(uint16 _validatorsCount, uint16 _excludedValidatorsBitmask) external payable {
         require(
             trustedAddresses[msg.sender],
-            "grr11"
-        ); // grr11 - not trusted address
+             "gerr11"
+        ); // gerr11 - not trusted address
 
         for(uint8 i = 0; i < _validatorsCount; i++) {
             if( (_excludedValidatorsBitmask >> i) & 1 == 0 ) {
