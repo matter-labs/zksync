@@ -55,11 +55,8 @@ fn main() {
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for committer");
-    let contract_addr = storage
-        .load_config()
-        .expect("can not load server_config")
-        .contract_addr
-        .expect("contract_addr empty in server_config");
+    let server_config = storage.load_config().expect("can not load server_config");
+    let contract_addr = server_config.contract_addr.expect("server config is empty");
     if contract_addr != config::RUNTIME_CONFIG.contract_addr {
         panic!(
             "Contract addresses mismatch! From DB = {}, from env = {}",

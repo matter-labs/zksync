@@ -1,6 +1,6 @@
 import {deployContract} from 'ethereum-waffle';
 import {ethers} from 'ethers';
-import {bigNumberify} from "ethers/utils";
+import {bigNumberify, parseEther} from "ethers/utils";
 import Axios from "axios";
 const qs = require('querystring');
 
@@ -123,9 +123,9 @@ export async function postContractToTesseracts(contractCode, contractName: strin
 export async function addTestERC20Token(wallet, governance) {
     try {
         let erc20 = await deployContract(wallet, ERC20MintableContract, []);
-        await erc20.mint(wallet.address, bigNumberify("1000000000"));
+        await erc20.mint(wallet.address, parseEther("3000000000"));
         console.log("TEST_ERC20=" + erc20.address);
-        // await (await governance.addToken(erc20.address)).wait();
+        await (await governance.addToken(erc20.address)).wait();
         return erc20
     } catch (err) {
         console.log("Add token error:" + err);

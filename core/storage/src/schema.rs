@@ -167,6 +167,7 @@ table! {
     server_config (id) {
         id -> Bool,
         contract_addr -> Nullable<Text>,
+        gov_contract_addr -> Nullable<Text>,
     }
 }
 

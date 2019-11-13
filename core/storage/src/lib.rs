@@ -481,6 +481,7 @@ pub struct IntegerNumber {
 pub struct ServerConfig {
     pub id: bool,
     pub contract_addr: Option<String>,
+    pub gov_contract_addr: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, QueryableByName)]

@@ -4,7 +4,8 @@
 FRANKLIN_ENV=
 . .setup_env
 
-psql "$DATABASE_URL" -c "INSERT INTO server_config (contract_addr) \
-                         VALUES ('$CONTRACT_ADDR') \
-                         ON CONFLICT (id) DO UPDATE SET contract_addr = '$CONTRACT_ADDR'" || exit 1
+psql "$DATABASE_URL" -c "INSERT INTO server_config (contract_addr, gov_contract_addr) \
+                         VALUES ('$CONTRACT_ADDR', '$GOVERNANCE_ADDR') \
+                         ON CONFLICT (id) DO UPDATE  \
+                         SET (contract_addr, gov_contract_addr) = ('$CONTRACT_ADDR', '$GOVERNANCE_ADDR')" || exit 1
 echo "successfully inserted contract address into the database"

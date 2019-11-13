@@ -314,6 +314,9 @@ contract Franklin {
 
         requireActive();
 
+        // Get token id by its address
+        uint16 tokenId = governance.validateTokenAddress(_token);
+
         require(
             msg.value >= fee,
             "fd011"
@@ -324,9 +327,6 @@ contract Franklin {
             "fd012"
         ); // fd012 - token transfer failed deposit
 
-        // Get token id by its address
-        uint16 tokenId = governance.validateTokenAddress(_token);
-        
         registerDeposit(tokenId, _amount, fee, _franklinAddr);
 
         if (msg.value != fee) {

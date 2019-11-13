@@ -43,7 +43,7 @@ contract Governance {
     // Add token to the list of possible tokens
     // Params:
     // - _token - token address
-    function addToken(address _token) internal {
+    function addToken(address _token) external {
         require(
             tokenIds[_token] == 0,
             "gan11"
@@ -82,15 +82,6 @@ contract Governance {
             _tokenId < totalTokens + 1,
             "grd11"
         ); // grd11 - unknown token id
-    }
-
-    function getOrCreateToken(address _tokenAddress) external returns (uint16)   {
-        uint16 tokenId = tokenIds[_tokenAddress];
-        if (tokenAddresses[tokenId] == _tokenAddress) {
-            // Token does not exist
-            addToken(_tokenAddress);
-        }
-        return tokenIds[_tokenAddress];
     }
 
     // Validate token address

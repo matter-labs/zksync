@@ -40,6 +40,7 @@ impl ResponseAccountState {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountInfoResp {
     address: AccountAddress,
     id: Option<AccountId>,
@@ -48,6 +49,7 @@ pub struct AccountInfoResp {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct BlockInfo {
     pub block_number: i64,
     pub commited: bool,
@@ -55,6 +57,7 @@ pub struct BlockInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct TransactionInfoResp {
     pub executed: bool,
     pub success: Option<bool>,
@@ -63,9 +66,17 @@ pub struct TransactionInfoResp {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
 pub struct ETHOpInfoResp {
     pub executed: bool,
     pub block: Option<BlockInfo>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct ContractAddressResp {
+    pub main_contract: String,
+    pub gov_contract: String,
 }
 
 #[rpc]
@@ -79,7 +90,7 @@ pub trait Rpc {
     #[rpc(name = "tx_submit")]
     fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash>;
     #[rpc(name = "contract_address")]
-    fn contract_address(&self) -> Result<String>;
+    fn contract_address(&self) -> Result<ContractAddressResp>;
 }
 
 pub struct RpcApp {
@@ -200,15 +211,14 @@ impl Rpc for RpcApp {
         })
     }
 
-    fn contract_address(&self) -> Result<String> {
+    fn contract_address(&self) -> Result<ContractAddressResp> {
         let storage = self.access_storage()?;
-        let contract_address = storage
-            .load_config()
-            .map_err(|_| Error::internal_error())?
-            .contract_addr
-            .expect("contract_addr missing");
+        let config = storage.load_config().map_err(|_| Error::internal_error())?;
 
-        Ok(contract_address)
+        Ok(ContractAddressResp {
+            main_contract: config.contract_addr.expect("server config"),
+            gov_contract: config.gov_contract_addr.expect("server config"),
+        })
     }
 }
 
