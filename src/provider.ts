@@ -1,9 +1,18 @@
 import { AbstractTransport, HTTPTransport, WSTransport } from "./transport";
-import { utils } from "ethers";
+import { utils, ethers, Contract } from "ethers";
 import { SyncAccountState, SyncAddress, Token } from "./types";
 
+const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(
+    require("../abi/SyncGov.json").interface
+);
+
+export interface ContractAddress {
+    mainContract: string;
+    govContract: string;
+}
+
 export class SyncProvider {
-    contractAddress: string;
+    contractAddress: ContractAddress;
     private constructor(public transport: AbstractTransport) {}
 
     static async newWebsocketProvider(
@@ -29,7 +38,7 @@ export class SyncProvider {
         return await this.transport.request("tx_submit", [tx]);
     }
 
-    async getContractAddress(): Promise<string> {
+    async getContractAddress(): Promise<ContractAddress> {
         return await this.transport.request("contract_address", null);
     }
 
@@ -73,12 +82,30 @@ export class SyncProvider {
             );
         });
     }
+}
+
+export class ETHProxy {
+    constructor(
+        private ethersProvider: ethers.providers.Provider,
+        private contractAddress: ContractAddress
+    ) {}
 
     async resolveTokenId(token: Token): Promise<number> {
         if (token == "ETH") {
             return 0;
         } else {
-            throw new Error("unimplemented erc20");
+            const syncContract = new Contract(
+                this.contractAddress.govContract,
+                SYNC_GOV_CONTRACT_INTERFACE,
+                this.ethersProvider
+            );
+            let tokenId = await syncContract.tokenIds(token);
+            if (tokenId == 0) {
+                throw new Error(
+                    `ERC20 token is not supported address: ${token}`
+                );
+            }
+            return tokenId;
         }
     }
 }

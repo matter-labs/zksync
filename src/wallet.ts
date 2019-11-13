@@ -8,7 +8,7 @@ import {
 } from "./crypto";
 import { Contract, ContractTransaction, ethers, utils } from "ethers";
 import { curve } from "elliptic";
-import { SyncProvider } from "./provider";
+import { ETHProxy, SyncProvider } from "./provider";
 import { SyncSigner } from "./signer";
 import { SyncAccountState, SyncAddress, SyncWithdraw, Token } from "./types";
 
@@ -16,14 +16,18 @@ const IERC20ConractInterface = new utils.Interface(
     require("../abi/IERC20.json").interface
 );
 const sidechainMainContractInterface = new utils.Interface(
-    require("../abi/SidechainMain.json").interface
+    require("../abi/SyncMain.json").interface
 );
 const priorityQueueInterface = new utils.Interface(
-    require("../abi/PriorityQueue.json").interface
+    require("../abi/SyncPriorityQueue.json").interface
 );
 
 export class Wallet {
-    constructor(public signer: SyncSigner, public provider: SyncProvider) {}
+    constructor(
+        public signer: SyncSigner,
+        public provider: SyncProvider,
+        public ethProxy: ETHProxy
+    ) {}
 
     async syncTransfer(
         to: SyncAddress,
@@ -32,7 +36,7 @@ export class Wallet {
         fee: utils.BigNumberish,
         nonce: "commited" | number = "commited"
     ): Promise<TransactionHandle> {
-        const tokenId = await this.provider.resolveTokenId(token);
+        const tokenId = await this.ethProxy.resolveTokenId(token);
         const transaxtionData = {
             to,
             tokenId,
@@ -61,7 +65,7 @@ export class Wallet {
         fee: utils.BigNumberish,
         nonce: "commited" | number = "commited"
     ): Promise<TransactionHandle> {
-        const tokenId = await this.provider.resolveTokenId(token);
+        const tokenId = await this.ethProxy.resolveTokenId(token);
         const transactionData = {
             ethAddress,
             tokenId,
@@ -115,12 +119,13 @@ export class Wallet {
 
     static async fromEthWallet(
         ethWallet: ethers.Signer,
-        sidechainProvider: SyncProvider
+        sidechainProvider: SyncProvider,
+        ethProxy: ETHProxy
     ) {
         const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
         const seed = Buffer.from(seedHex, "hex");
         const signer = SyncSigner.fromSeed(seed);
-        return new Wallet(signer, sidechainProvider);
+        return new Wallet(signer, sidechainProvider, ethProxy);
     }
 
     async getAccountState(): Promise<SyncAccountState> {
@@ -132,6 +137,9 @@ export class Wallet {
         type: "commited" | "verified" = "commited"
     ): Promise<utils.BigNumber> {
         const accountState = await this.getAccountState();
+        if (token != "ETH") {
+            token = token.toLowerCase();
+        }
         let balance;
         if (type == "commited") {
             balance = accountState.commited.balances[token] || "0";
@@ -150,7 +158,7 @@ export async function depositFromETH(
     maxFeeInETHCurrenty: utils.BigNumberish
 ) {
     const mainSidechainContract = new Contract(
-        depositTo.provider.contractAddress,
+        depositTo.provider.contractAddress.mainContract,
         sidechainMainContractInterface,
         depositFrom
     );
@@ -174,7 +182,7 @@ export async function depositFromETH(
             depositFrom
         );
         const approveTx = await erc20contract.approve(
-            depositTo.provider.contractAddress,
+            depositTo.provider.contractAddress.mainContract,
             amount
         );
         ethTransaction = await mainSidechainContract.depositERC20(
@@ -208,9 +216,7 @@ class DepositTransactionHandle {
 
         const txReceipt = await this.ethTx.wait();
         for (const log of txReceipt.logs) {
-            const priorityQueueLog = priorityQueueInterface.parseLog(
-                txReceipt.logs[0]
-            );
+            const priorityQueueLog = priorityQueueInterface.parseLog(log);
             if (priorityQueueLog) {
                 this.priorityOpId = priorityQueueLog.values.serialId;
             }
@@ -293,36 +299,4 @@ class TransactionHandle {
 //       }
 //   );
 //   return tx.hash;
-// }
-
-// async getETHBalances(): Promise<ETHAccountState> {
-//   const tokens = this.provider.sideChainInfo.tokens;
-//   const onchainBalances = new Array<utils.BigNumber>(tokens.length);
-//   const contractBalances = new Array<utils.BigNumber>(tokens.length);
-//
-//   const sidechainMainContract = new Contract(
-//     this.provider.sideChainInfo.contract_address,
-//     sidechainMainContractInterface,
-//     this.ethWallet
-//   );
-//   const ethAddress = await this.ethWallet.getAddress();
-//   for (const token of tokens) {
-//     if (token.id == 0) {
-//       onchainBalances[token.id] = await this.ethWallet.provider.getBalance(
-//         ethAddress
-//       );
-//     } else {
-//       const erc20token = new Contract(
-//         token.address,
-//         IERC20ConractInterface,
-//         this.ethWallet
-//       );
-//       onchainBalances[token.id] = await erc20token.balanceOf(ethAddress);
-//     }
-//     contractBalances[
-//       token.id
-//     ] = await sidechainMainContract.balancesToWithdraw(ethAddress, token.id);
-//   }
-//
-//   return { onchainBalances, contractBalances };
 // }
