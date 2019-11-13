@@ -47,7 +47,7 @@ contract Governance {
     mapping(address => uint16) public tokenIds;
 
     /// @notice Validators addresses list
-    mapping(uint256 => address) public validators;
+    mapping(uint16 => address) public validators;
 
     /// @notice Each validators' info
     mapping(address => ValidatorInfo) public validatorsInfo;
@@ -64,7 +64,7 @@ contract Governance {
     /// @member pubkey Validators' pubkey
     struct ValidatorInfo {
         bool isActive;
-        uint256 id;
+        uint16 id;
         BlsOperations.G2Point pubkey;
     }
 
@@ -188,13 +188,13 @@ contract Governance {
 
     /// @notice Returns validators aggregated pubkey for specified validators bitmask
     /// @param _validators Validators addresses
-    function getValidatorsAggrPubkey(uint256 _bitmask)
+    function getValidatorsAggrPubkey(uint16 _bitmask)
     internal
     view
     returns (BlsOperations.G2Point memory aggrPubkey,
-             uint256 signersCount)
+             uint16 signersCount)
     {
-        for(uint8 i = 0; i < 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; i++) {
+        for(uint8 i = 0; i < validatorsCount; i++) {
             if( (bitmask >> i) & 1 > 0 ) {
                 address addr = validators[i];
                 require(
@@ -208,35 +208,33 @@ contract Governance {
         }
     }
 
-    function verifySenderAndBlsSignature(uint256 _sender,
+    function verifySenderAndBlsSignature(address _sender,
                                          uint256 _aggrSignatureX,
                                          uint256 _aggrSignatureY,
                                          uint256 _signersBitmask,
                                          uint256 _messageHash)
     external
     view
-    returns (uint256 signersCount,
-             bool result)
+    returns (bool result)
     {
-        uint256 validatorId = validatorsInfo[_sender].id;
+        uint16 validatorId = validatorsInfo[_sender].id;
         require(
             (_signersBitmask >> validatorId) & 1 > 0,
             "sst011"
         ); // sst011 - sender is not in validators bitmask
         BlsOperations.G1Point memory signature = BlsOperations.G1Point(_aggrSignatureX, _aggrSignatureY);
         BlsOperations.G1Point memory mpoint = BlsOperations.messageHashToG1(_messageHash);
-        (BlsOperations.G2Point memory aggrPubkey, uint256 signersCount) = getValidatorsAggrPubkey(_signersBitmask);
+        (BlsOperations.G2Point memory aggrPubkey, uint16 signersCount) = getValidatorsAggrPubkey(_signersBitmask);
         require(
             signersCount >= 2 * validatorsCount / 3,
             "sst011"
         ); // sst011 - not enouth validators count
-        bool result = BlsOperations.pairing(mpoint, aggrPubkey, signature, BlsOperations.negate(BlsOperations.generatorG2()));
-        return (signersCount, result);
+        return BlsOperations.pairing(mpoint, aggrPubkey, signature, BlsOperations.negate(BlsOperations.generatorG2()));
     }
 
     // Validate token address
     function validateTokenAddress(address _tokenAddr)
-    external
+    public
     view
     returns (uint16)
     {
@@ -250,7 +248,7 @@ contract Governance {
 
     // Validate token id
     function validateTokenId(uint16 _tokenId)
-    external
+    public
     view
     returns (address)
     {
@@ -264,7 +262,7 @@ contract Governance {
 
     // Check if the sender is governor
     function requireGovernor()
-    internal
+    public
     view
     {
         require(
@@ -333,8 +331,8 @@ contract Governance {
             IERC20(tokenAddress).transferFrom(msg.sender, address(this), _amount),
             "sst011"
         ); // sst011 - token transfer in failed
-        funds[tokenId] = funds[tokenId].add(_amount);
-        validatorsBalances[_validator][tokenId] = validatorsBalances[_validator][tokenId].add(_amount);
+        funds[tokenId] += _amount;
+        validatorsBalances[_validator][tokenId] += _amount;
     }
 
     /// @notice Function to accept ether payments
@@ -342,8 +340,8 @@ contract Governance {
     external
     payable
     {
-        funds[0] = funds[0].add(msg.value);
-        validatorsBalances[_validator][0] = validatorsBalances[_validator][0].add(_amount);
+        funds[0] += msg.value;
+        validatorsBalances[_validator][0] += _amount;
     }
 
     function setTrustedAddress(address _address)
@@ -356,16 +354,18 @@ contract Governance {
     function borrowToTrustedAddress(uint16 _tokenId,
                                     uint256 _amount)
     external
-    returns(bool result)
+    returns(uint16 suppliersCount)
     {
-        address tokenAddress = validateTokenId(_tokenId);
         require(
             trustedAddresses[msg.sender],
             "grr11"
         ); // grr11 - not trusted address
+
+        address tokenAddress = validateTokenId(_tokenId);
+
         uint256 supply = funds[_tokenId];
         if (supply < _amount) {
-            return false;
+            return 0;
         }
         if (_tokenId == 0) {
             msg.sender.transfer(_amount);
@@ -375,42 +375,59 @@ contract Governance {
                 "sstt11"
             ); // sstt11 - token transfer out failed
         }
+
+        for(uint16 i = 0; i < validatorsCount; i++) {
+            validatorsBalances[validators[i]][_tokenId] -= _amount * validatorsBalances[validators[i]][_tokenId] / funds[_tokenId];
+        }
         funds[_tokenId] -= _amount;
-        return true;
+        return validatorsCount;
     }
 
     /// @notice Transfers specified amount of ERC20 token into contract
     /// @param _tokenAddress ERC20 token address
     /// @param _amount Amount in ERC20 tokens
-    function repayBorrowInERC20(uint16 _tokenId,
-                                uint256 _amount)
+    function repayInERC20(uint16 _tokenId,
+                          uint256 _amount,
+                          uint16 _validatorsCount,
+                          uint16 _excludedValidatorsBitmask)
     external
     {
+        require(
+            trustedAddresses[msg.sender],
+            "grr11"
+        ); // grr11 - not trusted address
+
         address tokenAddress = validateTokenId(_tokenId);
         require(
             IERC20(tokenAddress).transferFrom(msg.sender, address(this), _amount),
             "sst011"
         ); // sst011 - token transfer in failed
-        funds[_tokenId] = funds[_tokenId].add(_amount);
+
+        for(uint8 i = 0; i < _validatorsCount; i++) {
+            if( (_excludedValidatorsBitmask >> i) & 1 == 0 ) {
+                validatorsBalances[validators[i]][_tokenId] += _amount * validatorsBalances[validators[i]][_tokenId] / funds[_tokenId];
+            }
+        }
+        funds[_tokenId] += _amount;
     }
 
     /// @notice Transfers specified amount of ERC20 token into contract
     /// @param _amount Amount in ERC20 tokens
-    function repayBorrowInEther()
+    function repayInEther(uint16 _validatorsCount,
+                          uint16 _excludedValidatorsBitmask)
     external
     payable
     {
-        funds[0] = funds[0].add(_amount);
-    }
+        require(
+            trustedAddresses[msg.sender],
+            "grr11"
+        ); // grr11 - not trusted address
 
-    /// @notice Transfers specified amount of ERC20 token into contract
-    /// @param _amount Amount in ERC20 tokens
-    function punishValidator(address _validator,
-                             uint16 _tokenId,
-                             uint256 _amount)
-    external
-    payable
-    {
-        validatorsBalances[_validator][_tokenId] -= _amount;
+        for(uint8 i = 0; i < _validatorsCount; i++) {
+            if( (_excludedValidatorsBitmask >> i) & 1 == 0 ) {
+                validatorsBalances[validators[i]][0] += _amount * validatorsBalances[validators[i]][0] / funds[0];
+            }
+        }
+        funds[0] += _amount;
     }
 }

@@ -7,17 +7,17 @@ import "compound-protocol/contracts/Unitroller.sol";
 
 import "./Governance.sol";
 import "./Franklin.sol";
-import "./SafeMath.sol";
 
 /// @title Swift Exits Contract
 /// @notice Consensus version
 /// @author Matter Labs
 contract SwiftExits is BlsVerifier {
-    
-    using SafeMath for uint256;
 
     /// @notice Validators fee coeff
     uint256 constant VALIDATORS_FEE_COEFF = 5;
+
+    /// @notice Borrowing from validators coeff
+    uint256 constant BORROWING_COEFF = 3;
 
     /// @notice Matter token id
     uint256 internal matterTokenId;
@@ -62,8 +62,8 @@ contract SwiftExits is BlsVerifier {
         uint256 creationCost;
         uint256 validatorsFee;
         address validatorSender;
-        uint256 signersBitmask;
-        uint256 signersCount;
+        uint16 signersBitmask;
+        uint16 suppliersCount;
         uint16 supplyTokenId;
         uint256 supplyAmount;
     }
@@ -124,7 +124,7 @@ contract SwiftExits is BlsVerifier {
     function addSwiftExit(bytes memory _swiftExit,
                           uint256 _aggrSignatureX,
                           uint256 _aggrSignatureY,
-                          uint256 _signersBitmask)
+                          uint16 _signersBitmask)
     external
     {
         // Swift Exit data
@@ -154,7 +154,7 @@ contract SwiftExits is BlsVerifier {
             !exitOrdersExistance[blockNumber][onchainOpNumber],
             "ssat13"
         ); // "ssat13" - request exists
-        (uint256 signersCount, bool signResult) = governance.verifySenderAndBlsSignature(
+        bool signResult = governance.verifySenderAndBlsSignature(
             msg.sender,
             _aggrSignatureX,
             _aggrSignatureY,
@@ -170,17 +170,15 @@ contract SwiftExits is BlsVerifier {
         uint32 lastVerifiedBlock = rollup.totalBlocksVerified;
 
         if (blockNumber <= lastVerifiedBlock) {
-            // Get fees
-            uint256 validatorsFee = tokenAmount * LATE_VALIDATORS_FEE_COEFF / 100;
 
             // Check if tokenAmount is higher than sum of fees
             require(
-                creationCost + validatorsFee < tokenAmount,
+                creationCost < tokenAmount,
                 "ssat12"
             ); // "ssat12" - wrong amount
 
             // Sending amount
-            uint256 sendingAmount = tokenAmount - (creationCost + validatorsFee);
+            uint256 sendingAmount = tokenAmount - creationCost;
 
             // Check existance
             uint64 onchainOpsStartIdInBlock = rollup.blocks[_blockNumber].startId;
@@ -189,7 +187,7 @@ contract SwiftExits is BlsVerifier {
                 realOpHash == opHash,
                 "ssat12"
             ); // "ssat12" - wrong amount
-            
+
             // Try withdraw from rollup
             rollup.withdrawFunds(
                 tokenId,
@@ -200,7 +198,7 @@ contract SwiftExits is BlsVerifier {
             // Freeze funds on rollup
             rollup.freezeFunds(
                 tokenId,
-                creationCost + validatorsFee,
+                creationCost,
                 recipient
             );
 
@@ -211,10 +209,10 @@ contract SwiftExits is BlsVerifier {
                 tokenId,
                 0,
                 creationCost,
-                validatorsFee,
+                0,
                 msg.sender,
                 _signersBitmask,
-                signersCount,
+                0,
                 0,
                 0
             );
@@ -242,8 +240,11 @@ contract SwiftExits is BlsVerifier {
             // Sending amount
             uint256 sendingAmount = tokenAmount - (creationCost + validatorsFee);
 
+            // // Lock amount
+            // uint256 lockAmount = 3 * sendingAmount;
+
             // Borrow from validators and exchange with compound if needed
-            (uint16 supplyTokenId, uint256 supplyAmount) = exchangeTokens(tokenId, sendingAmount);
+            (uint16 supplyTokenId, uint256 supplyAmount, uint16 suppliersCount) = exchangeTokens(tokenId, sendingAmount);
 
             // Send to recepient
             sendTokensToRecipient(recipient, tokenId, sendingAmount);
@@ -258,7 +259,7 @@ contract SwiftExits is BlsVerifier {
                 validatorsFee,
                 msg.sender,
                 _signersBitmask,
-                signersCount,
+                suppliersCount,
                 supplyTokenId,
                 supplyAmount
             );
@@ -283,14 +284,16 @@ contract SwiftExits is BlsVerifier {
     }
 
     function exchangeTokens(uint16 _tokenId,
-                            uint256 _amount)
+                            uint256 _sendingAmount)
     internal
     returns (uint16 supplyTokenId,
-             uint256 supplyAmount)
+             uint256 supplyAmount,
+             uint16 suppliersCount)
     {
         // try borrow directly specified token from validators
-        if (governance.borrowToTrustedAddress(_tokenId, _amount)) {
-            return (_tokenId, _amount);
+        suppliersCount = governance.borrowToTrustedAddress(_tokenId, BORROWING_COEFF * _sendingAmount);
+        if (suppliersCount > 0) {
+            return (_tokenId, BORROWING_COEFF * _sendingAmount);
         }
 
         // borrow matter token if previous failed
@@ -305,16 +308,18 @@ contract SwiftExits is BlsVerifier {
             "dfsdjfk"
         );
 
-        uint256 matterTokenAmount = _amount * (matterTokenPrice / tokenPrice) / collateralFactorMantissa;
+        uint256 matterTokenAmount = _sendingAmount * (matterTokenPrice / tokenPrice) / collateralFactorMantissa;
+        
+        suppliersCount = governance.borrowToTrustedAddress(matterTokenId, BORROWING_COEFF * matterTokenAmount);
         require(
-            governance.borrowToTrustedAddress(matterTokenId, matterTokenAmount),
+            suppliersCount > 0,
             "dsf"
         );
 
         // exchange with compound
-        borrowFromCompound(matterTokenId, matterTokenAmount, _tokenId, _amount);
+        borrowFromCompound(matterTokenId, matterTokenAmount, _tokenId, _sendingAmount);
 
-        return (matterTokenId, matterTokenAmount);
+        return (matterTokenId, BORROWING_COEFF * matterTokenAmount, suppliersCount);
     }
 
     function borrowFromCompound(uint16 _tokenSupplyId,
@@ -399,7 +404,7 @@ contract SwiftExits is BlsVerifier {
                 require(
                     IERC20(tokenAddress).approve(address(cTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
                     "serd12"
-            );  // serd12 - token approve failed
+                );  // serd12 - token approve failed
             }
             CErc20 cToken = CErc20(cTokenAddress);
             require(
@@ -415,7 +420,7 @@ contract SwiftExits is BlsVerifier {
             require(
                 cToken.redeemUnderlying(_supplyAmount) == 0,
                 "serd14"
-        );  // serd14 - token redeem failed
+            );  // serd14 - token redeem failed
         } else {
             CErc20 cToken = CErc20(cSupplyTokenAddress);
             require(
@@ -471,38 +476,39 @@ contract SwiftExits is BlsVerifier {
     internal
     {
         // Withdraw from rollup
-        rollup.withdrawToTrustedAddress(_order.tokenId, _order.sendingAmount + _order.creationCost + _order.validatorsFee);
+        rollup.withdrawToTrustedAddress(_order.tokenId,
+                                        _order.sendingAmount + _order.creationCost + _order.validatorsFee);
         
         // Repay to compound and governance if needed
         if (_order.supplyAmount > 0) {
             if (_order.tokenId != _order.supplyTokenId) {
-                repayToCompound(_order.tokenId, _order.sendingAmount, _order.supplyTokenId, _order.supplyAmount);
+                repayToCompound(_order.tokenId,
+                                _order.sendingAmount,
+                                _order.supplyTokenId,
+                                _order.supplyAmount / BORROWING_COEFF);
             }
             if (_order.supplyTokenId == 0) {
-                governance.repayBorrowInEther.value(_order.supplyAmount);
+                governance.repayInEther.value(_order.supplyAmount)
+                                             (_order.suppliersCount,
+                                              0);
             } else {
-                governance.repayBorrowInERC20(_order.supplyTokenId, _order.supplyAmount);
+                governance.repayInErc20(_order.supplyTokenId,
+                                        _order.supplyAmount,
+                                        _order.suppliersCount,
+                                        0);
             }
         }
 
         // Consummate fees
-        for(uint8 i = 0; i < 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; i++)
-        {
-            if( (_order.signersBitmask >> i) & 1 > 0 ) {
-                address validator = governance.validators(i);
-                if (_order.tokenId == 0) {
-                    governance.supplyEther.value(_order.validatorsFee / _order.signersCount)(validator);
-                } else {
-                    governance.supplyErc20(_order.tokenId, _order.validatorsFee / _order.signersCount, validator);
-                }
-            }
-        }
-
-        // Consummate gas cost
         if (_order.tokenId == 0) {
+            governance.repayInEther.value(_order.validatorsFee);
             governance.supplyEther.value(_order.creationCost)(order.validatorSender);
         } else {
-            governance.supplyErc20(_order.tokenId, _order.creationCost, order.validatorSender);
+            governance.repayInErc20(_order.tokenId,
+                                    _order.validatorsFee);
+            governance.supplyErc20(_order.tokenId,
+                                   _order.creationCost,
+                                   order.validatorSender);
         }
     }
 
@@ -512,8 +518,6 @@ contract SwiftExits is BlsVerifier {
     function punishForFailedOrder(ExitOrder _order)
     internal
     {
-        address supplyTokenAddress = governance.verifyTokenId(_order.supplyTokenId);
-
         // Defrost funds on rollup
         rollup.defrostFunds(
             _order.tokenId,
@@ -521,12 +525,17 @@ contract SwiftExits is BlsVerifier {
             recipient
         );
 
-        // Punish signers
-        for(uint8 i = 0; i < 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff; i++)
-        {
-            if( (_order.signersBitmask >> i) & 1 > 0 ) {
-                address validator = governance.validators(i);
-                governance.punishValidator(validator, supplyTokenAddress, _order.supplyAmount / _order.signersCount);
+        // Repay to governance
+        if (_order.supplyAmount > 0) {
+            if (_order.supplyTokenId == 0) {
+                governance.repayInEther.value(_order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF)
+                                             (_order.suppliersCount,
+                                              _order.signersBitmask);
+            } else {
+                governance.repayInErc20(_order.supplyTokenId,
+                                        _order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF,
+                                        _order.suppliersCounts,
+                                        _order.signersBitmask);
             }
         }
     }
