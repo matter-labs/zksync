@@ -1,24 +1,17 @@
 import { AbstractTransport, HTTPTransport, WSTransport } from "./transport";
 import { utils } from "ethers";
-import {
-  Address,
-  CloseTx,
-  SidechainAccountState,
-  SidechainInfo, Token,
-  TokenLike,
-  TransferTx,
-  WithdrawTx
-} from "./types";
+import {SyncAccountState, SyncAddress, Token} from "./types";
 
 export class SyncProvider {
   contractAddress: string;
+  private constructor(public transport: AbstractTransport) {}
 
   static async newWebsocketProvider(
     address: string = "ws://127.0.0.1:3031"
   ): Promise<SyncProvider> {
     const transport = await WSTransport.connect(address);
     const provider = new SyncProvider(transport);
-    await provider.updateSidechainInfo();
+    provider.contractAddress = await provider.getContractAddress();
     return provider;
   }
 
@@ -27,55 +20,21 @@ export class SyncProvider {
   ): Promise<SyncProvider> {
     const transport = new HTTPTransport(address);
     const provider = new SyncProvider(transport);
-    await provider.updateSidechainInfo();
+    provider.contractAddress = await provider.getContractAddress();
     return provider;
   }
 
-  private constructor(public transport: AbstractTransport) {}
-
-  private async updateSidechainInfo() {
-    this.sideChainInfo = await this.getSidechainInfo();
-  }
-
-  static prepareTransferTxForApi(tx: TransferTx, signature) {
-    const req: any = tx;
-    req.type = "Transfer";
-    req.from = tx.from;
-    req.to = tx.to;
-    req.amount = utils.bigNumberify(tx.amount).toString();
-    req.fee = utils.bigNumberify(tx.fee).toString();
-    req.signature = signature;
-    return req;
-  }
-
-  static prepareWithdrawTxForApi(tx: WithdrawTx, signature) {
-    const req: any = tx;
-    req.type = "Withdraw";
-    req.account = tx.account;
-    req.amount = utils.bigNumberify(tx.amount).toString();
-    req.fee = utils.bigNumberify(tx.fee).toString();
-    req.signature = signature;
-    return req;
-  }
-
-  static prepareCloseRequestForApi(tx: CloseTx, signature) {
-    const req: any = tx;
-    req.type = "Close";
-    req.account = tx.account;
-    req.signature = signature;
-    return req;
-  }
 
   // return transaction hash (e.g. 0xdead..beef)
   async submitTx(tx: any): Promise<string> {
     return await this.transport.request("tx_submit", [tx]);
   }
 
-  async getSidechainInfo(): Promise<SidechainInfo> {
-    return await this.transport.request("chain_info", null);
+  async getContractAddress(): Promise<string> {
+    return await this.transport.request("contract_address", null);
   }
 
-  async getState(address: Address): Promise<SidechainAccountState> {
+  async getState(address: SyncAddress): Promise<SyncAccountState> {
     return await this.transport.request("account_info", [address]);
   }
 
@@ -120,7 +79,7 @@ export class SyncProvider {
       if (token == "ETH") {
         return 0;
       } else {
-        throw new Error("not implemented");
+        throw new Error("unimplemented erc20");
       }
   }
 }
