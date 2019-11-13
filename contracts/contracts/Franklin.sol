@@ -13,7 +13,7 @@ import "./SwiftExits.sol";
 
 contract Franklin {
     // Swift exits contract
-    SwiftExits internal swiftExits;
+    address internal swiftExits;
     // Verifier contract
     Verifier internal verifier;
     // Governance contract
@@ -141,7 +141,7 @@ contract Franklin {
     // Blocks by Franklin block id
     mapping(uint32 => Block) public blocks;
 
-    // Types of franklin operations in blocks. Lending is separate type
+    // Types of franklin operations in blocks
     enum OpType {
         Noop,
         Deposit,
@@ -188,34 +188,17 @@ contract Franklin {
 
     // mapping (uint32 => bool) tokenMigrated;
 
-    // SwiftExits
-    mapping(uint32 => mapping(uint64 => SwiftExit)) internal swiftExits;
-
-    struct SwiftExit{
-        uint256 withdrawOpHash;
-        address recipient;
-    }
-
-    event NewSwiftExit(
-        uint32 blockNumber,
-        uint64 withdrawOpOffset,
-        uint256 withdrawOpHash,
-        address recipient
-    );
-
     // MARK: - CONSTRUCTOR
 
     // Inits verifier, verification key and governance contracts instances,
     // sets genesis root
     constructor(
-        address _swiftExitsAddress,
         address _governanceAddress,
         address _verifierAddress,
         address _priorityQueueAddress,
         address _genesisAccAddress,
         bytes32 _genesisRoot
     ) public {
-        swiftExits = SwiftExits(_swiftExitsAddress);
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
         priorityQueue = PriorityQueue(_priorityQueueAddress);
@@ -504,7 +487,7 @@ contract Franklin {
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
-            (uint64 startId, uint64 totalProcessed, uint64 priorityNumber) = processAndCollectOnchainOps(_publicData);
+            (uint64 startId, uint64 totalProcessed, uint64 priorityNumber) = collectOnchainOps(_publicData);
 
             // Verify that priority operations from this block are valid
             // (their data is similar to data from priority requests mapping)
@@ -544,7 +527,7 @@ contract Franklin {
     // onchain operations number for this block, priority operations number for this block
     // Params:
     // - _publicData - operations packed in bytes array
-    function processAndCollectOnchainOps(bytes memory _publicData)
+    function collectOnchainOps(bytes memory _publicData)
         internal
         returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint64 priorityCount)
     {
@@ -729,7 +712,7 @@ contract Franklin {
             "fvk13"
         ); // fvk13 - verification failed
 
-        consummateOnchainOpsAndSwiftExits(_blockNumber);
+        consummateOnchainOps(_blockNumber);
 
         collectValidatorsFeeAndDeleteRequests(
             blocks[_blockNumber].priorityOperations,
@@ -745,26 +728,11 @@ contract Franklin {
     // (user must have possibility to withdraw funds if withdrawed)
     // Params:
     // - _blockNumber - number of block
-    function consummateOnchainOpsAndSwiftExits(uint32 _blockNumber) internal {
+    function consummateOnchainOps(uint32 _blockNumber) internal {
         uint64 start = blocks[_blockNumber].operationStartId;
         uint64 end = start + blocks[_blockNumber].onchainOperations;
-
-        uint256[] memory failed;
-        uint64 failedCount;
-
-        uint256[] memory succeeded;
-        uint64 succeededCount;
-
-        uint16[] memory tokensIds;
-        uint126[] memory tokensAmounts;
-
         for (uint64 current = start; current < end; ++current) {
             OnchainOperation memory op = onchainOps[current];
-            SwiftExit memory se = swiftExits[_blockNumber][current];
-            if (se.withdrawOpHash != uint256(keccak256(op.pubData)) && se.withdrawHash != 0) {
-                failed[failedCount] = se.withdrawOpHash;
-                failedCount++;
-            }
             if (op.opType == OpType.PartialExit) {
                 // partial exit was successful, accrue balance
                 bytes memory tokenBytes = new bytes(TOKEN_BYTES);
@@ -779,20 +747,11 @@ contract Franklin {
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
-                if (se.withdrawOpHash == uint256(keccak256(op.pubData))) {
-                    succeeded[succeededCount] = se.withdrawOpHash;
-                    succeededCount++;
-
-                    tokensIds[succeededCount] = tokenId;
-                    tokensAmounts[succeededCount] = amount;
-                } else {
-                    bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
-                    for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                        ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
-                    }
-                    address ethAddr = Bytes.bytesToAddress(ethAddress);
-                    balancesToWithdraw[ethAddr][tokenId] += amount;
+                bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
+                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
+                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
                 }
+                balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
@@ -814,23 +773,8 @@ contract Franklin {
                 }
                 balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
             }
-            delete onchainOps[current];
+            // delete onchainOps[current];
         }
-
-        // Fulfill swift exits
-        for (uint64 i = 0; i < succeededCount; i++) {
-            if (tokensIds[i] > 0) {
-                address tokenAddr = governance.tokenAddresses(tokensIds[i]);
-                uint256 allowence = IERC20(tokenAddr).allowence(address(this), address(swiftExits));
-                if (allowence < uint256(tokensAmounts[i])) {
-                    require(
-                        IERC20(tokenAddr).approve(address(swiftExits), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                        "fw011"
-                    ); // fw011 - token approve failed
-                }
-            }
-        }
-        swiftExits.newVerifiedBlock(_blockNumber, succeeded, failed, tokensIds, tokensAmounts);
     }
 
     // Checks that commitment is expired and revert blocks
