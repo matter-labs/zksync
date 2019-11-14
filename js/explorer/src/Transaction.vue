@@ -8,10 +8,10 @@
     <br>
     <b-container>
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-        <h5>Transaction data</h5>
-        <b-card no-body>
-            <b-table responsive id="my-table" thead-class="hidden_header" :items="props" fixed>
-                <span slot="value" slot-scope="data" v-html="data.value"></span>
+        <h5 class="mt-3">Transaction data</h5>
+        <b-card no-body class="table-margin-hack">
+            <b-table responsive thead-class="hidden_header" :items="props">
+                <template v-slot:cell(value)="data"><span v-html="data.item['value']" /></template>
             </b-table>
         </b-card>
         <br>
@@ -21,13 +21,22 @@
 
 <script>
 
-import store from './store'
+import store from './store';
+import { readableEther } from './utils';
 
 export default {
     name: 'transaction',
+    data: () => ({
+        tx_data: {},
+    }),
+    async created() {
+        let tx_data = await this.fraProvider.getTransactionByHash(this.tx_hash);
+        tx_data.tokenName = (await this.tokensPromise)[tx_data.token].symbol;
+        this.tx_data = tx_data;
+    },
     computed: {
-        id() {
-            return this.$route.params.id
+        tx_hash() {
+            return this.$route.params.id;
         },
         breadcrumbs() {
             return [
@@ -36,43 +45,49 @@ export default {
                     to: '/'
                 },
                 {
-                    text: 'Block ' + 123,
-                    to: '/blocks/123'
+                    text: 'Block ' + this.tx_data.block_number,
+                    to: '/blocks/' + this.tx_data.block_number,
                 },                
                 {
-                    text: 'Transaction '+this.id,
+                    text: 'Transaction ' + this.tx_hash,
                     active: true
                 },
-            ]
+            ];
         },
         props() {
-            return [
-                { name: 'Id', value: `<b>${this.id}</b>`, empty1: '', empty2: ''},
-                { name: 'Type', value: 'Unknown', },
-                { name: 'From', value: '', },
-                { name: 'To', value: '256', },
-                { name: 'Amount', value: '1200', },
-                { name: 'Nonce', value: '23', },
-            ]
-        }
+            if (Object.keys(this.tx_data).length == 0) 
+                return [];
+
+            let link_from 
+                = this.tx_data.tx_type == 'Deposit' ? `${this.blockchain_explorer_address}/${this.tx_data.from}`
+                : `/accounts/${this.tx_data.from}`;
+
+            let link_to 
+                = this.tx_data.tx_type == 'Withdraw' ? `${this.blockchain_explorer_address}/${this.tx_data.to}`
+                : `/accounts/${this.tx_data.to}`;
+
+            let rows = [
+                { name: 'Tx hash',        value: `<code>${this.tx_hash}</code>`},
+                { name: "Type",           value: `<b>${this.tx_data.tx_type}</b>`   },
+                { name: "From",           value: `<code><a target="_blanc" href="${link_from}">${this.tx_data.from}</a></code>`      },
+                { name: "To",             value: `<code><a target="_blanc" href="${link_to}">${this.tx_data.to}</a></code>`      },
+                { name: "Amount",         value: `<b>${this.tx_data.tokenName}</b> ${readableEther(this.tx_data.amount)}`    },
+            ];
+
+            if (this.tx_data.fee) 
+                rows.push(
+                { name: "fee",            value: this.tx_data.fee       });
+
+            return rows;
+        },
     },
-    data() {
-      return {
-        items: [
-          { tx_id: 1, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-          { tx_id: 2, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-          { tx_id: 3, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-          { tx_id: 4, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-          { tx_id: 5, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-          { tx_id: 6, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-          { tx_id: 7, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-          { tx_id: 8, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, },
-          { tx_id: 9, type: 'Transfer', from: 2, to: 4, amount: 123, nonce: 87, }
-        ]
-      }
-    }
-}
+};
 </script>
 
 <style>
+.table-margin-hack table, 
+.table-margin-hack .table-responsive {
+    margin: 0 !important;
+}
+
 </style>

@@ -6,24 +6,39 @@
         </b-container>
     </b-navbar>
     <b-container>
-        <h5 class="mt-2">Account data</h5>
+        <h5 class="mt-4 mb-2">Account data</h5>
         <b-card no-body class="table-margin-hack">
-            <b-table responsive outlined thead-class="hidden_header" class="my-0 py-0" :items="accountDataProps">
-                <span slot="value" slot-scope="data" v-html="data.value"></span>
+            <b-table responsive thead-class="hidden_header" class="my-0 py-0" :items="accountDataProps">
+                <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
             </b-table>
         </b-card>
-        <h5 class="mt-2">Account balances</h5>
-        <b-card no-body class="table-margin-hack">
-            <b-table responsive outlined thead-class="hidden_header" :fields="balancesFields" :items="balancesProps">
-                <span slot="value" slot-scope="data" v-html="data.value"></span>
+        <h5 class="mt-4 mb-2">Account balances</h5>
+        <b-card no-body class="table-margin-hack table-width-hack">
+            <b-table responsive thead-class="hidden_header" :items="balancesProps">
+                <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
             </b-table>
         </b-card>
-        <h5 class="mt-2">Account transactions</h5>
+        <h5 class="mt-4 mb-2">Account transactions</h5>
         <b-card no-body class="table-margin-hack">
-            <b-table responsive outlined thead-class="hidden_header" :items="transactionProps">
-                <span slot="value" slot-scope="data" v-html="data.value"></span>
+            <b-table responsive :items="transactionProps" :fields="transactionFields" @row-clicked="onRowClicked">
+                <template v-slot:cell(Type)="data"><span v-html="data.item['Type']" /></template>
+                <template v-slot:cell(TxnHash)="data"><span v-html="data.item['TxnHash']" /></template>
+                <template v-slot:cell(Block)="data"><span v-html="data.item['Block']" /></template>
+                <template v-slot:cell(Value)="data"><span v-html="data.item['Value']" /></template>
+                <template v-slot:cell(Amount)="data"><span v-html="data.item['Amount']" /></template>
+                <template v-slot:cell(Age)="data"><span v-html="data.item['Age']" /></template>
+                <template v-slot:cell(From)="data"><span v-html="data.item['From']" /></template>
+                <template v-slot:cell(To)="data"><span v-html="data.item['To']" /></template>
+                <template v-slot:cell(Fee)="data"><span v-html="data.item['Fee']" /></template>
             </b-table>
         </b-card>
+        <b-pagination 
+            class="mt-2 mb-2"
+            v-model="currentPage" 
+            :per-page="rowsPerPage" 
+            :total-rows="totalRows"
+            hide-goto-end-buttons
+        ></b-pagination>
     </b-container>
 </div>
 </template>
@@ -36,40 +51,9 @@
 
 <script>
 
-import store from './store'
-import { FranklinProvider } from 'franklin_lib'
-import config from './env-config'
-import Axios from 'axios'
-import { ethers } from 'ethers'
-
-class walletDecorator {
-    constructor(address) {
-        this.address = address;
-        this.fraProvider = new FranklinProvider(
-            config.API_SERVER,
-            config.CONTRACT_ADDR
-        );
-    }
-    async getAccount() {
-        return await Axios.get(`${config.API_SERVER}/api/v0.1/account/${this.address}`).then(r => r.data);
-    }
-    async getCommitedBalances() {
-        let account = await this.getAccount();
-        console.log(account);
-        return Object.entries(account.commited.balances)
-            .map(([tokenId, balance]) => {
-                return { 
-                    tokenId, balance,
-                    balance: ethers.utils.formatEther(balance),
-                    tokenName: ['ETH', 'DAI', 'FAU'][tokenId],
-                };
-            });
-    }
-    async getTransactions() {
-        let [ offset, limit ] = [ 10, 10 ];
-        return await this.fraProvider.getTransactionsHistory(this.address, offset, limit);   
-    }
-};
+import store from './store';
+import { WalletDecorator } from './WalletDecorator';
+import { readableEther } from './utils';
 
 let client;
 
@@ -78,19 +62,73 @@ export default {
     data: () => ({
         balances: [],
         transactions: [],
+        pagesOfTransactions: {},
+
+        currentPage: 1,
+        rowsPerPage: 10,
+        totalRows: 0,
+
+        loading: true,
     }),
     async created() {
-        client = new walletDecorator(this.address);
+        client = new WalletDecorator(this.address, this.fraProvider);
 
         this.update();
     },
     methods: {
+        onRowClicked(item) {
+            console.log(item);
+            this.$parent.$router.push('/transactions/' + item.hash);
+        },
         async update() {
             let balances = await client.getCommitedBalances();
             this.balances = balances
-                .map(bal => Object.assign({ name: bal.tokenName, value: bal.balance }, bal));
+                .map(bal => ({ name: bal.tokenName, value: bal.balance }));
 
-            this.transactions = client.getTransactions();
+            this.loading = true;
+
+
+            let offset = (this.currentPage - 1) * this.rowsPerPage;
+            let limit = this.rowsPerPage;
+
+            // maybe load the requested page
+            if (this.pagesOfTransactions[this.currentPage] == undefined)
+                this.pagesOfTransactions[this.currentPage] 
+                    = await client.getTransactions(offset, limit);
+            
+
+            let nextPageLoaded = false;
+            let numNextPageTransactions;
+            
+            // maybe load the next page
+            if (this.pagesOfTransactions[this.currentPage + 1] == undefined) {
+                let txs = await client.getTransactions(offset + limit, limit);
+                numNextPageTransactions = txs.length;
+                nextPageLoaded = true;
+
+                // Once we assign txs to pagesOfTransactions,
+                // it gets wrapped in vue watchers and stuff.
+                // 
+                // Sometimes this.pagesOfTransactions[this.currentPage + 1].length
+                // is > limit, which I can only explain by vue's wrapping.
+                // Hopefully, this will fix it.
+                this.pagesOfTransactions[this.currentPage + 1] = txs;
+            }
+
+            if (nextPageLoaded) {
+                // we now know if we can add a new page button
+                this.totalRows = offset + limit + numNextPageTransactions;
+            }
+
+            // display the page
+            this.transactions = this.pagesOfTransactions[this.currentPage];
+
+            this.loading = false;
+        },
+        loadNewTransactions() {
+            this.totalRows = 0;
+            this.pagesOfTransactions = {};
+            this.load();
         },
     },
     computed: {
@@ -102,33 +140,71 @@ export default {
                 { name: 'Address',          value: `<code>${this.address}</code>`},
             ];
         },
-        balancesFields() {
-            return [
-                'tokenName',
-                'balance',
-            ];
-        },
         balancesProps() {
-            return [
-                ...this.balances,
-            ];
+            return this.balances;
         },
         transactionProps() {
-            // optionally pass :fields="fields" to a btable
-            return [
-                ...this.transactions,
-            ];
+            return this.transactions
+                .map(tx => {
+                    console.log('tx', tx);
+
+                    let TxnHash = `<code>
+                        <a href="/transactions/${tx.data.hash}" target="_blanc">
+                            ${tx.data.hash.slice(0, 8)}..${tx.data.hash.slice(-8)}
+                        </a>
+                    </code>`;                    
+
+                    let link_from
+                        = tx.data.type == 'Deposit' ? `${this.blockchain_explorer_address}/${tx.data.from}`
+                        : `/accounts/${tx.data.from}`;
+
+                    let link_to
+                        = tx.data.type == 'Withdraw' ? `${this.blockchain_explorer_address}/${tx.data.to}`
+                        : `/accounts/${tx.data.to}`;
+
+                    let From = `<code>
+                        <a href="${link_from}" target="_blanc">
+                            ${tx.data.from.slice(0, 8)}..${tx.data.from.slice(-8)}
+                        </a>
+                    </code>`;
+
+                    let To = `<code>
+                        <a href="${link_to}" target="_blanc">
+                            ${tx.data.to.slice(0, 8)}..${tx.data.to.slice(-8)}
+                        </a>
+                    </code>`;
+
+                    let Type = `<b>${tx.data.type}</b>`;
+
+                    let Amount = `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
+
+                    return {
+                        Type,
+                        TxnHash,
+                        Amount,
+                        From, 
+                        To,
+
+                        hash: tx.data.hash,
+                    };
+                });
         },
+        transactionFields() {
+            return this.transactionProps && this.transactionProps.length
+                 ? Object.keys(this.transactionProps[0]).filter(k => k != 'hash')
+                 : [];
+        }
     },
 };
 </script>
 
 <style>
-.round {
-    border-radius: 3px;
-    border: 1px solid #e5e5e5;
-}
-.table-margin-hack table {
+.table-margin-hack table, 
+.table-margin-hack .table-responsive {
     margin: 0 !important;
+}
+
+.table-width-hack td:first-child {
+    width: 10em;
 }
 </style>

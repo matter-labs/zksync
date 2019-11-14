@@ -303,6 +303,30 @@ fn handle_get_executed_transaction_by_hash(
     }
 }
 
+fn handle_get_tx_by_hash(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
+    let hash_str: &str = req
+        .match_info()
+        .get("tx_hash")
+        .map(|hash| &hash[2..])
+        .ok_or_else(|| error::ErrorBadRequest("Invalid hash parameter"))?;
+
+    let hash = hex::decode(hash_str)
+        .map_err(|_| error::ErrorBadRequest("Invalid hash parameter"))?;
+
+    let storage = req
+        .state()
+        .connection_pool
+        .clone()
+        .access_storage()
+        .map_err(error::ErrorInternalServerError)?;
+
+    let res = storage
+        .get_tx_by_hash(hash.as_slice())
+        .map_err(error::ErrorInternalServerError)?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
 fn handle_get_priority_op_receipt(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let id = req
         .match_info()
@@ -509,7 +533,28 @@ fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<Htt
             }));
         }
     };
-    Ok(HttpResponse::Ok().json(executed_ops))
+
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct WithHash {
+        op: ExecutedOperations,
+        tx_hash: String,
+    };
+
+    let executed_ops_with_hashes = executed_ops.into_iter().map(|op| {
+        let tx_hash = match &op {
+            ExecutedOperations::Tx(tx) => tx.tx.hash(),
+            ExecutedOperations::PriorityOp(tx) => tx.priority_op.eth_hash.clone(),
+        };
+
+        let tx_hash = hex::encode(&tx_hash);
+
+        WithHash {
+            op: op,
+            tx_hash: tx_hash,
+        }
+    }).collect::<Vec<_>>();
+
+    Ok(HttpResponse::Ok().json(executed_ops_with_hashes))
 }
 
 fn handle_get_transaction_by_id(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
@@ -628,6 +673,9 @@ fn start_server(state: AppState, bind_to: String) {
                     .resource("/transactions/{tx_hash}", |r| {
                         r.method(Method::GET)
                             .f(handle_get_executed_transaction_by_hash);
+                    })
+                    .resource("/transactions_all/{tx_hash}", |r| {
+                        r.method(Method::GET).f(handle_get_tx_by_hash);
                     })
                     .resource("/priority_operations/{pq_id}/", |r| {
                         r.method(Method::GET).f(handle_get_priority_op_receipt);

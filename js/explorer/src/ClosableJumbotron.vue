@@ -22,7 +22,7 @@ export default {
             this.show = false;
         },
     },
-}
+};
 </script>
 
 <style scoped>

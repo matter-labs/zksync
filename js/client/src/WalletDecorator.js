@@ -148,7 +148,7 @@ export class WalletDecorator {
             let row_status
                 = tx.verified     ? `<span style="color: green">Verified</span>`
                 : tx.commited     ? `<span style="color: grey">Committed</span>`
-                : tx.fail_reason  ? `<span style="color: red">Failed with ${fail_reason}</span>`
+                : tx.fail_reason  ? `<span style="color: red">Failed with ${tx.fail_reason}</span>`
                 : `<span style="color: red">(Unknown status)</span>`
 
             let status_tooltip = await (async () => {

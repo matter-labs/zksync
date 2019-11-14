@@ -51,7 +51,10 @@
         <br>
 
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
-        <b-table responsive id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable"></b-table>
+        <b-table responsive id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable">
+            <template v-slot:cell(status)="data"><span v-html="data.item.status"></span></template>
+            <template v-slot:cell(new_state_root)="data"><span v-html="data.item.new_state_root"></span></template>
+        </b-table>
         <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
     </b-container>
@@ -112,103 +115,103 @@ body {
 
 <script>
 
-import store from './store'
-import client from './client'
+import store from './store';
+import client from './client';
 
-import ClosableJumbotron from './ClosableJumbotron.vue'
+import ClosableJumbotron from './ClosableJumbotron.vue';
 const components = { 
     ClosableJumbotron 
-}
+};
 
 export default {
     name: 'home',
     created() {
-        this.update()
+        this.update();
     },
     timers: {
         ticker: { time: 1000, autostart: true, repeat: true }
     },
     methods: {
         ticker() {
-            this.update(true)
+            this.update(true);
         },
         async search() {
             if (this.query) {
-                this.searching = true
-                this.notFound = false
-                let block = await client.searchBlock(this.query)
-                this.searching = false
+                this.searching = true;
+                this.notFound = false;
+                let block = await client.searchBlock(this.query);
+                this.searching = false;
                 if (block && block.block_number) {
-                    this.$router.push('/blocks/' + block.block_number)
+                    this.$router.push('/blocks/' + block.block_number);
                 } else {
-                    this.notFound = true
-                    await new Promise(resolve => setTimeout(resolve, 3600))
-                    this.notFound = false
+                    this.notFound = true;
+                    await new Promise(resolve => setTimeout(resolve, 3600));
+                    this.notFound = false;
                 }
             }
         },
         onRowClicked(item) {
-            this.$router.push('/blocks/' + item.block_number)
+            this.$router.push('/blocks/' + item.block_number);
         },
         async onPageChanged(page) {
-            this.$router.push(`${this.$route.path}?page=${page}`)
+            this.$router.push(`${this.$route.path}?page=${page}`);
             //this.updateBlocks()
         },
         async update(silent) {
             if (!silent) {
-                this.loading = true
+                this.loading = true;
             }
-            const status = await client.status()
-            let newBlocks = false
+            const status = await client.status();
+            let newBlocks = false;
             if (status) {
-                newBlocks = this.lastCommitted !== status.last_committed || this.lastVerified !== status.last_verified
-                this.lastCommitted = status.last_committed
-                this.lastVerified = status.last_verified
-                this.totalTransactions = status.total_transactions
+                newBlocks = this.lastCommitted !== status.last_committed || this.lastVerified !== status.last_verified;
+                this.lastCommitted = status.last_committed;
+                this.lastVerified = status.last_verified;
+                this.totalTransactions = status.total_transactions;
             }
             if (newBlocks) {
-                this.updateBlocks()
+                this.updateBlocks();
             } else {
-                this.loading = false
+                this.loading = false;
             }
         },
         async updateBlocks() {
-            let max = this.lastCommitted - (client.PAGE_SIZE * (this.currentPage-1))
-            if (max < 0) return
+            let max = this.lastCommitted - (client.PAGE_SIZE * (this.currentPage-1));
+            if (max < 0) return;
 
-            let blocks = await client.loadBlocks(max)
+            let blocks = await client.loadBlocks(max);
             if (blocks) {
                 this.blocks = blocks.map( b => ({
                     block_number:   b.block_number,
-                    status:         b.verified_at ? 'Verified' : 'Committed',
-                    new_state_root: b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(50, 66),
+                    status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
+                    new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
                     committed_at:   b.committed_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0],
                     verified_at:    b.verified_at ? (b.verified_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0]) : null,
-                }))
-                this.currentPage = this.page
-                this.ready = true
+                }));
+                this.currentPage = this.page;
+                this.ready = true;
             }
-            this.loading = false
+            this.loading = false;
         },
     },
     watch: {
         '$route' (to, from) {
-            this.currentPage = this.page
-            this.updateBlocks()
+            this.currentPage = this.page;
+            this.updateBlocks();
         },
     },
     computed: {
         page() {
-            return this.$route.query.page || 1
+            return this.$route.query.page || 1;
         },
         items() {
-            return this.blocks
+            return this.blocks;
         },
         perPage() {
-            return client.PAGE_SIZE
+            return client.PAGE_SIZE;
         },
         rows() {
-            return this.lastCommitted || 9999
+            return this.lastCommitted || 9999;
         },
     },
     data() {
@@ -233,8 +236,8 @@ export default {
                     active: true
                 },
             ],
-        }
+        };
     },
     components,
-}
+};
 </script>

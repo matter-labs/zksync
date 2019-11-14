@@ -92,6 +92,11 @@ export class FranklinProvider {
             Axios.get(this.providerAddress + '/api/v0.1/tokens'));
     }
 
+    async getTransactionByHash(tx_hash) {
+        return await FranklinProvider.axiosRequest(
+            Axios.get(`${this.providerAddress}/api/v0.1/transactions_all/${tx_hash}`));
+    }
+
     async getTransactionsHistory(address: Address, offset: number, limit: number) {
         return await FranklinProvider.axiosRequest(
             Axios.get(`${this.providerAddress}/api/v0.1/account/0x${address.toString("hex")}/history/${offset}/${limit}`));
