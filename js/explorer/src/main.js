@@ -10,6 +10,7 @@ import App from './App.vue'
 import Home from './Home.vue'
 import Block from './Block.vue'
 import Transaction from './Transaction.vue'
+import Account from './Account.vue'
 
 import axios from 'axios'
 import url from 'url'
@@ -26,6 +27,7 @@ const routes = [
     { path: '/', component: Home },
     { path: '/blocks/:blockNumber', component: Block },
     { path: '/transactions/:id', component: Transaction },
+    { path: '/accounts/:address', component: Account }
 ]
 
 const router = new Router({

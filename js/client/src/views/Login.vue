@@ -39,8 +39,8 @@ export default {
         async login() {
             try {
                 await window.ethereum.enable();
-                window.eth = new Eth(window.web3.currentProvider);
-                window.ethersProvider = new ethers.providers.Web3Provider(window.web3.currentProvider);
+                window.eth = new Eth(window.ethereum);
+                window.ethersProvider = new ethers.providers.Web3Provider(window.ethereum);
                 let franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
                 let signer = window.ethersProvider.getSigner();
                 window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);

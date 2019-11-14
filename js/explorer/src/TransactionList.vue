@@ -4,8 +4,6 @@
 
 <script>
 
-import store from './store'
-
 export default {
     name: 'transaction-list',
     props: ['blockNumber', 'transactions'],

@@ -25,11 +25,6 @@ import store from './store'
 
 export default {
     name: 'transaction',
-    methods: {
-        test() {
-            console.log('test')
-        }
-    },
     computed: {
         id() {
             return this.$route.params.id

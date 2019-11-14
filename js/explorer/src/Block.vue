@@ -11,7 +11,9 @@
         <h5>Block data</h5>
         <b-card no-body>
             <b-table responsive id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
-                <span slot="value" slot-scope="data" v-html="data.value"></span>
+                <template v-slot:cell(value)="data">
+                    <span v-html="data.item.value"></span>
+                </template>
             </b-table>
         </b-card>
         <br>
