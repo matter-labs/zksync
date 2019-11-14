@@ -956,10 +956,10 @@ contract Franklin {
                     ); // fnds12 - token transfer failed
                 }
                 // Fulfill succeded order
-                fulfillSucceededOrder(_blockNumber, i);
+                swiftExits.fulfillSucceededOrder(_blockNumber, i);
             } else {
                 // Punish for failed order
-                punishForFailedOrder(_blockNumber, i);
+                swiftExits.punishForFailedOrder(_blockNumber, i);
             }
         }
     }
