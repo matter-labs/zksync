@@ -214,11 +214,19 @@ contract Governance {
         view
         returns (bool result)
     {
+        // If there is only 1 validator and he is sender - return true (single operator model)
+        if (validatorsCount == 1 && validators[0] == _sender) {
+            return true;
+        }
+
+        // Check if sender is in bitmask
         uint16 validatorId = validatorsInfo[_sender].id;
         require(
             (_signersBitmask >> validatorId) & 1 > 0,
             "geve11"
         ); // geve11 - sender is not in validators bitmask
+
+        // Bls signature veification
         BlsOperations.G1Point memory signature = BlsOperations.G1Point(_aggrSignatureX, _aggrSignatureY);
         BlsOperations.G1Point memory mpoint = BlsOperations.messageHashToG1(_messageHash);
         (BlsOperations.G2Point memory aggrPubkey, uint16 signersCount) = getValidatorsAggrPubkey(_signersBitmask);
