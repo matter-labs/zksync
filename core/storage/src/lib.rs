@@ -912,7 +912,7 @@ impl StorageProcessor {
                 token: tx_token as i32,
                 amount: tx_amount.to_string(),
                 fee: tx_fee,
-                block_number: block_number,
+                block_number,
             }));
         };
 
@@ -962,7 +962,7 @@ impl StorageProcessor {
                 token: tx_token as i32,
                 amount: tx_amount.to_string(),
                 fee: tx_fee,
-                block_number: block_number,
+                block_number,
             }));
         };
 

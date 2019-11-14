@@ -550,10 +550,7 @@ fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<Htt
 
             let tx_hash = hex::encode(&tx_hash);
 
-            WithHash {
-                op: op,
-                tx_hash: tx_hash,
-            }
+            WithHash { op, tx_hash }
         })
         .collect::<Vec<_>>();
 
