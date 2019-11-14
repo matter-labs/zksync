@@ -299,6 +299,57 @@ contract SwiftExits {
         }
     }
 
+    /// @notice Returns order token id, amount, recipient
+    /// @param _blockNumber Block number
+    /// @param _orderNumber Order number
+    function getOrderInfo(uint32 _blockNumber, uint64 _orderNumber) external returns (uint16 tokenId, uint256 amount, address recipient) {
+        // Can be called only from Rollup contract
+        require(
+            msg.sender == address(rollup),
+            "fnds11"
+        ); // fnds11 - wrong address
+        ExitOrder order = exitOrders[_blockNumber][_orderNumber];
+        return (
+            order.tokenId,
+            order.sendingAmount + order.creationCost + order.validatorsFee,
+            order.recipient
+        );
+    }
+
+    /// @notice Get orders success status for block
+    /// @param _blockNumber Block number
+    function getOrdersSuccessStatusList(uint32 _blockNumber) external returns (bytes memory succeeded) {
+        // Can be called only from Rollup contract
+        require(
+            msg.sender == address(rollup),
+            "fnds11"
+        ); // fnds11 - wrong address
+        // Requires verified blocks count is higher than specified block number
+        require(
+            rollup.totalBlocksVerified >= _blockNumber,
+            "fnds12"
+        ); // fnds12 - wrong block number
+        // Get onchain operations start id in this block from Rollup contract
+        uint64 onchainOpsStartIdInBlock = rollup.blocks[_blockNumber].startId;
+        // Go into loop for all exit orders in block
+        for (uint64 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
+            // Get exit order by block nubmer and id
+            ExitOrder order = exitOrders[_blockNumber][i];
+            // Get real onchain operation hash from Rollup contract
+            uint256 realOpHash = uint256(keccak256(rollup.onchainOps[onchainOpsStartIdInBlock + order.onchainOpNumber].pubData));
+            // Get expected operation hash from exit order
+            uint256 expectedOpHash = order.opHash;
+
+            if (realOpHash == expectedOpHash) {
+                // If hashes are equal - add 1
+                succeeded[i] = 1;
+            } else {
+                // If hashes aren't equal - add 0
+                succeeded[i] = 0;
+            }
+        }
+    }
+
     /// @notice Get the amount of tokens, which after conversion to Ether will be equal to the order creation transaction gas cost
     /// @param _tokenId Token id
     function getCreationCostForToken(uint16 _tokenId) internal returns (uint256) {
@@ -558,57 +609,6 @@ contract SwiftExits {
                 IERC20(tokenAddress).transfer(_recipient, _amount),
                 "ssst11"
             ); // ssst11 - token transfer failed
-        }
-    }
-
-    /// @notice Returns order token id, amount, recipient
-    /// @param _blockNumber Block number
-    /// @param _orderNumber Order number
-    function getOrderInfo(uint32 _blockNumber, uint64 _orderNumber) external returns (uint16 tokenId, uint256 amount, address recipient) {
-        // Can be called only from Rollup contract
-        require(
-            msg.sender == address(rollup),
-            "fnds11"
-        ); // fnds11 - wrong address
-        ExitOrder order = exitOrders[_blockNumber][_orderNumber];
-        return (
-            order.tokenId,
-            order.sendingAmount + order.creationCost + order.validatorsFee,
-            order.recipient
-        );
-    }
-
-    /// @notice Get orders success status for block
-    /// @param _blockNumber Block number
-    function getOrdersSuccessStatusList(uint32 _blockNumber) external returns (bytes memory succeeded) {
-        // Can be called only from Rollup contract
-        require(
-            msg.sender == address(rollup),
-            "fnds11"
-        ); // fnds11 - wrong address
-        // Requires verified blocks count is higher than specified block number
-        require(
-            rollup.totalBlocksVerified >= _blockNumber,
-            "fnds12"
-        ); // fnds12 - wrong block number
-        // Get onchain operations start id in this block from Rollup contract
-        uint64 onchainOpsStartIdInBlock = rollup.blocks[_blockNumber].startId;
-        // Go into loop for all exit orders in block
-        for (uint64 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
-            // Get exit order by block nubmer and id
-            ExitOrder order = exitOrders[_blockNumber][i];
-            // Get real onchain operation hash from Rollup contract
-            uint256 realOpHash = uint256(keccak256(rollup.onchainOps[onchainOpsStartIdInBlock + order.onchainOpNumber].pubData));
-            // Get expected operation hash from exit order
-            uint256 expectedOpHash = order.opHash;
-
-            if (realOpHash == expectedOpHash) {
-                // If hashes are equal - add 1
-                succeeded[i] = 1;
-            } else {
-                // If hashes aren't equal - add 0
-                succeeded[i] = 0;
-            }
         }
     }
 
