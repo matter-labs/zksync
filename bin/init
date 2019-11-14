@@ -12,3 +12,4 @@ franklin db-setup
 franklin build-contracts
 franklin genesis
 franklin redeploy
+echo done.

@@ -12,7 +12,7 @@ steps:
     restore: true
     mount:
       - ./contracts/node_modules
-      - ./js/client_js/node_modules
+      - ./js/client/node_modules
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
       - ./target/cargo
@@ -92,7 +92,7 @@ steps:
     rebuild: true
     mount:
       - ./contracts/node_modules
-      - ./js/client_js/node_modules
+      - ./js/client/node_modules
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
       - ./target/cargo

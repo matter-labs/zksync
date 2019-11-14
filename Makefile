@@ -48,7 +48,7 @@ db-insert-contract:
 update-frontend-contract:
 	@bin/update-frontend-contract.sh
 
-db-reset: confirm_action db-drop db-setup db-insert-contract update-frontend-contract
+db-reset: confirm_action db-wait db-drop db-setup db-insert-contract update-frontend-contract
 	@echo database is ready
 
 db-migrate: confirm_action
@@ -90,13 +90,7 @@ image-nginx: dist-client dist-explorer
 push-image-nginx: image-nginx
 	docker push "${NGINX_DOCKER_IMAGE}"
 
-explorer-up: #dist-explorer
-	@docker build -t "${NGINX_DOCKER_IMAGE}" -f ./docker/nginx/Dockerfile .
-	@docker-compose up -d nginx
-
-
-# Rust: cross-platform rust builder for linus
-
+# Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
 rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
@@ -116,6 +110,7 @@ server:
 sandbox:
 	@cargo run --bin sandbox
 
+# See more more at https://github.com/emk/rust-musl-builder#caching-builds
 build-target:
 	$(rust-musl-builder) sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
 	$(rust-musl-builder) cargo build --release
@@ -184,15 +179,24 @@ deposit: confirm_action
 # Devops: main
 
 # (Re)deploy contracts and database
+ifeq (dev,$(FRANKLIN_ENV))
+redeploy: confirm_action stop deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
+else
 redeploy: confirm_action stop deploy-contracts db-insert-contract
+endif
 
+ifeq (dev,$(FRANKLIN_ENV))
+init-deploy: confirm_action deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
+else
 init-deploy: confirm_action deploy-contracts db-insert-contract
-
-dev-ready = docker ps | grep -q "$(GETH_DOCKER_IMAGE)"
+endif
 
 start-local:
-	@docker ps | grep -q "$(GETH_DOCKER_IMAGE)" || { echo "Dev env not ready. Try: 'franklin dev-up'" && exit 1; }
-	@docker-compose up -d --scale prover=1 server prover nginx
+	@kubectl apply -f ./etc/kube/minikube/server.yaml
+	@kubectl apply -f ./etc/kube/minikube/prover.yaml
+	./bin/kube-update-server-vars
+	@kubectl apply -f ./etc/kube/minikube/postgres.yaml
+	@kubectl apply -f ./etc/kube/minikube/geth.yaml
 
 dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
@@ -219,7 +223,13 @@ endif
 
 ifeq (dev,$(FRANKLIN_ENV))
 stop: confirm_action
-	@docker-compose stop server prover
+	@kubectl delete deployments --selector=app=dev-server
+	@kubectl delete deployments --selector=app=dev-prover
+	@kubectl delete deployments --selector=app=dev-nginx
+	@kubectl delete svc --selector=app=dev-server
+	@kubectl delete svc --selector=app=dev-nginx
+	@kubectl delete -f ./etc/kube/minikube/postgres.yaml
+	@kubectl delete -f ./etc/kube/minikube/geth.yaml
 else ifeq (ci,$(FRANKLIN_ENV))
 stop:
 else
@@ -251,9 +261,6 @@ stop-nginx:
 status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
 
-log-dc:
-	@docker-compose logs -f server prover
-
 log-server:
 	kubectl logs -f deployments/$(FRANKLIN_ENV)-server
 
@@ -283,16 +290,6 @@ dev-down:
 geth-up: geth
 	@docker-compose up geth
 
-blockscout-migrate:
-	@docker-compose up -d blockscout_postgres
-	@docker-compose run blockscout /bin/sh -c "echo $MIX_ENV && mix do ecto.drop --force, ecto.create, ecto.migrate"
-
-blockscout-up:
-	@docker-compose up -d blockscout_postgres blockscout
-
-blockscout-down:
-	@docker-compose stop blockscout blockscout_postgres
-
 
 # Auxillary docker containers for dev environment (usually no need to build, just use images from dockerhub)
 
@@ -307,7 +304,6 @@ dev-push-geth:
 
 dev-push-flattener:
 	@docker push "${FLATTENER_DOCKER_IMAGE}"
-
 # Key generator 
 
 make-keys:
