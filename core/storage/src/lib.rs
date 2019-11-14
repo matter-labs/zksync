@@ -29,7 +29,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
-use diesel::sql_types::{Int4, BigInt, Bool, Jsonb, Nullable, Text, Timestamp};
+use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
 
 use itertools::Itertools;
 use models::node::AccountAddress;
@@ -273,16 +273,16 @@ pub struct PriorityOpReceiptResponse {
 pub struct TxByHashResponse {
     #[sql_type = "Text"]
     pub tx_type: String, // all
-    
+
     #[sql_type = "Text"]
     pub from: String, // transfer(from) | deposit(our contract) | withdraw(sender)
-    
+
     #[sql_type = "Text"]
     pub to: String, // transfer(to) | deposit(sender) | withdraw(our contract)
-    
+
     #[sql_type = "Int4"]
     pub token: i32, // all
-    
+
     #[sql_type = "Text"]
     pub amount: String, // all
 
@@ -839,10 +839,7 @@ impl StorageProcessor {
         }
     }
 
-    pub fn get_tx_by_hash(
-        &self,
-        hash: &[u8]
-    ) -> QueryResult<Option<TxByHashResponse>> {
+    pub fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
         // first check executed_transactions
         let tx: Option<StoredExecutedTransaction> = executed_transactions::table
             .filter(executed_transactions::tx_hash.eq(hash))
@@ -858,24 +855,38 @@ impl StorageProcessor {
 
             let tx_type = operation["type"].as_str().unwrap_or("unknown type");
             let tx_token = operation["tx"]["token"].as_i64().unwrap_or(-1);
-            let tx_amount = operation["tx"]["amount"].as_str().unwrap_or("unknown amount");
+            let tx_amount = operation["tx"]["amount"]
+                .as_str()
+                .unwrap_or("unknown amount");
 
             let (tx_from, tx_to, tx_fee) = match tx_type {
-                "Withdraw" => {(
-                    operation["tx"]["account"].as_str().unwrap_or("unknown from").to_string(), 
-                    operation["tx"]["eth_address"].as_str().unwrap_or("unknown to").to_string(),
-                    operation["tx"]["fee"].as_str().map(|v| v.to_string())
-                )}
-                "Transfer" | "TransferToNew" => {(
-                    operation["tx"]["from"].as_str().unwrap_or("unknown from").to_string(), 
-                    operation["tx"]["to"].as_str().unwrap_or("unknown to").to_string(), 
-                    operation["tx"]["fee"].as_str().map(|v| v.to_string())
-                )}
-                &_ => {(
-                    "unknown from".to_string(), 
-                    "unknown to".to_string(), 
-                    Some("unknown fee".to_string())
-                )}
+                "Withdraw" => (
+                    operation["tx"]["account"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["tx"]["eth_address"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["tx"]["fee"].as_str().map(|v| v.to_string()),
+                ),
+                "Transfer" | "TransferToNew" => (
+                    operation["tx"]["from"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["tx"]["to"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["tx"]["fee"].as_str().map(|v| v.to_string()),
+                ),
+                &_ => (
+                    "unknown from".to_string(),
+                    "unknown to".to_string(),
+                    Some("unknown fee".to_string()),
+                ),
             };
 
             let tx_type_user = if tx_type == "TransferToNew" {
@@ -906,18 +917,32 @@ impl StorageProcessor {
             let block_number = tx.block_number;
 
             let tx_type = operation["type"].as_str().unwrap_or("unknown type");
-            let tx_token = operation["priority_op"]["token"].as_i64().expect("must be here");
-            let tx_amount = operation["priority_op"]["amount"].as_str().unwrap_or("unknown amount");
+            let tx_token = operation["priority_op"]["token"]
+                .as_i64()
+                .expect("must be here");
+            let tx_amount = operation["priority_op"]["amount"]
+                .as_str()
+                .unwrap_or("unknown amount");
 
             let (tx_from, tx_to, tx_fee) = match tx_type {
-                "Deposit" => {(
-                    operation["priority_op"]["sender"].as_str().unwrap_or("unknown from").to_string(), 
-                    operation["priority_op"]["account"].as_str().unwrap_or("unknown to").to_string(), 
-                    operation["priority_op"]["fee"].as_str().map(|v| v.to_string())
-                )}
-                &_ => {
-                    ("unknown from".to_string(), "unknown to".to_string(), Some("unknown fee".to_string()))
-                }
+                "Deposit" => (
+                    operation["priority_op"]["sender"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["priority_op"]["account"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["priority_op"]["fee"]
+                        .as_str()
+                        .map(|v| v.to_string()),
+                ),
+                &_ => (
+                    "unknown from".to_string(),
+                    "unknown to".to_string(),
+                    Some("unknown fee".to_string()),
+                ),
             };
 
             return Ok(Some(TxByHashResponse {
@@ -930,10 +955,10 @@ impl StorageProcessor {
                 block_number: block_number,
             }));
         };
-        
+
         Ok(None)
     }
-    
+
     pub fn get_account_transactions_history(
         &self,
         address: &AccountAddress,

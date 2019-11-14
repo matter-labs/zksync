@@ -256,7 +256,7 @@ impl TryFrom<Log> for PriorityOp {
                 .transaction_hash
                 .expect("It must be mined, since it's in logs")
                 .as_bytes()
-                .to_vec()
+                .to_vec(),
         })
     }
 }

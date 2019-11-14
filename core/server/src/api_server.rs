@@ -310,8 +310,8 @@ fn handle_get_tx_by_hash(req: &HttpRequest<AppState>) -> ActixResult<HttpRespons
         .map(|hash| &hash[2..])
         .ok_or_else(|| error::ErrorBadRequest("Invalid hash parameter"))?;
 
-    let hash = hex::decode(hash_str)
-        .map_err(|_| error::ErrorBadRequest("Invalid hash parameter"))?;
+    let hash =
+        hex::decode(hash_str).map_err(|_| error::ErrorBadRequest("Invalid hash parameter"))?;
 
     let storage = req
         .state()
@@ -540,19 +540,22 @@ fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<Htt
         tx_hash: String,
     };
 
-    let executed_ops_with_hashes = executed_ops.into_iter().map(|op| {
-        let tx_hash = match &op {
-            ExecutedOperations::Tx(tx) => tx.tx.hash(),
-            ExecutedOperations::PriorityOp(tx) => tx.priority_op.eth_hash.clone(),
-        };
+    let executed_ops_with_hashes = executed_ops
+        .into_iter()
+        .map(|op| {
+            let tx_hash = match &op {
+                ExecutedOperations::Tx(tx) => tx.tx.hash(),
+                ExecutedOperations::PriorityOp(tx) => tx.priority_op.eth_hash.clone(),
+            };
 
-        let tx_hash = hex::encode(&tx_hash);
+            let tx_hash = hex::encode(&tx_hash);
 
-        WithHash {
-            op: op,
-            tx_hash: tx_hash,
-        }
-    }).collect::<Vec<_>>();
+            WithHash {
+                op: op,
+                tx_hash: tx_hash,
+            }
+        })
+        .collect::<Vec<_>>();
 
     Ok(HttpResponse::Ok().json(executed_ops_with_hashes))
 }
