@@ -7,10 +7,10 @@ The main goal is to ensure the continuity of user flow. A typical use case is th
 ## Structure
 
 Main components:
-- `SwiftExits` contract - contains the main methods that are responsible for the operation of the entire swift exits system, the processing of transaction, as well as for the storage of validators tokens.
-- `Rollup` contract - the main rollup contract, it processes withdraw operations, for swift exits it repays to `SwiftExits` contract
-- `BlsVerifier` library - the library for verifying BLS signatures over BN256 curve
-- `Compound` contract - money market, allowes validatorss to borrow Ethereum assets for providing swift exit operation
+- `Governance` contract - contains the list of validators with their tokens, starts the process of SwiftExits operation. Validates aggregated signature, transfers/recieves tokens to/from `SwiftExits` contract (consummating fees to honest validators).
+- `SwiftExits` contract - contains the list of **SwiftExits** requests. Validates their states, depending on corresponding withdraw operations on `Rollup` contract. Borrows token from `Compound` contract for validators supplied tokens and sends them to request recipient. Repays tokens recieved from `Rollup` contract to `Compound` contract and validators on `Governance` contract.
+- `Rollup` contract - the main rollup contract, validates the signature of user-owner of the request. Freezes specified amount of tokens for recipient. On block verification defrosts this tokens. If request was successful - sends specifiend amount of tokens to `SwiftExits` contract to complete `SwiftExits` request.
+- `Compound` contract - money market, allowes validators to borrow Ethereum assets for providing swift exit operation
 
 ## Swift exit algorithm
 
@@ -18,37 +18,37 @@ Simplified swift exit process without special cases of early verified block and 
 ![Algorithm scheme](https://i.imgur.com/6nHBY2f.png)
 
 All process we can divide into 3 parts:
-- Sidechain: user creates operation and swift exit request, consensus signs it
+- Sidechain: user creates withdraw operation and corresponding swift exit request, supermajority of Rollup validators sign it
 - Processing exit request on contracts: validating swift exit request, borrowing tokens for it, calculating fees, sending tokens to recipient
-- Repaying borrow on contract: on blocks commit checks if request exists, on blocks verify repay borrow to compound and consummate fees or punish validators if there is no request verification
+- Repaying borrow on contract: on blocks verify checks if corresponding withdraw operation exists, then any validator can send transaction to repay borrow to compound and consummate fees or punish validators depending on request status
 
 ### Sidechain
 
-1. While creating an withdraw operation, the user can create and sign a request for a swift exit for this operation. To indicate this operation, its hash will be used. // TODO: - Discuss with Vitaly
-2. Since validators are responsible for including a user’s operation in a block, they can take responsibility for processing this request. Validators can verify the user's signature, as well as to sign this request themselves. When the required number of signatures is collected (2/3 of the total number of validators), validators send to `newSwiftExit` method of `SwiftExits` contract following data:
-   - SwiftExitRequest (sender, recepient, token, amount)
+1. While creating an withdraw operation, the user can create and sign a request for a swift exit for this operation.
+2. Since validators are responsible for including a user’s operation in a block, they can take responsibility for processing this request. Validators can verify the user's signature, as well as to sign this request themselves. When the required number of signatures is collected (2/3 of the total number of validators), validators send to `SwiftExits` contract following data:
+   - Swift exit owner, recepient, token, amount, fee, block number, corresponding operation number
+   - Owner signature
    - Aggregated signature
-   - List of validators addresses
-   - Swift exit block number and identifier
+   - List of signers
 
 ### Processing exit request on contracts
 
-1. Verification of validators signature using `BlsVerifier` library `verify` method
-2. If the specified block is validated and contains indicated withdraw operation - an instant withdraw to Layer 1 will occure if there is enough tokens on corresponding balance on `Rollup` contract. EARLY VALIDATED BLOCK - EXIT ALGORITHM
-3. If the specified block is not validated yet, there will be a check for enough free validators tokens on `SwiftExits` contract (in Matter tokens)
-4. Current rate and collateral factor for the token will be taken from `Compound` contract to calculate validators supply tokens amount and fees
-5. `SwiftExitRequest`, that contains swift exit information, will be stored on `SwiftExits` contract
-6. The required amount of validators tokens will be borrowed on `SwiftExits` contract to support borrow from compound
-7. A borrow of tokens from `Compound` contract to `SwiftExits` contract for validators tokens will occurre
-8. Tokens will be sent to the recipient from `SwiftExits` contract
-9. New `RepaymentRequest`, that contains swift exit information and its status (committed/none), will be created on `Rollup` contract.
+1. Verification of validators aggregated signature on `Governance` contract and owner signature on `Rollup` 
+2. If the specified block is not validated yet, there will be a check for enough free validators tokens on `Governance` contract (in Matter tokens)
+3. Current rate and collateral factor for the token will be taken from `Compound` contract to calculate validators supply tokens amount
+4. Swift exit data will be stored on `SwiftExits` contract, containing swift exit information
+5. The required amount of validators tokens will be borrowed on `SwiftExits` contract to support borrow from compound
+6. A borrow of tokens from `Compound` contract to `SwiftExits` contract for validators tokens will occurre
+7. Tokens will be sent to the recipient from `SwiftExits` contract
+8. Needed amount of tokens will be frozen on `Rollup` contract for request recipient
 
 ### Repaying borrow on contract
 
-1. When the specified block is committed on `Rollup` contract (or if it has been already committed), the relevant `RepaymentRequest`s will be marked as `committed`
-2. When the specified block is verified on `Rollup` contract, it will check relevant `RepaymentRequest`s for `committed` mark and send required number of tokens to `SwiftExits` contract.
-3. `SwiftExits` contract will repay a debt to `Compound` and will get validators tokens, fees will be sent to validators accounts on `Rollup` contract
-4. If the verified block does not have the corresponding withdrawal operation, but `RepaymentRequest` for it created, the punishment process will start. An intersection of the validators who signed the swift exit request and the validators who verified the block without corresponding withdraw operation will be found. The borrowed amount will be held from them in no return. The rest of the validators will receive their tokens
+1. When the specified block is verified on `Rollup` contract there will be a check to find for swift exits their corresponding withdraw operations in block
+2. The frozen funds will be defrosted on `Rollup` contract
+3. If the block contains correct swift exit - its amount will be sent to `SwiftExits` contract
+4. `SwiftExits` contract will repay a debt to `Compound` and will get validators tokens, fees will be sent to validators accounts on `Rollup` contract
+5. If the verified block does not have the corresponding withdrawal operation, the punishment process will start. An intersection of the validators who signed the swift exit request and the validators who verified the block without corresponding withdraw operation will be found. The borrowed amount will be held from them in no return. The rest of the validators will receive their tokens
 
 <!-- Full swift exit process without special cases of early verified block and punishment of validators. Contains complete inner contracts logic:
 [Algorithm scheme](https://i.imgur.com/5UDLLGi.png) -->

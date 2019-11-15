@@ -77,7 +77,7 @@ contract Governance {
     }
 
     /// @notice Set new swift exits address
-    /// @param _address Trusted address
+    /// @param _address SwiftExits contract address
     function setSwiftExitsAddress(address _address) external {
         requireGovernor();
         swiftExits = SwiftExits(address);
