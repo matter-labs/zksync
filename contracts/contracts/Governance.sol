@@ -2,10 +2,14 @@ pragma solidity ^0.5.8;
 
 import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 import "./BlsOperations.sol";
+import "./SwiftExits.sol";
 
 /// @title Governance Contract
 /// @author Matter Labs
 contract Governance {
+
+    /// @notice SwiftExits contract
+    SwiftExits swiftExits;
 
     /// @notice Address which will excercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
@@ -16,8 +20,8 @@ contract Governance {
     /// @notice validators count
     uint256 public validatorsCount;
 
-    /// @notice Trusted addresses to withdraw funds
-    mapping(address => bool) public trustedAddresses;
+    /// @notice Matter token id
+    uint16 public matterTokenId;
 
     /// @notice List of registered tokens by tokenId
     mapping(uint16 => address) public tokenAddresses;
@@ -72,10 +76,28 @@ contract Governance {
         networkGovernor = _networkGovernor;
     }
 
+    /// @notice Set new swift exits address
+    /// @param _address Trusted address
+    function setSwiftExitsAddress(address _address) external {
+        requireGovernor();
+        swiftExits = SwiftExits(address);
+    }
+
     /// @notice Fallback function
     /// @dev Reverts all payments in Ether
     function() external payable {
         revert("Cant accept ether in fallback function");
+    }
+
+    /// @notice Set Matter token id
+    /// @param _matterTokenId Matter token id
+    function setMatterTokenId(uint16 _matterTokenId) external {
+        requireGovernor();
+        require(
+            validateTokenId(_matterTokenId) != address(0),
+             "gesd11"
+        ); // gean11 - token doesn't exists
+        matterTokenId = _matterTokenId;
     }
 
     /// @notice Change current governor
@@ -201,44 +223,78 @@ contract Governance {
         validatorsInfo[_address].isActive = _active;
     }
 
-    /// @notice Verifies sender presence in bitmask and aggregated signature
-    /// @param _sender Sender of the request
-    /// @param _aggrSignatureX Aggregated signature X
-    /// @param _aggrSignatureY Aggregated signature Y
-    /// @param _signersBitmask Signers bitmask
-    /// @param _messageHash Message hash
-    function verifySenderAndBlsSignature(
-        address _sender,
-        uint256 _aggrSignatureX,
-        uint256 _aggrSignatureY,
-        uint256 _signersBitmask,
-        uint256 _messageHash
-    )
-        external
-        view
-        returns (bool result)
-    {
-        // If there is only 1 validator and he is sender - return true (single operator model)
-        if (validatorsCount == 1 && validators[0] == _sender) {
-            return true;
+
+    /// @notice Sends the swift exit request, signed by user and validators, to SwiftExits contract, borrows tokens for it from validators, freezes tokens on rollup contract
+    /// @param _swiftExit Signed swift exit data: block number, onchain op number, acc number, token id, token amount, fee amount, recipient, author
+    /// @param _supplyAmount Supplied matter token amount
+    /// @param _userSigV User signature v
+    /// @param _userSigR User signature r
+    /// @param _userSigS User signature s
+    /// @param _signersAggrSigX Aggregated validators signature x
+    /// @param _signersAggrSigY Aggregated validators signature y
+    /// @param _signersBitmask Validators-signers bitmask
+    function createSwiftExitRequest(
+        bytes memory _swiftExit,
+        uint256 _supplyAmount,
+        uint8 _userSigV,
+        bytes32 _userSigR,
+        bytes32 _userSigS,
+        uint256 _signersAggrSigX,
+        uint256 _signersAggrSigY,
+        uint16 _signersBitmask
+    ) external {
+        // Swift Exit hash
+        uint256 swiftExitHash = uint256(keccak256(_swiftExit));
+        
+        // Verify sender and validators signature
+        require(
+            verifySenderAndBlsSignature(
+                msg.sender,
+                _signersAggrSigX,
+                _signersAggrSigY,
+                _signersBitmask,
+                swiftExitHash
+            ),
+            "gect11"
+        ); // "gect11" - wrong signature or validator-sender is not in signers bitmask
+        
+        // Check that there are enouth free tokens on contract
+        uint256 totalSupply = funds[matterTokenId];
+        require(
+            totalSupply >= _supplyAmount,
+            "gect12"
+        ); // "gect12" - not enouth amount
+
+        // Send tokens to swiftExits
+        address tokenAddress = validateTokenId(matterTokenId);
+        require(
+            IERC20(tokenAddress).transfer(address(swiftExits), _supplyAmount),
+            "gect13"
+        ); // gect13 - token transfer out failed
+
+        // Reduce validators balances
+        for(uint16 i = 0; i < validatorsCount; i++) {
+            validatorsBalances[validators[i]][matterTokenId] -= _supplyAmount * validatorsBalances[validators[i]][matterTokenId] / totalSupply;
         }
+        // Reduce total balance
+        funds[matterTokenId] -= _amount;
 
-        // Check if sender is in bitmask
-        uint16 validatorId = validatorsInfo[_sender].id;
-        require(
-            (_signersBitmask >> validatorId) & 1 > 0,
-            "geve11"
-        ); // geve11 - sender is not in validators bitmask
+        // Add the swift exit on SwiftExits contract
+        swiftExits.addSwiftExit(
+            _swiftExit,
+            matterTokenId,
+            _supplyAmount,
+            validatorsCount,
+            msg.sender
+        );
 
-        // Bls signature veification
-        BlsOperations.G1Point memory signature = BlsOperations.G1Point(_aggrSignatureX, _aggrSignatureY);
-        BlsOperations.G1Point memory mpoint = BlsOperations.messageHashToG1(_messageHash);
-        (BlsOperations.G2Point memory aggrPubkey, uint16 signersCount) = getValidatorsAggrPubkey(_signersBitmask);
-        require(
-            signersCount >= 2 * validatorsCount / 3,
-            "geve12"
-        ); // geve12 - not enouth validators count
-        return BlsOperations.pairing(mpoint, aggrPubkey, signature, BlsOperations.negate(BlsOperations.generatorG2()));
+        // Freeze funds on rollup contract
+        rollup.freezeFunds(
+            _swiftExit,
+            _userSigV,
+            _userSigR,
+            _userSigS
+        );
     }
 
     /// @notice Checks if validator is active
@@ -265,6 +321,46 @@ contract Governance {
                 signersCount++;
             }
         }
+    }
+
+    /// @notice Verifies sender presence in bitmask and aggregated signature
+    /// @param _sender Sender of the request
+    /// @param _aggrSignatureX Aggregated signature X
+    /// @param _aggrSignatureY Aggregated signature Y
+    /// @param _signersBitmask Signers bitmask
+    /// @param _messageHash Message hash
+    function verifySenderAndBlsSignature(
+        address _sender,
+        uint256 _aggrSignatureX,
+        uint256 _aggrSignatureY,
+        uint256 _signersBitmask,
+        uint256 _messageHash
+    )
+        internal
+        view
+        returns (bool result)
+    {
+        // If there is only 1 validator and he is sender - return true (single operator model)
+        if (validatorsCount == 1 && validators[0] == _sender) {
+            return true;
+        }
+
+        // Check if sender is in bitmask
+        uint16 validatorId = validatorsInfo[_sender].id;
+        require(
+            (_signersBitmask >> validatorId) & 1 > 0,
+            "geve11"
+        ); // geve11 - sender is not in validators bitmask
+
+        // Bls signature veification
+        BlsOperations.G1Point memory signature = BlsOperations.G1Point(_aggrSignatureX, _aggrSignatureY);
+        BlsOperations.G1Point memory mpoint = BlsOperations.messageHashToG1(_messageHash);
+        (BlsOperations.G2Point memory aggrPubkey, uint16 signersCount) = getValidatorsAggrPubkey(_signersBitmask);
+        require(
+            signersCount >= 2 * validatorsCount / 3,
+            "geve12"
+        ); // geve12 - not enouth validators count
+        return BlsOperations.pairing(mpoint, aggrPubkey, signature, BlsOperations.negate(BlsOperations.generatorG2()));
     }
 
     /// @notice Supplies specified amount of ERC20 tokens to validator balance
@@ -294,30 +390,48 @@ contract Governance {
         validatorsBalances[_validator][0] += _amount;
     }
 
-    /// @notice Withdraws specified amount from validators supply
+    /// @notice Withdraws specified amount of ERC20 tokens from validators supply
     /// @dev Requires allowed amount is >= specified amount, which should be > 0
     /// @param _tokenAddress Token address
     /// @param _amount Specified amount
-    function withdraw(address _tokenAddress, uint256 _amount) external {
+    function withdrawErc20(address _tokenAddress, uint256 _amount) external {
         require(
             _amount > 0,
             "geww11"
         ); // geww11 - amount must be > 0
         address tokenId = validateTokenAddress(_tokenAddress);
         require(
-            getAllowedWithdrawAmount(msg.sender, tokenId) >= _amount,
+            tokenId > 0,
             "geww12"
-        ); // geww12 - wrong amount - higher than allowed
-        if (tokenId == 0) {
-            msg.sender.transfer(_amount); // transfer ether
-        } else {
-            require(
-                IERC20(_tokenAddress).transfer(msg.sender, _amount),
-                "geww13"
-            ); // geww13 - token transfer out failed
-        }
+        ); // geww12 - wrong token address
+        require(
+            getAllowedWithdrawAmount(msg.sender, tokenId) >= _amount,
+            "geww13"
+        ); // geww13 - wrong amount - higher than allowed
+        require(
+            IERC20(_tokenAddress).transfer(msg.sender, _amount),
+            "geww13"
+        ); // geww14 - token transfer out failed
         funds[tokenId] -= _amount;
         validatorsBalances[msg.sender][tokenId] -= _amount;
+    }
+
+    /// @notice Withdraws specified amount of Ether from validators supply
+    /// @dev Requires allowed amount is >= specified amount, which should be > 0
+    /// @param _amount Specified amount
+    function withdrawEther(uint256 _amount) external {
+        require(
+            _amount > 0,
+            "geww11"
+        ); // geww11 - amount must be > 0
+        require(
+            getAllowedWithdrawAmount(msg.sender, 0) >= _amount,
+            "geww12"
+        ); // geww12 - wrong amount - higher than allowed
+        // transfer ether
+        msg.sender.transfer(_amount);
+        funds[0] -= _amount;
+        validatorsBalances[msg.sender][0] -= _amount;
     }
     
     /// @notice Gets allowed withdraw amount for validator
@@ -334,44 +448,6 @@ contract Governance {
         }
     }
 
-    /// @notice Set new trusted address
-    /// @param _address Trusted address
-    function setTrustedAddress(address _address) external {
-        requireGovernor();
-        trustedAddresses[_address] = true;
-    }
-
-    /// @notice Borrows validators funds to trusted address and returns suppliers count
-    /// @param _tokenId Token id
-    /// @param _amount Token amount
-    function borrowToTrustedAddress(uint16 _tokenId, uint256 _amount) external returns(uint16 suppliersCount) {
-        require(
-            trustedAddresses[msg.sender],
-             "gerr11"
-        ); // gerr11 - not trusted address
-
-        address tokenAddress = validateTokenId(_tokenId);
-
-        uint256 supply = funds[_tokenId];
-        if (supply < _amount) {
-            return 0;
-        }
-        if (_tokenId == 0) {
-            msg.sender.transfer(_amount);
-        } else {
-            require(
-                IERC20(tokenAddress).transfer(swiftExits, _amount),
-                "gett11"
-            ); // gett11 - token transfer out failed
-        }
-
-        for(uint16 i = 0; i < validatorsCount; i++) {
-            validatorsBalances[validators[i]][_tokenId] -= _amount * validatorsBalances[validators[i]][_tokenId] / funds[_tokenId];
-        }
-        funds[_tokenId] -= _amount;
-        return validatorsCount;
-    }
-
     /// @notice Repays specified amount of ERC20 token into contract
     /// @param _tokenId Token id
     /// @param _amount Token aount
@@ -386,15 +462,15 @@ contract Governance {
         external
     {
         require(
-            trustedAddresses[msg.sender],
+            msg.sender == address(swiftExit),
              "gerr11"
-        ); // gerr11 - not trusted address
+        ); // gerr11 - not swift exit contract address
 
         address tokenAddress = validateTokenId(_tokenId);
         require(
             IERC20(tokenAddress).transferFrom(msg.sender, address(this), _amount),
-            "get011"
-        ); // get011 - token transfer in failed
+            "gerr12"
+        ); // gerr12 - token transfer in failed
 
         for(uint8 i = 0; i < _validatorsCount; i++) {
             if( (_excludedValidatorsBitmask >> i) & 1 == 0 ) {
@@ -409,9 +485,9 @@ contract Governance {
     /// @param _excludedValidatorsBitmask Excluded validators bitmask
     function repayInEther(uint16 _validatorsCount, uint16 _excludedValidatorsBitmask) external payable {
         require(
-            trustedAddresses[msg.sender],
+            msg.sender == address(swiftExit),
              "gerr11"
-        ); // gerr11 - not trusted address
+        ); // gerr21 - not swift exit contract address
 
         for(uint8 i = 0; i < _validatorsCount; i++) {
             if( (_excludedValidatorsBitmask >> i) & 1 == 0 ) {
