@@ -4,6 +4,7 @@ import EdwardsPoint = curve.edwards.EdwardsPoint;
 import { sha256 } from "js-sha256";
 import edwards = curve.edwards;
 import { Signature } from "./types";
+import { buffer2bitsBE, buffer2bitsLE } from "./utils";
 
 const blake2b = require("blake2b");
 const elliptic = require("elliptic");
@@ -118,38 +119,6 @@ function genPedersonHashLookupTable() {
     return table;
 }
 
-function buffer2bits_le(buff) {
-    const res = new Array(buff.length * 8);
-    for (let i = 0; i < buff.length; i++) {
-        const b = buff[i];
-        res[i * 8] = (b & 0x01) != 0;
-        res[i * 8 + 1] = (b & 0x02) != 0;
-        res[i * 8 + 2] = (b & 0x04) != 0;
-        res[i * 8 + 3] = (b & 0x08) != 0;
-        res[i * 8 + 4] = (b & 0x10) != 0;
-        res[i * 8 + 5] = (b & 0x20) != 0;
-        res[i * 8 + 6] = (b & 0x40) != 0;
-        res[i * 8 + 7] = (b & 0x80) != 0;
-    }
-    return res;
-}
-
-function buffer2bits_be(buff) {
-    const res = new Array(buff.length * 8);
-    for (let i = 0; i < buff.length; i++) {
-        const b = buff[i];
-        res[i * 8] = (b & 0x80) != 0;
-        res[i * 8 + 1] = (b & 0x40) != 0;
-        res[i * 8 + 2] = (b & 0x20) != 0;
-        res[i * 8 + 3] = (b & 0x10) != 0;
-        res[i * 8 + 4] = (b & 0x08) != 0;
-        res[i * 8 + 5] = (b & 0x04) != 0;
-        res[i * 8 + 6] = (b & 0x02) != 0;
-        res[i * 8 + 7] = (b & 0x01) != 0;
-    }
-    return res;
-}
-
 export function pedersenHash(
     input: Buffer,
     bit_endianness: "le" | "be" = "le"
@@ -157,9 +126,9 @@ export function pedersenHash(
     const personaizationBits = new Array(6).fill(true);
     let bits;
     if (bit_endianness == "le") {
-        bits = personaizationBits.concat(buffer2bits_le(input));
+        bits = personaizationBits.concat(buffer2bitsLE(input));
     } else {
-        bits = personaizationBits.concat(buffer2bits_be(input));
+        bits = personaizationBits.concat(buffer2bitsBE(input));
     }
 
     function fsToPoint(fs, generator) {

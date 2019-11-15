@@ -99,7 +99,7 @@ export class ETHProxy {
                 SYNC_GOV_CONTRACT_INTERFACE,
                 this.ethersProvider
             );
-            let tokenId = await syncContract.tokenIds(token);
+            const tokenId = await syncContract.tokenIds(token);
             if (tokenId == 0) {
                 throw new Error(
                     `ERC20 token is not supported address: ${token}`

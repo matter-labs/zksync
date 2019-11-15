@@ -1,32 +1,41 @@
 import BN = require("bn.js");
-import { ethers } from "ethers";
+import { utils } from "ethers";
+import { bigNumberify } from "ethers/utils";
+
+const AMOUNT_EXPONENT_BIT_WIDTH = 5;
+const AMOUNT_MANTISSA_BIT_WIDTH = 35;
+const FEE_EXPONENT_BIT_WIDTH = 5;
+const FEE_MANTISSA_BIT_WIDTH = 11;
 
 export function floatToInteger(
     floatBytes: Buffer,
-    exp_bits: number,
-    mantissa_bits: number,
-    exp_base: number
+    expBits: number,
+    mantissaBits: number,
+    expBaseNumber: number
 ): BN {
+    if (floatBytes.length * 8 != mantissaBits + expBits) {
+        throw new Error("Float unpacking, incorrect input length");
+    }
+
     const floatHolder = new BN(floatBytes, 16, "be"); // keep bit order
-    const totalBits = floatBytes.length * 8 - 1; // starts from zero
-    const expBase = new BN(exp_base);
+    const expBase = new BN(expBaseNumber);
     let exponent = new BN(0);
-    let exp_power_of_to = new BN(1);
+    let expPow2 = new BN(1);
     const two = new BN(2);
-    for (let i = 0; i < exp_bits; i++) {
-        if (floatHolder.testn(totalBits - i)) {
-            exponent = exponent.add(exp_power_of_to);
+    for (let i = 0; i < expBits; i++) {
+        if (floatHolder.testn(i)) {
+            exponent = exponent.add(expPow2);
         }
-        exp_power_of_to = exp_power_of_to.mul(two);
+        expPow2 = expPow2.mul(two);
     }
     exponent = expBase.pow(exponent);
     let mantissa = new BN(0);
-    let mantissa_power_of_to = new BN(1);
-    for (let i = 0; i < mantissa_bits; i++) {
-        if (floatHolder.testn(totalBits - exp_bits - i)) {
-            mantissa = mantissa.add(mantissa_power_of_to);
+    let mantissaPow2 = new BN(1);
+    for (let i = expBits; i < expBits + mantissaBits; i++) {
+        if (floatHolder.testn(i)) {
+            mantissa = mantissa.add(mantissaPow2);
         }
-        mantissa_power_of_to = mantissa_power_of_to.mul(two);
+        mantissaPow2 = mantissaPow2.mul(two);
     }
     return exponent.mul(mantissa);
 }
@@ -103,10 +112,10 @@ export function integerToFloat(
     }
 
     for (let i = 0; i < mantissa_bits; ++i) {
-        if (mantissa.and(new BN(1 << i)).eqn(0)) {
-            encoding.push(false);
-        } else {
+        if (mantissa.testn(i)) {
             encoding.push(true);
+        } else {
+            encoding.push(false);
         }
     }
 
@@ -126,20 +135,44 @@ export function reverseBits(buffer: Buffer): Buffer {
 }
 
 function packAmount(amount: BN): Buffer {
-    return reverseBits(integerToFloat(amount, 5, 19, 10));
+    return reverseBits(
+        integerToFloat(
+            amount,
+            AMOUNT_EXPONENT_BIT_WIDTH,
+            AMOUNT_MANTISSA_BIT_WIDTH,
+            10
+        )
+    );
 }
 
 function packFee(amount: BN): Buffer {
-    return reverseBits(integerToFloat(amount, 6, 10, 10));
+    return reverseBits(
+        integerToFloat(
+            amount,
+            FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH,
+            10
+        )
+    );
 }
 
 export function packAmountChecked(amount: BN): Buffer {
-    // TODO: check is amount is packable;
+    if (
+        closestPackableTransactionAmount(amount.toString()).toString() !==
+        amount.toString()
+    ) {
+        throw new Error("Transaction Amount is not packable");
+    }
     return packAmount(amount);
 }
 
 export function packFeeChecked(amount: BN): Buffer {
-    // TODO: check is amount is packable;
+    if (
+        closestPackableTransactionFee(amount.toString()).toString() !==
+        amount.toString()
+    ) {
+        throw new Error("Fee Amount is not packable");
+    }
     return packFee(amount);
 }
 
@@ -147,44 +180,19 @@ export function packFeeChecked(amount: BN): Buffer {
  * packs and unpacks the amount, returning the closest packed value.
  * e.g 1000000003 => 1000000000
  * @param amount
- * @param AMOUNT_EXPONENT_BIT_WIDTH
- * @param AMOUNT_MANTISSA_BIT_WIDTH
  */
-function packedHelper(
-    amount: ethers.utils.BigNumberish,
-    AMOUNT_EXPONENT_BIT_WIDTH: number,
-    AMOUNT_MANTISSA_BIT_WIDTH: number
-) {
-    const amountStr10 = ethers.utils.bigNumberify(amount).toString();
-    const bn = new BN(amountStr10, 10);
-
-    const packed = integerToFloat(
-        bn,
-        AMOUNT_EXPONENT_BIT_WIDTH,
-        AMOUNT_MANTISSA_BIT_WIDTH,
-        10
-    );
-    const unpacked = floatToInteger(
-        packed,
-        AMOUNT_EXPONENT_BIT_WIDTH,
-        AMOUNT_MANTISSA_BIT_WIDTH,
-        10
-    );
-    return unpacked.toString(10);
-}
-
-/**
- * packs and unpacks the amount, returning the closest packed value.
- * e.g 1000000003 => 1000000000
- * @param amount
- */
-export function packedAmount(amount: ethers.utils.BigNumberish) {
-    const AMOUNT_EXPONENT_BIT_WIDTH = 5;
-    const AMOUNT_MANTISSA_BIT_WIDTH = 19;
-    return packedHelper(
-        amount,
-        AMOUNT_EXPONENT_BIT_WIDTH,
-        AMOUNT_MANTISSA_BIT_WIDTH
+export function closestPackableTransactionAmount(
+    amount: utils.BigNumberish
+): utils.BigNumber {
+    const amountBN = new BN(utils.bigNumberify(amount).toString());
+    const packedAmount = packAmount(amountBN);
+    return bigNumberify(
+        floatToInteger(
+            packedAmount,
+            AMOUNT_EXPONENT_BIT_WIDTH,
+            AMOUNT_MANTISSA_BIT_WIDTH,
+            10
+        ).toString()
     );
 }
 
@@ -193,8 +201,49 @@ export function packedAmount(amount: ethers.utils.BigNumberish) {
  * e.g 1000000003 => 1000000000
  * @param fee
  */
-export function packedFee(fee: ethers.utils.BigNumberish) {
-    const FEE_EXPONENT_BIT_WIDTH = 4;
-    const FEE_MANTISSA_BIT_WIDTH = 4;
-    return packedHelper(fee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH);
+export function closestPackableTransactionFee(
+    fee: utils.BigNumberish
+): utils.BigNumber {
+    const feeBN = new BN(utils.bigNumberify(fee).toString());
+    const packedFee = packFee(feeBN);
+    return bigNumberify(
+        floatToInteger(
+            packedFee,
+            FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH,
+            10
+        ).toString()
+    );
+}
+
+export function buffer2bitsLE(buff) {
+    const res = new Array(buff.length * 8);
+    for (let i = 0; i < buff.length; i++) {
+        const b = buff[i];
+        res[i * 8] = (b & 0x01) != 0;
+        res[i * 8 + 1] = (b & 0x02) != 0;
+        res[i * 8 + 2] = (b & 0x04) != 0;
+        res[i * 8 + 3] = (b & 0x08) != 0;
+        res[i * 8 + 4] = (b & 0x10) != 0;
+        res[i * 8 + 5] = (b & 0x20) != 0;
+        res[i * 8 + 6] = (b & 0x40) != 0;
+        res[i * 8 + 7] = (b & 0x80) != 0;
+    }
+    return res;
+}
+
+export function buffer2bitsBE(buff) {
+    const res = new Array(buff.length * 8);
+    for (let i = 0; i < buff.length; i++) {
+        const b = buff[i];
+        res[i * 8] = (b & 0x80) != 0;
+        res[i * 8 + 1] = (b & 0x40) != 0;
+        res[i * 8 + 2] = (b & 0x20) != 0;
+        res[i * 8 + 3] = (b & 0x10) != 0;
+        res[i * 8 + 4] = (b & 0x08) != 0;
+        res[i * 8 + 5] = (b & 0x04) != 0;
+        res[i * 8 + 6] = (b & 0x02) != 0;
+        res[i * 8 + 7] = (b & 0x01) != 0;
+    }
+    return res;
 }

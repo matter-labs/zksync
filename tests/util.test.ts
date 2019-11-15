@@ -1,24 +1,30 @@
 import { expect } from "chai";
 import BN = require("bn.js");
-import { floatToInteger, integerToFloat } from "../src/utils";
+import {
+    closestPackableTransactionAmount,
+    closestPackableTransactionFee
+} from "../src/utils";
 import { pedersenHash } from "../src/crypto";
+import { bigNumberify } from "ethers/utils";
 
 describe("Packing and unpacking", function() {
-    it("Test round-trip", function() {
-        let initial_fee = new BN("120000000");
-        let packed_fee = integerToFloat(initial_fee, 4, 4, 10);
-        console.log("Fee: ", initial_fee.toString(), " ", packed_fee);
-        let unpacked_fee = floatToInteger(packed_fee, 4, 4, 10);
-        expect(initial_fee.eq(unpacked_fee)).to.equal(true, "Fee packing");
-
-        let initial_amount = new BN("987650000000000000000");
-        let packed_amount = integerToFloat(initial_amount, 5, 19, 10);
-        console.log("Amount: ", initial_amount.toString(), " ", packed_amount);
-        let unpacked_amount = floatToInteger(packed_amount, 5, 19, 10);
-        expect(initial_amount.eq(unpacked_amount)).to.equal(
-            true,
-            "Amount packing"
-        );
+    it("Test basic fee packing/unpacking", function() {
+        let nums = [
+            "0",
+            "1",
+            "2",
+            "2047000",
+            "1000000000000000000000000000000000"
+        ];
+        for (let num of nums) {
+            const bigNumberAmount = bigNumberify(num);
+            expect(
+                closestPackableTransactionFee(bigNumberAmount).toString()
+            ).equal(bigNumberAmount.toString(), "fee packing");
+            expect(
+                closestPackableTransactionAmount(bigNumberAmount).toString()
+            ).equal(bigNumberAmount.toString(), "amount packing");
+        }
     });
 });
 
