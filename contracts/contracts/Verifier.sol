@@ -4,7 +4,7 @@ pragma solidity ^0.5.8;
 import "./VerificationKey.sol";
 
 contract Verifier is VerificationKey {
-    bool constant DUMMY_VERIFIER = true;
+    bool constant DUMMY_VERIFIER = false;
 
     // Proof verification
     // Params:
