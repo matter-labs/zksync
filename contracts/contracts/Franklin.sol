@@ -56,7 +56,7 @@ contract Franklin {
     uint256 constant NOOP_LENGTH = 1 * 8; // noop
     uint256 constant DEPOSIT_LENGTH = 6 * 8; // deposit
     uint256 constant TRANSFER_TO_NEW_LENGTH = 5 * 8; // transfer
-    uint256 constant PARTIAL_EXIT_LENGTH = 6 * 8; // partial exit
+    uint256 constant PARTIAL_EXIT_LENGTH = 8 * 8; // partial exit
     uint256 constant CLOSE_ACCOUNT_LENGTH = 1 * 8; // close account
     uint256 constant TRANSFER_LENGTH = 2 * 8; // transfer
     uint256 constant FULL_EXIT_LENGTH = 18 * 8; // full exit
@@ -596,9 +596,9 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.PartialExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES + ETH_ADDR_BYTES);
             require(
-                pubData.length == ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES,
+                pubData.length == ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES + ETH_ADDR_BYTES,
                 "fpp12"
             ); // fpp12 - wrong partial exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
