@@ -100,60 +100,6 @@ library BN256G2 {
         );
     }
 
-    /**
-     * @notice Multiply a twist point by a scalar
-     * @param s     Scalar to multiply by
-     * @param pt1xx Coefficient 1 of x
-     * @param pt1xy Coefficient 2 of x
-     * @param pt1yx Coefficient 1 of y
-     * @param pt1yy Coefficient 2 of y
-     * @return (pt2xx, pt2xy, pt2yx, pt2yy)
-     */
-    function ECTwistMul(
-        uint256 s,
-        uint256 pt1xx, uint256 pt1xy,
-        uint256 pt1yx, uint256 pt1yy
-    ) internal view returns (
-        uint256, uint256,
-        uint256, uint256
-    ) {
-        uint256 pt1zx = 1;
-        if (
-            pt1xx == 0 && pt1xy == 0 &&
-            pt1yx == 0 && pt1yy == 0
-        ) {
-            pt1xx = 1;
-            pt1yx = 1;
-            pt1zx = 0;
-        } else {
-            assert(_isOnCurve(
-                pt1xx, pt1xy,
-                pt1yx, pt1yy
-            ));
-        }
-
-        uint256[6] memory pt2 = _ECTwistMulJacobian(
-            s,
-            pt1xx, pt1xy,
-            pt1yx, pt1yy,
-            pt1zx, 0
-        );
-
-        return _fromJacobian(
-            pt2[PTXX], pt2[PTXY],
-            pt2[PTYX], pt2[PTYY],
-            pt2[PTZX], pt2[PTZY]
-        );
-    }
-
-    /**
-     * @notice Get the field modulus
-     * @return The field modulus
-     */
-    function GetFieldModulus() internal pure returns (uint256) {
-        return FIELD_MODULUS;
-    }
-
     function submod(uint256 a, uint256 b, uint256 n) internal pure returns (uint256) {
         return addmod(a, n - b, n);
     }
@@ -196,14 +142,6 @@ library BN256G2 {
             submod(xx, yx, FIELD_MODULUS),
             submod(xy, yy, FIELD_MODULUS)
         );
-    }
-
-    function _FQ2Div(
-        uint256 xx, uint256 xy,
-        uint256 yx, uint256 yy
-    ) internal view returns (uint256, uint256) {
-        (yx, yy) = _FQ2Inv(yx, yy);
-        return _FQ2Mul(xx, xy, yx, yy);
     }
 
     function _FQ2Inv(uint256 x, uint256 y) internal view returns (uint256, uint256) {
@@ -366,35 +304,5 @@ library BN256G2 {
         (pt2xx, pt2xy) = _FQ2Mul(pt2xx, pt2xy, pt1zx, pt1zy); // newx = 2 * H * S
         (pt2zx, pt2zy) = _FQ2Mul(pt1zx, pt1zy, pt2zx, pt2zy); // S * S_squared
         (pt2zx, pt2zy) = _FQ2Muc(pt2zx, pt2zy, 8);            // newz = 8 * S * S_squared
-    }
-
-    function _ECTwistMulJacobian(
-        uint256 d,
-        uint256 pt1xx, uint256 pt1xy,
-        uint256 pt1yx, uint256 pt1yy,
-        uint256 pt1zx, uint256 pt1zy
-    ) internal pure returns (uint256[6] memory pt2) {
-        while (d != 0) {
-            if ((d & 1) != 0) {
-                pt2 = _ECTwistAddJacobian(
-                    pt2[PTXX], pt2[PTXY],
-                    pt2[PTYX], pt2[PTYY],
-                    pt2[PTZX], pt2[PTZY],
-                    pt1xx, pt1xy,
-                    pt1yx, pt1yy,
-                    pt1zx, pt1zy);
-            }
-            (
-                pt1xx, pt1xy,
-                pt1yx, pt1yy,
-                pt1zx, pt1zy
-            ) = _ECTwistDoubleJacobian(
-                pt1xx, pt1xy,
-                pt1yx, pt1yy,
-                pt1zx, pt1zy
-            );
-
-            d = d / 2;
-        }
     }
 }
