@@ -28,9 +28,34 @@ constructor(signer: SyncSigner, provider: SyncProvider, ethProxy: ETHProxy);
 | provider | Sync provider that is used for submitting transaction to the Sync network. |
 | ethProxy | Ethereum proxy that is used for read-only access to the ethereum network. |
 
+## static async fromEthWallet
+
+### Signature
+```typescript
+static async fromEthWallet(
+    ethWallet: ethers.Signer,
+    provider: SyncProvider,
+    ethProxy: ETHProxy
+): Promise<SyncWallet>;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| ethWallet | `Signer` from `ethers.js` that is used to created random seed for `SyncSigner`|
+| provider | Sync provider that is used for submitting transaction to the Sync network. |
+| ethProxy | Ethereum proxy that is used for read-only access to the ethereum network. |
+| returns | `SyncWallet` derived from ethereum wallet |
+
 ## async syncTransfer
 
 Moves funds between accounts inside Sync network.
+
+{% hint style="alert" %}
+Transfer amount and fee should have limited number of significant digits according to spec.
+{% endhint %}
+
 
 ### Signature
 ```typescript
@@ -78,6 +103,24 @@ async withdrawTo(
 | token | token to be transfered ("ETH" or address of the ERC20 token) |
 | amount | amount of token to be transferred |
 | fee | amount of token to be payed as a fee for this transaction |
+| nonce | Nonce that is going to be used for this transaction. ("commited" is used for the last known nonce for this account) |
+| returns | Handle of the submitted transaction | 
+
+## async close
+
+Removes account from the Sync network.
+
+### Signature
+```typescript
+async close(
+    nonce: "commited" | number = "commited"
+): Promise<TransactionHandle>;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
 | nonce | Nonce that is going to be used for this transaction. ("commited" is used for the last known nonce for this account) |
 | returns | Handle of the submitted transaction | 
 
@@ -195,3 +238,146 @@ Returns when deposit block was verified in the Sync network.
 ```typescript
 async waitVerify();
 ```
+# class SyncSigner
+
+## static fromPrivateKey
+
+### Signature
+
+```typescript
+static fromPrivateKey(pk: BN): SyncSigner;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| pk | private key |
+| returns | `SyncSigner` derived from private key | 
+
+## static fromSeed
+
+### Signature
+
+```typescript
+static fromSeed(seed: Buffer): SyncSigner;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| seed | Random bytes array (should be >= 32 bytes long) |
+| returns | `SyncSigner` derived from this seed | 
+
+## address
+
+### Signature
+
+```typescript
+address(): SyncAddress;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| returns | Address of the Sync account derrived from corresponding public key | 
+
+## signSyncTransfer
+
+Signs transfer transaction, result can be submitted to the Sync network.
+Sender for this transaction is assumed to be this `SyncSigner` address.
+
+### Signature
+
+```typescript
+signSyncTransfer(transfer: {
+    to: SyncAddress;
+    tokenId: number;
+    amount: utils.BigNumberish;
+    fee: utils.BigNumberish;
+    nonce: number;
+}): SyncTransfer;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| transfer.to | Address of the recipient | 
+| transfer.tokenId | Numerical token id  | 
+| transfer.amount | Amount to transfer, payed in token  | 
+| transfer.fee | Fee to pay for transfer, payed in token  | 
+| transfer.nonce | Transaction nonce   | 
+| returns | Signed Sync transfer transaction | 
+
+## signSyncWithdraw
+
+Signs withdraw transaction, result can be submitted to the Sync network.
+Sender for this transaction is assumed to be this `SyncSigner` address.
+
+### Signature
+
+```typescript
+signSyncWithdraw(withdraw: {
+    ethAddress: string;
+    tokenId: number;
+    amount: utils.BigNumberish;
+    fee: utils.BigNumberish;
+    nonce: number;
+}): SyncWithdraw {
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| withdraw.ethAddress | Ethereum address of the recipient | 
+| withdraw.tokenId | Numerical token id  | 
+| withdraw.amount | Amount to withdraw, payed in token  | 
+| withdraw.fee | Fee to pay for withdraw, payed in token  | 
+| withdraw.nonce | Transaction nonce   | 
+| returns | Signed Sync withdraw transaction | 
+
+## signSyncCloseAccount
+
+Signs account close transaction, result can be submitted to the Sync network.
+Account to be closed is assumed to be this `SyncSigner` address.
+
+### Signature
+
+```typescript
+signSyncCloseAccount(close: { nonce: number }): SyncCloseAccount;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| close.nonce | Transaction nonce   | 
+| returns | Signed Sync account close transaction | 
+
+## syncEmergencyWithdrawSignature
+
+Signs emergency withdraw transaction, returned signature can be used to submit withdraw request to ethereum network.
+Account for withdraw is assumed to be this `SyncSigner` address.
+
+### Signature
+
+```typescript
+syncEmergencyWithdrawSignature(emergencyWithdraw: {
+    ethAddress: string;
+    tokenId: number;
+    nonce: number;
+}): Buffer;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| emergencyWithdraw.ethAddress | Ethereum address of the recipient | 
+| emergencyWithdraw.tokenId | Numerical token id in the SyncNetwork | 
+| emergencyWithdraw.nonce | Transaction nonce   | 
+| returns | Signature for emergency withdraw transaction (64 byte, packed) | 

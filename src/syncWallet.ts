@@ -105,13 +105,13 @@ export class SyncWallet {
 
     static async fromEthWallet(
         ethWallet: ethers.Signer,
-        sidechainProvider: SyncProvider,
+        provider: SyncProvider,
         ethProxy: ETHProxy
-    ) {
+    ): Promise<SyncWallet> {
         const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
         const seed = Buffer.from(seedHex, "hex");
         const signer = SyncSigner.fromSeed(seed);
-        return new SyncWallet(signer, sidechainProvider, ethProxy);
+        return new SyncWallet(signer, provider, ethProxy);
     }
 
     async getAccountState(): Promise<SyncAccountState> {

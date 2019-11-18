@@ -118,16 +118,16 @@ export class SyncSigner {
         };
     }
 
-    signSyncEmergencyWithdraw(fullExit: {
+    syncEmergencyWithdrawSignature(emergencyWithdraw: {
         ethAddress: string;
         tokenId: number;
         nonce: number;
     }): Buffer {
         const type = Buffer.from([6]);
         const packed_pubkey = serializePointPacked(this.publicKey);
-        const eth_address = serializeAddress(fullExit.ethAddress);
-        const token = serializeTokenId(fullExit.tokenId);
-        const nonce = serializeNonce(fullExit.nonce);
+        const eth_address = serializeAddress(emergencyWithdraw.ethAddress);
+        const token = serializeTokenId(emergencyWithdraw.tokenId);
+        const nonce = serializeNonce(emergencyWithdraw.nonce);
         const msg = Buffer.concat([
             type,
             packed_pubkey,
