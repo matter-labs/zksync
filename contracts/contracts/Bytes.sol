@@ -113,6 +113,46 @@ library Bytes {
         return tempUint;
     }
 
+    // Compies bytes 'self' into a new 'uint32'.
+    // Returns the newly created 'uint32'.
+    function bytesToUInt32(bytes memory self)
+        internal
+        pure
+        returns (uint32)
+    {
+        require(
+            self.length >= 4,
+            "bb211"
+        ); // bb211 - wrong bytes length to 32
+        uint32 tempUint;
+
+        assembly {
+            tempUint := mload(add(add(self, 0x4), 0))
+        }
+
+        return tempUint;
+    }
+
+    // Compies bytes 'self' into a new 'uint64'.
+    // Returns the newly created 'uint64'.
+    function bytesToUInt64(bytes memory self)
+        internal
+        pure
+        returns (uint64)
+    {
+        require(
+            self.length >= 8,
+            "bb421"
+        ); // bb421 - wrong bytes length to 64
+        uint64 tempUint;
+
+        assembly {
+            tempUint := mload(add(add(self, 0x8), 0))
+        }
+
+        return tempUint;
+    }
+
     // Compies bytes 'self' into a new 'uint128'.
     // Returns the newly created 'uint128'.
     function bytesToUInt128(bytes memory self)
@@ -128,6 +168,26 @@ library Bytes {
 
         assembly {
             tempUint := mload(add(add(self, 0x10), 0))
+        }
+
+        return tempUint;
+    }
+
+    // Compies bytes 'self' into a new 'uint256'.
+    // Returns the newly created 'uint256'.
+    function bytesToUInt256(bytes memory self)
+        internal
+        pure
+        returns (uint256)
+    {
+        require(
+            self.length >= 32,
+            "bb621"
+        ); // bb621 - wrong bytes length to 256
+        uint128 tempUint;
+
+        assembly {
+            tempUint := mload(add(add(self, 0x20), 0))
         }
 
         return tempUint;

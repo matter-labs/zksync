@@ -223,10 +223,8 @@ contract Governance {
         validatorsInfo[_address].isActive = _active;
     }
 
-
     /// @notice Sends the swift exit request, signed by user and validators, to SwiftExits contract, borrows tokens for it from validators, freezes tokens on rollup contract
     /// @param _swiftExit Signed swift exit data: block number, onchain op number, acc number, token id, token amount, fee amount, recipient, author
-    /// @param _supplyAmount Supplied matter token amount
     /// @param _userSigV User signature v
     /// @param _userSigR User signature r
     /// @param _userSigS User signature s
@@ -235,7 +233,6 @@ contract Governance {
     /// @param _signersBitmask Validators-signers bitmask
     function createSwiftExitRequest(
         bytes memory _swiftExit,
-        uint256 _supplyAmount,
         uint8 _userSigV,
         bytes32 _userSigR,
         bytes32 _userSigS,
@@ -243,13 +240,37 @@ contract Governance {
         uint256 _signersAggrSigY,
         uint16 _signersBitmask
     ) external {
+        // Swift Exit data:
+        // blockNumber Rollup block number
+        // onchainOpNumber Withdraw operation number in block
+        // accNumber Account - creator of withdraw operation
+        // tokenId Token id
+        // tokenAmount Token amount
+        // feeAmount Fee amount in specified tokens
+        // recipient Withdraw operation recipient
+        // owner Withdraw operation owner
+        // swiftExitFee Swift exit fee for validators, signed by user
+        // supplyAmount Validators supplied amount to fulfill this requests
+        (
+            uint32 blockNumber,
+            uint64 onchainOpNumber,
+            uint24 accNumber,
+            uint16 tokenId,
+            uint256 tokenAmount,
+            uint16 feeAmount,
+            address recipient,
+            address owner,
+            uint256 swiftExitFee,
+            uint256 supplyAmount
+        ) = parseSwiftExit(_swiftExit);
+
         // Swift Exit hash
         uint256 swiftExitHash = uint256(keccak256(_swiftExit));
         
         // Verify sender and validators signature
         require(
             verifySenderAndBlsSignature(
-                msg.sender,
+                msg.sender, // Sender MUST be active validator
                 _signersAggrSigX,
                 _signersAggrSigY,
                 _signersBitmask,
@@ -261,36 +282,50 @@ contract Governance {
         // Check that there are enouth free tokens on contract
         uint256 totalSupply = funds[matterTokenId];
         require(
-            totalSupply >= _supplyAmount,
+            totalSupply >= supplyAmount,
             "gect12"
         ); // "gect12" - not enouth amount
 
         // Send tokens to swiftExits
         address tokenAddress = validateTokenId(matterTokenId);
         require(
-            IERC20(tokenAddress).transfer(address(swiftExits), _supplyAmount),
+            IERC20(tokenAddress).transfer(address(swiftExits), supplyAmount),
             "gect13"
         ); // gect13 - token transfer out failed
 
         // Reduce validators balances
         for(uint16 i = 0; i < validatorsCount; i++) {
-            validatorsBalances[validators[i]][matterTokenId] -= _supplyAmount * validatorsBalances[validators[i]][matterTokenId] / totalSupply;
+            validatorsBalances[validators[i]][matterTokenId] -= supplyAmount * validatorsBalances[validators[i]][matterTokenId] / totalSupply;
         }
         // Reduce total balance
-        funds[matterTokenId] -= _amount;
+        funds[matterTokenId] -= supplyAmount;
 
         // Add the swift exit on SwiftExits contract
         swiftExits.addSwiftExit(
-            _swiftExit,
+            blockNumber,
+            onchainOpNumber,
+            accNumber,
+            tokenId,
+            tokenAmount,
+            feeAmount,
+            recipient,
+            owner,
+            swiftExitFee,
             matterTokenId,
-            _supplyAmount,
-            validatorsCount,
-            msg.sender
+            supplyAmount,
+            validatorsCount
         );
 
         // Freeze funds on rollup contract
         rollup.freezeFunds(
-            _swiftExit,
+            blockNumber,
+            onchainOpNumber,
+            accNumber,
+            tokenId,
+            tokenAmount,
+            recipient,
+            owner,
+            swiftExitFee,
             _userSigV,
             _userSigR,
             _userSigS
@@ -304,6 +339,137 @@ contract Governance {
             validatorsInfo[_address].isActive,
             "geir11"
         ); // geir11 - validator is not active
+    }
+    
+    /// @notice Parses swift exit bytes data to its field
+    /// @param _swiftExit Swift exit bytes data
+    function parseSwiftExit(bytes memory _swiftExit) internal returns (
+        uint32 blockNumber,
+        uint64 onchainOpNumber,
+        uint24 accNumber,
+        uint16 tokenId,
+        uint128 tokenAmount,
+        uint16 feeAmount,
+        address recipient,
+        address owner,
+        uint256 swiftExitFee,
+        uint256 supplyAmount
+    ) {
+        uint8 blockNumberBytesLen = 4;
+        uint8 onchainOpNumberBytesLen = 8;
+        uint8 accNumberBytesLen = 3;
+        uint8 tokenIdBytesLen = 2;
+        uint8 tokenAmountBytesLen = 16;
+        uint8 feeAmountBytesLen = 2;
+        uint8 recipientBytesLen = 20;
+        uint8 ownerBytesLen = 20;
+        uint8 swiftExitFeeBytesLen = 32;
+        uint8 supplyAmountBytesLen = 32;
+
+        bytes memory blockNumberBytes = new bytes(blockNumberBytesLen);
+        for (uint8 i = 0; i < blockNumberBytesLen; ++i) {
+            blockNumberBytes[i] = _swiftExit[i];
+        }
+        blockNumber = Bytes.bytesToUInt32(blockNumberBytes);
+
+        bytes memory onchainOpNumberBytes = new bytes(onchainOpNumberBytesLen);
+        for (uint8 i = 0; i < onchainOpNumberBytesLen; ++i) {
+            onchainOpNumberBytes[i] = _swiftExit[blockNumberBytesLen + i];
+        }
+        onchainOpNumber = Bytes.bytesToUInt64(onchainOpNumberBytes);
+
+        bytes memory accNumberBytes = new bytes(accNumberBytesLen);
+        for (uint8 i = 0; i < accNumberBytesLen; ++i) {
+            accNumberBytes[i] = _swiftExit[blockNumberBytesLen + onchainOpNumberBytesLen + i];
+        }
+        accNumber = Bytes.bytesToUInt24(accNumberBytes);
+
+        bytes memory tokenIdBytes = new bytes(tokenIdBytesLen);
+        for (uint8 i = 0; i < tokenIdBytesLen; ++i) {
+            tokenIdBytes[i] = _swiftExit[blockNumberBytesLen + onchainOpNumberBytesLen + accNumberBytesLen + i];
+        }
+        tokenId = Bytes.bytesToUInt16(tokenIdBytes);
+
+        bytes memory tokenAmountBytes = new bytes(tokenAmountBytesLen);
+        for (uint8 i = 0; i < tokenAmountBytesLen; ++i) {
+            tokenAmountBytes[i] = _swiftExit[blockNumberBytesLen + onchainOpNumberBytesLen + accNumberBytesLen + tokenIdBytesLen + i];
+        }
+        tokenAmount = Bytes.bytesToUInt128(tokenAmountBytes);
+
+        bytes memory feeAmountBytes = new bytes(feeAmountBytesLen);
+        for (uint8 i = 0; i < feeAmountBytesLen; ++i) {
+            feeAmountBytes[i] = _swiftExit[
+                blockNumberBytesLen +
+                onchainOpNumberBytesLen +
+                accNumberBytesLen +
+                tokenIdBytesLen +
+                tokenAmountBytesLen +
+                i
+            ];
+        }
+        feeAmount = Bytes.bytesToUInt16(feeAmountBytes);
+
+        bytes memory recipientBytes = new bytes(recipientBytesLen);
+        for (uint8 i = 0; i < recipientBytesLen; ++i) {
+            recipientBytes[i] = _swiftExit[
+                blockNumberBytesLen +
+                onchainOpNumberBytesLen +
+                accNumberBytesLen +
+                tokenIdBytesLen +
+                tokenAmountBytesLen +
+                feeAmountBytesLen +
+                i
+            ];
+        }
+        recipient = Bytes.bytesToAddress(recipientBytes);
+
+        bytes memory ownerBytes = new bytes(ownerBytesLen);
+        for (uint8 i = 0; i < ownerBytesLen; ++i) {
+            ownerBytes[i] = _swiftExit[
+                blockNumberBytesLen +
+                onchainOpNumberBytesLen +
+                accNumberBytesLen +
+                tokenIdBytesLen +
+                tokenAmountBytesLen +
+                feeAmountBytesLen +
+                recipientBytesLen +
+                i
+            ];
+        }
+        owner = Bytes.bytesToAddress(ownerBytes);
+
+        bytes memory swiftExitFeeBytes = new bytes(swiftExitFeeBytesLen);
+        for (uint8 i = 0; i < swiftExitFeeBytesLen; ++i) {
+            swiftExitFeeBytes[i] = _swiftExit[
+                blockNumberBytesLen +
+                onchainOpNumberBytesLen +
+                accNumberBytesLen +
+                tokenIdBytesLen +
+                tokenAmountBytesLen +
+                feeAmountBytesLen +
+                recipientBytesLen +
+                ownerBytesLen +
+                i
+            ];
+        }
+        swiftExitFee = Bytes.bytesToUInt256(swiftExitFeeBytes);
+
+        bytes memory supplyAmountBytes = new bytes(supplyAmountBytesLen);
+        for (uint8 i = 0; i < supplyAmountBytesLen; ++i) {
+            supplyAmountBytes[i] = _swiftExit[
+                blockNumberBytesLen +
+                onchainOpNumberBytesLen +
+                accNumberBytesLen +
+                tokenIdBytesLen +
+                tokenAmountBytesLen +
+                feeAmountBytesLen +
+                recipientBytesLen +
+                ownerBytesLen +
+                swiftExitFeeBytesLen +
+                i
+            ];
+        }
+        supplyAmount = Bytes.bytesToUInt256(supplyAmountBytes);
     }
 
     /// @notice Returns validators aggregated pubkey and their count for specified validators bitmask
@@ -452,12 +618,10 @@ contract Governance {
     /// @param _tokenId Token id
     /// @param _amount Token aount
     /// @param _validatorsCount Suppliers
-    /// @param _excludedValidatorsBitmask Excluded validators bitmask
     function repayInErc20(
         uint16 _tokenId,
         uint256 _amount,
-        uint16 _validatorsCount,
-        uint16 _excludedValidatorsBitmask
+        uint16 _validatorsCount
     )
         external
     {
@@ -473,26 +637,21 @@ contract Governance {
         ); // gerr12 - token transfer in failed
 
         for(uint8 i = 0; i < _validatorsCount; i++) {
-            if( (_excludedValidatorsBitmask >> i) & 1 == 0 ) {
-                validatorsBalances[validators[i]][_tokenId] += _amount * validatorsBalances[validators[i]][_tokenId] / funds[_tokenId];
-            }
+            validatorsBalances[validators[i]][_tokenId] += _amount * validatorsBalances[validators[i]][_tokenId] / funds[_tokenId];
         }
         funds[_tokenId] += _amount;
     }
 
     /// @notice Repays specified amount of Ether token into contract
     /// @param _validatorsCount Suppliers
-    /// @param _excludedValidatorsBitmask Excluded validators bitmask
-    function repayInEther(uint16 _validatorsCount, uint16 _excludedValidatorsBitmask) external payable {
+    function repayInEther(uint16 _validatorsCount) external payable {
         require(
             msg.sender == address(swiftExit),
              "gerr11"
         ); // gerr21 - not swift exit contract address
 
         for(uint8 i = 0; i < _validatorsCount; i++) {
-            if( (_excludedValidatorsBitmask >> i) & 1 == 0 ) {
-                validatorsBalances[validators[i]][0] += _amount * validatorsBalances[validators[i]][0] / funds[0];
-            }
+            validatorsBalances[validators[i]][0] += _amount * validatorsBalances[validators[i]][0] / funds[0];
         }
         funds[0] += _amount;
     }

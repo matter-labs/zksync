@@ -41,20 +41,17 @@ contract SwiftExits {
     mapping(uint32 => mapping(uint64 => bool)) internal exitOrdersExistance;
 
     /// @notice Container for information about Swift Exit Order
-    /// @memner status Order success status (true for success)
     /// @member onchainOpNumber Withdraw operation number in block
+    /// @member opHash Corresponding onchain operation hash
     /// @member tokenId Order (sending) token id
     /// @member sendingAmount Sending amount to recepient (initial amount minus fees)
     /// @member creationCost Cost in orders' token of swift exit operation for validator-sender
     /// @member validatorsFee Fee for validators in orders' tokens
     /// @member validatorSender Address of validator-sender (order transaction sender)
-    /// @member signersBitmask Order validators-signers bitmask
     /// @member suppliersCount Order validators-suppliers count
     /// @member supplyTokenId Supplied token id
     /// @member supplyAmount Supplied token amount
-    /// @member neededSupplyAmount Supplied token amount that is used for compound
     struct ExitOrder {
-        bool status;
         uint64 onchainOpNumber;
         uint256 opHash;
         uint16 tokenId;
@@ -62,11 +59,9 @@ contract SwiftExits {
         uint256 creationCost;
         uint256 validatorsFee;
         address validatorSender;
-        uint16 signersBitmask;
         uint16 suppliersCount;
         uint16 supplyTokenId;
         uint256 supplyAmount;
-        uint256 neededSupplyAmount;
     }
 
     /// @notice Construct swift exits contract
@@ -115,17 +110,31 @@ contract SwiftExits {
 
     /// @notice Adds new swift exit
     /// @dev Only validator can send this order, validates validators aggregated signature, requires that order must be new
-    /// @param _swiftExit Swift exit data
+    /// @param _blockNumber Rollup block number
+    /// @param _onchainOpNumber Withdraw operation number in block
+    /// @param _accNumber Account - creator of withdraw operation
+    /// @param _tokenId Token id
+    /// @param _tokenAmount Token amount
+    /// @param _feeAmount Fee amount in specified tokens
+    /// @param _recipient Withdraw operation recipient
+    /// @param _owner Withdraw operation owner
+    /// @param _swiftExitFee Validators fee
     /// @param _supplyTokenId Supplied token id
     /// @param _supplyAmount Supplied amount
     /// @param _suppliersCount Suppliers count
-    /// @param _sender Sender of transaction (validator-sender)
     function addSwiftExit(
-        bytes memory _swiftExit,
+        uint32 _blockNumber,
+        uint64 _onchainOpNumber,
+        uint24 _accNumber,
+        uint16 _tokenId,
+        uint256 _tokenAmount,
+        uint256 _feeAmount,
+        uint256 _recipient,
+        uint256 _owner,
+        uint256 _swiftExitFee,
         uint16 _supplyTokenId,
         uint256 _supplyAmount,
-        uint16 _suppliersCount,
-        address _sender
+        uint16 _suppliersCount
     )
         external
     {
@@ -135,49 +144,17 @@ contract SwiftExits {
             "fnds11"
         ); // fnds11 - wrong address
 
-        // Swift Exit data:
-        // blockNumber Rollup block number
-        // onchainOpNumber Withdraw operation number in block
-        // accNumber Account - creator of withdraw operation
-        // tokenId Token id
-        // tokenAmount Token amount
-        // feeAmount Fee amount in specified tokens
-        // recipient Withdraw operation recipient
-        // owner Withdraw operation owner
-        // swiftExitFee Validators fee
-        (
-            uint32 blockNumber,
-            uint64 onchainOpNumber,
-            uint24 accNumber,
-            uint16 tokenId,
-            uint256 tokenAmount,
-            uint16 feeAmount,
-            address recipient,
-            address owner,
-            uint256 swiftExitFee
-        ) = parceSwiftExit(_swiftExit);
-
         // This transaction cost for validator-sender
         uint256 creationCost = getCreationCostForToken(_tokenId);
 
-        // Withdraw peration hash
-        uint256 opHash = uint256(keccak256(abi.encodePacked(
-            accNumber,
-            tokenId,
-            tokenAmount,
-            feeAmount,
-            recipient,
-            owner
-        )));
-
         // Check that order is new
         require(
-            !exitOrdersExistance[blockNumber][onchainOpNumber],
+            !exitOrdersExistance[_blockNumber][_onchainOpNumber],
             "ssat12"
         ); // "ssat12" - order exists
 
         // Sending amount: token amount minus sum of validators fees for swift exit and transaction cost
-        uint256 sendingAmount = tokenAmount - (creationCost + swiftExitFee);
+        uint256 sendingAmount = _tokenAmount - (creationCost + _swiftExitFee);
 
         // Check if tokenAmount is higher than sum of validators fees for swift exit and transaction cost
         require(
@@ -185,38 +162,36 @@ contract SwiftExits {
             "ssat13"
         ); // "ssat13" - wrong amount
 
-        // Get amount of supply needed to get sending amount
-        uint256 neededSupplyAmount = getNeededAmount(_supplyTokenId, tokenId, sendingAmount);
+        // Withdraw peration hash
+        uint256 opHash = uint256(keccak256(abi.encodePacked(
+            _accNumber,
+            _tokenId,
+            _tokenAmount,
+            _feeAmount,
+            _recipient,
+            _owner
+        )));
 
-        // Check if tokenAmount >= than sum of validators fees for swift exit and transaction cost
-        require(
-            neededSupplyAmount - _supplyAmount >= 0,
-            "ssat14"
-        ); // "ssat14" - not enouth supplied
-
-        if (_supplyTokenId != tokenId) {
+        if (_supplyTokenId != _tokenId) {
             // Borrow needed tokens from compound if token ids arent equal
-            borrowFromCompound(_supplyTokenId, neededSupplyAmount, tokenId, sendingAmount);
+            borrowFromCompound(_supplyTokenId, _supplyAmount, tokenId, sendingAmount);
         }
 
         // Send tokens to recepient
-        sendTokensToRecipient(recipient, tokenId, sendingAmount);
+        sendTokensToRecipient(_recipient, _tokenId, sendingAmount);
 
         // Create ExitOrder
         ExitOrder order = ExitOrder(
-            false,
-            onchainOpNumber,
+            _onchainOpNumber,
             opHash,
-            tokenId,
+            _tokenId,
             sendingAmount,
             creationCost,
-            swiftExitFee,
-            msg.sender,
-            _signersBitmask,
-            suppliersCount,
-            supplyTokenId,
-            supplyAmount,
-            neededSupplyAmount
+            _swiftExitFee,
+            tx.origin, // Here tx origin MUST be only validator address, so we can use it
+            _suppliersCount,
+            _supplyTokenId,
+            _supplyAmount
         );
         exitOrders[_blockNumber][exitOrdersCount[_blockNumber]] = order;
         // Increase orders count in block
@@ -234,9 +209,9 @@ contract SwiftExits {
     )
         external
         returns (
-            bool isSucceeded,
+            uint16 suppliersCount,
             uint16 tokenId,
-            uint256 amount,
+            uint256 fullAmount,
             address recipient
         )
     {
@@ -248,16 +223,16 @@ contract SwiftExits {
         ExitOrder order = exitOrders[_blockNumber][_orderNumber];
         
         return (
-            order.status,
+            order.suppliersCount,
             order.tokenId,
             order.sendingAmount + order.creationCost + order.validatorsFee,
             order.recipient
         );
     }
 
-    /// @notice Sets orders success status for block
+    /// @notice Clears suppliers count in wrong orders to "mark" them as wrong
     /// @param _blockNumber Block number
-    function setOrdersStatuses(uint32 _blockNumber) external returns (bytes memory succeeded) {
+    function clearSuppliersInWrongOrders(uint32 _blockNumber) external {
         // Can be called only from Rollup contract
         require(
             msg.sender == address(rollup),
@@ -274,9 +249,9 @@ contract SwiftExits {
             // Get expected operation hash from exit order
             uint256 expectedOpHash = order.opHash;
 
-            if (realOpHash == expectedOpHash) {
-                // If hashes are equal - success
-                exitOrders[_blockNumber][i].status = true;
+            if (realOpHash != expectedOpHash) {
+                // If hashes are not equal - clear suppliers count
+                exitOrders[_blockNumber][i].suppliersCount = 0;
             }
         }
     }
@@ -290,10 +265,9 @@ contract SwiftExits {
             "fnfs11"
         ); // fnfs11 - wrong address
         for (uint64 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
-            if (exitOrders[_blockNumber][i].status) {
+            if (exitOrders[_blockNumber][i].suppliersCount != 0) {
+                // If suppliers count in this order is not 0 - this order is correct and must be fulfilled
                 fulfillSucceededOrder(exitOrders[_blockNumber][i]);
-            } else {
-                punishForFailedOrder(exitOrders[_blockNumber][i]);
             }
         }
         delete exitOrdersCount[_blockNumber];
@@ -318,48 +292,6 @@ contract SwiftExits {
 
         // Cost in token is equal to ether gas cost * (token price / ether price)
         return etherGasCost * (tokenUnderlyingPrice / etherUnderlyingPrice);
-    }
-
-    /// @notice Returns needed amount of supplied token to exchange with compound
-    /// @param _supplyTokenId Supplied token id
-    /// @param _tokenId Token id
-    /// @param _sendingAmount Amount that will be sent to recipient
-    function getNeededAmount(
-        uint16 _supplyTokenId,
-        uint16 _tokenId,
-        uint256 _sendingAmount
-    )
-        internal
-        returns (uint256)
-    {
-        // If token ids equal - return needed amount = sendingAmount
-        if (_supplyTokenId == _tokenId) {
-            return _sendingAmount;
-        }
-
-        // Get corresponding cToken address for specified supply token
-        address cSupplyTokenAddress = governance.getCTokenAddress(_supplyTokenId);
-
-        // Get corresponding cToken address for specified token
-        address cTokenAddress = governance.getCTokenAddress(_tokenId);
-
-        // Get supply token price from oracle
-        uint256 supplyTokenPrice = priceOracle.getUnderlyingPrice(cSupplyTokenAddress);
-
-        // Get token price from oracle
-        uint256 tokenPrice = priceOracle.getUnderlyingPrice(cTokenAddress);
-
-        // Get token collateral factor mantissa (0..90%) that will show what part of supplied tokens to compound will be used for borrowing
-        // Also returns listed flag (if token is listed on compound markets)
-        (bool listed, uint256 collateralFactorMantissa) = comptroller.markets(cSupplyTokenAddress);
-        require(
-            listed,
-            "sses11"
-        ); // "sses11" - token is not listed on compound markets
-
-        // Supply token amount, that will be sent to compound. Is equal to:
-        // sendingAmount * (Supply token price / token price) * (collateralFactorMantissa / 100)
-        return _sendingAmount * (supplyTokenPrice / tokenPrice) / (collateralFactorMantissa / 100);
     }
 
     /// @notice Borrow specified amount from compound
@@ -548,20 +480,19 @@ contract SwiftExits {
     /// @dev Repays to compound (if needed) and validators, consummates fees
     /// @param _order - ExitOrder sturcture
     function fulfillSucceededOrder(ExitOrder _order) internal {
-        
         if (_order.tokenId != _order.supplyTokenId) {
             // If order token id is not equal to supplied token id - need to repay borrow to compound
             repayToCompound(
                 _order.tokenId,
                 _order.sendingAmount,
                 _order.supplyTokenId,
-                _order.neededSupplyAmount
+                _order.supplyAmount
             );
         }
 
         if (_order.supplyTokenId == 0) {
             // If supplied token id is 0 - repay validators in Ether
-            governance.repayInEther.value(_order.supplyAmount)(_order.suppliersCount, 0);
+            governance.repayInEther.value(_order.supplyAmount)(_order.suppliersCount);
         } else {
             // If supplied token id is not 0 - repay validators in ERC20
 
@@ -583,15 +514,14 @@ contract SwiftExits {
             governance.repayInErc20(
                 _order.supplyTokenId,
                 _order.supplyAmount,
-                v.suppliersCount,
-                0
+                _order.suppliersCount
             );
         }
 
         // Consummate fees
         if (_order.tokenId == 0) {
             // If order token id is 0 - pay validators fee and creation cost in Ether
-            governance.repayInEther.value(_order.validatorsFee);
+            governance.repayInEther.value(_order.validatorsFee, _order.suppliersCount);
             governance.supplyEther.value(_order.creationCost)(_order.validatorSender);
         } else {
             // If order token id is 0 - pay validators fee and creation cost in ERC20
@@ -614,8 +544,7 @@ contract SwiftExits {
             governance.repayInErc20(
                 _order.tokenId,
                 _order.validatorsFee,
-                _order.suppliersCount,
-                0
+                _order.suppliersCount
             );
 
             // Pay creation cost
@@ -623,48 +552,6 @@ contract SwiftExits {
                 _order.tokenId,
                 _order.creationCost,
                 _order.validatorSender
-            );
-        }
-    }
-
-    /// @notice Punishes validators-signers for failed order
-    /// @dev Repay unsent amount of supply to validators, that haven't signed order
-    /// @param _order - ExitOrder sturcture
-    function punishForFailedOrder(ExitOrder _order) internal {
-        // Repay unsent amount of supply to validators, that haven't signed order
-        // Repayment value is supplied value minus amound used for compund
-        uint356 value = _order.supplyAmount - _order.neededSupplyAmount;
-
-        if (_order.supplyTokenId == 0) {
-            // Repay in Ether if supply token id == 0
-            
-            // Repay in Ether to validators possible value, excluding (punish) validators-signers
-            governance.repayInEther.value(value)(
-                _order.suppliersCount,
-                _order.signersBitmask
-            );
-        } else {
-            // Repay in ERC20 if supply token id != 0
-            
-            // Get token address
-            address tokenAddress = governance.validateTokenId(supplyTokenId);
-            // Check for enouth allowence value for this token for repay to Governance contract
-            uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
-            // Allowence must be >= repayment value
-            if (allowence < value) {
-                // If allowence value is not anouth - approve max possible value for this token for repay to Governance contract
-                require(
-                    IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                    "sspr11"
-                ); // sspr11 - token approve failed
-            }
-
-            // Repay in ERC20 to validators possible value, excluding (punish) validators-signers
-            governance.repayInErc20(
-                _order.supplyTokenId,
-                _order.value,
-                _order.suppliersCounts,
-                _order.signersBitmask
             );
         }
     }
