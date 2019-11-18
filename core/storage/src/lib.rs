@@ -1583,10 +1583,8 @@ impl StorageProcessor {
                     .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
                     .first::<StoredOperation>(self.conn())
                     .optional()?
-                    .map(|c| c.confirmed)
-                    .unwrap_or(false);
+                    .is_some();
 
-                // Make shure that ETHereum "knowns" that block is commited.
                 if !commited {
                     return Ok(None);
                 }
