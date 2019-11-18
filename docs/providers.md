@@ -7,6 +7,8 @@ We support HTTP and WebSocket transport protocol for JSON-RPC communications. We
 `HTTPTransport` and `WSTransport` classes are used to implement details of communication, but usually you don't need to deal with this 
 objects directly.
 
+`ETHProxy` class is used to simplify some communication with Ethereum network.
+
 # class SyncProvider
 
 ## static async newWebsocketProvider
@@ -163,3 +165,42 @@ Used to close connection when persistent connection is used for transport (e.g. 
 ```typescript
 async disconnect();
 ```
+
+
+# class ETHProxy
+
+`ETHProxy` is wrapper around `Provider` from `ethers.js`
+
+## constructor
+
+### Signature
+```typescript
+constructor(
+    private ethersProvider: ethers.providers.Provider,
+    private contractAddress: ContractAddress
+) {}
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| ethersProvider | `ethers.js` provider connected to ethereum node|
+| contractAddress | Addresses of the Sync network contracts |
+
+## async resolveTokenId
+
+In order to sign Sync transaction user have to know unique numerical id of the given token.
+It can be retrieved from Sync network governance contract.
+
+### Signature
+```typescript
+async resolveTokenId(token: Token): Promise<number>;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| token | Ethereum token identifier ("ETH" or ERC20 contract address) |
+| returns | Numerical identifier of the given token inside Sync network. |
