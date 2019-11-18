@@ -2,8 +2,11 @@ import Axios from "axios";
 import WebSocketAsPromised = require("websocket-as-promised");
 const W3CWebSocket = require("websocket").w3cwebsocket;
 
-export abstract class AbstractTransport {
+export abstract class AbstractJSONRPCTransport {
     abstract async request(method: string, params): Promise<any>;
+    subscriptionsSupported(): boolean {
+        return false;
+    }
     async subscribe(
         subMethod: string,
         subParams,
@@ -12,6 +15,7 @@ export abstract class AbstractTransport {
     ): Promise<Subscription> {
         throw new Error("subscription are not supported for this transport");
     }
+    abstract async disconnect();
 }
 
 // Has jrpcError field which is JRPC error object.
@@ -31,7 +35,7 @@ class Subscription {
     constructor(public unsubscribe: () => Promise<void>) {}
 }
 
-export class HTTPTransport extends AbstractTransport {
+export class HTTPTransport extends AbstractJSONRPCTransport {
     public constructor(public address: string) {
         super();
     }
@@ -57,9 +61,11 @@ export class HTTPTransport extends AbstractTransport {
             throw new Error("Unknown JRPC Error");
         }
     }
+
+    async disconnect() {}
 }
 
-export class WSTransport extends AbstractTransport {
+export class WSTransport extends AbstractJSONRPCTransport {
     ws: WebSocketAsPromised;
     private subscriptionCallback: Map<string, (data: any) => void>;
 
@@ -95,6 +101,10 @@ export class WSTransport extends AbstractTransport {
         const transport = new WSTransport(address);
         await transport.ws.open();
         return transport;
+    }
+
+    subscriptionsSupported(): boolean {
+        return true;
     }
 
     async subscribe(
@@ -155,5 +165,9 @@ export class WSTransport extends AbstractTransport {
         } else {
             throw new Error("Unknown JRPC Error");
         }
+    }
+
+    async disconnect() {
+        await this.ws.close();
     }
 }

@@ -1,7 +1,11 @@
-import { AbstractTransport, HTTPTransport, WSTransport } from "./transport";
+import {
+    AbstractJSONRPCTransport,
+    HTTPTransport,
+    WSTransport
+} from "./transport";
 import { utils, ethers, Contract } from "ethers";
 import { SyncAccountState, SyncAddress, Token } from "./types";
-import { SYNC_GOV_CONTRACT_INTERFACE } from "./utils";
+import { sleep, SYNC_GOV_CONTRACT_INTERFACE } from "./utils";
 
 export interface ContractAddress {
     mainContract: string;
@@ -10,7 +14,7 @@ export interface ContractAddress {
 
 export class SyncProvider {
     contractAddress: ContractAddress;
-    private constructor(public transport: AbstractTransport) {}
+    private constructor(public transport: AbstractJSONRPCTransport) {}
 
     static async newWebsocketProvider(
         address: string = "ws://127.0.0.1:3031"
@@ -53,31 +57,65 @@ export class SyncProvider {
     }
 
     async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY") {
-        return await new Promise(resolve => {
-            const sub = this.transport.subscribe(
-                "ethop_subscribe",
-                [serialId, action],
-                "ethop_unsubscribe",
-                resp => {
-                    sub.then(sub => sub.unsubscribe());
-                    resolve(resp);
+        if (this.transport.subscriptionsSupported()) {
+            return await new Promise(resolve => {
+                const sub = this.transport.subscribe(
+                    "ethop_subscribe",
+                    [serialId, action],
+                    "ethop_unsubscribe",
+                    resp => {
+                        sub.then(sub => sub.unsubscribe());
+                        resolve(resp);
+                    }
+                );
+            });
+        } else {
+            let notifyDone = false;
+            while (!notifyDone) {
+                const priorOpStatus = await this.getPriorityOpStatus(serialId);
+                if (priorOpStatus.block) {
+                    if (action == "COMMIT") {
+                        notifyDone = priorOpStatus.block.commited;
+                    } else {
+                        notifyDone = priorOpStatus.block.verified;
+                    }
                 }
-            );
-        });
+                await sleep(3000);
+            }
+        }
     }
 
     async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY") {
-        return await new Promise(resolve => {
-            const sub = this.transport.subscribe(
-                "tx_subscribe",
-                [hash, action],
-                "tx_unsubscribe",
-                resp => {
-                    sub.then(sub => sub.unsubscribe());
-                    resolve(resp);
+        if (this.transport.subscriptionsSupported()) {
+            return await new Promise(resolve => {
+                const sub = this.transport.subscribe(
+                    "tx_subscribe",
+                    [hash, action],
+                    "tx_unsubscribe",
+                    resp => {
+                        sub.then(sub => sub.unsubscribe());
+                        resolve(resp);
+                    }
+                );
+            });
+        } else {
+            let notifyDone = false;
+            while (!notifyDone) {
+                const transactionStatus = await this.getTxReceipt(hash);
+                if (transactionStatus.block) {
+                    if (action == "COMMIT") {
+                        notifyDone = transactionStatus.block.commited;
+                    } else {
+                        notifyDone = transactionStatus.block.verified;
+                    }
                 }
-            );
-        });
+                await sleep(3000);
+            }
+        }
+    }
+
+    async disconnect() {
+        return await this.transport.disconnect();
     }
 }
 

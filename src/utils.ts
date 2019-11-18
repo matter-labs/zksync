@@ -261,3 +261,7 @@ export function buffer2bitsBE(buff) {
     }
     return res;
 }
+
+export function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}

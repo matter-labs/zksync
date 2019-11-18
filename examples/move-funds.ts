@@ -1,18 +1,18 @@
-import BN = require("bn.js");
 import { depositFromETH, SyncWallet } from "../src/syncWallet";
 import { Contract, ethers, utils } from "ethers";
-import { bigNumberify, formatEther, parseEther } from "ethers/utils";
+import { formatEther } from "ethers/utils";
 import { ETHProxy, SyncProvider } from "../src/provider";
-import { WSTransport } from "../src/transport";
 import { Token } from "../src/types";
+import { IERC20_INTERFACE } from "../src/utils";
+
+const WEB3_URL = process.env.WEB3_URL;
+// Mnemonic for eth wallet.
+const MNEMONIC = process.env.MNEMONIC;
+const TOKEN = process.env.TEST_ERC20;
 
 function shortAddr(address: string): string {
     return `${address.substr(0, 6)}`;
 }
-
-const IERC20ConractInterface = new utils.Interface(
-    require("../abi/IERC20.json").interface
-);
 
 async function logSyncBalance(
     wallet: SyncWallet,
@@ -31,11 +31,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     if (token == "ETH") {
         balance = formatEther(await wallet.getBalance());
     } else {
-        const erc20contract = new Contract(
-            token,
-            IERC20ConractInterface,
-            wallet
-        );
+        const erc20contract = new Contract(token, IERC20_INTERFACE, wallet);
         balance = formatEther(await erc20contract.balanceOf(wallet.address));
     }
 
@@ -45,10 +41,8 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
 }
 
 (async () => {
-    const ethersProvider = new ethers.providers.JsonRpcProvider(
-        process.env.WEB3_URL
-    );
-    const wsSidechainProvider = await SyncProvider.newWebsocketProvider();
+    const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
+    const wsSidechainProvider = await SyncProvider.newHttpProvider();
     const ethProxy = new ETHProxy(
         ethersProvider,
         wsSidechainProvider.contractAddress
@@ -57,7 +51,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     console.log("Contract address: ", wsSidechainProvider.contractAddress);
 
     const ethWallet = ethers.Wallet.fromMnemonic(
-        process.env.MNEMONIC,
+        MNEMONIC,
         "m/44'/60'/0'/0/1"
     ).connect(ethersProvider);
     const wallet = await SyncWallet.fromEthWallet(
@@ -67,7 +61,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     );
 
     const ethWallet2 = ethers.Wallet.fromMnemonic(
-        process.env.MNEMONIC,
+        MNEMONIC,
         "m/44'/60'/0'/0/2"
     ).connect(ethersProvider);
     const wallet2 = await SyncWallet.fromEthWallet(
@@ -77,7 +71,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     );
 
     const depositAmount = "0.1";
-    const depositToken = process.env.TEST_ERC20;
+    const depositToken = TOKEN;
     console.log("==================================");
     console.log(
         `Deposit: ${depositAmount} ${depositToken}: ETH:${shortAddr(
@@ -142,5 +136,5 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     await logSyncBalance(wallet2, depositToken, "verified");
     await logETHBalance(ethWallet2, depositToken);
 
-    await (wsSidechainProvider.transport as WSTransport).ws.close();
+    await wsSidechainProvider.disconnect();
 })();
