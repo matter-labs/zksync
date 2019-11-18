@@ -7,13 +7,11 @@ We support HTTP and WebSocket transport protocol for JSON-RPC communications. We
 `HTTPTransport` and `WSTransport` classes are used to implement details of communication, but usually you don't need to deal with this 
 objects directly.
 
-# API
+# class SyncProvider
 
-## class SyncProvider
+## static async newWebsocketProvider
 
-### static async newWebsocketProvider
-
-#### Signature
+### Signature
 
 ```typescript
 static async newWebsocketProvider(
@@ -21,16 +19,16 @@ static async newWebsocketProvider(
     ): Promise<SyncProvider>;
 ```
 
-#### Inputs and outputs
+### Inputs and outputs
 
 | Name | Description | 
 | -- | -- |
 | address | Address of the websocket endpoint of a Sync node, starts with `ws://` |
 | returns | Sync provider connected to the WebSocket endpoint |
 
-### static async newHttpProvider
+## static async newHttpProvider
 
-#### Signature
+### Signature
 
 ```typescript
 static async newHttpProvider(
@@ -38,7 +36,7 @@ static async newHttpProvider(
     ): Promise<SyncProvider>;
 ```
 
-#### Inputs and outputs
+### Inputs and outputs
 
 | Name | Description | 
 | -- | -- |
@@ -46,76 +44,76 @@ static async newHttpProvider(
 | returns | Sync provider that will direct requests to the `address` endpoint |
 
 
-### async submitTx
+## async submitTx
 
-#### Signature
+### Signature
 
 ```typescript
 async submitTx(tx: any): Promise<string>;
 ```
 
-#### Inputs and outputs
+### Inputs and outputs
 
 | Name | Description | 
 | -- | -- |
 | tx | Signed Sync transaction (see types, for detailed description) |
 | returns | `0x`-prefixed hex-encoded hash of the transaction |
 
-### async submitTx
+## async submitTx
 
-#### Signature
+### Signature
 
 ```typescript
 async getContractAddress(): Promise<ContractAddress>;
 ```
 
-#### Inputs and outputs
+### Inputs and outputs
 
 | Name | Description | 
 | -- | -- |
 | returns | Addresses of the Sync network smart contracts (see types, for detailed description) |
 
-### async getState
+## async getState
 
-#### Signature
+### Signature
 
 ```typescript
 async getState(address: SyncAddress): Promise<SyncAccountState>;
 ```
 
-#### Inputs and outputs
+### Inputs and outputs
 
 | Name | Description | 
 | -- | -- |
 | address | `0x`-prefixed hex-encoded address of the Sync account. |
 | returns | Detailed state of the Sync account, including balances, nonce. (see types, for detailed description) |
 
-### async getTxReceipt
+## async getTxReceipt
 
-#### Signature
+### Signature
 
 ```typescript
 async getTxReceipt(txHash: string): Promise<SyncTxReceipt>;
 ```
 
-#### Inputs and outputs
+### Inputs and outputs
 
 | Name | Description | 
 | -- | -- |
 | txHash | `0x`-prefixed hex-encoded hash of the Sync transaction. |
 | returns | Receipt of this transaction (see types, for detailed description) |
 
-### async notifyTransaction
+## async notifyTransaction
 
 This method will return when given transaction is commited or verified in the Sync network.
 
-#### Signature
+### Signature
 
 ```typescript
 async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<SyncTxReceipt> ;
 ```
 
-#### Inputs and outputs
+### Inputs and outputs
 
 | Name | Description | 
 | -- | -- |
@@ -123,32 +121,32 @@ async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<Sync
 | action | "COMMIT" or "VERIFY" |
 | returns | Receipt of this transaction (see types, for detailed description) |
 
-### async getPriorityOpStatus
+## async getPriorityOpStatus
 
-#### Signature
+### Signature
 
 ```typescript
 async getPriorityOpStatus(serialId: number): Promise<SyncPriorityOperationReceipt>;
 ```
 
-#### Inputs and outputs
+### Inputs and outputs
 
 | Name | Description | 
 | -- | -- |
 | serialId | Numerical id of the priority operation, can be found in logs of the ethereum transaction that created this operation (e.g. deposit) |
 | returns | Receipt of this priority operation (see types, for detailed description) |
 
-### async notifyPriorityOp
+## async notifyPriorityOp
 
 This method will return when given priority operation is commited or verified in the Sync network.
 
-#### Signature
+### Signature
 
 ```typescript
 async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<SyncPriorityOperationReceipt>;
 ```
 
-#### Inputs and outputs
+### Inputs and outputs
 
 | Name | Description | 
 | -- | -- |
@@ -156,11 +154,11 @@ async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<S
 | action | "COMMIT" or "VERIFY" |
 | returns | Receipt of this priority operation (see types, for detailed description) |
 
-### async disconnect
+## async disconnect
 
 Used to close connection when persistent connection is used for transport (e.g. WebSocket transport).
 
-#### Signature
+### Signature
 
 ```typescript
 async disconnect();
