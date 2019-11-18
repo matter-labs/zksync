@@ -1,5 +1,5 @@
 import BN = require("bn.js");
-import { depositFromETH, Wallet } from "../src/wallet";
+import { depositFromETH, SyncWallet } from "../src/syncWallet";
 import { Contract, ethers, utils } from "ethers";
 import { bigNumberify, formatEther, parseEther } from "ethers/utils";
 import { ETHProxy, SyncProvider } from "../src/provider";
@@ -15,7 +15,7 @@ const IERC20ConractInterface = new utils.Interface(
 );
 
 async function logSyncBalance(
-    wallet: Wallet,
+    wallet: SyncWallet,
     token: Token,
     type: "commited" | "verified" = "commited"
 ) {
@@ -60,7 +60,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
         process.env.MNEMONIC,
         "m/44'/60'/0'/0/1"
     ).connect(ethersProvider);
-    const wallet = await Wallet.fromEthWallet(
+    const wallet = await SyncWallet.fromEthWallet(
         ethWallet,
         wsSidechainProvider,
         ethProxy
@@ -70,7 +70,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
         process.env.MNEMONIC,
         "m/44'/60'/0'/0/2"
     ).connect(ethersProvider);
-    const wallet2 = await Wallet.fromEthWallet(
+    const wallet2 = await SyncWallet.fromEthWallet(
         ethWallet2,
         wsSidechainProvider,
         ethProxy

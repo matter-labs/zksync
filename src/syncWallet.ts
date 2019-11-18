@@ -1,28 +1,14 @@
-import BN = require("bn.js");
-import {
-    privateKeyFromSeed,
-    privateKeyToPublicKey,
-    pubkeyToAddress,
-    serializePointPacked,
-    signTransactionBytes
-} from "./crypto";
 import { Contract, ContractTransaction, ethers, utils } from "ethers";
-import { curve } from "elliptic";
 import { ETHProxy, SyncProvider } from "./provider";
 import { SyncSigner } from "./signer";
-import { SyncAccountState, SyncAddress, SyncWithdraw, Token } from "./types";
+import { SyncAccountState, SyncAddress, Token } from "./types";
+import {
+    IERC20_INTERFACE,
+    SYNC_MAIN_CONTRACT_INTERFACE,
+    SYNC_PRIOR_QUEUE_INTERFACE
+} from "./utils";
 
-const IERC20ConractInterface = new utils.Interface(
-    require("../abi/IERC20.json").interface
-);
-const sidechainMainContractInterface = new utils.Interface(
-    require("../abi/SyncMain.json").interface
-);
-const priorityQueueInterface = new utils.Interface(
-    require("../abi/SyncPriorityQueue.json").interface
-);
-
-export class Wallet {
+export class SyncWallet {
     constructor(
         public signer: SyncSigner,
         public provider: SyncProvider,
@@ -125,7 +111,7 @@ export class Wallet {
         const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
         const seed = Buffer.from(seedHex, "hex");
         const signer = SyncSigner.fromSeed(seed);
-        return new Wallet(signer, sidechainProvider, ethProxy);
+        return new SyncWallet(signer, sidechainProvider, ethProxy);
     }
 
     async getAccountState(): Promise<SyncAccountState> {
@@ -152,14 +138,14 @@ export class Wallet {
 
 export async function depositFromETH(
     depositFrom: ethers.Signer,
-    depositTo: Wallet,
+    depositTo: SyncWallet,
     token: Token,
     amount: utils.BigNumberish,
     maxFeeInETHCurrenty: utils.BigNumberish
 ) {
     const mainSidechainContract = new Contract(
         depositTo.provider.contractAddress.mainContract,
-        sidechainMainContractInterface,
+        SYNC_MAIN_CONTRACT_INTERFACE,
         depositFrom
     );
 
@@ -178,7 +164,7 @@ export async function depositFromETH(
         // ERC20 token deposit
         const erc20contract = new Contract(
             token,
-            IERC20ConractInterface,
+            IERC20_INTERFACE,
             depositFrom
         );
         const approveTx = await erc20contract.approve(
@@ -216,7 +202,7 @@ class DepositTransactionHandle {
 
         const txReceipt = await this.ethTx.wait();
         for (const log of txReceipt.logs) {
-            const priorityQueueLog = priorityQueueInterface.parseLog(log);
+            const priorityQueueLog = SYNC_PRIOR_QUEUE_INTERFACE.parseLog(log);
             if (priorityQueueLog) {
                 this.priorityOpId = priorityQueueLog.values.serialId;
             }
@@ -274,29 +260,3 @@ class TransactionHandle {
         this.state = "Verified";
     }
 }
-
-// async emergencyWithdraw(token: Token, nonce: "commited" | number = "commited") {
-//   const tokenId = await this.provider.resolveTokenId(token);
-//   const sidechainMainContract = new Contract(
-//       this.provider.contractAddress,
-//       sidechainMainContractInterface,
-//       this.ethWallet
-//   );
-//   const nonceNumber = await this.getNonce(nonce);
-//   const signature = this.walletKeys.signFullExit({
-//     token: token.id,
-//     eth_address: await this.ethWallet.getAddress(),
-//     nonce: nonceNumber
-//   });
-//   const tx = await sidechainMainContract.fullExit(
-//       serializePointPacked(this.walletKeys.publicKey),
-//       token.address,
-//       signature,
-//       nonceNumber,
-//       {
-//         gasLimit: utils.bigNumberify("500000"),
-//         value: utils.parseEther("0.02")
-//       }
-//   );
-//   return tx.hash;
-// }

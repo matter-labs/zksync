@@ -10,7 +10,6 @@ import { utils } from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
 import BN = require("bn.js");
 import {
-    Signature,
     SyncAddress,
     SyncCloseAccount,
     SyncTransfer,

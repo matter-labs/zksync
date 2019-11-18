@@ -2,6 +2,20 @@ import BN = require("bn.js");
 import { utils } from "ethers";
 import { bigNumberify } from "ethers/utils";
 
+export const IERC20_INTERFACE = new utils.Interface(
+    require("../abi/IERC20.json").interface
+);
+export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(
+    require("../abi/SyncMain.json").interface
+);
+export const SYNC_PRIOR_QUEUE_INTERFACE = new utils.Interface(
+    require("../abi/SyncPriorityQueue.json").interface
+);
+
+export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(
+    require("../abi/SyncGov.json").interface
+);
+
 const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
 const FEE_EXPONENT_BIT_WIDTH = 5;

@@ -41,7 +41,7 @@ const babyJubjubParams = {
 };
 
 const fsModulus = babyJubjubParams.n;
-const fsOne = new BN(1); // (new BN(2)).pow(new BN(256)).mod(fsModulus);
+const fsOne = new BN(1);
 const fsZero = new BN(0);
 export const altjubjubCurve = new elliptic.curve.edwards(babyJubjubParams);
 const curveZero = altjubjubCurve.point("0", "1");
@@ -245,10 +245,7 @@ function sha256HStart(a: Buffer, b: Buffer): BN {
     hasher.update(a);
     hasher.update(b);
     const hash = Buffer.from(hasher.array());
-    const point = to_uniform(hash);
-    // console.log("sha256: ", hash.toString("hex"));
-    // console.log("sha256 point: ", point);
-    return point;
+    return to_uniform(hash);
 }
 
 function pedersenHStar(input: Buffer): BN {

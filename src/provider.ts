@@ -1,10 +1,7 @@
 import { AbstractTransport, HTTPTransport, WSTransport } from "./transport";
 import { utils, ethers, Contract } from "ethers";
 import { SyncAccountState, SyncAddress, Token } from "./types";
-
-const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(
-    require("../abi/SyncGov.json").interface
-);
+import { SYNC_GOV_CONTRACT_INTERFACE } from "./utils";
 
 export interface ContractAddress {
     mainContract: string;
