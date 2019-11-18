@@ -631,45 +631,41 @@ contract SwiftExits {
     /// @dev Repay unsent amount of supply to validators, that haven't signed order
     /// @param _order - ExitOrder sturcture
     function punishForFailedOrder(ExitOrder _order) internal {
-        // Repay unsent amount of supply to validators, that haven't signed order if supplied amount is > 0
-        if (_order.supplyAmount > 0) {
-            if (_order.supplyTokenId == 0) {
-                // Repay in Ether if supply token id == 0
+        // Repay unsent amount of supply to validators, that haven't signed order
+        // Repayment value is supplied value minus amound used for compund
+        uint356 value = _order.supplyAmount - _order.neededSupplyAmount;
 
-                // Repayment value is supplied value minus = supply amount * (borrowing coeff - 1) / borrowing coeff
-                uint356 value = _order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF;
-                // Repay in Ether to validators possible value, excluding (punish) validators-signers
-                governance.repayInEther.value(value)(
-                    _order.suppliersCount,
-                    _order.signersBitmask
-                );
-            } else {
-                // Repay in ERC20 if supply token id != 0
-
-                // Repayment value is supplied value minus = supply amount * (borrowing coeff - 1) / borrowing coeff
-                uint356 value = _order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF;
-                
-                // Get token address
-                address tokenAddress = governance.validateTokenId(supplyTokenId);
-                // Check for enouth allowence value for this token for repay to Governance contract
-                uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
-                // Allowence must be >= repayment value
-                if (allowence < value) {
-                    // If allowence value is not anouth - approve max possible value for this token for repay to Governance contract
-                    require(
-                        IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                        "sspr11"
-                    ); // sspr11 - token approve failed
-                }
-
-                // Repay in ERC20 to validators possible value, excluding (punish) validators-signers
-                governance.repayInErc20(
-                    _order.supplyTokenId,
-                    _order.supplyAmount * (BORROWING_COEFF - 1) / BORROWING_COEFF,
-                    _order.suppliersCounts,
-                    _order.signersBitmask
-                );
+        if (_order.supplyTokenId == 0) {
+            // Repay in Ether if supply token id == 0
+            
+            // Repay in Ether to validators possible value, excluding (punish) validators-signers
+            governance.repayInEther.value(value)(
+                _order.suppliersCount,
+                _order.signersBitmask
+            );
+        } else {
+            // Repay in ERC20 if supply token id != 0
+            
+            // Get token address
+            address tokenAddress = governance.validateTokenId(supplyTokenId);
+            // Check for enouth allowence value for this token for repay to Governance contract
+            uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
+            // Allowence must be >= repayment value
+            if (allowence < value) {
+                // If allowence value is not anouth - approve max possible value for this token for repay to Governance contract
+                require(
+                    IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                    "sspr11"
+                ); // sspr11 - token approve failed
             }
+
+            // Repay in ERC20 to validators possible value, excluding (punish) validators-signers
+            governance.repayInErc20(
+                _order.supplyTokenId,
+                _order.value,
+                _order.suppliersCounts,
+                _order.signersBitmask
+            );
         }
     }
 }
