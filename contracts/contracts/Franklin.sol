@@ -449,9 +449,13 @@ contract Franklin {
     // - _amount - token amount
     function registerWithdrawal(address _from, uint16 _token, uint128 _amount) internal {
         require(
-            balancesToWithdraw[_from][_token] - frozenBalances[_from][_token] >= _amount,
+            frozenBalances[_from][_token] <= balancesToWithdraw[_from][_token],
             "frw11"
-        ); // frw11 - insufficient balance withdraw
+        ); // frw11 - subtract overflow
+        require(
+            balancesToWithdraw[_from][_token] - frozenBalances[_from][_token] >= _amount,
+            "frw12"
+        ); // frw12 - insufficient balance withdraw
 
         balancesToWithdraw[_from][_token] -= _amount;
 
