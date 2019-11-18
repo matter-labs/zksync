@@ -1,4 +1,0 @@
-#!/bin/bash
-
-# For more details see service configuration at <franklink-dir>/etc/kube/minikube/geth.yaml
-echo http://$(bin/cluster-ip):$(kubectl get svc geth -o=jsonpath='{.spec.ports[0].nodePort}')

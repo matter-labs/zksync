@@ -1,22 +1,5 @@
 version: '3.2'
 services:
-  server:
-    image: "gluk64/franklin:server"
-    env_file: $ENV_FILE
-    environment:
-      - DATABASE_URL=postgres://postgres@postgres/plasma
-      - WEB3_URL=http://geth:8545
-    ports:
-      - "3000:3000"
-  prover:
-    image: "gluk64/franklin:prover"
-    env_file: $ENV_FILE
-    environment:
-      - PROVER_DATABASE_URL=postgres://postgres@postgres/plasma
-    volumes:
-      - type: bind
-        source: ./keys
-        target: /keys
   postgres:
     image: "postgres:10.4"
     ports:
@@ -26,9 +9,7 @@ services:
       source: ./volumes/postgres
       target: /var/lib/postgresql/data
   geth:
-    image: "matterlabs/geth-dev:latest"
-    # image: "ethereum/client-go"
-    # command: '--rpcapi "db,personal,eth,net,web3" --rpccorsdomain="*" --networkid=456719 --rpc --rpcaddr="0.0.0.0"'
+    image: "gluk64/franklin:geth"
     ports:
       - "8545:8545"
       - "8546:8546"
@@ -36,20 +17,13 @@ services:
     - type: bind
       source: ./volumes/geth
       target: /var/lib/geth/data
-  blockscout_postgres:
-    image: "postgres:10.4"
-    volumes:
-    - type: bind
-      source: ./volumes/blockscout_postgres
-      target: /var/lib/postgresql/data
-  blockscout:
-    image: "gluk64/blockscout"
-    command: /bin/sh -c "mix phx.server"
+  tesseracts:
+    image: "adria0/tesseracts"
+    command: --cfg /tesseracts.toml -vvv
     ports:
-      - "4000:4000"
-    environment:
-      - MIX_ENV=prod
-      - DATABASE_URL=postgresql://postgres:@blockscout_postgres:5432/explorer?ssl=false
-      - ETHEREUM_JSONRPC_VARIANT=geth
-      - ETHEREUM_JSONRPC_HTTP_URL=http://geth:8545
-      - COIN=DAI
+      - "8000:8000"
+    volumes:
+    - ./etc/tesseracts/tesseracts.toml:/tesseracts.toml
+    - type: bind
+      source: ./volumes/tesseracts
+      target: /var/lib/tesseracts/data

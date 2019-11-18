@@ -212,12 +212,13 @@ endif
 
 ifeq (dev,$(FRANKLIN_ENV))
 stop: confirm_action
-	#@kubectl delete deployments --selector=app=dev-server
-	#@kubectl delete deployments --selector=app=dev-prover
-	#@kubectl delete deployments --selector=app=dev-nginx
-	#@kubectl delete svc --selector=app=dev-server
-	#@kubectl delete svc --selector=app=dev-nginx
-	# not deleting postgres, geth and tesseract resources assuming they are being used for development too.
+	@kubectl delete deployments --selector=app=dev-server
+	@kubectl delete deployments --selector=app=dev-prover
+	@kubectl delete deployments --selector=app=dev-nginx
+	@kubectl delete svc --selector=app=dev-server
+	@kubectl delete svc --selector=app=dev-nginx
+	@kubectl delete -f ./etc/kube/minikube/postgres.yaml
+	@kubectl delete -f ./etc/kube/minikube/geth.yaml
 else ifeq (ci,$(FRANKLIN_ENV))
 stop:
 else
@@ -267,17 +268,17 @@ nodes:
 # Dev environment
 
 dev-up:
-	@{ kubectl get po | grep -q "postgres" && echo "Dev env already running" && exit 1; } || echo -n
-	@kubectl apply -f ./etc/kube/minikube/postgres.yaml
-	@kubectl create configmap tesseracts-config --from-file=./etc/tesseracts/tesseracts.toml
-	@kubectl apply -f ./etc/kube/minikube/geth.yaml
-	./bin/update-services-url-env-vars
+	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
+	@docker-compose up -d postgres geth
+	@docker-compose up -d tesseracts
 
 dev-down:
-	@kubectl delete -f ./etc/kube/minikube/postgres.yaml
-	@kubectl delete -f ./etc/kube/minikube/geth.yaml
-	@kubectl delete configmap tesseracts-config
-	./bin/reset-services-url-env-vars
+	@docker-compose stop postgres geth
+	@docker-compose stop tesseracts
+
+geth-up: geth
+	@docker-compose up geth
+
 
 # Auxillary docker containers for dev environment (usually no need to build, just use images from dockerhub)
 
