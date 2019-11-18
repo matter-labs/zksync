@@ -59,7 +59,7 @@ async submitTx(tx: any): Promise<string>;
 | tx | Signed Sync transaction (see types, for detailed description) |
 | returns | `0x`-prefixed hex-encoded hash of the transaction |
 
-## async submitTx
+## async getContractAddress
 
 ### Signature
 
