@@ -8,6 +8,9 @@ mapping between ethereum wallet and Sync wallet.
 `SyncSigner` is used to store keys and signing transaction. `SyncWallet` integrates `SyncSigner` and provides 
 simple API for sending transaction in the Sync network. 
 
+Transaction handles (`DepositTransactionHandle` and `TransactionHandle`) are used to provide simple API for tracking 
+progress of recently submitted transactions.
+
 # class SyncWallet
 
 ## constructor
@@ -85,8 +88,10 @@ Fees are payed by ethereum account in ETH currency. Fee should be >=  base fee, 
 current gas price. 
 
 Formula for base fee calculation:
-| ETH token | 2 * 179000 * GAS_PRICE |
-| ERC20 token | 2 * 214000 * GAS_PRICE |
+| Token | Formula |
+| -- | -- |
+| ETH token | `2 * 179000 * GAS_PRICE` |
+| ERC20 token | `2 * 214000 * GAS_PRICE` |
 
 ### Signature
 
@@ -97,7 +102,7 @@ async function depositFromETH(
     token: Token,
     amount: utils.BigNumberish,
     maxFeeInETHCurrenty: utils.BigNumberish
-);
+): Promise<DepositTransactionHandle>;
 ```
 
 ### Inputs and outputs
@@ -109,3 +114,84 @@ async function depositFromETH(
 | token | token to be transfered ("ETH" or address of the ERC20 token) |
 | amount | amount of token to be transferred |
 | fee | amount of `ETH` to be payed by `depositFrom` wallet as a fee for this transaction |
+| returns | Handle for this transaction. | 
+
+# class TransactionHandle
+
+Sync transaction handle, used for tracking progress of the recently created sync transactions.
+
+It can be in the following states 
+
+States:
+| Name | Description |
+| -- | -- |
+| Sent | Default state after transaction is submitted to the Sync network. |
+| Commited | Transaction was included to the Sync network block |
+| Verified | Corresponding Sync network block was verified |
+
+## async waitCommit
+
+Returns when transaction was included to the Sync network block.
+
+### Signature 
+
+```typescript
+async waitCommit();
+```
+
+## async waitVerify
+
+Returns when transaction block was verified in the Sync network.
+
+### Signature 
+
+```typescript
+async waitVerify();
+```
+
+# class DepositTransactionHandle
+
+Sync deposit transaction handle, used for tracking progress of the recently created deposit transactions.
+Deposit transaction is initiated by ethereum transaction.
+
+Most of the time user in interested in the `waitCommit` or `waitVerify` methods.
+
+It can be in the following states 
+
+States:
+| Name | Description |
+| -- | -- |
+| Sent | Default state after deposit is submitted to ethereum. |
+| Mined | After ethereum transaction was mined |
+| Commited | Deposit was included to the Sync network block |
+| Verified | Corresponding Sync network block was verified |
+
+## async waitTxMine
+
+Returns after etherum transaction was mined.
+
+### Signature 
+
+```typescript
+async waitTxMine();
+```
+
+## async waitCommit
+
+Returns when deposit was included to the Sync network block.
+
+### Signature 
+
+```typescript
+async waitCommit();
+```
+
+## async waitVerify
+
+Returns when deposit block was verified in the Sync network.
+
+### Signature 
+
+```typescript
+async waitVerify();
+```

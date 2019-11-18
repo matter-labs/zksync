@@ -142,7 +142,7 @@ export async function depositFromETH(
     token: Token,
     amount: utils.BigNumberish,
     maxFeeInETHCurrenty: utils.BigNumberish
-) {
+): Promise<DepositTransactionHandle> {
     const mainSidechainContract = new Contract(
         depositTo.provider.contractAddress.mainContract,
         SYNC_MAIN_CONTRACT_INTERFACE,
