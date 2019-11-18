@@ -2,7 +2,7 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand>Matter Testnet</b-navbar-brand>
+        <b-navbar-brand href="/">Matter Network</b-navbar-brand>
     </b-container>
     </b-navbar>
     <br>
@@ -44,6 +44,9 @@ export default {
         this.intervalHandle = setInterval(() => {
             this.update();
         }, timeConstants.transactionUpdate);
+    },
+    destroyed() {
+        clearInterval(this.intervalHandle);
     },
     methods: {
         async update() {
@@ -90,12 +93,21 @@ export default {
                 = this.tx_data.tx_type == 'Withdraw' ? `${this.blockchain_explorer_address}/${this.tx_data.to}`
                 : `/accounts/${this.tx_data.to}`;
 
+            let onchain_from
+                = this.tx_data.tx_type == 'Deposit' ? `<span class="onchain_icon">onchain</span>`
+                : '';
+
+            // <i class="fas fa-external-link-alt" />
+            let onchain_to
+                = this.tx_data.tx_type == 'Withdraw' ? `<span class="onchain_icon">onchain</span>`
+                : '';
+
             let rows = [
                 { name: 'Tx hash',        value: `<code>${this.tx_hash}</code>`},
                 { name: "Type",           value: `<b>${this.tx_data.tx_type}</b>`   },
                 { name: "Status",         value: `<b>${this.tx_data.status}</b>` },
-                { name: "From",           value: `<code><a target="_blanc" href="${link_from}">${this.tx_data.from}</a></code>`      },
-                { name: "To",             value: `<code><a target="_blanc" href="${link_to}">${this.tx_data.to}</a></code>`      },
+                { name: "From",           value: `<code><a target="_blank" rel="noopener noreferrer" href="${link_from}">${this.tx_data.from} ${onchain_from}</a></code>`      },
+                { name: "To",             value: `<code><a target="_blank" rel="noopener noreferrer" href="${link_to}">${this.tx_data.to} ${onchain_to}</a></code>`      },
                 { name: "Amount",         value: `<b>${this.tx_data.tokenName}</b> ${readableEther(this.tx_data.amount)}`    },
             ];
 
@@ -115,4 +127,13 @@ export default {
     margin: 0 !important;
 }
 
+.onchain_icon {
+    display: inline-block;
+    line-height: 1.5em;
+    font-weight: bold;
+    background: #17a2b8;
+    border-radius: 5px;
+    padding: 0 .2em;
+    color: white;
+}
 </style>

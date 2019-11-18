@@ -39,6 +39,7 @@
             <b-card no-body class="table-margin-hack">
                 <b-table
                     responsive 
+                    class="clickable"
                     :items="transactionProps" 
                     :fields="transactionFields" 
                     @row-clicked="onRowClicked">
@@ -54,6 +55,7 @@
                 </b-table>
             </b-card>
             <b-pagination 
+                v-if="this.pagesOfTransactions[2].length"
                 class="mt-2 mb-2"
                 v-model="currentPage" 
                 :per-page="rowsPerPage" 
@@ -98,15 +100,15 @@ export default {
         this.client = new WalletDecorator(this.address, this.fraProvider);
 
         this.update();  
-        this.intervalHandle = setInterval(() => {
-            if (this.currentPage == 1) {
-                this.update();
-            }
-        }, timeConstants.accountUpdate);
+        // this.intervalHandle = setInterval(() => {
+        //     if (this.currentPage == 1) {
+        //         this.update();
+        //     }
+        // }, timeConstants.accountUpdate);
     },
-    destroyed() {
-        clearInterval(this.intervalHandle);
-    },
+    // destroyed() {
+    //     clearInterval(this.intervalHandle);
+    // },
     methods: {
         onRowClicked(item) {
             console.log(item);
@@ -116,9 +118,6 @@ export default {
             let balances = await this.client.getCommitedBalances();
             this.balances = balances
                 .map(bal => ({ name: bal.tokenName, value: bal.balance }));
-
-            this.loading = true;
-
 
             let offset = (this.currentPage - 1) * this.rowsPerPage;
             let limit = this.rowsPerPage;
@@ -181,7 +180,7 @@ export default {
                     console.log('tx', tx);
 
                     let TxnHash = `<code>
-                        <a href="/transactions/${tx.data.hash}" target="_blanc">
+                        <a href="/transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
                             ${tx.data.hash.slice(0, 8)}..${tx.data.hash.slice(-8)}
                         </a>
                     </code>`;                    
@@ -195,13 +194,13 @@ export default {
                         : `/accounts/${tx.data.to}`;
 
                     let From = `<code>
-                        <a href="${link_from}" target="_blanc">
+                        <a href="${link_from}" target="_blank" rel="noopener noreferrer">
                             ${tx.data.from.slice(0, 8)}..${tx.data.from.slice(-8)}
                         </a>
                     </code>`;
 
                     let To = `<code>
-                        <a href="${link_to}" target="_blanc">
+                        <a href="${link_to}" target="_blank" rel="noopener noreferrer">
                             ${tx.data.to.slice(0, 8)}..${tx.data.to.slice(-8)}
                         </a>
                     </code>`;

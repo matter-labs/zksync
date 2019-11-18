@@ -1,5 +1,5 @@
 <template>
-<b-table responsive id="my-table" hover outlined :items="transactions" @row-clicked="onRowClicked" :fields="fields">
+<b-table responsive id="my-table" hover outlined :items="transactions" @row-clicked="onRowClicked" :fields="fields" class="clickable">
     <template v-slot:cell(type)="data"><span v-html="data.item['type']" /></template>
     <template v-slot:cell(from)="data"><span v-html="data.item['from']" /></template>
     <template v-slot:cell(to)="data"><span v-html="data.item['to']" /></template>

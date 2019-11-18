@@ -6,8 +6,8 @@
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
-            <b-nav-item href="/client/" target="_blanc">MatterMask</b-nav-item>
-            <b-nav-item v-bind:href="`${blockchain_explorer_address}/${store.config.CONTRACT_ADDR}`" target="_blanc">
+            <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">MatterMask</b-nav-item>
+            <b-nav-item v-bind:href="`${blockchain_explorer_address}/${store.config.CONTRACT_ADDR}`" target="_blank" rel="noopener noreferrer">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
@@ -19,20 +19,7 @@
         <ClosableJumbotron></ClosableJumbotron>
         <b-card bg-variant="light" >
             <h4>Matter Testnet Block Explorer</h4> 
-            <b-form @submit.stop.prevent="search">
-            <b-input-group>
-                <b-form-input v-model="query" placeholder="block number, tx hash or state root hash"></b-form-input>
-                <b-input-group-append>
-                <b-button @click="search" variant="info" :disabled="searching">
-                    <b-spinner v-if="searching" small></b-spinner>
-                    <span>Search</span>
-                </b-button>
-                </b-input-group-append>
-                <b-form-invalid-feedback v-if="notFound" :state="false">
-                    Nothing found for query '{{query}}'.
-                </b-form-invalid-feedback>
-            </b-input-group>
-            </b-form>
+            <SearchField />
         </b-card>
         <br>
         <b-card>
@@ -50,12 +37,12 @@
         </b-card>
         <br>
 
-        <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
+        <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
         <b-table responsive id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable">
             <template v-slot:cell(status)="data"><span v-html="data.item.status"></span></template>
             <template v-slot:cell(new_state_root)="data"><span v-html="data.item.new_state_root"></span></template>
         </b-table>
-        <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
+        <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
     </b-container>
 </div>
@@ -119,8 +106,10 @@ import store from './store';
 import client from './client';
 
 import ClosableJumbotron from './ClosableJumbotron.vue';
+import SearchField from './SearchField.vue';
 const components = { 
-    ClosableJumbotron 
+    ClosableJumbotron,
+    SearchField,
 };
 
 export default {
@@ -134,21 +123,6 @@ export default {
     methods: {
         ticker() {
             this.update(true);
-        },
-        async search() {
-            if (this.query) {
-                this.searching = true;
-                this.notFound = false;
-                let block = await client.searchBlock(this.query);
-                this.searching = false;
-                if (block && block.block_number) {
-                    this.$router.push('/blocks/' + block.block_number);
-                } else {
-                    this.notFound = true;
-                    await new Promise(resolve => setTimeout(resolve, 3600));
-                    this.notFound = false;
-                }
-            }
         },
         onRowClicked(item) {
             this.$router.push('/blocks/' + item.block_number);
@@ -225,10 +199,7 @@ export default {
             blocks:             [],
             ready:              false,
 
-            query:              '',
             loading:            true,
-            searching:          false,
-            notFound:           false,
 
             breadcrumbs: [
                 {

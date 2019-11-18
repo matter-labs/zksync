@@ -7,7 +7,7 @@
         This is a testnet of ZK Rollup for ERC-20 transfers. Play around with the demo!
         </template>
 
-        <b-button class="tryWalletButton" size="lg" variant="primary" href="/client/" target="_blanc">Try demo wallet</b-button>
+        <b-button class="tryWalletButton" size="lg" variant="primary" href="/client/" target="_blank" rel="noopener noreferrer">Try demo wallet</b-button>
     </b-jumbotron>
 </template>
 

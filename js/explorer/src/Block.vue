@@ -44,8 +44,8 @@ function formatToken(amount, token) {
 }
 
 function formatAddress(address) {
-    return address;
-    // return `${address.slice(0, 12)}..${address.slice(-12)}`;
+    return `${address.slice(0, 8)}..${address.slice(-8)}`;
+    // return address;
 }
 
 function defaultTokenSymbol(tokenId) {
@@ -97,12 +97,16 @@ export default {
                 let fee = "";
                 let from_explorer_link = "";
                 let to_explorer_link = "";
+                let from_onchain_icon = "";
+                let to_onchain_icon = "";
 
                 if (type == "Deposit") {
                     from = formatAddress(tx.priority_op.data.sender);
                     to = formatAddress(tx.priority_op.data.account);
                     from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.account}`;
                     to_explorer_link = `/accounts/${tx.priority_op.data.account}`;
+                    from_onchain_icon = `<span class="onchain_icon">onchain</span>`;
+                    to_onchain_icon = '';
                     token = tx.priority_op.data.token;
                     token = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
                     amount =  `${formatToken(tx.priority_op.data.amount, token)} ${token}`;
@@ -112,6 +116,8 @@ export default {
                     to = formatAddress(tx.tx.to);
                     from_explorer_link = `/accounts/${tx.tx.from}`;
                     to_explorer_link = `/accounts/${tx.tx.to}`;
+                    from_onchain_icon = '';
+                    to_onchain_icon = '';
                     token = tx.tx.token;
                     token = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
                     amount =  `${formatToken(tx.tx.amount, token)} ${token}`;
@@ -121,6 +127,8 @@ export default {
                     to = formatAddress(tx.tx.eth_address);
                     from_explorer_link = `/accounts/${tx.tx.account}`;
                     to_explorer_link = `${this.blockchain_explorer_address}/${tx.tx.account}`;
+                    from_onchain_icon = '';
+                    to_onchain_icon = `<span class="onchain_icon">onchain</span>`;
                     token = tx.tx.token;
                     token = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
                     amount =  `${formatToken(tx.tx.amount, token)} ${token}`;
@@ -129,8 +137,8 @@ export default {
 
                 return {
                     type: `<b>${type}</b>`,
-                    from: `<code><a href="${from_explorer_link}" target="_blanc">${from}</a></code>`,
-                    to: `<code><a href="${to_explorer_link}" target="_blanc">${to}</a></code>`,
+                    from: `<code><a href="${from_explorer_link}" target="_blank" rel="noopener noreferrer">${from} ${from_onchain_icon}</a></code>`,
+                    to: `<code><a href="${to_explorer_link}" target="_blank" rel="noopener noreferrer">${to} ${to_onchain_icon}</a></code>`,
                     amount,
                     fee,
                     tx_hash: tx.tx_hash,
@@ -164,12 +172,12 @@ export default {
                 { name: 'New root hash',    value: `<code>${this.new_state_root}</code>`},
                 // { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
-                { name: 'Commit tx hash',   value: `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.commit_tx_hash}">${this.commit_tx_hash}</a></code>`, },
+                { name: 'Commit tx hash',   value: `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.commit_tx_hash}">${this.commit_tx_hash} <span class="onchain_icon">onchain</span></a></code>`, },
                 { name: 'Committed at',     value: formatDate(this.committed_at)},
-                { name: 'Verify tx hash',   value: `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.verify_tx_hash}">${this.verify_tx_hash}</a></code>`, },
+                { name: 'Verify tx hash',   value: `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.verify_tx_hash}">${this.verify_tx_hash} <span class="onchain_icon">onchain</span></a></code>`, },
                 { name: 'Verified at',      value: formatDate(this.verified_at)},
             ];
-        }
+        },
     },
     data() {
         return {

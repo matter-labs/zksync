@@ -2,7 +2,7 @@ import axios from 'axios';
 import store from './store';
 
 async function fetch(req) {
-    let r = await axios(req);
+    let r = await axios(req).catch(_ => ({}));
     if (r.status == 200) {
         return r.data;
     } else {
@@ -63,10 +63,24 @@ let self = {
         });
     },
 
-    async searchBlock(query) {
+    searchBlock(query) {
         return fetch({
             method:     'get',
             url:        `${baseUrl()}/search?query=${query}`,
+        });
+    },
+
+    searchAccount(address) {
+        return fetch({
+            method: 'get',
+            url: `${baseUrl()}/account/${address}`,
+        });
+    },
+    
+    searchTx(tx_hash) {
+        return fetch({
+            method: 'get',
+            url: `${baseUrl()}/transactions_all/${tx_hash}`,
         });
     },
 };
