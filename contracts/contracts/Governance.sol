@@ -1,6 +1,6 @@
 pragma solidity ^0.5.8;
 
-import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import "./IERC20.sol";
 import "./BlsOperations.sol";
 import "./SwiftExits.sol";
 

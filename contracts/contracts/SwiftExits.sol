@@ -1,10 +1,10 @@
 pragma solidity ^0.5.8;
 
-import "openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
-import "compound-protocol/contracts/CEther.sol";
-import "compound-protocol/contracts/CErc20.sol";
-import "compound-protocol/contracts/Comptrolnler.sol";
-import "compound-protocol/contracts/PriceOracle.sol";
+import "./IERC20.sol";
+import "./IComptroller.sol";
+import "./ICEther.sol";
+import "./ICErc20.sol";
+import "./PriceOracle.sol";
 
 import "./Governance.sol";
 import "./Franklin.sol";
