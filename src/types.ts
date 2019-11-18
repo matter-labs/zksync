@@ -52,3 +52,21 @@ export interface SyncCloseAccount {
     nonce: number;
     signature: Signature;
 }
+
+export interface BlockInfo {
+    blockNumber: number,
+    commited: boolean,
+    verified: boolean,
+}
+
+export interface SyncTxReceipt {
+    executed: boolean,
+    success?: boolean,
+    failReason?: string,
+    block?: BlockInfo
+}
+
+export interface SyncPriorityOperationReceipt {
+    executed: boolean,
+    block?: BlockInfo,
+}
