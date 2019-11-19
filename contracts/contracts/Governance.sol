@@ -12,6 +12,9 @@ contract Governance {
 
     /// @notice Freeze time for token, when validator withdraw it. Then the validator must wait this time to withdraw it again
     uint256 constant FREEZE_TIME = 10000;
+    
+    /// @notice Validator-creator fee coefficient
+    uint256 constant VALIDATOR_CREATOR_FEE_COEFF = 10;
 
     /// @notice Rollup contract
     Franklin rollup;
@@ -298,11 +301,16 @@ contract Governance {
             "gect14"
         ); // "gect14" - fees must be > 0
 
+        require(
+            tokenAmount > swiftExitFee,
+            "ssat15"
+        ); // "ssat15" - amount must be > fees
+
         // Check that there are enouth free tokens on contract
         require(
             (2 * totalSupply / 3) - totalLended >= supplyAmount,
-            "gect15"
-        ); // "gect15" - not enouth amount
+            "gect16"
+        ); // "gect16" - not enouth amount
 
         // Verify sender and validators signature
         require(
@@ -312,14 +320,14 @@ contract Governance {
                 _signersBitmask,
                 uint256(keccak256(_swiftExit))
             ),
-            "gect16"
-        ); // "gect16" - wrong signature or validator-sender is not in signers bitmask
+            "gect17"
+        ); // "gect17" - wrong signature or validator-sender is not in signers bitmask
         
         // Send tokens to swiftExits
         require(
             IERC20(matterTokenAddress).transfer(address(swiftExits), supplyAmount),
-            "gect17"
-        ); // gect17 - token transfer out failed
+            "gect18"
+        ); // gect18 - token transfer out failed
 
         // Sum lended balance
         totalLended += supplyAmount;
@@ -638,10 +646,12 @@ contract Governance {
     /// @param _repayAmount Matter token repayment amount
     /// @param _feesTokenAddress Fees token address, address(0) for Ether
     /// @param _feesAmount Fees amount
+    /// @param _validatorCreator Validator, that processed order
     function repayBorrowWithFees(
         uint256 _repayAmount,
         address _feesTokenAddress,
-        uint256 _feesAmount
+        uint256 _feesAmount,
+        address _validatorCreator
     ) external payable {
         require(
             msg.sender == address(swiftExit),
@@ -653,12 +663,12 @@ contract Governance {
         require(
             _repayAmount > 0,
             "gers12"
-        ); // gers12 - amount must be > 0s
+        ); // gers12 - repay amount must be > 0s
 
         require(
             IERC20(matterTokenAddress).transferFrom(msg.sender, address(this), _repayAmount),
             "gers13"
-        ); // gers13 - token transfer in failed
+        ); // gers13 - matter token transfer in failed
 
         totalLended -= _repayAmount;
 
@@ -667,13 +677,20 @@ contract Governance {
         uint16 tokenId = validateTokenAddress(_feesTokenAddress);
         if (tokenId == 0) {
             // Token is Ether
+
+            // Accumulate validators fees
             require(
                 _feesAmount == 0 && msg.value > 0,
                 "gers14"
             ); // gers14 - amount must be == 0 and msg.value > 0
-            accumulatedFees += msg.value;
+            accumulatedFees += msg.value * (1 - VALIDATOR_CREATOR_FEE_COEFF / 100);
+            
+            // Repay fee to validator that created request
+            _validatorCreator.transfer(msg.value * VALIDATOR_CREATOR_FEE_COEFF / 100);
         } else {
             // Token is ERC20
+
+            // Accumulate validators fees
             require(
                 _feesAmount > 0 && msg.value == 0,
                 "gers15"
@@ -682,7 +699,13 @@ contract Governance {
                 IERC20(_feesTokenAddress).transferFrom(msg.sender, address(this), _feesAmount),
                 "gers16"
             ); // gers16 - token transfer in failed
-            accumulatedFees += _feesAmount;
+            accumulatedFees += _feesAmount * (1 - VALIDATOR_CREATOR_FEE_COEFF / 100);
+
+            // Repay fee to validator that created request
+            require(
+                IERC20(_feesTokenAddress).transfer(_validatorCreator, _feesAmount * VALIDATOR_CREATOR_FEE_COEFF / 100),
+                "gers17"
+            ); // gers17 - token transfer out failed
         }
     }
 }

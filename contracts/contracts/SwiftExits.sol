@@ -4,7 +4,6 @@ import "./IERC20.sol";
 import "./IComptroller.sol";
 import "./ICEther.sol";
 import "./ICErc20.sol";
-import "./PriceOracle.sol";
 
 import "./Governance.sol";
 import "./Franklin.sol";
@@ -12,12 +11,6 @@ import "./Franklin.sol";
 /// @title Swift Exits Contract
 /// @author Matter Labs
 contract SwiftExits {
-
-    /// @notice GAS value to complete Swift Exit order creation transaction
-    uint256 constant SWIFT_EXIT_TX_CREATION_GAS = 100000;
-
-    /// @notice cEther token contract address
-    address internal cEtherAddress;
 
     /// @notice Governance contract
     Governance internal governance;
@@ -28,39 +21,32 @@ contract SwiftExits {
     /// @notice Comptroller contract
     Comptroller internal comptroller;
 
-    /// @notice PriceOracle contract
-    PriceOracle internal priceOracle;
-
     /// @notice Swift Exits orders by Rollup block number (block number -> order number -> order)
-    mapping(uint32 => mapping(uint64 => ExitOrder)) internal exitOrders;
+    mapping(uint32 => mapping(uint64 => ExitOrder)) public exitOrders;
     
     /// @notice Swift Exits in blocks count (block number -> orders count)
-    mapping(uint32 => uint64) internal exitOrdersCount;
+    mapping(uint32 => uint64) public exitOrdersCount;
 
     /// @notice Swift Exits existance in block with specified withdraw operation number (block number -> withdraw op number -> existance)
-    mapping(uint32 => mapping(uint64 => bool)) internal exitOrdersExistance;
+    mapping(uint32 => mapping(uint64 => bool)) public exitOrdersExistance;
 
     /// @notice Container for information about Swift Exit Order
     /// @member onchainOpNumber Withdraw operation number in block
     /// @member opHash Corresponding onchain operation hash
     /// @member tokenId Order (sending) token id
-    /// @member sendingAmount Sending amount to recepient (initial amount minus fees)
-    /// @member creationCost Cost in orders' token of swift exit operation for validator-sender
+    /// @member sendingAmount Sending amount to recipient (initial amount minus fees)
+    /// @member recipient Recipient of the withdraw operation
     /// @member validatorsFee Fee for validators in orders' tokens
     /// @member validatorSender Address of validator-sender (order transaction sender)
-    /// @member suppliersCount Order validators-suppliers count
-    /// @member supplyTokenId Supplied token id
     /// @member supplyAmount Supplied token amount
     struct ExitOrder {
         uint64 onchainOpNumber;
         uint256 opHash;
         uint16 tokenId;
         uint256 sendingAmount;
-        uint256 creationCost;
+        address recipient;
         uint256 validatorsFee;
         address validatorSender;
-        uint16 suppliersCount;
-        uint16 supplyTokenId;
         uint256 supplyAmount;
     }
 
@@ -75,12 +61,10 @@ contract SwiftExits {
     /// @param _matterTokenAddress The address of Matter token
     /// @param _rollupAddress The address of Rollup contract
     /// @param _comptrollerAddress The address of Comptroller contract
-    /// @param _comptrollerAddress The address of PriceOracle contract
     function setupRelatedContracts(
         address _matterTokenAddress,
         address _rollupAddress,
-        address _comptrollerAddress,
-        address _priceOracleAddress
+        address _comptrollerAddress
     )
         external
     {
@@ -90,22 +74,6 @@ contract SwiftExits {
         // Set contracts by addresses
         rollup = Franklin(_rollupAddress);
         comptroller = Comptroller(_comptrollerAddress);
-        priceOracle = PriceOracle(_priceOracleAddress);
-
-        // Set cEther address
-        cEtherAddress = governance.getCTokenAddress(0);
-    }
-
-    /// @notice Fallback function
-    /// @dev Accepts ether only from governance, rollup and cEther addresses
-    function() external payable {
-        if (
-            msg.sender != address(governance) ||
-            msg.sender != address(rollup) ||
-            msg.sender != cEtherAddress
-        ) {
-            revert("Cant accept from unexpected contract");
-        }
     }
 
     /// @notice Adds new swift exit
@@ -119,9 +87,7 @@ contract SwiftExits {
     /// @param _recipient Withdraw operation recipient
     /// @param _owner Withdraw operation owner
     /// @param _swiftExitFee Validators fee
-    /// @param _supplyTokenId Supplied token id
     /// @param _supplyAmount Supplied amount
-    /// @param _suppliersCount Suppliers count
     function addSwiftExit(
         uint32 _blockNumber,
         uint64 _onchainOpNumber,
@@ -132,9 +98,7 @@ contract SwiftExits {
         uint256 _recipient,
         uint256 _owner,
         uint256 _swiftExitFee,
-        uint16 _supplyTokenId,
-        uint256 _supplyAmount,
-        uint16 _suppliersCount
+        uint256 _supplyAmount
     )
         external
     {
@@ -143,10 +107,6 @@ contract SwiftExits {
             msg.sender == address(governance),
             "fnds11"
         ); // fnds11 - wrong address
-
-        // This transaction cost for validator-sender
-        uint256 creationCost = getCreationCostForToken(_tokenId);
-
         // Check that order is new
         require(
             !exitOrdersExistance[_blockNumber][_onchainOpNumber],
@@ -154,7 +114,7 @@ contract SwiftExits {
         ); // "ssat12" - order exists
 
         // Sending amount: token amount minus sum of validators fees for swift exit and transaction cost
-        uint256 sendingAmount = _tokenAmount - (creationCost + _swiftExitFee);
+        uint256 sendingAmount = _tokenAmount - _swiftExitFee;
 
         // Check if tokenAmount is higher than sum of validators fees for swift exit and transaction cost
         require(
@@ -171,13 +131,14 @@ contract SwiftExits {
             _recipient,
             _owner
         )));
-
-        if (_supplyTokenId != _tokenId) {
+        
+        uint16 matterTokenId = governance.matterTokenId;
+        if (_tokenId != matterTokenId) {
             // Borrow needed tokens from compound if token ids arent equal
-            borrowFromCompound(_supplyTokenId, _supplyAmount, tokenId, sendingAmount);
+            borrowFromCompound(_supplyAmount, tokenId, sendingAmount);
         }
 
-        // Send tokens to recepient
+        // Send tokens to recipient
         sendTokensToRecipient(_recipient, _tokenId, sendingAmount);
 
         // Create ExitOrder
@@ -186,11 +147,9 @@ contract SwiftExits {
             opHash,
             _tokenId,
             sendingAmount,
-            creationCost,
+            _recipient,
             _swiftExitFee,
             tx.origin, // Here tx origin MUST be only validator address, so we can use it
-            _suppliersCount,
-            _supplyTokenId,
             _supplyAmount
         );
         exitOrders[_blockNumber][exitOrdersCount[_blockNumber]] = order;
@@ -200,74 +159,89 @@ contract SwiftExits {
         exitOrdersExistance[_blockNumber][_onchainOpNumber] = true;
     }
 
-    /// @notice Returns order token id, amount, recipient
+    /// @notice Consummates fees for succeeded and punishes for failed orders
     /// @param _blockNumber Block number
-    /// @param _orderNumber Order number
-    function getOrderInfo(
-        uint32 _blockNumber,
-        uint64 _orderNumber
-    )
-        external
-        returns (
-            uint16 suppliersCount,
-            uint16 tokenId,
-            uint256 fullAmount,
-            address recipient
-        )
-    {
-        // Can be called only from Rollup contract
-        require(
-            msg.sender == address(rollup),
-            "fnds11"
-        ); // fnds11 - wrong address
-        ExitOrder order = exitOrders[_blockNumber][_orderNumber];
-        
-        return (
-            order.suppliersCount,
-            order.tokenId,
-            order.sendingAmount + order.creationCost + order.validatorsFee,
-            order.recipient
-        );
-    }
+    function completeOrders(uint32 _blockNumber) external {
+        // Can be called only by active validator
+        governance.requireActiveValidator(msg.sender);
 
-    /// @notice Clears suppliers count in wrong orders to "mark" them as wrong
-    /// @param _blockNumber Block number
-    function clearSuppliersInWrongOrders(uint32 _blockNumber) external {
-        // Can be called only from Rollup contract
-        require(
-            msg.sender == address(rollup),
-            "fnds11"
-        ); // fnds11 - wrong address
         // Get onchain operations start id in this block from Rollup contract
         uint64 onchainOpsStartIdInBlock = rollup.blocks[_blockNumber].startId;
+
         // Go into loop for all exit orders in block
         for (uint64 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
             // Get exit order by block nubmer and id
             ExitOrder order = exitOrders[_blockNumber][i];
+
             // Get real onchain operation hash from Rollup contract
             uint256 realOpHash = uint256(keccak256(rollup.onchainOps[onchainOpsStartIdInBlock + order.onchainOpNumber].pubData));
+
             // Get expected operation hash from exit order
             uint256 expectedOpHash = order.opHash;
 
-            if (realOpHash != expectedOpHash) {
-                // If hashes are not equal - clear suppliers count
-                exitOrders[_blockNumber][i].suppliersCount = 0;
-            }
-        }
-    }
+            if (realOpHash == expectedOpHash) {
+                // If hashes are equal - order is correct -> get tokens from rollup, repay to compound if needed, repay to validators
+                
+                // Defrost funds on rollup and get tokens
+                rollup.defrostFunds(
+                    order.recipient,
+                    order.tokenId,
+                    order.sendingAmount + order.validatorsFee
+                );
 
-    /// @notice Consummates fees for succeeded and punishes for failed orders
-    /// @param _blockNumber Block number
-    function fulfillOrders(uint32 _blockNumber) external {
-        // Can be called only from Rollup contract
-        require(
-            msg.sender == address(rollup),
-            "fnfs11"
-        ); // fnfs11 - wrong address
-        for (uint64 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
-            if (exitOrders[_blockNumber][i].suppliersCount != 0) {
-                // If suppliers count in this order is not 0 - this order is correct and must be fulfilled
-                fulfillSucceededOrder(exitOrders[_blockNumber][i]);
+                // Repay to compound if needed
+                uint16 matterTokenId = governance.matterTokenId;
+                if (order.tokenId != matterTokenId) {
+                    repayToCompound(
+                        order.tokenId,
+                        order.sendingAmount,
+                        order.supplyAmount
+                    );
+                }
+
+                // Check for enouth allowence value for matter token to repay borrow
+                address matterTokenAddress = governance.matterTokenAddress;
+                uint256 allowence = IERC20(matterTokenAddress).allowence(address(this), address(governance));
+                // Allowence must be >= supplied amount
+                if (allowence < _order.supplyAmount) {
+                    // If allowence value is not enouth - approve max possible value for this token for repay to Governance contract
+                    require(
+                        IERC20(matterTokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                        "sscs11"
+                    ); // ssfr11 - token approve failed
+                }
+                
+                // Repay borrows and charge fees to validators
+                if (order.tokenId == 0) {
+                    // Fees in Ether
+                    governance.repayBorrowWithFees.value(order.validatorsFee)(
+                        order.supplyAmount,
+                        address(0),
+                        0,
+                        order.validatorSender
+                    );
+                } else {
+                    // Fees in ERC20
+                    address tokenAddress = governance.validateTokenId(order.tokenId);
+
+                    // Check for enouth allowence value for this token to charge fees
+                    uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
+                    // Allowence must be >= validators fee
+                    if (allowence < _order.validatorsFee) {
+                        // If allowence value is not enouth - approve max possible value for this token for repay to Governance contract
+                        require(
+                            IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                            "sscs12"
+                        ); // ssfr12 - token approve failed
+                    }
+
+                    governance.repayBorrowWithFees.value(0)(
+                        order.supplyAmount,
+                        tokenAddress,
+                        order.validatorsFee,
+                        order.validatorSender
+                    );
+                }
             }
         }
         delete exitOrdersCount[_blockNumber];
@@ -275,32 +249,11 @@ contract SwiftExits {
         delete exitOrders[_blockNumber];
     }
 
-    /// @notice Get the amount of tokens, which after conversion to Ether will be equal to the order creation transaction gas cost
-    /// @param _tokenId Token id
-    function getCreationCostForToken(uint16 _tokenId) internal returns (uint256) {
-        // Get ether gas cost = fixed amount of gas * transaction gas price
-        uint256 etherGasCost = SWIFT_EXIT_TX_CREATION_GAS * tx.gasprice;
-
-        // Get corresponding cToken address for specified token
-        address cTokenAddress = governance.getCTokenAddress(_tokenId);
-
-        // Get price for ether from price oracle
-        uint256 etherUnderlyingPrice = priceOracle.getUnderlyingPrice(cEtherAddress);
-
-        // Get price for token from price oracle
-        uint256 tokenUnderlyingPrice = priceOracle.getUnderlyingPrice(cTokenAddress);
-
-        // Cost in token is equal to ether gas cost * (token price / ether price)
-        return etherGasCost * (tokenUnderlyingPrice / etherUnderlyingPrice);
-    }
-
     /// @notice Borrow specified amount from compound
-    /// @param _tokenSupplyId Token supply id
     /// @param _supplyAmount Amount of supplied tokens
     /// @param _tokenBorrowId Token borrow id
     /// @param _borrowAmount Amount of tokens to borrow
     function borrowFromCompound(
-        uint16 _tokenSupplyId,
         uint256 _supplyAmount,
         uint16 _tokenBorrowId,
         uint256 _borrowAmount
@@ -308,9 +261,9 @@ contract SwiftExits {
         internal
     {
         // Get supply token address
-        address supplyTokenAddress = governance.validateTokenId(_tokenSupplyId);
+        address supplyTokenAddress = governance.matterTokenAddress;
         // Get supply cToken address (corresponding to supply token)
-        address cSupplyTokenAddress = governance.getCTokenAddress(_tokenSupplyId);
+        address cSupplyTokenAddress = governance.cMatterTokenAddress;
 
         // Get borrow cToken address (corresponding to borrow token)
         address cBorrowTokenAddress = governance.getCTokenAddress(_tokenBorrowId);
@@ -325,36 +278,23 @@ contract SwiftExits {
             "sebd11"
         ); // sebd11 - enter markets failed
 
-        if (_tokenSupplyId == 0) {
-            // If token supply id is 0 - its Ether
-
-            // Supply (mint) cEther
-            CEther cToken = CEther(cSupplyTokenAddress);
+        // Check for enouth allowence value for this token for supply to cToken contract
+        uint256 allowence = IERC20(supplyTokenAddress).allowence(address(this), address(cSupplyTokenAddress));
+        // Allowence must be >= supply amount
+        if (allowence < _supplyAmount) {
+            // If allowence value is not anouth - approve max possible value for this token for supply to cToken contract
             require(
-                cToken.mint.value(_supplyAmount)() == 0,
-                "sebd12"
-            ); // sebd12 - token mint failed
-        } else {
-            // If token supply id is not 0 - its ERC20 token
-
-            // Check for enouth allowence value for this token for supply to cToken contract
-            uint256 allowence = IERC20(supplyTokenAddress).allowence(address(this), address(cSupplyTokenAddress));
-            // Allowence must be >= supply amount
-            if (allowence < _supplyAmount) {
-                // If allowence value is not anouth - approve max possible value for this token for supply to cToken contract
-                require(
-                    IERC20(supplyTokenAddress).approve(address(cSupplyTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                    "sebd13"
-                ); // sebd13 - token approve failed
-            }
-            
-            // Supply (mint) cErc20
-            CErc20 cToken = CErc20(cSupplyTokenAddress);
-            require(
-                cToken.mint(_supplyAmount) == 0,
-                "sebd14"
-            ); // sebd14 - token mint failed
+                IERC20(supplyTokenAddress).approve(address(cSupplyTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                "sebd13"
+            ); // sebd13 - token approve failed
         }
+        
+        // Supply (mint) cErc20
+        CErc20 cToken = CErc20(cSupplyTokenAddress);
+        require(
+            cToken.mint(_supplyAmount) == 0,
+            "sebd14"
+        ); // sebd14 - token mint failed
 
         if (_tokenBorrowId == 0) {
             // If token borrow id is 0 - its Ether
@@ -380,12 +320,10 @@ contract SwiftExits {
     /// @notice Repays specified amount to compound
     /// @param _tokenRepayId Token repay id
     /// @param _repayAmount Amount of tokens to repay
-    /// @param _tokenRedeemId Token redeem id
     /// @param _redeemAmount Amount of supplied tokens
     function repayToCompound(
         uint16 _tokenRepayId,
         uint256 _repayAmount,
-        uint16 _tokenRedeemId,
         uint256 _redeemAmount
     )
         internal
@@ -396,7 +334,7 @@ contract SwiftExits {
         address cRepayTokenAddress = governance.getCTokenAddress(_tokenRepayId);
 
         // Get redeem cToken address (corresponding to redeem token)
-        address cRedeemTokenAddress = governance.getCTokenAddress(_tokenRedeemId);
+        address cRedeemTokenAddress = governance.cMatterTokenAddress;
 
         if (_tokenRepayId == 0) {
             // If token repay id is 0 - its Ether
@@ -429,25 +367,12 @@ contract SwiftExits {
             );  // serd13 - token repay failed
         }
 
-        if (_tokenRedeemId == 0) {
-            // If token redeem id is 0 - its Ether
-
-            // Redeem cEther
-            CEther cToken = CEther(cRedeemTokenAddress);
-            require(
-                cToken.redeemUnderlying(_redeemAmount) == 0,
-                "serd14"
-            );  // serd14 - token redeem failed
-        } else {
-            // If token redeem id is not 0 - its ERC20 token
-
-            // Redeem cErc20
-            CErc20 cToken = CErc20(cRedeemTokenAddress);
-            require(
-                cToken.redeemUnderlying(_redeemAmount) == 0,
-                "serd15"
-            );  // serd15 - token redeem failed
-        }
+        // Redeem cErc20
+        CErc20 cToken = CErc20(cRedeemTokenAddress);
+        require(
+            cToken.redeemUnderlying(_redeemAmount) == 0,
+            "serd14"
+        );  // serd14 - token redeem failed
     }
 
     /// @notice Sends specified amount of token to recipient
@@ -473,86 +398,6 @@ contract SwiftExits {
                 IERC20(tokenAddress).transfer(_recipient, _amount),
                 "ssst11"
             ); // ssst11 - token transfer failed
-        }
-    }
-
-    /// @notice Fulfills succeeded order
-    /// @dev Repays to compound (if needed) and validators, consummates fees
-    /// @param _order - ExitOrder sturcture
-    function fulfillSucceededOrder(ExitOrder _order) internal {
-        if (_order.tokenId != _order.supplyTokenId) {
-            // If order token id is not equal to supplied token id - need to repay borrow to compound
-            repayToCompound(
-                _order.tokenId,
-                _order.sendingAmount,
-                _order.supplyTokenId,
-                _order.supplyAmount
-            );
-        }
-
-        if (_order.supplyTokenId == 0) {
-            // If supplied token id is 0 - repay validators in Ether
-            governance.repayInEther.value(_order.supplyAmount)(_order.suppliersCount);
-        } else {
-            // If supplied token id is not 0 - repay validators in ERC20
-
-            // Validate token id - get token address
-            address tokenAddress = governance.validateTokenId(supplyTokenId);
-
-            // Check for enouth allowence value for this token for repay to Governance contract
-            uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
-            // Allowence must be >= supply amount
-            if (allowence < _order.supplyAmount) {
-                // If allowence value is not anouth - approve max possible value for this token for repay to Governance contract
-                require(
-                    IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                    "ssfr11"
-                ); // ssfr11 - token approve failed
-            }
-
-            // Repay to Governance in Ether
-            governance.repayInErc20(
-                _order.supplyTokenId,
-                _order.supplyAmount,
-                _order.suppliersCount
-            );
-        }
-
-        // Consummate fees
-        if (_order.tokenId == 0) {
-            // If order token id is 0 - pay validators fee and creation cost in Ether
-            governance.repayInEther.value(_order.validatorsFee, _order.suppliersCount);
-            governance.supplyEther.value(_order.creationCost)(_order.validatorSender);
-        } else {
-            // If order token id is 0 - pay validators fee and creation cost in ERC20
-
-            // Validate token id - get token address
-            address tokenAddress = governance.validateTokenId(_order.tokenId);
-
-            // Check for enouth allowence value for this token for pay fees to Governance contract
-            uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
-            // Allowence must be >= validators fee + creation cost
-            if (allowence < _order.validatorsFee + _order.creationCost) {
-                // If allowence value is not anouth - approve max possible value for this token for repay to Governance contract
-                require(
-                    IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                    "ssfr11"
-                ); // ssfr11 - token approve failed
-            }
-
-            // Pay fees
-            governance.repayInErc20(
-                _order.tokenId,
-                _order.validatorsFee,
-                _order.suppliersCount
-            );
-
-            // Pay creation cost
-            governance.supplyErc20(
-                _order.tokenId,
-                _order.creationCost,
-                _order.validatorSender
-            );
         }
     }
 }

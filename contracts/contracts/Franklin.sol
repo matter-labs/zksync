@@ -932,21 +932,25 @@ contract Franklin {
             msg.sender == swiftExits,
             "fnds11"
         ); // fnds11 - sender must be swift exits contract
+        require(
+            governance.requireActiveValidator(tx.origin),
+            "fnds12"
+        ); // fnds12 - tx origin must be active validator
 
         require(
             _amount > 0,
-            "fnsw12"
-        ); // fnds12 - amount must be > 0
+            "fnsw13"
+        ); // fnds13 - amount must be > 0
 
         require(
             frozenBalances[_account][_tokenId] >= _amount,
-            "fnsw13"
-        ); // fnds13 - frozen balance must be >= amount
+            "fnsw14"
+        ); // fnds14 - frozen balance must be >= amount
 
         require(
             balancesToWithdraw[_account][_tokenId] >= _amount,
-            "fnsw14"
-        ); // fnds14 - balance must be >= amount
+            "fnsw15"
+        ); // fnds15 - balance must be >= amount
 
         // Defrost balance
         frozenBalances[_account][_tokenId] -= _amount;
@@ -965,47 +969,8 @@ contract Franklin {
             // Transfer token
             require(
                 IERC20(tokenAddress).transfer(swiftExits, _amount),
-                "fnds15"
-            ); // fnds15 - token transfer failed
+                "fnds16"
+            ); // fnds16 - token transfer failed
         }
     }
-
-    // /// @notice Fulfills swift exits in block
-    // function fulfillSwiftExits(uint32 _blockNumber) external {
-    //     // Requires sender to be active validator
-    //     governance.requireActiveValidator(msg.sender);
-    //     // Block number must be equal or less than total verified blocks count
-    //     require(
-    //         totalBlocksVerified >= blockNumber,
-    //         "fnjs11"
-    //     ); // fnjs11 - wrong block number
-
-    //     // Loop orders list
-    //     for (uint64 i = 0; i < swiftExits.exitOrdersCount[_blockNumber]; i++) {
-    //         // Get info about order
-    //         (
-    //             uint16 suppliersCount,
-    //             uint16 tokenId,
-    //             uint256 amount,
-    //             address recipient
-    //         ) = swiftExits.getOrderInfo(_blockNumber, i);
-    //         // Anyway unfroze balance
-    //         frozenBalances[recipient][tokenId] -= amount;
-
-    //         if (suppliersCount > 0) {
-    //             // If withdraw op is correct (suppliers count > 0) - withdraw necessary amount to swift exits contract
-    //             registerWithdrawal(recipient, tokenId, _amount);
-    //             if (tokenId == 0){
-    //                 address(swiftExits).transfer(amount);
-    //             } else {
-    //                 address tokenAddress = governance.validateTokenId(tokenId);
-    //                 require(
-    //                     IERC20(tokenAddress).transfer(address(swiftExits), amount),
-    //                     "fnjs11"
-    //                 ); // fnjs11 - token transfer failed
-    //             }
-    //         }
-    //     }
-    //     swiftExits.fulfillOrders(_blockNumber);
-    // }
 }
