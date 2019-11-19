@@ -46,21 +46,21 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
 
 (async () => {
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
-    const wsSidechainProvider = await SyncProvider.newHttpProvider();
+    const syncProvider = await SyncProvider.newWebsocketProvider();
     const ethProxy = new ETHProxy(
         ethersProvider,
-        wsSidechainProvider.contractAddress
+        syncProvider.contractAddress
     );
 
-    console.log("Contract address: ", wsSidechainProvider.contractAddress);
+    console.log("Contract address: ", syncProvider.contractAddress);
 
     const ethWallet = ethers.Wallet.fromMnemonic(
         MNEMONIC,
         "m/44'/60'/0'/0/1"
     ).connect(ethersProvider);
-    const wallet = await SyncWallet.fromEthWallet(
+    const syncWallet = await SyncWallet.fromEthWallet(
         ethWallet,
-        wsSidechainProvider,
+        syncProvider,
         ethProxy
     );
 
@@ -68,9 +68,9 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
         MNEMONIC,
         "m/44'/60'/0'/0/2"
     ).connect(ethersProvider);
-    const wallet2 = await SyncWallet.fromEthWallet(
+    const syncWallet2 = await SyncWallet.fromEthWallet(
         ethWallet2,
-        wsSidechainProvider,
+        syncProvider,
         ethProxy
     );
 
@@ -80,14 +80,14 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     console.log(
         `Deposit: ${depositAmount} ${depositToken}: ETH:${shortAddr(
             ethWallet.address
-        )} -> SYNC:${shortAddr(wallet.address())}`
+        )} -> SYNC:${shortAddr(syncWallet.address())}`
     );
     await logETHBalance(ethWallet, depositToken);
-    await logSyncBalance(wallet, depositToken, "verified");
+    await logSyncBalance(syncWallet, depositToken, "verified");
 
     const depositHandle = await depositFromETH(
         ethWallet,
-        wallet,
+        syncWallet,
         depositToken,
         utils.parseEther(depositAmount),
         utils.parseEther("0.1")
@@ -96,19 +96,19 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     console.log("Deposit commited");
 
     await logETHBalance(ethWallet, depositToken);
-    await logSyncBalance(wallet, depositToken, "commited");
+    await logSyncBalance(syncWallet, depositToken, "commited");
 
     console.log("==================================");
     console.log(
         `Transfer: ${depositAmount} ${depositToken}: SYNC:${shortAddr(
-            wallet.address()
-        )} -> SYNC:${shortAddr(wallet2.address())}`
+            syncWallet.address()
+        )} -> SYNC:${shortAddr(syncWallet2.address())}`
     );
-    await logSyncBalance(wallet, depositToken, "commited");
-    await logSyncBalance(wallet2, depositToken, "commited");
+    await logSyncBalance(syncWallet, depositToken, "commited");
+    await logSyncBalance(syncWallet2, depositToken, "commited");
 
-    const transferHandle = await wallet.syncTransfer(
-        wallet2.address(),
+    const transferHandle = await syncWallet.syncTransfer(
+        syncWallet2.address(),
         depositToken,
         utils.parseEther(depositAmount),
         0
@@ -116,19 +116,19 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     await transferHandle.waitCommit();
     console.log("Transfer commited");
 
-    await logSyncBalance(wallet, depositToken, "commited");
-    await logSyncBalance(wallet2, depositToken, "commited");
+    await logSyncBalance(syncWallet, depositToken, "commited");
+    await logSyncBalance(syncWallet2, depositToken, "commited");
 
     console.log("==================================");
     console.log(
         `Withdraw: ${depositAmount} ${depositToken}: SYNC:${shortAddr(
-            wallet.address()
+            syncWallet.address()
         )} -> ETH:${shortAddr(ethWallet2.address)}`
     );
-    await logSyncBalance(wallet2, depositToken);
+    await logSyncBalance(syncWallet2, depositToken);
     await logETHBalance(ethWallet2, depositToken);
 
-    const withdrawHandle = await wallet2.withdrawTo(
+    const withdrawHandle = await syncWallet2.withdrawTo(
         ethWallet2.address,
         depositToken,
         ethers.utils.parseEther(depositAmount),
@@ -137,8 +137,8 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
     await withdrawHandle.waitVerify();
     console.log("Withdraw commited");
 
-    await logSyncBalance(wallet2, depositToken, "verified");
+    await logSyncBalance(syncWallet2, depositToken, "verified");
     await logETHBalance(ethWallet2, depositToken);
 
-    await wsSidechainProvider.disconnect();
+    await syncProvider.disconnect();
 })();
