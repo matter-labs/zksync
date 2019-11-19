@@ -161,6 +161,10 @@ impl PlasmaState {
             return updates;
         };
 
+        if account.nonce != op.priority_op.nonce {
+            return updates;
+        }
+
         let old_balance = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;
         if old_nonce != op.priority_op.nonce {
