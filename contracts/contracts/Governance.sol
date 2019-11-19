@@ -634,54 +634,55 @@ contract Governance {
         }
     }
 
-    /// @notice Repays specified amount of matter token into contract
-    /// @param _amount Token amount
-    function repayBorrow(uint256 _amount) external {
-        require(
-            _amount > 0,
-            "gerw11"
-        ); // gerw11 - amount must be > 0
-        require(
-            msg.sender == address(swiftExit),
-             "gerw12"
-        ); // gerw12 - not swift exit contract address
-
-        require(
-            IERC20(matterTokenAddress).transferFrom(msg.sender, address(this), _amount),
-            "gerw13"
-        ); // gerw13 - token transfer in failed
-
-        totalLended -= _amount;
-    }
-
-    /// @notice Charges specified amount of tokens or ether as fee into contract
-    /// @param _tokenAddress Token address, address(0) for Ether
-    /// @param _amount Token amount
-    function chargeFees(address _tokenAddress, uint256 _amount) external payable {
+    /// @notice Repays specified amount of matter token into contract, charges specified amount of tokens or ether as fee into contract
+    /// @param _repayAmount Matter token repayment amount
+    /// @param _feesTokenAddress Fees token address, address(0) for Ether
+    /// @param _feesAmount Fees amount
+    function repayBorrowWithFees(
+        uint256 _repayAmount,
+        address _feesTokenAddress,
+        uint256 _feesAmount
+    ) external payable {
         require(
             msg.sender == address(swiftExit),
-             "gecs11"
-        ); // gecs11 - not swift exit contract address
+             "gers11"
+        ); // gers11 - not swift exit contract addres
 
-        uint16 tokenId = validateTokenAddress(_tokenAddress);
+        // Repay borrow
+
+        require(
+            _repayAmount > 0,
+            "gers12"
+        ); // gers12 - amount must be > 0s
+
+        require(
+            IERC20(matterTokenAddress).transferFrom(msg.sender, address(this), _repayAmount),
+            "gers13"
+        ); // gers13 - token transfer in failed
+
+        totalLended -= _repayAmount;
+
+        // Charge fees
+
+        uint16 tokenId = validateTokenAddress(_feesTokenAddress);
         if (tokenId == 0) {
             // Token is Ether
             require(
-                _amount == 0 && msg.value > 0,
-                "gecs12"
-            ); // gecs12 - amount must be == 0 and msg.value > 0
+                _feesAmount == 0 && msg.value > 0,
+                "gers14"
+            ); // gers14 - amount must be == 0 and msg.value > 0
             accumulatedFees += msg.value;
         } else {
             // Token is ERC20
             require(
-                _amount > 0 && msg.value == 0,
-                "gecs13"
-            ); // gecs13 - amount must be > 0 and msg.value == 0
+                _feesAmount > 0 && msg.value == 0,
+                "gers15"
+            ); // gers15 - amount must be > 0 and msg.value == 0
             require(
-                IERC20(_tokenAddress).transferFrom(msg.sender, address(this), _amount),
-                "gerw13"
-            ); // gecs14 - token transfer in failed
-            accumulatedFees += _amount;
+                IERC20(_feesTokenAddress).transferFrom(msg.sender, address(this), _feesAmount),
+                "gers16"
+            ); // gers16 - token transfer in failed
+            accumulatedFees += _feesAmount;
         }
     }
 }
