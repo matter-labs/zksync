@@ -1,18 +1,20 @@
-use ethabi::Contract;
-use models::abi::FRANKLIN_CONTRACT;
-use serde_json;
+// Built-in uses
+use std::env;
 use std::str::FromStr;
+// External uses
+use ethabi::Contract;
+use lazy_static::lazy_static;
+use serde_json;
 use web3::futures::Future;
 use web3::types::{Address, H256};
 use web3::types::{Transaction, TransactionId};
-
-use lazy_static::lazy_static;
-use std::env;
+// Workspace uses
+use models::abi::FRANKLIN_CONTRACT;
 
 pub const FUNC_NAME_HASH_LENGTH: usize = 4;
 
 lazy_static! {
-    pub static ref DATA_RESTORE_CONFIG: DataRestoreConfig = DataRestoreConfig::new();
+    pub static ref DATA_RESTORE_CONFIG: DataRestoreConfig = DataRestoreConfig::from_env();
 }
 
 /// Configuratoin of DataRestore driver
@@ -32,7 +34,7 @@ pub struct DataRestoreConfig {
 
 impl DataRestoreConfig {
     /// Return the configuration for setted Infura web3 endpoint
-    pub fn new() -> Self {
+    pub fn from_env() -> Self {
         let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
             .expect("Cant get plasma contract")
             .get("abi")
@@ -61,12 +63,6 @@ impl DataRestoreConfig {
             )
             .expect("Cant get genesis tx hash"),
         }
-    }
-}
-
-impl Default for DataRestoreConfig {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

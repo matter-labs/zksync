@@ -101,7 +101,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         )?;
         assert_eq!(
             validator_audit_path.len(),
-            franklin_constants::ACCOUNT_TREE_DEPTH as usize
+            franklin_constants::account_tree_depth() as usize
         );
 
         let validator_account = AccountContent::from_witness(

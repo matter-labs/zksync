@@ -1,4 +1,6 @@
+// Built-in uses
 use std::cmp::Ordering;
+// External uses
 use web3::types::H256;
 
 /// Franklin Contract event type describing the state of the corresponding Franklin block

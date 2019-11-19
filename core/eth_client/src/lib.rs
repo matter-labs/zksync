@@ -2,7 +2,6 @@
 extern crate serde_derive;
 
 use futures::Future;
-use std::env;
 use std::str::FromStr;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
@@ -31,32 +30,24 @@ pub struct SignedCallResult {
 }
 
 impl<T: Transport> ETHClient<T> {
-    pub fn new(transport: T, contract_abi: String) -> Self {
+    pub fn new(
+        transport: T,
+        contract_abi: String,
+        operator_eth_addr: String,
+        operator_pk: String,
+        contract_eth_addr: String,
+        chain_id: u8,
+        gas_price_factor: usize,
+    ) -> Self {
         Self {
-            private_key: H256::from_str(
-                &env::var("OPERATOR_PRIVATE_KEY").expect("OPERATOR_PRIVATE_KEY"),
-            )
-            .expect("private key must be correct"),
-            contract_addr: H160::from_str(
-                &env::var("CONTRACT_ADDR")
-                    .map(|s| s[2..].to_string())
-                    .expect("CONTRACT_ADDR"),
-            )
-            .expect("contract address must be correct"),
-            sender_account: H160::from_str(
-                &env::var("OPERATOR_ETH_ADDRESS")
-                    .map(|s| s[2..].to_string())
-                    .expect("OPERATOR_ETH_ADDRESS"),
-            )
-            .expect("operator eth address"),
-            chain_id: u8::from_str(&env::var("CHAIN_ID").unwrap_or_else(|_| "4".to_string()))
-                .expect("chain id must be correct"),
+            sender_account: H160::from_str(&operator_eth_addr).expect("operator eth address"),
+            private_key: H256::from_str(&operator_pk).expect("private key must be correct"),
+            contract_addr: H160::from_str(&contract_eth_addr)
+                .expect("contract address must be correct"),
+            chain_id,
             contract: ethabi::Contract::load(contract_abi.as_bytes())
                 .expect("contract must be loaded correctly"),
-            gas_price_factor: usize::from_str(
-                &env::var("GAS_PRICE_FACTOR").unwrap_or_else(|_| "1".to_string()),
-            )
-            .expect("GAS_PRICE_FACTOR not set"),
+            gas_price_factor,
             web3: Web3::new(transport),
         }
     }
