@@ -8,8 +8,14 @@ mapping between ethereum wallet and Sync wallet.
 `SyncSigner` is used to store keys and signing transaction. `SyncWallet` integrates `SyncSigner` and provides 
 simple API for sending transaction in the Sync network. 
 
-Transaction handles (`DepositTransactionHandle` and `TransactionHandle`) are used to provide simple API for tracking 
+Transaction handles (`ETHOperationHandle` and `TransactionHandle`) are used to provide simple API for tracking 
 progress of recently submitted transactions.
+
+There are two types of transactions:
+1) *Transactions* They are submitted directly to the Sync network.
+Transfer, withdraw and account close are transactions.
+2) *Priority operations* They are initiated with ethereum transaction.
+Deposits and emergency withdraws are priority operations.
 
 # class SyncWallet
 
@@ -145,7 +151,7 @@ async function depositFromETH(
     token: Token,
     amount: utils.BigNumberish,
     maxFeeInETHCurrenty: utils.BigNumberish
-): Promise<DepositTransactionHandle>;
+): Promise<ETHOperationHandle>;
 ```
 
 ### Inputs and outputs
@@ -154,9 +160,43 @@ async function depositFromETH(
 | -- | -- |
 | depositFrom | ethereum account of the sender |
 | depositTo | Sync account of the receiver |
-| token | token to be transfered ("ETH" or address of the ERC20 token) |
+| token | token to be transferred ("ETH" or address of the ERC20 token) |
 | amount | amount of token to be transferred |
-| fee | amount of `ETH` to be payed by `depositFrom` wallet as a fee for this transaction |
+| maxFeeInETHCurrenty | amount of `ETH` to be payed by `depositFrom` wallet as a fee for this transaction |
+| returns | Handle for this transaction. | 
+
+# async function emergencyWithdraw
+
+If ordinary withdraw from Sync account is ignored by network operators user could create emergency 
+withdraw request using special ethereum transaction, this withdraw request can't be ignored.
+
+Moves full amount of the given token from the Sync account to ethereum account(represented as `Signer` from `ethers.js`).
+
+Fees are payed by ethereum account in ETH currency. Fee should be >=  base fee, calculated on the contract based on the 
+current gas price. 
+Formula for base fee calculation: ```2 * 170000 * GAS_PRICE```
+
+### Signature
+
+```typescript
+export async function emergencyWithdraw(
+    withdrawTo: ethers.Signer,
+    withdrawFrom: SyncWallet,
+    token: Token,
+    maxFeeInETHCurrenty: utils.BigNumberish,
+    nonce: "commited" | number = "commited"
+): Promise<ETHOperationHandle>;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| withdrawTo | ethereum account of the receiver, also this account posts withdraw request to ethereum |
+| withdrawFrom | Sync account of the sender |
+| token | token to be transferred ("ETH" or address of the ERC20 token) |
+| amount | amount of token to be transferred |
+| maxFeeInETHCurrenty | amount of `ETH` to be payed by `withdrawTo` wallet as a fee for this transaction |
 | returns | Handle for this transaction. | 
 
 # class TransactionHandle
@@ -192,10 +232,10 @@ Returns when transaction block was verified in the Sync network.
 async waitVerify();
 ```
 
-# class DepositTransactionHandle
+# class ETHOperationHandle
 
-Sync deposit transaction handle, used for tracking progress of the recently created deposit transactions.
-Deposit transaction is initiated by ethereum transaction.
+Sync priority operation handle, used for tracking progress of the recently created priority operations.
+Priority operation is initiated by ethereum transaction.
 
 Most of the time user in interested in the `waitCommit` or `waitVerify` methods.
 
@@ -204,9 +244,9 @@ It can be in the following states
 States:
 | Name | Description |
 | -- | -- |
-| Sent | Default state after deposit is submitted to ethereum. |
+| Sent | Default state after transaction is submitted to ethereum. |
 | Mined | After ethereum transaction was mined |
-| Commited | Deposit was included to the Sync network block |
+| Commited | Priority operation was included to the Sync network block |
 | Verified | Corresponding Sync network block was verified |
 
 ## async waitTxMine
@@ -221,7 +261,7 @@ async waitTxMine();
 
 ## async waitCommit
 
-Returns when deposit was included to the Sync network block.
+Returns when priority operation was included to the Sync network block.
 
 ### Signature 
 
@@ -231,7 +271,7 @@ async waitCommit();
 
 ## async waitVerify
 
-Returns when deposit block was verified in the Sync network.
+Returns when block with this operation was verified in the Sync network.
 
 ### Signature 
 

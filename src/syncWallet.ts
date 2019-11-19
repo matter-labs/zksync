@@ -191,6 +191,7 @@ export async function emergencyWithdraw(
     withdrawTo: ethers.Signer,
     withdrawFrom: SyncWallet,
     token: Token,
+    maxFeeInETHCurrenty: utils.BigNumberish,
     nonce: "commited" | number = "commited"
 ): Promise<ETHOperationHandle> {
     const tokenId = await withdrawFrom.ethProxy.resolveTokenId(token);
@@ -220,7 +221,7 @@ export async function emergencyWithdraw(
         numNonce,
         {
             gasLimit: utils.bigNumberify("500000"),
-            value: utils.parseEther("0.02")
+            value: maxFeeInETHCurrenty
         }
     );
 
