@@ -1,4 +1,8 @@
-import { depositFromETH, SyncWallet } from "../src/syncWallet";
+import {
+    depositFromETH,
+    emergencyWithdraw,
+    SyncWallet
+} from "../src/syncWallet";
 import { Contract, ethers, utils } from "ethers";
 import { formatEther } from "ethers/utils";
 import { ETHProxy, SyncProvider } from "../src/provider";
@@ -70,7 +74,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: Token) {
         ethProxy
     );
 
-    const depositAmount = "0.1";
+    const depositAmount = "17.0";
     const depositToken = TOKEN;
     console.log("==================================");
     console.log(

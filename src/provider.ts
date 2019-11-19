@@ -4,7 +4,13 @@ import {
     WSTransport
 } from "./transport";
 import { utils, ethers, Contract } from "ethers";
-import {SyncAccountState, SyncAddress, Token, SyncTxReceipt, SyncPriorityOperationReceipt} from "./types";
+import {
+    SyncAccountState,
+    SyncAddress,
+    Token,
+    SyncTxReceipt,
+    SyncPriorityOperationReceipt
+} from "./types";
 import { sleep, SYNC_GOV_CONTRACT_INTERFACE } from "./utils";
 
 export interface ContractAddress {
@@ -52,11 +58,16 @@ export class SyncProvider {
         return await this.transport.request("tx_info", [txHash]);
     }
 
-    async getPriorityOpStatus(serialId: number): Promise<SyncPriorityOperationReceipt> {
+    async getPriorityOpStatus(
+        serialId: number
+    ): Promise<SyncPriorityOperationReceipt> {
         return await this.transport.request("ethop_info", [serialId]);
     }
 
-    async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<SyncPriorityOperationReceipt>  {
+    async notifyPriorityOp(
+        serialId: number,
+        action: "COMMIT" | "VERIFY"
+    ): Promise<SyncPriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
                 const sub = this.transport.subscribe(
@@ -85,7 +96,10 @@ export class SyncProvider {
         }
     }
 
-    async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<SyncTxReceipt>  {
+    async notifyTransaction(
+        hash: string,
+        action: "COMMIT" | "VERIFY"
+    ): Promise<SyncTxReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
                 const sub = this.transport.subscribe(

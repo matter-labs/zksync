@@ -54,19 +54,19 @@ export interface SyncCloseAccount {
 }
 
 export interface BlockInfo {
-    blockNumber: number,
-    commited: boolean,
-    verified: boolean,
+    blockNumber: number;
+    commited: boolean;
+    verified: boolean;
 }
 
 export interface SyncTxReceipt {
-    executed: boolean,
-    success?: boolean,
-    failReason?: string,
-    block?: BlockInfo
+    executed: boolean;
+    success?: boolean;
+    failReason?: string;
+    block?: BlockInfo;
 }
 
 export interface SyncPriorityOperationReceipt {
-    executed: boolean,
-    block?: BlockInfo,
+    executed: boolean;
+    block?: BlockInfo;
 }

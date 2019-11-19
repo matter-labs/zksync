@@ -7,6 +7,7 @@ import {
     SYNC_MAIN_CONTRACT_INTERFACE,
     SYNC_PRIOR_QUEUE_INTERFACE
 } from "./utils";
+import { serializePointPacked } from "./crypto";
 
 export class SyncWallet {
     constructor(
@@ -142,7 +143,7 @@ export async function depositFromETH(
     token: Token,
     amount: utils.BigNumberish,
     maxFeeInETHCurrenty: utils.BigNumberish
-): Promise<DepositTransactionHandle> {
+): Promise<ETHOperationHandle> {
     const mainSidechainContract = new Contract(
         depositTo.provider.contractAddress.mainContract,
         SYNC_MAIN_CONTRACT_INTERFACE,
@@ -183,10 +184,50 @@ export async function depositFromETH(
         );
     }
 
-    return new DepositTransactionHandle(ethTransaction, depositTo.provider);
+    return new ETHOperationHandle(ethTransaction, depositTo.provider);
 }
 
-class DepositTransactionHandle {
+export async function emergencyWithdraw(
+    withdrawTo: ethers.Signer,
+    withdrawFrom: SyncWallet,
+    token: Token,
+    nonce: "commited" | number = "commited"
+): Promise<ETHOperationHandle> {
+    const tokenId = await withdrawFrom.ethProxy.resolveTokenId(token);
+    const numNonce = await withdrawFrom.getNonce(nonce);
+    const emergencyWithdrawSignature = withdrawFrom.signer.syncEmergencyWithdrawSignature(
+        {
+            ethAddress: await withdrawTo.getAddress(),
+            tokenId,
+            nonce: numNonce
+        }
+    );
+
+    const mainSyncContract = new Contract(
+        withdrawFrom.provider.contractAddress.mainContract,
+        SYNC_MAIN_CONTRACT_INTERFACE,
+        withdrawTo
+    );
+
+    let tokenAddress = "0x0000000000000000000000000000000000000000";
+    if (token != "ETH") {
+        tokenAddress = token;
+    }
+    const ethTransaction = await mainSyncContract.fullExit(
+        serializePointPacked(withdrawFrom.signer.publicKey),
+        tokenAddress,
+        emergencyWithdrawSignature,
+        numNonce,
+        {
+            gasLimit: utils.bigNumberify("500000"),
+            value: utils.parseEther("0.02")
+        }
+    );
+
+    return new ETHOperationHandle(ethTransaction, withdrawFrom.provider);
+}
+
+class ETHOperationHandle {
     state: "Sent" | "Mined" | "Commited" | "Verified";
     priorityOpId?: utils.BigNumber;
 
