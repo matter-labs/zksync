@@ -56,6 +56,17 @@ library Bytes {
         bts = toBytesFromBytes32(bytes32(uint(self) << 96), 20);
     }
 
+    function bytesToBytes32(bytes memory self) internal  pure returns (bytes32 bts) {
+        require(
+            self.length >= 32,
+            "bbs11"
+        ); // bbs11 - wrong bytes length to bytes32
+
+        assembly {
+            bts := mload(add(add(self, 0x20), 0))
+        }
+    }
+
     // Compies bytes 'self' into a new 'address'.
     // Returns the newly created 'address'.
     function bytesToAddress(bytes memory self)
@@ -65,8 +76,8 @@ library Bytes {
     {
         require(
             self.length >= 20,
-            "bbs11"
-        ); // bbs11 - wrong bytes length to address
+            "bbs12"
+        ); // bbs12 - wrong bytes length to address
 
         assembly {
             addr := div(mload(add(add(self, 0x20), 0)), 0x1000000000000000000000000)
