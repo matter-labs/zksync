@@ -66,7 +66,8 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
             &self.args.ethereum_key.unwrap(),
             franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
-        pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
+
+        pubdata_bits.resize(8 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
     pub fn get_sig_bits(&self) -> Vec<bool> {

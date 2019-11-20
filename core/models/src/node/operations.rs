@@ -175,9 +175,9 @@ pub struct WithdrawOp {
 }
 
 impl WithdrawOp {
-    pub const CHUNKS: usize = 6;
+    pub const CHUNKS: usize = 8;
     pub const OP_CODE: u8 = 0x03;
-    pub const OP_LENGTH: usize = 43;
+    pub const OP_LENGTH: usize = 63;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -187,6 +187,7 @@ impl WithdrawOp {
         data.extend_from_slice(&big_decimal_to_u128(&self.tx.amount).to_be_bytes());
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(self.tx.eth_address.as_bytes());
+        data.extend_from_slice(self.tx.account.data);
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }

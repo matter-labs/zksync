@@ -151,9 +151,12 @@ impl Withdraw {
         let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
         let fee_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LENGTH;
         let eth_address_pre_length = fee_pre_length + FEE_BYTES_LENGTH;
+        let account_pre_length = eth_address_pre_length + ETH_ADDR_BYTES_LENGTH;
 
         Some(Self {
-            account: AccountAddress::zero(), // From pubdata its unknown
+            account: AccountAddress::from_bytes(
+                &bytes[account_pre_length..account_pre_length + FR_ADDRESS_LEN],
+            ),
             eth_address: Address::from_slice(
                 &bytes[eth_address_pre_length..eth_address_pre_length + ETH_ADDR_BYTES_LENGTH],
             ),
