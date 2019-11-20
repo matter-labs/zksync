@@ -1,15 +1,14 @@
 import {
     depositFromETH,
     SyncWallet,
-    ETHProxy, SyncProvider
+    ETHProxy, SyncProvider, types
 } from "zksync";
 import { ethers, utils } from "ethers";
 
-import {Token} from "zksync/build/types";
 
 let syncProvider: SyncProvider;
 
-async function getOperatorBalance(token: Token, type: "committed" | "verified" = "committed") {
+async function getOperatorBalance(token: types.Token, type: "committed" | "verified" = "committed") {
     const accountState = await syncProvider.getState(process.env.OPERATOR_FRANKLIN_ADDRESS);
     if (token != "ETH") {
         token = token.toLowerCase();
@@ -23,7 +22,7 @@ async function getOperatorBalance(token: Token, type: "committed" | "verified" =
     return utils.bigNumberify(balance);
 }
 
-async function testDeposit(ethWallet: ethers.Wallet, syncWallet: SyncWallet, token: Token, amount: utils.BigNumberish) {
+async function testDeposit(ethWallet: ethers.Wallet, syncWallet: SyncWallet, token: types.Token, amount: utils.BigNumberish) {
     const balanceBeforeDep = await syncWallet.getBalance(token);
     const depositHandle = await depositFromETH(
         ethWallet,
@@ -40,7 +39,7 @@ async function testDeposit(ethWallet: ethers.Wallet, syncWallet: SyncWallet, tok
     }
 }
 
-async function testTransfer(syncWallet1: SyncWallet, syncWallet2: SyncWallet, token: Token, amount: utils.BigNumber, fee: utils.BigNumber) {
+async function testTransfer(syncWallet1: SyncWallet, syncWallet2: SyncWallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
     const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
     const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
     const operatorBeforeTransfer = await getOperatorBalance(token);
@@ -64,7 +63,7 @@ async function testTransfer(syncWallet1: SyncWallet, syncWallet2: SyncWallet, to
     }
 }
 
-async function testWithdraw(ethWallet: ethers.Wallet, syncWallet: SyncWallet, token: Token, amount: utils.BigNumber, fee: utils.BigNumber) {
+async function testWithdraw(ethWallet: ethers.Wallet, syncWallet: SyncWallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
     const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
     const operatorBeforeWithdraw = await getOperatorBalance(token);
     const withdrawHandle = await syncWallet.withdrawTo(
@@ -86,7 +85,7 @@ async function testWithdraw(ethWallet: ethers.Wallet, syncWallet: SyncWallet, to
     }
 }
 
-async function moveFunds(wallet1: ethers.Wallet, syncWallet1: SyncWallet, wallet2: ethers.Wallet, syncWallet2: SyncWallet, token: Token, depositAmountETH: string) {
+async function moveFunds(wallet1: ethers.Wallet, syncWallet1: SyncWallet, wallet2: ethers.Wallet, syncWallet2: SyncWallet, token: types.Token, depositAmountETH: string) {
     const depositAmount = utils.parseEther(depositAmountETH);
 
     // we do two transfers to test transfer to new and ordinary transfer.
