@@ -228,6 +228,20 @@ export async function emergencyWithdraw(
     return new ETHOperationHandle(ethTransaction, withdrawFrom.provider);
 }
 
+export async function getEthereumBalance(
+    ethSigner: ethers.Signer,
+    token: Token
+): Promise<utils.BigNumber> {
+    let balance: utils.BigNumber;
+    if (token == "ETH") {
+        balance = await ethSigner.provider.getBalance(ethSigner.getAddress());
+    } else {
+        const erc20contract = new Contract(token, IERC20_INTERFACE, ethSigner);
+        balance = await erc20contract.balanceOf(await ethSigner.getAddress());
+    }
+    return balance;
+}
+
 class ETHOperationHandle {
     state: "Sent" | "Mined" | "Commited" | "Verified";
     priorityOpId?: utils.BigNumber;

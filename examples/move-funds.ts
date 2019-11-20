@@ -1,13 +1,14 @@
 import {
     depositFromETH,
     emergencyWithdraw,
-    SyncWallet
-} from "../src/syncWallet";
+    SyncWallet,
+    ETHProxy,
+    SyncProvider,
+    getEthereumBalance
+} from "../src/index";
+import { types } from "../src/index";
 import { Contract, ethers, utils } from "ethers";
 import { formatEther } from "ethers/utils";
-import { ETHProxy, SyncProvider } from "../src/provider";
-import { Token } from "../src/types";
-import { IERC20_INTERFACE } from "../src/utils";
 
 const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
@@ -20,7 +21,7 @@ function shortAddr(address: string): string {
 
 async function logSyncBalance(
     wallet: SyncWallet,
-    token: Token,
+    token: types.Token,
     type: "committed" | "verified" = "committed"
 ) {
     const balance = formatEther(await wallet.getBalance(token, type));
@@ -30,14 +31,8 @@ async function logSyncBalance(
         )} ${type} balance: ${balance} ${token}`
     );
 }
-async function logETHBalance(wallet: ethers.Wallet, token: Token) {
-    let balance;
-    if (token == "ETH") {
-        balance = formatEther(await wallet.getBalance());
-    } else {
-        const erc20contract = new Contract(token, IERC20_INTERFACE, wallet);
-        balance = formatEther(await erc20contract.balanceOf(wallet.address));
-    }
+async function logETHBalance(wallet: ethers.Wallet, token: types.Token) {
+    const balance = await getEthereumBalance(wallet, token);
 
     console.log(
         `ETH:${shortAddr(wallet.address)} balance: ${balance} ${token}`
