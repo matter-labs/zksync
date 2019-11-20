@@ -1,5 +1,18 @@
-import { SyncWallet } from "./syncWallet";
-import { WSTransport, HTTPTransport } from "./transport";
-import { SyncProvider } from "./provider";
+import { SyncWallet, depositFromETH, emergencyWithdraw } from "./syncWallet";
+import { SyncProvider, ETHProxy } from "./provider";
+import { SyncSigner } from "./signer";
+import {
+    closestPackableTransactionAmount,
+    closestPackableTransactionFee
+} from "./utils";
 
-export { SyncWallet, SyncProvider, WSTransport, HTTPTransport };
+export {
+    SyncWallet,
+    SyncSigner,
+    SyncProvider,
+    ETHProxy,
+    closestPackableTransactionFee,
+    closestPackableTransactionAmount,
+    depositFromETH,
+    emergencyWithdraw
+};
