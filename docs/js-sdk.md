@@ -101,6 +101,13 @@ const verifiedBalances = state.verified.balances;
 const commitedETHBalance = verifiedBalances["ETH"];
 ```
 
+### Get balance in the Ethereum network
+
+For convenience there is method with similar signature that can be used to query balance in the Ethereum network. 
+
+```typescript
+const onchainETHBalance = await getEthereumBalance(ethWallet, "ETH");
+```
 
 ## Moving funds inside Sync network
 

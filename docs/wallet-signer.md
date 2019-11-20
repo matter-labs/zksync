@@ -196,6 +196,26 @@ async function depositFromETH(
 | maxFeeInETHCurrenty | amount of `ETH` to be payed by `depositFrom` wallet as a fee for this transaction |
 | returns | Handle for this transaction. | 
 
+## async getEthereumBalance
+
+Method similar to `syncWallet.getBalance` but used to query balance in the Ethereum network.
+
+### Signature
+```typescript
+export async function getEthereumBalance(
+    ethSigner: ethers.Signer,
+    token: Token
+): Promise<utils.BigNumber>;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| ethSigner | `Signer` from `ethers.js`, should be connected to ethereum node. |
+| token | token of interest, "ETH" or address of the supported ERC20 token |
+| returns | Balance of this token | 
+
 # async function emergencyWithdraw
 
 If ordinary withdraw from Sync account is ignored by network operators user could create emergency 
