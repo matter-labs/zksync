@@ -21,7 +21,7 @@ export class SyncWallet {
         token: Token,
         amount: utils.BigNumberish,
         fee: utils.BigNumberish,
-        nonce: "commited" | number = "commited"
+        nonce: "committed" | number = "committed"
     ): Promise<TransactionHandle> {
         const tokenId = await this.ethProxy.resolveTokenId(token);
         const transaxtionData = {
@@ -50,7 +50,7 @@ export class SyncWallet {
         token: Token,
         amount: utils.BigNumberish,
         fee: utils.BigNumberish,
-        nonce: "commited" | number = "commited"
+        nonce: "committed" | number = "committed"
     ): Promise<TransactionHandle> {
         const tokenId = await this.ethProxy.resolveTokenId(token);
         const transactionData = {
@@ -75,7 +75,7 @@ export class SyncWallet {
     }
 
     async close(
-        nonce: "commited" | number = "commited"
+        nonce: "committed" | number = "committed"
     ): Promise<TransactionHandle> {
         const signerdCloseTransaction = this.signer.signSyncCloseAccount({
             nonce: await this.getNonce()
@@ -91,10 +91,10 @@ export class SyncWallet {
         );
     }
 
-    async getNonce(nonce: "commited" | number = "commited"): Promise<number> {
-        if (nonce == "commited") {
+    async getNonce(nonce: "committed" | number = "committed"): Promise<number> {
+        if (nonce == "committed") {
             return (await this.provider.getState(this.signer.address()))
-                .commited.nonce;
+                .committed.nonce;
         } else if (typeof nonce == "number") {
             return nonce;
         }
@@ -121,15 +121,15 @@ export class SyncWallet {
 
     async getBalance(
         token: Token,
-        type: "commited" | "verified" = "commited"
+        type: "committed" | "verified" = "committed"
     ): Promise<utils.BigNumber> {
         const accountState = await this.getAccountState();
         if (token != "ETH") {
             token = token.toLowerCase();
         }
         let balance;
-        if (type == "commited") {
-            balance = accountState.commited.balances[token] || "0";
+        if (type == "committed") {
+            balance = accountState.committed.balances[token] || "0";
         } else {
             balance = accountState.verified.balances[token] || "0";
         }
@@ -192,7 +192,7 @@ export async function emergencyWithdraw(
     withdrawFrom: SyncWallet,
     token: Token,
     maxFeeInETHCurrenty: utils.BigNumberish,
-    nonce: "commited" | number = "commited"
+    nonce: "committed" | number = "committed"
 ): Promise<ETHOperationHandle> {
     const tokenId = await withdrawFrom.ethProxy.resolveTokenId(token);
     const numNonce = await withdrawFrom.getNonce(nonce);

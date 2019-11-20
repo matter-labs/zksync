@@ -70,7 +70,7 @@ async syncTransfer(
     token: Token,
     amount: utils.BigNumberish,
     fee: utils.BigNumberish,
-    nonce: "commited" | number = "commited"
+    nonce: "committed" | number = "committed"
 ): Promise<TransactionHandle>;
 ```
 
@@ -82,7 +82,7 @@ async syncTransfer(
 | token | token to be transfered ("ETH" or address of the ERC20 token) |
 | amount | amount of token to be transferred |
 | fee | amount of token to be payed as a fee for this transaction |
-| nonce | Nonce that is going to be used for this transaction. ("commited" is used for the last known nonce for this account) |
+| nonce | Nonce that is going to be used for this transaction. ("committed" is used for the last known nonce for this account) |
 | returns | Handle of the submitted transaction | 
 
 
@@ -97,7 +97,7 @@ async withdrawTo(
     token: Token,
     amount: utils.BigNumberish,
     fee: utils.BigNumberish,
-    nonce: "commited" | number = "commited"
+    nonce: "committed" | number = "committed"
 ): Promise<TransactionHandle>;
 ```
 
@@ -109,7 +109,7 @@ async withdrawTo(
 | token | token to be transfered ("ETH" or address of the ERC20 token) |
 | amount | amount of token to be transferred |
 | fee | amount of token to be payed as a fee for this transaction |
-| nonce | Nonce that is going to be used for this transaction. ("commited" is used for the last known nonce for this account) |
+| nonce | Nonce that is going to be used for this transaction. ("committed" is used for the last known nonce for this account) |
 | returns | Handle of the submitted transaction | 
 
 ## async close
@@ -119,7 +119,7 @@ Removes account from the Sync network.
 ### Signature
 ```typescript
 async close(
-    nonce: "commited" | number = "commited"
+    nonce: "committed" | number = "committed"
 ): Promise<TransactionHandle>;
 ```
 
@@ -127,8 +127,39 @@ async close(
 
 | Name | Description | 
 | -- | -- |
-| nonce | Nonce that is going to be used for this transaction. ("commited" is used for the last known nonce for this account) |
+| nonce | Nonce that is going to be used for this transaction. ("committed" is used for the last known nonce for this account) |
 | returns | Handle of the submitted transaction | 
+
+## async getAccountState
+
+### Signature
+```typescript
+async getAccountState(): Promise<SyncAccountState>;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| returns | State of the given account, see [types](types-utils.md) for detailed description.  | 
+
+## async getBalance
+
+### Signature
+```typescript
+async getBalance(
+    token: Token,
+    type: "committed" | "verified" = "committed"
+): Promise<utils.BigNumber>;
+```
+
+### Inputs and outputs
+
+| Name | Description | 
+| -- | -- |
+| token | token of interest, "ETH" or address of the supported ERC20 token |
+| type | "committed" or "verified" |
+| returns | Balance of this token | 
 
 # async function depositFromETH
 
@@ -184,7 +215,7 @@ export async function emergencyWithdraw(
     withdrawFrom: SyncWallet,
     token: Token,
     maxFeeInETHCurrenty: utils.BigNumberish,
-    nonce: "commited" | number = "commited"
+    nonce: "committed" | number = "committed"
 ): Promise<ETHOperationHandle>;
 ```
 

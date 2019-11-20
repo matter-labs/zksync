@@ -7,7 +7,7 @@ yarn add zksync
 yarn add ethers # For interactions with ETH network
 ```
 
-## Connecting to Sync network
+## Connecting to the Sync network
 
 In order to interact with Sync network user have to know endpoint of the operator node.
 
@@ -49,7 +49,7 @@ const ethWallet = ethers.Wallet.fromMnemonic( MNEMONIC ).connect(ethersProvider)
 const syncWallet = await SyncWallet.fromEthWallet(ethWallet, syncProvider, ethProxy);
 ```
 
-## Moving funds from ethereum to Sync
+## Moving funds from ethereum to the Sync network
 
 We are going do deposit some funds from our ethereum wallet into sync account.
 For that we should create specific ethereum transaction. We can create this transaction using `depositFromETH` function. 
@@ -78,6 +78,30 @@ If we want to wait until deposit is processed and finalized using ZKP by the Syn
 const depositReceipt = await depositHandle.waitVerify();
 ```
 
+## Get balance in the Sync network
+
+To get balance of the Sync account you can use `getBalance` method.
+Committed state is last state of the account that may or may not be finalized by ZK proof.
+Verified is referred to finalized by ZK proof state of the account. 
+
+```typescript
+const commitedETHBalance = await syncWallet.getBalance("ETH");
+const verifiedETHBalance = await syncWallet.getBalance("ETH", "verified");
+```
+
+To get all tokens of this account you can use `getAccountState`.
+
+```typescript
+const state = await syncWallet.getAccountState("ETH");
+
+const commitedBalances = state.committed.balances;
+const commitedETHBalance = commitedBalances["ETH"];
+
+const verifiedBalances = state.verified.balances;
+const commitedETHBalance = verifiedBalances["ETH"];
+```
+
+
 ## Moving funds inside Sync network
 
 Let create second wallet and transfer funds to it.
@@ -105,7 +129,7 @@ In order to track progress of this transaction we can use returned transaction h
 const transferReceipt = await depositHandle.waitCommit();
 ```
 
-## Moving funds out of Sync network
+## Moving funds out of the Sync network
 
 To withdraw funds from Sync account to ethereum account we can use `withdrawTo` method.
 

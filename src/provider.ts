@@ -86,7 +86,7 @@ export class SyncProvider {
                 const priorOpStatus = await this.getPriorityOpStatus(serialId);
                 if (priorOpStatus.block) {
                     if (action == "COMMIT") {
-                        notifyDone = priorOpStatus.block.commited;
+                        notifyDone = priorOpStatus.block.committed;
                     } else {
                         notifyDone = priorOpStatus.block.verified;
                     }
@@ -118,7 +118,7 @@ export class SyncProvider {
                 const transactionStatus = await this.getTxReceipt(hash);
                 if (transactionStatus.block) {
                     if (action == "COMMIT") {
-                        notifyDone = transactionStatus.block.commited;
+                        notifyDone = transactionStatus.block.committed;
                     } else {
                         notifyDone = transactionStatus.block.verified;
                     }

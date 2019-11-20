@@ -30,7 +30,7 @@ Account `id` is numerical identifier of the account is the Sync network.
 export interface SyncAccountState {
     address: SyncAddress;
     id?: number;
-    commited: {
+    committed: {
         balances: {
             [token: string]: utils.BigNumberish;
         };
@@ -117,7 +117,7 @@ export interface SyncCloseAccount {
 ```typescript
 export interface BlockInfo {
     blockNumber: number;
-    commited: boolean;
+    committed: boolean;
     verified: boolean;
 }
 ```

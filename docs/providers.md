@@ -107,7 +107,7 @@ async getTxReceipt(txHash: string): Promise<SyncTxReceipt>;
 
 ## async notifyTransaction
 
-This method will return when given transaction is commited or verified in the Sync network.
+This method will return when given transaction is committed or verified in the Sync network.
 
 ### Signature
 
@@ -140,7 +140,7 @@ async getPriorityOpStatus(serialId: number): Promise<SyncPriorityOperationReceip
 
 ## async notifyPriorityOp
 
-This method will return when given priority operation is commited or verified in the Sync network.
+This method will return when given priority operation is committed or verified in the Sync network.
 
 ### Signature
 

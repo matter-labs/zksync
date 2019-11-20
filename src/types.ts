@@ -8,7 +8,7 @@ export type Token = "ETH" | string;
 export interface SyncAccountState {
     address: SyncAddress;
     id?: number;
-    commited: {
+    committed: {
         balances: {
             [token: string]: utils.BigNumberish;
         };
@@ -55,7 +55,7 @@ export interface SyncCloseAccount {
 
 export interface BlockInfo {
     blockNumber: number;
-    commited: boolean;
+    committed: boolean;
     verified: boolean;
 }
 
