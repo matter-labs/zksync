@@ -44,7 +44,7 @@ impl ResponseAccountState {
 pub struct AccountInfoResp {
     address: AccountAddress,
     id: Option<AccountId>,
-    commited: ResponseAccountState,
+    committed: ResponseAccountState,
     verified: ResponseAccountState,
 }
 
@@ -52,7 +52,7 @@ pub struct AccountInfoResp {
 #[serde(rename_all = "camelCase")]
 pub struct BlockInfo {
     pub block_number: i64,
-    pub commited: bool,
+    pub committed: bool,
     pub verified: bool,
 }
 
@@ -119,9 +119,9 @@ impl Rpc for RpcApp {
             .map_err(|_| Error::internal_error())?;
         let tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
 
-        let id = account.commited.as_ref().map(|(id, _)| *id);
+        let id = account.committed.as_ref().map(|(id, _)| *id);
 
-        let commited = if let Some((_, account)) = account.commited {
+        let commited = if let Some((_, account)) = account.committed {
             ResponseAccountState::try_to_restore(account, &tokens)?
         } else {
             ResponseAccountState::default()
@@ -136,7 +136,7 @@ impl Rpc for RpcApp {
         Ok(AccountInfoResp {
             address,
             id,
-            commited,
+            committed: commited,
             verified,
         })
     }
@@ -152,7 +152,7 @@ impl Rpc for RpcApp {
                 executed: true,
                 block: Some(BlockInfo {
                     block_number: executed_op.block_number,
-                    commited: true,
+                    committed: true,
                     verified: block.map(|b| b.verified_at.is_some()).unwrap_or_default(),
                 }),
             }
@@ -176,7 +176,7 @@ impl Rpc for RpcApp {
                 fail_reason: stored_receipt.fail_reason,
                 block: Some(BlockInfo {
                     block_number: stored_receipt.block_number,
-                    commited: true,
+                    committed: true,
                     verified: stored_receipt.verified,
                 }),
             }

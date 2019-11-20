@@ -293,7 +293,7 @@ impl OperationNotifier {
         let storage = self.db_pool.access_storage()?;
         let account_state = storage.account_state_by_address(&address)?;
 
-        let account_id = if let Some(id) = account_state.commited.as_ref().map(|(id, _)| id) {
+        let account_id = if let Some(id) = account_state.committed.as_ref().map(|(id, _)| id) {
             *id
         } else {
             bail!("AccountId is unkwown");
@@ -308,7 +308,7 @@ impl OperationNotifier {
         ));
 
         let account_state = if let Some(account) = match action {
-            ActionType::COMMIT => account_state.commited,
+            ActionType::COMMIT => account_state.committed,
             ActionType::VERIFY => account_state.verified,
         }
         .map(|(_, a)| a)

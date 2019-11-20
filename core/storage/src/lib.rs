@@ -656,7 +656,7 @@ fn restore_account(
 }
 
 pub struct StoredAccountState {
-    pub commited: Option<(AccountId, Account)>,
+    pub committed: Option<(AccountId, Account)>,
     pub verified: Option<(AccountId, Account)>,
 }
 
@@ -1556,7 +1556,7 @@ impl StorageProcessor {
             account_create_record.account_id as AccountId
         } else {
             return Ok(StoredAccountState {
-                commited: None,
+                committed: None,
                 verified: None,
             });
         };
@@ -1567,7 +1567,10 @@ impl StorageProcessor {
         let verified = self
             .last_verified_state_for_account(account_id)?
             .map(|a| (account_id, a));
-        Ok(StoredAccountState { commited, verified })
+        Ok(StoredAccountState {
+            committed: commited,
+            verified,
+        })
     }
 
     pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
@@ -1971,7 +1974,7 @@ impl StorageProcessor {
         }
 
         let StoredAccountState {
-            commited: commited_state,
+            committed: commited_state,
             ..
         } = self.account_state_by_address(&tx.account())?;
         let lowest_possible_nonce = commited_state
@@ -2010,7 +2013,7 @@ impl StorageProcessor {
 
     pub fn get_pending_txs(&self, address: &AccountAddress) -> QueryResult<Vec<FranklinTx>> {
         let StoredAccountState {
-            commited: commited_state,
+            committed: commited_state,
             ..
         } = self.account_state_by_address(address)?;
         let commited_nonce = commited_state
