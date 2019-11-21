@@ -12,20 +12,20 @@ import "./Franklin.sol";
 /// @author Matter Labs
 contract SwiftExits {
 
-    /// @notice Governance contract
+    /// @notice Governance contract, container for validators and tokens
     Governance internal governance;
 
-    /// @notice Rollup contract
+    /// @notice Rollup contract, contains user funds
     Franklin internal rollup;
 
-    /// @notice Comptroller contract
+    /// @notice Comptroller contract, allows borrow tokens for validators supply
     Comptroller internal comptroller;
 
     /// @notice Swift Exits orders by Rollup block number (block number -> order number -> order)
     mapping(uint32 => mapping(uint64 => ExitOrder)) public exitOrders;
     
     /// @notice Swift Exits in blocks count (block number -> orders count)
-    mapping(uint32 => uint64) public exitOrdersCount;
+    mapping(uint32 => uint64) public totalExitOrders;
 
     /// @notice Swift Exits existance in block with specified withdraw operation number (block number -> withdraw op number -> existance)
     mapping(uint32 => mapping(uint64 => bool)) public exitOrdersExistance;
@@ -33,12 +33,12 @@ contract SwiftExits {
     /// @notice Container for information about Swift Exit Order
     /// @member onchainOpNumber Withdraw operation number in block
     /// @member opHash Corresponding onchain operation hash
-    /// @member tokenId Order (sending) token id
+    /// @member tokenId Order (sending/fees) token id
     /// @member sendingAmount Sending amount to recipient (initial amount minus fees)
     /// @member recipient Recipient of the withdraw operation
-    /// @member validatorsFee Fee for validators in orders' tokens
-    /// @member validatorSender Address of validator-sender (order transaction sender)
-    /// @member supplyAmount Supplied token amount
+    /// @member validatorsFee Fee for validators that signed request in orders' tokens + Fee for the validator that created request
+    /// @member validatorSender Address of the validator that created request (order transaction sender)
+    /// @member supplyAmount Supplied by validators token amount
     struct ExitOrder {
         uint64 onchainOpNumber;
         uint256 opHash;
@@ -50,19 +50,17 @@ contract SwiftExits {
         uint256 supplyAmount;
     }
 
-    /// @notice Construct swift exits contract
+    /// @notice Constructs swift exits contract
     /// @param _governanceAddress The address of Governance contract
     constructor(address _governanceAddress) public {
         governance = Governance(_governanceAddress);
     }
 
-    /// @notice Add addresses of related contracts
-    /// @dev Requires governor
-    /// @param _matterTokenAddress The address of Matter token
+    /// @notice Adds addresses of related contracts
+    /// @dev Requires the governor to be msg.sender
     /// @param _rollupAddress The address of Rollup contract
     /// @param _comptrollerAddress The address of Comptroller contract
     function setupRelatedContracts(
-        address _matterTokenAddress,
         address _rollupAddress,
         address _comptrollerAddress
     )
@@ -76,18 +74,18 @@ contract SwiftExits {
         comptroller = Comptroller(_comptrollerAddress);
     }
 
-    /// @notice Adds new swift exit
-    /// @dev Only validator can send this order, validates validators aggregated signature, requires that order must be new
+    /// @notice Saves a new swift exit. If needed borrows from tokens from compound  for validators supply, sends them to swift exit recipient
+    /// @dev Requires validator to be tx.origin and Governance contract to be msg.sender
     /// @param _blockNumber Rollup block number
-    /// @param _onchainOpNumber Withdraw operation number in block
-    /// @param _accNumber Account - creator of withdraw operation
-    /// @param _tokenId Token id
-    /// @param _tokenAmount Token amount
-    /// @param _feeAmount Fee amount in specified tokens
+    /// @param _onchainOpNumber Withdraw operation number in rollup block
+    /// @param _accNumber Account - creator of withdraw operation (id in Rollup)
+    /// @param _tokenId Token id (sending/fees)
+    /// @param _tokenAmount Token amount (sending+fees)
+    /// @param _feeAmount Rollup fee amount in specified tokens, used only to create withdraw op hash
     /// @param _recipient Withdraw operation recipient
-    /// @param _owner Withdraw operation owner
-    /// @param _swiftExitFee Validators fee
-    /// @param _supplyAmount Supplied amount
+    /// @param _owner Withdraw operation owner (ethereum address)
+    /// @param _swiftExitFee Validators fee for this request
+    /// @param _supplyAmount Supplied amount by validators to borrow from Compound / send to recipient
     function addSwiftExit(
         uint32 _blockNumber,
         uint64 _onchainOpNumber,
@@ -107,11 +105,18 @@ contract SwiftExits {
             msg.sender == address(governance),
             "fnds11"
         ); // fnds11 - wrong address
+
+        // Tx origin must be active validator
+        require(
+            governance.requireActiveValidator(tx.origin),
+            "fnds12"
+        ); // fnds12 - wrong address
+
         // Check that order is new
         require(
             !exitOrdersExistance[_blockNumber][_onchainOpNumber],
-            "ssat12"
-        ); // "ssat12" - order exists
+            "ssat13"
+        ); // "ssat13" - order exists
 
         // Sending amount: token amount minus sum of validators fees for swift exit and transaction cost
         uint256 sendingAmount = _tokenAmount - _swiftExitFee;
@@ -119,10 +124,10 @@ contract SwiftExits {
         // Check if tokenAmount is higher than sum of validators fees for swift exit and transaction cost
         require(
             sendingAmount > 0,
-            "ssat13"
-        ); // "ssat13" - wrong amount
+            "ssat14"
+        ); // "ssat14" - wrong amount
 
-        // Withdraw peration hash
+        // Withdraw operation hash - will be used to check correctness of this request (this hash must be equal to corresponding withdraw op hash on Rollup contract)
         uint256 opHash = uint256(keccak256(abi.encodePacked(
             _accNumber,
             _tokenId,
@@ -132,6 +137,7 @@ contract SwiftExits {
             _owner
         )));
         
+        // Get matter token id from governance to check if there is need to borrow from Compound (if sending token is also Matter token - no need)
         uint16 matterTokenId = governance.matterTokenId;
         if (_tokenId != matterTokenId) {
             // Borrow needed tokens from compound if token ids arent equal
@@ -141,7 +147,7 @@ contract SwiftExits {
         // Send tokens to recipient
         sendTokensToRecipient(_recipient, _tokenId, sendingAmount);
 
-        // Create ExitOrder
+        // Create and save ExitOrder
         ExitOrder order = ExitOrder(
             _onchainOpNumber,
             opHash,
@@ -152,26 +158,36 @@ contract SwiftExits {
             tx.origin, // Here tx origin MUST be only validator address, so we can use it
             _supplyAmount
         );
-        exitOrders[_blockNumber][exitOrdersCount[_blockNumber]] = order;
+        exitOrders[_blockNumber][totalExitOrders[_blockNumber]] = order;
         // Increase orders count in block
-        exitOrdersCount[_blockNumber]++;
+        totalExitOrders[_blockNumber]++;
         // Set order existance
         exitOrdersExistance[_blockNumber][_onchainOpNumber] = true;
     }
 
-    /// @notice Consummates fees for succeeded and punishes for failed orders
-    /// @param _blockNumber Block number
-    function completeOrders(uint32 _blockNumber) external {
+    /// @notice Closes (deletes) Swift Exit Orders for specified Rollup block number
+    /// @dev Defrosts user tokens on Rollup contract.
+    /// @dev If order is correct (similar withdraw op hashes on it and on Rollup contract) -
+    /// @dev repays borrow to compound and repays redeemed Matter tokens and fees to validators on Governance contract
+    /// @param _blockNumber Rollup block number in which it is needed to delete orders
+    function closeExitOrders(uint32 _blockNumber) external {
         // Can be called only by active validator
         governance.requireActiveValidator(msg.sender);
 
         // Get onchain operations start id in this block from Rollup contract
         uint64 onchainOpsStartIdInBlock = rollup.blocks[_blockNumber].startId;
 
-        // Go into loop for all exit orders in block
-        for (uint64 i = 0; i < exitOrdersCount[_blockNumber]; i++) {
+        // Go into loop for all exit orders in this block
+        for (uint64 i = 0; i < totalExitOrders[_blockNumber]; i++) {
             // Get exit order by block nubmer and id
             ExitOrder order = exitOrders[_blockNumber][i];
+                
+            // Defrost funds on rollup and get tokens
+            rollup.defrostFunds(
+                order.recipient,
+                order.tokenId,
+                order.sendingAmount + order.validatorsFee
+            );
 
             // Get real onchain operation hash from Rollup contract
             uint256 realOpHash = uint256(keccak256(rollup.onchainOps[onchainOpsStartIdInBlock + order.onchainOpNumber].pubData));
@@ -181,15 +197,8 @@ contract SwiftExits {
 
             if (realOpHash == expectedOpHash) {
                 // If hashes are equal - order is correct -> get tokens from rollup, repay to compound if needed, repay to validators
-                
-                // Defrost funds on rollup and get tokens
-                rollup.defrostFunds(
-                    order.recipient,
-                    order.tokenId,
-                    order.sendingAmount + order.validatorsFee
-                );
 
-                // Repay to compound if needed
+                // Repay to compound if order token id is not Matter token
                 uint16 matterTokenId = governance.matterTokenId;
                 if (order.tokenId != matterTokenId) {
                     repayToCompound(
@@ -199,7 +208,7 @@ contract SwiftExits {
                     );
                 }
 
-                // Check for enouth allowence value for matter token to repay borrow
+                // Check for enouth allowence value for Matter token to repay borrow to validators
                 address matterTokenAddress = governance.matterTokenAddress;
                 uint256 allowence = IERC20(matterTokenAddress).allowence(address(this), address(governance));
                 // Allowence must be >= supplied amount
@@ -244,12 +253,13 @@ contract SwiftExits {
                 }
             }
         }
-        delete exitOrdersCount[_blockNumber];
+        // Delete storage records for specified block number
+        delete totalExitOrders[_blockNumber];
         delete exitOrdersExistance[_blockNumber];
         delete exitOrders[_blockNumber];
     }
 
-    /// @notice Borrow specified amount from compound
+    /// @notice Borrow specified token amount from Compound for Matter token
     /// @param _supplyAmount Amount of supplied tokens
     /// @param _tokenBorrowId Token borrow id
     /// @param _borrowAmount Amount of tokens to borrow
@@ -260,17 +270,17 @@ contract SwiftExits {
     )
         internal
     {
-        // Get supply token address
-        address supplyTokenAddress = governance.matterTokenAddress;
-        // Get supply cToken address (corresponding to supply token)
-        address cSupplyTokenAddress = governance.cMatterTokenAddress;
+        // Get Matter token address
+        address matterTokenAddress = governance.matterTokenAddress;
+        // Get cMatter token address (corresponding to Matter token on Compound)
+        address cMatterTokenAddress = governance.cMatterTokenAddress;
 
-        // Get borrow cToken address (corresponding to borrow token)
+        // Get borrow cToken address (corresponding to borrow token on Compound)
         address cBorrowTokenAddress = governance.getCTokenAddress(_tokenBorrowId);
 
         // Enter compound markets for this tokens (in order to supply or borrow in a market, it must be entered first)
         address[] memory ctokens = new address[](2);
-        ctokens[0] = cSupplyTokenAddress;
+        ctokens[0] = cMatterTokenAddress;
         ctokens[1] = cBorrowTokenAddress;
         uint[] memory errors = comptroller.enterMarkets(ctokens);
         require(
@@ -278,23 +288,23 @@ contract SwiftExits {
             "sebd11"
         ); // sebd11 - enter markets failed
 
-        // Check for enouth allowence value for this token for supply to cToken contract
-        uint256 allowence = IERC20(supplyTokenAddress).allowence(address(this), address(cSupplyTokenAddress));
+        // Check for enouth allowence value for this token for supply to cMatter contract
+        uint256 allowence = IERC20(matterTokenAddress).allowence(address(this), address(cMatterTokenAddress));
         // Allowence must be >= supply amount
         if (allowence < _supplyAmount) {
-            // If allowence value is not anouth - approve max possible value for this token for supply to cToken contract
+            // If allowence value is not anouth - approve max possible value for this token for supply to cMatter contract
             require(
-                IERC20(supplyTokenAddress).approve(address(cSupplyTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
-                "sebd13"
-            ); // sebd13 - token approve failed
+                IERC20(matterTokenAddress).approve(address(cMatterTokenAddress), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
+                "sebd12"
+            ); // sebd12 - token approve failed
         }
         
         // Supply (mint) cErc20
-        CErc20 cToken = CErc20(cSupplyTokenAddress);
+        CErc20 cToken = CErc20(cMatterTokenAddress);
         require(
             cToken.mint(_supplyAmount) == 0,
-            "sebd14"
-        ); // sebd14 - token mint failed
+            "sebd13"
+        ); // sebd13 - token mint failed
 
         if (_tokenBorrowId == 0) {
             // If token borrow id is 0 - its Ether
@@ -317,10 +327,10 @@ contract SwiftExits {
         }
     }
 
-    /// @notice Repays specified amount to compound
+    /// @notice Repays specified amount to compound and redeems Matter tokens
     /// @param _tokenRepayId Token repay id
     /// @param _repayAmount Amount of tokens to repay
-    /// @param _redeemAmount Amount of supplied tokens
+    /// @param _redeemAmount Amount of supplied Matter tokens
     function repayToCompound(
         uint16 _tokenRepayId,
         uint256 _repayAmount,
@@ -330,11 +340,11 @@ contract SwiftExits {
     {
         // Get repay token address
         address repayTokenAddress = governance.validateTokenId(_tokenRepayId);
-        // Get repay cToken address (corresponding to repay token)
+        // Get repay cToken address (corresponding to repay token on Compound)
         address cRepayTokenAddress = governance.getCTokenAddress(_tokenRepayId);
 
-        // Get redeem cToken address (corresponding to redeem token)
-        address cRedeemTokenAddress = governance.cMatterTokenAddress;
+        // Get redeem cMatteraddress (corresponding to Matter token on Compound)
+        address cMatterTokenAddress = governance.cMatterTokenAddress;
 
         if (_tokenRepayId == 0) {
             // If token repay id is 0 - its Ether
@@ -367,8 +377,8 @@ contract SwiftExits {
             );  // serd13 - token repay failed
         }
 
-        // Redeem cErc20
-        CErc20 cToken = CErc20(cRedeemTokenAddress);
+        // Redeem cMatter
+        CErc20 cToken = CErc20(cMatterTokenAddress);
         require(
             cToken.redeemUnderlying(_redeemAmount) == 0,
             "serd14"
