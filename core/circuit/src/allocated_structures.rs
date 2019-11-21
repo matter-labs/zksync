@@ -30,7 +30,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
         let account_address = CircuitElement::from_fe_strict(
             cs.namespace(|| "account_address"),
             || Ok(operation_branch.address.grab()?),
-            franklin_constants::ACCOUNT_TREE_DEPTH,
+            franklin_constants::account_tree_depth(),
         )?;
         let account_address = account_address.pad(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
 
@@ -40,7 +40,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
         )?;
         assert_eq!(
             account_audit_path.len(),
-            franklin_constants::ACCOUNT_TREE_DEPTH
+            franklin_constants::account_tree_depth()
         );
 
         let account = account::AccountContent::from_witness(

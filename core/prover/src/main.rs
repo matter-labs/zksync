@@ -23,8 +23,9 @@ fn main() {
         .expect("Error setting SIGQUIT handler");
 
     let worker = env::var("POD_NAME").unwrap_or_else(|_| "default".to_string());
+    let key_dir = std::env::var("KEY_DIR").expect("KEY_DIR not set");
     info!("creating prover, worker: {}", worker);
-    let mut prover = BabyProver::create(worker).unwrap();
+    let mut prover = BabyProver::create(worker, key_dir).unwrap();
     let prover_id = prover.prover_id;
 
     let mut rt = Runtime::new().unwrap();

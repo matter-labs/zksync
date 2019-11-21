@@ -10,23 +10,25 @@
 //!
 //! Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 //! that state is always recoverable.
-
-use crate::ThreadPanicNotify;
-use bigdecimal::BigDecimal;
-use eth_client::{ETHClient, SignedCallResult};
-use ff::{PrimeField, PrimeFieldRepr};
-use futures::Future;
-use models::abi::FRANKLIN_CONTRACT;
-use models::{Action, Operation};
+// Built-in uses
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
-use storage::ConnectionPool;
+// External uses
+use bigdecimal::BigDecimal;
+use ff::{PrimeField, PrimeFieldRepr};
+use futures::Future;
 use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{Transaction, TransactionId, TransactionReceipt, H256, U256};
 use web3::Transport;
+// Workspace uses
+use crate::ThreadPanicNotify;
+use eth_client::{ETHClient, SignedCallResult};
+use models::abi::FRANKLIN_CONTRACT;
+use models::{Action, Operation};
+use storage::ConnectionPool;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 // TODO: fix rare nonce bug, when pending nonce is not equal to real pending nonce.
@@ -88,16 +90,7 @@ struct ETHSender<T: Transport> {
 }
 
 impl<T: Transport> ETHSender<T> {
-    fn new(transport: T, db_pool: ConnectionPool) -> Self {
-        let eth_client = {
-            let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
-
-            ETHClient::new(transport, abi_string)
-        };
+    fn new(db_pool: ConnectionPool, eth_client: ETHClient<T>) -> Self {
         let mut sender = Self {
             eth_client,
             unsent_ops: VecDeque::new(),
@@ -473,21 +466,58 @@ impl<T: Transport> ETHSender<T> {
     }
 }
 
-pub fn start_eth_sender(pool: ConnectionPool, panic_notify: Sender<bool>) -> Sender<Operation> {
+pub struct StartEthSenderOptions {
+    pub web3_url: String,
+    pub operator_eth_addr: String,
+    pub operator_pk: String,
+    pub contract_eth_addr: String,
+    pub chain_id: u8,
+    pub gas_price_factor: usize,
+}
+
+pub fn start_eth_sender(
+    pool: ConnectionPool,
+    panic_notify: Sender<bool>,
+    opts: StartEthSenderOptions,
+) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
+    non_empty_or_panic("Web3 URL", &opts.web3_url);
+    non_empty_or_panic("Operator Eth Address", &opts.operator_eth_addr);
+    non_empty_or_panic("Operator Private Key", &opts.operator_pk);
+    non_empty_or_panic("Contract Eth Address", &opts.contract_eth_addr);
 
     std::thread::Builder::new()
         .name("eth_sender".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
-
-            let web3_url = std::env::var("WEB3_URL").expect("WEB3_URL env var not found");
             let (_event_loop, transport) =
-                Http::new(&web3_url).expect("failed to start web3 transport");
-            let mut eth_sender = ETHSender::new(transport, pool);
+                Http::new(&opts.web3_url).expect("failed to start web3 transport");
+
+            let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
+                .unwrap()
+                .get("abi")
+                .unwrap()
+                .to_string();
+            let eth_client = ETHClient::new(
+                transport,
+                abi_string,
+                opts.operator_eth_addr,
+                opts.operator_pk,
+                opts.contract_eth_addr,
+                opts.chain_id,
+                opts.gas_price_factor,
+            );
+
+            let mut eth_sender = ETHSender::new(pool, eth_client);
             eth_sender.run(rx_for_eth);
         })
         .expect("Eth sender thread");
 
     tx_for_eth
+}
+
+fn non_empty_or_panic(name: &str, v: &str) {
+    if v.is_empty() {
+        panic!("{} required", name);
+    }
 }

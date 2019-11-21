@@ -1,8 +1,10 @@
-use crate::ThreadPanicNotify;
-use models::{Action, CommitRequest, Operation};
+// Built-in uses
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
+// Workspace uses
+use crate::ThreadPanicNotify;
+use models::{Action, CommitRequest, Operation};
 use storage::ConnectionPool;
 
 pub fn start_committer(
@@ -28,7 +30,7 @@ fn run_committer(
     info!("committer started");
     let storage = pool
         .access_storage()
-        .expect("db connection failed for committer");;
+        .expect("db connection failed for committer");
 
     let mut last_verified_block = storage.get_last_verified_block().expect("db failed");
     loop {

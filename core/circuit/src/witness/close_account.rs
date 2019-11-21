@@ -81,7 +81,7 @@ pub fn apply_close_account(
         get_audits(tree, close_account.account_address, 0);
 
     let capacity = tree.capacity();
-    assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+    assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
     let account_address_fe = Fr::from_str(&close_account.account_address.to_string()).unwrap();
 
     //calculate a and b
@@ -206,7 +206,7 @@ mod test {
         let phasher = PedersenHasher::<Bn256>::default();
 
         let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+            CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
         let capacity = tree.capacity();
 
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
