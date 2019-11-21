@@ -1,30 +1,19 @@
+// Built-in uses
+use std::convert::TryFrom;
+use std::str::FromStr;
+// External uses
+use web3::types::H256;
+// Workspace uses
 use crate::data_restore_driver::StorageUpdateState;
 use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
 use crate::franklin_ops::FranklinOpsBlock;
 use crate::helpers::DataRestoreError;
 use models::node::{AccountMap, AccountUpdate};
-use std::convert::TryFrom;
 use storage::{
     ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
     StoredFranklinOpsBlock,
 };
-use web3::types::H256;
-
-// /// Removes stored data
-// ///
-// /// # Arguments
-// ///
-// /// * `connection_pool` - Database Connection Pool
-// ///
-// pub fn remove_storage_data(connection_pool: ConnectionPool) -> Result<(), DataRestoreError> {
-//     remove_last_watched_block_number(connection_pool.clone())?;
-//     remove_events_state(connection_pool.clone())?;
-//     remove_franklin_ops(connection_pool.clone())?;
-//     remove_tree_state(connection_pool.clone())?;
-//     remove_storage_state_status(connection_pool.clone())?;
-//     Ok(())
-// }
 
 /// Updates stored tree state
 ///
@@ -341,7 +330,7 @@ pub fn get_last_watched_block_number_from_storage(
         .block_number;
 
     Ok(
-        u64::from_str_radix(last_watched_block_number_string.as_str(), 10).map_err(|_| {
+        u64::from_str(last_watched_block_number_string.as_str()).map_err(|_| {
             DataRestoreError::Unknown(
                 "cant make u256 block_number in get_last_watched_block_number_from_storage"
                     .to_string(),

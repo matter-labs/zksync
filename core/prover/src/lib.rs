@@ -160,25 +160,12 @@ impl BabyProver {
 
         let (c_x, c_y) = serialize_g1_for_ethereum(proof.proof.c);
 
-        // let new_root = serialize_fe_for_ethereum(proof.inputs[1]);
-
-        // let total_fees = serialize_fe_for_ethereum(proof.total_fees);
-
-        // let block_number = serialize_fe_for_ethereum(proof.block_number);
-
-        // let public_data = proof.public_data.clone();
-
         let p = [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y];
-
-        // EncodedProof{
-        //     groth_proof: [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y],
-        //     //block_number: block_number,
-        // };
 
         Ok(p)
     }
 
-    pub fn create(worker: String) -> Result<BabyProver, BabyProverErr> {
+    pub fn create(worker: String, key_dir: String) -> Result<BabyProver, BabyProverErr> {
         let storage =
             StorageProcessor::establish_connection().expect("db connection failed for prover");
         let (last_block, accounts) = storage
@@ -192,8 +179,8 @@ impl BabyProver {
 
         let path = {
             let mut key_file_path = std::path::PathBuf::new();
-            key_file_path.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
-            key_file_path.push(&format!("{}", franklin_constants::BLOCK_SIZE_CHUNKS));
+            key_file_path.push(&key_dir);
+            key_file_path.push(&format!("{}", franklin_constants::block_size_chunks()));
             key_file_path.push(franklin_constants::KEY_FILENAME);
             key_file_path
         };
@@ -208,7 +195,7 @@ impl BabyProver {
         info!("Copying states to balance tree");
 
         // TODO: replace with .clone() by moving PedersenHasher to static context
-        let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+        let mut tree = CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
         extend_accounts(&mut tree, initial_state.get_accounts().into_iter());
 
         let root = tree.root_hash();
@@ -233,7 +220,7 @@ impl BabyProver {
             .expect("getting prover id failed");
 
         Ok(Self {
-            operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+            operation_batch_size: franklin_constants::block_size_chunks(),
             current_block_number: state_block_number,
             accounts_tree: tree,
             parameters: franklin_circuit_params.unwrap(),
@@ -261,7 +248,7 @@ impl BabyProver {
             .load_committed_state(Some(expected_current_block))
             .map_err(|e| format!("load_state_diff failed: {}", e))?;
 
-        let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+        let mut tree = CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
         extend_accounts(&mut tree, new_accounts.into_iter());
 
         self.accounts_tree = tree;
@@ -490,8 +477,8 @@ impl BabyProver {
                     _ => {}
                 }
             }
-            if operations.len() < franklin_constants::BLOCK_SIZE_CHUNKS {
-                for _ in 0..franklin_constants::BLOCK_SIZE_CHUNKS - operations.len() {
+            if operations.len() < franklin_constants::block_size_chunks() {
+                for _ in 0..franklin_constants::block_size_chunks() - operations.len() {
                     let (
                         signature,
                         first_sig_msg,
@@ -512,8 +499,8 @@ impl BabyProver {
                     pub_data.extend(vec![false; 64]);
                 }
             }
-            assert_eq!(pub_data.len(), 64 * franklin_constants::BLOCK_SIZE_CHUNKS);
-            assert_eq!(operations.len(), franklin_constants::BLOCK_SIZE_CHUNKS);
+            assert_eq!(pub_data.len(), 64 * franklin_constants::block_size_chunks());
+            assert_eq!(operations.len(), franklin_constants::block_size_chunks());
 
             let validator_acc = self
                 .accounts_tree
@@ -562,7 +549,7 @@ impl BabyProver {
 
             let instance = FranklinCircuit {
                 params: &self.jubjub_params,
-                operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+                operation_batch_size: franklin_constants::block_size_chunks(),
                 old_root: Some(initial_root),
                 new_root: Some(block.new_root_hash),
                 block_number: Fr::from_str(&(block_number).to_string()),

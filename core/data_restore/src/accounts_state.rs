@@ -1,13 +1,11 @@
-use plasma::state::{OpSuccess, PlasmaState};
-
 use crate::franklin_ops::FranklinOpsBlock;
 use crate::helpers::DataRestoreError;
-
 use models::node::account::{Account, AccountAddress};
 use models::node::operations::FranklinOp;
 use models::node::priority_ops::FranklinPriorityOp;
 use models::node::tx::FranklinTx;
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
+use plasma::state::{OpSuccess, PlasmaState};
 
 /// Franklin Accounts states with data restore configuration
 pub struct FranklinAccountsState {
