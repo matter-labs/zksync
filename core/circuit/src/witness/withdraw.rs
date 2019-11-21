@@ -70,7 +70,7 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.before.witness.account_witness.address.unwrap(),
+            &self.before.witness.account_witness.pub_key_hash.unwrap(),
             franklin_constants::FRANKLIN_KEY_BIT_WIDTH,
         );
 
@@ -88,11 +88,6 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
             &mut sig_bits,
             &self.before.witness.account_witness.pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.witness.account_witness.address.unwrap(),
-            franklin_constants::FRANKLIN_KEY_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
