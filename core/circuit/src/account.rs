@@ -8,6 +8,7 @@ use franklin_crypto::circuit::Assignment;
 pub struct AccountWitness<E: JubjubEngine> {
     pub nonce: Option<E::Fr>,
     pub pub_key_hash: Option<E::Fr>,
+    pub address: Option<E::Fr>,
 }
 
 pub struct AccountContent<E: JubjubEngine> {

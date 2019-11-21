@@ -21,6 +21,7 @@ pub struct WithdrawData {
     pub token: u32,
     pub account_address: u32,
     pub ethereum_key: Fr,
+    pub owner_key: Fr
 }
 pub struct WithdrawWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -67,6 +68,12 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
             franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
 
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.before.witness.account_witness.address.unwrap(),
+            franklin_constants::FRANKLIN_KEY_BIT_WIDTH,
+        );
+
         pubdata_bits.resize(8 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
@@ -81,6 +88,11 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
             &mut sig_bits,
             &self.before.witness.account_witness.pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.witness.account_witness.address.unwrap(),
+            franklin_constants::FRANKLIN_KEY_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -120,6 +132,7 @@ pub fn apply_withdraw_tx(
         token: u32::from(withdraw.tx.token),
         account_address: withdraw.account_id,
         ethereum_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.eth_address)).unwrap(),
+        owner_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.account.to_hex())).unwrap()
     };
     // le_bit_vector_into_field_element()
     apply_withdraw(tree, &withdraw_data)
