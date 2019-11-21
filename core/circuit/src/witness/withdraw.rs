@@ -21,7 +21,6 @@ pub struct WithdrawData {
     pub token: u32,
     pub account_address: u32,
     pub ethereum_key: Fr,
-    pub owner_key: Fr
 }
 pub struct WithdrawWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -127,7 +126,6 @@ pub fn apply_withdraw_tx(
         token: u32::from(withdraw.tx.token),
         account_address: withdraw.account_id,
         ethereum_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.eth_address)).unwrap(),
-        owner_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.account.to_hex())).unwrap()
     };
     // le_bit_vector_into_field_element()
     apply_withdraw(tree, &withdraw_data)
