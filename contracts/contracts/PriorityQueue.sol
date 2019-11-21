@@ -1,39 +1,57 @@
 pragma solidity ^0.5.8;
 
 import "./Bytes.sol";
+import "./Governance.sol";
 
+/// @title Priority Queue Contract
+/// @author Matter Labs
 contract PriorityQueue {
 
-    address internal franklinAddress; // Franklin contract address
-    address internal ownerAddress; // Owner address
+    /// @notice Rollup contract address
+    address internal rollupAddress;
+
+    /// @notice Governance contract
+    Governance internal governance;
     
-    // Priority operation numbers
-    uint8 constant DEPOSIT_OP = 1; // Deposit operation number
-    uint8 constant FULL_EXIT_OP = 6; // Full exit operation number
+    /// @notice Deposit operation number
+    uint8 constant DEPOSIT_OP = 1;
 
-    // Operation fields bytes lengths
-    uint8 constant TOKEN_BYTES = 2; // token id
-    uint8 constant AMOUNT_BYTES = 16; // token amount
-    uint8 constant ETH_ADDR_BYTES = 20; // ethereum address
-    uint8 constant ACC_NUM_BYTES = 3; // franklin account id
-    uint8 constant NONCE_BYTES = 4; // franklin nonce
+    /// @notice Full exit operation number
+    uint8 constant FULL_EXIT_OP = 6;
 
-    // Franklin chain address length
+    /// @notice Token id bytes length
+    uint8 constant TOKEN_BYTES = 2;
+
+    /// @notice Token amount bytes length
+    uint8 constant AMOUNT_BYTES = 16;
+
+    /// @notice Ethereum address bytes length
+    uint8 constant ETH_ADDR_BYTES = 20;
+
+    /// @notice Rollup account id bytes length
+    uint8 constant ACC_NUM_BYTES = 3;
+
+    /// @notice Rollup nonce bytes length
+    uint8 constant NONCE_BYTES = 4;
+
+    /// @notice Rollup chain address length
     uint8 constant PUBKEY_HASH_LEN = 20;
-    // Signature (for example full exit signature) length
+
+    /// @notice Signature (for example full exit signature) length
     uint8 constant SIGNATURE_LEN = 64;
-    // Public key length
+
+    /// @notice Public key length
     uint8 constant PUBKEY_LEN = 32;
-    // Expiration delta for priority request to be satisfied (in ETH blocks)
+
+    /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 250; // About 1 hour
 
-    // New priority request event
-    // Emitted when a request is placed into mapping
-    // Params:
-    // - opType - operation type
-    // - pubData - operation data
-    // - expirationBlock - the number of Ethereum block when request becomes expired
-    // - fee - validators' fee
+    /// @notice New priority request event
+    /// @dev Emitted when a request is placed into mapping
+    /// @member opType Rollup operation type
+    /// @member pubData Operation pubdata
+    /// @member expirationBlock The number of Ethereum block when request becomes expired
+    /// @member fee Validators' fee
     event NewPriorityRequest(
         uint64 serialId,
         uint8 opType,
@@ -42,7 +60,11 @@ contract PriorityQueue {
         uint256 fee
     );
 
-    // Priority Operation contains operation type, its data, expiration block, and fee
+    /// @notice Priority Operation container
+    /// @member opType Rollup poperation type
+    /// @member pubData Operation pubdata
+    /// @member expirationBlock The number of Ethereum block when request becomes expired
+    /// @member fee Validators' fee
     struct PriorityOperation {
         uint8 opType;
         bytes pubData;
@@ -50,48 +72,60 @@ contract PriorityQueue {
         uint256 fee;
     }
 
-    // Priority Requests mapping (request id - operation)
-    // Contains op type, pubdata, fee and expiration block of unsatisfied requests.
-    // Numbers are in order of requests receiving
+    /// @notice Priority Requests mapping (request id - operation)
+    /// @notice Contains op type, pubdata, fee and expiration block of unsatisfied requests.
+    /// @notice Numbers are in order of requests receiving
     mapping(uint64 => PriorityOperation) public priorityRequests;
-    // First priority request id
+    
+    /// @notice First open priority request id
     uint64 public firstPriorityRequestId;
-    // Total number of requests
+
+    /// @notice Total number of requests
     uint64 public totalOpenPriorityRequests;
-    // Total number of committed requests
+
+    /// @notice Total number of committed requests. Used in checks: if the request matches the operation on Rollup contract,
+    /// @notice if provided number of requests is not too big
     uint64 public totalCommittedPriorityRequests;
 
-    // Constructor sets owner address
-    constructor(address _ownerAddress) public {
-        ownerAddress = _ownerAddress;
+    /// @notice Constructs PriorityQueue contract
+    /// @param _governanceAddress Governance contract address
+    constructor(address _governanceAddress) public {
+        governance = Governance(_governanceAddress);
     }
 
-    // Change franklin address
-    // _franklinAddress - address of the Franklin contract
-    function changeFranklinAddress(address _franklinAddress) external {
-        // Its possible to set franklin contract address only if it has not been setted before
+    /// @notice Sets rollup address
+    /// param _rollupAddress Address of the Rollup contract
+    function setRollupAddress(address _rollupAddress) external {
+        // Its possible to set rollup contract address only if it has not been setted before
         require(
-            franklinAddress == address(0),
+            rollupAddress == address(0),
             "pcs11"
         ); // pcs11 - frankin address is already setted
-        requireOwner();
-        franklinAddress = _franklinAddress;
+        
+        // Check for governor
+        governance.requireGovernor();
+
+        // Set rollup address
+        rollupAddress = _rollupAddress;
     }
 
-    // Calculate expiration block for request, store this request and emit NewPriorityRequest event
-    // Params:
-    // - _opType - priority request type
-    // - _fee - validators' fee
-    // - _pubData - request data
+    /// @notice Saves priority request in storage
+    /// @dev Calculates expiration block for request, store this request and emit NewPriorityRequest event
+    /// @param _opType Rollup operation type
+    /// @param _fee Validators' fee
+    /// @param _pubData Operation pubdata
     function addPriorityRequest(
         uint8 _opType,
         uint256 _fee,
         bytes calldata _pubData
     ) external {
-        requireFranklin();
+        // Must be called by Rollup contract
+        requireRollup();
+
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
+        // Save priority operation
         priorityRequests[firstPriorityRequestId+totalOpenPriorityRequests] = PriorityOperation({
             opType: _opType,
             pubData: _pubData,
@@ -99,6 +133,7 @@ contract PriorityQueue {
             fee: _fee
         });
 
+        // Emit nuew priority request event
         emit NewPriorityRequest(
             firstPriorityRequestId+totalOpenPriorityRequests,
             _opType,
@@ -110,29 +145,34 @@ contract PriorityQueue {
         totalOpenPriorityRequests++;
     }
 
-    // Collects a fee from provided requests number for the validator, return it and delete these requests
-    // Params:
-    // - _number - the number of requests
+    /// @notice Collects a fee from provided requests number for the validator, return it and delete these requests
+    /// @param _number The number of requests to process
     function collectValidatorsFeeAndDeleteRequests(uint64 _number) external returns (uint256) {
-        requireFranklin();
+        requireRollup();
         require(
             _number <= totalOpenPriorityRequests,
             "pcs21"
         ); // pcs21 - number is heigher than total priority requests number
-
+        
+        // Collect fees from provided requests number
         uint256 totalFee = 0;
         for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + _number; i++) {
+            // Sum request fee
             totalFee += priorityRequests[i].fee;
+            // Delete request
             delete priorityRequests[i];
         }
+        // Reduce total open priority requests number
         totalOpenPriorityRequests -= _number;
+        // Increase first priority request id
         firstPriorityRequestId += _number;
+        // Reduce total committed priority requests number
         totalCommittedPriorityRequests -= _number;
 
         return totalFee;
     }
 
-    // Returns deposits pub data in bytes
+    /// @notice Returns open deposit requests concated pubdata
     function getOutstandingDeposits() external view returns (bytes memory depositsPubData) {
         for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + totalOpenPriorityRequests; i++) {
             if (priorityRequests[i].opType == DEPOSIT_OP) {
@@ -141,11 +181,10 @@ contract PriorityQueue {
         }
     }
 
-    // Compares operation with corresponding priority requests' operation
-    // Params:
-    // - _opType - operation type
-    // - _pubData - operation pub data
-    // - _id - operation number
+    /// @notice Compares Rollup operation with corresponding priority requests' operation
+    /// @param _opType Operation type
+    /// @param _pubData Operation pub data
+    /// @param _id - Request id
     function isPriorityOpValid(uint8 _opType, bytes calldata _pubData, uint64 _id) external view returns (bool) {
         uint64 _priorityRequestId = _id + firstPriorityRequestId + totalCommittedPriorityRequests;
         bytes memory priorityPubData;
@@ -163,9 +202,8 @@ contract PriorityQueue {
             (keccak256(onchainPubData) == keccak256(priorityPubData));
     }
 
-    // Checks if provided number is less than uncommitted requests count
-    // Params:
-    // - _number - number of requests
+    /// @notice Checks if provided number is less than uncommitted requests count
+    /// @param _number Number of requests
     function validateNumberOfRequests(uint64 _number) external view {
         require(
             _number <= totalOpenPriorityRequests-totalCommittedPriorityRequests,
@@ -173,40 +211,34 @@ contract PriorityQueue {
         ); // pvs11 - too much priority requests
     }
 
-    // Increases committed requests count by provided number
+    /// @notice Increases committed requests count by provided number
+    /// @param _number Number of requests
     function increaseCommittedRequestsNumber(uint64 _number) external {
-        requireFranklin();
+        requireRollup();
         totalCommittedPriorityRequests += _number;
     }
 
-    // Decreases committed requests count by provided number
+    /// @notice Decreases committed requests count by provided number
+    /// @param _number Number of requests
     function decreaseCommittedRequestsNumber(uint64 _number) external {
-        requireFranklin();
+        requireRollup();
         totalCommittedPriorityRequests -= _number;
     }
 
-    // Checks if Exodus mode must be entered and returns bool.
-    // Returns bool flag that is true if the Exodus mode must be entered.
-    // Exodus mode must be entered in case of current ethereum block number is higher than the oldest
-    // of existed priority requests expiration block number.
+    /// @notice Checks if Exodus mode must be entered and returns bool.
+    /// @notice Returns bool flag that is true if the Exodus mode must be entered.
+    /// @notice Exodus mode must be entered in case of current ethereum block number is higher than the oldest
+    /// @notice of existed priority requests expiration block number.
     function triggerExodusIfNeeded() external view returns (bool) {
         return block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
             priorityRequests[firstPriorityRequestId].expirationBlock != 0;
     }
 
-    // Check if the sender is franklin contract
-    function requireFranklin() internal view {
+    /// @notice Check if the sender is rollup contract
+    function requireRollup() internal view {
         require(
-            msg.sender == franklinAddress,
+            msg.sender == rollupAddress,
             "prn11"
-        ); // prn11 - only by franklin
-    }
-
-    // Check if the sender is owner
-    function requireOwner() internal view {
-        require(
-            msg.sender == ownerAddress,
-            "prr11"
-        ); // prr11 - only by owner
+        ); // prn11 - only by rollup
     }
 }

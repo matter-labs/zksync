@@ -3,13 +3,16 @@ pragma solidity ^0.5.8;
 
 import "./VerificationKey.sol";
 
+/// @title Verifier Contract
+/// @author Matter Labs
 contract Verifier is VerificationKey {
+
+    /// @notice If this flag is true - use dummy verification instead of full
     bool constant DUMMY_VERIFIER = false;
 
-    // Proof verification
-    // Params:
-    // - _proof - block number
-    // - _commitment - block commitment
+    /// @notice Rollup block proof verification
+    /// @param _proof Block proof
+    /// @param _commitment Block commitment
     function verifyBlockProof(
         uint256[8] calldata _proof,
         bytes32 _commitment
@@ -23,6 +26,11 @@ contract Verifier is VerificationKey {
         return Verify(vk, gammaABC, _proof, inputs);
     }
 
+    /// @notice Verifies exit proof
+    /// @param _tokenId Token id
+    /// @param _owner Token owner (user)
+    /// @param _amount Token amount
+    /// @param _proof Proof that user committed
     function verifyExitProof(
         uint16 _tokenId,
         address _owner,
@@ -43,24 +51,32 @@ contract Verifier is VerificationKey {
         return Verify(vk, gammaABC, _proof, inputs);
     }
 
-    function NegateY(uint256 Y) internal pure returns (uint256) {
+    /// @notice Negates Y value
+    /// @param _y Y value
+    function NegateY(uint256 _y) internal pure returns (uint256) {
         uint256 q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-        return q - (Y % q);
+        return q - (y % q);
     }
 
+    /// @notice Verifies exit proof
+    /// @param _in_vk Verification key inputs
+    /// @param _vk_gammaABC Verification key gamma
+    /// @param _in_proof Proof input (Block proof)
+    /// @param _public_inputs Public inputs (commitment & mask)
     function Verify(
-        uint256[14] memory in_vk,
-        uint256[] memory vk_gammaABC,
-        uint256[8] memory in_proof,
-        uint256[] memory proof_inputs
+        uint256[14] memory _in_vk,
+        uint256[] memory _vk_gammaABC,
+        uint256[8] memory _in_proof,
+        uint256[] memory _public_inputs
     ) internal view returns (bool) {
+        // If DUMMY_VERIFIER constant is true than return true
         if (DUMMY_VERIFIER) {
             return true;
         }
 
         // Start
         require(
-            ((vk_gammaABC.length / 2) - 1) == proof_inputs.length,
+            ((_vk_gammaABC.length / 2) - 1) == _public_inputs.length,
             "vvy11"
         ); // vvy11 - Invalid number of public inputs
 
@@ -71,14 +87,14 @@ contract Verifier is VerificationKey {
         uint256 m = 2;
 
         // First two fields are used as the sum
-        add_input[0] = vk_gammaABC[0];
-        add_input[1] = vk_gammaABC[1];
+        add_input[0] = _vk_gammaABC[0];
+        add_input[1] = _vk_gammaABC[1];
 
-        // Performs a sum of gammaABC[0] + sum[ gammaABC[i+1]^proof_inputs[i] ]
-        for (uint256 i = 0; i < proof_inputs.length; i++) {
-            mul_input[0] = vk_gammaABC[m++];
-            mul_input[1] = vk_gammaABC[m++];
-            mul_input[2] = proof_inputs[i];
+        // Performs a sum of gammaABC[0] + sum[ gammaABC[i+1]^_public_inputs[i] ]
+        for (uint256 i = 0; i < _public_inputs.length; i++) {
+            mul_input[0] = _vk_gammaABC[m++];
+            mul_input[1] = _vk_gammaABC[m++];
+            mul_input[2] = _public_inputs[i];
 
             // solhint-disable-next-line no-inline-assembly
             assembly {
@@ -116,33 +132,33 @@ contract Verifier is VerificationKey {
 
         uint256[24] memory input = [
             // (proof.A, proof.B)
-            in_proof[0],
-            in_proof[1], // proof.A   (G1)
-            in_proof[2],
-            in_proof[3],
-            in_proof[4],
-            in_proof[5], // proof.B   (G2)
+            _in_proof[0],
+            _in_proof[1], // proof.A   (G1)
+            _in_proof[2],
+            _in_proof[3],
+            _in_proof[4],
+            _in_proof[5], // proof.B   (G2)
             // (-vk.alpha, vk.beta)
-            in_vk[0],
-            NegateY(in_vk[1]), // -vk.alpha (G1)
-            in_vk[2],
-            in_vk[3],
-            in_vk[4],
-            in_vk[5], // vk.beta   (G2)
+            _in_vk[0],
+            NegateY(_in_vk[1]), // -vk.alpha (G1)
+            _in_vk[2],
+            _in_vk[3],
+            _in_vk[4],
+            _in_vk[5], // vk.beta   (G2)
             // (-vk_x, vk.gamma)
             add_input[0],
             NegateY(add_input[1]), // -vk_x     (G1)
-            in_vk[6],
-            in_vk[7],
-            in_vk[8],
-            in_vk[9], // vk.gamma  (G2)
+            _in_vk[6],
+            _in_vk[7],
+            _in_vk[8],
+            _in_vk[9], // vk.gamma  (G2)
             // (-proof.C, vk.delta)
-            in_proof[6],
-            NegateY(in_proof[7]), // -proof.C  (G1)
-            in_vk[10],
-            in_vk[11],
-            in_vk[12],
-            in_vk[13] // vk.delta  (G2)
+            _in_proof[6],
+            NegateY(_in_proof[7]), // -proof.C  (G1)
+            _in_vk[10],
+            _in_vk[11],
+            _in_vk[12],
+            _in_vk[13] // vk.delta  (G2)
         ];
 
         uint256[1] memory out;

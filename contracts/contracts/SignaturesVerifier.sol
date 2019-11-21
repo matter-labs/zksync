@@ -3,7 +3,14 @@ pragma solidity ^0.5.8;
 import "./Bytes.sol";
 import "./BlsOperations.sol";
 
+/// @title Signatures Verifier lebrary
+/// @author Matter Labs
 library SignaturesVerifier {
+
+    /// @notice Verifies user signature
+    /// @param _user User address
+    /// @param _signature User signature
+    /// @param _messageHash Message hash
     function verifyUserSignature(
         address _user,
         bytes memory _signature,
@@ -27,6 +34,10 @@ library SignaturesVerifier {
         return ecrecover(_messageHash, v, r, s) == _user;
     }
 
+    /// @notice Verifies validators signature
+    /// @param _aggrPubkey Validators aggregated pubkey
+    /// @param _signature Validators aggregated signature
+    /// @param _messageHash Message hash
     function verifyValidatorsSignature(
         BlsOperations.G2Point memory _aggrPubkey,
         bytes memory _signature,
