@@ -16,10 +16,10 @@ contract Governance {
     /// @notice Validator-creator fee coefficient
     uint256 constant VALIDATOR_CREATOR_FEE_COEFF = 10;
 
-    /// @notice Rollup contract
+    /// @notice Rollup contract, contains user funds
     Franklin rollup;
 
-    /// @notice SwiftExits contract
+    /// @notice SwiftExits contract, processes swift exits request
     SwiftExits swiftExits;
 
     /// @notice Matter token id
@@ -49,7 +49,7 @@ contract Governance {
     /// @notice List of registered tokens by tokenId
     mapping(uint16 => address) public tokenAddresses;
 
-    /// @notice List of registered cTokens by corresponding token id
+    /// @notice List of registered cTokens (corresponding to underlying token on Compound) by corresponding token id
     mapping(uint16 => address) public cTokenAddresses;
 
     /// @notice List of registered tokens by address
@@ -72,11 +72,13 @@ contract Governance {
     /// @member isActive Flag for validator existance in current lending process
     /// @member id Validator id. Needed to identify single validator in bitmask
     /// @member pubkey Validators' pubkey
+    /// @member frozenUntilBlock Indicates that all validators tokens are unavailable to withdraw until thatblock number
     struct ValidatorInfo {
         uint256 supply;
         bool isActive;
         uint16 id;
         BlsOperations.G2Point pubkey;
+        uint256 frozenUntilBlock;
     }
 
     /// @notice Token added to Franklin net
@@ -87,9 +89,9 @@ contract Governance {
         uint16 tokenId
     );
 
-    /// @notice cToken added to Franklin net
+    /// @notice cToken (corresponding to underlying token on Compound) added to Franklin net
     /// @member cToken cToken address
-    /// @member token Token id
+    /// @member token Underlying token id
     event cTokenAdded(
         address cToken,
         uint16 tokenId
@@ -105,23 +107,46 @@ contract Governance {
     /// @dev Requires governor. MUST be called before all other operations
     /// @param _matterTokenAddress The address of Matter token
     /// @param _cMatterTokenAddress The address of Compound CMatter token
+    /// @param _cEtherTokenAddress The address of Compound CEther token
     /// @param _rollupAddress The address of Rollup contract
     /// @param _swiftExitsAddress The address of SwiftExits contract
     function setupRelatedContracts(
         address _matterTokenAddress,
         address _cMatterTokenAddress,
+        address _cEtherTokenAddress,
         address _rollupAddress,
         address _swiftExitsAddress
     ) external {
+        require(
+            _matterTokenAddress == address(0) &&
+            _cMatterTokenAddress == address(0) &&
+            _cEtherTokenAddress == address(0) &&
+            _rollupAddress == address(0) &&
+            _swiftExitsAddress == address(0),
+            "gess11"
+        ); // gess11 - contracts must be setted only once
+
+        // Can be called only by governor
         requireGovernor();
+
+        // Set contracts
         swiftExits = SwiftExits(_swiftExitsAddress);
         rollup = Franklin(_rollupAddress);
 
+        // Add matter token
         addToken(_matterTokenAddress);
+        // Add cMatter token
         addCToken(_cMatterTokenAddress, totalTokens);
+
+        // Set Matter token address
         matterTokenAddress = _matterTokenAddress;
+        // Set cMatter token address
         cMatterTokenAddress = _cMatterTokenAddress;
+        // Save Matter token id
         matterTokenId = totalTokens;
+
+        // Add cEther
+        addCToken(_cEtherTokenAddress, 0);
     }
 
     /// @notice Fallback function
@@ -133,7 +158,9 @@ contract Governance {
     /// @notice Change current governor
     /// @param _newGovernor Address of the new governor
     function changeGovernor(address _newGovernor) external {
+        // Can be called only by governor
         requireGovernor();
+
         networkGovernor = _newGovernor;
     }
 
@@ -145,25 +172,31 @@ contract Governance {
         ); // gerr11 - only by governor
     }
 
-    /// @notice Add token to the list of possible tokens
+    /// @notice Add token to the list of networks tokens
     /// @param _token Token address
     function addToken(address _token) public {
+        // Can be called only by governor
         requireGovernor();
+        // Token must be added once
         require(
             tokenIds[_token] == 0,
              "gean11"
         ); // gean11 - token exists
-        tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
+
+        // Adding one to token id because tokenId = 0 is reserved for ETH
+        tokenAddresses[totalTokens + 1] = _token;
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
         emit TokenAdded(_token, totalTokens);
     }
 
-    /// @notice Add cToken for token to the list of possible cTokens
+    /// @notice Add cToken for token to the list of cTokens. cToken is Compound representation for underlying token
     /// @param _cToken cToken address
-    /// @param _token Token address
+    /// @param _token Underlying token address
     function addCToken(address _cToken, uint16 _tokenId) external {
+        // Can be called only by governor
         requireGovernor();
+        // Token must not be Ether
         require(
             validateTokenId(_tokenId) != address(0),
              "gean21"
@@ -195,7 +228,6 @@ contract Governance {
     }
 
     /// @notice Add new validator with pubkey
-    /// @dev Only governor can add new validator
     /// @param _address Validator address
     /// @param _pbkxx Validator pubkey xx
     /// @param _pbkxy Validator pubkey xy
@@ -210,7 +242,9 @@ contract Governance {
     )
         external
     {
+        // Can be called only by governor
         requireGovernor();
+        // Requires validator not to be active
         require(
             !validatorsInfo[_address].isActive,
             "gear11"
@@ -231,12 +265,13 @@ contract Governance {
         totalValidators++;
     }
 
-    /// @notice Change validator status
-    /// @dev Only governor can add new validator
+    /// @notice Change validator status (active or not active)
     /// @param _address Validator address
     /// @param _active Active flag
     function setValidatorStatus(address _address, bool _active) external {
+        // Can be called only by governor
         requireGovernor();
+        // Require validator to exist (non-zero pubkey)
         require(
             validatorsInfo[_address].pubkey.x[0] != 0 &&
             validatorsInfo[_address].pubkey.x[1] != 0 &&
@@ -247,7 +282,8 @@ contract Governance {
         validatorsInfo[_address].isActive = _active;
     }
 
-    /// @notice Sends the swift exit request, signed by user and validators, to SwiftExits contract, borrows tokens for it from validators, freezes tokens on rollup contract
+    /// @notice Sends the swift exit request, signed by user and validators, to SwiftExits contract,
+    /// @notice borrows tokens for it from validators, freezes tokens on rollup contract
     /// @param _swiftExit Signed swift exit data: block number, onchain op number, acc number, token id, token amount, fee amount, recipient, author
     /// @param _userSignature User signature
     /// @param _signersSignature Aggregated validators signature
@@ -257,6 +293,7 @@ contract Governance {
         bytes memory _signersSignature,
         uint16 _signersBitmask
     ) external {
+        // Signers bitmask must not be nill
         require(
             _signersBitmask > 0,
             "gect11"
@@ -286,6 +323,8 @@ contract Governance {
             uint256 supplyAmount
         ) = parseSwiftExit(_swiftExit);
 
+        // Checks that amounts are enouth
+
         require(
             tokenAmount > 0,
             "gect12"
@@ -312,9 +351,9 @@ contract Governance {
             "gect16"
         ); // "gect16" - not enouth amount
 
-        // Verify sender and validators signature
+        // Check that sender exists in bitmask and verify validators signature
         require(
-            verifySenderAndValidatorsSignature(
+            verifySenderPresenceAndValidatorsSignature(
                 msg.sender, // Sender MUST be active validator
                 _signersSignature,
                 _signersBitmask,
@@ -329,10 +368,10 @@ contract Governance {
             "gect18"
         ); // gect18 - token transfer out failed
 
-        // Sum lended balance
+        // Increase total lended balance
         totalLended += supplyAmount;
 
-        // Freeze funds on rollup contract
+        // Freeze tokenAmount on Rollup contract for recipient
         rollup.freezeFunds(
             blockNumber,
             onchainOpNumber,
@@ -346,7 +385,7 @@ contract Governance {
             _userSignature
         );
 
-        // Add the swift exit on SwiftExits contract
+        // Save the swift exit on SwiftExits contract
         swiftExits.addSwiftExit(
             blockNumber,
             onchainOpNumber,
@@ -370,7 +409,7 @@ contract Governance {
         ); // geir11 - validator is not active
     }
     
-    /// @notice Parses swift exit bytes data to its field
+    /// @notice Parses swift exit bytes data into its field
     /// @param _swiftExit Swift exit bytes data
     function parseSwiftExit(bytes memory _swiftExit) internal returns (
         uint32 blockNumber,
@@ -512,10 +551,14 @@ contract Governance {
         BlsOperations.G2Point memory aggrPubkey,
         uint16 signersCount
     ) {
+        // Go into a loop for totalValidators
         for(uint8 i = 0; i < totalValidators; i++) {
+            // Check that validator exists in bitmask
             if( (bitmask >> i) & 1 > 0 ) {
                 address addr = validators[i];
+                // Check that validator is active
                 requireActiveValidator(addr);
+                // Get her pubkey add it to aggregated pubkey
                 BlsOperations.G2Point memory pubkey = validatorsInfo[addr].pubkey;
                 aggrPubkey = BlsOperations.addG2(aggrPubkey, pubkey);
                 signersCount++;
@@ -523,12 +566,12 @@ contract Governance {
         }
     }
 
-    /// @notice Verifies sender presence in bitmask and aggregated signature
+    /// @notice Verifies sender presence in bitmask and verifies aggregated bls signature
     /// @param _sender Sender of the request
     /// @param _aggrSignature Aggregated signature
     /// @param _signersBitmask Signers bitmask
     /// @param _messageHash Message hash
-    function verifySenderAndValidatorsSignature(
+    function verifySenderPresenceAndValidatorsSignature(
         address _sender,
         bytes memory _aggrSignature,
         uint256 _signersBitmask,
@@ -538,7 +581,7 @@ contract Governance {
         view
         returns (bool result)
     {
-        // If there is only 1 validator and he is sender - return true (single operator model)
+        // If there is only 1 validator and he is sender - return true (single validator)
         if (totalValidators == 1 && validators[0] == _sender) {
             return true;
         }
@@ -566,10 +609,8 @@ contract Governance {
 
     /// @notice Supplies specified amount of Matter tokens to validator balance
     /// @param _amount Token amount
-    /// @param _validator Validator address
     function supplyMatterToken(
-        uint256 _amount,
-        address _validator
+        uint256 _amount
     )
         external
     {
@@ -577,45 +618,70 @@ contract Governance {
             amount > 0,
             "gesn11"
         ); // gesn11 - amount must be > 0
-        requireActiveValidator(_validator);
+
+        // Validator must be active
+        requireActiveValidator(msg.sender);
+        
+        // Transfer Matter token from sender to contract
         require(
             IERC20(matterTokenAddress).transferFrom(msg.sender, address(this), _amount),
             "gesn12"
         ); // gesn12 - token transfer in failed
+
+        // Increase total validators supply
         totalSupply += _amount;
-        validatorsInfo[_validator].supply += _amount;
+
+        // Increase validator supply
+        validatorsInfo[msg.sender].supply += _amount;
+
+        // Freeze all tokens for validator
+        validatorsInfo[msg.sender].frozenUntilBlock = block.number + FREEZE_TIME;
     }
 
     /// @notice Withdraws specified amount of Matter tokens, supplied by validator
     /// @param _amount Specified amount
     function withdrawSupply(uint256 _amount) external {
+        // Amount must be > 0
         require(
             _amount > 0,
             "gewy11"
         ); // gewy11 - amount must be > 0
+
+        // Amount must be withdrawable (total supply - total lended >= amount)
         require(
             _amount <= totalSupply - totalLended,
             "gewy12"
         ); // gewy12 - amount must be <= free matter tokens on contract
+
+        // Validator must have enouth supply
         require(
             _amount <= validatorsInfo[msg.sender].supply,
             "gewy13"
         ); // gewy13 - amount must be <= validator supply
+
+        // Transfer Matter token amount to validator (sender)
         require(
             IERC20(matterTokenAddress).transfer(msg.sender, _amount),
             "gewy14"
         ); // gewy14 - token transfer out failed
+
+        // Reduce total supply
         totalSupply -= _amount;
+
+        // Reduce validator supply
         validatorsInfo[msg.sender].supply -= _amount;
     }
 
     /// @notice Withdraws specified amount of tokens or ether fees
     /// @param _tokenAddress Token address, 0 if address(0)
     function withdrawFees(address _tokenAddress) external {
+        // Validate token address and get its id
         uint16 tokenId = validateTokenAddress(_tokenAddress);
 
+        // Require validator to be able to withdraw token at current ethereum block (token is not frozen)
         require(
-            validatorsFrozenTokens[msg.sender][tokenId] <= block.number,
+            validatorsFrozenTokens[msg.sender][tokenId] <= block.number &&
+            validatorsInfo[msg.sender].frozenUntilBlock <= block.number,
             "gews11"
         ); // gews11 - validator cant withdraw this token yet
 
@@ -628,7 +694,7 @@ contract Governance {
         // Freeze token for validator
         validatorsFrozenTokens[msg.sender][tokenId] = block.number + FREEZE_TIME;
 
-        // Withdraw fees
+        // Reduce accumulated fees for this token
         accumulatedFees[tokenId] -= amount;
 
         if (tokenId == 0) {
@@ -642,7 +708,7 @@ contract Governance {
         }
     }
 
-    /// @notice Repays specified amount of matter token into contract, charges specified amount of tokens or ether as fee into contract
+    /// @notice Repays specified amount of atter token into contract, charges specified amount of tokens or ether as fee into contract
     /// @param _repayAmount Matter token repayment amount
     /// @param _feesTokenAddress Fees token address, address(0) for Ether
     /// @param _feesAmount Fees amount
@@ -653,36 +719,43 @@ contract Governance {
         uint256 _feesAmount,
         address _validatorCreator
     ) external payable {
+        // Can be called only from swift exit contract  
         require(
             msg.sender == address(swiftExit),
              "gers11"
         ); // gers11 - not swift exit contract addres
 
         // Repay borrow
-
+        
+        // Repayments amount must be higher than 0
         require(
             _repayAmount > 0,
             "gers12"
-        ); // gers12 - repay amount must be > 0s
+        ); // gers12 - repay amount must be > 0
 
+        // Transfer Matter token from SwiftExits contract to this contract
         require(
             IERC20(matterTokenAddress).transferFrom(msg.sender, address(this), _repayAmount),
             "gers13"
         ); // gers13 - matter token transfer in failed
 
+        // Reduce total lended balance
         totalLended -= _repayAmount;
 
         // Charge fees
 
+        // Validate token address and get its id
         uint16 tokenId = validateTokenAddress(_feesTokenAddress);
         if (tokenId == 0) {
             // Token is Ether
 
-            // Accumulate validators fees
+            // Requires fees amount to be provided in msg.value and feesAmount param to be nill
             require(
                 _feesAmount == 0 && msg.value > 0,
                 "gers14"
             ); // gers14 - amount must be == 0 and msg.value > 0
+
+            // Accumulate validators fees
             accumulatedFees += msg.value * (1 - VALIDATOR_CREATOR_FEE_COEFF / 100);
             
             // Repay fee to validator that created request
@@ -690,15 +763,19 @@ contract Governance {
         } else {
             // Token is ERC20
 
-            // Accumulate validators fees
+            // Requires fees amount to be provided in function params and msg.value to be nill
             require(
                 _feesAmount > 0 && msg.value == 0,
                 "gers15"
             ); // gers15 - amount must be > 0 and msg.value == 0
+
+            // Transfer token for fees from SwiftExits contract to this contract
             require(
                 IERC20(_feesTokenAddress).transferFrom(msg.sender, address(this), _feesAmount),
                 "gers16"
             ); // gers16 - token transfer in failed
+
+            // Accumulate validators fees
             accumulatedFees += _feesAmount * (1 - VALIDATOR_CREATOR_FEE_COEFF / 100);
 
             // Repay fee to validator that created request

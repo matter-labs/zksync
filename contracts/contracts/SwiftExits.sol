@@ -66,6 +66,12 @@ contract SwiftExits {
     )
         external
     {
+        require(
+            _rollupAddress == address(0) &&
+            _comptrollerAddress == address(0),
+            "ssss11"
+        ); // ssss11 - contracts must be setted only once
+
         // Check for governor
         governance.requireGovernor();
 
