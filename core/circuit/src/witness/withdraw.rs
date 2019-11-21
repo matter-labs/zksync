@@ -148,7 +148,7 @@ pub fn apply_withdraw(
         get_audits(tree, withdraw.account_address, withdraw.token);
 
     let capacity = tree.capacity();
-    assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+    assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
     let account_address_fe = Fr::from_str(&withdraw.account_address.to_string()).unwrap();
     let token_fe = Fr::from_str(&withdraw.token.to_string()).unwrap();
     let amount_as_field_element = Fr::from_str(&withdraw.amount.to_string()).unwrap();
@@ -382,7 +382,7 @@ mod test {
         let phasher = PedersenHasher::<Bn256>::default();
 
         let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+            CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
 
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
