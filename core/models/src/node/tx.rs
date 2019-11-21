@@ -156,7 +156,7 @@ impl Withdraw {
         Some(Self {
             account: AccountAddress::from_bytes(
                 &bytes[account_pre_length..account_pre_length + FR_ADDRESS_LEN],
-            ),
+            ).ok()?,
             eth_address: Address::from_slice(
                 &bytes[eth_address_pre_length..eth_address_pre_length + ETH_ADDR_BYTES_LENGTH],
             ),

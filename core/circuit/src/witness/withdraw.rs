@@ -332,6 +332,34 @@ pub fn calculate_withdraw_operations_from_witness(
         lhs: withdraw_witness.after.clone(),
         rhs: withdraw_witness.after.clone(),
     };
+    let operation_six = Operation {
+        new_root: withdraw_witness.after_root,
+        tx_type: withdraw_witness.tx_type,
+        chunk: Some(Fr::from_str("6").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[6]),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
+        args: withdraw_witness.args.clone(),
+        lhs: withdraw_witness.after.clone(),
+        rhs: withdraw_witness.after.clone(),
+    };
+    let operation_seven = Operation {
+        new_root: withdraw_witness.after_root,
+        tx_type: withdraw_witness.tx_type,
+        chunk: Some(Fr::from_str("7").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[7]),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
+        args: withdraw_witness.args.clone(),
+        lhs: withdraw_witness.after.clone(),
+        rhs: withdraw_witness.after.clone(),
+    };
     vec![
         operation_zero,
         operation_one,
@@ -339,6 +367,8 @@ pub fn calculate_withdraw_operations_from_witness(
         operation_three,
         operation_four,
         operation_five,
+        operation_six,
+        operation_seven
     ]
 }
 #[cfg(test)]

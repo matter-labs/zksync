@@ -747,9 +747,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETHEREUM_KEY=160
+        pubdata_bits.extend(cur.account.pub_key_hash.get_bits_be()); //PUB_KEY_HASH=160
                                                                  //        assert_eq!(pubdata_bits.len(), 30 * 8);
         pubdata_bits.resize(
-            6 * franklin_constants::CHUNK_BIT_WIDTH,
+            8 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -769,7 +770,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            6,
+            8,
         )?;
 
         //TODO: this flag is used too often, we better compute it above
