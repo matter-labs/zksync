@@ -3,6 +3,11 @@
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
         <b-navbar-brand href="/">Matter Network</b-navbar-brand>
+        <b-navbar-nav class="ml-auto">
+            <b-nav-form>
+                <SearchField :searchFieldInMenu="true" />
+            </b-nav-form>
+        </b-navbar-nav>
     </b-container>
     </b-navbar>
     <br>
@@ -16,7 +21,7 @@
         </b-card>
         <br>
         <h5>Transactions in this block</h5>
-        <transaction-list :transactions="transactions"></transaction-list>
+        <TransactionList :transactions="transactions"></TransactionList>
     </b-container>
 </div>
 </template>
@@ -30,10 +35,17 @@
 <script>
 
 import store from './store';
-import TransactionList from './TransactionList.vue';
 import client from './client';
 import { ethers } from 'ethers';
 import { readableEther } from './utils';
+
+import TransactionList from './TransactionList.vue';
+import SearchField from './SearchField.vue';
+
+const components = {
+    TransactionList,
+    SearchField,
+};
 
 function formatToken(amount, token) {
     return readableEther(amount);
@@ -54,14 +66,11 @@ function defaultTokenSymbol(tokenId) {
 
 function formatDate(date) {
     if (date == null) return '';
-    return date.toString().split('T')[0] + " " + date.toString().split('T')[1].split('.')[0]
+    return date.toString().split('T')[0] + " " + date.toString().split('T')[1].split('.')[0];
 }
 
 export default {
     name: 'block',
-    components: {
-        'transaction-list':  TransactionList
-    },
     created() {
         this.update();
     },
@@ -135,10 +144,18 @@ export default {
                     fee = `${formatToken(tx.tx.fee, token)} ${token}`;
                 }
 
+                let from_target = from_explorer_link.startsWith('/')
+                    ? ''
+                    : `_target="_blank" rel="noopener noreferrer"`;
+
+                let to_target = to_explorer_link.startsWith('/')
+                    ? ''
+                    : `_target="_blank" rel="noopener noreferrer"`;
+
                 return {
                     type: `<b>${type}</b>`,
-                    from: `<code><a href="${from_explorer_link}" target="_blank" rel="noopener noreferrer">${from} ${from_onchain_icon}</a></code>`,
-                    to: `<code><a href="${to_explorer_link}" target="_blank" rel="noopener noreferrer">${to} ${to_onchain_icon}</a></code>`,
+                    from: `<code><a href="${from_explorer_link}" ${from_target}>${from} ${from_onchain_icon}</a></code>`,
+                    to: `<code><a href="${to_explorer_link}" ${to_target}>${to} ${to_onchain_icon}</a></code>`,
                     amount,
                     fee,
                     tx_hash: tx.tx_hash,
@@ -190,6 +207,7 @@ export default {
             status:         null,
             transactions:   [  ],
         };
-    }
+    },
+    components,
 };
 </script>

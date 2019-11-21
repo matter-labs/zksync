@@ -11,6 +11,11 @@
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
+        <b-navbar-nav class="ml-auto">
+            <b-nav-form>
+                <SearchField :searchFieldInMenu="true" />
+            </b-nav-form>
+        </b-navbar-nav>
         </b-collapse>
     </b-container>
     </b-navbar>
@@ -19,7 +24,7 @@
         <ClosableJumbotron></ClosableJumbotron>
         <b-card bg-variant="light" >
             <h4>Matter Testnet Block Explorer</h4> 
-            <SearchField />
+            <SearchField :searchFieldInMenu="false" />
         </b-card>
         <br>
         <b-card>

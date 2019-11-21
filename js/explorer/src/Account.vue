@@ -3,16 +3,23 @@
     <b-navbar toggleable="md" type="dark" variant="info">
         <b-container>
             <b-navbar-brand href="/">Matter Network</b-navbar-brand>
+            <b-navbar-nav class="ml-auto">
+                <b-nav-form>
+                    <SearchField :searchFieldInMenu="true" />
+                </b-nav-form>
+            </b-navbar-nav>
         </b-container>
     </b-navbar>
+    <br>
     <b-container>
-        <h5 class="mt-4 mb-2">Account data</h5>
+        <b-breadcrumb class="" :items="breadcrumbs"></b-breadcrumb>
+        <h5 class="mt-3 mb-2">Account data</h5>
         <b-card no-body class="table-margin-hack">
             <b-table responsive thead-class="hidden_header" class="my-0 py-0" :items="accountDataProps">
                 <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
             </b-table>
         </b-card>
-        <h5 class="mt-4 mb-2">Account balances</h5>
+        <h5 class="mt-3 mb-2">Account balances</h5>
         <img 
             src="./assets/loading.gif" 
             width="100" 
@@ -26,7 +33,7 @@
                 <template v-slot:cell(value)="data"><span v-html="data.item.value" /></template>
             </b-table>
         </b-card>
-        <h5 class="mt-4 mb-2">Account transactions</h5>
+        <h5 class="mt-3 mb-2">Account transactions</h5>
         <img 
             src="./assets/loading.gif" 
             width="100" 
@@ -55,7 +62,7 @@
                 </b-table>
             </b-card>
             <b-pagination 
-                v-if="this.pagesOfTransactions[2].length"
+                v-if="this.pagesOfTransactions[2] && this.pagesOfTransactions[2].length"
                 class="mt-2 mb-2"
                 v-model="currentPage" 
                 :per-page="rowsPerPage" 
@@ -80,6 +87,12 @@ import timeConstants from './timeConstants';
 import { WalletDecorator } from './WalletDecorator';
 import { readableEther } from './utils';
 
+import SearchField from './SearchField.vue';
+
+const components = {
+    SearchField,
+};
+
 export default {
     name: 'Account',
     data: () => ({
@@ -100,18 +113,18 @@ export default {
         this.client = new WalletDecorator(this.address, this.fraProvider);
 
         this.update();  
-        // this.intervalHandle = setInterval(() => {
-        //     if (this.currentPage == 1) {
-        //         this.update();
-        //     }
-        // }, timeConstants.accountUpdate);
+        this.intervalHandle = setInterval(async () => {
+            if (this.currentPage == 1) {
+                this.pagesOfTransactions = {};
+                await this.update();
+            }
+        }, timeConstants.accountUpdate);
     },
-    // destroyed() {
-    //     clearInterval(this.intervalHandle);
-    // },
+    destroyed() {
+        clearInterval(this.intervalHandle);
+    },
     methods: {
         onRowClicked(item) {
-            console.log(item);
             this.$parent.$router.push('/transactions/' + item.hash);
         },
         async update() {
@@ -174,11 +187,21 @@ export default {
         balancesProps() {
             return this.balances;
         },
+        breadcrumbs() {
+            return [
+                {
+                    text: 'Home',
+                    to: '/'
+                },
+                {
+                    text: 'Account '+this.address,
+                    active: true
+                },
+            ];
+        },
         transactionProps() {
             return this.transactions
                 .map(tx => {
-                    console.log('tx', tx);
-
                     let TxnHash = `<code>
                         <a href="/transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
                             ${tx.data.hash.slice(0, 8)}..${tx.data.hash.slice(-8)}
@@ -193,20 +216,27 @@ export default {
                         = tx.data.type == 'Withdraw' ? `${this.blockchain_explorer_address}/${tx.data.to}`
                         : `/accounts/${tx.data.to}`;
 
+                    let target_from
+                        = tx.data.type == 'Deposit' ? `target="_blank" rel="noopener noreferrer"`
+                        : '';
+
+                    let target_to
+                        = tx.data.type == 'Withdraw' ? `target="_blank" rel="noopener noreferrer"`
+                        : '';
+
                     let From = `<code>
-                        <a href="${link_from}" target="_blank" rel="noopener noreferrer">
+                        <a href="${link_from}" ${target_from}>
                             ${tx.data.from.slice(0, 8)}..${tx.data.from.slice(-8)}
                         </a>
                     </code>`;
 
                     let To = `<code>
-                        <a href="${link_to}" target="_blank" rel="noopener noreferrer">
+                        <a href="${link_to}" ${target_to}>
                             ${tx.data.to.slice(0, 8)}..${tx.data.to.slice(-8)}
                         </a>
                     </code>`;
 
                     let Type = `<b>${tx.data.type}</b>`;
-
                     let Amount = `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
 
                     return {
@@ -226,6 +256,7 @@ export default {
                  : [];
         }
     },
+    components,
 };
 </script>
 
