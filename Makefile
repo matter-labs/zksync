@@ -5,6 +5,7 @@ export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(FRANKLIN_ENV)
 
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
+export CI_DOCKER_IMAGE ?= matterlabs/ci
 
 # Getting started
 
@@ -89,6 +90,12 @@ image-nginx: dist-client dist-explorer
 
 push-image-nginx: image-nginx
 	docker push "${NGINX_DOCKER_IMAGE}"
+
+image-ci:
+	@docker build -t "${CI_DOCKER_IMAGE}" -f ./docker/ci/Dockerfile .
+
+push-image-ci:
+	docker push "${CI_DOCKER_IMAGE}"
 
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
