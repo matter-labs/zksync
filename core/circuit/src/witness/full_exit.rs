@@ -308,12 +308,14 @@ mod test {
     };
     use models::merkle_tree::hasher::Hasher;
     use models::merkle_tree::PedersenHasher;
-    use models::node::tx::PackedPublicKey;
+    use models::node::tx::{PackedPublicKey, TxSignature};
+    use models::node::Fs;
     use models::params as franklin_constants;
     use rand::{Rng, SeedableRng, XorShiftRng};
+
     #[test]
     #[ignore]
-    fn test_full_exit_franklin_sucess() {
+    fn test_full_exit_franklin_success() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let validator_address_number = 7;
@@ -325,7 +327,7 @@ mod test {
         let mut tree: CircuitAccountTree =
             CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
 
-        let sender_sk = PrivateKey::<Bn256>(rng.gen());
+        let sender_sk = PrivateKey::<Bn256>(Fs::from_str("5").unwrap());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
         let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
         let (sender_x, sender_y) = sender_pk.0.into_xy();
@@ -353,7 +355,7 @@ mod test {
         account_address %= tree.capacity();
         let token: u32 = 2;
         let token_fe = Fr::from_str(&token.to_string()).unwrap();
-        let ethereum_key = Fr::from_str("124").unwrap();
+        let ethereum_key = Fr::from_str("0").unwrap();
 
         let sender_balance_before: u128 = 2000;
 
@@ -376,8 +378,7 @@ mod test {
         };
 
         let packed_public_key = PackedPublicKey(sender_pk.clone());
-        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-        packed_public_key_bytes.reverse();
+        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
         let _signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
             .iter()
             .map(|x| Some(*x))
@@ -405,82 +406,43 @@ mod test {
             &sender_leaf_initial.nonce,
             franklin_constants::NONCE_BIT_WIDTH,
         );
+        let message_bytes = be_bit_vector_into_bytes(&sig_bits);
 
-        println!("sig_bits outside: ");
-        for (i, bit) in sig_bits.iter().enumerate() {
-            if i % 64 == 0 {
-                println!()
-            } else if i % 8 == 0 {
-                print!(" ")
-            };
-            let numb = {
-                if *bit {
-                    1
-                } else {
-                    0
-                }
-            };
-            print!("{}", numb);
-        }
-        println!();
         tree.insert(account_address, sender_leaf_initial);
 
-        sig_bits.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
-        println!(
-            "outside generation after resize: {}",
-            hex::encode(be_bit_vector_into_bytes(&sig_bits))
-        );
+        println!("message bytes: {}", hex::encode(&message_bytes));
 
-        let sig_msg = phasher.hash_bits(sig_bits.clone());
-
-        let mut sig_bits_to_check: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
-        sig_bits_to_check.reverse();
-        sig_bits_to_check.resize(256, false);
-        println!(
-            "outside generation: {}",
-            hex::encode(be_bit_vector_into_bytes(&sig_bits_to_check))
-        );
-        let mut message_bytes = vec![];
-        let byte_chunks = sig_bits_to_check.chunks(8);
-        for byte_chunk in byte_chunks {
-            let mut byte = 0u8;
-            for (i, bit) in byte_chunk.iter().enumerate() {
-                if *bit {
-                    byte |= 1 << i;
-                }
-            }
-            message_bytes.push(byte);
-        }
-
-        let (signature, first_sig_part, second_sig_part, third_sig_part) =
-            generate_sig_data(&sig_bits, &phasher, &sender_sk, params);
-
-        // move to func
-        let r_x_bit = signature.r_packed[0].unwrap();
-
-        let mut r_y_bits: Vec<bool> = signature.r_packed[1..].iter().map(|x| x.unwrap()).collect();
-        r_y_bits.reverse();
-        let r_y = le_bit_vector_into_field_element(&r_y_bits);
-
-        let mut s_bits: Vec<bool> = signature.s.iter().map(|x| x.unwrap()).collect();
-        s_bits.reverse();
-
-        let s: <Bn256 as JubjubEngine>::Fs = le_bit_vector_into_field_element(&s_bits);
-        let r = edwards::Point::get_for_y(r_y, r_x_bit, params);
-
-        let (is_sig_correct, _) = match r {
-            None => (false, None),
-            Some(r) => {
-                let sig = Signature { r, s };
-                let is_valid_signature =
-                    sender_pk.verify_musig_pedersen(&message_bytes, &sig, p_g, params);
-                (is_valid_signature, Some(sig))
-            }
+        let signature = TxSignature::sign_musig_pedersen(&sender_sk, &message_bytes);
+        let (r_bytes, s_bytes) = {
+            let sign_bytes = signature.sign.serialize_packed().unwrap();
+            let (r_slice, s_slice) = sign_bytes.split_at(32);
+            (r_slice.to_vec(), s_slice.to_vec())
         };
-        // println!("reconstructed_x={:?} reconstructed_y={:?}", reconstructed_signature.unwrap().into_xy(), reconstructed_signature.unwrap().into_xy().1);
-        assert_eq!(is_sig_correct, true);
+        let is_sig_correct = signature.verify_musig_pedersen(&message_bytes).is_some();
 
-        let signature_data = signature.clone();
+        let r_bits: Vec<_> = bytes_into_be_bits(&r_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
+        let s_bits: Vec<_> = bytes_into_be_bits(&s_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
+        let signature_data = SignatureData {
+            r_packed: r_bits,
+            s: s_bits,
+        };
+
+        let (first_sig_msg, second_sig_msg, third_sig_msg) =
+            generate_sig_witness(&sig_bits, &phasher, &params);
+        let signer_packed_key_bytes = signature.pub_key.serialize_packed().unwrap();
+        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&signer_packed_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
+
+        assert!(is_sig_correct, "Signature is incorrect");
+
         let full_exit_witness = apply_full_exit(
             &mut tree,
             &FullExitData {
@@ -491,19 +453,12 @@ mod test {
             },
             is_sig_correct,
         );
-        let packed_public_key = PackedPublicKey(sender_pk);
-        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-        packed_public_key_bytes.reverse();
-        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
-            .iter()
-            .map(|x| Some(*x))
-            .collect();
 
         let operations = calculate_full_exit_operations_from_witness(
             &full_exit_witness,
-            &first_sig_part,
-            &second_sig_part,
-            &third_sig_part,
+            &first_sig_msg,
+            &second_sig_msg,
+            &third_sig_msg,
             &signature_data,
             &signer_packed_key_bits,
         );
@@ -512,37 +467,6 @@ mod test {
             apply_fee(&mut tree, validator_address_number, 0, 0);
 
         let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
-        println!("pub_data outside: ");
-        for (i, bit) in full_exit_witness
-            .get_pubdata(
-                &signature_data,
-                &bytes_into_be_bits(&packed_public_key_bytes),
-            )
-            .iter()
-            .enumerate()
-        {
-            if i % 64 == 0 {
-                println!()
-            } else if i % 8 == 0 {
-                print!(" ")
-            };
-            let numb = {
-                if *bit {
-                    1
-                } else {
-                    0
-                }
-            };
-            print!("{}", numb);
-        }
-        println!();
-        println!(
-            "full_exit_witness.before_root: {:?},",
-            full_exit_witness.before_root
-        );
-        println!("root_after_fee: {},", root_after_fee);
-        println!("validator_address: {},", validator_address);
-        println!("block_number: {},", block_number);
         let public_data_commitment = public_data_commitment::<Bn256>(
             &full_exit_witness.get_pubdata(
                 &signature_data,
