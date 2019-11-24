@@ -212,13 +212,7 @@ endif
 
 ifeq (dev,$(FRANKLIN_ENV))
 stop: confirm_action
-	@kubectl delete deployments --selector=app=dev-server
-	@kubectl delete deployments --selector=app=dev-prover
-	@kubectl delete deployments --selector=app=dev-nginx
-	@kubectl delete svc --selector=app=dev-server
-	@kubectl delete svc --selector=app=dev-nginx
-	@kubectl delete -f ./etc/kube/minikube/postgres.yaml
-	@kubectl delete -f ./etc/kube/minikube/geth.yaml
+	@echo "DO NOTHING"
 else ifeq (ci,$(FRANKLIN_ENV))
 stop:
 else

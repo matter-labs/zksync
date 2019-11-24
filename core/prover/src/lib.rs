@@ -430,7 +430,7 @@ impl BabyProver {
                         pub_data.extend(close_account_witness.get_pubdata());
                     }
                     FranklinOp::FullExit(full_exit) => {
-                        let is_sig_correct = full_exit.priority_op.verify_signature().is_some();
+                        let is_sig_correct = full_exit.account_data.is_some();
                         let full_exit_witness =
                             apply_full_exit_tx(&mut self.accounts_tree, &full_exit, is_sig_correct);
 

@@ -990,7 +990,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         );
         base_valid_flags.push(is_pubdata_chunk_correct);
 
-        // verify correct tx_co     de
+        // verify correct tx_code
         let is_full_exit = Boolean::from(Expression::equals(
             cs.namespace(|| "is_full_exit"),
             &chunk_data.tx_type.get_number(),
@@ -1055,7 +1055,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "update cur nonce"),
             updated_nonce,
             &cur.account.nonce,
-            &lhs_valid,
+            &lhs_valid_signed,
         )?;
 
         Ok(tx_valid)

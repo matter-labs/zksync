@@ -122,7 +122,11 @@ pub fn apply_full_exit_tx(
 ) -> FullExitWitness<Bn256> {
     let full_exit = FullExitData {
         token: u32::from(full_exit.priority_op.token),
-        account_address: full_exit.account_data.clone().unwrap().0,
+        account_address: full_exit
+            .account_data
+            .as_ref()
+            .map(|(id, _)| *id)
+            .unwrap_or(0),
         ethereum_key: Fr::from_hex(&format!("{:x}", &full_exit.priority_op.eth_address)).unwrap(),
         pub_nonce: Fr::from_str(&full_exit.priority_op.nonce.to_string()).unwrap(),
     };
@@ -179,9 +183,7 @@ pub fn apply_full_exit(
                 tree,
                 full_exit.account_address,
                 full_exit.token,
-                |acc| {
-                    acc.nonce.add_assign(&Fr::from_str("1").unwrap());
-                },
+                |_| {},
                 |_| {},
             )
         }

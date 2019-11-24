@@ -25,7 +25,7 @@ use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
-use franklin_crypto::eddsa::{PublicKey, Signature};
+use franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use web3::types::Address;
@@ -339,6 +339,44 @@ impl TxSignature {
             None
         }
     }
+
+    pub fn sign_musig_pedersen(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
+        let hashed_msg = pedersen_hash_tx_msg(msg);
+        let signature = pk.musig_pedersen_sign(
+            &hashed_msg,
+            &mut rand::thread_rng(),
+            FixedGenerators::SpendingKeyGenerator,
+            &JUBJUB_PARAMS,
+        );
+
+        Self {
+            pub_key: PackedPublicKey(PublicKey::from_private(
+                pk,
+                FixedGenerators::SpendingKeyGenerator,
+                &JUBJUB_PARAMS,
+            )),
+            sign: PackedSignature(signature),
+        }
+    }
+
+    pub fn sign_musig_sha256(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
+        let hashed_msg = pedersen_hash_tx_msg(msg);
+        let signature = pk.musig_sha256_sign(
+            &hashed_msg,
+            &mut rand::thread_rng(),
+            FixedGenerators::SpendingKeyGenerator,
+            &JUBJUB_PARAMS,
+        );
+
+        Self {
+            pub_key: PackedPublicKey(PublicKey::from_private(
+                pk,
+                FixedGenerators::SpendingKeyGenerator,
+                &JUBJUB_PARAMS,
+            )),
+            sign: PackedSignature(signature),
+        }
+    }
 }
 
 impl std::fmt::Debug for TxSignature {
@@ -453,5 +491,71 @@ impl<'de> Deserialize<'de> for PackedSignature {
             let bytes = hex::decode(&string).map_err(|e| Error::custom(e.to_string()))?;
             PackedSignature::deserialize_packed(&bytes).map_err(|e| Error::custom(e.to_string()))
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rand::{Rng, SeedableRng, XorShiftRng};
+
+    fn gen_pk_and_msg() -> (PrivateKey<Engine>, Vec<Vec<u8>>) {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+
+        let pk = PrivateKey(rng.gen());
+
+        let mut messages = Vec::new();
+        messages.push(Vec::<u8>::new());
+        messages.push("hello world".as_bytes().to_vec());
+
+        (pk, messages)
+    }
+
+    #[test]
+    fn test_musig_pedersen_signing_verification() {
+        let (pk, messages) = gen_pk_and_msg();
+
+        for msg in &messages {
+            let signature = TxSignature::sign_musig_pedersen(&pk, msg);
+
+            if let Some(sign_pub_key) = signature.verify_musig_pedersen(msg) {
+                let pub_key = PublicKey::from_private(
+                    &pk,
+                    FixedGenerators::SpendingKeyGenerator,
+                    &JUBJUB_PARAMS,
+                );
+                assert!(
+                    sign_pub_key.0.eq(&pub_key.0),
+                    "Signature pub key is wrong, msg: {}",
+                    hex::encode(&msg)
+                );
+            } else {
+                panic!("Signature is incorrect, msg: {}", hex::encode(&msg));
+            }
+        }
+    }
+
+    #[test]
+    fn test_musig_sha256_signing_verification() {
+        let (pk, messages) = gen_pk_and_msg();
+
+        for msg in &messages {
+            let signature = TxSignature::sign_musig_sha256(&pk, msg);
+
+            if let Some(sign_pub_key) = signature.verify_musig_sha256(msg) {
+                let pub_key = PublicKey::from_private(
+                    &pk,
+                    FixedGenerators::SpendingKeyGenerator,
+                    &JUBJUB_PARAMS,
+                );
+                assert!(
+                    sign_pub_key.0.eq(&pub_key.0),
+                    "Signature pub key is wrong, msg: {}",
+                    hex::encode(&msg)
+                );
+            } else {
+                panic!("Signature is incorrect, msg: {}", hex::encode(&msg));
+            }
+        }
     }
 }

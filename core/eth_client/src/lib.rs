@@ -40,9 +40,9 @@ impl<T: Transport> ETHClient<T> {
         gas_price_factor: usize,
     ) -> Self {
         Self {
-            sender_account: H160::from_str(&operator_eth_addr).expect("operator eth address"),
+            sender_account: H160::from_str(&operator_eth_addr[2..]).expect("operator eth address"),
             private_key: H256::from_str(&operator_pk).expect("private key must be correct"),
-            contract_addr: H160::from_str(&contract_eth_addr)
+            contract_addr: H160::from_str(&contract_eth_addr[2..])
                 .expect("contract address must be correct"),
             chain_id,
             contract: ethabi::Contract::load(contract_abi.as_bytes())

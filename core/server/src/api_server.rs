@@ -675,12 +675,13 @@ pub fn start_api_server(
                 network_status: SharedNetworkStatus::default(),
             };
 
+            let sys = actix::System::new("api-server");
+
             let bind_to = format!("{}:{}", bind_address, bind_port);
             start_server(state.clone(), bind_to.clone());
             info!("Started http server at {}", &bind_to);
             start_status_interval(state);
 
-            let sys = actix::System::new("api-server");
             sys.run();
         })
         .expect("Api server thread");

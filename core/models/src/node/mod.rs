@@ -2,6 +2,7 @@ use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use super::params;
 use super::primitives::{pack_as_float, u128_to_bigdecimal, unpack_float};
 use bigdecimal::BigDecimal;
+use franklin_crypto::jubjub::JubjubEngine;
 use pairing::bn256;
 
 pub mod account;
@@ -23,6 +24,7 @@ pub use self::tx::{Close, FranklinTx, Transfer, Withdraw};
 
 pub type Engine = bn256::Bn256;
 pub type Fr = bn256::Fr;
+pub type Fs = <Engine as JubjubEngine>::Fs;
 
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
