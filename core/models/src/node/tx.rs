@@ -506,7 +506,7 @@ mod test {
 
         let mut messages = Vec::new();
         messages.push(Vec::<u8>::new());
-        messages.push("hello world".as_bytes().to_vec());
+        messages.push(b"hello world".to_vec());
 
         (pk, messages)
     }
