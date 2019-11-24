@@ -24,7 +24,7 @@ use web3::transports::Http;
 use web3::types::{Transaction, TransactionId, TransactionReceipt, H256, U256};
 use web3::Transport;
 // Workspace uses
-use crate::ThreadPanicNotify;
+use crate::{ConfigurationOptions, ThreadPanicNotify};
 use eth_client::{ETHClient, SignedCallResult};
 use models::abi::FRANKLIN_CONTRACT;
 use models::{Action, Operation};
@@ -466,32 +466,19 @@ impl<T: Transport> ETHSender<T> {
     }
 }
 
-pub struct StartEthSenderOptions {
-    pub web3_url: String,
-    pub operator_eth_addr: String,
-    pub operator_pk: String,
-    pub contract_eth_addr: String,
-    pub chain_id: u8,
-    pub gas_price_factor: usize,
-}
-
 pub fn start_eth_sender(
     pool: ConnectionPool,
     panic_notify: Sender<bool>,
-    opts: StartEthSenderOptions,
+    config_options: ConfigurationOptions,
 ) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
-    non_empty_or_panic("Web3 URL", &opts.web3_url);
-    non_empty_or_panic("Operator Eth Address", &opts.operator_eth_addr);
-    non_empty_or_panic("Operator Private Key", &opts.operator_pk);
-    non_empty_or_panic("Contract Eth Address", &opts.contract_eth_addr);
 
     std::thread::Builder::new()
         .name("eth_sender".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
             let (_event_loop, transport) =
-                Http::new(&opts.web3_url).expect("failed to start web3 transport");
+                Http::new(&config_options.web3_url).expect("failed to start web3 transport");
 
             let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
                 .unwrap()
@@ -501,11 +488,11 @@ pub fn start_eth_sender(
             let eth_client = ETHClient::new(
                 transport,
                 abi_string,
-                opts.operator_eth_addr,
-                opts.operator_pk,
-                opts.contract_eth_addr,
-                opts.chain_id,
-                opts.gas_price_factor,
+                config_options.operator_eth_addr,
+                config_options.operator_private_key,
+                config_options.contract_eth_addr,
+                config_options.chain_id,
+                config_options.gas_price_factor,
             );
 
             let mut eth_sender = ETHSender::new(pool, eth_client);
@@ -514,10 +501,4 @@ pub fn start_eth_sender(
         .expect("Eth sender thread");
 
     tx_for_eth
-}
-
-fn non_empty_or_panic(name: &str, v: &str) {
-    if v.is_empty() {
-        panic!("{} required", name);
-    }
 }
