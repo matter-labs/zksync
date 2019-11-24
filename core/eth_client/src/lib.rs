@@ -2,7 +2,6 @@
 extern crate serde_derive;
 
 use futures::Future;
-use std::str::FromStr;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::types::{Address, BlockNumber, Bytes};
@@ -33,17 +32,16 @@ impl<T: Transport> ETHClient<T> {
     pub fn new(
         transport: T,
         contract_abi: String,
-        operator_eth_addr: String,
-        operator_pk: String,
-        contract_eth_addr: String,
+        operator_eth_addr: H160,
+        operator_pk: H256,
+        contract_eth_addr: H160,
         chain_id: u8,
         gas_price_factor: usize,
     ) -> Self {
         Self {
-            sender_account: H160::from_str(&operator_eth_addr[2..]).expect("operator eth address"),
-            private_key: H256::from_str(&operator_pk).expect("private key must be correct"),
-            contract_addr: H160::from_str(&contract_eth_addr[2..])
-                .expect("contract address must be correct"),
+            sender_account: operator_eth_addr,
+            private_key: operator_pk,
+            contract_addr: contract_eth_addr,
             chain_id,
             contract: ethabi::Contract::load(contract_abi.as_bytes())
                 .expect("contract must be loaded correctly"),
