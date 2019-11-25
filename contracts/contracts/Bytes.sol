@@ -356,4 +356,31 @@ library Bytes {
         return tempBytes;
     }
 
+    /// @notice Parses 5 bits of exponent base 10 and 11 bits of mantissa
+    /// @notice there are no overflow checks here cause maximum float value < UINT128_MAX
+    /// @param _float Float to parse
+    function parseFloat(uint16 _float) public pure returns (uint128 scaledValue) {
+        uint128 exponent = 0;
+        uint128 powerOfTwo = 1;
+        
+        for (uint256 i = 0; i < 5; i++) {
+            if (_float & (1 << (15 - i)) > 0) {
+                exponent += powerOfTwo;
+            }
+            powerOfTwo = powerOfTwo * 2;
+        }
+        exponent = uint128(10) ** exponent;
+
+        uint128 mantissa = 0;
+        powerOfTwo = 1;
+
+        for (uint256 i = 0; i < 11; i++) {
+            if (_float & (1 << (10 - i)) > 0) {
+                mantissa += powerOfTwo;
+            }
+            powerOfTwo = powerOfTwo * 2;
+        }
+        return exponent * mantissa;
+    }
+
 }

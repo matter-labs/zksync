@@ -4,7 +4,6 @@ import "./IERC20.sol";
 import "./BlsOperations.sol";
 import "./SwiftExits.sol";
 import "./Franklin.sol";
-import "./SignaturesVerifier.sol";
 
 /// @title Governance Contract
 /// @author Matter Labs
@@ -14,7 +13,13 @@ contract Governance {
     uint256 constant FREEZE_TIME = 10000;
     
     /// @notice Validator-creator fee coefficient
-    uint256 constant VALIDATOR_CREATOR_FEE_COEFF = 10;
+    uint256 constant VALIDATOR_CREATOR_FEE_COEFF = 5;
+
+    /// @notice Validators fee coefficient
+    uint256 constant VALIDATORS_SE_FEE_COEFF = 5;
+
+    /// @notice Swift exit fee coefficient
+    uint256 constant SWIFT_EXIT_FEE_COEFF = 15;
 
     /// @notice Rollup contract, contains user funds
     Franklin rollup;
@@ -282,14 +287,12 @@ contract Governance {
         validatorsInfo[_address].isActive = _active;
     }
 
-    /// @notice Sends the swift exit request, signed by user and validators, to SwiftExits contract,
+    /// @notice Sends the swift exit request, signed by validators, to SwiftExits contract,
     /// @notice borrows tokens for it from validators, freezes tokens on rollup contract
-    /// @param _swiftExit Signed swift exit data: block number, onchain op number, acc number, token id, token amount, fee amount, recipient, author
-    /// @param _userSignature User signature
+    /// @param _swiftExit Signed swift exit data: block number, onchain op number, acc number, token id, token amount, fee amount, recipient
     /// @param _signersSignature Aggregated validators signature
     function createSwiftExitRequest(
         bytes memory _swiftExit,
-        bytes memory _userSignature,
         bytes memory _signersSignature,
         uint16 _signersBitmask
     ) external {
@@ -307,8 +310,6 @@ contract Governance {
         // tokenAmount Token amount
         // feeAmount Fee amount in specified tokens
         // recipient Withdraw operation recipient
-        // owner Withdraw operation owner
-        // swiftExitFee Swift exit fee for validators, signed by user
         // supplyAmount Validators supplied amount to fulfill this requests
         (
             uint32 blockNumber,
@@ -318,8 +319,6 @@ contract Governance {
             uint256 tokenAmount,
             uint16 feeAmount,
             address recipient,
-            address owner,
-            uint256 swiftExitFee,
             uint256 supplyAmount
         ) = parseSwiftExit(_swiftExit);
 
@@ -327,29 +326,26 @@ contract Governance {
 
         require(
             tokenAmount > 0,
-            "gect12"
-        ); // "gect12" - token amount must be > 0
+            "gect11"
+        ); // "gect11" - token amount must be > 0
 
         require(
             supplyAmount > 0,
+            "gect12"
+        ); // "gect12" - supply amount must be > 0
+
+        uint256 swiftExitFee = Bytes.parseFloat(feeAmount);
+
+        require(
+            swiftExitFee == tokenAmount * SWIFT_EXIT_FEE_COEFF / 100,
             "gect13"
-        ); // "gect13" - supply amount must be > 0
-
-        require(
-            swiftExitFee > 0,
-            "gect14"
-        ); // "gect14" - fees must be > 0
-
-        require(
-            tokenAmount > swiftExitFee,
-            "ssat15"
-        ); // "ssat15" - amount must be > fees
+        ); // "gect13" - fees must be == amount * fee coeff
 
         // Check that there are enouth free tokens on contract
         require(
             (2 * totalSupply / 3) - totalLended >= supplyAmount,
-            "gect16"
-        ); // "gect16" - not enouth amount
+            "gect14"
+        ); // "gect14" - not enouth amount
 
         // Check that sender exists in bitmask and verify validators signature
         require(
@@ -359,30 +355,24 @@ contract Governance {
                 _signersBitmask,
                 uint256(keccak256(_swiftExit))
             ),
-            "gect17"
-        ); // "gect17" - wrong signature or validator-sender is not in signers bitmask
+            "gect15"
+        ); // "gect15" - wrong signature or validator-sender is not in signers bitmask
         
         // Send tokens to swiftExits
         require(
             IERC20(matterTokenAddress).transfer(address(swiftExits), supplyAmount),
-            "gect18"
-        ); // gect18 - token transfer out failed
+            "gect16"
+        ); // gect16 - token transfer out failed
 
         // Increase total lended balance
         totalLended += supplyAmount;
 
-        // Freeze tokenAmount on Rollup contract for recipient
+        // Freeze tokenAmount with validators fees on Rollup contract for recipient
         rollup.freezeFunds(
             blockNumber,
-            onchainOpNumber,
-            accNumber,
             tokenId,
-            tokenAmount,
-            feeAmount,
-            recipient,
-            owner,
-            swiftExitFee,
-            _userSignature
+            tokenAmount + swiftExitFee * (VALIDATORS_SE_FEE_COEFF + VALIDATOR_CREATOR_FEE_COEFF) / SWIFT_EXIT_FEE_COEFF,
+            recipient
         );
 
         // Save the swift exit on SwiftExits contract
@@ -394,8 +384,6 @@ contract Governance {
             tokenAmount,
             feeAmount,
             recipient,
-            owner,
-            swiftExitFee,
             supplyAmount
         );
     }
@@ -419,12 +407,10 @@ contract Governance {
         uint128 tokenAmount,
         uint16 feeAmount,
         address recipient,
-        address owner,
-        uint256 swiftExitFee,
         uint256 supplyAmount
     ) {
         require(
-            _swiftExit.length == 139,
+            _swiftExit.length == 87,
             "gept11"
         ); // gept11 - wrong swift exit length
 
@@ -435,8 +421,6 @@ contract Governance {
         uint8 tokenAmountBytesLen = 16;
         uint8 feeAmountBytesLen = 2;
         uint8 recipientBytesLen = 20;
-        uint8 ownerBytesLen = 20;
-        uint8 swiftExitFeeBytesLen = 32;
         uint8 supplyAmountBytesLen = 32;
 
         bytes memory blockNumberBytes = new bytes(blockNumberBytesLen);
@@ -496,37 +480,6 @@ contract Governance {
         }
         recipient = Bytes.bytesToAddress(recipientBytes);
 
-        bytes memory ownerBytes = new bytes(ownerBytesLen);
-        for (uint8 i = 0; i < ownerBytesLen; ++i) {
-            ownerBytes[i] = _swiftExit[
-                blockNumberBytesLen +
-                onchainOpNumberBytesLen +
-                accNumberBytesLen +
-                tokenIdBytesLen +
-                tokenAmountBytesLen +
-                feeAmountBytesLen +
-                recipientBytesLen +
-                i
-            ];
-        }
-        owner = Bytes.bytesToAddress(ownerBytes);
-
-        bytes memory swiftExitFeeBytes = new bytes(swiftExitFeeBytesLen);
-        for (uint8 i = 0; i < swiftExitFeeBytesLen; ++i) {
-            swiftExitFeeBytes[i] = _swiftExit[
-                blockNumberBytesLen +
-                onchainOpNumberBytesLen +
-                accNumberBytesLen +
-                tokenIdBytesLen +
-                tokenAmountBytesLen +
-                feeAmountBytesLen +
-                recipientBytesLen +
-                ownerBytesLen +
-                i
-            ];
-        }
-        swiftExitFee = Bytes.bytesToUInt256(swiftExitFeeBytes);
-
         bytes memory supplyAmountBytes = new bytes(supplyAmountBytesLen);
         for (uint8 i = 0; i < supplyAmountBytesLen; ++i) {
             supplyAmountBytes[i] = _swiftExit[
@@ -537,33 +490,10 @@ contract Governance {
                 tokenAmountBytesLen +
                 feeAmountBytesLen +
                 recipientBytesLen +
-                ownerBytesLen +
-                swiftExitFeeBytesLen +
                 i
             ];
         }
         supplyAmount = Bytes.bytesToUInt256(supplyAmountBytes);
-    }
-
-    /// @notice Returns validators aggregated pubkey and their count for specified validators bitmask
-    /// @param _bitmask Validators bitmask
-    function getValidatorsAggrPubkey(uint16 _bitmask) internal view returns (
-        BlsOperations.G2Point memory aggrPubkey,
-        uint16 signersCount
-    ) {
-        // Go into a loop for totalValidators
-        for(uint8 i = 0; i < totalValidators; i++) {
-            // Check that validator exists in bitmask
-            if( (bitmask >> i) & 1 > 0 ) {
-                address addr = validators[i];
-                // Check that validator is active
-                requireActiveValidator(addr);
-                // Get her pubkey add it to aggregated pubkey
-                BlsOperations.G2Point memory pubkey = validatorsInfo[addr].pubkey;
-                aggrPubkey = BlsOperations.addG2(aggrPubkey, pubkey);
-                signersCount++;
-            }
-        }
     }
 
     /// @notice Verifies sender presence in bitmask and verifies aggregated bls signature
@@ -600,20 +530,67 @@ contract Governance {
             "geve12"
         ); // geve12 - not enouth validators count
 
-        return SignaturesVerifier.verifyValidatorsSignature(
+        return verifyValidatorsSignature(
             aggrPubkey,
             _aggrSignature,
             _messageHash
         );
     }
 
+    /// @notice Returns validators aggregated pubkey and their count for specified validators bitmask
+    /// @param _bitmask Validators bitmask
+    function getValidatorsAggrPubkey(uint16 _bitmask) internal view returns (
+        BlsOperations.G2Point memory aggrPubkey,
+        uint16 signersCount
+    ) {
+        // Go into a loop for totalValidators
+        for(uint8 i = 0; i < totalValidators; i++) {
+            // Check that validator exists in bitmask
+            if( (bitmask >> i) & 1 > 0 ) {
+                address addr = validators[i];
+                // Check that validator is active
+                requireActiveValidator(addr);
+                // Get her pubkey add it to aggregated pubkey
+                BlsOperations.G2Point memory pubkey = validatorsInfo[addr].pubkey;
+                aggrPubkey = BlsOperations.addG2(aggrPubkey, pubkey);
+                signersCount++;
+            }
+        }
+    }
+
+    /// @notice Verifies validators signature
+    /// @param _aggrPubkey Validators aggregated pubkey
+    /// @param _signature Validators aggregated signature
+    /// @param _messageHash Message hash
+    function verifyValidatorsSignature(
+        BlsOperations.G2Point memory _aggrPubkey,
+        bytes memory _signature,
+        uint256 _messageHash
+    ) internal view returns (bool) {
+        require(
+            _signature.length == 64,
+            "srve21"
+        ); // srve21 - wrong validators signature length
+        bytes memory aggrSignatureXBytes = new bytes(32);
+        for (uint8 i = 0; i < 32; ++i) {
+            aggrSignatureXBytes[i] = _signature[i];
+        }
+        uint256 aggrSignatureX = Bytes.bytesToUInt256(aggrSignatureXBytes);
+
+        bytes memory aggrSignatureYBytes = new bytes(32);
+        for (uint8 i = 0; i < 32; ++i) {
+            aggrSignatureYBytes[i] = _signature[32 + i];
+        }
+        uint256 aggrSignatureY = Bytes.bytesToUInt256(aggrSignatureYBytes);
+        
+        BlsOperations.G1Point memory mpoint = BlsOperations.messageHashToG1(_messageHash);
+        BlsOperations.G1Point memory signature = BlsOperations.G1Point(aggrSignatureX, aggrSignatureY);
+        return BlsOperations.pairing(mpoint, _aggrPubkey, signature, BlsOperations.negate(BlsOperations.generatorG2()));
+    }
+
     /// @notice Supplies specified amount of Matter tokens to validator balance
     /// @param _amount Token amount
-    function supplyMatterToken(
-        uint256 _amount
-    )
-        external
-    {
+    function supplyMatterToken(uint256 _amount) external {
         require(
             amount > 0,
             "gesn11"
@@ -685,7 +662,7 @@ contract Governance {
             "gews11"
         ); // gews11 - validator cant withdraw this token yet
 
-        uint256 amount = accumulatedFees[tokenId] * validatorsInfo[msg.sender] / totalSupply;
+        uint256 amount = accumulatedFees[tokenId] * validatorsInfo[msg.sender].supply / totalSupply;
         require(
             amount > 0,
             "gews12"
@@ -719,7 +696,7 @@ contract Governance {
         uint256 _feesAmount,
         address _validatorCreator
     ) external payable {
-        // Can be called only from swift exit contract  
+        // Can be called only from swift exit contract
         require(
             msg.sender == address(swiftExit),
              "gers11"
@@ -756,10 +733,10 @@ contract Governance {
             ); // gers14 - amount must be == 0 and msg.value > 0
 
             // Accumulate validators fees
-            accumulatedFees += msg.value * (1 - VALIDATOR_CREATOR_FEE_COEFF / 100);
+            accumulatedFees += msg.value * VALIDATORS_SE_FEE_COEFF / (VALIDATOR_CREATOR_FEE_COEFF + VALIDATORS_SE_FEE_COEFF);
             
             // Repay fee to validator that created request
-            _validatorCreator.transfer(msg.value * VALIDATOR_CREATOR_FEE_COEFF / 100);
+            _validatorCreator.transfer(msg.value * VALIDATOR_CREATOR_FEE_COEFF / (VALIDATOR_CREATOR_FEE_COEFF + VALIDATORS_SE_FEE_COEFF));
         } else {
             // Token is ERC20
 
@@ -776,11 +753,11 @@ contract Governance {
             ); // gers16 - token transfer in failed
 
             // Accumulate validators fees
-            accumulatedFees += _feesAmount * (1 - VALIDATOR_CREATOR_FEE_COEFF / 100);
+            accumulatedFees += _feesAmount * VALIDATORS_SE_FEE_COEFF / (VALIDATOR_CREATOR_FEE_COEFF + VALIDATORS_SE_FEE_COEFF);
 
             // Repay fee to validator that created request
             require(
-                IERC20(_feesTokenAddress).transfer(_validatorCreator, _feesAmount * VALIDATOR_CREATOR_FEE_COEFF / 100),
+                IERC20(_feesTokenAddress).transfer(_validatorCreator, _feesAmount * VALIDATOR_CREATOR_FEE_COEFF / (VALIDATOR_CREATOR_FEE_COEFF + VALIDATORS_SE_FEE_COEFF)),
                 "gers17"
             ); // gers17 - token transfer out failed
         }

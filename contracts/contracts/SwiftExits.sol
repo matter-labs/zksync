@@ -21,6 +21,15 @@ contract SwiftExits {
     /// @notice Comptroller contract, allows borrow tokens for validators supply
     Comptroller internal comptroller;
 
+    /// @notice Validator-creator fee coefficient
+    uint256 constant VALIDATOR_CREATOR_FEE_COEFF = 5;
+
+    /// @notice Validators fee coefficient
+    uint256 constant VALIDATORS_SE_FEE_COEFF = 5;
+
+    /// @notice Swift exit fee coefficient
+    uint256 constant SWIFT_EXIT_FEE_COEFF = 15;
+
     /// @notice Swift Exits orders by Rollup block number (block number -> order number -> order)
     mapping(uint32 => mapping(uint64 => ExitOrder)) public exitOrders;
     
@@ -34,7 +43,7 @@ contract SwiftExits {
     /// @member onchainOpNumber Withdraw operation number in block
     /// @member opHash Corresponding onchain operation hash
     /// @member tokenId Order (sending/fees) token id
-    /// @member sendingAmount Sending amount to recipient (initial amount minus fees)
+    /// @member sendingAmount Sending amount to recipient
     /// @member recipient Recipient of the withdraw operation
     /// @member validatorsFee Fee for validators that signed request in orders' tokens + Fee for the validator that created request
     /// @member validatorSender Address of the validator that created request (order transaction sender)
@@ -89,8 +98,6 @@ contract SwiftExits {
     /// @param _tokenAmount Token amount (sending+fees)
     /// @param _feeAmount Rollup fee amount in specified tokens, used only to create withdraw op hash
     /// @param _recipient Withdraw operation recipient
-    /// @param _owner Withdraw operation owner (ethereum address)
-    /// @param _swiftExitFee Validators fee for this request
     /// @param _supplyAmount Supplied amount by validators to borrow from Compound / send to recipient
     function addSwiftExit(
         uint32 _blockNumber,
@@ -100,8 +107,6 @@ contract SwiftExits {
         uint256 _tokenAmount,
         uint256 _feeAmount,
         uint256 _recipient,
-        uint256 _owner,
-        uint256 _swiftExitFee,
         uint256 _supplyAmount
     )
         external
@@ -124,14 +129,8 @@ contract SwiftExits {
             "ssat13"
         ); // "ssat13" - order exists
 
-        // Sending amount: token amount minus sum of validators fees for swift exit and transaction cost
-        uint256 sendingAmount = _tokenAmount - _swiftExitFee;
-
-        // Check if tokenAmount is higher than sum of validators fees for swift exit and transaction cost
-        require(
-            sendingAmount > 0,
-            "ssat14"
-        ); // "ssat14" - wrong amount
+        // Calculate fee for validators
+        uint256 validatorsFee = Bytes.parseFloat(_feeAmount) * (VALIDATORS_SE_FEE_COEFF + VALIDATOR_CREATOR_FEE_COEFF) / SWIFT_EXIT_FEE_COEFF);
 
         // Withdraw operation hash - will be used to check correctness of this request (this hash must be equal to corresponding withdraw op hash on Rollup contract)
         uint256 opHash = uint256(keccak256(abi.encodePacked(
@@ -139,28 +138,27 @@ contract SwiftExits {
             _tokenId,
             _tokenAmount,
             _feeAmount,
-            _recipient,
-            _owner
+            _recipient
         )));
         
         // Get matter token id from governance to check if there is need to borrow from Compound (if sending token is also Matter token - no need)
         uint16 matterTokenId = governance.matterTokenId;
         if (_tokenId != matterTokenId) {
             // Borrow needed tokens from compound if token ids arent equal
-            borrowFromCompound(_supplyAmount, tokenId, sendingAmount);
+            borrowFromCompound(_supplyAmount, tokenId, _tokenAmount);
         }
 
         // Send tokens to recipient
-        sendTokensToRecipient(_recipient, _tokenId, sendingAmount);
+        sendTokensToRecipient(_recipient, _tokenId, _tokenAmount);
 
         // Create and save ExitOrder
         ExitOrder order = ExitOrder(
             _onchainOpNumber,
             opHash,
             _tokenId,
-            sendingAmount,
+            _tokenAmount,
             _recipient,
-            _swiftExitFee,
+            validatorsFee,
             tx.origin, // Here tx origin MUST be only validator address, so we can use it
             _supplyAmount
         );
@@ -187,12 +185,20 @@ contract SwiftExits {
         for (uint64 i = 0; i < totalExitOrders[_blockNumber]; i++) {
             // Get exit order by block nubmer and id
             ExitOrder order = exitOrders[_blockNumber][i];
-                
+
+            // Validators fee
+            uint128 validatorsFee = order.validatorsFee * VALIDATORS_SE_FEE_COEFF / (VALIDATORS_SE_FEE_COEFF + VALIDATOR_CREATOR_FEE_COEFF);
+            // Validator sener fee
+            uint128 validatorSenderFee = order.validatorsFee * VALIDATOR_CREATOR_FEE_COEFF / (VALIDATORS_SE_FEE_COEFF + VALIDATOR_CREATOR_FEE_COEFF);
+
             // Defrost funds on rollup and get tokens
             rollup.defrostFunds(
                 order.recipient,
                 order.tokenId,
-                order.sendingAmount + order.validatorsFee
+                order.sendingAmount,
+                validatorsFee,
+                validatorSenderFee,
+                order.validatorSender
             );
 
             // Get real onchain operation hash from Rollup contract
@@ -229,11 +235,10 @@ contract SwiftExits {
                 // Repay borrows and charge fees to validators
                 if (order.tokenId == 0) {
                     // Fees in Ether
-                    governance.repayBorrowWithFees.value(order.validatorsFee)(
+                    governance.repayBorrowWithFees.value(validatorsFee)(
                         order.supplyAmount,
                         address(0),
-                        0,
-                        order.validatorSender
+                        0
                     );
                 } else {
                     // Fees in ERC20
@@ -242,7 +247,7 @@ contract SwiftExits {
                     // Check for enouth allowence value for this token to charge fees
                     uint256 allowence = IERC20(tokenAddress).allowence(address(this), address(governance));
                     // Allowence must be >= validators fee
-                    if (allowence < _order.validatorsFee) {
+                    if (allowence < order.validatorsFee * VALIDATORS_SE_FEE_COEFF / (VALIDATORS_SE_FEE_COEFF + VALIDATOR_CREATOR_FEE_COEFF)) {
                         // If allowence value is not enouth - approve max possible value for this token for repay to Governance contract
                         require(
                             IERC20(tokenAddress).approve(address(governance), 0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff),
@@ -253,8 +258,7 @@ contract SwiftExits {
                     governance.repayBorrowWithFees.value(0)(
                         order.supplyAmount,
                         tokenAddress,
-                        order.validatorsFee,
-                        order.validatorSender
+                        validatorsFee
                     );
                 }
             }

@@ -24,6 +24,15 @@ contract Franklin {
     /// @notice Priority Queue contract. Contains priority requests list
     PriorityQueue internal priorityQueue;
 
+    /// @notice Validator-creator fee coefficient for creating swift exit request
+    uint256 constant VALIDATOR_CREATOR_FEE_COEFF = 5;
+
+    /// @notice Validators fee coefficient for swift exit request sign
+    uint256 constant VALIDATORS_SE_FEE_COEFF = 5;
+
+    /// @notice Swift exit fee total coefficient (fees for circuit + fees for swift exit)
+    uint256 constant SWIFT_EXIT_FEE_COEFF = 15;
+
     /// @notice Token id bytes lengths
     uint8 constant TOKEN_BYTES = 2;
 
@@ -52,7 +61,7 @@ contract Franklin {
     uint8 constant PUBKEY_BYTES = 32;
 
     /// @notice Fee coefficient for priority request transaction
-    uint256 constant FEE_COEFF = 2;
+    uint256 constant PRIORITY_FEE_COEFF = 2;
     
     /// @notice Base gas cost for deposit eth transaction
     uint256 constant BASE_DEPOSIT_ETH_GAS = 179000;
@@ -95,7 +104,6 @@ contract Franklin {
     
     /// @notice Full exit operation length
     uint256 constant FULL_EXIT_LENGTH = 18 * 8;
-
 
     /// @notice Event emitted when a block is committed
     /// @member blockNumber The number of committed block
@@ -274,7 +282,7 @@ contract Franklin {
     function depositETH(bytes calldata _franklinAddr) external payable {
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
-        uint256 fee = FEE_COEFF * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
+        uint256 fee = PRIORITY_FEE_COEFF * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
 
         requireActive();
 
@@ -311,7 +319,7 @@ contract Franklin {
     ) external payable {
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
-        uint256 fee = FEE_COEFF * BASE_DEPOSIT_ERC_GAS * tx.gasprice;
+        uint256 fee = PRIORITY_FEE_COEFF * BASE_DEPOSIT_ERC_GAS * tx.gasprice;
 
         requireActive();
 
@@ -361,7 +369,7 @@ contract Franklin {
     ) external payable {
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
-        uint256 fee = FEE_COEFF * BASE_FULL_EXIT_GAS * tx.gasprice;
+        uint256 fee = PRIORITY_FEE_COEFF * BASE_FULL_EXIT_GAS * tx.gasprice;
         
         uint16 tokenId;
         if (_token == address(0)) {
@@ -733,6 +741,18 @@ contract Franklin {
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
+                // Get fee, if it satisfies the value of swift exits fees than
+                // increase the amount of withdraw by validators fee (total fee is circuit fee and validators fee for swift exit)
+                bytes memory feeBytes = new bytes(FEE_BYTES);
+                for (uint256 i = 0; i < FEE_BYTES; ++i) {
+                    feeBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + i];
+                }
+                uint16 packedFee = Bytes.bytesToUInt16(feeBytes);
+                uint128 fee = Bytes.parseFloat(packedFee);
+                if (amount * SWIFT_EXIT_FEE_COEFF / 100 == fee) {
+                    amount += fee * (VALIDATORS_SE_FEE_COEFF + VALIDATOR_CREATOR_FEE_COEFF) / SWIFT_EXIT_FEE_COEFF;
+                }
+
                 bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
@@ -857,26 +877,14 @@ contract Franklin {
 
     /// @notice Freeze balance for user, if he submitted swift exit request
     /// @param _blockNumber Rollup block number
-    /// @param _onchainOpNumber Withdraw operation number in rollup block
-    /// @param _accNumber Account - creator of withdraw operation (id in Rollup)
     /// @param _tokenId Token id
-    /// @param _tokenAmount Token amount
-    /// @param _feeAmount Rollup fee amount in specified tokens
+    /// @param _amount Token amount
     /// @param _recipient Withdraw operation recipient
-    /// @param _owner Withdraw operation owner (ethereum address)
-    /// @param _swiftExitFee Validators fee for this request
-    /// @param _userSignature User (tokens owner) signature for freeze funds request
     function freezeFunds(
         uint32 _blockNumber,
-        uint64 _onchainOpNumber,
-        uint24 _accNumber,
         uint16 _tokenId,
-        uint256 _tokenAmount,
-        uint256 _feeAmount,
-        address _recipient,
-        address _owner,
-        uint256 _swiftExitFee,
-        bytes memory _userSignature
+        uint256 _amount,
+        address _recipient
     ) external {
         require(
             msg.sender == address(governance),
@@ -888,38 +896,26 @@ contract Franklin {
             "fnfs12"
         ); // fnfs12 - wrong block number
 
-        // Message hash
-        bytes32 messageHash = keccak256(abi.encodePacked(
-            _blockNumber,
-            _onchainOpNumber,
-            _accNumber,
-            _tokenId,
-            _tokenAmount,
-            _feeAmount,
-            _recipient,
-            _owner,
-            _swiftExitFee
-        ));
-
-        // Verify user signature
-        require(
-            SignaturesVerifier.verifyUserSignature(_onwer, _userSignature, messageHash),
-            "fnfs13"
-        ); // fnfs11 - wrong signature
-
         // Freeze balance
-        frozenBalances[_recipient][_tokenId] += uint128(tokenAmount);
+        frozenBalances[_recipient][_tokenId] += uint128(_amount);
     }
 
     /// @notice Defrost user funds if she has enouth balance to withdraw,
-    /// @notice then send it to sender that MUST be swift exits contract
+    /// @notice then send withdraw operation amount and validators fees to swift exits contract,
+    /// @notice consummate fee to validator-sender
     /// @param _account Account addess
     /// @param _tokenId Token id
-    /// @param _tokenAmount Token amount
+    /// @param _amount Token amount
+    /// @param _validatorsFee Validators fees
+    /// @param _validatorSenderFee Validator-sender fee
+    /// @param _validatorSender Validators that created swift exit request
     function defrostFunds(
         address _account,
         uint16 _tokenId,
-        uint128 _amount
+        uint128 _amount,
+        uint128 _validatorsFee,
+        uint128 _validatorSenderFee,
+        address _validatorSender
     ) external {
         require(
             msg.sender == swiftExits,
@@ -930,29 +926,28 @@ contract Franklin {
             "fnds12"
         ); // fnds12 - tx origin must be active validator
 
-        require(
-            _amount > 0,
-            "fnsw13"
-        ); // fnds13 - amount must be > 0
+        uint128 fullAmount = _amount + _validatorSenderFee + _validatorsFee;
 
         require(
-            frozenBalances[_account][_tokenId] >= _amount,
+            frozenBalances[_account][_tokenId] >= fullAmount,
             "fnsw14"
         ); // fnds14 - frozen balance must be >= amount
 
         require(
-            balancesToWithdraw[_account][_tokenId] >= _amount,
+            balancesToWithdraw[_account][_tokenId] >= fullAmount,
             "fnsw15"
         ); // fnds15 - balance must be >= amount
 
         // Defrost balance
-        frozenBalances[_account][_tokenId] -= _amount;
+        frozenBalances[_account][_tokenId] -= fullAmount;
         // Register withdraw for balance to withdraw
-        registerWithdrawal(_account, _tokenId, _amount);
+        registerWithdrawal(_account, _tokenId, fullAmount);
+        // Update balance of validator-sender
+        balancesToWithdraw[_validatorSender][_tokenId] += _validatorSenderFee;
 
         if (_tokenId == 0){
             // If token id == 0 -> transfer ether
-            swiftExits.transfer(_amount);
+            swiftExits.transfer(_amount + _validatorsFee);
         } else {
             // If token id != 0 -> transfer erc20
 
@@ -961,7 +956,7 @@ contract Franklin {
 
             // Transfer token
             require(
-                IERC20(tokenAddress).transfer(swiftExits, _amount),
+                IERC20(tokenAddress).transfer(swiftExits, _amount + _validatorsFee),
                 "fnds16"
             ); // fnds16 - token transfer failed
         }
