@@ -5,11 +5,11 @@ import {
 } from "./transport";
 import { utils, ethers, Contract } from "ethers";
 import {
-    SyncAccountState,
-    SyncAddress,
+    AccountState,
+    Address,
     Token,
-    SyncTxReceipt,
-    SyncPriorityOperationReceipt
+    TransactionReceipt,
+    PriorityOperationReceipt
 } from "./types";
 import { sleep, SYNC_GOV_CONTRACT_INTERFACE } from "./utils";
 
@@ -18,24 +18,24 @@ export interface ContractAddress {
     govContract: string;
 }
 
-export class SyncProvider {
+export class Provider {
     contractAddress: ContractAddress;
     private constructor(public transport: AbstractJSONRPCTransport) {}
 
     static async newWebsocketProvider(
         address: string = "ws://127.0.0.1:3031"
-    ): Promise<SyncProvider> {
+    ): Promise<Provider> {
         const transport = await WSTransport.connect(address);
-        const provider = new SyncProvider(transport);
+        const provider = new Provider(transport);
         provider.contractAddress = await provider.getContractAddress();
         return provider;
     }
 
     static async newHttpProvider(
         address: string = "http://127.0.0.1:3030"
-    ): Promise<SyncProvider> {
+    ): Promise<Provider> {
         const transport = new HTTPTransport(address);
-        const provider = new SyncProvider(transport);
+        const provider = new Provider(transport);
         provider.contractAddress = await provider.getContractAddress();
         return provider;
     }
@@ -49,25 +49,25 @@ export class SyncProvider {
         return await this.transport.request("contract_address", null);
     }
 
-    async getState(address: SyncAddress): Promise<SyncAccountState> {
+    async getState(address: Address): Promise<AccountState> {
         return await this.transport.request("account_info", [address]);
     }
 
     // get transaction status by its hash (e.g. 0xdead..beef)
-    async getTxReceipt(txHash: string): Promise<SyncTxReceipt> {
+    async getTxReceipt(txHash: string): Promise<TransactionReceipt> {
         return await this.transport.request("tx_info", [txHash]);
     }
 
     async getPriorityOpStatus(
         serialId: number
-    ): Promise<SyncPriorityOperationReceipt> {
+    ): Promise<PriorityOperationReceipt> {
         return await this.transport.request("ethop_info", [serialId]);
     }
 
     async notifyPriorityOp(
         serialId: number,
         action: "COMMIT" | "VERIFY"
-    ): Promise<SyncPriorityOperationReceipt> {
+    ): Promise<PriorityOperationReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
                 const sub = this.transport.subscribe(
@@ -99,7 +99,7 @@ export class SyncProvider {
     async notifyTransaction(
         hash: string,
         action: "COMMIT" | "VERIFY"
-    ): Promise<SyncTxReceipt> {
+    ): Promise<TransactionReceipt> {
         if (this.transport.subscriptionsSupported()) {
             return await new Promise(resolve => {
                 const sub = this.transport.subscribe(

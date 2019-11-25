@@ -1,12 +1,12 @@
 import { utils } from "ethers";
 
-export type SyncAddress = string;
+export type Address = string;
 
 // ETH or ERC20 address
 export type Token = "ETH" | string;
 
-export interface SyncAccountState {
-    address: SyncAddress;
+export interface AccountState {
+    address: Address;
     id?: number;
     committed: {
         balances: {
@@ -27,9 +27,9 @@ export interface Signature {
     signature: string;
 }
 
-export interface SyncTransfer {
-    from: SyncAddress;
-    to: SyncAddress;
+export interface Transfer {
+    from: Address;
+    to: Address;
     token: number;
     amount: utils.BigNumberish;
     fee: utils.BigNumberish;
@@ -37,8 +37,8 @@ export interface SyncTransfer {
     signature: Signature;
 }
 
-export interface SyncWithdraw {
-    account: SyncAddress;
+export interface Withdraw {
+    account: Address;
     ethAddress: string;
     token: number;
     amount: utils.BigNumberish;
@@ -47,8 +47,8 @@ export interface SyncWithdraw {
     signature: Signature;
 }
 
-export interface SyncCloseAccount {
-    account: SyncAddress;
+export interface CloseAccount {
+    account: Address;
     nonce: number;
     signature: Signature;
 }
@@ -59,14 +59,14 @@ export interface BlockInfo {
     verified: boolean;
 }
 
-export interface SyncTxReceipt {
+export interface TransactionReceipt {
     executed: boolean;
     success?: boolean;
     failReason?: string;
     block?: BlockInfo;
 }
 
-export interface SyncPriorityOperationReceipt {
+export interface PriorityOperationReceipt {
     executed: boolean;
     block?: BlockInfo;
 }

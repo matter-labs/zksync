@@ -1,8 +1,8 @@
 # Table of contents
 
-* [Getting Started](README.md)
 * [Introduction](introduction.md)
-* [JS SDK](js-sdk.md)
+* [Getting Started](js-sdk.md)
+* API reference
     * [Providers](providers.md)
     * [Wallet and Signer](wallet-signer.md)
     * [Types and utils](types-utils.md)

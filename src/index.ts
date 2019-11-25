@@ -1,11 +1,11 @@
 import {
-    SyncWallet,
+    Wallet,
     depositFromETH,
     emergencyWithdraw,
     getEthereumBalance
-} from "./syncWallet";
-import { SyncProvider, ETHProxy } from "./provider";
-import { SyncSigner } from "./signer";
+} from "./wallet";
+import { Provider, ETHProxy } from "./provider";
+import { Signer } from "./signer";
 import {
     closestPackableTransactionAmount,
     closestPackableTransactionFee
@@ -16,9 +16,9 @@ import * as utils from "./utils";
 import * as crypto from "./crypto";
 
 export {
-    SyncWallet,
-    SyncSigner,
-    SyncProvider,
+    Wallet,
+    Signer,
+    Provider,
     ETHProxy,
     closestPackableTransactionFee,
     closestPackableTransactionAmount,

@@ -10,15 +10,15 @@ import { utils } from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
 import BN = require("bn.js");
 import {
-    SyncAddress,
-    SyncCloseAccount,
-    SyncTransfer,
-    SyncWithdraw
+    Address,
+    CloseAccount,
+    Transfer,
+    Withdraw
 } from "./types";
 
 const MAX_NUMBER_OF_TOKENS = 4096;
 
-export class SyncSigner {
+export class Signer {
     readonly privateKey: BN;
     readonly publicKey: curve.edwards.EdwardsPoint;
 
@@ -27,17 +27,17 @@ export class SyncSigner {
         this.publicKey = privateKeyToPublicKey(this.privateKey);
     }
 
-    address(): SyncAddress {
+    address(): Address {
         return `0x${pubkeyToAddress(this.publicKey).toString("hex")}`;
     }
 
     signSyncTransfer(transfer: {
-        to: SyncAddress;
+        to: Address;
         tokenId: number;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce: number;
-    }): SyncTransfer {
+    }): Transfer {
         const type = Buffer.from([5]); // tx type
         const from = serializeAddress(this.address());
         const to = serializeAddress(transfer.to);
@@ -74,7 +74,7 @@ export class SyncSigner {
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce: number;
-    }): SyncWithdraw {
+    }): Withdraw {
         const typeBytes = Buffer.from([3]);
         const accountBytes = serializeAddress(this.address());
         const ethAddressBytes = serializeAddress(withdraw.ethAddress);
@@ -103,7 +103,7 @@ export class SyncSigner {
         };
     }
 
-    signSyncCloseAccount(close: { nonce: number }): SyncCloseAccount {
+    signSyncCloseAccount(close: { nonce: number }): CloseAccount {
         const type = Buffer.from([4]);
         const account = serializeAddress(this.address());
         const nonce = serializeNonce(close.nonce);
@@ -141,17 +141,17 @@ export class SyncSigner {
         );
     }
 
-    static fromPrivateKey(pk: BN): SyncSigner {
-        return new SyncSigner(pk);
+    static fromPrivateKey(pk: BN): Signer {
+        return new Signer(pk);
     }
 
-    static fromSeed(seed: Buffer): SyncSigner {
-        return new SyncSigner(privateKeyFromSeed(seed));
+    static fromSeed(seed: Buffer): Signer {
+        return new Signer(privateKeyFromSeed(seed));
     }
 }
 
 // Sync or eth address
-function serializeAddress(address: SyncAddress | string): Buffer {
+function serializeAddress(address: Address | string): Buffer {
     const addressBytes = Buffer.from(address.substr(2), "hex");
     if (addressBytes.length != 20) {
         throw new Error("Address should be 20 bytes long");

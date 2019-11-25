@@ -1,7 +1,7 @@
 import { Contract, ContractTransaction, ethers, utils } from "ethers";
-import { ETHProxy, SyncProvider } from "./provider";
-import { SyncSigner } from "./signer";
-import { SyncAccountState, SyncAddress, Token } from "./types";
+import { ETHProxy, Provider } from "./provider";
+import { Signer } from "./signer";
+import { AccountState, Address, Token } from "./types";
 import {
     IERC20_INTERFACE,
     SYNC_MAIN_CONTRACT_INTERFACE,
@@ -9,20 +9,20 @@ import {
 } from "./utils";
 import { serializePointPacked } from "./crypto";
 
-export class SyncWallet {
+export class Wallet {
     constructor(
-        public signer: SyncSigner,
-        public provider: SyncProvider,
+        public signer: Signer,
+        public provider: Provider,
         public ethProxy: ETHProxy
     ) {}
 
     async syncTransfer(
-        to: SyncAddress,
+        to: Address,
         token: Token,
         amount: utils.BigNumberish,
         fee: utils.BigNumberish,
         nonce: "committed" | number = "committed"
-    ): Promise<TransactionHandle> {
+    ): Promise<Transaction> {
         const tokenId = await this.ethProxy.resolveTokenId(token);
         const transaxtionData = {
             to,
@@ -38,7 +38,7 @@ export class SyncWallet {
         const transactionHash = await this.provider.submitTx(
             signedTransferTransaction
         );
-        return new TransactionHandle(
+        return new Transaction(
             signedTransferTransaction,
             transactionHash,
             this.provider
@@ -51,7 +51,7 @@ export class SyncWallet {
         amount: utils.BigNumberish,
         fee: utils.BigNumberish,
         nonce: "committed" | number = "committed"
-    ): Promise<TransactionHandle> {
+    ): Promise<Transaction> {
         const tokenId = await this.ethProxy.resolveTokenId(token);
         const transactionData = {
             ethAddress,
@@ -67,7 +67,7 @@ export class SyncWallet {
         const submitResponse = await this.provider.submitTx(
             signedWithdrawTransaction
         );
-        return new TransactionHandle(
+        return new Transaction(
             signedWithdrawTransaction,
             submitResponse,
             this.provider
@@ -76,7 +76,7 @@ export class SyncWallet {
 
     async close(
         nonce: "committed" | number = "committed"
-    ): Promise<TransactionHandle> {
+    ): Promise<Transaction> {
         const signerdCloseTransaction = this.signer.signSyncCloseAccount({
             nonce: await this.getNonce()
         });
@@ -84,7 +84,7 @@ export class SyncWallet {
         const transactionHash = await this.provider.submitTx(
             signerdCloseTransaction
         );
-        return new TransactionHandle(
+        return new Transaction(
             signerdCloseTransaction,
             transactionHash,
             this.provider
@@ -100,22 +100,22 @@ export class SyncWallet {
         }
     }
 
-    address(): SyncAddress {
+    address(): Address {
         return this.signer.address();
     }
 
     static async fromEthWallet(
         ethWallet: ethers.Signer,
-        provider: SyncProvider,
+        provider: Provider,
         ethProxy: ETHProxy
-    ): Promise<SyncWallet> {
+    ): Promise<Wallet> {
         const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
         const seed = Buffer.from(seedHex, "hex");
-        const signer = SyncSigner.fromSeed(seed);
-        return new SyncWallet(signer, provider, ethProxy);
+        const signer = Signer.fromSeed(seed);
+        return new Wallet(signer, provider, ethProxy);
     }
 
-    async getAccountState(): Promise<SyncAccountState> {
+    async getAccountState(): Promise<AccountState> {
         return this.provider.getState(this.signer.address());
     }
 
@@ -139,11 +139,11 @@ export class SyncWallet {
 
 export async function depositFromETH(
     depositFrom: ethers.Signer,
-    depositTo: SyncWallet,
+    depositTo: Wallet,
     token: Token,
     amount: utils.BigNumberish,
     maxFeeInETHCurrenty: utils.BigNumberish
-): Promise<ETHOperationHandle> {
+): Promise<ETHOperation> {
     const mainSidechainContract = new Contract(
         depositTo.provider.contractAddress.mainContract,
         SYNC_MAIN_CONTRACT_INTERFACE,
@@ -184,16 +184,16 @@ export async function depositFromETH(
         );
     }
 
-    return new ETHOperationHandle(ethTransaction, depositTo.provider);
+    return new ETHOperation(ethTransaction, depositTo.provider);
 }
 
 export async function emergencyWithdraw(
     withdrawTo: ethers.Signer,
-    withdrawFrom: SyncWallet,
+    withdrawFrom: Wallet,
     token: Token,
     maxFeeInETHCurrenty: utils.BigNumberish,
     nonce: "committed" | number = "committed"
-): Promise<ETHOperationHandle> {
+): Promise<ETHOperation> {
     const tokenId = await withdrawFrom.ethProxy.resolveTokenId(token);
     const numNonce = await withdrawFrom.getNonce(nonce);
     const emergencyWithdrawSignature = withdrawFrom.signer.syncEmergencyWithdrawSignature(
@@ -225,7 +225,7 @@ export async function emergencyWithdraw(
         }
     );
 
-    return new ETHOperationHandle(ethTransaction, withdrawFrom.provider);
+    return new ETHOperation(ethTransaction, withdrawFrom.provider);
 }
 
 export async function getEthereumBalance(
@@ -242,13 +242,13 @@ export async function getEthereumBalance(
     return balance;
 }
 
-class ETHOperationHandle {
+class ETHOperation {
     state: "Sent" | "Mined" | "Commited" | "Verified";
     priorityOpId?: utils.BigNumber;
 
     constructor(
         public ethTx: ContractTransaction,
-        public sidechainProvider: SyncProvider
+        public sidechainProvider: Provider
     ) {
         this.state = "Sent";
     }
@@ -292,13 +292,13 @@ class ETHOperationHandle {
     }
 }
 
-class TransactionHandle {
+class Transaction {
     state: "Sent" | "Commited" | "Verified";
 
     constructor(
         public txData,
         public txHash: string,
-        public sidechainProvider: SyncProvider
+        public sidechainProvider: Provider
     ) {
         this.state = "Sent";
     }
