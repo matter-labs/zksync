@@ -32,8 +32,7 @@ export const governanceTestContractCode = require('../build/GovernanceTest');
 export const priorityQueueTestContractCode = require('../build/PriorityQueueTest')
 
 export async function publishSourceCode(contractname, contractaddress, sourceCode, compiled, constructorParams: any[]) {
-    const providerUrl = url.parse(process.env.WEB3_URL);
-    const network = providerUrl.host.split('.')[0];
+    const network = process.env.ETH_NETWORK;
     const etherscanApiUrl = network === 'mainnet' ? 'https://api.etherscan.io/api' : `https://api-${network}.etherscan.io/api`;
 
     let constructorArguments;

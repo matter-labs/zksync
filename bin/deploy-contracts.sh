@@ -10,10 +10,17 @@
 # cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
 echo redeploying for the db $DATABASE_URL
-franklin flatten;
-cd contracts
-yarn deploy_flat  | tee ../deploy.log
-cd ..
+if [[ "$FRANKLIN_ENV" != "dev" && "$FRANKLIN_ENV" != "ci"]]; 
+then
+    franklin flatten;
+    cd contracts;
+    yarn deploy_flat  | tee ../deploy.log;
+    cd ..;
+else
+    cd contracts;
+    yarn deploy  | tee ../deploy.log;
+    cd ..;
+fi
 
 CONTRACT_ADDR_NEW_VALUE=`grep "CONTRACT_ADDR" deploy.log`
 ERC20_ADDR_NEW_VALUE=`grep "TEST_ERC20" deploy.log`
