@@ -62,16 +62,6 @@ steps:
   depends_on:
   - rust-checks
 
-- name: rust-circuit-tests
-  image: matterlabs/ci
-  commands:
-  - export FRANKLIN_HOME=`pwd`
-  - export PATH=$FRANKLIN_HOME/bin:$PATH
-  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
-  - f cargo test --no-fail-fast --release -p circuit -- --ignored
-  depends_on:
-  - rust-tests
-
 - name: deploy-test
   image: matterlabs/ci
   commands:
