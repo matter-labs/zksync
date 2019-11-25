@@ -2,8 +2,6 @@
 #[macro_use]
 extern crate log;
 // Built-in uses
-use std::env;
-use std::str::FromStr;
 use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
@@ -15,56 +13,9 @@ use server::api_server::start_api_server;
 use server::committer::start_committer;
 use server::eth_watch::start_eth_watch;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
-use server::{eth_sender, ThreadPanicNotify};
+use server::{eth_sender, ConfigurationOptions, ThreadPanicNotify};
 use storage::ConnectionPool;
-
-struct ConfigurationOptions {
-    api_server_addr: String,
-    api_server_port: String,
-    contract_eth_addr: String,
-    web3_url: String,
-    governance_eth_addr: String,
-    priority_queue_eth_addr: String,
-    operator_franklin_addr: String,
-    operator_eth_addr: String,
-    operator_private_key: String,
-    chain_id: u8,
-    gas_price_factor: usize,
-    tx_batch_size: usize,
-}
-
-impl ConfigurationOptions {
-    pub fn from_env() -> ConfigurationOptions {
-        let chain_id = env::var("CHAIN_ID").unwrap_or_else(|_| "4".to_string());
-        let chain_id = u8::from_str(&chain_id).expect("CHAIN_ID invalid value");
-
-        let gas_price_factor = env::var("GAS_PRICE_FACTOR").unwrap_or_else(|_| "1".to_string());
-        let gas_price_factor =
-            usize::from_str(&gas_price_factor).expect("gas price factor invalid");
-
-        let tx_batch_size = env::var("TX_BATCH_SIZE").expect("TX_BATCH_SIZE env var missing");
-        let tx_batch_size = usize::from_str(&tx_batch_size).expect("TX_BATCH_SIZE invalid value");
-        ConfigurationOptions {
-            api_server_addr: env::var("BIND_TO").unwrap_or_else(|_| "127.0.0.1".to_string()),
-            api_server_port: env::var("PORT").unwrap_or_else(|_| "8080".to_string()),
-            contract_eth_addr: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env var missing"),
-            web3_url: env::var("WEB3_URL").expect("WEB3_URL env var missing"),
-            governance_eth_addr: env::var("GOVERNANCE_ADDR")
-                .expect("GOVERNANCE_ADDR env var missing"),
-            priority_queue_eth_addr: env::var("PRIORITY_QUEUE_ADDR")
-                .expect("PRIORITY_QUEUE_ADDR env var missing"),
-            operator_franklin_addr: env::var("OPERATOR_FRANKLIN_ADDRESS")
-                .expect("OPERATOR_FRANKLIN_ADDRESS env var missing"),
-            operator_eth_addr: env::var("OPERATOR_ETH_ADDRESS")
-                .expect("OPERATOR_ETH_ADDRESS env var missing"),
-            operator_private_key: env::var("OPERATOR_PRIVATE_KEY")
-                .expect("OPERATOR_ETH_ADDRESS env var missing"),
-            chain_id,
-            gas_price_factor,
-            tx_batch_size,
-        }
-    }
-}
+use web3::types::H160;
 
 fn main() {
     env_logger::init();
@@ -86,7 +37,7 @@ fn main() {
         info!("Generating genesis block.");
         PlasmaStateKeeper::create_genesis_block(
             connection_pool.clone(),
-            config_opts.operator_franklin_addr.clone(),
+            &config_opts.operator_franklin_addr,
         );
         return;
     }
@@ -106,11 +57,13 @@ fn main() {
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for committer");
-    let contract_addr = storage
+    let contract_addr: H160 = storage
         .load_config()
         .expect("can not load server_config")
         .contract_addr
-        .expect("contract_addr empty in server_config");
+        .expect("contract_addr empty in server_config")[2..]
+        .parse()
+        .expect("contract_addr in db wrong");
     if contract_addr != config_opts.contract_eth_addr {
         panic!(
             "Contract addresses mismatch! From DB = {}, from env = {}",
@@ -129,16 +82,12 @@ fn main() {
         tx_for_state.clone(),
         connection_pool.clone(),
         stop_signal_sender.clone(),
-        config_opts.api_server_addr.clone(),
-        config_opts.api_server_port.clone(),
-        config_opts.contract_eth_addr.clone(),
+        config_opts.clone(),
     );
     let shared_eth_state = start_eth_watch(
         connection_pool.clone(),
         stop_signal_sender.clone(),
-        config_opts.web3_url.clone(),
-        config_opts.governance_eth_addr.clone(),
-        config_opts.priority_queue_eth_addr.clone(),
+        config_opts.clone(),
     );
     let (tx_for_ops, rx_for_ops) = channel();
     let state_keeper = PlasmaStateKeeper::new(
@@ -156,14 +105,7 @@ fn main() {
     let tx_for_eth = eth_sender::start_eth_sender(
         connection_pool.clone(),
         stop_signal_sender.clone(),
-        eth_sender::StartEthSenderOptions {
-            web3_url: config_opts.web3_url.clone(),
-            operator_eth_addr: config_opts.operator_eth_addr.clone(),
-            operator_pk: config_opts.operator_private_key.clone(),
-            contract_eth_addr: config_opts.contract_eth_addr.clone(),
-            chain_id: config_opts.chain_id,
-            gas_price_factor: config_opts.gas_price_factor,
-        },
+        config_opts.clone(),
     );
     start_committer(
         rx_for_ops,
