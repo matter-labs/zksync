@@ -16,19 +16,26 @@ export const ERC20MintableContract = function () {
     return contract
 }();
 
-export const franklinContractCode = require('../flat_build/Franklin');
-export const verifierContractCode = require('../flat_build/Verifier');
-export const governanceContractCode = require('../flat_build/Governance');
-export const priorityQueueContractCode = require('../flat_build/PriorityQueue')
+const contractCodeFolder = process.env.FRANKLIN_ENV === 'ci' ? 'build' : 'flat_build';
+export const franklinContractCode =      require(`../${contractCodeFolder}/Franklin`);
+export const verifierContractCode =      require(`../${contractCodeFolder}/Verifier`);
+export const governanceContractCode =    require(`../${contractCodeFolder}/Governance`);
+export const priorityQueueContractCode = require(`../${contractCodeFolder}/PriorityQueue`);
 
-export const franklinContractSourceCode = fs.readFileSync('flat/Franklin.sol', 'utf8');
-export const verifierContractSourceCode = fs.readFileSync('flat/Verifier.sol', 'utf8');
-export const governanceContractSourceCode = fs.readFileSync('flat/Governance.sol', 'utf8');
-export const priorityQueueContractSourceCode = fs.readFileSync('flat/PriorityQueue.sol', 'utf8');
+function maybeReadContractSourceFile(path) {
+    if (['ci', 'dev'].includes(process.env.FRANKLIN_ENV)) 
+        return null;
+    return fs.readFileSync(path, 'utf8');
+}
 
-export const franklinTestContractCode = require('../build/FranklinTest');
-export const verifierTestContractCode = require('../build/VerifierTest');
-export const governanceTestContractCode = require('../build/GovernanceTest');
+export const franklinContractSourceCode      = maybeReadContractSourceFile('flat/Franklin.sol');
+export const verifierContractSourceCode      = maybeReadContractSourceFile('flat/Verifier.sol');
+export const governanceContractSourceCode    = maybeReadContractSourceFile('flat/Governance.sol');
+export const priorityQueueContractSourceCode = maybeReadContractSourceFile('flat/PriorityQueue.sol');
+
+export const franklinTestContractCode      = require('../build/FranklinTest');
+export const verifierTestContractCode      = require('../build/VerifierTest');
+export const governanceTestContractCode    = require('../build/GovernanceTest');
 export const priorityQueueTestContractCode = require('../build/PriorityQueueTest')
 
 export async function publishSourceCode(contractname, contractaddress, sourceCode, compiled, constructorParams: any[]) {
@@ -88,7 +95,7 @@ export async function deployGovernance(
         });
         console.log(`GOVERNANCE_ADDR=${governance.address}`);
 
-        if (governanceSourceCode && process.env.FRANKLIN_ENV != 'dev') {
+        if (governanceSourceCode) {
             publishSourceCode('Governance', governance.address, governanceSourceCode, governanceCode, [governorAddress]);;
         }
 
@@ -110,7 +117,7 @@ export async function deployPriorityQueue(
         });
         console.log(`PRIORITY_QUEUE_ADDR=${priorityQueue.address}`);
 
-        if (priorityQueueSourceCode && process.env.FRANKLIN_ENV != 'dev') {
+        if (priorityQueueSourceCode) {
             publishSourceCode('PriorityQueue', priorityQueue.address, priorityQueueSourceCode, priorityQueueCode, [ownerAddress]);
         }
 
@@ -131,7 +138,7 @@ export async function deployVerifier(
         });
         console.log(`VERIFIER_ADDR=${verifier.address}`);
 
-        if (verifierSourceCode && process.env.FRANKLIN_ENV != 'dev') {
+        if (verifierSourceCode) {
             publishSourceCode('Verifier', verifier.address, verifierSourceCode, verifierCode, []);;
         }
 
@@ -168,14 +175,19 @@ export async function deployFranklin(
             });
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
-        if (franklinSourceCode && process.env.FRANKLIN_ENV != 'dev') {
-            publishSourceCode('Franklin', contract.address, franklinSourceCode, franklinCode, [
-                        governanceAddress,
-                        verifierAddress,
-                        priorityQueueAddress,
-                        genesisAddress,
-                        genesisRoot,
-                    ]);;
+        if (franklinSourceCode) {
+            publishSourceCode(
+                'Franklin', 
+                contract.address, 
+                franklinSourceCode, 
+                franklinCode, 
+                [
+                    governanceAddress,
+                    verifierAddress,
+                    priorityQueueAddress,
+                    genesisAddress,
+                    genesisRoot,
+                ]);
         }
 
         const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);

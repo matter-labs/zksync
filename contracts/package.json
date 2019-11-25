@@ -24,7 +24,7 @@
   },
   "scripts": {
     "build": "waffle",
-    "flat_build": "waffle config_flat.json",
+    "flat_build": "yarn build && waffle config_flat.json",
     "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
     "deploy": "yarn build && ts-node scripts/testnet-deploy.ts",
     "deploy_flat": "yarn flat_build && ts-node scripts/testnet-deploy.ts",

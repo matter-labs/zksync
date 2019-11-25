@@ -10,15 +10,14 @@
 # cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
 echo "redeploying for the db $DATABASE_URL"
-if [[ "$FRANKLIN_ENV" != "dev" && "$FRANKLIN_ENV" != "ci" ]]
-then
+if [[ "$FRANKLIN_ENV" == "ci" ]]; then
+    cd contracts;
+    yarn deploy  | tee ../deploy.log;
+    cd ..;
+else
     franklin flatten;
     cd contracts;
     yarn deploy_flat  | tee ../deploy.log;
-    cd ..;
-else
-    cd contracts;
-    yarn deploy  | tee ../deploy.log;
     cd ..;
 fi
 
