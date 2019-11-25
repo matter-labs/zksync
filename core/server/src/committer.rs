@@ -31,7 +31,7 @@ fn run_committer(
     info!("committer started");
     let storage = pool
         .access_storage()
-        .expect("db connection failed for committer");;
+        .expect("db connection failed for committer");
 
     let mut last_verified_block = storage.get_last_verified_block().expect("db failed");
     loop {

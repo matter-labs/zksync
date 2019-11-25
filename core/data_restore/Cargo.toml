@@ -4,9 +4,9 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-bigdecimal = { version = "0.0.14", features = ["serde"]}
+bigdecimal = { version = "0.1.0", features = ["serde"]}
 futures = "0.1.28"
-web3 = { git = "https://github.com/tomusdrw/rust-web3" }
+web3 = "0.8.0"
 tiny-keccak = "1.4.2"
 ethabi = "8.0.0"
 hex = "0.3.2"

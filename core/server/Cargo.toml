@@ -52,8 +52,8 @@ actix-cors = "0.1.0"
 actix = "0.8.3"
 actix-web = "1.0.8"
 
-bigdecimal = { version = "0.0.14", features = ["serde"]}
+bigdecimal = { version = "0.1.0", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
-diesel = { version = "1.4.2", features = ["postgres", "serde_json", "r2d2", "chrono"] }
+diesel = { version = "1.4.3", features = ["postgres", "serde_json", "r2d2", "chrono"] }
 ctrlc = "3.1"
 failure = "0.1"
