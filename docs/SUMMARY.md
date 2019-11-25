@@ -8,5 +8,5 @@
 * [Overview](overview.md)
 * [Providers](provider.md)
 * [Account](account.md)
-* [Transactions](types-utils.md)
+* [Transactions](transactions.md)
 

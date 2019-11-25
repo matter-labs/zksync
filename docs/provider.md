@@ -1,7 +1,7 @@
 # Intro 
 
 JSON-RPC protocol is used to communicate with Sync network nodes.
-`SyncProvider` is used to abstract details of the communication and provides useful api for interaction with Sync network.
+`Provider` is used to abstract details of the communication and provides useful api for interaction with Sync network.
 
 We support HTTP and WebSocket transport protocol for JSON-RPC communications. WebSocket transport is preferred since it supports subscriptions.
 `HTTPTransport` and `WSTransport` classes are used to implement details of communication, but usually you don't need to deal with this 
@@ -9,7 +9,7 @@ objects directly.
 
 `ETHProxy` class is used to simplify some communication with Ethereum network.
 
-# class SyncProvider
+# class Provider
 
 ## static async newWebsocketProvider
 
@@ -18,7 +18,7 @@ objects directly.
 ```typescript
 static async newWebsocketProvider(
         address: string = "ws://127.0.0.1:3031"
-    ): Promise<SyncProvider>;
+    ): Promise<Provider>;
 ```
 
 ### Inputs and outputs
@@ -35,7 +35,7 @@ static async newWebsocketProvider(
 ```typescript
 static async newHttpProvider(
         address: string = "http://127.0.0.1:3030"
-    ): Promise<SyncProvider>;
+    ): Promise<Provider>;
 ```
 
 ### Inputs and outputs
@@ -80,7 +80,7 @@ async getContractAddress(): Promise<ContractAddress>;
 ### Signature
 
 ```typescript
-async getState(address: SyncAddress): Promise<SyncAccountState>;
+async getState(address: Address): Promise<AccountState>;
 ```
 
 ### Inputs and outputs
@@ -95,7 +95,7 @@ async getState(address: SyncAddress): Promise<SyncAccountState>;
 ### Signature
 
 ```typescript
-async getTxReceipt(txHash: string): Promise<SyncTxReceipt>;
+async getTxReceipt(txHash: string): Promise<TransactionReceipt>;
 ```
 
 ### Inputs and outputs
@@ -112,7 +112,7 @@ This method will return when given transaction is committed or verified in the S
 ### Signature
 
 ```typescript
-async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<SyncTxReceipt> ;
+async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<TransactionReceipt> ;
 ```
 
 ### Inputs and outputs
@@ -128,7 +128,7 @@ async notifyTransaction(hash: string, action: "COMMIT" | "VERIFY"): Promise<Sync
 ### Signature
 
 ```typescript
-async getPriorityOpStatus(serialId: number): Promise<SyncPriorityOperationReceipt>;
+async getPriorityOpStatus(serialId: number): Promise<PriorityOperationReceipt>;
 ```
 
 ### Inputs and outputs
@@ -145,7 +145,7 @@ This method will return when given priority operation is committed or verified i
 ### Signature
 
 ```typescript
-async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<SyncPriorityOperationReceipt>;
+async notifyPriorityOp(serialId: number, action: "COMMIT" | "VERIFY"): Promise<PriorityOperationReceipt>;
 ```
 
 ### Inputs and outputs

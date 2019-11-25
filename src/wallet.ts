@@ -253,7 +253,7 @@ class ETHOperation {
         this.state = "Sent";
     }
 
-    async waitTxMine() {
+    async awaitEthereumTxCommit() {
         if (this.state != "Sent") return;
 
         const txReceipt = await this.ethTx.wait();
@@ -270,8 +270,8 @@ class ETHOperation {
         this.state = "Mined";
     }
 
-    async waitCommit() {
-        await this.waitTxMine();
+    async awaitReceipt() {
+        await this.awaitEthereumTxCommit();
         if (this.state != "Mined") return;
         await this.sidechainProvider.notifyPriorityOp(
             this.priorityOpId.toNumber(),
@@ -280,8 +280,8 @@ class ETHOperation {
         this.state = "Commited";
     }
 
-    async waitVerify() {
-        await this.waitCommit();
+    async awaitVerifyReceipt() {
+        await this.awaitReceipt();
         if (this.state != "Commited") return;
 
         await this.sidechainProvider.notifyPriorityOp(
@@ -303,15 +303,15 @@ class Transaction {
         this.state = "Sent";
     }
 
-    async waitCommit() {
+    async awaitReceipt() {
         if (this.state !== "Sent") return;
 
         await this.sidechainProvider.notifyTransaction(this.txHash, "COMMIT");
         this.state = "Commited";
     }
 
-    async waitVerify() {
-        await this.waitCommit();
+    async awaitVerifyReceipt() {
+        await this.awaitReceipt();
         await this.sidechainProvider.notifyTransaction(this.txHash, "VERIFY");
         this.state = "Verified";
     }

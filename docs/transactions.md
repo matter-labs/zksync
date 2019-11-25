@@ -8,9 +8,7 @@ Deposits and emergency withdraws are priority operations.
 
 # Types
 
-
-
-# class SyncWallet
+# class Wallet
 
 ## async syncTransfer
 
@@ -24,12 +22,12 @@ Transfer amount and fee should have limited number of significant digits accordi
 ### Signature
 ```typescript
 async syncTransfer(
-    to: SyncAddress,
+    to: Address,
     token: Token,
     amount: utils.BigNumberish,
     fee: utils.BigNumberish,
     nonce: "committed" | number = "committed"
-): Promise<TransactionHandle>;
+): Promise<Transaction>;
 ```
 
 ### Inputs and outputs
@@ -70,6 +68,7 @@ async withdrawTo(
 | nonce | Nonce that is going to be used for this transaction. ("committed" is used for the last known nonce for this account) |
 | returns | Handle of the submitted transaction | 
 
+
 # async function depositFromETH
 
 Moves funds from ethereum account(represented as `Signer` from `ethers.js`) to the Sync account.
@@ -87,11 +86,11 @@ Formula for base fee calculation:
 ```typescript
 async function depositFromETH(
     depositFrom: ethers.Signer,
-    depositTo: SyncWallet,
+    depositTo: Wallet,
     token: Token,
     amount: utils.BigNumberish,
     maxFeeInETHCurrenty: utils.BigNumberish
-): Promise<ETHOperationHandle>;
+): Promise<ETHOperation>;
 ```
 
 ### Inputs and outputs
@@ -121,11 +120,11 @@ Formula for base fee calculation: ```2 * 170000 * GAS_PRICE```
 ```typescript
 export async function emergencyWithdraw(
     withdrawTo: ethers.Signer,
-    withdrawFrom: SyncWallet,
+    withdrawFrom: Wallet,
     token: Token,
     maxFeeInETHCurrenty: utils.BigNumberish,
     nonce: "committed" | number = "committed"
-): Promise<ETHOperationHandle>;
+): Promise<ETHOperation>;
 ```
 
 ### Inputs and outputs
@@ -152,24 +151,24 @@ States:
 | Commited | Transaction was included to the Sync network block |
 | Verified | Corresponding Sync network block was verified |
 
-## async waitCommit
+## async awaitReceipt
 
 Returns when transaction was included to the Sync network block.
 
 ### Signature 
 
 ```typescript
-async waitCommit();
+async awaitReceipt();
 ```
 
-## async waitVerify
+## async awaitVerifyReceipt
 
 Returns when transaction block was verified in the Sync network.
 
 ### Signature 
 
 ```typescript
-async waitVerify();
+async awaitVerifyReceipt();
 ```
 
 # class ETHOperation
@@ -189,34 +188,34 @@ States:
 | Commited | Priority operation was included to the Sync network block |
 | Verified | Corresponding Sync network block was verified |
 
-## async waitTxMine
+## async awaitEthereumTxCommit
 
 Returns after etherum transaction was mined.
 
 ### Signature 
 
 ```typescript
-async waitTxMine();
+async awaitEthereumTxCommit();
 ```
 
-## async waitCommit
+## async awaitReceipt
 
 Returns when priority operation was included to the Sync network block.
 
 ### Signature 
 
 ```typescript
-async waitCommit();
+async awaitReceipt();
 ```
 
-## async waitVerify
+## async awaitVerifyReceipt
 
 Returns when block with this operation was verified in the Sync network.
 
 ### Signature 
 
 ```typescript
-async waitVerify();
+async awaitVerifyReceipt();
 ```
 
 # Utils
@@ -258,11 +257,11 @@ export interface BlockInfo {
 }
 ```
 
-## SyncTxReceipt
+## TxReceipt
 
 ### Definition
 ```typescript
-export interface SyncTxReceipt {
+export interface TxReceipt {
     executed: boolean;
     success?: boolean;
     failReason?: string;
@@ -270,11 +269,11 @@ export interface SyncTxReceipt {
 }
 ```
 
-## SyncPriorityOperationReceipt
+## PriorityOperationReceipt
 
 ### Definition
 ```typescript
-export interface SyncPriorityOperationReceipt {
+export interface PriorityOperationReceipt {
     executed: boolean;
     block?: BlockInfo;
 }
@@ -299,15 +298,15 @@ export interface Signature {
 }
 ```
 
-## SyncTransfer
+## Transfer
 
 Signed transfer transaction.
 
 ### Definition
 ```typescript
-export interface SyncTransfer {
-    from: SyncAddress;
-    to: SyncAddress;
+export interface Transfer {
+    from: Address;
+    to: Address;
     token: number;
     amount: utils.BigNumberish;
     fee: utils.BigNumberish;
@@ -316,14 +315,14 @@ export interface SyncTransfer {
 }
 ```
 
-## SyncWithdraw
+## Withdraw
 
 Signed withdraw transaction.
 
 ### Definition
 ```typescript
-export interface SyncWithdraw {
-    account: SyncAddress;
+export interface Withdraw {
+    account: Address;
     ethAddress: string;
     token: number;
     amount: utils.BigNumberish;
