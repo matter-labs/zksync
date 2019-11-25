@@ -9,8 +9,8 @@
 # mkdir -p contracts/contracts/keys/
 # cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
-echo redeploying for the db $DATABASE_URL
-if [[ "$FRANKLIN_ENV" != "dev" && "$FRANKLIN_ENV" != "ci"]]; 
+echo "redeploying for the db $DATABASE_URL"
+if [[ "$FRANKLIN_ENV" != "dev" && "$FRANKLIN_ENV" != "ci" ]]
 then
     franklin flatten;
     cd contracts;
