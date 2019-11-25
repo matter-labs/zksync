@@ -13,7 +13,7 @@ use web3::contract::Contract;
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
 use web3::{Transport, Web3};
 // Workspace uses
-use crate::ThreadPanicNotify;
+use crate::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::{PriorityOp, TokenId};
 use models::params::PRIORITY_EXPIRATION;
 use storage::ConnectionPool;
@@ -67,12 +67,9 @@ impl<T: Transport> EthWatch<T> {
     pub fn new(
         web3: Web3<T>,
         db_pool: ConnectionPool,
-        governance_addr: String,
-        priority_queue_address: String,
+        governance_addr: H160,
+        priority_queue_address: H160,
     ) -> Self {
-        if governance_addr.is_empty() {
-            panic!("governance address required");
-        }
         let gov_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
                 .unwrap()
@@ -80,9 +77,11 @@ impl<T: Transport> EthWatch<T> {
                 .unwrap()
                 .to_string();
             let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
-            let address = H160::from_str(&governance_addr[2..].to_string()).unwrap();
 
-            (abi.clone(), Contract::new(web3.eth(), address, abi.clone()))
+            (
+                abi.clone(),
+                Contract::new(web3.eth(), governance_addr, abi.clone()),
+            )
         };
 
         let priority_queue_contract = {
@@ -92,12 +91,11 @@ impl<T: Transport> EthWatch<T> {
                 .unwrap()
                 .to_string();
             let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
-            if priority_queue_address.is_empty() {
-                panic!("priority queue address required");
-            }
-            let address = H160::from_str(&priority_queue_address[2..].to_string()).unwrap();
 
-            (abi.clone(), Contract::new(web3.eth(), address, abi.clone()))
+            (
+                abi.clone(),
+                Contract::new(web3.eth(), priority_queue_address, abi.clone()),
+            )
         };
 
         Self {
@@ -289,9 +287,7 @@ impl<T: Transport> EthWatch<T> {
 pub fn start_eth_watch(
     pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
-    web3_url: String,
-    governance_addr: String,
-    priority_queue_address: String,
+    config_options: ConfigurationOptions,
 ) -> Arc<RwLock<ETHState>> {
     let (sender, receiver) = sync_channel(1);
 
@@ -299,9 +295,15 @@ pub fn start_eth_watch(
         .name("eth_watch".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
-            let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
+            let (_eloop, transport) =
+                web3::transports::Http::new(&config_options.web3_url).unwrap();
             let web3 = web3::Web3::new(transport);
-            let eth_watch = EthWatch::new(web3, pool, governance_addr, priority_queue_address);
+            let eth_watch = EthWatch::new(
+                web3,
+                pool,
+                config_options.governance_eth_addr,
+                config_options.priority_queue_eth_addr,
+            );
             sender.send(eth_watch.get_shared_eth_state()).unwrap();
             eth_watch.run();
         })

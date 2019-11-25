@@ -43,7 +43,7 @@ impl PlasmaStateKeeper {
     pub fn new(
         pool: ConnectionPool,
         eth_state: Arc<RwLock<ETHState>>,
-        fee_account_address: String,
+        fee_account_address: AccountAddress,
         tx_batch_size: usize,
     ) -> Self {
         info!("constructing state keeper instance");
@@ -54,8 +54,6 @@ impl PlasmaStateKeeper {
         let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);
-        let fee_account_address =
-            AccountAddress::from_hex(&fee_account_address).expect("invalid fee account address");
         let current_unprocessed_priority_op = storage
             .load_stored_op_with_block_number(last_committed, ActionType::COMMIT)
             .map(|storage_op| {
@@ -91,9 +89,7 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: String) {
-        let fee_account_address =
-            AccountAddress::from_hex(&fee_account_address).expect("invalid fee account address");
+    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &AccountAddress) {
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");
