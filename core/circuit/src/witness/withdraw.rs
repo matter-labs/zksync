@@ -18,6 +18,7 @@ use pairing::bn256::*;
 pub struct WithdrawData {
     pub amount: u128,
     pub fee: u128,
+    pub swift_exit_fee: u128,
     pub token: u32,
     pub account_address: u32,
     pub ethereum_key: Fr,
@@ -63,14 +64,20 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.swift_exit_fee.unwrap(),
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
         );
 
         append_be_fixed_width(
             &mut pubdata_bits,
             &self.before.witness.account_witness.pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.args.ethereum_key.unwrap(),
+            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
 
         pubdata_bits.resize(8 * franklin_constants::CHUNK_BIT_WIDTH, false);
@@ -110,6 +117,11 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
         );
         append_be_fixed_width(
             &mut sig_bits,
+            &self.args.swift_exit_fee.unwrap(),
+            franklin_constants::FEE_MANTISSA_BIT_WIDTH + franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
             &self.before.witness.account_witness.nonce.unwrap(),
             franklin_constants::NONCE_BIT_WIDTH,
         );
@@ -123,6 +135,7 @@ pub fn apply_withdraw_tx(
     let withdraw_data = WithdrawData {
         amount: big_decimal_to_u128(&withdraw.tx.amount),
         fee: big_decimal_to_u128(&withdraw.tx.fee),
+        swift_exit_fee: big_decimal_to_u128(&withdraw.tx.swift_exit_fee),
         token: u32::from(withdraw.tx.token),
         account_address: withdraw.account_id,
         ethereum_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.eth_address)).unwrap(),
@@ -167,6 +180,18 @@ pub fn apply_withdraw(
     .unwrap();
 
     let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
+
+    let swift_exit_fee_as_field_element = Fr::from_str(&withdraw.swift_exit_fee.to_string()).unwrap();
+
+    let swift_exit_fee_bits = convert_to_float(
+        withdraw.swift_exit_fee,
+        franklin_constants::FEE_EXPONENT_BIT_WIDTH,
+        franklin_constants::FEE_MANTISSA_BIT_WIDTH,
+        10,
+    )
+    .unwrap();
+
+    let swift_exit_fee_encoded: Fr = le_bit_vector_into_field_element(&swift_exit_fee_bits);
 
     //calculate a and b
 
@@ -221,6 +246,7 @@ pub fn apply_withdraw(
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
+            swift_exit_fee: Some(swift_exit_fee_encoded),
             pub_nonce: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
@@ -351,6 +377,20 @@ pub fn calculate_withdraw_operations_from_witness(
         tx_type: withdraw_witness.tx_type,
         chunk: Some(Fr::from_str("7").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[7]),
+        first_sig_msg: Some(*first_sig_msg),
+        second_sig_msg: Some(*second_sig_msg),
+        third_sig_msg: Some(*third_sig_msg),
+        signature_data: signature_data.clone(),
+        signer_pub_key_packed: signer_pub_key_packed.to_vec(),
+        args: withdraw_witness.args.clone(),
+        lhs: withdraw_witness.after.clone(),
+        rhs: withdraw_witness.after.clone(),
+    };
+    let operation_eight = Operation {
+        new_root: withdraw_witness.after_root,
+        tx_type: withdraw_witness.tx_type,
+        chunk: Some(Fr::from_str("8").unwrap()),
+        pubdata_chunk: Some(pubdata_chunks[8]),
         first_sig_msg: Some(*first_sig_msg),
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),

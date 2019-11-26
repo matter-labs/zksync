@@ -136,6 +136,7 @@ pub struct Withdraw {
     /// None -> withdraw all
     pub amount: BigDecimal,
     pub fee: BigDecimal,
+    pub swift_exit_fee: BigDecimal,
     pub nonce: Nonce,
     pub signature: TxSignature,
 }
@@ -150,8 +151,9 @@ impl Withdraw {
         let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
         let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
         let fee_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LENGTH;
-        let eth_address_pre_length = fee_pre_length + FEE_BYTES_LENGTH;
-        let account_pre_length = eth_address_pre_length + ETH_ADDR_BYTES_LENGTH;
+        let swift_exit_fee_pre_length = fee_pre_length + FEE_BYTES_LENGTH;
+        let account_pre_length = swift_exit_fee_pre_length + FEE_BYTES_LENGTH;
+        let eth_address_pre_length = account_pre_length + ETH_ADDR_BYTES_LENGTH;
 
         Some(Self {
             account: AccountAddress::from_bytes(
@@ -167,6 +169,7 @@ impl Withdraw {
                 &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
             )?),
             fee: unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LENGTH])?,
+            swift_exit_fee: unpack_fee_amount(&bytes[swift_exit_fee_pre_length..swift_exit_fee_pre_length + FEE_BYTES_LENGTH])?,
             nonce: 0,                          // From pubdata its unknown
             signature: TxSignature::default(), // From pubdata its unknown
         })
@@ -180,12 +183,13 @@ impl Withdraw {
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&big_decimal_to_u128(&self.amount).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
+        out.extend_from_slice(&pack_fee_amount(&self.swift_exit_fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
 
     pub fn check_correctness(&self) -> bool {
-        is_fee_amount_packable(&self.fee) && self.amount <= u128_to_bigdecimal(u128::max_value())
+        is_fee_amount_packable(&self.swift_exit_fee) && is_fee_amount_packable(&self.fee) && self.amount <= u128_to_bigdecimal(u128::max_value())
     }
 
     pub fn verify_signature(&self) -> bool {

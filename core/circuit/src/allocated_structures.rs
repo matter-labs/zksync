@@ -91,6 +91,7 @@ pub struct AllocatedChunkData<E: JubjubEngine> {
 pub struct AllocatedOperationData<E: JubjubEngine> {
     pub amount_packed: CircuitElement<E>,
     pub fee_packed: CircuitElement<E>,
+    pub swift_exit_fee_packed: CircuitElement<E>,
     pub amount_unpacked: CircuitElement<E>,
     pub full_amount: CircuitElement<E>,
     pub fee: CircuitElement<E>,
@@ -130,6 +131,12 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         let fee_packed = CircuitElement::from_fe_strict(
             cs.namespace(|| "fee_packed"),
             || op.args.fee.grab(),
+            franklin_constants::FEE_EXPONENT_BIT_WIDTH + franklin_constants::FEE_MANTISSA_BIT_WIDTH,
+        )?;
+
+        let swift_exit_fee_packed = CircuitElement::from_fe_strict(
+            cs.namespace(|| "swift_exit_fee_packed"),
+            || op.args.swift_exit_fee.grab(),
             franklin_constants::FEE_EXPONENT_BIT_WIDTH + franklin_constants::FEE_MANTISSA_BIT_WIDTH,
         )?;
 
@@ -205,6 +212,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             amount_packed,
             fee_packed,
             fee,
+            swift_exit_fee_packed,
             amount_unpacked,
             full_amount,
             first_sig_msg,

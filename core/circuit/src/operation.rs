@@ -44,6 +44,7 @@ pub struct OperationArguments<E: JubjubEngine> {
     pub amount_packed: Option<E::Fr>,
     pub full_amount: Option<E::Fr>,
     pub fee: Option<E::Fr>,
+    pub swift_exit_fee: Option<E::Fr>,
     pub new_pub_key_hash: Option<E::Fr>,
     pub ethereum_key: Option<E::Fr>,
     pub pub_nonce: Option<E::Fr>,
