@@ -34,9 +34,6 @@ contract PriorityQueue {
     /// @notice Rollup nonce bytes length
     uint8 constant NONCE_BYTES = 4;
 
-    /// @notice Rollup chain address length
-    uint8 constant PUBKEY_HASH_BYTES = 20;
-
     /// @notice Signature (for example full exit signature) length
     uint8 constant SIGNATURE_BYTES = 64;
 
@@ -190,7 +187,7 @@ contract PriorityQueue {
         bytes memory priorityPubData;
         bytes memory onchainPubData;
         if (_opType == DEPOSIT_OP && priorityRequests[_priorityRequestId].opType == DEPOSIT_OP) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, PUBKEY_HASH_BYTES + AMOUNT_BYTES + TOKEN_BYTES);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, ETH_ADDR_BYTES + AMOUNT_BYTES + TOKEN_BYTES);
             onchainPubData = _pubData;
         } else if (_opType == FULL_EXIT_OP && priorityRequests[_priorityRequestId].opType == FULL_EXIT_OP) {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES);

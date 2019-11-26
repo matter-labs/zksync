@@ -42,9 +42,6 @@ contract Franklin {
     /// @notice Franklin nonce bytes lengths
     uint8 constant NONCE_BYTES = 4;
 
-    /// @notice Franklin chain address bytes length
-    uint8 constant PUBKEY_HASH_BYTES = 20;
-
     /// @notice Signature (for example full exit signature) bytes length
     uint8 constant SIGNATURE_BYTES = 64;
 
@@ -85,7 +82,7 @@ contract Franklin {
     uint256 constant TRANSFER_TO_NEW_LENGTH = 5 * 8;
     
     /// @notice Withdraw operation length
-    uint256 constant WITHDRAW_LENGTH = 6 * 8;
+    uint256 constant WITHDRAW_LENGTH = 9 * 8;
     
     /// @notice Close operation length
     uint256 constant CLOSE_ACCOUNT_LENGTH = 1 * 8;
@@ -264,7 +261,7 @@ contract Franklin {
             // Increase withdrawable amount for this owner/token
             balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
             // Go to next deposit
-            i += ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES+PUBKEY_HASH_BYTES;
+            i += ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES+ETH_ADDR_BYTES;
         }
     }
 
@@ -409,18 +406,13 @@ contract Franklin {
         uint16 _token,
         uint128 _amount,
         uint256 _fee,
-        bytes memory _franklinAddr
+        address _franklinAddr
     ) internal {
-        require(
-            _franklinAddr.length == PUBKEY_HASH_BYTES,
-            "frd11"
-        ); // frd11 - wrong franklin address hash
-        
         // Priority Queue request
         bytes memory pubData = Bytes.toBytesFromAddress(msg.sender); // sender
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token)); // token id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
-        pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(_franklinAddr)); // franklin address
 
         priorityQueue.addPriorityRequest(uint8(OpType.Deposit), _fee, pubData);
 
@@ -574,9 +566,9 @@ contract Franklin {
         if (_opType == uint8(OpType.CloseAccount)) return (CLOSE_ACCOUNT_LENGTH, 0, 0);
 
         if (_opType == uint8(OpType.Deposit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + ETH_ADDR_BYTES);
             require(
-                pubData.length == TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES,
+                pubData.length == TOKEN_BYTES + AMOUNT_BYTES + ETH_ADDR_BYTES,
                 "fpp11"
             ); // fpp11 - wrong deposit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -587,9 +579,9 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.Withdraw)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES + FEE_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + FEE_BYTES + ETH_ADDR_BYTES + ETH_ADDR_BYTES);
             require(
-                pubData.length == ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES + FEE_BYTES,
+                pubData.length == ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + FEE_BYTES + ETH_ADDR_BYTES + ETH_ADDR_BYTES,
                 "fpp12"
             ); // fpp12 - wrong withdraw length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -732,11 +724,40 @@ contract Franklin {
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
-                bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
-                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
+                bytes memory seFeeBytes = new bytes(FEE_BYTES);
+                for (uint256 i = 0; i < FEE_BYTES; ++i) {
+                    seFeeBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
                 }
-                balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
+                uint16 packedSeFee = Bytes.bytesToUInt16(seFeeBytes);
+                uint128 seFee = Bytes.parseFloat(packedSeFee);
+                
+                bytes memory rollupAddressBytes = new bytes(ETH_ADDR_BYTES);
+                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
+                    rollupAddressBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + FEE_BYTES + i];
+                }
+                address rollupAddress = Bytes.bytesToAddress(rollupAddressBytes);
+
+                bytes memory ethAddressBytes = new bytes(ETH_ADDR_BYTES);
+                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
+                    ethAddressBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + FEE_BYTES + ETH_ADDR_BYTES + i];
+                }
+                address ethAddress = Bytes.bytesToAddress(ethAddressBytes);
+
+                if (seFee > 0) {
+                    // If there is swift exit fee - check if there is enouth frozen balance for owner
+                    if (frozenBalances[rollupAddress][tokenId] - balancesToWithdraw[rollupAddress][tokenId] >= amount + seFee) {
+                        // If yes - consider that swift exit succeeded and increase balances for owner by withdraw amount and swift exit fee
+                        balancesToWithdraw[rollupAddress][tokenId] += amount + seFee;
+                    } else {
+                        // If not - consider that swift exit failed and increase balance for recipient by withdraw amount
+                        // and increase owner balance by swift exit fee
+                        balancesToWithdraw[rollupAddress][tokenId] += seFee;
+                        balancesToWithdraw[ethAddress][tokenId] += amount;
+                    }
+                } else {
+                    // If there is no swift exit fee - increase recipient balance by withdraw amount
+                    balancesToWithdraw[ethAddress][tokenId] += amount;
+                }
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
@@ -824,10 +845,10 @@ contract Franklin {
         }
     }
 
-    /// @notice Withdraws token from Franklin to root chain
+    /// @notice Withdraws token from Franklin to root chain in case of exodus mode. User must provide proof that he owns funds
     /// @param _tokenId Verified token id
-    /// @param _owners All owners
-    /// @param _amounts Amounts for owners
+    /// @param _owner Owner
+    /// @param _amount Amount for owner
     /// @param _proof Proof
     function exit(
         uint16 _tokenId,
@@ -851,19 +872,19 @@ contract Franklin {
         ); // fet13 - verification failed
 
         balancesToWithdraw[_owner][_tokenId] += _amount;
-        exited[_owner][_tokenId] == false;
+        exited[_owner][_tokenId] == true;
     }
 
     /// @notice Freeze balance for user, if he submitted swift exit request
     /// @param _blockNumber Rollup block number
     /// @param _tokenId Token id
     /// @param _amount Token amount
-    /// @param _recipient Withdraw operation recipient
+    /// @param _owner Withdraw operation owner
     function freezeFunds(
         uint32 _blockNumber,
         uint16 _tokenId,
         uint256 _amount,
-        address _recipient
+        address _owner
     ) external {
         require(
             msg.sender == address(governance),
@@ -876,23 +897,29 @@ contract Franklin {
         ); // fnfs12 - wrong block number
 
         // Freeze balance
-        frozenBalances[_recipient][_tokenId] += uint128(_amount);
+        frozenBalances[_owner][_tokenId] += uint128(_amount);
     }
 
-    /// @notice Defrost user funds if she has enouth balance to withdraw,
+    /// @notice Defrost user funds.
+    /// @notice If user has enouth balance to withdraw and swift exit succeeded,
     /// @notice then send withdraw operation amount and validators fees to swift exits contract,
-    /// @notice consummate fee to validator-sender
+    /// @notice consummate fee to validator-sender.
+    /// @notice After that delete corresponding onchain operation.
+    /// @param _onchainOpId Corresponding onchain op id
     /// @param _account Account addess
     /// @param _tokenId Token id
     /// @param _amount Token amount
     /// @param _validatorCreatorFee Fee for the validator-creator of corresponding swift exit request
     /// @param _validatorCreator Validators that created swift exit request
+    /// @param _succeeded Flag that indicates that the swift exit has succeeded
     function defrostFunds(
+        uint64 _onchainOpId,
         address _account,
         uint16 _tokenId,
         uint128 _amount,
         uint128 _validatorCreatorFee,
-        address _validatorCreator
+        address _validatorCreator,
+        bool _succeeded
     ) external {
         require(
             msg.sender == swiftExits,
@@ -908,35 +935,38 @@ contract Franklin {
             "fnsw14"
         ); // fnds14 - frozen balance must be >= amount
 
-        require(
-            balancesToWithdraw[_account][_tokenId] >= _amount,
-            "fnsw15"
-        ); // fnds15 - balance must be >= amount
-
-        // Amount that will be sent to swift exits contract
-        uint128 amountToSend = _amount - _validatorCreatorFee;
-
         // Defrost balance
         frozenBalances[_account][_tokenId] -= _amount;
-        // Register withdraw for balance to withdraw
-        registerWithdrawal(_account, _tokenId, _amount);
-        // Update balance of validator-sender
-        balancesToWithdraw[_validatorSender][_tokenId] += _validatorCreatorFee;
 
-        if (_tokenId == 0){
-            // If token id == 0 -> transfer ether
-            swiftExits.transfer(amountToSend);
-        } else {
-            // If token id != 0 -> transfer erc20
+        // If there is enouth balance to withdraw (withdraw op for this swift exit occured)
+        if (balancesToWithdraw[_account][_tokenId] >= _amount && _succeeded) {
 
-            // Get token address
-            address tokenAddress = governance.validateTokenId(_tokenId);
+            // Amount that will be sent to swift exits contract
+            uint128 amountToSend = _amount - _validatorCreatorFee;
 
-            // Transfer token
-            require(
-                IERC20(tokenAddress).transfer(swiftExits, amountToSend),
-                "fnds16"
-            ); // fnds16 - token transfer failed
+            // Register withdraw for balance to withdraw
+            registerWithdrawal(_account, _tokenId, _amount);
+
+            // Update balance of validator-sender
+            balancesToWithdraw[_validatorSender][_tokenId] += _validatorCreatorFee;
+
+            if (_tokenId == 0){
+                // If token id == 0 -> transfer ether
+                swiftExits.transfer(uint256(amountToSend));
+            } else {
+                // If token id != 0 -> transfer erc20
+
+                // Get token address
+                address tokenAddress = governance.validateTokenId(_tokenId);
+
+                // Transfer token
+                require(
+                    IERC20(tokenAddress).transfer(swiftExits, uint256(amountToSend)),
+                    "fnds16"
+                ); // fnds16 - token transfer failed
+            }
         }
+
+        delete onchainOps[_onchainOpId];
     }
 }

@@ -301,16 +301,18 @@ contract Governance {
         // tokenAmount Token amount
         // feeAmount Fee amount in specified tokens
         // swiftExitFee Fee amount in specified tokens
-        // recipient Withdraw operation recipient
+        // owner Withdraw operation owner (rollup address)
+        // recipient Withdraw operation recipient (ethereum adddress)
         // supplyAmount Validators supplied amount to fulfill this requests
         (
             uint32 blockNumber,
             uint64 onchainOpNumber,
             uint24 accNumber,
             uint16 tokenId,
-            uint256 tokenAmount,
+            uint128 tokenAmount,
             uint16 feeAmount,
             uint16 packedSwiftExitFee,
+            address owner,
             address recipient,
             uint256 supplyAmount
         ) = parseSwiftExit(_swiftExit);
@@ -322,11 +324,24 @@ contract Governance {
             "gect11"
         ); // "gect11" - supply amount must be > 0
 
+        // Unpack fees value
+        uint128 swiftExitFee = Bytes.parseFloat(packedSwiftExitFee);
+
+        require(
+            swiftExitFee > 0,
+            "gect12"
+        ); // "gect12" - fees must be > 0
+
+        require(
+            tokenAmount > swiftExitFee,
+            "gect13"
+        ); // "gect13" - token amount must be > fee
+
         // Check that there are enouth free tokens on contract
         require(
             (2 * totalSupply / 3) - totalLended >= supplyAmount,
-            "gect12"
-        ); // "gect12" - not enouth amount
+            "gect14"
+        ); // "gect14" - not enouth amount
 
         // Check that sender exists in bitmask and verify validators signature
         require(
@@ -348,12 +363,12 @@ contract Governance {
         // Increase total lended balance
         totalLended += supplyAmount;
 
-        // Freeze tokenAmount with validators fees on Rollup contract for recipient
+        // Freeze tokenAmount with validators fees on Rollup contract for owner
         rollup.freezeFunds(
             blockNumber,
             tokenId,
-            tokenAmount,
-            recipient
+            tokenAmount + swiftExitFee,
+            owner
         );
 
         // Save the swift exit on SwiftExits contract
@@ -365,6 +380,7 @@ contract Governance {
             tokenAmount,
             feeAmount,
             packedSwiftExitFee,
+            owner,
             recipient,
             supplyAmount
         );
@@ -388,12 +404,13 @@ contract Governance {
         uint16 tokenId,
         uint128 tokenAmount,
         uint16 feeAmount,
-        uint256 swiftExitFee,
+        uint16 swiftExitFee,
+        address owner,
         address recipient,
         uint256 supplyAmount
     ) {
         require(
-            _swiftExit.length == 119,
+            _swiftExit.length == 109,
             "gept11"
         ); // gept11 - wrong swift exit length
 
@@ -403,8 +420,9 @@ contract Governance {
         uint8 tokenIdBytesLen = 2;
         uint8 tokenAmountBytesLen = 16;
         uint8 feeAmountBytesLen = 2;
-        uint8 recipientBytesLen = 20;
         uint8 swiftExitFeeBytesLen = 2;
+        uint8 recipientBytesLen = 20;
+        uint8 ownerBytesLen = 20;
         uint8 supplyAmountBytesLen = 32;
 
         bytes memory blockNumberBytes = new bytes(blockNumberBytesLen);
@@ -464,6 +482,21 @@ contract Governance {
         }
         swiftExitFee = Bytes.bytesToUInt16(swiftExitFeeBytes);
 
+        bytes memory ownerBytes = new bytes(ownerBytesLen);
+        for (uint8 i = 0; i < ownerBytesLen; ++i) {
+            ownerBytes[i] = _swiftExit[
+                blockNumberBytesLen +
+                onchainOpNumberBytesLen +
+                accNumberBytesLen +
+                tokenIdBytesLen +
+                tokenAmountBytesLen +
+                feeAmountBytesLen +
+                swiftExitFeeBytesLen +
+                i
+            ];
+        }
+        owner = Bytes.bytesToAddress(ownerBytes);
+
         bytes memory recipientBytes = new bytes(recipientBytesLen);
         for (uint8 i = 0; i < recipientBytesLen; ++i) {
             recipientBytes[i] = _swiftExit[
@@ -474,6 +507,7 @@ contract Governance {
                 tokenAmountBytesLen +
                 feeAmountBytesLen +
                 swiftExitFeeBytesLen +
+                ownerBytesLength +
                 i
             ];
         }
@@ -489,6 +523,7 @@ contract Governance {
                 tokenAmountBytesLen +
                 feeAmountBytesLen +
                 swiftExitFeeBytesLen +
+                ownerBytesLength +
                 recipientBytesLen +
                 i
             ];

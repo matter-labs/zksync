@@ -37,8 +37,8 @@ contract SwiftExits {
     /// @member onchainOpNumber Withdraw operation number in block
     /// @member opHash Corresponding onchain operation hash
     /// @member tokenId Order (sending/fees) token id
-    /// @member tokenAmount Token amount (sending+fees)
-    /// @member recipient Recipient of the withdraw operation
+    /// @member tokenAmount Token amount
+    /// @member owner Owner of the withdraw operation
     /// @member validatorsFee Fee for validators that signed request in orders' tokens + Fee for the validator that created request
     /// @member validatorSender Address of the validator that created request (order transaction sender)
     /// @member supplyAmount Supplied by validators token amount
@@ -46,9 +46,9 @@ contract SwiftExits {
         uint64 onchainOpNumber;
         uint256 opHash;
         uint16 tokenId;
-        uint256 tokenAmount;
-        address recipient;
-        uint256 validatorsFee;
+        uint128 tokenAmount;
+        address onwer;
+        uint16 validatorsFee;
         address validatorSender;
         uint256 supplyAmount;
     }
@@ -89,9 +89,10 @@ contract SwiftExits {
     /// @param _onchainOpNumber Withdraw operation number in rollup block
     /// @param _accNumber Account - creator of withdraw operation (id in Rollup)
     /// @param _tokenId Token id (sending/fees)
-    /// @param _tokenAmount Token amount (sending+fees)
+    /// @param _tokenAmount Token amount 
     /// @param _feeAmount Rollup fee amount in specified tokens, used only to create withdraw op hash
     /// @param _packedSwiftExitFee Fee for validators that signed request and validator that sent this tx
+    /// @param _owner Withdraw operation owner
     /// @param _recipient Withdraw operation recipient
     /// @param _supplyAmount Supplied amount by validators to borrow from Compound / send to recipient
     function addSwiftExit(
@@ -99,10 +100,11 @@ contract SwiftExits {
         uint64 _onchainOpNumber,
         uint24 _accNumber,
         uint16 _tokenId,
-        uint256 _tokenAmount,
+        uint128 _tokenAmount,
         uint16 _feeAmount,
         uint16 _packedSwiftExitFee,
-        uint256 _recipient,
+        address _owner,
+        address _recipient,
         uint256 _supplyAmount
     )
         external
@@ -131,35 +133,20 @@ contract SwiftExits {
             _tokenId,
             _tokenAmount,
             _feeAmount,
-            _recipient,
-            _packedSwiftExitFee
+            _packedSwiftExitFee,
+            _owner,
+            _recipient
         )));
-        
-        // Unpack fees value
-        uint256 swiftExitFee = Bytes.parseFloat(packedSwiftExitFee);
-
-        require(
-            swiftExitFee > 0,
-            "ssat14"
-        ); // "ssat14" - fees must be > 0
-
-        require(
-            _tokenAmount > swiftExitFee,
-            "ssat15"
-        ); // "ssat15" - token amount must be > swift exits fees
-
-        // Amount that will be sent to recipient
-        uint256 sendingAmount = _tokenAmount - swiftExitFee;
         
         // Get matter token id from governance to check if there is need to borrow from Compound (if sending token is also Matter token - no need)
         uint16 matterTokenId = governance.matterTokenId;
         if (_tokenId != matterTokenId) {
             // Borrow needed tokens from compound if token ids arent equal
-            borrowFromCompound(_supplyAmount, tokenId, sendingAmount);
+            borrowFromCompound(_supplyAmount, tokenId, _tokenAmount);
         }
 
         // Send tokens to recipient
-        sendTokensToRecipient(_recipient, _tokenId, sendingAmount);
+        sendTokensToRecipient(_recipient, _tokenId, _tokenAmount);
 
         // Create and save ExitOrder
         ExitOrder order = ExitOrder(
@@ -167,8 +154,8 @@ contract SwiftExits {
             opHash,
             _tokenId,
             _tokenAmount,
-            _recipient,
-            swiftExitFee,
+            _owner,
+            packedSwiftExitFee,
             tx.origin, // Here tx origin MUST be only validator address, so we can use it
             _supplyAmount
         );
@@ -199,15 +186,6 @@ contract SwiftExits {
             // Validator creator fee (she created request)
             uint128 validatorCreatorFee = order.validatorsFee / VALIDATOR_CREATOR_FEE_COEFF;
 
-            // Defrost funds on rollup, pay fee to validator-creator and get tokens from rollup to repay borrowed from validators
-            rollup.defrostFunds(
-                order.recipient,
-                order.tokenId,
-                order.tokenAmount,
-                validatorCreatorFee,
-                order.validatorSender
-            );
-
             // Get real onchain operation hash from Rollup contract
             uint256 realOpHash = uint256(keccak256(rollup.onchainOps[onchainOpsStartIdInBlock + order.onchainOpNumber].pubData));
 
@@ -217,12 +195,23 @@ contract SwiftExits {
             if (realOpHash == expectedOpHash) {
                 // If hashes are equal - order is correct -> get tokens from rollup, repay to compound if needed, repay to validators
 
+                // Defrost funds on rollup, pay fee to validator-creator and get tokens from rollup to repay borrowed from validators
+                rollup.defrostFunds(
+                    onchainOpsStartIdInBlock + order.onchainOpNumber,
+                    order.owner,
+                    order.tokenId,
+                    order.tokenAmount + order.validatorsFee,
+                    validatorCreatorFee,
+                    order.validatorSender,
+                    true
+                );
+
                 // Repay to compound if order token id is not Matter token
                 uint16 matterTokenId = governance.matterTokenId;
                 if (order.tokenId != matterTokenId) {
                     repayToCompound(
                         order.tokenId,
-                        order.tokenAmount - order.validatorsFee,
+                        order.tokenAmount,
                         order.supplyAmount
                     );
                 }
@@ -268,6 +257,17 @@ contract SwiftExits {
                         order.validatorsFee - validatorCreatorFee
                     );
                 }
+            } else {
+                // If hashes aren't equal - just defrost user funds
+                rollup.defrostFunds(
+                    onchainOpsStartIdInBlock + order.onchainOpNumber,
+                    order.owner,
+                    order.tokenId,
+                    order.tokenAmount + order.validatorsFee,
+                    0,
+                    address(0),
+                    false
+                );
             }
         }
         // Delete storage records for specified block number
