@@ -85,7 +85,7 @@ contract Franklin {
     uint256 constant TRANSFER_TO_NEW_LENGTH = 5 * 8;
     
     /// @notice Withdraw operation length
-    uint256 constant WITHDRAW_LENGTH = 8 * 8;
+    uint256 constant WITHDRAW_LENGTH = 6 * 8;
     
     /// @notice Close operation length
     uint256 constant CLOSE_ACCOUNT_LENGTH = 1 * 8;
@@ -587,9 +587,9 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.Withdraw)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES + ETH_ADDR_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES + FEE_BYTES);
             require(
-                pubData.length == ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES + ETH_ADDR_BYTES,
+                pubData.length == ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES + FEE_BYTES,
                 "fpp12"
             ); // fpp12 - wrong withdraw length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -731,11 +731,6 @@ contract Franklin {
                     amountBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + i];
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
-
-                bytes memory feeBytes = new bytes(FEE_BYTES);
-                for (uint256 i = 0; i < FEE_BYTES; ++i) {
-                    feeBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + i];
-                }
 
                 bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
