@@ -363,11 +363,11 @@ contract Governance {
         // Increase total lended balance
         totalLended += supplyAmount;
 
-        // Freeze tokenAmount with validators fees on Rollup contract for owner
+        // Freeze tokenAmount on Rollup contract for owner
         rollup.freezeFunds(
             blockNumber,
             tokenId,
-            tokenAmount + swiftExitFee,
+            tokenAmount,
             owner
         );
 

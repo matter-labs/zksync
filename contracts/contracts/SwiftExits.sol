@@ -37,7 +37,7 @@ contract SwiftExits {
     /// @member onchainOpNumber Withdraw operation number in block
     /// @member opHash Corresponding onchain operation hash
     /// @member tokenId Order (sending/fees) token id
-    /// @member tokenAmount Token amount
+    /// @member sendingAmount Token amount that will be sent to recipient
     /// @member owner Owner of the withdraw operation
     /// @member validatorsFee Fee for validators that signed request in orders' tokens + Fee for the validator that created request
     /// @member validatorSender Address of the validator that created request (order transaction sender)
@@ -46,7 +46,7 @@ contract SwiftExits {
         uint64 onchainOpNumber;
         uint256 opHash;
         uint16 tokenId;
-        uint128 tokenAmount;
+        uint128 sendingAmount;
         address onwer;
         uint16 validatorsFee;
         address validatorSender;
@@ -89,7 +89,7 @@ contract SwiftExits {
     /// @param _onchainOpNumber Withdraw operation number in rollup block
     /// @param _accNumber Account - creator of withdraw operation (id in Rollup)
     /// @param _tokenId Token id (sending/fees)
-    /// @param _tokenAmount Token amount 
+    /// @param _tokenAmount Token amount (sending amount + swift exit fees)
     /// @param _feeAmount Rollup fee amount in specified tokens, used only to create withdraw op hash
     /// @param _packedSwiftExitFee Fee for validators that signed request and validator that sent this tx
     /// @param _owner Withdraw operation owner
@@ -127,6 +127,12 @@ contract SwiftExits {
             "ssat13"
         ); // "ssat13" - order exists
 
+        // Get swift exit fee to reduce token amount by this value
+        uint128 swiftExitFee = Bytes.parseFloat(_packedSwiftExitFee);
+
+        // Amount that will be borrowed from Compounds and sent to recipient
+        uint128 sendingAmount = _tokenAmount - swiftExitFee;
+
         // Withdraw operation hash - will be used to check correctness of this request (this hash must be equal to corresponding withdraw op hash on Rollup contract)
         uint256 opHash = uint256(keccak256(abi.encodePacked(
             _accNumber,
@@ -142,18 +148,18 @@ contract SwiftExits {
         uint16 matterTokenId = governance.matterTokenId;
         if (_tokenId != matterTokenId) {
             // Borrow needed tokens from compound if token ids arent equal
-            borrowFromCompound(_supplyAmount, tokenId, _tokenAmount);
+            borrowFromCompound(_supplyAmount, tokenId, sendingAmount);
         }
 
         // Send tokens to recipient
-        sendTokensToRecipient(_recipient, _tokenId, _tokenAmount);
+        sendTokensToRecipient(_recipient, _tokenId, sendingAmount);
 
         // Create and save ExitOrder
         ExitOrder order = ExitOrder(
             _onchainOpNumber,
             opHash,
             _tokenId,
-            _tokenAmount,
+            sendingAmount,
             _owner,
             packedSwiftExitFee,
             tx.origin, // Here tx origin MUST be only validator address, so we can use it
@@ -200,7 +206,7 @@ contract SwiftExits {
                     onchainOpsStartIdInBlock + order.onchainOpNumber,
                     order.owner,
                     order.tokenId,
-                    order.tokenAmount + order.validatorsFee,
+                    order.sendingAmount + order.validatorsFee,
                     validatorCreatorFee,
                     order.validatorSender,
                     true
@@ -211,7 +217,7 @@ contract SwiftExits {
                 if (order.tokenId != matterTokenId) {
                     repayToCompound(
                         order.tokenId,
-                        order.tokenAmount,
+                        order.sendingAmount,
                         order.supplyAmount
                     );
                 }
@@ -263,7 +269,7 @@ contract SwiftExits {
                     onchainOpsStartIdInBlock + order.onchainOpNumber,
                     order.owner,
                     order.tokenId,
-                    order.tokenAmount + order.validatorsFee,
+                    order.sendingAmount + order.validatorsFee,
                     0,
                     address(0),
                     false

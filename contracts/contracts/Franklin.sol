@@ -745,14 +745,14 @@ contract Franklin {
 
                 if (seFee > 0) {
                     // If there is swift exit fee - check if there is enouth frozen balance for owner
-                    if (frozenBalances[rollupAddress][tokenId] - balancesToWithdraw[rollupAddress][tokenId] >= amount + seFee) {
-                        // If yes - consider that swift exit succeeded and increase balances for owner by withdraw amount and swift exit fee
-                        balancesToWithdraw[rollupAddress][tokenId] += amount + seFee;
+                    if (frozenBalances[rollupAddress][tokenId] - balancesToWithdraw[rollupAddress][tokenId] >= amount) {
+                        // If yes - consider that swift exit succeeded and increase balances for owner by withdraw amounte
+                        balancesToWithdraw[rollupAddress][tokenId] += amount;
                     } else {
-                        // If not - consider that swift exit failed and increase balance for recipient by withdraw amount
+                        // If not - consider that swift exit failed and increase balance for recipient by withdraw amount minus swift exit fee
                         // and increase owner balance by swift exit fee
                         balancesToWithdraw[rollupAddress][tokenId] += seFee;
-                        balancesToWithdraw[ethAddress][tokenId] += amount;
+                        balancesToWithdraw[ethAddress][tokenId] += amount - seFee;
                     }
                 } else {
                     // If there is no swift exit fee - increase recipient balance by withdraw amount
