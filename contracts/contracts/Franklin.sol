@@ -24,15 +24,6 @@ contract Franklin {
     /// @notice Priority Queue contract. Contains priority requests list
     PriorityQueue internal priorityQueue;
 
-    /// @notice Validator-creator fee coefficient for creating swift exit request
-    uint256 constant VALIDATOR_CREATOR_FEE_COEFF = 5;
-
-    /// @notice Validators fee coefficient for swift exit request sign
-    uint256 constant VALIDATORS_SE_FEE_COEFF = 5;
-
-    /// @notice Swift exit fee total coefficient (fees for circuit + fees for swift exit)
-    uint256 constant SWIFT_EXIT_FEE_COEFF = 15;
-
     /// @notice Token id bytes lengths
     uint8 constant TOKEN_BYTES = 2;
 
@@ -741,16 +732,9 @@ contract Franklin {
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
-                // Get fee, if it satisfies the value of swift exits fees than
-                // increase the amount of withdraw by validators fee (total fee is circuit fee and validators fee for swift exit)
                 bytes memory feeBytes = new bytes(FEE_BYTES);
                 for (uint256 i = 0; i < FEE_BYTES; ++i) {
                     feeBytes[i] = op.pubData[ACC_NUM_BYTES + TOKEN_BYTES + AMOUNT_BYTES + i];
-                }
-                uint16 packedFee = Bytes.bytesToUInt16(feeBytes);
-                uint128 fee = Bytes.parseFloat(packedFee);
-                if (amount * SWIFT_EXIT_FEE_COEFF / 100 == fee) {
-                    amount += fee * (VALIDATORS_SE_FEE_COEFF + VALIDATOR_CREATOR_FEE_COEFF) / SWIFT_EXIT_FEE_COEFF;
                 }
 
                 bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
@@ -906,16 +890,14 @@ contract Franklin {
     /// @param _account Account addess
     /// @param _tokenId Token id
     /// @param _amount Token amount
-    /// @param _validatorsFee Validators fees
-    /// @param _validatorSenderFee Validator-sender fee
-    /// @param _validatorSender Validators that created swift exit request
+    /// @param _validatorCreatorFee Fee for the validator-creator of corresponding swift exit request
+    /// @param _validatorCreator Validators that created swift exit request
     function defrostFunds(
         address _account,
         uint16 _tokenId,
         uint128 _amount,
-        uint128 _validatorsFee,
-        uint128 _validatorSenderFee,
-        address _validatorSender
+        uint128 _validatorCreatorFee,
+        address _validatorCreator
     ) external {
         require(
             msg.sender == swiftExits,
@@ -926,28 +908,29 @@ contract Franklin {
             "fnds12"
         ); // fnds12 - tx origin must be active validator
 
-        uint128 fullAmount = _amount + _validatorSenderFee + _validatorsFee;
-
         require(
-            frozenBalances[_account][_tokenId] >= fullAmount,
+            frozenBalances[_account][_tokenId] >= _amount,
             "fnsw14"
         ); // fnds14 - frozen balance must be >= amount
 
         require(
-            balancesToWithdraw[_account][_tokenId] >= fullAmount,
+            balancesToWithdraw[_account][_tokenId] >= _amount,
             "fnsw15"
         ); // fnds15 - balance must be >= amount
 
+        // Amount that will be sent to swift exits contract
+        uint128 amountToSend = _amount - _validatorCreatorFee;
+
         // Defrost balance
-        frozenBalances[_account][_tokenId] -= fullAmount;
+        frozenBalances[_account][_tokenId] -= _amount;
         // Register withdraw for balance to withdraw
-        registerWithdrawal(_account, _tokenId, fullAmount);
+        registerWithdrawal(_account, _tokenId, _amount);
         // Update balance of validator-sender
-        balancesToWithdraw[_validatorSender][_tokenId] += _validatorSenderFee;
+        balancesToWithdraw[_validatorSender][_tokenId] += _validatorCreatorFee;
 
         if (_tokenId == 0){
             // If token id == 0 -> transfer ether
-            swiftExits.transfer(_amount + _validatorsFee);
+            swiftExits.transfer(amountToSend);
         } else {
             // If token id != 0 -> transfer erc20
 
@@ -956,7 +939,7 @@ contract Franklin {
 
             // Transfer token
             require(
-                IERC20(tokenAddress).transfer(swiftExits, _amount + _validatorsFee),
+                IERC20(tokenAddress).transfer(swiftExits, amountToSend),
                 "fnds16"
             ); // fnds16 - token transfer failed
         }

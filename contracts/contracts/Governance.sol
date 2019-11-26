@@ -11,15 +11,6 @@ contract Governance {
 
     /// @notice Freeze time for token, when validator withdraw it. Then the validator must wait this time to withdraw it again
     uint256 constant FREEZE_TIME = 10000;
-    
-    /// @notice Validator-creator fee coefficient
-    uint256 constant VALIDATOR_CREATOR_FEE_COEFF = 5;
-
-    /// @notice Validators fee coefficient
-    uint256 constant VALIDATORS_SE_FEE_COEFF = 5;
-
-    /// @notice Swift exit fee coefficient
-    uint256 constant SWIFT_EXIT_FEE_COEFF = 15;
 
     /// @notice Rollup contract, contains user funds
     Franklin rollup;
@@ -309,6 +300,7 @@ contract Governance {
         // tokenId Token id
         // tokenAmount Token amount
         // feeAmount Fee amount in specified tokens
+        // swiftExitFee Fee amount in specified tokens
         // recipient Withdraw operation recipient
         // supplyAmount Validators supplied amount to fulfill this requests
         (
@@ -318,6 +310,7 @@ contract Governance {
             uint16 tokenId,
             uint256 tokenAmount,
             uint16 feeAmount,
+            uint16 packedSwiftExitFee,
             address recipient,
             uint256 supplyAmount
         ) = parseSwiftExit(_swiftExit);
@@ -325,27 +318,15 @@ contract Governance {
         // Checks that amounts are enouth
 
         require(
-            tokenAmount > 0,
-            "gect11"
-        ); // "gect11" - token amount must be > 0
-
-        require(
             supplyAmount > 0,
-            "gect12"
-        ); // "gect12" - supply amount must be > 0
-
-        uint256 swiftExitFee = Bytes.parseFloat(feeAmount);
-
-        require(
-            swiftExitFee == tokenAmount * SWIFT_EXIT_FEE_COEFF / 100,
-            "gect13"
-        ); // "gect13" - fees must be == amount * fee coeff
+            "gect11"
+        ); // "gect11" - supply amount must be > 0
 
         // Check that there are enouth free tokens on contract
         require(
             (2 * totalSupply / 3) - totalLended >= supplyAmount,
-            "gect14"
-        ); // "gect14" - not enouth amount
+            "gect12"
+        ); // "gect12" - not enouth amount
 
         // Check that sender exists in bitmask and verify validators signature
         require(
@@ -355,14 +336,14 @@ contract Governance {
                 _signersBitmask,
                 uint256(keccak256(_swiftExit))
             ),
-            "gect15"
-        ); // "gect15" - wrong signature or validator-sender is not in signers bitmask
+            "gect13"
+        ); // "gect13" - wrong signature or validator-sender is not in signers bitmask
         
         // Send tokens to swiftExits
         require(
             IERC20(matterTokenAddress).transfer(address(swiftExits), supplyAmount),
-            "gect16"
-        ); // gect16 - token transfer out failed
+            "gect14"
+        ); // gect14 - token transfer out failed
 
         // Increase total lended balance
         totalLended += supplyAmount;
@@ -371,7 +352,7 @@ contract Governance {
         rollup.freezeFunds(
             blockNumber,
             tokenId,
-            tokenAmount + swiftExitFee * (VALIDATORS_SE_FEE_COEFF + VALIDATOR_CREATOR_FEE_COEFF) / SWIFT_EXIT_FEE_COEFF,
+            tokenAmount,
             recipient
         );
 
@@ -383,6 +364,7 @@ contract Governance {
             tokenId,
             tokenAmount,
             feeAmount,
+            packedSwiftExitFee,
             recipient,
             supplyAmount
         );
@@ -406,11 +388,12 @@ contract Governance {
         uint16 tokenId,
         uint128 tokenAmount,
         uint16 feeAmount,
+        uint256 swiftExitFee,
         address recipient,
         uint256 supplyAmount
     ) {
         require(
-            _swiftExit.length == 87,
+            _swiftExit.length == 119,
             "gept11"
         ); // gept11 - wrong swift exit length
 
@@ -421,6 +404,7 @@ contract Governance {
         uint8 tokenAmountBytesLen = 16;
         uint8 feeAmountBytesLen = 2;
         uint8 recipientBytesLen = 20;
+        uint8 swiftExitFeeBytesLen = 2;
         uint8 supplyAmountBytesLen = 32;
 
         bytes memory blockNumberBytes = new bytes(blockNumberBytesLen);
@@ -466,6 +450,20 @@ contract Governance {
         }
         feeAmount = Bytes.bytesToUInt16(feeAmountBytes);
 
+        bytes memory swiftExitFeeBytes = new bytes(swiftExitFeeBytesLen);
+        for (uint8 i = 0; i < swiftExitFeeBytesLen; ++i) {
+            swiftExitFeeBytes[i] = _swiftExit[
+                blockNumberBytesLen +
+                onchainOpNumberBytesLen +
+                accNumberBytesLen +
+                tokenIdBytesLen +
+                tokenAmountBytesLen +
+                feeAmountBytesLen +
+                i
+            ];
+        }
+        swiftExitFee = Bytes.bytesToUInt16(swiftExitFeeBytes);
+
         bytes memory recipientBytes = new bytes(recipientBytesLen);
         for (uint8 i = 0; i < recipientBytesLen; ++i) {
             recipientBytes[i] = _swiftExit[
@@ -475,6 +473,7 @@ contract Governance {
                 tokenIdBytesLen +
                 tokenAmountBytesLen +
                 feeAmountBytesLen +
+                swiftExitFeeBytesLen +
                 i
             ];
         }
@@ -489,6 +488,7 @@ contract Governance {
                 tokenIdBytesLen +
                 tokenAmountBytesLen +
                 feeAmountBytesLen +
+                swiftExitFeeBytesLen +
                 recipientBytesLen +
                 i
             ];
@@ -685,16 +685,14 @@ contract Governance {
         }
     }
 
-    /// @notice Repays specified amount of atter token into contract, charges specified amount of tokens or ether as fee into contract
+    /// @notice Repays specified amount of matter token into contract, charges specified amount of tokens or ether as fee into contract
     /// @param _repayAmount Matter token repayment amount
     /// @param _feesTokenAddress Fees token address, address(0) for Ether
     /// @param _feesAmount Fees amount
-    /// @param _validatorCreator Validator, that processed order
     function repayBorrowWithFees(
         uint256 _repayAmount,
         address _feesTokenAddress,
-        uint256 _feesAmount,
-        address _validatorCreator
+        uint256 _feesAmount
     ) external payable {
         // Can be called only from swift exit contract
         require(
@@ -733,10 +731,7 @@ contract Governance {
             ); // gers14 - amount must be == 0 and msg.value > 0
 
             // Accumulate validators fees
-            accumulatedFees += msg.value * VALIDATORS_SE_FEE_COEFF / (VALIDATOR_CREATOR_FEE_COEFF + VALIDATORS_SE_FEE_COEFF);
-            
-            // Repay fee to validator that created request
-            _validatorCreator.transfer(msg.value * VALIDATOR_CREATOR_FEE_COEFF / (VALIDATOR_CREATOR_FEE_COEFF + VALIDATORS_SE_FEE_COEFF));
+            accumulatedFees += msg.value;
         } else {
             // Token is ERC20
 
@@ -753,13 +748,7 @@ contract Governance {
             ); // gers16 - token transfer in failed
 
             // Accumulate validators fees
-            accumulatedFees += _feesAmount * VALIDATORS_SE_FEE_COEFF / (VALIDATOR_CREATOR_FEE_COEFF + VALIDATORS_SE_FEE_COEFF);
-
-            // Repay fee to validator that created request
-            require(
-                IERC20(_feesTokenAddress).transfer(_validatorCreator, _feesAmount * VALIDATOR_CREATOR_FEE_COEFF / (VALIDATOR_CREATOR_FEE_COEFF + VALIDATORS_SE_FEE_COEFF)),
-                "gers17"
-            ); // gers17 - token transfer out failed
+            accumulatedFees += _feesAmount;
         }
     }
 }
