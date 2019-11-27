@@ -23,6 +23,7 @@ steps:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
   - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - ci-prepare-env.sh
   - franklin env ci
   - franklin yarn
   - franklin db-wait
@@ -47,7 +48,7 @@ steps:
   - export PATH=$FRANKLIN_HOME/bin:$PATH
   - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
   - cargo fmt -- --check
-  - cargo clippy --tests --benches -- -D warnings
+  - f cargo clippy --tests --benches -- -D warnings
   depends_on:
   - build-contracts
 
@@ -57,7 +58,7 @@ steps:
   - export FRANKLIN_HOME=`pwd`
   - export PATH=$FRANKLIN_HOME/bin:$PATH
   - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
-  - cargo test
+  - f cargo test
   depends_on:
   - rust-checks
 

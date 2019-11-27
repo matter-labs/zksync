@@ -119,7 +119,7 @@ mod test {
         let phasher = PedersenHasher::<Bn256>::default();
 
         let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+            CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
 
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);

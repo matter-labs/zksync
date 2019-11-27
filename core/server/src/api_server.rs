@@ -1,24 +1,26 @@
 #![cfg_attr(feature = "cargo-clippy", allow(clippy::needless_pass_by_value))]
-
+// Built-in uses
+use std::env;
+use std::sync::mpsc;
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant};
+use storage::{BlockDetails, ConnectionPool};
+// External uses
+use actix_web::Result as ActixResult;
 use actix_web::{
     error, http::Method, middleware, middleware::cors::Cors, server, App, AsyncResponder, Body,
     Error, HttpMessage, HttpRequest, HttpResponse,
 };
-use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
-use models::{NetworkStatus, StateKeeperRequest};
-use std::sync::mpsc;
-use storage::{BlockDetails, ConnectionPool};
-
-use crate::ThreadPanicNotify;
-use actix_web::Result as ActixResult;
 use failure::format_err;
 use futures::Future;
-use models::node::AccountAddress;
-use std::env;
-use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
 use tokio::prelude::*;
 use tokio::timer::Interval;
+// Workspace uses
+use crate::{ConfigurationOptions, ThreadPanicNotify};
+use models::node::AccountAddress;
+use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
+use models::{NetworkStatus, StateKeeperRequest};
+use std::net::SocketAddr;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ApiError {
@@ -210,40 +212,6 @@ fn handle_get_testnet_config(req: &HttpRequest<AppState>) -> ActixResult<HttpRes
     let address = req.state().contract_address.clone();
     Ok(HttpResponse::Ok().json(TestnetConfigResponse { address }))
 }
-
-// fn handle_get_network_status(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
-//     let tx_for_state = req.state().tx_for_state.clone();
-
-//     let (tx, rx) = mpsc::channel();
-//     let request = StateKeeperRequest::GetNetworkStatus(tx);
-//     tx_for_state.send(request).expect("must send a new transaction to queue");
-//     let status: Result<NetworkStatus, _> = rx.recv_timeout(std::time::Duration::from_millis(TIMEOUT));
-//     if status.is_err() {
-//         return Ok(HttpResponse::Ok().json(ApiError{error: "timeout".to_owned()}));
-//     }
-//     let status = status.unwrap();
-
-//     let pool = req.state().connection_pool.clone();
-//     let storage = pool.access_storage();
-//     if storage.is_err() {
-//         return Ok(HttpResponse::Ok().json(ApiError{error: "rate limit".to_string()}));
-//     }
-//     let mut storage = storage.unwrap();
-
-//     // TODO: properly handle failures
-//     let last_committed = storage.get_last_committed_block().unwrap_or(0);
-//     let last_verified = storage.get_last_verified_block().unwrap_or(0);
-//     let outstanding_txs = storage.count_outstanding_proofs(last_verified).unwrap_or(0);
-
-//     let status = NetworkStatus{
-//         next_block_at_max: status.next_block_at_max,
-//         last_committed,
-//         last_verified,
-//         outstanding_txs,
-//     };
-
-//     Ok(HttpResponse::Ok().json(status))
-// }
 
 fn handle_get_account_transactions(req: &HttpRequest<AppState>) -> ActixResult<HttpResponse> {
     let account_address = req.match_info().get("id");
@@ -596,7 +564,7 @@ fn handle_search(
         .responder()
 }
 
-fn start_server(state: AppState, bind_to: String) {
+fn start_server(state: AppState, bind_to: &SocketAddr) {
     server::new(move || {
         App::with_state(state.clone()) // <- create app with shared state
             .middleware(middleware::Logger::default())
@@ -649,7 +617,7 @@ fn start_server(state: AppState, bind_to: String) {
                     })
             })
     })
-    .bind(&bind_to)
+    .bind(bind_to)
     .unwrap()
     .shutdown_timeout(1)
     .start();
@@ -690,29 +658,27 @@ pub fn start_api_server(
     tx_for_state: mpsc::Sender<StateKeeperRequest>,
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
+    config_options: ConfigurationOptions,
 ) {
     std::thread::Builder::new()
         .name("actix".to_string())
         .spawn(move || {
             env::set_var("RUST_LOG", "actix_web=info");
+
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
-
-            let address = env::var("BIND_TO").unwrap_or_else(|_| "127.0.0.1".to_string());
-            let port = env::var("PORT").unwrap_or_else(|_| "8080".to_string());
-            let bind_to = format!("{}:{}", address, port);
-
-            let sys = actix::System::new("api-server");
 
             let state = AppState {
                 tx_for_state: tx_for_state.clone(),
-                contract_address: env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env missing"),
+                contract_address: format!("0x{}", config_options.contract_eth_addr),
                 connection_pool: connection_pool.clone(),
                 network_status: SharedNetworkStatus::default(),
             };
 
-            start_server(state.clone(), bind_to.clone());
-            info!("Started http server at {}", &bind_to);
-            start_status_interval(state.clone());
+            let sys = actix::System::new("api-server");
+
+            start_server(state.clone(), &config_options.api_server_address);
+            start_status_interval(state);
+
             sys.run();
         })
         .expect("Api server thread");

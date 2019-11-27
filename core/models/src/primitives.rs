@@ -1,6 +1,7 @@
-use crate::circuit::utils::append_le_fixed_width;
-use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
-use crate::params;
+// Built-in uses
+use std::convert::TryInto;
+use std::str::FromStr;
+// External uses
 use bigdecimal::BigDecimal;
 use failure::bail;
 use ff::ScalarEngine;
@@ -8,9 +9,11 @@ use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use pairing::bn256::Bn256;
 use pairing::{CurveAffine, Engine};
-use std::convert::TryInto;
-use std::str::FromStr;
 use web3::types::U256;
+// Workspace uses
+use crate::circuit::utils::append_le_fixed_width;
+use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
+use crate::params;
 
 // TODO: replace Vec with Iterator?
 
