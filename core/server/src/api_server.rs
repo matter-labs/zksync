@@ -16,10 +16,11 @@ use futures::Future;
 use tokio::prelude::*;
 use tokio::timer::Interval;
 // Workspace uses
-use crate::ThreadPanicNotify;
+use crate::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::AccountAddress;
 use models::node::{tx::FranklinTx, Account, AccountId, ExecutedOperations};
 use models::{NetworkStatus, StateKeeperRequest};
+use std::net::SocketAddr;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ApiError {
@@ -563,7 +564,7 @@ fn handle_search(
         .responder()
 }
 
-fn start_server(state: AppState, bind_to: String) {
+fn start_server(state: AppState, bind_to: &SocketAddr) {
     server::new(move || {
         App::with_state(state.clone()) // <- create app with shared state
             .middleware(middleware::Logger::default())
@@ -616,7 +617,7 @@ fn start_server(state: AppState, bind_to: String) {
                     })
             })
     })
-    .bind(&bind_to)
+    .bind(bind_to)
     .unwrap()
     .shutdown_timeout(1)
     .start();
@@ -657,9 +658,7 @@ pub fn start_api_server(
     tx_for_state: mpsc::Sender<StateKeeperRequest>,
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
-    bind_address: String,
-    bind_port: String,
-    contract_eth_addr: String,
+    config_options: ConfigurationOptions,
 ) {
     std::thread::Builder::new()
         .name("actix".to_string())
@@ -670,17 +669,16 @@ pub fn start_api_server(
 
             let state = AppState {
                 tx_for_state: tx_for_state.clone(),
-                contract_address: contract_eth_addr,
+                contract_address: format!("0x{}", config_options.contract_eth_addr),
                 connection_pool: connection_pool.clone(),
                 network_status: SharedNetworkStatus::default(),
             };
 
-            let bind_to = format!("{}:{}", bind_address, bind_port);
-            start_server(state.clone(), bind_to.clone());
-            info!("Started http server at {}", &bind_to);
+            let sys = actix::System::new("api-server");
+
+            start_server(state.clone(), &config_options.api_server_address);
             start_status_interval(state);
 
-            let sys = actix::System::new("api-server");
             sys.run();
         })
         .expect("Api server thread");
