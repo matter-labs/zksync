@@ -293,6 +293,7 @@ pub fn apply_transfer(
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
+            swift_exit_fee: Some(Fr::zero()),
             pub_nonce: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),

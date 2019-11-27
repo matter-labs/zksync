@@ -181,8 +181,6 @@ pub fn apply_withdraw(
 
     let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
 
-    let swift_exit_fee_as_field_element = Fr::from_str(&withdraw.swift_exit_fee.to_string()).unwrap();
-
     let swift_exit_fee_bits = convert_to_float(
         withdraw.swift_exit_fee,
         franklin_constants::FEE_EXPONENT_BIT_WIDTH,
@@ -408,7 +406,8 @@ pub fn calculate_withdraw_operations_from_witness(
         operation_four,
         operation_five,
         operation_six,
-        operation_seven
+        operation_seven,
+        operation_eight
     ]
 }
 #[cfg(test)]

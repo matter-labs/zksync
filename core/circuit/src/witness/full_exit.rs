@@ -221,6 +221,7 @@ pub fn apply_full_exit(
             amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_to_exit),
             fee: Some(Fr::zero()),
+            swift_exit_fee: Some(Fr::zero()),
             pub_nonce: Some(full_exit.pub_nonce),
             a: Some(a),
             b: Some(b),

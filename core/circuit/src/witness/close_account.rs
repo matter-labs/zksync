@@ -133,6 +133,7 @@ pub fn apply_close_account(
             full_amount: Some(Fr::zero()),
             pub_nonce: Some(Fr::zero()),
             fee: Some(Fr::zero()),
+            swift_exit_fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
             new_pub_key_hash: Some(Fr::zero()),

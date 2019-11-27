@@ -175,7 +175,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 |lc| lc + CS::one(),
                 |lc| lc + rolling_root.get_variable(),
             );
-            self. (
+            self.execute_op(
                 cs.namespace(|| "execute_op"),
                 &mut current_branch,
                 &lhs,
@@ -567,7 +567,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             is_op_data_correct_flags.push(CircuitElement::equals(
                 cs.namespace(|| "is swift_exit_fee_packed equal to previous"),
                 &op_data.swift_exit_fee_packed,
-                &prev.op_data.fee_swift_exit_fee_packedpacked,
+                &prev.op_data.swift_exit_fee_packed,
             )?);
             is_op_data_correct_flags.push(CircuitElement::equals(
                 cs.namespace(|| "is ethereum_key equal to previous"),

@@ -50,6 +50,7 @@ pub fn noop_operation(
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
             fee: Some(Fr::zero()),
+            swift_exit_fee: Some(Fr::zero()),
             a: Some(Fr::zero()),
             b: Some(Fr::zero()),
             pub_nonce: Some(Fr::zero()),

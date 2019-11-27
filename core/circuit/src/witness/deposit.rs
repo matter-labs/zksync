@@ -169,6 +169,7 @@ pub fn apply_deposit(
             amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_as_field_element),
             fee: Some(Fr::zero()),
+            swift_exit_fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
             pub_nonce: Some(Fr::zero()),
