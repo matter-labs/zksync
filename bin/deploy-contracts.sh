@@ -10,20 +10,15 @@
 # cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
 echo "redeploying for the db $DATABASE_URL"
-if [[ "$FRANKLIN_ENV" == "ci" ]]; then
-    cd contracts;
-    yarn deploy  | tee ../deploy.log;
-    cd ..;
-else
-    franklin flatten;
-    cd contracts;
-    yarn deploy_flat  | tee ../deploy.log;
-    cd ..;
-fi
+franklin flatten;
+cd contracts;
+yarn deploy | tee ../deploy.log;
+cd ..;
 
 CONTRACT_ADDR_NEW_VALUE=`grep "CONTRACT_ADDR" deploy.log`
 ERC20_ADDR_NEW_VALUE=`grep "TEST_ERC20" deploy.log`
 GOVERNANCE_ADDR_NEW_VALUE=`grep "GOVERNANCE_ADDR" deploy.log`
+VERIFIER_ADDR_NEW_VALUE=`grep "VERIFIER_ADDR" deploy.log`
 PRIORITY_QUEUE_ADDR_NEW_VALUE=`grep "PRIORITY_QUEUE_ADDR" deploy.log`
 if [[ ! -z "$CONTRACT_ADDR_NEW_VALUE" ]]
 then
@@ -35,6 +30,7 @@ then
     python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $ERC20_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_ADDR_NEW_VALUE
+    python3 bin/replace-env-variable.py ./$ENV_FILE $VERIFIER_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $PRIORITY_QUEUE_ADDR_NEW_VALUE
 else
     echo "Contract deployment failed"

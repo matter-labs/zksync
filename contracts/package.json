@@ -2,8 +2,10 @@
   "name": "franklin-contracts",
   "version": "0.1.0",
   "devDependencies": {
+    "@types/argparse": "^1.0.36",
     "@types/chai": "^4.1.7",
     "@types/mocha": "^5.2.7",
+    "argparse": "^1.0.10",
     "axios": "^0.19.0",
     "chai": "^4.2.0",
     "ethereum-waffle": "^2.0.12",
@@ -23,11 +25,10 @@
     "typescript": "^3.5.3"
   },
   "scripts": {
-    "build": "waffle",
-    "flat_build": "yarn build && waffle config_flat.json",
+    "build": "waffle config.json && waffle config_flat.json",
     "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
-    "deploy": "yarn build && ts-node scripts/testnet-deploy.ts",
-    "deploy_flat": "yarn flat_build && ts-node scripts/testnet-deploy.ts",
+    "deploy": "yarn build && ts-node scripts/testnet-deploy.ts --deploy --publish",
+    "publish": "ts-node scripts/testnet-deploy.ts --publish",
     "print-operator-wallet": "ts-node scripts/init-operator-acc.ts",
     "submit-proof": "ts-node scripts/submit-proof.ts",
     "submit-test-proof": "yarn build && ts-node scripts/submit-test-proof.ts",

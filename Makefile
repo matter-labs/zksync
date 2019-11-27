@@ -2,9 +2,7 @@ export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:latest
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:latest
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(FRANKLIN_ENV)
-
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
-export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
 # Getting started
@@ -145,16 +143,12 @@ deploy-contracts: confirm_action
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
-build-contracts: confirm_action
+build-contracts: confirm_action flatten
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
-
-flattener = @docker run --rm -v $(shell pwd)/contracts:/home/contracts -it "${FLATTENER_DOCKER_IMAGE}"
 define flatten_file
-	@echo flattening $(1)
-	$(flattener) -c 'solidity_flattener --output /home/contracts/flat/$(1) --solc-paths "solc --allow-paths /home/contracts/node_modules/openzeppelin-solidity/ openzeppelin-solidity=/home/contracts/node_modules/openzeppelin-solidity" /home/contracts/contracts/$(1)'
-	perl -pi -e 's/solidity \^0.4.13/solidity 0.5.10/g' contracts/flat/$(1); # https://github.com/BlockCatIO/solidity-flattener/issues/36
+	@cd contracts && scripts/solidityFlattener.pl --mainsol $(1) --outputsol flat/$(1);
 endef
 
 # Flatten contract source
@@ -304,14 +298,9 @@ geth-up: geth
 dev-build-geth:
 	@docker build -t "${GETH_DOCKER_IMAGE}" ./docker/geth
 
-dev-build-flattener:
-	@docker build -t "${FLATTENER_DOCKER_IMAGE}" ./docker/flattener
-
 dev-push-geth:
 	@docker push "${GETH_DOCKER_IMAGE}"
 
-dev-push-flattener:
-	@docker push "${FLATTENER_DOCKER_IMAGE}"
 # Key generator 
 
 make-keys:

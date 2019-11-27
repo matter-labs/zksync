@@ -22,23 +22,17 @@ export const verifierContractCode =      require(`../${contractCodeFolder}/Verif
 export const governanceContractCode =    require(`../${contractCodeFolder}/Governance`);
 export const priorityQueueContractCode = require(`../${contractCodeFolder}/PriorityQueue`);
 
-function maybeReadContractSourceFile(path) {
-    if (['ci', 'dev'].includes(process.env.FRANKLIN_ENV)) 
-        return null;
-    return fs.readFileSync(path, 'utf8');
-}
-
-export const franklinContractSourceCode      = maybeReadContractSourceFile('flat/Franklin.sol');
-export const verifierContractSourceCode      = maybeReadContractSourceFile('flat/Verifier.sol');
-export const governanceContractSourceCode    = maybeReadContractSourceFile('flat/Governance.sol');
-export const priorityQueueContractSourceCode = maybeReadContractSourceFile('flat/PriorityQueue.sol');
+export const franklinContractSourceCode      = fs.readFileSync('flat/Franklin.sol', 'utf8');
+export const verifierContractSourceCode      = fs.readFileSync('flat/Verifier.sol', 'utf8');
+export const governanceContractSourceCode    = fs.readFileSync('flat/Governance.sol', 'utf8');
+export const priorityQueueContractSourceCode = fs.readFileSync('flat/PriorityQueue.sol', 'utf8');
 
 export const franklinTestContractCode      = require('../build/FranklinTest');
 export const verifierTestContractCode      = require('../build/VerifierTest');
 export const governanceTestContractCode    = require('../build/GovernanceTest');
 export const priorityQueueTestContractCode = require('../build/PriorityQueueTest')
 
-export async function publishSourceCode(contractname, contractaddress, sourceCode, compiled, constructorParams: any[]) {
+export async function publishSourceCodeToEtherscan(contractname, contractaddress, sourceCode, compiled, constructorParams: any[]) {
     const network = process.env.ETH_NETWORK;
     const etherscanApiUrl = network === 'mainnet' ? 'https://api.etherscan.io/api' : `https://api-${network}.etherscan.io/api`;
 
@@ -70,11 +64,15 @@ export async function publishSourceCode(contractname, contractaddress, sourceCod
     };
     
     let r = await Axios.post(etherscanApiUrl, qs.stringify(data));
+    let retriesLeft = 20;
     if (r.data.status != 1) {
         if (r.data.result.includes('Unable to locate ContractCode')) {
             // waiting for etherscan backend and try again
             await sleep(15000);
-            await publishSourceCode(contractname, contractaddress, sourceCode, compiled, constructorParams);
+            if (retriesLeft > 0) {
+                --retriesLeft;
+                await publishSourceCodeToEtherscan(contractname, contractaddress, sourceCode, compiled, constructorParams);
+            }
         } else {
             console.log(`Problem publishing ${contractname}:`, r.data);
         }
@@ -85,21 +83,16 @@ export async function publishSourceCode(contractname, contractaddress, sourceCod
 
 export async function deployGovernance(
     wallet,
-    governorAddress,
     governanceCode,
-    governanceSourceCode
-    ) {
+    constructorArgs
+) {
     try {
-        let governance = await deployContract(wallet, governanceCode, [governorAddress], {
+        let governance = await deployContract(wallet, governanceCode, constructorArgs, {
             gasLimit: 3000000,
         });
         console.log(`GOVERNANCE_ADDR=${governance.address}`);
 
-        if (governanceSourceCode) {
-            publishSourceCode('Governance', governance.address, governanceSourceCode, governanceCode, [governorAddress]);;
-        }
-
-        return governance
+        return governance;
     } catch (err) {
         console.log("Governance deploy error:" + err);
     }
@@ -107,43 +100,35 @@ export async function deployGovernance(
 
 export async function deployPriorityQueue(
     wallet,
-    ownerAddress,
     priorityQueueCode,
-    priorityQueueSourceCode
+    constructorArgs
 ) {
     try {
-        let priorityQueue = await deployContract(wallet, priorityQueueCode, [ownerAddress], {
+        let priorityQueue = await deployContract(wallet, priorityQueueCode, constructorArgs, {
             gasLimit: 5000000,
         });
         console.log(`PRIORITY_QUEUE_ADDR=${priorityQueue.address}`);
 
-        if (priorityQueueSourceCode) {
-            publishSourceCode('PriorityQueue', priorityQueue.address, priorityQueueSourceCode, priorityQueueCode, [ownerAddress]);
-        }
-
-        return priorityQueue
+        return priorityQueue;
     } catch (err) {
         console.log("Priority queue deploy error:" + err);
     }
 }
 
+const shouldPublishSource = true;
+
 export async function deployVerifier(
     wallet,
     verifierCode,
-    verifierSourceCode
+    constructorArgs
 ) {
     try {
-        let verifier = await deployContract(wallet, verifierCode, [], {
+        let verifier = await deployContract(wallet, verifierCode, constructorArgs, {
             gasLimit: 2000000,
         });
         console.log(`VERIFIER_ADDR=${verifier.address}`);
 
-        if (verifierSourceCode) {
-            publishSourceCode('Verifier', verifier.address, verifierSourceCode, verifierCode, []);;
-        }
-
-
-        return verifier
+        return verifier;
     } catch (err) {
         console.log("Verifier deploy error:" + err);
     }
@@ -152,47 +137,29 @@ export async function deployVerifier(
 export async function deployFranklin(
     wallet,
     franklinCode,
-    franklinSourceCode,
-    governanceAddress,
-    priorityQueueAddress,
-    verifierAddress,
-    genesisAddress,
-    genesisRoot = ethers.constants.HashZero
+    constructorArgs
 ) {
     try {
+        let [
+            governanceAddress,
+            verifierAddress,
+            priorityQueueAddress,
+            genesisAddress,
+            genesisRoot
+        ] = constructorArgs;
+
         let contract = await deployContract(
             wallet,
             franklinCode,
-            [
-                governanceAddress,
-                verifierAddress,
-                priorityQueueAddress,
-                genesisAddress,
-                genesisRoot,
-            ],
+            constructorArgs,
             {
                 gasLimit: 6600000,
             });
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
-        if (franklinSourceCode) {
-            publishSourceCode(
-                'Franklin', 
-                contract.address, 
-                franklinSourceCode, 
-                franklinCode, 
-                [
-                    governanceAddress,
-                    verifierAddress,
-                    priorityQueueAddress,
-                    genesisAddress,
-                    genesisRoot,
-                ]);
-        }
-
         const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);
         await (await priorityQueueContract.changeFranklinAddress(contract.address)).wait();
-        return contract
+        return contract;
     } catch (err) {
         console.log("Franklin deploy error:" + err);
     }
