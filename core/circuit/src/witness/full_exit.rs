@@ -123,7 +123,7 @@ pub fn apply_full_exit_tx(
     let full_exit = FullExitData {
         token: u32::from(full_exit.priority_op.token),
         account_address: full_exit
-            .account_data
+            .account_with_id
             .as_ref()
             .map(|(id, _)| *id)
             .unwrap_or(0),
