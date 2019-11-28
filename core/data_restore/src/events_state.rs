@@ -1,6 +1,7 @@
+// External uses
 use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
-
+// Workspace uses
 use crate::events::{EventData, EventType};
 use crate::helpers::{DataRestoreError, DATA_RESTORE_CONFIG};
 

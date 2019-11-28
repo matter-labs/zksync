@@ -1407,8 +1407,7 @@ impl StorageProcessor {
     }
 
     pub fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block> {
-        let op = self.load_commit_op(block_number);
-        op.and_then(|r| Some(r.block))
+        self.load_commit_op(block_number).map(|r| r.block)
     }
 
     pub fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>> {

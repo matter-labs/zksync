@@ -2,7 +2,7 @@ use super::FranklinOp;
 use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
-use crate::params::BLOCK_SIZE_CHUNKS;
+use crate::params::block_size_chunks;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedTx {
@@ -64,7 +64,7 @@ impl Block {
             });
 
         // Pad block with noops.
-        executed_tx_pub_data.resize(BLOCK_SIZE_CHUNKS * 8, 0x00);
+        executed_tx_pub_data.resize(block_size_chunks() * 8, 0x00);
 
         executed_tx_pub_data
     }

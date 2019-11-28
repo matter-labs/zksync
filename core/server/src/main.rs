@@ -1,28 +1,30 @@
 //use tokio::runtime::Runtime;
 #[macro_use]
 extern crate log;
-
+// Built-in uses
 use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
-
+// External uses
+use clap::{App, Arg};
+use futures::sync::mpsc as fmpsc;
+// Workspace uses
+use models::StateKeeperRequest;
 use server::api_server::start_api_server;
 use server::committer::start_committer;
 use server::eth_watch::start_eth_watch;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
-use server::{eth_sender, ThreadPanicNotify};
-
-use futures::sync::mpsc as fmpsc;
-use models::{node::config, StateKeeperRequest};
+use server::{eth_sender, ConfigurationOptions, ThreadPanicNotify};
 use storage::ConnectionPool;
-
-use clap::{App, Arg};
+use web3::types::H160;
 
 fn main() {
     env_logger::init();
 
-    let cmd_line = App::new("Franklin operator node")
-        .author("Matter labs")
+    let config_opts = ConfigurationOptions::from_env();
+
+    let cli = App::new("Franklin operator node")
+        .author("Matter Labs")
         .arg(
             Arg::with_name("genesis")
                 .long("genesis")
@@ -32,9 +34,12 @@ fn main() {
 
     let connection_pool = ConnectionPool::new();
 
-    if cmd_line.is_present("genesis") {
+    if cli.is_present("genesis") {
         info!("Generating genesis block.");
-        PlasmaStateKeeper::create_genesis_block(connection_pool.clone());
+        PlasmaStateKeeper::create_genesis_block(
+            connection_pool.clone(),
+            &config_opts.operator_franklin_addr,
+        );
         return;
     }
 
@@ -50,19 +55,20 @@ fn main() {
         .expect("Error setting Ctrl-C handler");
     }
 
-    // create main tokio runtime
-    //let rt = Runtime::new().unwrap();
-
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for committer");
-    let server_config = storage.load_config().expect("can not load server_config");
-    let contract_addr = server_config.contract_addr.expect("server config is empty");
-    if contract_addr != config::RUNTIME_CONFIG.contract_addr {
+    let contract_addr: H160 = storage
+        .load_config()
+        .expect("can not load server_config")
+        .contract_addr
+        .expect("contract_addr empty in server_config")[2..]
+        .parse()
+        .expect("contract_addr in db wrong");
+    if contract_addr != config_opts.contract_eth_addr {
         panic!(
             "Contract addresses mismatch! From DB = {}, from env = {}",
-            contract_addr,
-            config::RUNTIME_CONFIG.contract_addr
+            contract_addr, config_opts.contract_eth_addr
         );
     }
     drop(storage);
@@ -72,21 +78,30 @@ fn main() {
 
     info!("starting actors");
 
-    let (tx_for_state, rx_for_state) = channel();
-    let shared_eth_state = start_eth_watch(connection_pool.clone(), stop_signal_sender.clone());
+    let shared_eth_state = start_eth_watch(
+        connection_pool.clone(),
+        stop_signal_sender.clone(),
+        config_opts.clone(),
+    );
     let (tx_for_ops, rx_for_ops) = channel();
-    let state_keeper = PlasmaStateKeeper::new(connection_pool.clone(), shared_eth_state);
+    let state_keeper = PlasmaStateKeeper::new(
+        connection_pool.clone(),
+        shared_eth_state,
+        config_opts.operator_franklin_addr.clone(),
+    );
+    let (tx_for_state, rx_for_state) = channel();
     start_state_keeper(
         state_keeper,
         rx_for_state,
         tx_for_ops.clone(),
         stop_signal_sender.clone(),
     );
-    let (op_notify_sender, op_notify_receiver) = fmpsc::channel(512);
+    let (op_notify_sender, op_notify_receiver) = fmpsc::channel(256);
     let tx_for_eth = eth_sender::start_eth_sender(
         connection_pool.clone(),
         stop_signal_sender.clone(),
         op_notify_sender.clone(),
+        config_opts.clone(),
     );
     start_committer(
         rx_for_ops,
@@ -99,6 +114,7 @@ fn main() {
         op_notify_receiver,
         connection_pool.clone(),
         stop_signal_sender.clone(),
+        config_opts.clone(),
     );
 
     // Simple timer, pings every 100 ms

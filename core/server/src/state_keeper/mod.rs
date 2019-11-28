@@ -1,22 +1,21 @@
-use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::tx::FranklinTx;
-use models::node::{Account, AccountAddress, AccountMap, AccountUpdate, PriorityOp, TransferOp};
-use plasma::state::{OpSuccess, PlasmaState};
-use std::sync::{Arc, RwLock};
-use web3::types::H256;
-
-use models::node::config;
-
-use models::{ActionType, CommitRequest, NetworkStatus, StateKeeperRequest};
-use storage::ConnectionPool;
-
+// Built-in uses
 use std::sync::mpsc::{Receiver, Sender};
-
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+// External uses
+use itertools::Itertools;
+use web3::types::H256;
+// Workspace uses
 use crate::eth_watch::ETHState;
 use crate::ThreadPanicNotify;
-use itertools::Itertools;
-use models::params::BLOCK_SIZE_CHUNKS;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use models::node::config;
+use models::node::tx::FranklinTx;
+use models::node::{Account, AccountAddress, AccountMap, AccountUpdate, PriorityOp, TransferOp};
+use models::params::block_size_chunks;
+use models::{ActionType, CommitRequest, NetworkStatus, StateKeeperRequest};
+use plasma::state::{OpSuccess, PlasmaState};
+use storage::ConnectionPool;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -41,7 +40,11 @@ type RootHash = H256;
 type UpdatedAccounts = AccountMap;
 
 impl PlasmaStateKeeper {
-    pub fn new(pool: ConnectionPool, eth_state: Arc<RwLock<ETHState>>) -> Self {
+    pub fn new(
+        pool: ConnectionPool,
+        eth_state: Arc<RwLock<ETHState>>,
+        fee_account_address: AccountAddress,
+    ) -> Self {
         info!("constructing state keeper instance");
         let storage = pool
             .access_storage()
@@ -50,13 +53,6 @@ impl PlasmaStateKeeper {
         let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);
-
-        let fee_account_address = std::env::var("OPERATOR_FRANKLIN_ADDRESS")
-            .map(|addr| {
-                AccountAddress::from_hex(&addr).expect("Incorrect franklin account address")
-            })
-            .expect("OPERATOR_FRANKLIN_ADDRESS must be set");
-
         let current_unprocessed_priority_op = storage
             .load_stored_op_with_block_number(last_committed, ActionType::COMMIT)
             .map(|storage_op| {
@@ -92,15 +88,10 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn create_genesis_block(pool: ConnectionPool) {
+    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &AccountAddress) {
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");
-        let fee_account_address = std::env::var("OPERATOR_FRANKLIN_ADDRESS")
-            .map(|addr| {
-                AccountAddress::from_hex(&addr).expect("Incorrect franklin account address")
-            })
-            .expect("OPERATOR_FRANKLIN_ADDRESS must be set");
 
         let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
         // TODO: move genesis block creation to separate routine.
@@ -187,7 +178,7 @@ impl PlasmaStateKeeper {
                             true
                         } else {
                             // Try filling 4/5 of a block;
-                            if chunks_left < BLOCK_SIZE_CHUNKS / 5 {
+                            if chunks_left < block_size_chunks() / 5 {
                                 self.block_tries = 0;
                                 true
                             } else {
@@ -239,7 +230,7 @@ impl PlasmaStateKeeper {
         let eth_state = self.eth_state.read().expect("eth state read");
 
         let mut selected_ops = Vec::new();
-        let mut chunks_left = BLOCK_SIZE_CHUNKS;
+        let mut chunks_left = block_size_chunks();
         let mut unprocessed_op = self.current_unprocessed_priority_op;
 
         while let Some(op) = eth_state.priority_queue.get(&unprocessed_op) {
@@ -261,7 +252,7 @@ impl PlasmaStateKeeper {
             .db_conn_pool
             .access_storage()
             .map(|m| {
-                m.mempool_get_txs((BLOCK_SIZE_CHUNKS / TransferOp::CHUNKS) * 2)
+                m.mempool_get_txs((block_size_chunks() / TransferOp::CHUNKS) * 2)
                     .expect("Failed to get tx from db")
             })
             .expect("Failed to get txs from mempool");
@@ -338,7 +329,7 @@ impl PlasmaStateKeeper {
         let mut accounts_updated = Vec::new();
         let mut fees = Vec::new();
         let mut ops = Vec::new();
-        let mut chunks_left = BLOCK_SIZE_CHUNKS;
+        let mut chunks_left = block_size_chunks();
         let mut current_op_block_index = 0u32;
         let last_unprocessed_prior_op = self.current_unprocessed_priority_op;
 

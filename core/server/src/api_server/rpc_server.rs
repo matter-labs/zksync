@@ -25,9 +25,7 @@ impl ResponseAccountState {
             if token_id == 0 {
                 balances.insert("ETH".to_string(), balance);
             } else {
-                let token = tokens
-                    .get(&token_id)
-                    .ok_or_else(|| Error::internal_error())?;
+                let token = tokens.get(&token_id).ok_or_else(Error::internal_error)?;
                 balances.insert(token.address.clone(), balance);
             }
         }

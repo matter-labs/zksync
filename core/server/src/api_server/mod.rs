@@ -8,45 +8,33 @@ mod rest;
 mod rpc_server;
 mod rpc_subscriptions;
 
+use crate::ConfigurationOptions;
 use models::Operation;
 use std::sync::mpsc;
 use storage::ConnectionPool;
 
 use futures::sync::mpsc as fmpsc;
 
-use std::env;
-
 pub fn start_api_server(
     op_notify_receiver: fmpsc::Receiver<Operation>,
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
+    config_options: ConfigurationOptions,
 ) {
-    let rest_api_listen_addr = env::var("REST_API_BIND")
-        .expect("REST_API_BIND not found")
-        .parse()
-        .expect("REST_API_BIND invalid");
     rest::start_server_thread_detached(
         connection_pool.clone(),
-        rest_api_listen_addr,
+        config_options.rest_api_server_address,
         panic_notify.clone(),
     );
-    let ws_api_listen_addr = env::var("WS_API_BIND")
-        .expect("WS_API_BIND not found")
-        .parse()
-        .expect("WS_API_BIND invalid");
     rpc_subscriptions::start_ws_server(
         op_notify_receiver,
         connection_pool.clone(),
-        ws_api_listen_addr,
+        config_options.json_rpc_ws_server_address,
         panic_notify.clone(),
     );
 
-    let http_rpc_api_listen_addr = env::var("HTTP_RPC_API_BIND")
-        .expect("HTTP_RPC_API_BIND not found")
-        .parse()
-        .expect("HTTP_RPC_API_BIND invalid");
     rpc_server::start_rpc_server(
-        http_rpc_api_listen_addr,
+        config_options.json_rpc_http_server_address,
         connection_pool.clone(),
         panic_notify.clone(),
     );

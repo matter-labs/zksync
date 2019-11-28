@@ -22,7 +22,7 @@ pub fn make_franklin_key() {
     let out_dir = {
         let mut out_dir = PathBuf::new();
         out_dir.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
-        out_dir.push(&format!("{}", franklin_constants::BLOCK_SIZE_CHUNKS));
+        out_dir.push(&format!("{}", franklin_constants::block_size_chunks()));
         out_dir
     };
     let key_file_path = {
@@ -82,7 +82,7 @@ pub fn make_franklin_key() {
                     nonce: None,
                     pub_key_hash: None,
                 },
-                account_path: vec![None; franklin_constants::ACCOUNT_TREE_DEPTH],
+                account_path: vec![None; franklin_constants::account_tree_depth()],
                 balance_value: None,
                 balance_subtree_path: vec![None; franklin_constants::BALANCE_TREE_DEPTH],
             },
@@ -95,7 +95,7 @@ pub fn make_franklin_key() {
                     nonce: None,
                     pub_key_hash: None,
                 },
-                account_path: vec![None; franklin_constants::ACCOUNT_TREE_DEPTH],
+                account_path: vec![None; franklin_constants::account_tree_depth()],
                 balance_value: None,
                 balance_subtree_path: vec![None; franklin_constants::BALANCE_TREE_DEPTH],
             },
@@ -104,15 +104,15 @@ pub fn make_franklin_key() {
 
     let instance_for_generation: FranklinCircuit<'_, Bn256> = FranklinCircuit {
         params,
-        operation_batch_size: franklin_constants::BLOCK_SIZE_CHUNKS,
+        operation_batch_size: franklin_constants::block_size_chunks(),
         old_root: None,
         new_root: None,
         validator_address: None,
         block_number: None,
         pub_data_commitment: None,
         validator_balances: vec![None; (1 << franklin_constants::BALANCE_TREE_DEPTH) as usize],
-        validator_audit_path: vec![None; franklin_constants::ACCOUNT_TREE_DEPTH],
-        operations: vec![empty_operation; franklin_constants::BLOCK_SIZE_CHUNKS],
+        validator_audit_path: vec![None; franklin_constants::account_tree_depth()],
+        operations: vec![empty_operation; franklin_constants::block_size_chunks()],
         validator_account: AccountWitness {
             nonce: None,
             pub_key_hash: None,

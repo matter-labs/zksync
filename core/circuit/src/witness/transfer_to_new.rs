@@ -161,7 +161,7 @@ pub fn apply_transfer_to_new(
     );
 
     let capacity = tree.capacity();
-    assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+    assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
     let account_address_from_fe =
         Fr::from_str(&transfer_to_new.from_account_address.to_string()).unwrap();
     let account_address_to_fe =
@@ -468,10 +468,10 @@ mod test {
         let _validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let phasher = PedersenHasher::<Bn256>::default();
 
-        let tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+        let tree = CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
 
         let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
 
         let from_sk = PrivateKey::<Bn256>(rng.gen());
         let from_pk = PublicKey::from_private(&from_sk, p_g, params);
@@ -501,10 +501,10 @@ mod test {
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let phasher = PedersenHasher::<Bn256>::default();
 
-        let mut tree = CircuitAccountTree::new(franklin_constants::ACCOUNT_TREE_DEPTH as u32);
+        let mut tree = CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
 
         let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::ACCOUNT_TREE_DEPTH);
+        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
 
         let from_sk = PrivateKey::<Bn256>(rng.gen());
         let from_pk = PublicKey::from_private(&from_sk, p_g, params);

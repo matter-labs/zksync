@@ -36,7 +36,7 @@ pub struct CollectedFee {
 
 impl PlasmaState {
     pub fn empty() -> Self {
-        let tree_depth = params::ACCOUNT_TREE_DEPTH as u32;
+        let tree_depth = params::account_tree_depth() as u32;
         let balance_tree = AccountTree::new(tree_depth);
         Self {
             balance_tree,
@@ -138,7 +138,7 @@ impl PlasmaState {
         };
         let op = FullExitOp {
             priority_op,
-            account_data,
+            account_with_id: account_data,
         };
 
         OpSuccess {
@@ -150,7 +150,7 @@ impl PlasmaState {
 
     fn apply_full_exit_op(&mut self, op: &FullExitOp) -> AccountUpdates {
         let mut updates = Vec::new();
-        let (account_id, amount) = if let Some((account_id, amount)) = &op.account_data {
+        let (account_id, amount) = if let Some((account_id, amount)) = &op.account_with_id {
             (*account_id, amount.clone())
         } else {
             return updates;

@@ -11,26 +11,29 @@
 //! Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 //! that state is always recoverable.
 
-use crate::ThreadPanicNotify;
-use bigdecimal::BigDecimal;
-use eth_client::{ETHClient, SignedCallResult};
-use ff::{PrimeField, PrimeFieldRepr};
-use futures::{sync::mpsc as fmpsc, Future};
-use models::abi::FRANKLIN_CONTRACT;
-use models::{Action, ActionType, Operation};
+// Built-in uses
 use std::collections::VecDeque;
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
-use storage::ConnectionPool;
+// External uses
+use bigdecimal::BigDecimal;
+use ff::{PrimeField, PrimeFieldRepr};
+use futures::{sync::mpsc as fmpsc, Future};
 use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{Transaction, TransactionId, TransactionReceipt, H256, U256};
 use web3::Transport;
+// Workspace uses
+use crate::{ConfigurationOptions, ThreadPanicNotify};
+use eth_client::{ETHClient, SignedCallResult};
+use models::abi::FRANKLIN_CONTRACT;
+use models::{Action, ActionType, Operation};
+use storage::ConnectionPool;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 // TODO: fix rare nonce bug, when pending nonce is not equal to real pending nonce.
-const MAX_UNCONFIRMED_TX: usize = 10;
+const MAX_UNCONFIRMED_TX: usize = 1;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 const WAIT_CONFIRMATIONS: u64 = 10;
 
@@ -88,16 +91,7 @@ struct ETHSender<T: Transport> {
 }
 
 impl<T: Transport> ETHSender<T> {
-    fn new(transport: T, db_pool: ConnectionPool) -> Self {
-        let eth_client = {
-            let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
-
-            ETHClient::new(transport, abi_string)
-        };
+    fn new(db_pool: ConnectionPool, eth_client: ETHClient<T>) -> Self {
         let mut sender = Self {
             eth_client,
             unsent_ops: VecDeque::new(),
@@ -487,6 +481,7 @@ pub fn start_eth_sender(
     pool: ConnectionPool,
     panic_notify: Sender<bool>,
     op_notify_sender: fmpsc::Sender<Operation>,
+    config_options: ConfigurationOptions,
 ) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
 
@@ -494,11 +489,25 @@ pub fn start_eth_sender(
         .name("eth_sender".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
-
-            let web3_url = std::env::var("WEB3_URL").expect("WEB3_URL env var not found");
             let (_event_loop, transport) =
-                Http::new(&web3_url).expect("failed to start web3 transport");
-            let mut eth_sender = ETHSender::new(transport, pool);
+                Http::new(&config_options.web3_url).expect("failed to start web3 transport");
+
+            let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
+                .unwrap()
+                .get("abi")
+                .unwrap()
+                .to_string();
+            let eth_client = ETHClient::new(
+                transport,
+                abi_string,
+                config_options.operator_eth_addr,
+                config_options.operator_private_key,
+                config_options.contract_eth_addr,
+                config_options.chain_id,
+                config_options.gas_price_factor,
+            );
+
+            let mut eth_sender = ETHSender::new(pool, eth_client);
             eth_sender.run(rx_for_eth, op_notify_sender);
         })
         .expect("Eth sender thread");

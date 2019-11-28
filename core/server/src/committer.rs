@@ -1,9 +1,12 @@
-use crate::ThreadPanicNotify;
-use futures::sync::mpsc as fmpsc;
-use models::{Action, CommitRequest, Operation};
+// Built-in uses
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
+// External uses
+use futures::sync::mpsc as fmpsc;
+// Workspace uses
+use crate::ThreadPanicNotify;
+use models::{Action, CommitRequest, Operation};
 use storage::ConnectionPool;
 
 pub fn start_committer(
