@@ -35,7 +35,7 @@ async function main() {
     const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 
-    let governanceAddress    = process.env.GOVERNAN_ADDR;
+    let governanceAddress    = process.env.GOVERNANCE_ADDR;
     let priorityQueueAddress = process.env.PRIORITY_QUEUE_ADDR;
     let verifierAddress      = process.env.VERIFIER_ADDR;
     let franklinAddress      = process.env.CONTRACT_ADDR;

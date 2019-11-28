@@ -16,11 +16,10 @@ export const ERC20MintableContract = function () {
     return contract
 }();
 
-const contractCodeFolder = process.env.FRANKLIN_ENV === 'ci' ? 'build' : 'flat_build';
-export const franklinContractCode =      require(`../${contractCodeFolder}/Franklin`);
-export const verifierContractCode =      require(`../${contractCodeFolder}/Verifier`);
-export const governanceContractCode =    require(`../${contractCodeFolder}/Governance`);
-export const priorityQueueContractCode = require(`../${contractCodeFolder}/PriorityQueue`);
+export const franklinContractCode =      require(`../flat_build/Franklin`);
+export const verifierContractCode =      require(`../flat_build/Verifier`);
+export const governanceContractCode =    require(`../flat_build/Governance`);
+export const priorityQueueContractCode = require(`../flat_build/PriorityQueue`);
 
 export const franklinContractSourceCode      = fs.readFileSync('flat/Franklin.sol', 'utf8');
 export const verifierContractSourceCode      = fs.readFileSync('flat/Verifier.sol', 'utf8');
@@ -77,7 +76,12 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
             console.log(`Problem publishing ${contractname}:`, r.data);
         }
     } else {
-        console.log(`Published ${contractname} sources on ${etherscanApiUrl}`);
+        let status;
+        do {
+            status = await Axios.get(`http://api.etherscan.io/api?module=contract&&action=checkverifystatus&&guid=${r.data.result}`).then(r => r.data);
+        } while (status.result.includes('Pending in queue'));
+
+        console.log(`Published ${contractname} sources on https://${network}.etherscan.io/address/${contractaddress} with status`, status);
     }
 }
 
@@ -114,8 +118,6 @@ export async function deployPriorityQueue(
         console.log("Priority queue deploy error:" + err);
     }
 }
-
-const shouldPublishSource = true;
 
 export async function deployVerifier(
     wallet,

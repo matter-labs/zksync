@@ -8,6 +8,9 @@
 # ----------------------------------------------------------------------------------------------
 
 use strict;
+# TODO: maybe create a json file with all contrats and gry to verify that?
+# use lib qw(/Users/oleg/perl5/lib/perl5);
+# use String::Escape;
 use Getopt::Long qw(:config no_auto_abbrev);
 use File::Basename;
 use File::Spec::Functions;
@@ -45,6 +48,7 @@ Stopped\;
 
 my ($contractsdir, $remapdir, $mainsol, $outputsol, $help, $verbose);
 my %seen = ();
+# my %contracts_json = ();
 
 GetOptions(
   "contractsdir:s" => \$contractsdir,
@@ -89,6 +93,18 @@ open OUTPUT, ">$outputsol"
 
 processSol(catfile($contractsdir, $mainsol), 0);
 
+# my $outputjson = "${outputsol}_json";
+# open JSON_OUTPUT, ">$outputjson"
+#   or die "Cannot open $outputjson for writing. Stopped";
+
+# print JSON_OUTPUT "{\n";
+# foreach my $key (keys %contracts_json) {
+#   # do whatever you want with $key and $value here ...
+#   my $value = $contracts_json{$key};
+#   printf JSON_OUTPUT "\t\"%s\": \"%s\",\n", $key, $value;
+# }
+# print JSON_OUTPUT "}";
+
 close OUTPUT
   or die "Cannot close $outputsol. Stopped";
 
@@ -123,6 +139,10 @@ sub processSol {
   my @lines = <INPUT>;
   close INPUT
     or die "Cannot close $sol. Stopped";
+
+  # my $concat_file = join("", @lines);
+  # $concat_file = String::Escape::backslash( $concat_file );
+  # $contracts_json{$file} = $concat_file;
 
   for my $line (@lines) {
     chomp $line;

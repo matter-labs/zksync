@@ -28,7 +28,7 @@
     "build": "waffle config.json && waffle config_flat.json",
     "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
     "deploy": "yarn build && ts-node scripts/testnet-deploy.ts --deploy --publish",
-    "publish": "ts-node scripts/testnet-deploy.ts --publish",
+    "publish_source": "ts-node scripts/testnet-deploy.ts --publish",
     "print-operator-wallet": "ts-node scripts/init-operator-acc.ts",
     "submit-proof": "ts-node scripts/submit-proof.ts",
     "submit-test-proof": "yarn build && ts-node scripts/submit-test-proof.ts",
