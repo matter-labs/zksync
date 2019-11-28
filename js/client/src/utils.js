@@ -1,4 +1,3 @@
-// import { formatUnits } from 'ethers/utils';
 import { ethers } from 'ethers'
 
 export const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));

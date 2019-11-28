@@ -1,7 +1,6 @@
 import { FranklinProvider } from 'franklin_lib';
 import config from './env-config';
 import Axios from 'axios';
-import { formatEther } from 'ethers/utils';
 import { readableEther } from './utils';
 
 export class WalletDecorator {
