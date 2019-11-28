@@ -72,6 +72,7 @@ dist-config:
 	bin/.gen_js_config > js/explorer/src/env-config.js
 
 client:
+	@cd js/client && yarn update_franklin_lib
 	@cd js/client && yarn serve
 
 explorer: dist-config
