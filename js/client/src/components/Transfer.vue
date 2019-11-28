@@ -30,7 +30,7 @@
 </template>
 
 <script>
-import { bigNumberify, parseEther } from 'ethers/utils'
+import { utils } from 'ethers'
 import TokenSelector from './TokenSelector.vue'
 import FeeSelector from './FeeSelector.vue'
 import { getDisplayableBalanceDict, feesFromAmount, isReadablyPrintable } from '../utils';
@@ -93,8 +93,8 @@ export default {
         getAmount() {
             try {
                 return isReadablyPrintable(this.token)
-                    ? parseEther(this.amountSelected)
-                    : bigNumberify(this.amountSelected);
+                    ? utils.parseEther(this.amountSelected)
+                    : utils.bigNumberify(this.amountSelected);
             } catch (e) {
                 console.log('amount compute error: ', e);
                 return null;
@@ -152,7 +152,7 @@ export default {
                 return;
             }
 
-            if (amount.add(fee).gt(bigNumberify(this.balancesDict[this.token]))) {
+            if (amount.add(fee).gt(utils.bigNumberify(this.balancesDict[this.token]))) {
                 this.localDisplayAlert(`It's too much, man!`);
                 return;
             }

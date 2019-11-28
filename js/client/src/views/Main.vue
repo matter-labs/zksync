@@ -1,27 +1,18 @@
 <template>
     <div>
         <header>
-            <nav class="navbar navbar-expand-md navbar-dark bg-info mb-4">
+            <b-navbar toggleable="md" type="dark" variant="info" class="mb-4">
                 <b-container>
-                    <a class="navbar-brand" href="#">Matter Testnet</a>
-                    <button 
-                        class="navbar-toggler" type="button" data-toggle="collapse" 
-                        data-target="#navbarCollapse" aria-controls="navbarCollapse" 
-                        aria-expanded="false" aria-label="Toggle navigation">
-                        <span class="navbar-toggler-icon"></span>
-                    </button>
-                    <div class="collapse navbar-collapse" id="navbarCollapse">
-                        <ul class="navbar-nav mr-auto">
-                            <li class="nav-item" :class="{active: componentToBeShown=='Wallet'}">
-                                <a class="nav-link" @click="componentToBeShown='Wallet'">Wallet</a>
-                            </li>
-                            <li class="nav-item" :class="{active: componentToBeShown=='History'}">
-                                <a class="nav-link" @click="componentToBeShown='History'">Transactions</a>
-                            </li>
-                        </ul>
-                    </div>
+                    <a href="/explorer/"><b-navbar-brand>Matter Network</b-navbar-brand></a>
+                    <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
+                    <b-collapse id="nav-collapse" is-nav>
+                        <b-navbar-nav target>
+                            <b-nav-item :class="{active: componentToBeShown=='Wallet'}"  @click="componentToBeShown='Wallet'">Wallet</b-nav-item>
+                            <b-nav-item :class="{active: componentToBeShown=='History'}"  @click="componentToBeShown='History'">Transactions</b-nav-item>
+                        </b-navbar-nav>
+                    </b-collapse>
                 </b-container>
-            </nav>
+            </b-navbar>
         </header>
         <b-container>
             <b-row class="w-100 m-0 p-0" style="position: relative">
