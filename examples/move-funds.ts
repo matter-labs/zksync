@@ -23,6 +23,7 @@ async function logSyncBalance(
         )} ${type} balance: ${balance} ${token}`
     );
 }
+
 async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
     const balance = await zksync.getEthereumBalance(wallet, token);
 
@@ -33,8 +34,11 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
 
 (async () => {
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
-    const syncProvider = await zksync.Provider.newWebsocketProvider();
-    const ethProxy = new zksync.ETHProxy(ethersProvider, syncProvider.contractAddress);
+    const syncProvider = await zksync.getDefaultProvider("localhost");
+    const ethProxy = new zksync.ETHProxy(
+        ethersProvider,
+        syncProvider.contractAddress
+    );
 
     console.log("Contract address: ", syncProvider.contractAddress);
 
@@ -69,13 +73,13 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
     await logETHBalance(ethWallet, depositToken);
     await logSyncBalance(syncWallet, depositToken, "verified");
 
-    const depositHandle = await zksync.depositFromETH(
-        ethWallet,
-        syncWallet,
-        depositToken,
-        utils.parseEther(depositAmount),
-        utils.parseEther("0.1")
-    );
+    const depositHandle = await zksync.depositFromETH({
+        depositFrom: ethWallet,
+        depositTo: syncWallet,
+        token: depositToken,
+        amount: utils.parseEther(depositAmount),
+        maxFeeInETHCurrenty: utils.parseEther("0.1")
+    });
     await depositHandle.awaitReceipt();
     console.log("Deposit committed");
 
@@ -91,12 +95,12 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
     await logSyncBalance(syncWallet, depositToken, "committed");
     await logSyncBalance(syncWallet2, depositToken, "committed");
 
-    const transferHandle = await syncWallet.syncTransfer(
-        syncWallet2.address(),
-        depositToken,
-        utils.parseEther(depositAmount),
-        0
-    );
+    const transferHandle = await syncWallet.syncTransfer({
+        to: syncWallet2.address(),
+        token: depositToken,
+        amount: utils.parseEther(depositAmount),
+        fee: 0
+    });
     await transferHandle.awaitReceipt();
     console.log("Transfer committed");
 
@@ -112,12 +116,12 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
     await logSyncBalance(syncWallet2, depositToken);
     await logETHBalance(ethWallet2, depositToken);
 
-    const withdrawHandle = await syncWallet2.withdrawTo(
-        ethWallet2.address,
-        depositToken,
-        ethers.utils.parseEther(depositAmount),
-        0
-    );
+    const withdrawHandle = await syncWallet2.withdrawTo({
+        ethAddress: ethWallet2.address,
+        token: depositToken,
+        amount: ethers.utils.parseEther(depositAmount),
+        fee: 0
+    });
     await withdrawHandle.awaitVerifyReceipt();
     console.log("Withdraw committed");
 

@@ -9,12 +9,7 @@ import {
 import { utils } from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
 import BN = require("bn.js");
-import {
-    Address,
-    CloseAccount,
-    Transfer,
-    Withdraw
-} from "./types";
+import { Address, CloseAccount, Transfer, Withdraw } from "./types";
 
 const MAX_NUMBER_OF_TOKENS = 4096;
 

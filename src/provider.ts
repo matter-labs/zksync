@@ -18,13 +18,19 @@ export interface ContractAddress {
     govContract: string;
 }
 
+export async function getDefaultProvider(
+    network: "localhost"
+): Promise<Provider> {
+    if (network == "localhost") {
+        return await Provider.newWebsocketProvider("ws://127.0.0.1:3031");
+    }
+}
+
 export class Provider {
     contractAddress: ContractAddress;
     private constructor(public transport: AbstractJSONRPCTransport) {}
 
-    static async newWebsocketProvider(
-        address: string = "ws://127.0.0.1:3031"
-    ): Promise<Provider> {
+    static async newWebsocketProvider(address: string): Promise<Provider> {
         const transport = await WSTransport.connect(address);
         const provider = new Provider(transport);
         provider.contractAddress = await provider.getContractAddress();

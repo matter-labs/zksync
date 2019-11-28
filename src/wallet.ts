@@ -1,7 +1,7 @@
 import { Contract, ContractTransaction, ethers, utils } from "ethers";
 import { ETHProxy, Provider } from "./provider";
 import { Signer } from "./signer";
-import { AccountState, Address, Token } from "./types";
+import { AccountState, Address, Token, Nonce } from "./types";
 import {
     IERC20_INTERFACE,
     SYNC_MAIN_CONTRACT_INTERFACE,
@@ -16,20 +16,23 @@ export class Wallet {
         public ethProxy: ETHProxy
     ) {}
 
-    async syncTransfer(
-        to: Address,
-        token: Token,
-        amount: utils.BigNumberish,
-        fee: utils.BigNumberish,
-        nonce: "committed" | number = "committed"
-    ): Promise<Transaction> {
-        const tokenId = await this.ethProxy.resolveTokenId(token);
+    async syncTransfer(transfer: {
+        to: Address;
+        token: Token;
+        amount: utils.BigNumberish;
+        fee: utils.BigNumberish;
+        nonce?: Nonce;
+    }): Promise<Transaction> {
+        const tokenId = await this.ethProxy.resolveTokenId(transfer.token);
+        const nonce = transfer.nonce
+            ? await this.getNonce(transfer.nonce)
+            : await this.getNonce();
         const transaxtionData = {
-            to,
+            to: transfer.to,
             tokenId,
-            amount,
-            fee,
-            nonce: await this.getNonce(nonce)
+            amount: transfer.amount,
+            fee: transfer.fee,
+            nonce
         };
         const signedTransferTransaction = this.signer.signSyncTransfer(
             transaxtionData
@@ -45,20 +48,23 @@ export class Wallet {
         );
     }
 
-    async withdrawTo(
-        ethAddress: string,
-        token: Token,
-        amount: utils.BigNumberish,
-        fee: utils.BigNumberish,
-        nonce: "committed" | number = "committed"
-    ): Promise<Transaction> {
-        const tokenId = await this.ethProxy.resolveTokenId(token);
+    async withdrawTo(withdraw: {
+        ethAddress: string;
+        token: Token;
+        amount: utils.BigNumberish;
+        fee: utils.BigNumberish;
+        nonce?: Nonce;
+    }): Promise<Transaction> {
+        const tokenId = await this.ethProxy.resolveTokenId(withdraw.token);
+        const nonce = withdraw.nonce
+            ? await this.getNonce(withdraw.nonce)
+            : await this.getNonce();
         const transactionData = {
-            ethAddress,
+            ethAddress: withdraw.ethAddress,
             tokenId,
-            amount,
-            fee,
-            nonce: await this.getNonce(nonce)
+            amount: withdraw.amount,
+            fee: withdraw.fee,
+            nonce
         };
         const signedWithdrawTransaction = this.signer.signSyncWithdraw(
             transactionData
@@ -74,11 +80,10 @@ export class Wallet {
         );
     }
 
-    async close(
-        nonce: "committed" | number = "committed"
-    ): Promise<Transaction> {
+    async close(nonce: Nonce = "committed"): Promise<Transaction> {
+        const numNonce = await this.getNonce(nonce);
         const signerdCloseTransaction = this.signer.signSyncCloseAccount({
-            nonce: await this.getNonce()
+            nonce: numNonce
         });
 
         const transactionHash = await this.provider.submitTx(
@@ -91,7 +96,7 @@ export class Wallet {
         );
     }
 
-    async getNonce(nonce: "committed" | number = "committed"): Promise<number> {
+    async getNonce(nonce: Nonce = "committed"): Promise<number> {
         if (nonce == "committed") {
             return (await this.provider.getState(this.signer.address()))
                 .committed.nonce;
@@ -137,95 +142,102 @@ export class Wallet {
     }
 }
 
-export async function depositFromETH(
-    depositFrom: ethers.Signer,
-    depositTo: Wallet,
-    token: Token,
-    amount: utils.BigNumberish,
-    maxFeeInETHCurrenty: utils.BigNumberish
-): Promise<ETHOperation> {
+export async function depositFromETH(deposit: {
+    depositFrom: ethers.Signer;
+    depositTo: Wallet;
+    token: Token;
+    amount: utils.BigNumberish;
+    maxFeeInETHCurrenty: utils.BigNumberish;
+}): Promise<ETHOperation> {
     const mainSidechainContract = new Contract(
-        depositTo.provider.contractAddress.mainContract,
+        deposit.depositTo.provider.contractAddress.mainContract,
         SYNC_MAIN_CONTRACT_INTERFACE,
-        depositFrom
+        deposit.depositFrom
     );
 
     let ethTransaction;
 
-    if (token == "ETH") {
+    if (deposit.token == "ETH") {
         ethTransaction = await mainSidechainContract.depositETH(
-            amount,
-            depositTo.address(),
+            deposit.amount,
+            deposit.depositTo.address(),
             {
-                value: utils.bigNumberify(amount).add(maxFeeInETHCurrenty),
+                value: utils
+                    .bigNumberify(deposit.amount)
+                    .add(deposit.maxFeeInETHCurrenty),
                 gasLimit: utils.bigNumberify("200000")
             }
         );
     } else {
         // ERC20 token deposit
         const erc20contract = new Contract(
-            token,
+            deposit.token,
             IERC20_INTERFACE,
-            depositFrom
+            deposit.depositFrom
         );
         const approveTx = await erc20contract.approve(
-            depositTo.provider.contractAddress.mainContract,
-            amount
+            deposit.depositTo.provider.contractAddress.mainContract,
+            deposit.amount
         );
         ethTransaction = await mainSidechainContract.depositERC20(
-            token,
-            amount,
-            depositTo.address(),
+            deposit.token,
+            deposit.amount,
+            deposit.depositTo.address(),
             {
                 gasLimit: utils.bigNumberify("250000"),
-                value: maxFeeInETHCurrenty,
+                value: deposit.maxFeeInETHCurrenty,
                 nonce: approveTx.nonce + 1
             }
         );
     }
 
-    return new ETHOperation(ethTransaction, depositTo.provider);
+    return new ETHOperation(ethTransaction, deposit.depositTo.provider);
 }
 
-export async function emergencyWithdraw(
-    withdrawTo: ethers.Signer,
-    withdrawFrom: Wallet,
-    token: Token,
-    maxFeeInETHCurrenty: utils.BigNumberish,
-    nonce: "committed" | number = "committed"
-): Promise<ETHOperation> {
-    const tokenId = await withdrawFrom.ethProxy.resolveTokenId(token);
-    const numNonce = await withdrawFrom.getNonce(nonce);
-    const emergencyWithdrawSignature = withdrawFrom.signer.syncEmergencyWithdrawSignature(
+export async function emergencyWithdraw(withdraw: {
+    withdrawTo: ethers.Signer;
+    withdrawFrom: Wallet;
+    token: Token;
+    maxFeeInETHCurrenty: utils.BigNumberish;
+    nonce?: Nonce;
+}): Promise<ETHOperation> {
+    const tokenId = await withdraw.withdrawFrom.ethProxy.resolveTokenId(
+        withdraw.token
+    );
+    const nonce = withdraw.nonce
+        ? await this.getNonce(withdraw.nonce)
+        : await this.getNonce();
+    const numNonce = await withdraw.withdrawFrom.getNonce(nonce);
+    const emergencyWithdrawSignature = withdraw.withdrawFrom.signer.syncEmergencyWithdrawSignature(
         {
-            ethAddress: await withdrawTo.getAddress(),
+            ethAddress: await withdraw.withdrawTo.getAddress(),
             tokenId,
             nonce: numNonce
         }
     );
 
     const mainSyncContract = new Contract(
-        withdrawFrom.provider.contractAddress.mainContract,
+        withdraw.withdrawFrom.provider.contractAddress.mainContract,
         SYNC_MAIN_CONTRACT_INTERFACE,
-        withdrawTo
+        withdraw.withdrawTo
     );
 
     let tokenAddress = "0x0000000000000000000000000000000000000000";
-    if (token != "ETH") {
-        tokenAddress = token;
+    if (withdraw.token != "ETH") {
+        tokenAddress = withdraw.token;
     }
     const ethTransaction = await mainSyncContract.fullExit(
-        serializePointPacked(withdrawFrom.signer.publicKey),
+        serializePointPacked(withdraw.withdrawFrom.signer.publicKey),
         tokenAddress,
         emergencyWithdrawSignature,
         numNonce,
         {
             gasLimit: utils.bigNumberify("500000"),
-            value: maxFeeInETHCurrenty
+            value: withdraw.maxFeeInETHCurrenty
         }
     );
 
-    return new ETHOperation(ethTransaction, withdrawFrom.provider);
+    return new ETHOperation(ethTransaction, withdraw.withdrawFrom.provider);
 }
 
 export async function getEthereumBalance(

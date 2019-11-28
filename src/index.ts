@@ -4,7 +4,7 @@ import {
     emergencyWithdraw,
     getEthereumBalance
 } from "./wallet";
-import { Provider, ETHProxy } from "./provider";
+import { Provider, ETHProxy, getDefaultProvider } from "./provider";
 import { Signer } from "./signer";
 import {
     closestPackableTransactionAmount,
@@ -22,6 +22,7 @@ export {
     ETHProxy,
     closestPackableTransactionFee,
     closestPackableTransactionAmount,
+    getDefaultProvider,
     depositFromETH,
     emergencyWithdraw,
     getEthereumBalance,
