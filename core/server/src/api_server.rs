@@ -502,8 +502,8 @@ fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<Htt
         }
     };
 
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    struct WithHash {
+    #[derive(Serialize)]
+    struct ExecutedOperationWithHash {
         op: ExecutedOperations,
         tx_hash: String,
     };
@@ -516,9 +516,9 @@ fn handle_get_block_transactions(req: &HttpRequest<AppState>) -> ActixResult<Htt
                 ExecutedOperations::PriorityOp(tx) => tx.priority_op.eth_hash.clone(),
             };
 
-            let tx_hash = hex::encode(&tx_hash);
+            let tx_hash = format!("0x{}", hex::encode(&tx_hash));
 
-            WithHash { op, tx_hash }
+            ExecutedOperationWithHash { op, tx_hash }
         })
         .collect::<Vec<_>>();
 

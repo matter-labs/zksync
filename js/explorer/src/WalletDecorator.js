@@ -18,13 +18,13 @@ export class WalletDecorator {
     }
     async getCommitedBalances() {
         let account = await this.getAccount();
-        console.log(account);
+        let tokensNamesList = (await this.tokensPromise).map(token => token.symbol || `erc20_${token.tokenId}`);
         return Object.entries(account.commited.balances)
             .map(([tokenId, balance]) => {
                 return { 
                     tokenId,
                     balance: readableEther(balance),
-                    tokenName: ['ETH', 'DAI', 'FAU'][tokenId],
+                    tokenName: tokensNamesList[tokenId],
                 };
             });
     }

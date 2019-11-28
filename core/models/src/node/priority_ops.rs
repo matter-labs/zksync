@@ -254,7 +254,7 @@ impl TryFrom<Log> for PriorityOp {
             },
             eth_hash: event
                 .transaction_hash
-                .expect("It must be mined, since it's in logs")
+                .expect("Event transaction hash is missing")
                 .as_bytes()
                 .to_vec(),
         })

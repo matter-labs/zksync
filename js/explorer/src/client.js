@@ -51,7 +51,7 @@ let self = {
         
         return txs.map(tx => {
             let res = tx.op;
-            res.tx_hash = `0x${tx.tx_hash}`;
+            res.tx_hash = tx.tx_hash;
             return res;
         });
     },

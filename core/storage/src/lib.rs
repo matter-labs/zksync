@@ -850,6 +850,8 @@ impl StorageProcessor {
     }
 
     pub fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+        // TODO: Maybe move the transformations to api_server?
+
         // first check executed_transactions
         let tx: Option<StoredExecutedTransaction> = executed_transactions::table
             .filter(executed_transactions::tx_hash.eq(hash))
