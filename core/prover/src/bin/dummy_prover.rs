@@ -13,7 +13,7 @@ fn main() {
     loop {
         let storage = pool.access_storage().expect("Storage access");
         let job = storage
-            .fetch_prover_job(worker, PROVER_TIMEOUT)
+            .job_for_unverified_block(worker, PROVER_TIMEOUT)
             .expect("prover job, db access");
         if let Some(job) = job {
             info!("Received job for block: {}", job.block_number);

@@ -303,7 +303,7 @@ mod test {
     use super::*;
     use crate::witness::utils::public_data_commitment;
     use bellman::groth16::generate_random_parameters;
-    use bellman::groth16::{create_random_proof, prepare_verifying_key, verify_proof};
+    use bellman::groth16::{create_random_proof, prepare_verifying_key, verify_proof, Parameters};
     use models::merkle_tree::PedersenHasher;
 
     use crate::circuit::FranklinCircuit;
