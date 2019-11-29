@@ -1,9 +1,9 @@
 pragma solidity ^0.5.8;
 
-import "./IERC20.sol";
-import "./IComptroller.sol";
-import "./ICEther.sol";
-import "./ICErc20.sol";
+import "./interfaces/IERC20.sol";
+import "./interfaces/ComptrollerInterface.sol";
+import "./interfaces/ICEther.sol";
+import "./interfaces/ICErc20.sol";
 
 import "./Governance.sol";
 import "./Franklin.sol";
@@ -19,7 +19,7 @@ contract SwiftExits {
     Franklin internal rollup;
 
     /// @notice Comptroller contract, allows borrow tokens for validators supply
-    Comptroller internal comptroller;
+    ComptrollerInterface internal comptroller;
 
     /// @notice Validator-creator fee coefficient
     uint256 constant VALIDATOR_CREATOR_FEE_COEFF = 2;
@@ -80,7 +80,7 @@ contract SwiftExits {
 
         // Set contracts by addresses
         rollup = Franklin(_rollupAddress);
-        comptroller = Comptroller(_comptrollerAddress);
+        comptroller = ComptrollerInterface(_comptrollerAddress);
     }
 
     /// @notice Saves a new swift exit. If needed borrows from tokens from compound  for validators supply, sends them to swift exit recipient
