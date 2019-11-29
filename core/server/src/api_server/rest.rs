@@ -4,7 +4,7 @@ use actix_web::{
     web::{self},
     App, HttpResponse, HttpServer, Result as ActixResult,
 };
-use models::node::ExecutedOperations;
+use models::node::{ExecutedOperations, FranklinTx, AccountAddress, AccountId, Account};
 use models::NetworkStatus;
 use std::sync::mpsc;
 use storage::{ConnectionPool, StorageProcessor};
@@ -15,6 +15,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tokio::timer::Interval;
+use web3::types::H160;
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
@@ -31,6 +32,7 @@ impl SharedNetworkStatus {
 struct AppState {
     connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
+    contract_address: String,
 }
 
 impl AppState {
@@ -72,6 +74,180 @@ impl AppState {
         });
     }
 }
+#[derive(Debug, Serialize)]
+struct TestnetConfigResponse {
+    address: String,
+}
+
+// TODO: remove, JSON-rpc get contract should be used instead
+fn handle_get_testnet_config(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
+    let address = data.contract_address.clone();
+    Ok(HttpResponse::Ok().json(TestnetConfigResponse { address }))
+}
+
+fn handle_get_network_status(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
+    let network_status = data.network_status.read();
+    Ok(HttpResponse::Ok().json(network_status))
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct NewTxResponse {
+    hash: String,
+}
+
+fn handle_submit_tx(data: web::Data<AppState>, req: web::Json<FranklinTx>)-> ActixResult<HttpResponse> {
+    let storage = data.access_storage()?;
+
+    let tx_add_result = storage
+        .mempool_add_tx(&req)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    if let Err(e) = tx_add_result {
+        Err(HttpResponse::NotAcceptable().body(e.to_string()).into())
+    } else {
+        Ok(HttpResponse::Ok().json(NewTxResponse{ hash: req.hash().to_hex() }).into())
+    }
+
+}
+
+#[derive(Debug, Serialize)]
+struct AccountStateResponse {
+    // None if account is not created yet.
+    id: Option<AccountId>,
+    commited: Account,
+    verified: Account,
+    pending_txs: Vec<FranklinTx>,
+}
+
+fn handle_get_account_state(data: web::Data<AppState>, account_address: web::Path<AccountAddress>) -> ActixResult<HttpResponse> {
+    let storage = data.access_storage()?;
+
+    let (id, verified, commited) = {
+        let stored_account_state = storage.account_state_by_address(&account_address)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+        let empty_state = |address: &AccountAddress| {
+            let mut acc = Account::default();
+            acc.address = address.clone();
+            acc
+        };
+
+        let id = stored_account_state.committed.as_ref().map(|(id, _)| *id);
+        let committed = stored_account_state.committed.map(|(_, acc)| acc).unwrap_or_else(|| empty_state(&account_address));
+        let verified = stored_account_state.verified.map(|(_, acc)| acc).unwrap_or_else(|| empty_state(&account_address));
+
+        (id, verified, committed)
+    };
+
+    let pending_txs = storage.get_pending_txs(&account_address).map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    let res = AccountStateResponse {
+        id,
+        commited,
+        verified,
+        pending_txs,
+    };
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
+    let storage = data.access_storage()?;
+    let tokens = storage
+        .load_tokens()
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
+    vec_tokens.sort_by_key(|t| t.id);
+
+    Ok(HttpResponse::Ok().json(vec_tokens))
+}
+
+fn handle_get_account_transactions(data: web::Data<AppState>, address: web::Path<AccountAddress>) -> ActixResult<HttpResponse> {
+    let storage = data.access_storage()?;
+    let txs = storage.get_account_transactions(&address).map_err(|_| HttpResponse::InternalServerError().finish())?;
+    Ok(HttpResponse::Ok().json(txs))
+}
+
+fn handle_get_account_transactions_history(
+    data: web::Data<AppState>,
+    request_path: web::Path<(AccountAddress, i64, i64)>
+) -> ActixResult<HttpResponse> {
+    let (address, offset, limit) = request_path.into_inner();
+
+    const MAX_LIMIT: i64 = 100;
+    if limit > MAX_LIMIT {
+        return Err(HttpResponse::BadRequest().finish().into());
+    }
+
+    let storage =  data.access_storage()?;
+
+    let res = storage
+        .get_account_transactions_history(&address, offset, limit)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+fn handle_get_executed_transaction_by_hash(
+    data: web::Data<AppState>,
+    tx_hash_hex: web::Path<String>
+) -> ActixResult<HttpResponse> {
+    if tx_hash_hex.len() < 2 {
+        return Err(HttpResponse::BadRequest().finish().into())
+    }
+    let transaction_hash = hex::decode(&tx_hash_hex.into_inner()[2..]).map_err(|_| HttpResponse::BadRequest().finish())?;
+
+    let storage = data.access_storage()?;
+    if let Ok(tx) = storage.tx_receipt(transaction_hash.as_slice()) {
+        Ok(HttpResponse::Ok().json(tx))
+    } else {
+        Ok(HttpResponse::Ok().json(()))
+    }
+}
+
+fn handle_get_tx_by_hash(data: web::Data<AppState>, hash_hex_with_0x: web::Path<String>) -> ActixResult<HttpResponse> {
+    if hash_hex_with_0x.len() < 2 {
+        return Err(HttpResponse::BadRequest().finish().into())
+    }
+    let hash =
+        hex::decode(&hash_hex_with_0x.into_inner()[2..]).map_err(|_| HttpResponse::BadRequest().finish())?;
+
+    let storage = data.access_storage()?;
+
+    let res = storage
+        .get_tx_by_hash(hash.as_slice())
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+fn handle_get_priority_op_receipt(data: web::Data<AppState>, id: web::Path<i64>) -> ActixResult<HttpResponse> {
+    let storage = data.access_storage()?;
+
+    let res = storage
+        .get_priority_op_receipt(id.into_inner())
+    .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    Ok(HttpResponse::Ok().json(res))
+}
+
+fn handle_get_transaction_by_id(data: web::Data<AppState>, path: web::Path<(u32, u32)>) -> ActixResult<HttpResponse> {
+
+    let (block_id, tx_id) = path.into_inner();
+
+    let storage = data.access_storage()?;
+
+    let executed_ops = storage.get_block_executed_ops(block_id)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    if let Some(exec_op) = executed_ops.get(tx_id as usize) {
+        Ok(HttpResponse::Ok().json(exec_op))
+    } else {
+        Err(HttpResponse::NotFound().finish().into())
+    }
+}
+
 
 #[derive(Deserialize)]
 struct HandleBlocksQuery {
@@ -111,23 +287,43 @@ fn handle_get_block_by_id(
     }
 }
 
-fn handle_get_block_transactions(
-    data: web::Data<AppState>,
-    block_id: web::Path<u32>,
-) -> ActixResult<HttpResponse> {
+fn handle_get_block_transactions(data: web::Data<AppState>, path: web::Path<u32>) -> ActixResult<HttpResponse> {
+    let block_id = path.into_inner();
+
     let storage = data.access_storage()?;
-    let ops = storage
-        .get_block_executed_ops(block_id.into_inner())
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
-    let not_failed_ops = ops
+
+    let executed_ops =storage.get_block_executed_ops(block_id)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?
         .into_iter()
         .filter(|op| match op {
             ExecutedOperations::Tx(tx) => tx.op.is_some(),
             _ => true,
         })
         .collect::<Vec<_>>();
-    Ok(HttpResponse::Ok().json(not_failed_ops))
+
+    #[derive(Serialize)]
+    struct ExecutedOperationWithHash {
+        op: ExecutedOperations,
+        tx_hash: String,
+    };
+
+    let executed_ops_with_hashes = executed_ops
+        .into_iter()
+        .map(|op| {
+            let tx_hash = match &op {
+                ExecutedOperations::Tx(tx) => tx.tx.hash().as_ref().to_vec(),
+                ExecutedOperations::PriorityOp(tx) => tx.priority_op.eth_hash.clone(),
+            };
+
+            let tx_hash = format!("0x{}", hex::encode(&tx_hash));
+
+            ExecutedOperationWithHash { op, tx_hash }
+        })
+        .collect::<Vec<_>>();
+
+    Ok(HttpResponse::Ok().json(executed_ops_with_hashes))
 }
+
 
 #[derive(Deserialize)]
 struct BlockSearchQuery {
@@ -159,10 +355,24 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                         "/blocks/{block_id}/transactions",
                         web::get().to(handle_get_block_transactions),
                     )
-                    .route("/blocks/{block_id}", web::get().to(handle_get_block_by_id))
-                    .route("/blocks", web::get().to(handle_get_blocks))
-                    .route("/search", web::get().to(handle_block_search)),
+            .route("/testnet_config", web::get().to(handle_get_testnet_config))
+            .route("/status", web::get().to(handle_get_network_status))
+            .route("/submit_tx", web::post().to(handle_submit_tx))
+            .route("/account/{address}", web::get().to(handle_get_account_state))
+            .route("/tokens", web::get().to(handle_get_tokens))
+            .route("/account/{id}/transactions", web::get().to(handle_get_account_transactions))
+            .route("/account/{address}/history/{offset}/{limit}", web::get().to(handle_get_account_transactions_history))
+            .route("/transactions/{tx_hash}", web::get().to(handle_get_executed_transaction_by_hash))
+            .route("/transactions_all/{tx_hash}", web::get().to(handle_get_tx_by_hash))
+            .route("/priority_operations/{pq_id}/", web::get().to(handle_get_priority_op_receipt))
+            .route("/blocks/{block_id}/transactions/{tx_id}", web::get().to(handle_get_transaction_by_id))
+            .route("/blocks/{block_id}/transactions", web::get().to(handle_get_block_transactions))
+            .route("/blocks/{block_id}", web::get().to(handle_get_block_by_id))
+            .route("/blocks", web::get().to(handle_get_blocks))
+            .route("/search", web::get().to(handle_block_search))
             )
+            // Endpoint needed for js isReachable
+            .route("/favicon.ico", web::get().to(|| HttpResponse::Ok().finish()))
     })
     .bind(bind_to)
     .unwrap()
@@ -174,6 +384,7 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
 pub(super) fn start_server_thread_detached(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
+    contract_address: H160,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -186,6 +397,7 @@ pub(super) fn start_server_thread_detached(
             let state = AppState {
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
+                contract_address: format!("{}", contract_address)
             };
             state.spawn_network_status_updater();
 

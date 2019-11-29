@@ -831,13 +831,13 @@ impl StorageProcessor {
 
                 let commit = operations::table
                     .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-                    .filter(operations::action_type.eq("Commit"))
+                    .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
                     .first::<StoredOperation>(self.conn())
                     .optional()?;
 
                 let confirm = operations::table
                     .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-                    .filter(operations::action_type.eq("Verify"))
+                    .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
                     .first::<StoredOperation>(self.conn())
                     .optional()?;
 

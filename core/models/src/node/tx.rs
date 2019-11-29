@@ -282,7 +282,7 @@ impl Close {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(untagged)]
+#[serde(tag = "type")]
 pub enum FranklinTx {
     Transfer(Transfer),
     Withdraw(Withdraw),

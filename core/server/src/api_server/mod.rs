@@ -1,7 +1,8 @@
 //! API server handles endpoints for interaction with node.
 //!
 //! `mod rest` - api is used for block explorer.
-//! `mod rpc_server` - JSON rpc via HTTP (for request reply functions) and WS (also supports subscriptions)
+//! `mod rpc_server` - JSON rpc via HTTP (for request reply functions)
+//! `mod rpc_subscriptions` - JSON rpc via WebSocket (for request reply functions and subscriptions)
 
 mod event_notify;
 mod rest;
@@ -24,6 +25,7 @@ pub fn start_api_server(
     rest::start_server_thread_detached(
         connection_pool.clone(),
         config_options.rest_api_server_address,
+        config_options.contract_eth_addr,
         panic_notify.clone(),
     );
     rpc_subscriptions::start_ws_server(

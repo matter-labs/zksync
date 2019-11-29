@@ -1,6 +1,11 @@
 import BN = require('bn.js');
 import { ethers } from 'ethers';
 
+const AMOUNT_EXPONENT_BIT_WIDTH = 5;
+const AMOUNT_MANTISSA_BIT_WIDTH = 35;
+const FEE_EXPONENT_BIT_WIDTH = 5;
+const FEE_MANTISSA_BIT_WIDTH = 11;
+
 export function floatToInteger(floatBytes: Buffer, exp_bits: number, mantissa_bits: number, exp_base: number): BN {
     const floatHolder = new BN(floatBytes, 16, 'be'); // keep bit order
     const totalBits = floatBytes.length * 8 - 1; // starts from zero
@@ -66,12 +71,17 @@ export function bitsIntoBytesInOrder(bits: Array<boolean>) : Buffer {
     return resultBytes;
 }
 
-export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: number, exp_base: number): Buffer {
-    let max_exponent = (new BN(10)).pow(new BN((1 << exp_bits) - 1));
-    let max_mantissa = (new BN(2)).pow(new BN(mantissa_bits)).subn(1);
+export function integerToFloat(
+    integer: BN,
+    exp_bits: number,
+    mantissa_bits: number,
+    exp_base: number
+): Buffer {
+    const max_exponent = new BN(10).pow(new BN((1 << exp_bits) - 1));
+    const max_mantissa = new BN(2).pow(new BN(mantissa_bits)).subn(1);
 
     if (integer.gt(max_mantissa.mul(max_exponent))) {
-        throw "Integer is too big";
+        throw new Error("Integer is too big");
     }
 
     let exponent = 0;
@@ -82,7 +92,7 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
     }
 
     // encode into bits. First bits of mantissa in LE order
-    let encoding = [];
+    const encoding = [];
 
     for (let i = 0; i < exp_bits; ++i) {
         if ((exponent & (1 << i)) == 0) {
@@ -92,15 +102,55 @@ export function integerToFloat(integer: BN, exp_bits: number, mantissa_bits: num
         }
     }
 
-    for (let i =0; i < mantissa_bits; ++i) {
-        if (mantissa.and(new BN(1 << i)).eqn(0)) {
-            encoding.push(false);
-        } else {
+    for (let i = 0; i < mantissa_bits; ++i) {
+        if (mantissa.testn(i)) {
             encoding.push(true);
+        } else {
+            encoding.push(false);
         }
     }
 
-    return Buffer.from(bitsIntoBytesInOrder(encoding.reverse()).reverse());
+    return Buffer.from(bitsIntoBytesInBEOrder(encoding.reverse()).reverse());
+}
+
+function bitsIntoBytesInBEOrder(bits: boolean[]): Buffer {
+    if (bits.length % 8 != 0) {
+        throw new Error("wrong number of bits to pack");
+    }
+    const nBytes = bits.length / 8;
+    const resultBytes = Buffer.alloc(nBytes, 0);
+
+    for (let byte = 0; byte < nBytes; ++byte) {
+        let value = 0;
+        if (bits[byte * 8]) {
+            value |= 0x80;
+        }
+        if (bits[byte * 8 + 1]) {
+            value |= 0x40;
+        }
+        if (bits[byte * 8 + 2]) {
+            value |= 0x20;
+        }
+        if (bits[byte * 8 + 3]) {
+            value |= 0x10;
+        }
+        if (bits[byte * 8 + 4]) {
+            value |= 0x08;
+        }
+        if (bits[byte * 8 + 5]) {
+            value |= 0x04;
+        }
+        if (bits[byte * 8 + 6]) {
+            value |= 0x02;
+        }
+        if (bits[byte * 8 + 7]) {
+            value |= 0x01;
+        }
+
+        resultBytes[byte] = value;
+    }
+
+    return resultBytes;
 }
 
 export function reverseBits(buffer: Buffer): Buffer {
@@ -116,11 +166,25 @@ export function reverseBits(buffer: Buffer): Buffer {
 }
 
 export function packAmount(amount: BN): Buffer {
-    return reverseBits(integerToFloat(amount, 5, 19, 10));
+    return reverseBits(
+        integerToFloat(
+            amount,
+            AMOUNT_EXPONENT_BIT_WIDTH,
+            AMOUNT_MANTISSA_BIT_WIDTH,
+            10
+        )
+    );
 }
 
 export function packFee(amount: BN): Buffer {
-    return reverseBits(integerToFloat(amount, 6, 10, 10));
+    return reverseBits(
+        integerToFloat(
+            amount,
+            FEE_EXPONENT_BIT_WIDTH,
+            FEE_MANTISSA_BIT_WIDTH,
+            10
+        )
+    );
 }
 
 /**
