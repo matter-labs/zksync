@@ -373,6 +373,7 @@ mod test {
     use models::node::tx::PackedPublicKey;
     use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
+    #[ignore]
     fn test_transfer() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;

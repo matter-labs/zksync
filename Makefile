@@ -162,6 +162,10 @@ flatten:
 	$(call flatten_file,Verifier.sol)
 
 # testing
+
+run-simple-integration-test:
+	@cd js/tests && yarn simple
+
 price:
 	@node contracts/scripts/check-price.js
 

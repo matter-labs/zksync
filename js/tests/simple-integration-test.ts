@@ -1,12 +1,14 @@
 import {
     depositFromETH,
-    SyncWallet,
-    ETHProxy, SyncProvider, types
+    Wallet,
+    Provider,
+    ETHProxy, getDefaultProvider, types
 } from "zksync";
 import { ethers, utils } from "ethers";
+import {bigNumberify} from "ethers/utils";
 
 
-let syncProvider: SyncProvider;
+let syncProvider: Provider;
 
 async function getOperatorBalance(token: types.Token, type: "committed" | "verified" = "committed") {
     const accountState = await syncProvider.getState(process.env.OPERATOR_FRANKLIN_ADDRESS);
@@ -22,16 +24,17 @@ async function getOperatorBalance(token: types.Token, type: "committed" | "verif
     return utils.bigNumberify(balance);
 }
 
-async function testDeposit(ethWallet: ethers.Wallet, syncWallet: SyncWallet, token: types.Token, amount: utils.BigNumberish) {
+async function testDeposit(ethWallet: ethers.Signer, syncWallet: Wallet, token: types.Token, amount: utils.BigNumberish) {
     const balanceBeforeDep = await syncWallet.getBalance(token);
     const depositHandle = await depositFromETH(
-        ethWallet,
-        syncWallet,
-        token,
+    {
+        depositFrom: ethWallet,
+        depositTo:  syncWallet,
+        token: token,
         amount,
-        utils.parseEther("0.1")
-    );
-    await depositHandle.waitCommit();
+        maxFeeInETHCurrenty: utils.parseEther("0.1")
+    });
+    await depositHandle.awaitReceipt();
     const balanceAfterDep = await syncWallet.getBalance(token);
 
     if (!balanceAfterDep.sub(balanceBeforeDep).eq(amount)) {
@@ -39,17 +42,17 @@ async function testDeposit(ethWallet: ethers.Wallet, syncWallet: SyncWallet, tok
     }
 }
 
-async function testTransfer(syncWallet1: SyncWallet, syncWallet2: SyncWallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
+async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
     const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
     const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
     const operatorBeforeTransfer = await getOperatorBalance(token);
-    const transferToNewHandle = await syncWallet1.syncTransfer(
-        syncWallet2.address(),
+    const transferToNewHandle = await syncWallet1.syncTransfer({
+        to: syncWallet2.address(),
         token,
         amount,
         fee
-    );
-    await transferToNewHandle.waitCommit();
+    });
+    await transferToNewHandle.awaitReceipt();
     const wallet1AfterTransfer = await syncWallet1.getBalance(token);
     const wallet2AfterTransfer = await syncWallet2.getBalance(token);
     const operatorAfterTransfer = await getOperatorBalance(token);
@@ -63,16 +66,16 @@ async function testTransfer(syncWallet1: SyncWallet, syncWallet2: SyncWallet, to
     }
 }
 
-async function testWithdraw(ethWallet: ethers.Wallet, syncWallet: SyncWallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
+async function testWithdraw(ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
     const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
     const operatorBeforeWithdraw = await getOperatorBalance(token);
-    const withdrawHandle = await syncWallet.withdrawTo(
-        ethWallet.address,
+    const withdrawHandle = await syncWallet.withdrawTo({
+        ethAddress: ethWallet.address,
         token,
         amount,
         fee
-    );
-    await withdrawHandle.waitVerify();
+    });
+    await withdrawHandle.awaitReceipt();
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const operatorAfterWithdraw = await getOperatorBalance(token);
 
@@ -85,7 +88,7 @@ async function testWithdraw(ethWallet: ethers.Wallet, syncWallet: SyncWallet, to
     }
 }
 
-async function moveFunds(wallet1: ethers.Wallet, syncWallet1: SyncWallet, wallet2: ethers.Wallet, syncWallet2: SyncWallet, token: types.Token, depositAmountETH: string) {
+async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: ethers.Wallet, syncWallet2: Wallet, token: types.Token, depositAmountETH: string) {
     const depositAmount = utils.parseEther(depositAmountETH);
 
     // we do two transfers to test transfer to new and ordinary transfer.
@@ -111,7 +114,7 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: SyncWallet, wallet
     const MNEMONIC = process.env.MNEMONIC;
     const ERC_20TOKEN = process.env.TEST_ERC20;
 
-    syncProvider = await SyncProvider.newWebsocketProvider();
+    syncProvider = await getDefaultProvider("localhost");
 
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
     const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
@@ -120,21 +123,21 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: SyncWallet, wallet
         MNEMONIC,
         "m/44'/60'/0'/0/1"
     ).connect(ethersProvider);
-    const syncWallet = await SyncWallet.fromEthWallet(
+    const syncWallet = await Wallet.fromEthWallet(
         ethWallet,
         syncProvider,
         ethProxy
     );
 
     const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-    const syncWallet2 = await SyncWallet.fromEthWallet(
+    const syncWallet2 = await Wallet.fromEthWallet(
         ethWallet2,
         syncProvider,
         ethProxy
     );
 
     const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
-    const syncWallet3 = await SyncWallet.fromEthWallet(
+    const syncWallet3 = await Wallet.fromEthWallet(
         ethWallet3,
         syncProvider,
         ethProxy

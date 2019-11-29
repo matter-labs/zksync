@@ -44,6 +44,7 @@ contract Governance {
     // Params:
     // - _token - token address
     function addToken(address _token) external {
+        requireGovernor();
         require(
             tokenIds[_token] == 0,
             "gan11"

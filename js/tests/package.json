@@ -4,7 +4,13 @@
   "main": "index.js",
   "license": "MIT",
   "dependencies": {
-    "ethers": "^4.0.39",
-    "zksync": "^0.2.0"
+    "ethers": "^4.0.40",
+    "zksync": "^0.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^12.12.14"
+  },
+  "scripts": {
+    "simple": "f ts-node simple-integration-test.ts"
   }
 }
