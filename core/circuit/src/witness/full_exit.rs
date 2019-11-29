@@ -149,11 +149,6 @@ pub fn apply_full_exit(
     let account_address_fe = Fr::from_str(&full_exit.account_address.to_string()).unwrap();
     let token_fe = Fr::from_str(&full_exit.token.to_string()).unwrap();
 
-    let nonce_valid = tree
-        .get(full_exit.account_address)
-        .map(|acc| acc.nonce == full_exit.pub_nonce)
-        .unwrap_or(false);
-
     //applying full_exit
     let amount_to_exit = {
         let (_, _, balance, _) = apply_leaf_operation(
@@ -163,7 +158,7 @@ pub fn apply_full_exit(
             |_| {},
             |_| {},
         );
-        if is_sig_valid && nonce_valid {
+        if is_sig_valid {
             balance
         } else {
             Fr::zero()
@@ -171,7 +166,7 @@ pub fn apply_full_exit(
     };
 
     let (account_witness_before, account_witness_after, balance_before, balance_after) = {
-        if is_sig_valid && nonce_valid {
+        if is_sig_valid {
             apply_leaf_operation(
                 tree,
                 full_exit.account_address,

@@ -163,12 +163,13 @@ impl PlasmaState {
 
         let old_balance = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;
-        account.nonce += 1;
-        if old_nonce == op.priority_op.nonce {
-            // TODO: NOTE: If nonce is incorrect, we still update nonce of the account but we don't update account balance.
-            account.sub_balance(op.priority_op.token, &amount);
+        if old_nonce != op.priority_op.nonce {
+            return updates;
         }
+        account.sub_balance(op.priority_op.token, &amount);
+        account.nonce += 1;
         let new_balance = account.get_balance(op.priority_op.token);
+        assert_eq!(new_balance, BigDecimal::from(0));
         let new_nonce = account.nonce;
 
         self.insert_account(account_id, account);
