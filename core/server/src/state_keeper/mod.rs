@@ -166,37 +166,50 @@ impl PlasmaStateKeeper {
                         >= Duration::from_secs(config::PADDING_SUB_INTERVAL)
                     {
                         self.next_block_try_timer = Instant::now();
-
-                        let (chunks_left, proposed_ops, proposed_txs) = self.propose_new_block();
-                        if proposed_ops.is_empty() && proposed_txs.is_empty() {
-                            continue;
-                        }
-                        let old_tries = self.block_tries;
-
-                        let commit_block = if self.block_tries >= config::BLOCK_FORMATION_TRIES {
-                            self.block_tries = 0;
-                            true
-                        } else {
-                            // Try filling 4/5 of a block;
-                            if chunks_left < block_size_chunks() / 5 {
-                                self.block_tries = 0;
-                                true
-                            } else {
-                                self.block_tries += 1;
-                                false
-                            }
-                        };
-
-                        if commit_block {
-                            debug!(
-                                "Commiting block, chunks left {}, tries {}",
-                                chunks_left, old_tries
-                            );
-                            self.create_new_block(proposed_ops, proposed_txs, &tx_for_commitments);
-                        }
+                        self.commit_new_block_or_wait_for_txs(&tx_for_commitments);
                     }
                 }
             }
+        }
+    }
+
+    /// Algorithm for creating new block
+    /// At fixed time intervals: `PADDING_SUB_INTERVAL`
+    /// 1) select executable transactions from mempool.
+    /// 2.1) if # of executable txs == 0 => do nothing
+    /// 2.2) if # of executable txs creates block that is filled for more than 4/5 of its capacity => commit
+    /// 2.3) if # of executable txs creates block that is NOT filled for more than 4/5 of its capacity => wait for next time interval
+    /// but no more than `BLOCK_FORMATION_TRIES`
+    ///
+    /// If we have only 1 tx next block will be at `now + PADDING_SUB_INTERVAL*BLOCK_FORMATION_TRIES`
+    /// If we have a lot of txs to execute next block will be at  `now + PADDING_SUB_INTERVAL`
+    fn commit_new_block_or_wait_for_txs(&mut self, tx_for_commitments: &Sender<CommitRequest>) {
+        let (chunks_left, proposed_ops, proposed_txs) = self.propose_new_block();
+        if proposed_ops.is_empty() && proposed_txs.is_empty() {
+            return;
+        }
+        let old_tries = self.block_tries;
+
+        let commit_block = if self.block_tries >= config::BLOCK_FORMATION_TRIES {
+            self.block_tries = 0;
+            true
+        } else {
+            // Try filling 4/5 of a block;
+            if chunks_left < block_size_chunks() / 5 {
+                self.block_tries = 0;
+                true
+            } else {
+                self.block_tries += 1;
+                false
+            }
+        };
+
+        if commit_block {
+            debug!(
+                "Commiting block, chunks left {}, tries {}",
+                chunks_left, old_tries
+            );
+            self.create_new_block(proposed_ops, proposed_txs, &tx_for_commitments);
         }
     }
 
