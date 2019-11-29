@@ -1,5 +1,4 @@
-import { BigNumberish, BigNumber, bigNumberify, Interface } from 'ethers/utils';
-import { Contract } from 'ethers';
+import { Contract, utils } from 'ethers';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib';
 import { readableEther, sleep, isReadablyPrintable } from './utils';
 import timeConstants from './timeConstants';
@@ -83,7 +82,7 @@ export class WalletDecorator {
 
     async getDepositFee() {
         let gasPrice = await this.wallet.ethWallet.provider.getGasPrice();
-        let gasLimit = bigNumberify(200000); // from wallet.ts
+        let gasLimit = utils.bigNumberify(200000); // from wallet.ts
         let fee = gasPrice.mul(gasLimit);
         return readableEther(fee);
     }
@@ -148,7 +147,7 @@ export class WalletDecorator {
             let row_status
                 = tx.verified     ? `<span style="color: green">Verified</span>`
                 : tx.commited     ? `<span style="color: grey">Committed</span>`
-                : tx.fail_reason  ? `<span style="color: red">Failed with ${fail_reason}</span>`
+                : tx.fail_reason  ? `<span style="color: red">Failed with ${tx.fail_reason}</span>`
                 : `<span style="color: red">(Unknown status)</span>`
 
             let status_tooltip = await (async () => {
@@ -187,7 +186,7 @@ export class WalletDecorator {
                     let token = this.tokenNameFromId(tx.tx.priority_op.token);
                     let amount = isReadablyPrintable(token)
                         ? readableEther(tx.tx.priority_op.amount) 
-                        : bigNumberify(tx.tx.priority_op.amount);
+                        : utils.bigNumberify(tx.tx.priority_op.amount);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -204,7 +203,7 @@ export class WalletDecorator {
                     let token = this.tokenNameFromId(tx.tx.token);
                     let amount = isReadablyPrintable(token)
                         ? readableEther(tx.tx.amount) 
-                        : bigNumberify(tx.tx.amount);
+                        : utils.bigNumberify(tx.tx.amount);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -223,7 +222,7 @@ export class WalletDecorator {
                     let token = this.tokenNameFromId(tx.tx.token);
                     let amount = isReadablyPrintable(token)
                         ? readableEther(tx.tx.amount) 
-                        : bigNumberify(tx.tx.amount);
+                        : utils.bigNumberify(tx.tx.amount);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -242,7 +241,7 @@ export class WalletDecorator {
                     let token = this.tokenNameFromId(tx.tx.token);
                     let amount = isReadablyPrintable(token)
                         ? readableEther(tx.tx.amount) 
-                        : bigNumberify(tx.tx.amount);
+                        : utils.bigNumberify(tx.tx.amount);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -342,8 +341,8 @@ export class WalletDecorator {
         Object.entries(this.wallet.franklinState.verified.balances).forEach(assign('verifiedAmount'));
         return Object.values(res)
             .map(val => {
-                val['committedAmount'] = val['committedAmount'] || bigNumberify(0);
-                val['verifiedAmount']  = val['verifiedAmount']  || bigNumberify(0);
+                val['committedAmount'] = val['committedAmount'] || utils.bigNumberify(0);
+                val['verifiedAmount']  = val['verifiedAmount']  || utils.bigNumberify(0);
                 val.verified           = val.verifiedAmount     == val.committedAmount;
                 return val;
             })
@@ -364,8 +363,8 @@ export class WalletDecorator {
     // #region actions
     async * verboseTransfer(options) {
         let token = this.tokenFromName(options.token);
-        let amount = bigNumberify(options.amount);
-        let fee = bigNumberify(options.fee);
+        let amount = utils.bigNumberify(options.amount);
+        let fee = utils.bigNumberify(options.fee);
         let address = options.address;
 
         try {
@@ -388,8 +387,8 @@ export class WalletDecorator {
 
     async * verboseWithdrawOffchain(options) {
         let token = this.tokenFromName(options.token);
-        let amount = bigNumberify(options.amount);
-        let fee = bigNumberify(options.fee);
+        let amount = utils.bigNumberify(options.amount);
+        let fee = utils.bigNumberify(options.fee);
 
         try {
             yield info(`Sending withdraw...`);
@@ -415,7 +414,7 @@ export class WalletDecorator {
 
     async * verboseWithdrawOnchain(options) {
         let token = options.token
-        let amount = bigNumberify(options.amount);
+        let amount = utils.bigNumberify(options.amount);
 
         try {
             this.setPendingWithdrawStatus(`${token.id}`, 'loading');
@@ -440,7 +439,7 @@ export class WalletDecorator {
 
     async * verboseDeposit(options) {
         let token = this.tokenFromName(options.token);
-        let amount = bigNumberify(options.amount);
+        let amount = utils.bigNumberify(options.amount);
 
         try {
             yield info(`Sending deposit...`);

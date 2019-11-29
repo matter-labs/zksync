@@ -208,6 +208,7 @@ pub struct PriorityOp {
     pub data: FranklinPriorityOp,
     pub deadline_block: u64,
     pub eth_fee: BigDecimal,
+    pub eth_hash: Vec<u8>,
 }
 
 impl TryFrom<Log> for PriorityOp {
@@ -254,6 +255,11 @@ impl TryFrom<Log> for PriorityOp {
                 let amount_uint = dec_ev.remove(0).to_uint().unwrap();
                 BigDecimal::from_str(&format!("{}", amount_uint)).unwrap()
             },
+            eth_hash: event
+                .transaction_hash
+                .expect("Event transaction hash is missing")
+                .as_bytes()
+                .to_vec(),
         })
     }
 }

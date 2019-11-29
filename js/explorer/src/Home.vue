@@ -6,38 +6,25 @@
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
-            <b-nav-item href="/client/" target="_blanc">MatterMask</b-nav-item>
-            <b-nav-item v-bind:href="`${blockchain_explorer_address}/${store.config.CONTRACT_ADDR}`" target="_blanc">
+            <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">MatterMask</b-nav-item>
+            <b-nav-item v-bind:href="`${blockchain_explorer_address}/${store.config.CONTRACT_ADDR}`" target="_blank" rel="noopener noreferrer">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
         <b-navbar-nav class="ml-auto">
-            <b-nav-item-dropdown :text="store.network" class="capitalize" right>
-                <b-dropdown-item href="https://mainnet.matter-labs.io" target="blanc">Mainnet</b-dropdown-item>
-                <b-dropdown-item href="https://rinkeby.matter-labs.io" target="blanc">Rinkeby</b-dropdown-item>
-            </b-nav-item-dropdown>
+            <b-nav-form>
+                <SearchField :searchFieldInMenu="true" />
+            </b-nav-form>
         </b-navbar-nav>
         </b-collapse>
     </b-container>
     </b-navbar>
     <br>
     <b-container>
+        <ClosableJumbotron></ClosableJumbotron>
         <b-card bg-variant="light" >
             <h4>Matter Testnet Block Explorer</h4> 
-            <b-form @submit.stop.prevent="search">
-            <b-input-group>
-                <b-form-input v-model="query" placeholder="block number, tx hash or state root hash"></b-form-input>
-                <b-input-group-append>
-                <b-button @click="search" variant="info" :disabled="searching">
-                    <b-spinner v-if="searching" small></b-spinner>
-                    <span>Search</span>
-                </b-button>
-                </b-input-group-append>
-                <b-form-invalid-feedback v-if="notFound" :state="false">
-                    Nothing found for query '{{query}}'.
-                </b-form-invalid-feedback>
-            </b-input-group>
-            </b-form>
+            <SearchField :searchFieldInMenu="false" />
         </b-card>
         <br>
         <b-card>
@@ -55,9 +42,12 @@
         </b-card>
         <br>
 
-        <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
-        <b-table responsive id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable"></b-table>
-        <b-pagination v-if="ready" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
+        <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
+        <b-table responsive id="table" hover outlined :items="items" @row-clicked="onRowClicked" :busy="loading" class="clickable">
+            <template v-slot:cell(status)="data"><span v-html="data.item.status"></span></template>
+            <template v-slot:cell(new_state_root)="data"><span v-html="data.item.new_state_root"></span></template>
+        </b-table>
+        <b-pagination v-if="ready && totalTransactions > perPage" v-model="currentPage" :per-page="perPage" :total-rows="rows" @change="onPageChanged"></b-pagination>
 
     </b-container>
 </div>
@@ -117,98 +107,90 @@ body {
 
 <script>
 
-import store from './store'
-import client from './client'
+import store from './store';
+import client from './client';
+
+import ClosableJumbotron from './ClosableJumbotron.vue';
+import SearchField from './SearchField.vue';
+const components = { 
+    ClosableJumbotron,
+    SearchField,
+};
 
 export default {
     name: 'home',
     created() {
-        this.update()
+        this.update();
     },
     timers: {
         ticker: { time: 1000, autostart: true, repeat: true }
     },
     methods: {
         ticker() {
-            this.update(true)
-        },
-        async search() {
-            if (this.query) {
-                this.searching = true
-                this.notFound = false
-                let block = await client.searchBlock(this.query)
-                this.searching = false
-                if (block && block.block_number) {
-                    this.$router.push('/blocks/' + block.block_number)
-                } else {
-                    this.notFound = true
-                    await new Promise(resolve => setTimeout(resolve, 3600))
-                    this.notFound = false
-                }
-            }
+            this.update(true);
         },
         onRowClicked(item) {
-            this.$router.push('/blocks/' + item.block_number)
+            this.$router.push('/blocks/' + item.block_number);
         },
         async onPageChanged(page) {
-            this.$router.push(`${this.$route.path}?page=${page}`)
+            this.$router.push(`${this.$route.path}?page=${page}`);
             //this.updateBlocks()
         },
         async update(silent) {
             if (!silent) {
-                this.loading = true
+                this.loading = true;
             }
-            const status = await client.status()
-            let newBlocks = false
+            const status = await client.status();
+            let newBlocks = false;
             if (status) {
-                newBlocks = this.lastCommitted !== status.last_committed || this.lastVerified !== status.last_verified
-                this.lastCommitted = status.last_committed
-                this.lastVerified = status.last_verified
-                this.totalTransactions = status.total_transactions
+                newBlocks = this.lastCommitted !== status.last_committed || this.lastVerified !== status.last_verified;
+                this.lastCommitted = status.last_committed;
+                this.lastVerified = status.last_verified;
+                this.totalTransactions = status.total_transactions;
             }
             if (newBlocks) {
-                this.updateBlocks()
+                this.updateBlocks();
             } else {
-                this.loading = false
+                this.loading = false;
             }
         },
         async updateBlocks() {
-            let max = this.lastCommitted - (client.PAGE_SIZE * (this.currentPage-1))
-            if (max < 0) return
+            let max = this.lastCommitted - (client.PAGE_SIZE * (this.currentPage-1));
+            if (max < 0) return;
 
-            let blocks = await client.loadBlocks(max)
+            let blocks = await client.loadBlocks(max);
             if (blocks) {
                 this.blocks = blocks.map( b => ({
                     block_number:   b.block_number,
-                    status:         b.verified_at ? 'Verified' : 'Committed',
-                    new_state_root: b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(50, 66),
+                    status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
+                    new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
                     committed_at:   b.committed_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0],
                     verified_at:    b.verified_at ? (b.verified_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0]) : null,
-                }))
-                this.currentPage = this.page
-                this.ready = true
+                }));
+                this.currentPage = this.page;
+                this.ready = true;
             }
-            this.loading = false
+            this.loading = false;
         },
     },
     watch: {
         '$route' (to, from) {
-            this.currentPage = this.page
-            this.updateBlocks()
+            this.currentPage = this.page;
+            this.updateBlocks();
         },
     },
     computed: {
         page() {
-            return this.$route.query.page || 1
+            return this.$route.query.page || 1;
         },
         items() {
-            return this.blocks
+            return this.blocks;
         },
         perPage() {
-            return client.PAGE_SIZE
+            return client.PAGE_SIZE;
         },
         rows() {
-            return this.lastCommitted || 9999
+            return this.lastCommitted || 9999;
         },
     },
     data() {
@@ -222,10 +204,7 @@ export default {
             blocks:             [],
             ready:              false,
 
-            query:              '',
             loading:            true,
-            searching:          false,
-            notFound:           false,
 
             breadcrumbs: [
                 {
@@ -233,7 +212,8 @@ export default {
                     active: true
                 },
             ],
-        }
+        };
     },
-}
+    components,
+};
 </script>

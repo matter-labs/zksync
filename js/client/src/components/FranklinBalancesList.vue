@@ -38,7 +38,6 @@
 </template>
 
 <script>
-import { formatUnits } from 'ethers/utils';
 import { readableEther, isReadablyPrintable, readablyPrintableTokens } from '../utils';
 
 import TokenNameButton from './TokenNameButton.vue';

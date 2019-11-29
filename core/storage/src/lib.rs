@@ -39,7 +39,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
-use diesel::sql_types::{BigInt, Nullable, Text, Timestamp};
+use diesel::sql_types::{BigInt, Nullable, Text, Timestamp, Int4, Jsonb, Bool};
 
 use itertools::Itertools;
 use models::node::AccountAddress;
@@ -212,6 +212,7 @@ struct NewExecutedPriorityOperation {
     priority_op_serialid: i64,
     deadline_block: i64,
     eth_fee: BigDecimal,
+    eth_hash: Vec<u8>,
 }
 
 impl NewExecutedPriorityOperation {
@@ -223,6 +224,7 @@ impl NewExecutedPriorityOperation {
             priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
             deadline_block: exec_prior_op.priority_op.deadline_block as i64,
             eth_fee: exec_prior_op.priority_op.eth_fee.clone(),
+            eth_hash: exec_prior_op.priority_op.eth_hash.clone(),
         }
     }
 }
@@ -237,6 +239,7 @@ pub struct StoredExecutedPriorityOperation {
     pub priority_op_serialid: i64,
     pub deadline_block: i64,
     pub eth_fee: BigDecimal,
+    pub eth_hash: Vec<u8>,
 }
 
 impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
@@ -251,6 +254,7 @@ impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
                     .expect("FranklinOp should have priority op"),
                 deadline_block: self.deadline_block as u64,
                 eth_fee: self.eth_fee,
+                eth_hash: self.eth_hash,
             },
             op: franklin_op,
             block_index: self.block_index as u32,
@@ -266,6 +270,38 @@ pub struct TxReceiptResponse {
     pub verified: bool,
     pub fail_reason: Option<String>,
     pub prover_run: Option<ProverRun>,
+}
+
+// TODO: jazzandrock add more info(?)
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PriorityOpReceiptResponse {
+    committed: bool,
+    verified: bool,
+    prover_run: Option<ProverRun>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Queryable, QueryableByName)]
+pub struct TxByHashResponse {
+    #[sql_type = "Text"]
+    pub tx_type: String, // all
+
+    #[sql_type = "Text"]
+    pub from: String, // transfer(from) | deposit(our contract) | withdraw(sender)
+
+    #[sql_type = "Text"]
+    pub to: String, // transfer(to) | deposit(sender) | withdraw(our contract)
+
+    #[sql_type = "Int4"]
+    pub token: i32, // all
+
+    #[sql_type = "Text"]
+    pub amount: String, // all
+
+    #[sql_type = "Nullable<Text>"]
+    pub fee: Option<String>, // means Sync fee, not eth. transfer(sync fee), deposit(none), withdraw(Sync fee)
+
+    #[sql_type = "BigInt"]
+    pub block_number: i64, // all
 }
 
 #[derive(Debug)]
@@ -639,6 +675,30 @@ pub struct StorageProcessor {
     conn: ConnectionHolder,
 }
 
+#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+pub struct TransactionsHistoryItem {
+    #[sql_type = "Nullable<Text>"]
+    pub hash: Option<String>,
+
+    #[sql_type = "Nullable<BigInt>"]
+    pub pq_id: Option<i64>,
+
+    #[sql_type = "Jsonb"]
+    pub tx: Value,
+
+    #[sql_type = "Nullable<Bool>"]
+    pub success: Option<bool>,
+
+    #[sql_type = "Nullable<Text>"]
+    pub fail_reason: Option<String>,
+
+    #[sql_type = "Bool"]
+    pub commited: bool,
+
+    #[sql_type = "Bool"]
+    pub verified: bool,
+}
+
 fn restore_account(
     stored_account: StorageAccount,
     stored_balances: Vec<StorageBalance>,
@@ -755,129 +815,249 @@ impl StorageProcessor {
         Ok(())
     }
 
-    // TODO: dvush - revive it later
-    //    pub fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
-    //        // TODO: jazzandrock maybe use one db query(?).
-    //        let stored_executed_prior_op = executed_priority_operations::table
-    //            .filter(executed_priority_operations::priority_op_serialid.eq(op_id))
-    //            .first::<StoredExecutedPriorityOperation>(self.conn())
-    //            .optional()?;
-    //
-    //        match stored_executed_prior_op {
-    //            Some(stored_executed_prior_op) => {
-    //                let prover_run: Option<ProverRun> = prover_runs::table
-    //                    .filter(prover_runs::block_number.eq(stored_executed_prior_op.block_number))
-    //                    .first::<ProverRun>(self.conn())
-    //                    .optional()?;
-    //
-    //                let commit = operations::table
-    //                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-    //                    .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
-    //                    .first::<StoredOperation>(self.conn())
-    //                    .optional()?;
-    //
-    //                let confirm = operations::table
-    //                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-    //                    .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
-    //                    .first::<StoredOperation>(self.conn())
-    //                    .optional()?;
-    //
-    //                Ok(PriorityOpReceiptResponse {
-    //                    committed: commit.is_some(),
-    //                    verified: confirm.is_some(),
-    //                    prover_run,
-    //                })
-    //            }
-    //            None => Ok(PriorityOpReceiptResponse {
-    //                committed: false,
-    //                verified: false,
-    //                prover_run: None,
-    //            }),
-    //        }
-    //    }
+    pub fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
+        // TODO: jazzandrock maybe use one db query(?).
+        let stored_executed_prior_op = executed_priority_operations::table
+            .filter(executed_priority_operations::priority_op_serialid.eq(op_id))
+            .first::<StoredExecutedPriorityOperation>(self.conn())
+            .optional()?;
 
-    // TODO: dvush - revive it later
-    //    pub fn get_account_transactions_history(
-    //        &self,
-    //        address: &AccountAddress,
-    //        offset: i64,
-    //        limit: i64,
-    //    ) -> QueryResult<Vec<TransactionsHistoryItem>> {
-    //        // TODO: txs are not ordered
-    //        let query = format!(
-    //            "
-    //            select
-    //                encode(hash, 'hex') as hash,
-    //                pq_id,
-    //                tx,
-    //                success,
-    //                fail_reason,
-    //                coalesce(commited, false) as commited,
-    //                coalesce(verified, false) as verified
-    //            from (
-    //                select
-    //                    *
-    //                from (
-    //                    select
-    //                        tx,
-    //                        hash,
-    //                        null as pq_id,
-    //                        success,
-    //                        fail_reason,
-    //                        block_number
-    //                    from
-    //                        mempool
-    //                    left join
-    //                        executed_transactions
-    //                    on
-    //                        tx_hash = hash
-    //                    where
-    //                        encode(primary_account_address, 'hex') = '{address}'
-    //                        or
-    //                        tx->>'to' = '0x{address}'
-    //                    union all
-    //                    select
-    //                        operation as tx,
-    //                        null as hash,
-    //                        priority_op_serialid as pq_id,
-    //                        null as success,
-    //                        null as fail_reason,
-    //                        block_number
-    //                    from
-    //                        executed_priority_operations
-    //                    where
-    //                        operation->'priority_op'->>'account' = '0x{address}') t
-    //                order by
-    //                    block_number desc
-    //                offset
-    //                    {offset}
-    //                limit
-    //                    {limit}
-    //            ) t
-    //            left join
-    //                crosstab($$
-    //                    select
-    //                        block_number as rowid,
-    //                        action_type as category,
-    //                        true as values
-    //                    from
-    //                        operations
-    //                    order by
-    //                        block_number
-    //                    $$) t3 (
-    //                        block_number bigint,
-    //                        commited boolean,
-    //                        verified boolean)
-    //            using
-    //                (block_number)
-    //            ",
-    //            address = hex::encode(address.data),
-    //            offset = offset,
-    //            limit = limit
-    //        );
-    //
-    //        diesel::sql_query(query).load::<TransactionsHistoryItem>(self.conn())
-    //    }
+        match stored_executed_prior_op {
+            Some(stored_executed_prior_op) => {
+                let prover_run: Option<ProverRun> = prover_runs::table
+                    .filter(prover_runs::block_number.eq(stored_executed_prior_op.block_number))
+                    .first::<ProverRun>(self.conn())
+                    .optional()?;
+
+                let commit = operations::table
+                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
+                    .filter(operations::action_type.eq("Commit"))
+                    .first::<StoredOperation>(self.conn())
+                    .optional()?;
+
+                let confirm = operations::table
+                    .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
+                    .filter(operations::action_type.eq("Verify"))
+                    .first::<StoredOperation>(self.conn())
+                    .optional()?;
+
+                Ok(PriorityOpReceiptResponse {
+                    committed: commit.is_some(),
+                    verified: confirm.is_some(),
+                    prover_run,
+                })
+            }
+            None => Ok(PriorityOpReceiptResponse {
+                committed: false,
+                verified: false,
+                prover_run: None,
+            }),
+        }
+    }
+
+    pub fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+        // TODO: Maybe move the transformations to api_server?
+
+        // first check executed_transactions
+        let tx: Option<StoredExecutedTransaction> = executed_transactions::table
+            .filter(executed_transactions::tx_hash.eq(hash))
+            .first(self.conn())
+            .optional()?;
+
+        if let Some(tx) = tx {
+            let block_number = tx.block_number;
+            let operation = tx.operation.unwrap_or_else(|| {
+                debug!("operation empty in executed_transactions");
+                Value::default()
+            });
+
+            let tx_type = operation["type"].as_str().unwrap_or("unknown type");
+            let tx_token = operation["tx"]["token"].as_i64().unwrap_or(-1);
+            let tx_amount = operation["tx"]["amount"]
+                .as_str()
+                .unwrap_or("unknown amount");
+
+            let (tx_from, tx_to, tx_fee) = match tx_type {
+                "Withdraw" => (
+                    operation["tx"]["account"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["tx"]["eth_address"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["tx"]["fee"].as_str().map(|v| v.to_string()),
+                ),
+                "Transfer" | "TransferToNew" => (
+                    operation["tx"]["from"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["tx"]["to"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["tx"]["fee"].as_str().map(|v| v.to_string()),
+                ),
+                &_ => (
+                    "unknown from".to_string(),
+                    "unknown to".to_string(),
+                    Some("unknown fee".to_string()),
+                ),
+            };
+
+            let tx_type_user = if tx_type == "TransferToNew" {
+                "Transfer"
+            } else {
+                tx_type
+            };
+
+            return Ok(Some(TxByHashResponse {
+                tx_type: tx_type_user.to_string(),
+                from: tx_from,
+                to: tx_to,
+                token: tx_token as i32,
+                amount: tx_amount.to_string(),
+                fee: tx_fee,
+                block_number,
+            }));
+        };
+
+        // then check executed_priority_operations
+        let tx: Option<StoredExecutedPriorityOperation> = executed_priority_operations::table
+            .filter(executed_priority_operations::eth_hash.eq(hash))
+            .first(self.conn())
+            .optional()?;
+
+        if let Some(tx) = tx {
+            let operation = tx.operation;
+            let block_number = tx.block_number;
+
+            let tx_type = operation["type"].as_str().unwrap_or("unknown type");
+            let tx_token = operation["priority_op"]["token"]
+                .as_i64()
+                .expect("must be here");
+            let tx_amount = operation["priority_op"]["amount"]
+                .as_str()
+                .unwrap_or("unknown amount");
+
+            let (tx_from, tx_to, tx_fee) = match tx_type {
+                "Deposit" => (
+                    operation["priority_op"]["sender"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["priority_op"]["account"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["priority_op"]["fee"]
+                        .as_str()
+                        .map(|v| v.to_string()),
+                ),
+                &_ => (
+                    "unknown from".to_string(),
+                    "unknown to".to_string(),
+                    Some("unknown fee".to_string()),
+                ),
+            };
+
+            return Ok(Some(TxByHashResponse {
+                tx_type: tx_type.to_string(),
+                from: tx_from,
+                to: tx_to,
+                token: tx_token as i32,
+                amount: tx_amount.to_string(),
+                fee: tx_fee,
+                block_number,
+            }));
+        };
+
+        Ok(None)
+    }
+
+    pub fn get_account_transactions_history(
+        &self,
+        address: &AccountAddress,
+        offset: i64,
+        limit: i64,
+    ) -> QueryResult<Vec<TransactionsHistoryItem>> {
+        // TODO: txs are not ordered
+        let query = format!(
+            "
+            select
+                encode(hash, 'hex') as hash,
+                pq_id,
+                tx,
+                success,
+                fail_reason,
+                coalesce(commited, false) as commited,
+                coalesce(verified, false) as verified
+            from (
+                select
+                    *
+                from (
+                    select
+                        tx,
+                        hash,
+                        null as pq_id,
+                        success,
+                        fail_reason,
+                        block_number
+                    from
+                        mempool
+                    left join
+                        executed_transactions
+                    on
+                        tx_hash = hash
+                    where
+                        encode(primary_account_address, 'hex') = '{address}'
+                        or
+                        tx->>'to' = '0x{address}'
+                    union all
+                    select
+                        operation as tx,
+                        eth_hash as hash,
+                        priority_op_serialid as pq_id,
+                        null as success,
+                        null as fail_reason,
+                        block_number
+                    from 
+                        executed_priority_operations
+                    where 
+                        operation->'priority_op'->>'account' = '0x{address}') t
+                order by
+                    block_number desc
+                offset 
+                    {offset}
+                limit 
+                    {limit}
+            ) t
+            left join
+                crosstab($$
+                    select 
+                        block_number as rowid, 
+                        action_type as category, 
+                        true as values 
+                    from 
+                        operations
+                    order by
+                        block_number
+                    $$) t3 (
+                        block_number bigint, 
+                        commited boolean, 
+                        verified boolean)
+            using 
+                (block_number)
+            ",
+            address = hex::encode(address.data),
+            offset = offset,
+            limit = limit
+        );
+
+        diesel::sql_query(query).load::<TransactionsHistoryItem>(self.conn())
+    }
 
     pub fn get_account_transactions(
         &self,

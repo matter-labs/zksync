@@ -2,9 +2,8 @@ export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:latest
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:latest
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(FRANKLIN_ENV)
-
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
-export FLATTENER_DOCKER_IMAGE ?= gluk64/franklin:flattener
+export CI_DOCKER_IMAGE ?= matterlabs/ci
 
 # Getting started
 
@@ -73,10 +72,12 @@ dist-config:
 	bin/.gen_js_config > js/explorer/src/env-config.js
 
 client:
+	@cd js/client && yarn update_franklin_lib
 	@cd js/client && yarn serve
 
 explorer: dist-config
-	@cd js/explorer && yarn dev
+	@cd js/explorer && yarn update_franklin_lib
+	@cd js/explorer && yarn serve
 
 dist-client:
 	@cd js/client && yarn build
@@ -89,6 +90,12 @@ image-nginx: dist-client dist-explorer
 
 push-image-nginx: image-nginx
 	docker push "${NGINX_DOCKER_IMAGE}"
+
+image-ci:
+	@docker build -t "${CI_DOCKER_IMAGE}" -f ./docker/ci/Dockerfile .
+
+push-image-ci:
+	docker push "${CI_DOCKER_IMAGE}"
 
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
@@ -138,14 +145,21 @@ deploy-contracts: confirm_action
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
-build-contracts: confirm_action
+build-contracts: confirm_action flatten
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
-# Publish source to etherscan.io
-publish-source:
-	@node contracts/scripts/publish-source.js
-	@echo sources published
+define flatten_file
+	@cd contracts && scripts/solidityFlattener.pl --mainsol $(1) --outputsol flat/$(1);
+endef
+
+# Flatten contract source
+flatten:
+	@mkdir -p contracts/flat
+	$(call flatten_file,Franklin.sol)
+	$(call flatten_file,Governance.sol)
+	$(call flatten_file,PriorityQueue.sol)
+	$(call flatten_file,Verifier.sol)
 
 # testing
 price:
@@ -286,14 +300,9 @@ geth-up: geth
 dev-build-geth:
 	@docker build -t "${GETH_DOCKER_IMAGE}" ./docker/geth
 
-dev-build-flattener:
-	@docker build -t "${FLATTENER_DOCKER_IMAGE}" ./docker/flattener
-
 dev-push-geth:
 	@docker push "${GETH_DOCKER_IMAGE}"
 
-dev-push-flattener:
-	@docker push "${FLATTENER_DOCKER_IMAGE}"
 # Key generator 
 
 make-keys:
