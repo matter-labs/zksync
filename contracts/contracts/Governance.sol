@@ -1,6 +1,6 @@
 pragma solidity 0.5.10;
 
-import "./interfaces/IERC20.sol";
+import "./IERC20.sol";
 import "./BlsOperations.sol";
 import "./SwiftExits.sol";
 import "./Franklin.sol";
@@ -78,16 +78,12 @@ contract Governance {
     }
 
     /// @notice Token added to Franklin net
-    /// @member token Token address
-    /// @member tokenId Token id
     event TokenAdded(
         address token,
         uint16 tokenId
     );
 
     /// @notice cToken (corresponding to underlying token on Compound) added to Franklin net
-    /// @member cToken cToken address
-    /// @member token Underlying token id
     event cTokenAdded(
         address cToken,
         uint16 tokenId
@@ -188,7 +184,7 @@ contract Governance {
 
     /// @notice Add cToken for token to the list of cTokens. cToken is Compound representation for underlying token
     /// @param _cToken cToken address
-    /// @param _token Underlying token address
+    /// @param _tokenId Underlying token id
     function addCToken(address _cToken, uint16 _tokenId) external {
         // Can be called only by governor
         requireGovernor();

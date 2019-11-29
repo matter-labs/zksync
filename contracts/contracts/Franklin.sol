@@ -1,6 +1,6 @@
 pragma solidity 0.5.10;
 
-import "./interfaces/IERC20.sol";
+import "./IERC20.sol";
 
 import "./Governance.sol";
 import "./Verifier.sol";
@@ -94,17 +94,12 @@ contract Franklin {
     uint256 constant FULL_EXIT_LENGTH = 18 * 8;
 
     /// @notice Event emitted when a block is committed
-    /// @member blockNumber The number of committed block
     event BlockCommitted(uint32 indexed blockNumber);
 
     /// @notice Event emitted when a block is verified
-    /// @member blockNumber The number of verified block
     event BlockVerified(uint32 indexed blockNumber);
 
     /// @notice Event emitted when user send a transaction to withdraw her funds from onchain balance
-    /// @member owner Sender
-    /// @member tokenId Withdrawed token
-    /// @member amount Withdrawed token amount
     event OnchainWithdrawal(
         address indexed owner,
         uint16 tokenId,
@@ -112,11 +107,6 @@ contract Franklin {
     );
 
     /// @notice Event emitted when user send a transaction to deposit her funds
-    /// @member owner Deposit sender
-    /// @member tokenId Deposited token
-    /// @member amount Deposited token amount
-    /// @member fee Fee amount
-    /// @member franlkinAddress Deposit recipient (Rollup account)
     event OnchainDeposit(
         address indexed owner,
         uint16 tokenId,
@@ -126,8 +116,6 @@ contract Franklin {
     );
 
     /// @notice Event emitted when blocks are reverted
-    /// @member totalBlocksVerified The number of verified blocks
-    /// @member totalBlocksCommitted The number of committed blocks
     event BlocksReverted(
         uint32 indexed totalBlocksVerified,
         uint32 indexed totalBlocksCommitted
@@ -333,8 +321,8 @@ contract Franklin {
 
     /// @notice Withdraw ERC20 token
     /// @param _token Token address
-    /// @param Token amount to withdraw
-    /// @para _to Recipient Layer 1 address
+    /// @param _amount amount to withdraw
+    /// @param _to Recipient Layer 1 address
     function withdrawERC20(address _token, uint128 _amount, address _to) public {
         uint16 tokenId = governance.validateTokenAddress(_token);
         registerWithdrawal(msg.sender, tokenId, _amount);

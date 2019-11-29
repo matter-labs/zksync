@@ -43,12 +43,7 @@ contract PriorityQueue {
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 250; // About 1 hour
 
-    /// @notice New priority request event
-    /// @dev Emitted when a request is placed into mapping
-    /// @member opType Rollup operation type
-    /// @member pubData Operation pubdata
-    /// @member expirationBlock The number of Ethereum block when request becomes expired
-    /// @member fee Validators' fee
+    /// @notice New priority request event. Emitted when a request is placed into mapping
     event NewPriorityRequest(
         uint64 serialId,
         uint8 opType,
@@ -58,10 +53,6 @@ contract PriorityQueue {
     );
 
     /// @notice Priority Operation container
-    /// @member opType Rollup poperation type
-    /// @member pubData Operation pubdata
-    /// @member expirationBlock The number of Ethereum block when request becomes expired
-    /// @member fee Validators' fee
     struct PriorityOperation {
         uint8 opType;
         bytes pubData;

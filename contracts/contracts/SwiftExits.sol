@@ -1,9 +1,9 @@
 pragma solidity ^0.5.8;
 
-import "./interfaces/IERC20.sol";
-import "./interfaces/ComptrollerInterface.sol";
-import "./interfaces/ICEther.sol";
-import "./interfaces/ICErc20.sol";
+import "./IERC20.sol";
+import "./ComptrollerInterface.sol";
+import "./ICEther.sol";
+import "./ICErc20.sol";
 
 import "./Governance.sol";
 import "./Franklin.sol";
