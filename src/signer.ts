@@ -53,6 +53,7 @@ export class Signer {
         const signature = signTransactionBytes(this.privateKey, msgBytes);
 
         return {
+            type: "Transfer",
             from: this.address(),
             to: transfer.to,
             token: transfer.tokenId,
@@ -88,6 +89,7 @@ export class Signer {
         ]);
         const signature = signTransactionBytes(this.privateKey, msgBytes);
         return {
+            type: "Withdraw",
             account: this.address(),
             ethAddress: withdraw.ethAddress,
             token: withdraw.tokenId,
@@ -107,6 +109,7 @@ export class Signer {
         const signature = signTransactionBytes(this.privateKey, msg);
 
         return {
+            type: "Close",
             account: this.address(),
             nonce: close.nonce,
             signature

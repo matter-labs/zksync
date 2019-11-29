@@ -30,6 +30,7 @@ export interface Signature {
 }
 
 export interface Transfer {
+    type: "Transfer";
     from: Address;
     to: Address;
     token: number;
@@ -40,6 +41,7 @@ export interface Transfer {
 }
 
 export interface Withdraw {
+    type: "Withdraw";
     account: Address;
     ethAddress: string;
     token: number;
@@ -50,6 +52,7 @@ export interface Withdraw {
 }
 
 export interface CloseAccount {
+    type: "Close";
     account: Address;
     nonce: number;
     signature: Signature;
