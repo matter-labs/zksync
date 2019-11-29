@@ -27,8 +27,7 @@
 </template>
 
 <script>
-import { bigNumberify, parseEther, formatUnits } from 'ethers/utils'
-import { ethers } from 'ethers'
+import { utils } from 'ethers'
 import { getDisplayableBalanceDict, feesFromAmount, isReadablyPrintable } from '../utils'
 
 import TokenSelector from './TokenSelector.vue'
@@ -99,8 +98,8 @@ export default {
         getAmount() {
             try {
                 return isReadablyPrintable(this.token)
-                    ? parseEther(this.amountSelected)
-                    : bigNumberify(this.amountSelected);
+                    ? utils.parseEther(this.amountSelected)
+                    : utils.bigNumberify(this.amountSelected);
             } catch (e) {
                 console.log('amount compute error: ', e);
                 return null;
@@ -144,14 +143,14 @@ export default {
                     return;
                 }
     
-                if (amount.add(fee).gt(bigNumberify(this.balancesDict[this.token]))) {
+                if (amount.add(fee).gt(utils.bigNumberify(this.balancesDict[this.token]))) {
                     this.localDisplayAlert(`The amount is too large.`);
                     return;
                 }
             } else {
-                let fee = parseEther(this.depositFee);
-                let tooMuch = (this.token == 'ETH' && amount.add(fee).gt(bigNumberify(this.balancesDict[this.token])))
-                    || (amount.gt(bigNumberify(this.balancesDict[this.token])));
+                let fee = utils.parseEther(this.depositFee);
+                let tooMuch = (this.token == 'ETH' && amount.add(fee).gt(utils.bigNumberify(this.balancesDict[this.token])))
+                    || (amount.gt(utils.bigNumberify(this.balancesDict[this.token])));
 
                 if (tooMuch) {
                     this.localDisplayAlert(`The amount is too large.`);

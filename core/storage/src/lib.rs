@@ -39,7 +39,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError, PooledConnection};
 use serde_json::value::Value;
 use std::env;
 
-use diesel::sql_types::{BigInt, Bool, Jsonb, Nullable, Text, Timestamp};
+use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
 
 use itertools::Itertools;
 use models::node::AccountAddress;
@@ -211,6 +211,7 @@ struct NewExecutedPriorityOperation {
     priority_op_serialid: i64,
     deadline_block: i64,
     eth_fee: BigDecimal,
+    eth_hash: Vec<u8>,
 }
 
 impl NewExecutedPriorityOperation {
@@ -222,6 +223,7 @@ impl NewExecutedPriorityOperation {
             priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
             deadline_block: exec_prior_op.priority_op.deadline_block as i64,
             eth_fee: exec_prior_op.priority_op.eth_fee.clone(),
+            eth_hash: exec_prior_op.priority_op.eth_hash.clone(),
         }
     }
 }
@@ -236,6 +238,7 @@ struct StoredExecutedPriorityOperation {
     priority_op_serialid: i64,
     deadline_block: i64,
     eth_fee: BigDecimal,
+    eth_hash: Vec<u8>,
 }
 
 impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
@@ -250,6 +253,7 @@ impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
                     .expect("FranklinOp should have priority op"),
                 deadline_block: self.deadline_block as u64,
                 eth_fee: self.eth_fee,
+                eth_hash: self.eth_hash,
             },
             op: franklin_op,
             block_index: self.block_index as u32,
@@ -273,6 +277,30 @@ pub struct PriorityOpReceiptResponse {
     committed: bool,
     verified: bool,
     prover_run: Option<ProverRun>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Queryable, QueryableByName)]
+pub struct TxByHashResponse {
+    #[sql_type = "Text"]
+    pub tx_type: String, // all
+
+    #[sql_type = "Text"]
+    pub from: String, // transfer(from) | deposit(our contract) | withdraw(sender)
+
+    #[sql_type = "Text"]
+    pub to: String, // transfer(to) | deposit(sender) | withdraw(our contract)
+
+    #[sql_type = "Int4"]
+    pub token: i32, // all
+
+    #[sql_type = "Text"]
+    pub amount: String, // all
+
+    #[sql_type = "Nullable<Text>"]
+    pub fee: Option<String>, // means Sync fee, not eth. transfer(sync fee), deposit(none), withdraw(Sync fee)
+
+    #[sql_type = "BigInt"]
+    pub block_number: i64, // all
 }
 
 #[derive(Debug)]
@@ -821,6 +849,128 @@ impl StorageProcessor {
         }
     }
 
+    pub fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+        // TODO: Maybe move the transformations to api_server?
+
+        // first check executed_transactions
+        let tx: Option<StoredExecutedTransaction> = executed_transactions::table
+            .filter(executed_transactions::tx_hash.eq(hash))
+            .first(self.conn())
+            .optional()?;
+
+        if let Some(tx) = tx {
+            let block_number = tx.block_number;
+            let operation = tx.operation.unwrap_or_else(|| {
+                debug!("operation empty in executed_transactions");
+                Value::default()
+            });
+
+            let tx_type = operation["type"].as_str().unwrap_or("unknown type");
+            let tx_token = operation["tx"]["token"].as_i64().unwrap_or(-1);
+            let tx_amount = operation["tx"]["amount"]
+                .as_str()
+                .unwrap_or("unknown amount");
+
+            let (tx_from, tx_to, tx_fee) = match tx_type {
+                "Withdraw" => (
+                    operation["tx"]["account"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["tx"]["eth_address"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["tx"]["fee"].as_str().map(|v| v.to_string()),
+                ),
+                "Transfer" | "TransferToNew" => (
+                    operation["tx"]["from"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["tx"]["to"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["tx"]["fee"].as_str().map(|v| v.to_string()),
+                ),
+                &_ => (
+                    "unknown from".to_string(),
+                    "unknown to".to_string(),
+                    Some("unknown fee".to_string()),
+                ),
+            };
+
+            let tx_type_user = if tx_type == "TransferToNew" {
+                "Transfer"
+            } else {
+                tx_type
+            };
+
+            return Ok(Some(TxByHashResponse {
+                tx_type: tx_type_user.to_string(),
+                from: tx_from,
+                to: tx_to,
+                token: tx_token as i32,
+                amount: tx_amount.to_string(),
+                fee: tx_fee,
+                block_number,
+            }));
+        };
+
+        // then check executed_priority_operations
+        let tx: Option<StoredExecutedPriorityOperation> = executed_priority_operations::table
+            .filter(executed_priority_operations::eth_hash.eq(hash))
+            .first(self.conn())
+            .optional()?;
+
+        if let Some(tx) = tx {
+            let operation = tx.operation;
+            let block_number = tx.block_number;
+
+            let tx_type = operation["type"].as_str().unwrap_or("unknown type");
+            let tx_token = operation["priority_op"]["token"]
+                .as_i64()
+                .expect("must be here");
+            let tx_amount = operation["priority_op"]["amount"]
+                .as_str()
+                .unwrap_or("unknown amount");
+
+            let (tx_from, tx_to, tx_fee) = match tx_type {
+                "Deposit" => (
+                    operation["priority_op"]["sender"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["priority_op"]["account"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["priority_op"]["fee"]
+                        .as_str()
+                        .map(|v| v.to_string()),
+                ),
+                &_ => (
+                    "unknown from".to_string(),
+                    "unknown to".to_string(),
+                    Some("unknown fee".to_string()),
+                ),
+            };
+
+            return Ok(Some(TxByHashResponse {
+                tx_type: tx_type.to_string(),
+                from: tx_from,
+                to: tx_to,
+                token: tx_token as i32,
+                amount: tx_amount.to_string(),
+                fee: tx_fee,
+                block_number,
+            }));
+        };
+
+        Ok(None)
+    }
+
     pub fn get_account_transactions_history(
         &self,
         address: &AccountAddress,
@@ -862,7 +1012,7 @@ impl StorageProcessor {
                     union all
                     select 
                         operation as tx,
-                        null as hash,
+                        eth_hash as hash,
                         priority_op_serialid as pq_id,
                         null as success,
                         null as fail_reason,

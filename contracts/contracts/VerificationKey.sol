@@ -1,7 +1,7 @@
 
 // This contract is generated programmatically
 
-pragma solidity ^0.5.8;
+pragma solidity 0.5.10;
 
 
 // Hardcoded constants to avoid accessing store
@@ -10,26 +10,26 @@ contract VerificationKey {
     function getVk() internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {
 
         
-        vk[0] = 0x0cb05339409c3c9d78734f4e64567f5a78fd20019c834ff3a490d56621751f2e;
-        vk[1] = 0x232e8eb1188be891764dd7b2302e3c5d48b8c74312311d3253057ca70f334c9f;
-        vk[2] = 0x1b12fe58e6b1ebb6292844f564ca5644090a7f79bc0fefe5804ace44fe615b0b;
-        vk[3] = 0x1bf93f0cbb83439d7d384799eeaef3b3b068bf73e33370c20cd6c6a1947dd86a;
-        vk[4] = 0x047a1f5c358e142b0fdcbfc73d592d518da8cc11101a47147db8d16aac18d2e0;
-        vk[5] = 0x15a89dc2f30850851e58e6ab18cc0879a420fc3a18ce73cf65e5616112a55867;
-        vk[6] = 0x17ed20c8f08a77965e9e262a23d8f95ec4d9fe506a7a3e1a7b720056bb3d6f22;
-        vk[7] = 0x26c7cf5fb88cc851743cae4420127b4d35239c37f49a3dbf32cd17a28dad0916;
-        vk[8] = 0x211390504f6c10f0409f84ce750ff3af34de03c9da8e6a30084e8f187d2ee0b3;
-        vk[9] = 0x0207407d6d0eadac5400c1b3e0d0b6c3e26b7a1dfea2fe019b32bd626a34c45a;
-        vk[10] = 0x282e360ccadfcfa092eb4f1d1302a404bad7554261ad21f063179783230f1f07;
-        vk[11] = 0x283415f873249b70bbeb6655a5d2d5c6fa8eaad6cf19b2b259a602af5d8d538c;
-        vk[12] = 0x1c54b1e10c03fb442de55e17a4b360f9e65ad6914c1fa09721f91b771b17427b;
-        vk[13] = 0x0e6151f6334887ea9237ac9da17d3f272e4e24f242b8815647971478e143883a;
+        vk[0] = 0x05b354e1272e4cb82055db66dcdeb7d5b1b44cb09ab886d2a76a3c3c1fe51229;
+        vk[1] = 0x282f811f75b7b631a4c12a84c6c2af95f233394c93acc892f47209ac7c3650a2;
+        vk[2] = 0x04dbb944ede521511502cab1ed70a41c83f5ae4aabe54e416c50dbea5bd58cfb;
+        vk[3] = 0x1021fe1b1b452a6042efe46d10837a45d60b257cbca58209d6f9c0c3805085f9;
+        vk[4] = 0x168a066c5ce940acd2b46c913438e56edd24cb17ae506e6a98ab0f58a87b0bca;
+        vk[5] = 0x2973b67b9cbef8b2206d0024727703f26910058f69c8f89a5a7ad2f71565c4e8;
+        vk[6] = 0x28a8730585ef17efd7a52e1ab08345492b2d1df98a78ad9ee67fb0016a318b6e;
+        vk[7] = 0x2f733f508616ce679a05428ccb5b28d577ba025a470227740fca047d8f2bc81a;
+        vk[8] = 0x1aed52af76540838cc469a9327e5b7220b3a8d5eec60cd74454f752892f01db8;
+        vk[9] = 0x0f8a828f3ce1b55e1d0ddc07e73021964f8acabc1ffa828d1df40a6541a2735f;
+        vk[10] = 0x03e9884499baa2cd4a25c5f0052589d4d2268c1a6efa80efac8af19c82c6b226;
+        vk[11] = 0x1a0663c802f04c0d62af21b2fe561b061d02909765ef2301068e9ff940fcbe1e;
+        vk[12] = 0x180fda87504af3d684cbf20c9b9fb8ae2621dc2bf87b9034245d126ed5a4d42f;
+        vk[13] = 0x269d948f3a1b0a35e09245a7dfa6e1b95a7b9b4b32b742ac8fcd0c00481d8ad8;
 
         gammaABC = new uint256[](4);
-        gammaABC[0] = 0x0ee5660be5fb5077a76f3b3db16d04ab05011b60878931fdc4c1b38be00b9123;
-        gammaABC[1] = 0x25ac02ae491de9cae7d08f84d508786fbcddd26c3ac08fa5c28525b69aa5d40f;
-        gammaABC[2] = 0x25ec9a8d44bb400155df75edc38c8d3c3409e7dd21ec6e54a93e90654ea374fb;
-        gammaABC[3] = 0x18e07fc72f38ffebd1e8385894f8a20be391074d24fce3e4c33f89b633f9e0fb;
+        gammaABC[0] = 0x112fff131985becd42846c9e0c45aaa8c8b83cf0f1420bb80f590820bc369188;
+        gammaABC[1] = 0x174c28c7eb98484bed6d10f9b0bc935eb19a016cfc9e9c462f8d13c7c394242f;
+        gammaABC[2] = 0x05740fea12c68e895b5ea322785032a8ad8848ef654751bb197ce11bbe2888d7;
+        gammaABC[3] = 0x1b59e9f9a94ad8768f38a8c7fb8e97188275ee7ec7c13cda76d37351115c8caf;
 
 
     }
