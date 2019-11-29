@@ -4,7 +4,6 @@ use time::PreciseTime;
 
 use pairing::bn256::*;
 use rand::OsRng;
-
 use bellman::groth16::generate_random_parameters;
 
 use crate::vk_contract_generator::generate_vk_contract;
@@ -13,6 +12,7 @@ use circuit::circuit::FranklinCircuit;
 use circuit::operation::*;
 use models::params as franklin_constants;
 use std::path::PathBuf;
+use franklin_crypto::bellman::groth16::Parameters;
 
 const CONTRACT_FILENAME: &str = "VerificationKey.sol";
 const CONTRACT_NAME: &str = "VerificationKey";
@@ -46,6 +46,40 @@ pub fn make_franklin_key() {
     );
     let f_cont = File::create(contract_file_path).expect("Unable to create file");
 
+    let tmp_cirtuit_params = make_circuit_parameters();
+
+    use std::fs::File;
+    use std::io::{BufWriter, Write};
+    {
+        let f = File::create(&key_file_path).expect("Unable to create file");
+        let mut f = BufWriter::new(f);
+        tmp_cirtuit_params
+            .write(&mut f)
+            .expect("Unable to write proving key");
+    }
+
+    use std::io::BufReader;
+
+    let f_r = File::open(&key_file_path).expect("Unable to open file");
+    let mut r = BufReader::new(f_r);
+    let circuit_params = bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
+        .expect("Unable to read proving key");
+
+    let contract_content = generate_vk_contract(
+        &circuit_params.vk,
+        CONTRACT_NAME.to_string(),
+        CONTRACT_FUNCTION_NAME.to_string(),
+    );
+
+    let mut f_cont = BufWriter::new(f_cont);
+    f_cont
+        .write_all(contract_content.as_bytes())
+        .expect("Unable to write contract");
+
+    info!("Done");
+}
+
+pub fn make_circuit_parameters() -> Parameters<Bn256> {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &franklin_constants::JUBJUB_PARAMS;
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
@@ -127,33 +161,5 @@ pub fn make_franklin_key() {
         start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0
     );
 
-    use std::fs::File;
-    use std::io::{BufWriter, Write};
-    {
-        let f = File::create(&key_file_path).expect("Unable to create file");
-        let mut f = BufWriter::new(f);
-        tmp_cirtuit_params
-            .write(&mut f)
-            .expect("Unable to write proving key");
-    }
-
-    use std::io::BufReader;
-
-    let f_r = File::open(&key_file_path).expect("Unable to open file");
-    let mut r = BufReader::new(f_r);
-    let circuit_params = bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
-        .expect("Unable to read proving key");
-
-    let contract_content = generate_vk_contract(
-        &circuit_params.vk,
-        CONTRACT_NAME.to_string(),
-        CONTRACT_FUNCTION_NAME.to_string(),
-    );
-
-    let mut f_cont = BufWriter::new(f_cont);
-    f_cont
-        .write_all(contract_content.as_bytes())
-        .expect("Unable to write contract");
-
-    info!("Done");
+    tmp_cirtuit_params
 }

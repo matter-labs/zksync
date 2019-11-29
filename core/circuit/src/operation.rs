@@ -1,6 +1,6 @@
 use crate::account::AccountWitness;
 use ff::Field;
-
+use serde::{Serialize};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 
@@ -66,7 +66,7 @@ impl<E: JubjubEngine> TransactionSignature<E> {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub struct SignatureData {
     pub r_packed: Vec<Option<bool>>,
     pub s: Vec<Option<bool>>,

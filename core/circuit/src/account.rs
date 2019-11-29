@@ -1,9 +1,12 @@
+// External uses
 use franklin_crypto::jubjub::JubjubEngine;
-use models::params as franklin_constants;
-
+use franklin_crypto::circuit::Assignment;
+// Workspace uses
 use crate::element::CircuitElement;
 use bellman::{ConstraintSystem, SynthesisError};
-use franklin_crypto::circuit::Assignment;
+use models::params as franklin_constants;
+
+
 #[derive(Clone, Debug)]
 pub struct AccountWitness<E: JubjubEngine> {
     pub nonce: Option<E::Fr>,
@@ -14,6 +17,7 @@ pub struct AccountContent<E: JubjubEngine> {
     pub nonce: CircuitElement<E>,
     pub pub_key_hash: CircuitElement<E>,
 }
+
 impl<E: JubjubEngine> AccountContent<E> {
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,

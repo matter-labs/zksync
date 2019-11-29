@@ -19,6 +19,7 @@ rand = "0.4"
 rust-crypto = "0.2"
 rustc-hex = "2.0.1"
 
+web3 = "0.8.0"
 signal-hook = "0.1.8"
 tokio = "0.1.18"
 futures = "0.1.28"
