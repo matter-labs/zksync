@@ -16,7 +16,7 @@ pub const TOKEN_BYTES_LENGTH: usize = 2;
 pub const FULL_AMOUNT_BYTES_LENGTH: usize = 16;
 pub const FEE_BYTES_LENGTH: usize = 2;
 pub const ETH_ADDR_BYTES_LENGTH: usize = 20;
-pub const PACKED_AMOUNT_BYTES_LENGTH: usize = 3;
+pub const PACKED_AMOUNT_BYTES_LENGTH: usize = 5;
 pub const NONCE_BYTES_LENGTH: usize = 4;
 pub const SIGNATURE_R_BYTES_LENGTH: usize = 32;
 pub const SIGNATURE_S_BYTES_LENGTH: usize = 32;
@@ -90,7 +90,7 @@ pub struct TransferToNewOp {
 impl TransferToNewOp {
     pub const CHUNKS: usize = 5;
     pub const OP_CODE: u8 = 0x02;
-    pub const OP_LENGTH: usize = 33;
+    pub const OP_LENGTH: usize = 35;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -136,7 +136,7 @@ pub struct TransferOp {
 impl TransferOp {
     pub const CHUNKS: usize = 2;
     pub const OP_CODE: u8 = 0x05;
-    pub const OP_LENGTH: usize = 13;
+    pub const OP_LENGTH: usize = 15;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
