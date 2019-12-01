@@ -1,6 +1,6 @@
 pragma solidity ^0.5.8;
 
-interface CErc20 {
+interface ICErc20 {
     /**
      * @notice Sender supplies assets into the market and receives cTokens in exchange
      * @dev Accrues interest whether or not the operation succeeds, unless reverted

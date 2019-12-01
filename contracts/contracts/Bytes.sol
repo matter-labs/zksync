@@ -84,6 +84,23 @@ library Bytes {
         }
     }
 
+    // Compies bytes 'self' into a new payable 'address'.
+    // Returns the newly created 'address'.
+    function bytesToPayableAddress(bytes memory self)
+        internal
+        pure
+        returns (address payable addr)
+    {
+        require(
+            self.length >= 20,
+            "bbs12"
+        ); // bbs12 - wrong bytes length to address
+
+        assembly {
+            addr := div(mload(add(add(self, 0x20), 0)), 0x1000000000000000000000000)
+        }
+    }
+
     // Compies bytes 'self' into a new 'uint16'.
     // Returns the newly created 'uint16'.
     function bytesToUInt16(bytes memory self)

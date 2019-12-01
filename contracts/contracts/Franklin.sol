@@ -12,7 +12,7 @@ import "./Bytes.sol";
 contract Franklin {
 
     /// @notice Swift exits contract address
-    address internal swiftExits;
+    address payable internal swiftExits;
 
     /// @notice Verifier contract. Used to verify block proof and exit proof
     Verifier internal verifier;
@@ -112,7 +112,7 @@ contract Franklin {
         uint16 tokenId,
         uint128 amount,
         uint256 fee,
-        bytes franklinAddress
+        address franklinAddress
     );
 
     /// @notice Event emitted when blocks are reverted
@@ -197,14 +197,14 @@ contract Franklin {
     /// @param _genesisAccAddress The address of single account, that exists in genesis block
     /// @param _genesisRoot Genesis blocks (first block) root
     constructor(
-        address _swiftExitsAddress,
-        address _governanceAddress,
+        address payable _swiftExitsAddress,
+        address payable _governanceAddress,
         address _verifierAddress,
         address _priorityQueueAddress,
         address _genesisAccAddress,
         bytes32 _genesisRoot
     ) public {
-        swiftExits = _swiftExits;
+        swiftExits = _swiftExitsAddress;
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
         priorityQueue = PriorityQueue(_priorityQueueAddress);
@@ -255,7 +255,7 @@ contract Franklin {
 
     /// @notice Deposit ETH to Layer 2
     /// @param _franklinAddr The receiver Layer 2 address
-    function depositETH(bytes calldata _franklinAddr) external payable {
+    function depositETH(address _franklinAddr) external payable {
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = PRIORITY_FEE_COEFF * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
@@ -279,7 +279,7 @@ contract Franklin {
     /// @notice Withdraw ETH to Layer 1
     /// @param _amount Ether amount to withdraw
     /// @param _to Recipient Layer 1 address
-    function withdrawETH(uint128 _amount, address _to) public {
+    function withdrawETH(uint128 _amount, address payable _to) public {
         registerWithdrawal(msg.sender, 0, _amount);
         _to.transfer(_amount);
     }
@@ -291,7 +291,7 @@ contract Franklin {
     function depositERC20(
         address _token,
         uint128 _amount,
-        bytes calldata _franklinAddr
+        address _franklinAddr
     ) external payable {
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
@@ -834,15 +834,15 @@ contract Franklin {
     }
 
     /// @notice Withdraws token from Franklin to root chain in case of exodus mode. User must provide proof that he owns funds
+    /// @param _proof Proof
     /// @param _tokenId Verified token id
     /// @param _owner Owner
     /// @param _amount Amount for owner
-    /// @param _proof Proof
     function exit(
+        uint256[8] calldata _proof,
         uint16 _tokenId,
         address _owner,
-        uint128 _amount,
-        uint256[8] calldata _proof
+        uint128 _amount
     ) external {
         require(
             exodusMode,
@@ -864,15 +864,15 @@ contract Franklin {
     }
 
     /// @notice Freeze balance for user, if he submitted swift exit request
-    /// @param _blockNumber Rollup block number
-    /// @param _tokenId Token id
     /// @param _amount Token amount
     /// @param _owner Withdraw operation owner
+    /// @param _blockNumber Rollup block number
+    /// @param _tokenId Token id
     function freezeFunds(
-        uint32 _blockNumber,
-        uint16 _tokenId,
         uint256 _amount,
-        address _owner
+        address _owner,
+        uint32 _blockNumber,
+        uint16 _tokenId
     ) external {
         require(
             msg.sender == address(governance),
@@ -880,7 +880,7 @@ contract Franklin {
         ); // fnfs11 - wrong sender
 
         require(
-            totalBlocksVerified < blockNumber,
+            totalBlocksVerified < _blockNumber,
             "fnfs12"
         ); // fnfs12 - wrong block number
 
@@ -893,30 +893,28 @@ contract Franklin {
     /// @notice then send withdraw operation amount and validators fees to swift exits contract,
     /// @notice consummate fee to validator-sender.
     /// @notice After that delete corresponding onchain operation.
-    /// @param _onchainOpId Corresponding onchain op id
-    /// @param _account Account addess
-    /// @param _tokenId Token id
     /// @param _amount Token amount
     /// @param _validatorCreatorFee Fee for the validator-creator of corresponding swift exit request
+    /// @param _account Account addess
     /// @param _validatorCreator Validators that created swift exit request
+    /// @param _onchainOpId Corresponding onchain op id
+    /// @param _tokenId Token id
     /// @param _succeeded Flag that indicates that the swift exit has succeeded
     function defrostFunds(
-        uint64 _onchainOpId,
-        address _account,
-        uint16 _tokenId,
         uint128 _amount,
         uint128 _validatorCreatorFee,
+        address _account,
         address _validatorCreator,
+        uint64 _onchainOpId,
+        uint16 _tokenId,
         bool _succeeded
     ) external {
         require(
             msg.sender == swiftExits,
             "fnds11"
         ); // fnds11 - sender must be swift exits contract
-        require(
-            governance.requireActiveValidator(tx.origin),
-            "fnds12"
-        ); // fnds12 - tx origin must be active validator
+
+        governance.requireActiveValidator(tx.origin); // We can use tx.origin because sender (active validator) is actually MUST be tx origin
 
         require(
             frozenBalances[_account][_tokenId] >= _amount,
@@ -936,7 +934,7 @@ contract Franklin {
             registerWithdrawal(_account, _tokenId, _amount);
 
             // Update balance of validator-sender
-            balancesToWithdraw[_validatorSender][_tokenId] += _validatorCreatorFee;
+            balancesToWithdraw[_validatorCreator][_tokenId] += _validatorCreatorFee;
 
             if (_tokenId == 0){
                 // If token id == 0 -> transfer ether

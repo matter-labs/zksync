@@ -77,7 +77,7 @@ contract PriorityQueue {
 
     /// @notice Constructs PriorityQueue contract
     /// @param _governanceAddress Governance contract address
-    constructor(address _governanceAddress) public {
+    constructor(address payable _governanceAddress) public {
         governance = Governance(_governanceAddress);
     }
 

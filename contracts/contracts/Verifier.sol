@@ -55,7 +55,7 @@ contract Verifier is VerificationKey {
     /// @param _y Y value
     function NegateY(uint256 _y) internal pure returns (uint256) {
         uint256 q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-        return q - (y % q);
+        return q - (_y % q);
     }
 
     /// @notice Verifies exit proof
