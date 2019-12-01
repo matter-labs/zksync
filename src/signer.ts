@@ -12,6 +12,7 @@ import BN = require("bn.js");
 import { Address, CloseAccount, Transfer, Withdraw } from "./types";
 
 const MAX_NUMBER_OF_TOKENS = 4096;
+const MAX_NUMBER_OF_ACCOUNTS = 1 << 24;
 
 export class Signer {
     readonly privateKey: BN;
@@ -117,17 +118,20 @@ export class Signer {
     }
 
     syncEmergencyWithdrawSignature(emergencyWithdraw: {
+        accountId: number;
         ethAddress: string;
         tokenId: number;
         nonce: number;
     }): Buffer {
         const type = Buffer.from([6]);
         const packed_pubkey = serializePointPacked(this.publicKey);
+        const account_id = serializeAccountId(emergencyWithdraw.accountId);
         const eth_address = serializeAddress(emergencyWithdraw.ethAddress);
         const token = serializeTokenId(emergencyWithdraw.tokenId);
         const nonce = serializeNonce(emergencyWithdraw.nonce);
         const msg = Buffer.concat([
             type,
+            account_id,
             packed_pubkey,
             eth_address,
             token,
@@ -156,6 +160,20 @@ function serializeAddress(address: Address | string): Buffer {
     }
     return addressBytes;
 }
+
+function serializeAccountId(accountId: number): Buffer {
+    if (accountId < 0) {
+        throw new Error("Negative account id");
+    }
+    if (accountId >= MAX_NUMBER_OF_ACCOUNTS) {
+        throw new Error("AccountId is too big");
+    }
+    const buffer = Buffer.alloc(4);
+    buffer.writeUInt32BE(accountId, 0);
+    // only 3 bytes
+    return buffer.slice(1);
+}
+
 function serializeTokenId(tokenId: number): Buffer {
     if (tokenId < 0) {
         throw new Error("Negative tokenId");

@@ -142,7 +142,7 @@ export class Provider {
 export class ETHProxy {
     constructor(
         private ethersProvider: ethers.providers.Provider,
-        private contractAddress: ContractAddress
+        public contractAddress: ContractAddress
     ) {}
 
     async resolveTokenId(token: Token): Promise<number> {

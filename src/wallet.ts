@@ -199,25 +199,38 @@ export async function emergencyWithdraw(withdraw: {
     withdrawFrom: Wallet;
     token: Token;
     maxFeeInETHCurrenty: utils.BigNumberish;
+    accountId?: number;
     nonce?: Nonce;
 }): Promise<ETHOperation> {
+    let accountId;
+    if (withdraw.accountId != undefined) {
+        accountId = withdraw.accountId;
+    } else {
+        const accountState = await withdraw.withdrawFrom.getAccountState();
+        if (!accountState.id) {
+            throw new Error("Can't resolve account id from the ZK Sync node");
+        }
+        accountId = accountState.id;
+    }
+
     const tokenId = await withdraw.withdrawFrom.ethProxy.resolveTokenId(
         withdraw.token
     );
-    const nonce = withdraw.nonce
-        ? await this.getNonce(withdraw.nonce)
-        : await this.getNonce();
-    const numNonce = await withdraw.withdrawFrom.getNonce(nonce);
+    const nonce =
+        withdraw.nonce != undefined
+            ? await withdraw.withdrawFrom.getNonce(withdraw.nonce)
+            : await withdraw.withdrawFrom.getNonce();
     const emergencyWithdrawSignature = withdraw.withdrawFrom.signer.syncEmergencyWithdrawSignature(
         {
+            accountId,
             ethAddress: await withdraw.withdrawTo.getAddress(),
             tokenId,
-            nonce: numNonce
+            nonce
         }
     );
 
     const mainSyncContract = new Contract(
-        withdraw.withdrawFrom.provider.contractAddress.mainContract,
+        withdraw.withdrawFrom.ethProxy.contractAddress.mainContract,
         SYNC_MAIN_CONTRACT_INTERFACE,
         withdraw.withdrawTo
     );
@@ -227,10 +240,11 @@ export async function emergencyWithdraw(withdraw: {
         tokenAddress = withdraw.token;
     }
     const ethTransaction = await mainSyncContract.fullExit(
+        accountId,
         serializePointPacked(withdraw.withdrawFrom.signer.publicKey),
         tokenAddress,
         emergencyWithdrawSignature,
-        numNonce,
+        nonce,
         {
             gasLimit: utils.bigNumberify("500000"),
             value: withdraw.maxFeeInETHCurrenty
