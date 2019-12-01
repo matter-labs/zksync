@@ -1394,48 +1394,42 @@ impl StorageProcessor {
         to_block: Option<u32>,
     ) -> QueryResult<Option<(u32, AccountUpdates)>> {
         self.conn().transaction(|| {
-            let (to_block, unbounded) = if let Some(to_block) = to_block {
-                (to_block, false)
+            let to_block_resolved = if let Some(to_block) = to_block {
+                to_block
             } else {
-                (0, true)
+                let last_block = blocks::table
+                    .select(max(blocks::number))
+                    .first::<Option<i64>>(self.conn())?;
+                last_block.map(|n| n as u32).unwrap_or(0)
             };
 
-            let (time_forward, start_block, end_block) = if unbounded {
-                (true, from_block, 0)
-            } else {
-                (
-                    from_block <= to_block,
-                    cmp::min(from_block, to_block),
-                    cmp::max(from_block, to_block),
-                )
-            };
+            let (time_forward, start_block, end_block) = (
+                from_block <= to_block_resolved,
+                cmp::min(from_block, to_block_resolved),
+                cmp::max(from_block, to_block_resolved),
+            );
 
             let account_balance_diff = account_balance_updates::table
                 .filter(
                     account_balance_updates::block_number
                         .gt(&(i64::from(start_block)))
-                        .and(
-                            account_balance_updates::block_number
-                                .le(&(i64::from(end_block)))
-                                .or(unbounded),
-                        ),
+                        .and(account_balance_updates::block_number.le(&(i64::from(end_block)))),
                 )
                 .load::<StorageAccountUpdate>(self.conn())?;
             let account_creation_diff = account_creates::table
                 .filter(
                     account_creates::block_number
                         .gt(&(i64::from(start_block)))
-                        .and(
-                            account_creates::block_number
-                                .le(&(i64::from(end_block)))
-                                .or(unbounded),
-                        ),
+                        .and(account_creates::block_number.le(&(i64::from(end_block)))),
                 )
                 .load::<StorageAccountCreation>(self.conn())?;
 
             debug!(
                 "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
-                time_forward, start_block, end_block, unbounded
+                time_forward,
+                start_block,
+                end_block,
+                to_block.is_none()
             );
             debug!("Loaded account balance diff: {:#?}", account_balance_diff);
             debug!("Loaded account creation diff: {:#?}", account_creation_diff);
@@ -1471,7 +1465,11 @@ impl StorageProcessor {
                 reverse_updates(&mut account_updates);
             }
 
-            let block_after_updates = if time_forward { last_block } else { to_block };
+            let block_after_updates = if time_forward {
+                last_block
+            } else {
+                start_block
+            };
 
             if !account_updates.is_empty() {
                 Ok(Some((block_after_updates, account_updates)))

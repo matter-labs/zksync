@@ -349,11 +349,13 @@ contract Franklin {
     
     // Register full exit request
     // Params:
-    // - _pubKye - packed public key of the user account
+    // - _accountId - numerical id of the account
+    // - _pubKey - packed public key of the user account
     // - _token - token address, 0 address for ether
     // - _signature - user signature
     // - _nonce - request nonce
     function fullExit (
+        uint24 _accountId,
         bytes calldata _pubKey,
         address _token,
         bytes calldata _signature,
@@ -388,7 +390,8 @@ contract Franklin {
         ); // fft13 - wrong pubkey length
 
         // Priority Queue request
-        bytes memory pubData = _pubKey; // franklin id
+        bytes memory pubData = Bytes.toBytesFromUInt24(_accountId); // franklin id
+        pubData = Bytes.concat(pubData, _pubKey); // account id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt32(_nonce)); // nonce

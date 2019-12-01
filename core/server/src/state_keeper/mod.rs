@@ -229,7 +229,14 @@ impl PlasmaStateKeeper {
     ) {
         let commit_request = self.apply_txs(prior_ops, txs);
 
-        if !commit_request.accounts_updated.is_empty() {
+        let priority_ops_executed = {
+            let (prior_ops_before, prior_ops_after) = commit_request.block.processed_priority_ops;
+            prior_ops_after != prior_ops_before
+        };
+
+        let block_not_empty = !commit_request.accounts_updated.is_empty() || priority_ops_executed;
+
+        if block_not_empty {
             self.state.block_number += 1; // bump current block number as we've made one
         }
 

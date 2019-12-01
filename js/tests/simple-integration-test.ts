@@ -5,7 +5,6 @@ import {
     ETHProxy, getDefaultProvider, types
 } from "zksync";
 import { ethers, utils } from "ethers";
-import {bigNumberify} from "ethers/utils";
 
 
 let syncProvider: Provider;
@@ -32,7 +31,7 @@ async function testDeposit(ethWallet: ethers.Signer, syncWallet: Wallet, token: 
         depositTo:  syncWallet,
         token: token,
         amount,
-        maxFeeInETHCurrenty: utils.parseEther("0.1")
+        maxFeeInETHToken: utils.parseEther("0.1")
     });
     await depositHandle.awaitReceipt();
     const balanceAfterDep = await syncWallet.getBalance(token);

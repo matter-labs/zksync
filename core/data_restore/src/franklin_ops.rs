@@ -155,11 +155,12 @@ mod test {
     }
 
     #[test]
-    fn test_full_exit() {
+    fn test_successfull_full_exit() {
         let packed_pubkey = Box::new([7u8; PUBKEY_PACKED_BYTES_LENGTH]);
         let signature_r = Box::new([8u8; SIGNATURE_R_BYTES_LENGTH]);
         let signature_s = Box::new([9u8; SIGNATURE_S_BYTES_LENGTH]);
         let priority_op = FullExit {
+            account_id: 11,
             packed_pubkey,
             eth_address: [9u8; 20].into(),
             token: 1,
@@ -169,7 +170,31 @@ mod test {
         };
         let op = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
-            account_with_id: Some((9, BigDecimal::from(444))),
+            withdraw_amount: Some(BigDecimal::from(444)),
+        }));
+        let pub_data = op.public_data();
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
+            .expect("cant get ops from data");
+        println!("{:?}", ops);
+    }
+
+    #[test]
+    fn test_failed_full_exit() {
+        let packed_pubkey = Box::new([7u8; PUBKEY_PACKED_BYTES_LENGTH]);
+        let signature_r = Box::new([8u8; SIGNATURE_R_BYTES_LENGTH]);
+        let signature_s = Box::new([9u8; SIGNATURE_S_BYTES_LENGTH]);
+        let priority_op = FullExit {
+            account_id: 11,
+            packed_pubkey,
+            eth_address: [9u8; 20].into(),
+            token: 1,
+            nonce: 3,
+            signature_r,
+            signature_s,
+        };
+        let op = FranklinOp::FullExit(Box::new(FullExitOp {
+            priority_op,
+            withdraw_amount: None,
         }));
         let pub_data = op.public_data();
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)

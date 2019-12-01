@@ -51,7 +51,7 @@ impl<E: JubjubEngine> FullExitWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.before.witness.account_witness.nonce.unwrap(),
+            &self.args.pub_nonce.unwrap(),
             franklin_constants::NONCE_BIT_WIDTH,
         );
 
@@ -118,25 +118,21 @@ impl<E: JubjubEngine> FullExitWitness<E> {
 pub fn apply_full_exit_tx(
     tree: &mut CircuitAccountTree,
     full_exit: &FullExitOp,
-    is_sig_valid: bool,
+    is_success: bool,
 ) -> FullExitWitness<Bn256> {
     let full_exit = FullExitData {
         token: u32::from(full_exit.priority_op.token),
-        account_address: full_exit
-            .account_with_id
-            .as_ref()
-            .map(|(id, _)| *id)
-            .unwrap_or(0),
+        account_address: full_exit.priority_op.account_id,
         ethereum_key: Fr::from_hex(&format!("{:x}", &full_exit.priority_op.eth_address)).unwrap(),
         pub_nonce: Fr::from_str(&full_exit.priority_op.nonce.to_string()).unwrap(),
     };
     // le_bit_vector_into_field_element()
-    apply_full_exit(tree, &full_exit, is_sig_valid)
+    apply_full_exit(tree, &full_exit, is_success)
 }
 pub fn apply_full_exit(
     tree: &mut CircuitAccountTree,
     full_exit: &FullExitData,
-    is_sig_valid: bool,
+    is_success: bool,
 ) -> FullExitWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
@@ -158,7 +154,7 @@ pub fn apply_full_exit(
             |_| {},
             |_| {},
         );
-        if is_sig_valid {
+        if is_success {
             balance
         } else {
             Fr::zero()
@@ -166,7 +162,7 @@ pub fn apply_full_exit(
     };
 
     let (account_witness_before, account_witness_after, balance_before, balance_after) = {
-        if is_sig_valid {
+        if is_success {
             apply_leaf_operation(
                 tree,
                 full_exit.account_address,

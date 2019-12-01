@@ -896,6 +896,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         ext_pubdata_chunk: &AllocatedNum<E>,
         signature: &AllocatedSignatureData<E>,
     ) -> Result<Boolean, SynthesisError> {
+        // Execute first chunk
+
         //TODO: this flag is used too often, we better compute it above
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
@@ -903,161 +905,188 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
 
-        // construct signature message
+        // MUST be true for all chunks
+        let is_signature_witness_correct = {
+            let correct_in_first_chunk = {
+                // construct signature message
+                let mut serialized_tx_bits = vec![];
+                serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+                serialized_tx_bits.extend(cur.account_address.get_bits_be());
+                serialized_tx_bits.extend(signer_key.pubkey.get_external_packing());
+                serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
+                serialized_tx_bits.extend(cur.token.get_bits_be());
+                serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
 
-        let mut serialized_tx_bits = vec![];
+                verify_signature_message_construction(
+                    cs.namespace(|| "is_serialized_op_withess_correct"),
+                    serialized_tx_bits.clone(),
+                    &op_data,
+                )?
+            };
 
-        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(signer_key.pubkey.get_external_packing());
-        serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
-        serialized_tx_bits.extend(cur.token.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+            multi_or(
+                cs.namespace(|| "sig is valid or not first chunk"),
+                &[correct_in_first_chunk, is_first_chunk.clone().not()],
+            )?
+        };
 
-        let is_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_serialized_tx_correct"),
-            serialized_tx_bits.clone(),
-            &op_data,
-        )?;
+        // MUST be true for all chunks
+        let is_pubdata_chunk_correct = {
+            //construct pubdata
+            let pubdata_bits = {
+                let mut pub_data = Vec::new();
+                pub_data.extend(chunk_data.tx_type.get_bits_be()); //1
+                pub_data.extend(cur.account_address.get_bits_be()); //3
+                pub_data.extend(signer_key.pubkey.get_external_packing());
+                pub_data.extend(op_data.ethereum_key.get_bits_be()); //20
+                pub_data.extend(cur.token.get_bits_be()); // 2
+                pub_data.extend(op_data.pub_nonce.get_bits_be()); // 4
+                pub_data.extend(signature.get_packed_r().clone());
+                pub_data.extend(reverse_bytes(&signature.sig_s_bits.clone()));
+                pub_data.extend(op_data.full_amount.get_bits_be());
+                pub_data.resize(
+                    18 * franklin_constants::CHUNK_BIT_WIDTH,
+                    Boolean::constant(false),
+                );
+                pub_data
+            };
 
-        let is_serialized_tx_correct = multi_or(
-            cs.namespace(|| "sig is valid or not first chunk"),
-            &[is_serialized_tx_correct, is_first_chunk.clone().not()],
-        )?;
+            let pubdata_chunk = select_pubdata_chunk(
+                cs.namespace(|| "select_pubdata_chunk"),
+                &pubdata_bits,
+                &chunk_data.chunk_number,
+                18,
+            )?;
 
-        let is_signer_valid = CircuitElement::equals(
-            cs.namespace(|| "signer_key_correct"),
-            &signer_key.pubkey.get_hash(),
-            &cur.account.pub_key_hash,
-        )?;
-        debug!(
-            "is_serialized_tx_correct {:?}",
-            is_serialized_tx_correct.get_value()
-        );
-        debug!("is_signer_valid {:?}", is_signer_valid.get_value());
-        debug!(
-            "signature.is_verified. {:?}",
-            signature.is_verified.get_value()
-        );
+            Boolean::from(Expression::equals(
+                cs.namespace(|| "is_pubdata_equal"),
+                &pubdata_chunk,
+                ext_pubdata_chunk,
+            )?)
+        };
 
-        let is_signed_correctly = multi_and(
-            cs.namespace(|| "is_signed_correctly"),
-            &[
-                is_serialized_tx_correct,
-                is_signer_valid,
-                signature.is_verified.clone(),
-            ],
-        )?;
+        let is_base_valid = {
+            let mut base_valid_flags = Vec::new();
 
-        let amount_to_exit = CircuitElement::conditionally_select_with_number_strict(
-            cs.namespace(|| "amount_to_exit"),
-            Expression::constant::<CS>(E::Fr::zero()),
-            &cur.balance,
-            &is_signed_correctly.not(),
-        )?;
-        let mut base_valid_flags = vec![];
-        //construct pubdata
-        let mut pubdata_bits = vec![];
+            debug!(
+                "is_pubdata_chunk_correct {:?}",
+                is_pubdata_chunk_correct.get_value()
+            );
+            base_valid_flags.push(is_pubdata_chunk_correct);
+            // MUST be true
+            let is_full_exit = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_full_exit"),
+                &chunk_data.tx_type.get_number(),
+                Expression::u64::<CS>(6), //full_exit tx code
+            )?);
 
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //1
-        pubdata_bits.extend(cur.account_address.get_bits_be()); //3
-        pubdata_bits.extend(signer_key.pubkey.get_external_packing());
-        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //20
-        pubdata_bits.extend(cur.token.get_bits_be()); // 2
-        pubdata_bits.extend(op_data.pub_nonce.get_bits_be()); // 2
-        pubdata_bits.extend(signature.get_packed_r().clone());
-        pubdata_bits.extend(reverse_bytes(&signature.sig_s_bits.clone()));
-        pubdata_bits.extend(op_data.full_amount.get_bits_be());
-        pubdata_bits.resize(
-            18 * franklin_constants::CHUNK_BIT_WIDTH,
-            Boolean::constant(false),
-        );
+            base_valid_flags.push(is_full_exit.clone());
+            multi_and(cs.namespace(|| "valid base full_exit"), &base_valid_flags)?
+        };
 
-        let pubdata_chunk = select_pubdata_chunk(
-            cs.namespace(|| "select_pubdata_chunk"),
-            &pubdata_bits,
-            &chunk_data.chunk_number,
-            18,
-        )?;
+        // SHOULD be true for successful exit-- true if signature is verified for the given account
+        let is_signed_correctly = {
+            let is_signer_valid = CircuitElement::equals(
+                cs.namespace(|| "signer_key_correct"),
+                &signer_key.pubkey.get_hash(),
+                &cur.account.pub_key_hash,
+            )?;
+            debug!(
+                "is_signature_witness_correct {:?}",
+                is_signature_witness_correct.get_value()
+            );
+            debug!("is_signer_valid {:?}", is_signer_valid.get_value());
+            debug!(
+                "signature.is_verified. {:?}",
+                signature.is_verified.get_value()
+            );
 
-        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_pubdata_equal"),
-            &pubdata_chunk,
-            ext_pubdata_chunk,
-        )?);
-        debug!(
-            "is_pubdata_chunk_correct {:?}",
-            is_pubdata_chunk_correct.get_value()
-        );
-        base_valid_flags.push(is_pubdata_chunk_correct);
+            multi_and(
+                cs.namespace(|| "is_signed_correctly"),
+                &[
+                    is_signature_witness_correct,
+                    is_signer_valid,
+                    signature.is_verified.clone(),
+                ],
+            )?
+        };
 
-        // verify correct tx_code
-        let is_full_exit = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_full_exit"),
-            &chunk_data.tx_type.get_number(),
-            Expression::u64::<CS>(6), //full_exit tx code
-        )?);
-        base_valid_flags.push(is_full_exit.clone());
-
-        // base_valid_flags.push(_is_signer_valid);
-        debug!("is_base_valid start");
-        let is_base_valid = multi_and(cs.namespace(|| "valid base full_exit"), &base_valid_flags)?;
-        debug!("is_base_valid end");
-
-        let mut lhs_valid_flags = vec![];
-        lhs_valid_flags.push(is_first_chunk.clone());
-
-        lhs_valid_flags.push(is_base_valid.clone());
+        // SHOULD be true for successful exit
         let is_nonce_correct = CircuitElement::equals(
             cs.namespace(|| "is_nonce_correct"),
             &cur.account.nonce,
             &op_data.pub_nonce,
         )?;
-        lhs_valid_flags.push(is_nonce_correct);
-        lhs_valid_flags.push(no_nonce_overflow(
-            cs.namespace(|| "no nonce overflow"),
-            &cur.account.nonce.get_number(),
-        )?);
-        debug!("lhs_valid beginning");
-        let lhs_valid = multi_and(cs.namespace(|| "is_lhs_valid"), &lhs_valid_flags)?;
-        debug!("lhs_valid_signed beginning");
-        let lhs_valid_signed = multi_and(
-            cs.namespace(|| "lhs_valid_signed"),
-            &[lhs_valid.clone(), is_signed_correctly],
+
+        // SHOULD be true for successful exit
+        // otherwise it is impossible to decide from pub data if nonce should be updated?
+        let is_balance_not_zero = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_balance_not_zero"),
+            &cur.balance.get_number(),
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?)
+        .not();
+
+        // MUST be true for correct op. First chunk is correct and tree update can be executed.
+        let first_chunk_valid = {
+            let mut flags = Vec::new();
+            flags.push(is_first_chunk.clone());
+            flags.push(is_base_valid.clone());
+            flags.push(no_nonce_overflow(
+                cs.namespace(|| "no nonce overflow"),
+                &cur.account.nonce.get_number(),
+            )?);
+            multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
+        };
+
+        // Full exit was a success, update account is the first chunk.
+        let success_account_update = multi_and(
+            cs.namespace(|| "success_account_update"),
+            &[
+                first_chunk_valid.clone(),
+                is_signed_correctly,
+                is_nonce_correct,
+                is_balance_not_zero,
+            ],
         )?;
-        debug!("lhs_valid_signed end");
+        //        let amount_to_exit = CircuitElement::conditionally_select_with_number_strict(
+        //            cs.namespace(|| "amount_to_exit"),
+        //            Expression::constant::<CS>(E::Fr::zero()),
+        //            &cur.balance,
+        //            &lhs_valid_success.not(),
+        //        )?;
+        //        let updated_balance = Expression::from(&cur.balance.get_number())
+        //            - Expression::from(&amount_to_exit.get_number());
 
-        let mut ohs_valid_flags = vec![];
-        ohs_valid_flags.push(is_base_valid);
-        ohs_valid_flags.push(is_first_chunk.not());
-        let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
-
-        let tx_valid = multi_or(
-            cs.namespace(|| "tx_valid"),
-            &[lhs_valid.clone(), is_ohs_valid],
-        )?;
-
-        let updated_balance = Expression::from(&cur.balance.get_number())
-            - Expression::from(&amount_to_exit.get_number());
-
-        //mutate current branch if it is first chunk of valid withdraw transaction
+        //mutate current branch if it is first chunk of a successful withdraw transaction
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
             cs.namespace(|| "mutated balance"),
-            updated_balance,
+            Expression::constant::<CS>(E::Fr::zero()),
             &cur.balance,
-            &lhs_valid_signed,
+            &success_account_update,
         )?;
 
-        let updated_nonce =
-            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1);
-
-        //update nonce
+        //mutate current branch if it is first chunk of a successful withdraw transaction
         cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
             cs.namespace(|| "update cur nonce"),
-            updated_nonce,
+            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1),
             &cur.account.nonce,
-            &lhs_valid_signed,
+            &success_account_update,
         )?;
 
+        // Check other chunks
+        let other_chunks_valid = {
+            let mut flags = Vec::new();
+            flags.push(is_base_valid);
+            flags.push(is_first_chunk.not());
+            multi_and(cs.namespace(|| "other_chunks_valid"), &flags)?
+        };
+
+        // MUST be true for correct (successful or not) full exit
+        let tx_valid = multi_or(
+            cs.namespace(|| "tx_valid"),
+            &[first_chunk_valid.clone(), other_chunks_valid],
+        )?;
         Ok(tx_valid)
     }
 
@@ -1957,7 +1986,7 @@ fn no_nonce_overflow<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(Boolean::from(Expression::equals(
         cs.namespace(|| "is nonce at max"),
         nonce,
-        Expression::constant::<CS>(E::Fr::from_str(&(256 * 256 - 1).to_string()).unwrap()),
+        Expression::constant::<CS>(E::Fr::from_str(&std::u32::MAX.to_string()).unwrap()),
     )?)
     .not())
 }

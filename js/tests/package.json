@@ -5,12 +5,13 @@
   "license": "MIT",
   "dependencies": {
     "ethers": "^4.0.40",
-    "zksync": "^0.3.1"
+    "zksync": "^0.3.3"
   },
   "devDependencies": {
     "@types/node": "^12.12.14"
   },
   "scripts": {
-    "simple": "f ts-node simple-integration-test.ts"
+    "simple": "f ts-node simple-integration-test.ts",
+    "full-exit": "f ts-node full-exit-inegration-test.ts"
   }
 }

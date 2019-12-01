@@ -163,8 +163,11 @@ flatten:
 
 # testing
 
-run-simple-integration-test:
+integration-simple:
 	@cd js/tests && yarn simple
+
+integration-full-exit:
+	@cd js/tests && yarn full-exit
 
 price:
 	@node contracts/scripts/check-price.js
