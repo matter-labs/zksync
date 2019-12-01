@@ -147,7 +147,7 @@ export async function depositFromETH(deposit: {
     depositTo: Wallet;
     token: Token;
     amount: utils.BigNumberish;
-    maxFeeInETHCurrenty: utils.BigNumberish;
+    maxFeeInETHToken: utils.BigNumberish;
 }): Promise<ETHOperation> {
     const mainSidechainContract = new Contract(
         deposit.depositTo.provider.contractAddress.mainContract,
@@ -164,7 +164,7 @@ export async function depositFromETH(deposit: {
             {
                 value: utils
                     .bigNumberify(deposit.amount)
-                    .add(deposit.maxFeeInETHCurrenty),
+                    .add(deposit.maxFeeInETHToken),
                 gasLimit: utils.bigNumberify("200000")
             }
         );
@@ -185,7 +185,7 @@ export async function depositFromETH(deposit: {
             deposit.depositTo.address(),
             {
                 gasLimit: utils.bigNumberify("250000"),
-                value: deposit.maxFeeInETHCurrenty,
+                value: deposit.maxFeeInETHToken,
                 nonce: approveTx.nonce + 1
             }
         );
@@ -198,7 +198,7 @@ export async function emergencyWithdraw(withdraw: {
     withdrawTo: ethers.Signer;
     withdrawFrom: Wallet;
     token: Token;
-    maxFeeInETHCurrenty: utils.BigNumberish;
+    maxFeeInETHToken: utils.BigNumberish;
     accountId?: number;
     nonce?: Nonce;
 }): Promise<ETHOperation> {
@@ -247,7 +247,7 @@ export async function emergencyWithdraw(withdraw: {
         nonce,
         {
             gasLimit: utils.bigNumberify("500000"),
-            value: withdraw.maxFeeInETHCurrenty
+            value: withdraw.maxFeeInETHToken
         }
     );
 
