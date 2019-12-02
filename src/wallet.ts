@@ -109,7 +109,7 @@ export class Wallet {
         return this.signer.address();
     }
 
-    static async fromEthWallet(
+    static async fromEthSigner(
         ethWallet: ethers.Signer,
         provider: Provider,
         ethProxy: ETHProxy

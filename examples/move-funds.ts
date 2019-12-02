@@ -50,7 +50,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
         MNEMONIC,
         "m/44'/60'/0'/0/1"
     ).connect(ethersProvider);
-    const syncWallet = await zksync.Wallet.fromEthWallet(
+    const syncWallet = await zksync.Wallet.fromEthSigner(
         ethWallet,
         syncProvider,
         ethProxy
@@ -60,7 +60,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
         MNEMONIC,
         "m/44'/60'/0'/0/2"
     ).connect(ethersProvider);
-    const syncWallet2 = await zksync.Wallet.fromEthWallet(
+    const syncWallet2 = await zksync.Wallet.fromEthSigner(
         ethWallet2,
         syncProvider,
         ethProxy
