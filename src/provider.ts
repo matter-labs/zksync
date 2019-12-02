@@ -11,7 +11,7 @@ import {
     TransactionReceipt,
     PriorityOperationReceipt
 } from "./types";
-import { sleep, SYNC_GOV_CONTRACT_INTERFACE } from "./utils";
+import { sleep, SYNC_GOV_CONTRACT_INTERFACE, SYNC_MAIN_CONTRACT_INTERFACE } from "./utils";
 
 export interface ContractAddress {
     mainContract: string;
@@ -155,27 +155,42 @@ export class Provider {
 }
 
 export class ETHProxy {
+    private governanceContract: Contract;
+    private mainContract: Contract;
+
     constructor(
         private ethersProvider: ethers.providers.Provider,
         public contractAddress: ContractAddress
-    ) {}
+    ) {
+        this.governanceContract = new Contract(
+            this.contractAddress.govContract,
+            SYNC_GOV_CONTRACT_INTERFACE,
+            this.ethersProvider
+        );
+ 
+        this.mainContract = new Contract(
+            this.contractAddress.mainContract,
+            SYNC_MAIN_CONTRACT_INTERFACE,
+            this.ethersProvider
+        );
+    }
 
     async resolveTokenId(token: Token): Promise<number> {
         if (token == "ETH") {
             return 0;
         } else {
-            const syncContract = new Contract(
-                this.contractAddress.govContract,
-                SYNC_GOV_CONTRACT_INTERFACE,
-                this.ethersProvider
-            );
-            const tokenId = await syncContract.tokenIds(token);
+            const tokenId = await this.governanceContract.tokenIds(token);
             if (tokenId == 0) {
                 throw new Error(
-                    `ERC20 token is not supported address: ${token}`
+                    `ERC20 token ${token} is not supported`
                 );
             }
             return tokenId;
         }
+    }
+
+    async balanceToWithdraw(address: Address, tokenId: number) {
+        return await this.mainContract
+            .balancesToWithdraw(address, tokenId);
     }
 }

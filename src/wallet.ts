@@ -27,7 +27,7 @@ export class Wallet {
         const nonce = transfer.nonce
             ? await this.getNonce(transfer.nonce)
             : await this.getNonce();
-        const transaxtionData = {
+        const transactionData = {
             to: transfer.to,
             tokenId,
             amount: transfer.amount,
@@ -35,7 +35,7 @@ export class Wallet {
             nonce
         };
         const signedTransferTransaction = this.signer.signSyncTransfer(
-            transaxtionData
+            transactionData
         );
 
         const transactionHash = await this.provider.submitTx(
@@ -260,7 +260,7 @@ export async function getEthereumBalance(
 ): Promise<utils.BigNumber> {
     let balance: utils.BigNumber;
     if (token == "ETH") {
-        balance = await ethSigner.provider.getBalance(ethSigner.getAddress());
+        balance = await ethSigner.provider.getBalance(await ethSigner.getAddress());
     } else {
         const erc20contract = new Contract(token, IERC20_INTERFACE, ethSigner);
         balance = await erc20contract.balanceOf(await ethSigner.getAddress());
