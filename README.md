@@ -1,6 +1,4 @@
-# FRANKLIN Rollup: sidechain governed by SNARKs
-
-Spec: https://hackmd.io/cY-VP7SDTUGgPOzDiEU3TQ
+# ZK Sync: scaling and privacy engine for Ethereum
 
 # Basics
 
