@@ -2125,7 +2125,8 @@ impl StorageProcessor {
             .values(&new_token)
             .on_conflict(tokens::id)
             .do_update()
-            .set(&new_token)
+            // update token address but not symbol -- so we can update it externally
+            .set(tokens::address.eq(new_token.address.clone()))
             .execute(self.conn())
             .map(drop)
     }
