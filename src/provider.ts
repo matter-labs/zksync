@@ -9,14 +9,9 @@ import {
     Address,
     Token,
     TransactionReceipt,
-    PriorityOperationReceipt
+    PriorityOperationReceipt, ContractAddress, Tokens
 } from "./types";
 import { sleep, SYNC_GOV_CONTRACT_INTERFACE } from "./utils";
-
-export interface ContractAddress {
-    mainContract: string;
-    govContract: string;
-}
 
 export async function getDefaultProvider(
     network: "localhost" | "testnet",
@@ -68,6 +63,10 @@ export class Provider {
 
     async getContractAddress(): Promise<ContractAddress> {
         return await this.transport.request("contract_address", null);
+    }
+
+    async getTokens(): Promise<Tokens> {
+        return await this.transport.request("tokens", null);
     }
 
     async getState(address: Address): Promise<AccountState> {

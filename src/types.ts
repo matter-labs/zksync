@@ -75,3 +75,16 @@ export interface PriorityOperationReceipt {
     executed: boolean;
     block?: BlockInfo;
 }
+
+export interface ContractAddress {
+    mainContract: string;
+    govContract: string;
+}
+
+export interface Tokens {
+    [token: string]: {
+        address: string,
+        id: number,
+        symbol?: string,
+    }
+}
