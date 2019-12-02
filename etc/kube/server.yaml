@@ -11,6 +11,14 @@ spec:
     targetPort: 3000
     protocol: TCP
     name: http
+  - port: 8080
+    targetPort: 3030
+    protocol: TCP
+    name: http-jrpc
+  - port: 8880
+    targetPort: 3031
+    protocol: TCP
+    name: ws-jrpc
   selector:
     app: ${FRANKLIN_ENV}-server
 ---
@@ -77,6 +85,8 @@ spec:
           imagePullPolicy: Always
           ports: 
             - containerPort: 3000
+            - containerPort: 3030
+            - containerPort: 3031
           envFrom:
             - secretRef:
                 name: ${FRANKLIN_ENV}-secret

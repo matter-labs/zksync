@@ -142,8 +142,8 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: e
         ethProxy
     );
 
-    await moveFunds(ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "42.0");
-    await moveFunds(ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "42.0");
+    await moveFunds(ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "0.01");
+    await moveFunds(ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "0.01");
 
     await syncProvider.disconnect();
 })();

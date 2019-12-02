@@ -95,7 +95,7 @@ struct StorageBalance {
     pub balance: BigDecimal,
 }
 
-#[derive(Debug, Clone, Insertable, QueryableByName, Queryable, Serialize, Deserialize)]
+#[derive(Debug, Clone, Insertable, QueryableByName, Queryable, Serialize, Deserialize, AsChangeset)]
 #[table_name = "tokens"]
 pub struct Token {
     pub id: i32,
@@ -2123,7 +2123,9 @@ impl StorageProcessor {
         };
         diesel::insert_into(tokens::table)
             .values(&new_token)
-            .on_conflict_do_nothing()
+            .on_conflict(tokens::id)
+            .do_update()
+            .set(&new_token)
             .execute(self.conn())
             .map(drop)
     }
