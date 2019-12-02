@@ -6,6 +6,8 @@ const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
 const MNEMONIC = process.env.MNEMONIC;
 const TOKEN = process.env.TEST_ERC20;
+const network =
+    process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
 
 function shortAddr(address: string): string {
     return `${address.substr(0, 6)}`;
@@ -33,8 +35,10 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
 }
 
 (async () => {
+    console.log(`Starting test on the ${network} network`);
+
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
-    const syncProvider = await zksync.getDefaultProvider("localhost");
+    const syncProvider = await zksync.getDefaultProvider(network);
     const ethProxy = new zksync.ETHProxy(
         ethersProvider,
         syncProvider.contractAddress
@@ -62,7 +66,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
         ethProxy
     );
 
-    const depositAmount = "17.0";
+    const depositAmount = "0.0017";
     const depositToken = TOKEN;
     console.log("==================================");
     console.log(

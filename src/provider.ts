@@ -19,10 +19,25 @@ export interface ContractAddress {
 }
 
 export async function getDefaultProvider(
-    network: "localhost"
+    network: "localhost" | "testnet",
+    transport: "WS" | "HTTP" = "WS"
 ): Promise<Provider> {
     if (network == "localhost") {
-        return await Provider.newWebsocketProvider("ws://127.0.0.1:3031");
+        if (transport == "WS") {
+            return await Provider.newWebsocketProvider("ws://127.0.0.1:3031");
+        } else if (transport == "HTTP") {
+            return await Provider.newHttpProvider("http://127.0.0.1:3030");
+        }
+    } else if (network == "testnet") {
+        if (transport == "WS") {
+            return await Provider.newWebsocketProvider(
+                "ws://testnet.matter-labs.io:8880"
+            );
+        } else if (transport == "HTTP") {
+            return await Provider.newHttpProvider(
+                "http://testnet.matter-labs.io:8080"
+            );
+        }
     }
 }
 
