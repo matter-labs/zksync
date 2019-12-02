@@ -31,11 +31,11 @@ export async function getDefaultProvider(
     } else if (network == "testnet") {
         if (transport == "WS") {
             return await Provider.newWebsocketProvider(
-                "ws://testnet.matter-labs.io:8880"
+                "wss://testnet.matter-labs.io/jsrpc-ws"
             );
         } else if (transport == "HTTP") {
             return await Provider.newHttpProvider(
-                "http://testnet.matter-labs.io:8080"
+                "https://testnet.matter-labs.io/jsrpc"
             );
         }
     }
