@@ -45,6 +45,7 @@ let TRANSFERS_TOTAL = 100;
         ethWallets.push(ethWallet);
         syncWallets.push(syncWallet);
 
+        // Create wallets
         var i = 1;
         while (i < CLIENTS_TOTAL) {
             let ew = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -59,12 +60,14 @@ let TRANSFERS_TOTAL = 100;
             i++;
         }
 
+        // Deposits
         i = 0;
         while  (i < CLIENTS_TOTAL) {
             await depositEther(ethWallets[0], syncWallets[i], DEPOSIT_AMOUNT);
             i++;
         }
 
+        // Transfers
         i = 0;
         while(i < TRANSFERS_TOTAL) {
             let number1 = randomClientNumber();
@@ -79,6 +82,7 @@ let TRANSFERS_TOTAL = 100;
             i++;
         }
 
+        // Withdraws
         i = 0;
         while  (i < CLIENTS_TOTAL) {
             await withdrawEther(ethWallets[i], syncWallets[i]);
