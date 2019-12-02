@@ -9,10 +9,10 @@ import { ethers, utils } from "ethers";
 let syncProvider: Provider;
 
 let CLIENTS_TOTAL = 10;
-let INIT_DEPOSIT = "1.0";
+let DEPOSIT_AMOUNT = "1.0";
 let TRANSFER_AMOUNT = "0.00001";
 let FEE_DIVISOR = 20;
-let TRANSFER_TOTAL = 100;
+let TRANSFERS_TOTAL = 100;
 
 (async () => {
     const WEB3_URL = process.env.WEB3_URL;
@@ -61,12 +61,12 @@ let TRANSFER_TOTAL = 100;
 
         i = 0;
         while  (i < CLIENTS_TOTAL) {
-            await depositEther(ethWallets[0], syncWallets[i], INIT_DEPOSIT);
+            await depositEther(ethWallets[0], syncWallets[i], DEPOSIT_AMOUNT);
             i++;
         }
 
         i = 0;
-        while(i < TRANSFER_TOTAL) {
+        while(i < TRANSFERS_TOTAL) {
             let number1 = randomClientNumber();
             var number2 = randomClientNumber();
             while (number2 == number1) {
