@@ -16,6 +16,8 @@ To learn how to use ZK Sync, please refer to the [ZK Sync SDK documentation](htt
 
 # Development
 
+The legacy name `franklin` is still used in many places of the code.
+
 ## Prerequisites
 
 Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
