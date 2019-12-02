@@ -89,6 +89,8 @@ pub trait Rpc {
     fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash>;
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
+    #[rpc(name = "get_tokens")]
+    fn get_tokens(&self) -> Result<Vec<Token>>;
 }
 
 pub struct RpcApp {
@@ -217,6 +219,16 @@ impl Rpc for RpcApp {
             main_contract: config.contract_addr.expect("server config"),
             gov_contract: config.gov_contract_addr.expect("server config"),
         })
+    }
+
+    fn get_tokens(&self) -> Result<Vec<Token>> {
+        let storage = self.access_storage()?;
+        let tokens = storage
+            .load_tokens()
+            .map_err(|_| Error::internal_error())?;
+        let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
+        vec_tokens.sort_by_key(|t| t.id);
+        Ok(vec_tokens)
     }
 }
 

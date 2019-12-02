@@ -4,7 +4,10 @@ import { readableEther, sleep, isReadablyPrintable } from './utils';
 import timeConstants from './timeConstants';
 import IERC20Conract from '../../franklin_lib/abi/IERC20.json';
 import config from './env-config';
-
+import Axios from 'axios';
+const zksync = require('zksync');
+const ethers = require('ethers');
+window.ethers = ethers;
 import priority_queue_abi from '../../../contracts/build/PriorityQueue.json'
 
 const NUMERIC_LIMITS_UINT_256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
@@ -61,6 +64,26 @@ function stop_progress_bar() {
 }
 // #endregion
 
+function tokenInfoFromToken(token) {
+    if (token === 'ETH') {
+        return window.tokensList[0];
+    }
+
+    let info = window.tokensList.filter(t => t.address === token);
+
+    return info.length ? info[0] : { symbol: 'NAI' };
+}
+
+function tokenInfoFromSymbol(symbol) {
+    if (symbol === 'ETH') {
+        return window.tokensList[0];
+    }
+
+    let info = window.tokensList.filter(t => t.symbol === symbol);
+
+    return info.length ? info[0] : { symbol: 'NAI' };
+}
+
 function shortenedTxHash(tx_hash) {
     return `<code class="clickable copyable" data-clipboard-text="${tx_hash}">
                 ${ tx_hash.substr(0, 10) }
@@ -71,7 +94,7 @@ export class WalletDecorator {
     // #region everything
     constructor (wallet) {
         this.wallet = wallet;
-        this.address = '0x' + this.wallet.address.toString('hex');
+        this.address = window.syncWallet.address();
     }
 
     static async new(wallet) {
@@ -81,7 +104,7 @@ export class WalletDecorator {
     }
 
     async getDepositFee() {
-        let gasPrice = await this.wallet.ethWallet.provider.getGasPrice();
+        let gasPrice = await window.ethProvider.getGasPrice();
         let gasLimit = utils.bigNumberify(200000); // from wallet.ts
         let fee = gasPrice.mul(gasLimit);
         return readableEther(fee);
@@ -89,21 +112,48 @@ export class WalletDecorator {
 
     async updateState() {
         await this.wallet.updateState();
-        let address = this.wallet.address;
+    
+        const onchainBalances = [];
+        const contractBalances = [];
+        await Promise.all(
+            window.tokensList.map(
+                async tokenInfo => {
+                    const token = tokenInfo.symbol === 'ETH' 
+                        ? 'ETH' 
+                        : tokenInfo.address;
+
+                    onchainBalances.push(
+                        await zksync.getEthereumBalance(window.ethSigner, token)
+                    );
+
+                    contractBalances.push( 
+                        await window.ethProxy.balanceToWithdraw(
+                            await window.ethSigner.getAddress(), 
+                            tokenInfo.id
+                        )
+                    );
+                }
+            )
+        );
+        
+        this.ethState = {onchainBalances, contractBalances};
+        this.syncState = await window.syncWallet.getAccountState();
     }
 
     tokenNameFromId(tokenId) {
-        let token = this.wallet.supportedTokens[tokenId];
-        let res = token.symbol;
-        if (res) return res;
-        return `erc20_${tokenId}`;
+        let token = window.tokensList[tokenId];
+        if (token.symbol) {
+            return token.symbol;
+        } else {
+            return `erc20_${tokenId}`;
+        }
     }
 
     tokenFromName(tokenName) {
-        let first = this.wallet.supportedTokens.filter(token => token.symbol == tokenName);
+        let first = window.tokensList.filter(token => token.symbol == tokenName);
         if (first.length) return first[0];
         let tokenId = tokenName.slice('erc20_'.length);
-        let second = this.wallet.supportedTokens.filter(token => {
+        let second = window.tokensList.filter(token => {
             return token.id == tokenId;
         });
         return second[0];
@@ -112,7 +162,7 @@ export class WalletDecorator {
     async waitTxMine(hash) {
         let tx;
         do {
-            tx = await this.wallet.ethWallet.provider.getTransaction(hash);
+            tx = await window.ethProvider.getTransaction(hash);
         } while (tx.blockHash || await sleep(2000));
         return tx;
     }
@@ -120,7 +170,13 @@ export class WalletDecorator {
 
     // #region renderable
     async transactionsAsRenderableList(offset, limit) {
-        let transactions = await this.wallet.provider.getTransactionsHistory(this.wallet.address, offset, limit);
+        if (!this.address) {
+            console.log(this.address);
+            return [];
+        }
+        let transactionsUrl = `${config.API_SERVER}/api/v0.1/account/${this.address}/history/${offset}/${limit}`;
+        console.log(transactionsUrl);
+        let transactions = await Axios.get(transactionsUrl).then(res => res.data);
         let res = transactions.map(async (tx, index) => {
             let elem_id      = `history_${index}`;
             let type         = tx.tx.type || '';
@@ -309,36 +365,39 @@ export class WalletDecorator {
         return await this.pendingWithdrawsAsRenderableList();
     }
     onchainBalancesAsRenderableList() {
-        return this.wallet.ethState.onchainBalances
+        return this.ethState.onchainBalances
             .map((balance, tokenId) => ({
                 tokenName: this.tokenNameFromId(tokenId),
-                address: this.wallet.supportedTokens[tokenId].address,
+                address: window.tokensList[tokenId].address,
                 amount: balance.toString()
             }))
             .filter(tokenInfo => Number(tokenInfo.amount));
     }
     contractBalancesAsRenderableList() {
-        return this.wallet.ethState.contractBalances
+        return this.ethState.contractBalances
             .map((balance, tokenId) => ({
                 tokenName: this.tokenNameFromId(tokenId),
-                address: this.wallet.supportedTokens[tokenId].address,
+                address: window.tokensList[tokenId].address,
                 amount: `${balance.toString()}`
             }))
             .filter(tokenInfo => Number(tokenInfo.amount));
     }
     franklinBalancesAsRenderableListWithInfo() {
+        if (this.syncState == undefined) return [];
+
         let res = {};
-        let assign = key => ([tokenId, balance]) => {
-            if (res[tokenId] === undefined) {
-                res[tokenId] = {
-                    tokenName: this.tokenNameFromId(tokenId),
-                    address: this.wallet.supportedTokens[tokenId].address,
+        let assign = key => ([token, balance]) => {
+            let tokenInfo = tokenInfoFromToken(token);
+            if (res[tokenInfo.id] === undefined) {
+                res[tokenInfo.id] = {
+                    tokenName: tokenInfo.symbol,
+                    address: tokenInfo.token,
                 };
             }
-            res[tokenId][key] = balance;
-        };
-        Object.entries(this.wallet.franklinState.commited.balances).forEach(assign('committedAmount'));
-        Object.entries(this.wallet.franklinState.verified.balances).forEach(assign('verifiedAmount'));
+            res[tokenInfo.id][key] = balance;
+        }
+        Object.entries(this.syncState.committed.balances).forEach(assign('committedAmount'));
+        Object.entries(this.syncState.verified.balances).forEach(assign('verifiedAmount'));
         return Object.values(res)
             .map(val => {
                 val['committedAmount'] = val['committedAmount'] || utils.bigNumberify(0);
@@ -349,62 +408,79 @@ export class WalletDecorator {
             .filter(entry => Number(entry.committedAmount) || Number(entry.verifiedAmount));
     }
     franklinBalancesAsRenderableList() {
-        return Object.entries(this.wallet.franklinState.commited.balances)
-            .map(entry => {
-                let [tokenId, balance] = entry;
+        return Object.entries(this.syncState.committed.balances)
+            .map(([token, balance]) => {
                 return {
-                    tokenName: this.tokenNameFromId(tokenId),
+                    tokenName: tokenInfoFromToken(token).symbol,
                     amount: balance
                 };
-            }).filter(bal => Number(bal.amount));
+            })
+            .filter(bal => Number(bal.amount));
     }
     // #endregion
 
     // #region actions
     async * verboseTransfer(options) {
-        let token = this.tokenFromName(options.token);
-        let amount = utils.bigNumberify(options.amount);
-        let fee = utils.bigNumberify(options.fee);
-        let address = options.address;
+        const tokenInfo = tokenInfoFromSymbol(options.token);
+        const token   = options.token === "ETH" ? "ETH" : tokenInfo.address;
+        const amount  = utils.bigNumberify(options.amount);
+        const fee     = utils.bigNumberify(options.fee);
+        const address = options.address;
 
         try {
-            let fra_tx = await this.wallet.transfer(address, token, amount, fee);
-    
-            if (fra_tx.err) {
-                yield error(`Transfer failed with ${fra_tx.err}`);
-                return;
-            }
+            const transferTransaction = await window.syncWallet.syncTransfer({
+                to: address,
+                token,
+                amount, 
+                fee
+            });
 
+            // Wait wait till transaction is commited
+            const transactionReceipt = await transferTransaction.awaitReceipt();
+    
             yield info(`Sent transfer to Matter server`);
     
-            yield * this.verboseGetFranklinOpStatus(fra_tx.hash);
+            yield * this.verboseGetFranklinOpStatus(transferTransaction.txHash);
             return;
         } catch (e) {
+            console.log(e);
             yield error(`Sending transfer failed with ${e.message}`);
             return;
         }
     }
 
     async * verboseWithdrawOffchain(options) {
-        let token = this.tokenFromName(options.token);
-        let amount = utils.bigNumberify(options.amount);
-        let fee = utils.bigNumberify(options.fee);
+        const tokenInfo = tokenInfoFromSymbol(options.token);
+        const token   = options.token === "ETH" ? "ETH" : tokenInfo.address;
+        const amount  = utils.bigNumberify(options.amount);
+        const fee     = utils.bigNumberify(options.fee);
 
         try {
             yield info(`Sending withdraw...`);
 
-            let fra_tx = await this.wallet.widthdrawOffchain(token, amount, fee);
-            this.removePendingWithdraw(`${token.id}`);
+            const withdraw = {
+                ethAddress: await window.ethSigner.getAddress(),
+                token,
+                amount,
+                fee,
+            };
+            console.log({withdraw});
+            const withdrawTransaction = await window.syncWallet.withdrawTo(withdraw);
             
-            if (fra_tx.err) {
-                yield error(`Offchain withdraw failed with ${fra_tx.err}`);
-                return;
-            }
+            // Wait wait till transaction is verified
+            const transactionReceipt = await withdrawTransaction.awaitVerifyReceipt();            
+            this.removePendingWithdraw(`${tokenInfo.id}`);
+            
+            // if (fra_tx.err) {
+            //     yield error(`Offchain withdraw failed with ${fra_tx.err}`);
+            //     return;
+            // }
 
-            yield * this.verboseGetFranklinOpStatus(fra_tx.hash);
+            yield * this.verboseGetFranklinOpStatus(withdrawTransaction.txHash);
 
             yield info(`Offchain withdraw succeeded!`);
         } catch (e) {
+            console.log('error in verboseWithdrawOnchain', e);
             yield combineMessages(
                 error('Withdraw failed with ', e.message, { timeout: 7 }),
             );
@@ -438,34 +514,30 @@ export class WalletDecorator {
     }
 
     async * verboseDeposit(options) {
-        let token = this.tokenFromName(options.token);
-        let amount = utils.bigNumberify(options.amount);
-
+        const token = options.token === "ETH" ? "ETH" : tokenInfoFromSymbol(options.token);
+        const amount = utils.bigNumberify(options.amount);
         try {
             yield info(`Sending deposit...`);
             
-            let eth_tx;
-            if (token.symbol == 'ETH') {
-                eth_tx = await this.wallet.depositETH(amount);
-            } else {
-                let erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.wallet.ethWallet);
-                let allowance = await erc20DeployedToken.allowance(this.ethAddress, config.CONTRACT_ADDR);
-                if (allowance.toString().length != NUMERIC_LIMITS_UINT_256.length) {
-                    let nonce = await this.wallet.ethWallet.getTransactionCount();
-                    await this.wallet.approveERC20(token, NUMERIC_LIMITS_UINT_256, { nonce });
-                    eth_tx = await this.wallet.depositApprovedERC20(token, amount, { nonce: nonce + 1});
-                } else {
-                    eth_tx = await this.wallet.depositApprovedERC20(token, amount);
-                }
-            }
+            const maxFeeInETHToken = ethers.utils.parseEther("0.1");
+            const deposit = await zksync.depositFromETH({
+                depositFrom: window.ethSigner,
+                depositTo: window.syncWallet,
+                token,
+                amount,
+                maxFeeInETHToken
+            });
+        
+            deposit.awaitEthereumTxCommit();
 
-            const tx_hash_html = shortenedTxHash(eth_tx.hash);
+            const tx_hash_html = shortenedTxHash(deposit.ethTx.hash);
             yield info(`Deposit ${tx_hash_html} sent to Mainchain...`);
 
-            yield * await this.verboseGetRevertReason(eth_tx.hash);
+            yield * await this.verboseGetRevertReason(deposit.ethTx.hash);
             
-            yield * this.verboseGetPriorityOpStatus(eth_tx.hash);
+            yield * this.verboseGetPriorityOpStatus(deposit.ethTx.hash);
         } catch (e) {
+            console.log(e);
             yield combineMessages(
                 error(`Onchain deposit failed with "${e.message}"`, { timeout: 7 }),
             );

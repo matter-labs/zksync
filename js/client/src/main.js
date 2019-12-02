@@ -31,7 +31,7 @@ Vue.mixin({
             return window.walletDecorator.ethAddress;
         },
         franklinAddress() {
-            return window.walletDecorator.address;
+            return window.syncWallet.address();
         },
         baseUrl() {
             return this.apiServer + '/api/v0.1'

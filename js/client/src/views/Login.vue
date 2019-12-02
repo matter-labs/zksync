@@ -25,8 +25,9 @@ const components = {
     Alert
 };
 
-import Eth from 'ethjs'
-import { ethers } from 'ethers'
+const ethers = require('ethers');
+const zksync = require('zksync');
+
 import { Wallet, FranklinProvider } from 'franklin_lib'
 import { WalletDecorator } from '../WalletDecorator'
 
@@ -38,11 +39,25 @@ export default {
     methods: {
         async login() {
             try {
+                const syncProvider = await zksync.getDefaultProvider(this.currentLocationNetworkName);
+                
+                const tokensList = await syncProvider.getTokens();
+                window.tokensList = tokensList;
+
                 await window.ethereum.enable();
-                window.eth = new Eth(window.ethereum);
-                window.ethersProvider = new ethers.providers.Web3Provider(window.ethereum);
-                let franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
-                let signer = window.ethersProvider.getSigner();
+                const ethersProvider = new ethers.providers.Web3Provider(window.ethereum);
+                const ethProxy = new zksync.ETHProxy(ethersProvider, syncProvider.contractAddress);
+                
+                const signer = ethersProvider.getSigner();
+                const syncWallet = await zksync.Wallet.fromEthSigner(signer, syncProvider, ethProxy);
+
+                window.ethProvider = ethersProvider;
+                window.ethSigner = signer;
+                window.syncWallet = syncWallet;
+                window.syncProvider = syncProvider;
+                window.ethProxy = ethProxy;
+
+                const franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
                 window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
                 window.walletDecorator = await WalletDecorator.new(window.wallet);
 
@@ -56,7 +71,7 @@ export default {
             }
         }
     },
-    components
+    components,
 }
 </script>
 
