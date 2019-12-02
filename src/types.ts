@@ -5,6 +5,12 @@ export type Address = string;
 // ETH or ERC20 address
 export type Token = "ETH" | string;
 
+export type TokenInfo = {
+    id: number,
+    address: string,
+    symbol?: string,
+};
+
 export type Nonce = number | "committed";
 
 export interface AccountState {

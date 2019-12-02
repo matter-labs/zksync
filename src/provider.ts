@@ -8,6 +8,7 @@ import {
     AccountState,
     Address,
     Token,
+    TokenInfo,
     TransactionReceipt,
     PriorityOperationReceipt
 } from "./types";
@@ -64,6 +65,10 @@ export class Provider {
     // return transaction hash (e.g. 0xdead..beef)
     async submitTx(tx: any): Promise<string> {
         return await this.transport.request("tx_submit", [tx]);
+    }
+
+    async getTokens(): Promise<TokenInfo[]> {
+        return await this.transport.request("get_tokens", null);
     }
 
     async getContractAddress(): Promise<ContractAddress> {
