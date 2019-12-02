@@ -12,6 +12,7 @@
   },
   "scripts": {
     "simple": "f ts-node simple-integration-test.ts",
-    "full-exit": "f ts-node full-exit-inegration-test.ts"
+    "full-exit": "f ts-node full-exit-inegration-test.ts",
+    "loadtest": "f ts-node loadtest.ts"
   }
 }

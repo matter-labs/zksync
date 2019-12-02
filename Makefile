@@ -163,6 +163,9 @@ flatten:
 
 # testing
 
+loadtest:
+	@cd js/tests && yarn loadtest
+
 integration-simple:
 	@cd js/tests && yarn simple
 
