@@ -37,8 +37,6 @@ let TRANSFERS_TOTAL = 100;
             ethProxy
         );
 
-        // console.log(utils.formatEther(await ethWallet.getBalance()));
-
         const ethWallets = [];
         const syncWallets = [];
 
