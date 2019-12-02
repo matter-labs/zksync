@@ -354,10 +354,10 @@ yaeti@^0.0.6:
   resolved "https://registry.yarnpkg.com/yaeti/-/yaeti-0.0.6.tgz#f26f484d72684cf42bedfb76970aa1608fbf9577"
   integrity sha1-8m9ITXJoTPQr7ft2lwqhYI+/lXc=
 
-zksync@^0.3.3:
-  version "0.3.3"
-  resolved "https://registry.yarnpkg.com/zksync/-/zksync-0.3.3.tgz#0f0de2966b057bed5003b9056a9e6ca7ddb4008c"
-  integrity sha512-Ym1nuCeXuGm3dFJPUG6qBplEXG/nrHcTtZXQN3GZ3b8qmfA54dT7W7jRsuu9oTxDa6FU69jkPHd28ePFvqE4kw==
+zksync@^0.3.4:
+  version "0.3.4"
+  resolved "https://registry.yarnpkg.com/zksync/-/zksync-0.3.4.tgz#8b3a0fde69529a32a16b95e1be090b113212d596"
+  integrity sha512-bxAvk2iAGQ/zhNeNShBWucF447jktr1CYSp81PtSQwewHnm2q+59UsMozZlebIvX/0C8rRuhyWo5qmyrOKAiDQ==
   dependencies:
     axios "^0.19.0"
     blake2b "^2.1.3"

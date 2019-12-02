@@ -113,7 +113,10 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: e
     const MNEMONIC = process.env.MNEMONIC;
     const ERC_20TOKEN = process.env.TEST_ERC20;
 
-    syncProvider = await getDefaultProvider("localhost");
+    const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
+    console.log("Running integration test on the ", network, " network");
+
+    syncProvider = await getDefaultProvider(network);
 
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
     const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
@@ -142,8 +145,8 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: e
         ethProxy
     );
 
-    await moveFunds(ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "0.01");
-    await moveFunds(ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "0.01");
+    await moveFunds(ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "0.018");
+    await moveFunds(ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "0.018");
 
     await syncProvider.disconnect();
 })();

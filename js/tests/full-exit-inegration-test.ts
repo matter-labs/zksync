@@ -86,8 +86,10 @@ async function testWrongNonceFullExit(ethWallet: ethers.Wallet, syncWallet: Wall
 // Mnemonic for eth wallet.
     const MNEMONIC = process.env.MNEMONIC;
     const ERC_20TOKEN = process.env.TEST_ERC20;
+    const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
+    console.log("Running integration test on the ", network, " network");
 
-    syncProvider = await getDefaultProvider("localhost");
+    syncProvider = await getDefaultProvider(network);
 
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
     const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
