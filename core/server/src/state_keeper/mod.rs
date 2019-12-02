@@ -17,6 +17,9 @@ use models::{ActionType, CommitRequest, NetworkStatus, StateKeeperRequest};
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 
+// TODO: temporary limit
+const MAX_NUMBER_OF_WITHDRAWS: usize = 4;
+
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
     /// Current plasma state
@@ -287,6 +290,21 @@ impl PlasmaStateKeeper {
         mut chunks_left: usize,
         mut transfer_txs: Vec<FranklinTx>,
     ) -> (usize, Vec<FranklinTx>) {
+        // TODO: temporary measure - limit number of withdrawals in one block
+        let mut withdraws = 0;
+        transfer_txs.retain(|tx| {
+           if let FranklinTx::Withdraw(..) = tx {
+               if withdraws >= MAX_NUMBER_OF_WITHDRAWS {
+                   false
+               } else {
+                   withdraws += 1;
+                   true
+               }
+           } else {
+               true
+           }
+        });
+
         let mut filtered_txs = Vec::new();
 
         transfer_txs.sort_by_key(|tx| tx.account());
