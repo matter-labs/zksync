@@ -10,7 +10,7 @@ let syncProvider: Provider;
 
 let CLIENTS_TOTAL = 10;
 let DEPOSIT_AMOUNT = "1.0";
-let TRANSFER_AMOUNT = "0.00001";
+let TRANSFER_AMOUNT = "0.0001";
 let FEE_DIVISOR = 20;
 let TRANSFERS_TOTAL = 100;
 
