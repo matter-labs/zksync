@@ -9,7 +9,8 @@ export default {
 };
 </script>
 
-<style>
+<style lang="scss">
+@import "../../client/scss/common.scss";
 input::placeholder {
     color: lightgrey !important;
     font-style: italic !important;

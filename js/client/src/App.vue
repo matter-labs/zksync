@@ -15,3 +15,7 @@ input::placeholder {
     font-style: italic !important;
 }
 </style>
+
+<style lang="scss">
+@import "../scss/common.scss";
+</style>
