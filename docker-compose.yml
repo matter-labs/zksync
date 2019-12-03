@@ -9,7 +9,7 @@ services:
       source: ./volumes/postgres
       target: /var/lib/postgresql/data
   geth:
-    image: "gluk64/franklin:geth"
+    image: "matterlabs/geth:latest"
     ports:
       - "8545:8545"
       - "8546:8546"

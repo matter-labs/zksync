@@ -109,7 +109,7 @@ volumes:
 
 services:
   - name: geth
-    image: gluk64/franklin:geth
+    image: matterlabs/geth:latest
   - name: postgres
     image: postgres:10.4
 
