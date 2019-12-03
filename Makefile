@@ -332,4 +332,3 @@ data-restore-restart: confirm_action data-restore-db-prepare
 
 data-restore-continue:
 	@./target/release/data_restore
-	

@@ -8,7 +8,7 @@ import { ethers, utils } from "ethers";
 
 let syncProvider: Provider;
 
-let CLIENTS_TOTAL = 10;
+let CLIENTS_TOTAL = 3;
 let DEPOSIT_AMOUNT = "1.0";
 let TRANSFER_AMOUNT = "0.0001";
 let FEE_DIVISOR = 20;
@@ -16,7 +16,7 @@ let TRANSFERS_TOTAL = 100;
 
 (async () => {
     const WEB3_URL = process.env.WEB3_URL;
-    const MNEMONIC = process.env.MNEMONIC;
+    const TEST_ACCOUNT_PRIVATE_KEY = process.env.TEST_ACCOUNT_PRIVATE_KEY;
 
     const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
     console.log("Running loadtest on the ", network, " network");
@@ -27,10 +27,8 @@ let TRANSFERS_TOTAL = 100;
         const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
-        const ethWallet = ethers.Wallet.fromMnemonic(
-            MNEMONIC,
-            "m/44'/60'/0'/0/1"
-        ).connect(ethersProvider);
+        const ethWallet = new ethers.Wallet(TEST_ACCOUNT_PRIVATE_KEY, ethersProvider);
+
         const syncWallet = await Wallet.fromEthWallet(
             ethWallet,
             syncProvider,
@@ -66,6 +64,7 @@ let TRANSFERS_TOTAL = 100;
         }
 
         // Transfers
+        let promises = [];
         i = 0;
         while(i < TRANSFERS_TOTAL) {
             let number1 = randomClientNumber();
@@ -76,9 +75,10 @@ let TRANSFERS_TOTAL = 100;
             let client1 = syncWallets[number1];
             let client2 = syncWallets[number2];
 
-            await transferEther(client1, client2, TRANSFER_AMOUNT);
+            promises.push(transferEther(client1, client2, TRANSFER_AMOUNT));
             i++;
         }
+        await Promise.all(promises);
 
         // Withdraws
         i = 0;
@@ -132,31 +132,18 @@ async function depositEther(ethWallet: ethers.Wallet, syncWallet: Wallet, amount
 async function transferEther(syncWallet1: Wallet, syncWallet2: Wallet, amount: string) {
     try {
         const token = "ETH";
-        const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
-        const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
-        const operatorBeforeTransfer = await getOperatorBalance(token);
         const transferAmount = utils.parseEther(amount);
         const fee = transferAmount.div(FEE_DIVISOR);
-        const transferToNewHandle = await syncWallet1.syncTransfer({
+
+        console.log(`Ether transfer, from: ${syncWallet1.address()}, to: ${syncWallet2.address()}, amount: ${amount}, fee: ${utils.formatEther(fee)}`);
+       
+        await syncWallet1.syncTransfer({
             to: syncWallet2.address(),
             token,
             amount: transferAmount,
             fee
         });
-        await transferToNewHandle.awaitReceipt();
-        const wallet1AfterTransfer = await syncWallet1.getBalance(token);
-        const wallet2AfterTransfer = await syncWallet2.getBalance(token);
-        const operatorAfterTransfer = await getOperatorBalance(token);
 
-        let transferCorrect = true;
-        transferCorrect = transferCorrect && wallet1BeforeTransfer.sub(wallet1AfterTransfer).eq(transferAmount.add(fee));
-        transferCorrect = transferCorrect && wallet2AfterTransfer.sub(wallet2BeforeTransfer).eq(transferAmount);
-        transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
-        if (!transferCorrect) {
-            throw new Error("Transfer checks failed");
-        }
-
-        console.log(`Ether transfer ok, from: ${syncWallet1.address()}, to: ${syncWallet2.address()}, amount: ${amount}, fee: ${utils.formatEther(fee)}`);
     } catch (err) {
         console.log(`Transfer ether error: ${err}`)
         throw err
