@@ -145,7 +145,7 @@ mv -f *_pk.key ./prover/keys/
 
 If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant in `contracts/contracts/PlasmaStorage.sol`.
 
-## Contratcs
+## Contracts
 
 ### Re-build contracts:
 
@@ -163,7 +163,7 @@ So you need to rebuild the code on every change (to be automated).
 franklin publish-source
 ```
 
-# Lince 
+# License
 
 ZK Sync is distributed under the terms of both the MIT license
 and the Apache License (Version 2.0).
