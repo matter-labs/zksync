@@ -83,8 +83,8 @@ export interface ContractAddress {
 
 export interface Tokens {
     [token: string]: {
-        address: string,
-        id: number,
-        symbol?: string,
-    }
+        address: string;
+        id: number;
+        symbol?: string;
+    };
 }

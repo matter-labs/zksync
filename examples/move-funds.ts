@@ -81,8 +81,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
         depositFrom: ethWallet,
         depositTo: syncWallet,
         token: depositToken,
-        amount: utils.parseEther(depositAmount),
-        maxFeeInETHToken: utils.parseEther("0.1")
+        amount: utils.parseEther(depositAmount)
     });
     await depositHandle.awaitReceipt();
     console.log("Deposit committed");

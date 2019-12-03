@@ -9,7 +9,9 @@ import {
     Address,
     Token,
     TransactionReceipt,
-    PriorityOperationReceipt, ContractAddress, Tokens
+    PriorityOperationReceipt,
+    ContractAddress,
+    Tokens
 } from "./types";
 import {
     sleep,
@@ -188,5 +190,16 @@ export class ETHProxy {
             }
             return tokenId;
         }
+    }
+
+    async estimateDepositFeeInETHToken(token: Token): Promise<utils.BigNumber> {
+        const gasPrice = await this.ethersProvider.getGasPrice();
+        const multiplier = token == "ETH" ? 179000 : 214000;
+        return gasPrice.mul(2 * multiplier);
+    }
+
+    async estimateEmergencyWithdrawFeeInETHToken(): Promise<utils.BigNumber> {
+        const gasPrice = await this.ethersProvider.getGasPrice();
+        return gasPrice.mul(2 * 170000);
     }
 }
