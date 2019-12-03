@@ -260,7 +260,9 @@ export async function getEthereumBalance(
 ): Promise<utils.BigNumber> {
     let balance: utils.BigNumber;
     if (token == "ETH") {
-        balance = await ethSigner.provider.getBalance(await ethSigner.getAddress());
+        balance = await ethSigner.provider.getBalance(
+            await ethSigner.getAddress()
+        );
     } else {
         const erc20contract = new Contract(token, IERC20_INTERFACE, ethSigner);
         balance = await erc20contract.balanceOf(await ethSigner.getAddress());
