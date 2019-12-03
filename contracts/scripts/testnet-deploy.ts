@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import { ArgumentParser } from "argparse";
 import {
     addTestERC20Token,
+    mintTestERC20Token,
     deployFranklin,
     publishSourceCodeToEtherscan,
     franklinContractSourceCode,
@@ -34,6 +35,7 @@ async function main() {
 
     const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+    const test_wallet = new ethers.Wallet(process.env.TEST_ACCOUNT_PRIVATE_KEY);
 
     let governanceAddress    = process.env.GOVERNANCE_ADDR;
     let priorityQueueAddress = process.env.PRIORITY_QUEUE_ADDR;
@@ -72,7 +74,8 @@ async function main() {
         franklinAddress = franklin.address;
 
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
-        await addTestERC20Token(wallet, governance);
+        const erc20 = await addTestERC20Token(wallet, governance);
+        await mintTestERC20Token(test_wallet, erc20);
     }
 
     if (args.publish) {
