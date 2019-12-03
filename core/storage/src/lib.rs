@@ -95,7 +95,9 @@ struct StorageBalance {
     pub balance: BigDecimal,
 }
 
-#[derive(Debug, Clone, Insertable, QueryableByName, Queryable, Serialize, Deserialize, AsChangeset)]
+#[derive(
+    Debug, Clone, Insertable, QueryableByName, Queryable, Serialize, Deserialize, AsChangeset,
+)]
 #[table_name = "tokens"]
 pub struct Token {
     pub id: i32,
@@ -1586,6 +1588,49 @@ impl StorageProcessor {
 
     pub fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block> {
         self.load_commit_op(block_number).map(|r| r.block)
+    }
+
+    pub fn load_unconfirmed_operations(
+        &self,
+    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
+        self.conn().transaction(|| {
+            let ops: Vec<_> = operations::table
+                .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
+                .filter(operations::confirmed.eq(false))
+                .order(operations::id.asc())
+                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.conn())?;
+
+            let mut ops = ops
+                .into_iter()
+                .map(|(o, e)| o.into_op(self).map(|o| (o, e)))
+                .collect::<QueryResult<Vec<_>>>()?;
+            ops.sort_by_key(|(o, _)| o.id.unwrap()); // operations from db MUST have and id.
+
+            Ok(ops
+                .into_iter()
+                .group_by(|(o, _)| o.id.unwrap())
+                .into_iter()
+                .map(|(_op_id, group_iter)| {
+                    let fold_result = group_iter.fold(
+                        (None, Vec::new()),
+                        |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _),
+                         (op, eth_op)| {
+                            if let Some(accum_op) = accum_op.as_ref() {
+                                assert_eq!(accum_op.id, op.id);
+                            } else {
+                                accum_op = Some(op);
+                            }
+                            if let Some(eth_op) = eth_op {
+                                accum_eth_ops.push(eth_op);
+                            }
+
+                            (accum_op, accum_eth_ops)
+                        },
+                    );
+                    (fold_result.0.unwrap(), fold_result.1)
+                })
+                .collect())
+        })
     }
 
     pub fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>> {

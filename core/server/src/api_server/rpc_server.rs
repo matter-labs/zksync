@@ -225,13 +225,16 @@ impl Rpc for RpcApp {
     fn tokens(&self) -> Result<HashMap<String, Token>> {
         let storage = self.access_storage()?;
         let mut tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
-        Ok(tokens.drain().map(|(id, token)| {
-            if id == 0 {
-                ("ETH".to_string(), token)
-            } else {
-                (token.address.clone(), token)
-            }
-        }).collect())
+        Ok(tokens
+            .drain()
+            .map(|(id, token)| {
+                if id == 0 {
+                    ("ETH".to_string(), token)
+                } else {
+                    (token.address.clone(), token)
+                }
+            })
+            .collect())
     }
 }
 

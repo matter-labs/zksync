@@ -84,7 +84,6 @@ impl OperationState {
 }
 
 struct ETHSender<T: Transport> {
-    unsent_ops: VecDeque<Operation>,
     unconfirmed_ops: VecDeque<(Operation, OperationState)>,
     db_pool: ConnectionPool,
     eth_client: ETHClient<T>,
@@ -94,7 +93,6 @@ impl<T: Transport> ETHSender<T> {
     fn new(db_pool: ConnectionPool, eth_client: ETHClient<T>) -> Self {
         let mut sender = Self {
             eth_client,
-            unsent_ops: VecDeque::new(),
             unconfirmed_ops: VecDeque::new(),
             db_pool,
         };

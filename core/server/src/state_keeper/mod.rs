@@ -293,16 +293,16 @@ impl PlasmaStateKeeper {
         // TODO: temporary measure - limit number of withdrawals in one block
         let mut withdraws = 0;
         transfer_txs.retain(|tx| {
-           if let FranklinTx::Withdraw(..) = tx {
-               if withdraws >= MAX_NUMBER_OF_WITHDRAWS {
-                   false
-               } else {
-                   withdraws += 1;
-                   true
-               }
-           } else {
-               true
-           }
+            if let FranklinTx::Withdraw(..) = tx {
+                if withdraws >= MAX_NUMBER_OF_WITHDRAWS {
+                    false
+                } else {
+                    withdraws += 1;
+                    true
+                }
+            } else {
+                true
+            }
         });
 
         let mut filtered_txs = Vec::new();
