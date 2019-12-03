@@ -89,6 +89,9 @@ pub trait Rpc {
     fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash>;
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
+    /// "ETH" | #ERC20_ADDRESS => {Token}
+    #[rpc(name = "tokens")]
+    fn tokens(&self) -> Result<HashMap<String, Token>>;
 }
 
 pub struct RpcApp {
@@ -217,6 +220,21 @@ impl Rpc for RpcApp {
             main_contract: config.contract_addr.expect("server config"),
             gov_contract: config.gov_contract_addr.expect("server config"),
         })
+    }
+
+    fn tokens(&self) -> Result<HashMap<String, Token>> {
+        let storage = self.access_storage()?;
+        let mut tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
+        Ok(tokens
+            .drain()
+            .map(|(id, token)| {
+                if id == 0 {
+                    ("ETH".to_string(), token)
+                } else {
+                    (token.address.clone(), token)
+                }
+            })
+            .collect())
     }
 }
 

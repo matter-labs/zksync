@@ -95,7 +95,9 @@ struct StorageBalance {
     pub balance: BigDecimal,
 }
 
-#[derive(Debug, Clone, Insertable, QueryableByName, Queryable, Serialize, Deserialize, AsChangeset)]
+#[derive(
+    Debug, Clone, Insertable, QueryableByName, Queryable, Serialize, Deserialize, AsChangeset,
+)]
 #[table_name = "tokens"]
 pub struct Token {
     pub id: i32,
@@ -419,8 +421,9 @@ pub struct StorageETHOperation {
     pub nonce: i64,
     pub deadline_block: i64,
     pub gas_price: BigDecimal,
-    pub tx_hash: String,
+    pub tx_hash: Vec<u8>,
     pub confirmed: bool,
+    pub raw_tx: Vec<u8>,
 }
 
 #[derive(Debug, Insertable)]
@@ -430,7 +433,8 @@ struct NewETHOperation {
     nonce: i64,
     deadline_block: i64,
     gas_price: BigDecimal,
-    tx_hash: String,
+    tx_hash: Vec<u8>,
+    raw_tx: Vec<u8>,
 }
 
 #[derive(Debug, Insertable, Queryable)]
@@ -1508,7 +1512,7 @@ impl StorageProcessor {
             with eth_ops as (
             	select
             		operations.block_number,
-            		eth_operations.tx_hash,
+                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
             		operations.action_type,
             		operations.created_at
             	from operations
@@ -1542,10 +1546,10 @@ impl StorageProcessor {
         let l_query = query.to_lowercase();
         let sql_query = format!(
             "
-                        with eth_ops as (
+            with eth_ops as (
             	select
             		operations.block_number,
-            		eth_operations.tx_hash,
+                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
             		operations.action_type,
             		operations.created_at
             	from operations
@@ -1586,6 +1590,50 @@ impl StorageProcessor {
 
     pub fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block> {
         self.load_commit_op(block_number).map(|r| r.block)
+    }
+
+    pub fn load_unconfirmed_operations(
+        &self,
+        // TODO: move Eth transaction state to models and add it here
+    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
+        self.conn().transaction(|| {
+            let ops: Vec<_> = operations::table
+                .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
+                .filter(operations::confirmed.eq(false))
+                .order(operations::id.asc())
+                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.conn())?;
+
+            let mut ops = ops
+                .into_iter()
+                .map(|(o, e)| o.into_op(self).map(|o| (o, e)))
+                .collect::<QueryResult<Vec<_>>>()?;
+            ops.sort_by_key(|(o, _)| o.id.unwrap()); // operations from db MUST have and id.
+
+            Ok(ops
+                .into_iter()
+                .group_by(|(o, _)| o.id.unwrap())
+                .into_iter()
+                .map(|(_op_id, group_iter)| {
+                    let fold_result = group_iter.fold(
+                        (None, Vec::new()),
+                        |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _),
+                         (op, eth_op)| {
+                            if let Some(accum_op) = accum_op.as_ref() {
+                                assert_eq!(accum_op.id, op.id);
+                            } else {
+                                accum_op = Some(op);
+                            }
+                            if let Some(eth_op) = eth_op {
+                                accum_eth_ops.push(eth_op);
+                            }
+
+                            (accum_op, accum_eth_ops)
+                        },
+                    );
+                    (fold_result.0.unwrap(), fold_result.1)
+                })
+                .collect())
+        })
     }
 
     pub fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>> {
@@ -1644,6 +1692,7 @@ impl StorageProcessor {
         deadline_block: u64,
         nonce: u32,
         gas_price: BigDecimal,
+        raw_tx: Vec<u8>,
     ) -> QueryResult<()> {
         insert_into(eth_operations::table)
             .values(&NewETHOperation {
@@ -1651,7 +1700,8 @@ impl StorageProcessor {
                 nonce: i64::from(nonce),
                 deadline_block: deadline_block as i64,
                 gas_price,
-                tx_hash: format!("{:#x}", hash),
+                tx_hash: hash.as_bytes().to_vec(),
+                raw_tx,
             })
             .execute(self.conn())
             .map(drop)
@@ -1659,15 +1709,13 @@ impl StorageProcessor {
 
     pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
         self.conn().transaction(|| {
-            update(
-                eth_operations::table.filter(eth_operations::tx_hash.eq(format!("{:#x}", hash))),
-            )
-            .set(eth_operations::confirmed.eq(true))
-            .execute(self.conn())
-            .map(drop)?;
+            update(eth_operations::table.filter(eth_operations::tx_hash.eq(hash.as_bytes())))
+                .set(eth_operations::confirmed.eq(true))
+                .execute(self.conn())
+                .map(drop)?;
             let (op, _) = operations::table
                 .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
-                .filter(eth_operations::tx_hash.eq(format!("{:#x}", hash)))
+                .filter(eth_operations::tx_hash.eq(hash.as_bytes()))
                 .first::<(StoredOperation, StorageETHOperation)>(self.conn())?;
 
             update(operations::table.filter(operations::id.eq(op.id)))
@@ -2125,7 +2173,8 @@ impl StorageProcessor {
             .values(&new_token)
             .on_conflict(tokens::id)
             .do_update()
-            .set(&new_token)
+            // update token address but not symbol -- so we can update it externally
+            .set(tokens::address.eq(new_token.address.clone()))
             .execute(self.conn())
             .map(drop)
     }

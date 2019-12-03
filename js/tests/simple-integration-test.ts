@@ -31,7 +31,6 @@ async function testDeposit(ethWallet: ethers.Signer, syncWallet: Wallet, token: 
         depositTo:  syncWallet,
         token: token,
         amount,
-        maxFeeInETHToken: utils.parseEther("0.1")
     });
     await depositHandle.awaitReceipt();
     const balanceAfterDep = await syncWallet.getBalance(token);
@@ -125,21 +124,21 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: e
         MNEMONIC,
         "m/44'/60'/0'/0/1"
     ).connect(ethersProvider);
-    const syncWallet = await Wallet.fromEthWallet(
+    const syncWallet = await Wallet.fromEthSigner(
         ethWallet,
         syncProvider,
         ethProxy
     );
 
     const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-    const syncWallet2 = await Wallet.fromEthWallet(
+    const syncWallet2 = await Wallet.fromEthSigner(
         ethWallet2,
         syncProvider,
         ethProxy
     );
 
     const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
-    const syncWallet3 = await Wallet.fromEthWallet(
+    const syncWallet3 = await Wallet.fromEthSigner(
         ethWallet3,
         syncProvider,
         ethProxy

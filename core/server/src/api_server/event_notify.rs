@@ -278,7 +278,7 @@ impl OperationNotifier {
                 .assign_id(id.clone())
                 .map_err(|_| format_err!("SubIdAssign"))?;
             subs.push(SubscriptionSender { id, sink });
-            println!("tx sub added: {}", hash.to_hex());
+            trace!("tx sub added: {}", hash.to_hex());
         }
         self.tx_subs.insert((hash, action), subs);
         Ok(())
