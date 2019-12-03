@@ -1512,7 +1512,7 @@ impl StorageProcessor {
             with eth_ops as (
             	select
             		operations.block_number,
-            		eth_operations.tx_hash,
+                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
             		operations.action_type,
             		operations.created_at
             	from operations
@@ -1546,10 +1546,10 @@ impl StorageProcessor {
         let l_query = query.to_lowercase();
         let sql_query = format!(
             "
-                        with eth_ops as (
+            with eth_ops as (
             	select
             		operations.block_number,
-            		eth_operations.tx_hash,
+                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
             		operations.action_type,
             		operations.created_at
             	from operations

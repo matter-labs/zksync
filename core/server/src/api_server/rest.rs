@@ -296,9 +296,10 @@ fn handle_get_blocks(
     }
     let storage = data.access_storage()?;
 
-    let resp = storage
-        .load_block_range(max_block, limit)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    let resp = storage.load_block_range(max_block, limit).map_err(|e| {
+        warn!("handle_get_blocks db fail: {}", e);
+        HttpResponse::InternalServerError().finish()
+    })?;
     Ok(HttpResponse::Ok().json(resp))
 }
 
