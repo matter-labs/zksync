@@ -85,8 +85,7 @@ async function deposit(ethWallet: ethers.Wallet, syncWallets: Wallet[], tokens: 
     try {
         for (let i = 0; i < syncWallets.length; i++) {
             for (let k = 0; k < tokens.length; k++) {
-                const depositHandle = await depositFromETH(
-                {
+                const depositHandle = await depositFromETH({
                     depositFrom: ethWallet,
                     depositTo:  syncWallets[i],
                     token: tokens[k],
