@@ -1,7 +1,14 @@
 import { Contract, ContractTransaction, ethers, utils } from "ethers";
 import { ETHProxy, Provider } from "./provider";
 import { Signer } from "./signer";
-import { AccountState, Address, Token, Nonce } from "./types";
+import {
+    AccountState,
+    Address,
+    Token,
+    Nonce,
+    PriorityOperationReceipt,
+    TransactionReceipt
+} from "./types";
 import {
     IERC20_INTERFACE,
     SYNC_MAIN_CONTRACT_INTERFACE,
@@ -24,9 +31,10 @@ export class Wallet {
         nonce?: Nonce;
     }): Promise<Transaction> {
         const tokenId = await this.ethProxy.resolveTokenId(transfer.token);
-        const nonce = transfer.nonce
-            ? await this.getNonce(transfer.nonce)
-            : await this.getNonce();
+        const nonce =
+            transfer.nonce != null
+                ? await this.getNonce(transfer.nonce)
+                : await this.getNonce();
         const transactionData = {
             to: transfer.to,
             tokenId,
@@ -56,9 +64,10 @@ export class Wallet {
         nonce?: Nonce;
     }): Promise<Transaction> {
         const tokenId = await this.ethProxy.resolveTokenId(withdraw.token);
-        const nonce = withdraw.nonce
-            ? await this.getNonce(withdraw.nonce)
-            : await this.getNonce();
+        const nonce =
+            withdraw.nonce == null
+                ? await this.getNonce(withdraw.nonce)
+                : await this.getNonce();
         const transactionData = {
             ethAddress: withdraw.ethAddress,
             tokenId,
@@ -82,15 +91,15 @@ export class Wallet {
 
     async close(nonce: Nonce = "committed"): Promise<Transaction> {
         const numNonce = await this.getNonce(nonce);
-        const signerdCloseTransaction = this.signer.signSyncCloseAccount({
+        const signedCloseTransaction = this.signer.signSyncCloseAccount({
             nonce: numNonce
         });
 
         const transactionHash = await this.provider.submitTx(
-            signerdCloseTransaction
+            signedCloseTransaction
         );
         return new Transaction(
-            signerdCloseTransaction,
+            signedCloseTransaction,
             transactionHash,
             this.provider
         );
@@ -150,15 +159,15 @@ export async function depositFromETH(deposit: {
     maxFeeInETHToken?: utils.BigNumberish;
 }): Promise<ETHOperation> {
     let maxFeeInETHToken;
-    if (deposit.maxFeeInETHToken != undefined) {
+    if (deposit.maxFeeInETHToken != null) {
         maxFeeInETHToken = deposit.maxFeeInETHToken;
     } else {
         const baseFee = await deposit.depositTo.ethProxy.estimateDepositFeeInETHToken(
             deposit.token
         );
-        maxFeeInETHToken = baseFee.mul(115).div(100);
+        maxFeeInETHToken = baseFee.mul(115).div(100); // 15% higher that base fee.
     }
-    const mainSidechainContract = new Contract(
+    const mainZkSyncContract = new Contract(
         deposit.depositTo.provider.contractAddress.mainContract,
         SYNC_MAIN_CONTRACT_INTERFACE,
         deposit.depositFrom
@@ -167,7 +176,7 @@ export async function depositFromETH(deposit: {
     let ethTransaction;
 
     if (deposit.token == "ETH") {
-        ethTransaction = await mainSidechainContract.depositETH(
+        ethTransaction = await mainZkSyncContract.depositETH(
             deposit.amount,
             deposit.depositTo.address(),
             {
@@ -186,7 +195,7 @@ export async function depositFromETH(deposit: {
             deposit.depositTo.provider.contractAddress.mainContract,
             deposit.amount
         );
-        ethTransaction = await mainSidechainContract.depositERC20(
+        ethTransaction = await mainZkSyncContract.depositERC20(
             deposit.token,
             deposit.amount,
             deposit.depositTo.address(),
@@ -210,15 +219,15 @@ export async function emergencyWithdraw(withdraw: {
     nonce?: Nonce;
 }): Promise<ETHOperation> {
     let maxFeeInETHToken;
-    if (withdraw.maxFeeInETHToken != undefined) {
+    if (withdraw.maxFeeInETHToken != null) {
         maxFeeInETHToken = withdraw.maxFeeInETHToken;
     } else {
         const baseFee = await withdraw.withdrawFrom.ethProxy.estimateEmergencyWithdrawFeeInETHToken();
-        maxFeeInETHToken = baseFee.mul(115).div(100);
+        maxFeeInETHToken = baseFee.mul(115).div(100); // 15% higher
     }
 
     let accountId;
-    if (withdraw.accountId != undefined) {
+    if (withdraw.accountId != null) {
         accountId = withdraw.accountId;
     } else {
         const accountState = await withdraw.withdrawFrom.getAccountState();
@@ -232,7 +241,7 @@ export async function emergencyWithdraw(withdraw: {
         withdraw.token
     );
     const nonce =
-        withdraw.nonce != undefined
+        withdraw.nonce != null
             ? await withdraw.withdrawFrom.getNonce(withdraw.nonce)
             : await withdraw.withdrawFrom.getNonce();
     const emergencyWithdrawSignature = withdraw.withdrawFrom.signer.syncEmergencyWithdrawSignature(
@@ -244,7 +253,7 @@ export async function emergencyWithdraw(withdraw: {
         }
     );
 
-    const mainSyncContract = new Contract(
+    const mainZkSyncContract = new Contract(
         withdraw.withdrawFrom.ethProxy.contractAddress.mainContract,
         SYNC_MAIN_CONTRACT_INTERFACE,
         withdraw.withdrawTo
@@ -254,7 +263,7 @@ export async function emergencyWithdraw(withdraw: {
     if (withdraw.token != "ETH") {
         tokenAddress = withdraw.token;
     }
-    const ethTransaction = await mainSyncContract.fullExit(
+    const ethTransaction = await mainZkSyncContract.fullExit(
         accountId,
         serializePointPacked(withdraw.withdrawFrom.signer.publicKey),
         tokenAddress,
@@ -286,12 +295,12 @@ export async function getEthereumBalance(
 }
 
 class ETHOperation {
-    state: "Sent" | "Mined" | "Commited" | "Verified";
+    state: "Sent" | "Mined" | "Committed" | "Verified";
     priorityOpId?: utils.BigNumber;
 
     constructor(
         public ethTx: ContractTransaction,
-        public sidechainProvider: Provider
+        public zkSyncProvider: Provider
     ) {
         this.state = "Sent";
     }
@@ -311,32 +320,35 @@ class ETHOperation {
         }
 
         this.state = "Mined";
+        return txReceipt;
     }
 
-    async awaitReceipt() {
+    async awaitReceipt(): Promise<PriorityOperationReceipt> {
         await this.awaitEthereumTxCommit();
         if (this.state != "Mined") return;
-        await this.sidechainProvider.notifyPriorityOp(
+        const receipt = await this.zkSyncProvider.notifyPriorityOp(
             this.priorityOpId.toNumber(),
             "COMMIT"
         );
-        this.state = "Commited";
+        this.state = "Committed";
+        return receipt;
     }
 
-    async awaitVerifyReceipt() {
+    async awaitVerifyReceipt(): Promise<PriorityOperationReceipt> {
         await this.awaitReceipt();
-        if (this.state != "Commited") return;
+        if (this.state != "Committed") return;
 
-        await this.sidechainProvider.notifyPriorityOp(
+        const receipt = await this.zkSyncProvider.notifyPriorityOp(
             this.priorityOpId.toNumber(),
             "VERIFY"
         );
         this.state = "Verified";
+        return receipt;
     }
 }
 
 class Transaction {
-    state: "Sent" | "Commited" | "Verified";
+    state: "Sent" | "Committed" | "Verified";
 
     constructor(
         public txData,
@@ -346,16 +358,24 @@ class Transaction {
         this.state = "Sent";
     }
 
-    async awaitReceipt() {
+    async awaitReceipt(): Promise<TransactionReceipt> {
         if (this.state !== "Sent") return;
 
-        await this.sidechainProvider.notifyTransaction(this.txHash, "COMMIT");
-        this.state = "Commited";
+        const receipt = await this.sidechainProvider.notifyTransaction(
+            this.txHash,
+            "COMMIT"
+        );
+        this.state = "Committed";
+        return receipt;
     }
 
-    async awaitVerifyReceipt() {
+    async awaitVerifyReceipt(): Promise<TransactionReceipt> {
         await this.awaitReceipt();
-        await this.sidechainProvider.notifyTransaction(this.txHash, "VERIFY");
+        const receipt = await this.sidechainProvider.notifyTransaction(
+            this.txHash,
+            "VERIFY"
+        );
         this.state = "Verified";
+        return receipt;
     }
 }
