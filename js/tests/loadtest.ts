@@ -9,7 +9,7 @@ import {
 
 let syncProvider: Provider;
 
-const CLIENTS_TOTAL = 2;
+const CLIENTS_TOTAL = 10;
 const INIT_DEPOSIT_AMOUNT = "0.001";
 const TRANSFER_DIVISOR = 1000;
 const FEE_DIVISOR = 50;
