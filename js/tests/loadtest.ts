@@ -42,7 +42,7 @@ const FEE_DIVISOR = 20;
         syncWallets.push(syncWallet);
 
         // Create wallets
-        for(var i = 1; i < CLIENTS_TOTAL; i++) {
+        for(let i = 1; i < CLIENTS_TOTAL; i++) {
             let ew = ethers.Wallet.createRandom().connect(ethersProvider);
             let sw = await Wallet.fromEthWallet(
                 ew,
@@ -58,14 +58,14 @@ const FEE_DIVISOR = 20;
 
         // Transfers
         let promises = [];
-        for(var i = 0; i < CLIENTS_TOTAL; i++) {
+        for(let i = 0; i < CLIENTS_TOTAL; i++) {
             promises.push(transfer(syncWallets[i], syncWallets, ["ETH", ERC20_TOKEN], TRANSFER_AMOUNT));
         }
         await Promise.all(promises);
 
         // Withdraws
         promises = [];
-        for(var i = 0; i < CLIENTS_TOTAL; i++) {
+        for(let i = 0; i < CLIENTS_TOTAL; i++) {
             promises.push(withdraw(ethWallets[i], syncWallets[i], ["ETH", ERC20_TOKEN]));
         }
         await Promise.all(promises);
@@ -83,8 +83,8 @@ async function deposit(ethWallet: ethers.Wallet, syncWallets: Wallet[], tokens: 
         const depositAmount = utils.parseEther(amount);
         const fee = depositAmount.div(FEE_DIVISOR);
 
-        for (var i = 0; i < syncWallets.length; i++) {
-            for (var k = 0; k < tokens.length; k++) {
+        for (let i = 0; i < syncWallets.length; i++) {
+            for (let k = 0; k < tokens.length; k++) {
                 const depositHandle = await depositFromETH(
                 {
                     depositFrom: ethWallet,
@@ -110,9 +110,9 @@ async function transfer(fromWallet: Wallet, toWallets: Wallet[], tokens: types.T
         const transferAmount = utils.parseEther(amount);
         const fee = transferAmount.div(FEE_DIVISOR);
        
-        for (var i = 0; i < toWallets.length; i++) {
+        for (let i = 0; i < toWallets.length; i++) {
             if (toWallets[i].address() != fromWallet.address()) {
-                for (var k = 0; k < tokens.length; k++) {
+                for (let k = 0; k < tokens.length; k++) {
                     const tx = await fromWallet.syncTransfer({
                         to: toWallets[i].address(),
                         token: tokens[k],
@@ -134,7 +134,7 @@ async function transfer(fromWallet: Wallet, toWallets: Wallet[], tokens: types.T
 
 async function withdraw(ethWallet: ethers.Wallet, syncWallet: Wallet, tokens: types.Token[]) {
     try {
-        for (var k = 0; k < tokens.length; k++) {
+        for (let k = 0; k < tokens.length; k++) {
             const wallet2BeforeWithdraw = await syncWallet.getBalance(tokens[k]);
             const fee = utils.parseEther(TRANSFER_AMOUNT).div(FEE_DIVISOR);
             const amount = wallet2BeforeWithdraw.sub(fee);
