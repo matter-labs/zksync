@@ -9,28 +9,29 @@ import {
 
 let syncProvider: Provider;
 
-const CLIENTS_TOTAL = 3;
-const DEPOSIT_AMOUNT = "0.000000000000001";
+const CLIENTS_TOTAL = 2;
+const INIT_DEPOSIT_AMOUNT = "0.001";
 const TRANSFER_DIVISOR = 1000;
 const FEE_DIVISOR = 50;
 
 (async () => {
+    const privateKey = process.argv[2];
     const WEB3_URL = process.env.WEB3_URL;
-    const TEST_ACCOUNT_PRIVATE_KEY = process.env.TEST_ACCOUNT_PRIVATE_KEY;
     const ERC20_TOKEN = process.env.TEST_ERC20;
 
     const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
-    console.log("Running loadtest on the ", network, " network");
+    console.log(`Running loadtest for ${process.argv[2]} on the ${network} network`);
 
     syncProvider = await getDefaultProvider(network);
 
-    const depositAmount = utils.parseEther(DEPOSIT_AMOUNT);
+    const initDepositAmount = utils.parseEther(INIT_DEPOSIT_AMOUNT);
+    const depositAmount = initDepositAmount.div(CLIENTS_TOTAL);
 
     try {
         const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
-        const ethWallet = new ethers.Wallet(TEST_ACCOUNT_PRIVATE_KEY, ethersProvider);
+        const ethWallet = new ethers.Wallet(privateKey, ethersProvider);
 
         const syncWallet = await Wallet.fromEthSigner(
             ethWallet,
@@ -57,7 +58,8 @@ const FEE_DIVISOR = 50;
         }
 
         // Deposits
-        await deposit(ethWallets[0], syncWallets, ["ETH", ERC20_TOKEN], depositAmount);
+        await deposit(ethWallets[0], syncWallets[0], ["ETH", ERC20_TOKEN], initDepositAmount);
+        await transfer(syncWallets[0], syncWallets, ["ETH", ERC20_TOKEN], depositAmount);
 
         // Transfers
         let promises = [];
@@ -91,26 +93,25 @@ const FEE_DIVISOR = 50;
 
         await syncProvider.disconnect();
     } catch (err) {
+        console.log(`Failed: ${err}`);
         await syncProvider.disconnect();
         throw err;
     }
 
 })();
 
-async function deposit(ethWallet: ethers.Wallet, syncWallets: Wallet[], tokens: types.Token[], amount: utils.BigNumber) {
+async function deposit(ethWallet: ethers.Wallet, syncWallet: Wallet, tokens: types.Token[], amount: utils.BigNumber) {
     try {
-        for (const wallet of syncWallets) {
-            for (const token of tokens) {
-                const depositHandle = await depositFromETH({
-                    depositFrom: ethWallet,
-                    depositTo:  wallet,
-                    token,
-                    amount,
-                });
-                await depositHandle.awaitReceipt();
+        for (const token of tokens) {
+            const depositHandle = await depositFromETH({
+                depositFrom: ethWallet,
+                depositTo:  syncWallet,
+                token,
+                amount,
+            });
+            await depositHandle.awaitReceipt();
 
-                console.log(`${token} deposit ok, from: ${ethWallet.address}, to: ${wallet.address()}, amount: ${utils.formatEther(amount)}`);
-            }
+            console.log(`${token} deposit ok, from: ${ethWallet.address}, to: ${syncWallet.address()}, amount: ${utils.formatEther(amount)}`);
         }
 
     } catch (err) {
