@@ -31,7 +31,6 @@ async function testDeposit(ethWallet: ethers.Signer, syncWallet: Wallet, token: 
         depositTo:  syncWallet,
         token: token,
         amount,
-        maxFeeInETHToken: utils.parseEther("0.1")
     });
     await depositHandle.awaitReceipt();
     const balanceAfterDep = await syncWallet.getBalance(token);
@@ -113,7 +112,10 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: e
     const MNEMONIC = process.env.MNEMONIC;
     const ERC_20TOKEN = process.env.TEST_ERC20;
 
-    syncProvider = await getDefaultProvider("localhost");
+    const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
+    console.log("Running integration test on the ", network, " network");
+
+    syncProvider = await getDefaultProvider(network);
 
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
     const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
@@ -122,28 +124,28 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: e
         MNEMONIC,
         "m/44'/60'/0'/0/1"
     ).connect(ethersProvider);
-    const syncWallet = await Wallet.fromEthWallet(
+    const syncWallet = await Wallet.fromEthSigner(
         ethWallet,
         syncProvider,
         ethProxy
     );
 
     const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-    const syncWallet2 = await Wallet.fromEthWallet(
+    const syncWallet2 = await Wallet.fromEthSigner(
         ethWallet2,
         syncProvider,
         ethProxy
     );
 
     const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
-    const syncWallet3 = await Wallet.fromEthWallet(
+    const syncWallet3 = await Wallet.fromEthSigner(
         ethWallet3,
         syncProvider,
         ethProxy
     );
 
-    await moveFunds(ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "42.0");
-    await moveFunds(ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "42.0");
+    await moveFunds(ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "0.018");
+    await moveFunds(ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "0.018");
 
     await syncProvider.disconnect();
 })();

@@ -1,2 +1,2 @@
 -- tablefunc enables crosstab (pivot)
-CREATE EXTENSION tablefunc;
+CREATE EXTENSION IF NOT EXISTS tablefunc;

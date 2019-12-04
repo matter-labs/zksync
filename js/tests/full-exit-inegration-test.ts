@@ -13,9 +13,8 @@ async function testRandomAccountFullExit(ethWallet: ethers.Wallet, syncWallet: W
         withdrawTo: ethWallet,
         withdrawFrom: syncWallet,
         token: "ETH",
-        maxFeeInETHToken: utils.parseEther("0.1"),
         accountId: 2
-    })
+    });
     await fullExit.awaitVerifyReceipt();
     console.log(`Full exit random account ok, Token: ${token}`);
 }
@@ -29,7 +28,6 @@ async function testNormalFullExit(ethWallet: ethers.Wallet, syncWallet: Wallet, 
         withdrawTo: ethWallet,
         withdrawFrom: syncWallet,
         token,
-        maxFeeInETHToken: utils.parseEther("0.1"),
     });
     await fullExit.awaitVerifyReceipt();
 
@@ -49,7 +47,6 @@ async function testEmptyBalanceFullExit(ethWallet: ethers.Wallet, syncWallet: Wa
         withdrawTo: ethWallet,
         withdrawFrom: syncWallet,
         token,
-        maxFeeInETHToken: utils.parseEther("0.1"),
     });
     await fullExit.awaitVerifyReceipt();
 
@@ -69,7 +66,6 @@ async function testWrongNonceFullExit(ethWallet: ethers.Wallet, syncWallet: Wall
         withdrawTo: ethWallet,
         withdrawFrom: syncWallet,
         token,
-        maxFeeInETHToken: utils.parseEther("0.1"),
         nonce: 12341
     });
     await fullExit.awaitVerifyReceipt();
@@ -86,8 +82,10 @@ async function testWrongNonceFullExit(ethWallet: ethers.Wallet, syncWallet: Wall
 // Mnemonic for eth wallet.
     const MNEMONIC = process.env.MNEMONIC;
     const ERC_20TOKEN = process.env.TEST_ERC20;
+    const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
+    console.log("Running integration test on the ", network, " network");
 
-    syncProvider = await getDefaultProvider("localhost");
+    syncProvider = await getDefaultProvider(network);
 
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
     const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
@@ -102,7 +100,7 @@ async function testWrongNonceFullExit(ethWallet: ethers.Wallet, syncWallet: Wall
 
         let amount = utils.parseEther("0.89");
         const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-        const syncWallet2 = await Wallet.fromEthWallet(
+        const syncWallet2 = await Wallet.fromEthSigner(
             ethWallet2,
             syncProvider,
             ethProxy
@@ -114,7 +112,6 @@ async function testWrongNonceFullExit(ethWallet: ethers.Wallet, syncWallet: Wall
             depositTo: syncWallet2,
             token,
             amount,
-            maxFeeInETHToken: utils.parseEther("0.1")
         });
         await deposit.awaitReceipt();
         await testWrongNonceFullExit(ethWallet, syncWallet2, token);

@@ -1,18 +1,24 @@
-apiVersion: v1
-kind: Service
+apiVersion: networking.k8s.io/v1beta1
+kind: Ingress
 metadata:
-  name: ${FRANKLIN_ENV}-server
-  labels:
-    app: ${FRANKLIN_ENV}-server
+  name: api-ingress
 spec:
-  type: LoadBalancer
-  ports:
-  - port: 80
-    targetPort: 3000
-    protocol: TCP
-    name: http
-  selector:
-    app: ${FRANKLIN_ENV}-server
+  rules:
+  - host: testnet.matter-labs.io
+    http:
+      paths:
+      - path: /
+        backend:
+          serviceName: ${FRANKLIN_ENV}-server
+          servicePort: 3000
+      - path: /jsrpc
+        backend:
+          serviceName: ${FRANKLIN_ENV}-server
+          servicePort: 3030
+      - path: /jsrpc-ws
+        backend:
+          serviceName: ${FRANKLIN_ENV}-server
+          servicePort: 3031
 ---
 apiVersion: v1
 kind: Service
@@ -75,8 +81,10 @@ spec:
         - name: server
           image: matterlabs/server:latest
           imagePullPolicy: Always
-          ports: 
+          ports:
             - containerPort: 3000
+            - containerPort: 3030
+            - containerPort: 3031
           envFrom:
             - secretRef:
                 name: ${FRANKLIN_ENV}-secret

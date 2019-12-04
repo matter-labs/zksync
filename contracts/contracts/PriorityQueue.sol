@@ -25,7 +25,7 @@ contract PriorityQueue {
     // Public key length
     uint8 constant PUBKEY_LEN = 32;
     // Expiration delta for priority request to be satisfied (in ETH blocks)
-    uint256 constant PRIORITY_EXPIRATION = 250; // About 1 hour
+    uint256 constant PRIORITY_EXPIRATION = 4 * 60 * 24; // One day
 
     // New priority request event
     // Emitted when a request is placed into mapping

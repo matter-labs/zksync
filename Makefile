@@ -98,7 +98,7 @@ push-image-ci:
 	docker push "${CI_DOCKER_IMAGE}"
 
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
-docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry
+docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(FRANKLIN_HOME)/etc/env/$(FRANKLIN_ENV).env
 rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 
@@ -126,10 +126,10 @@ clean-target:
 	$(rust-musl-builder) cargo clean
 
 image-server: build-target
-	docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
+	@docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
 
 image-prover: build-target
-	docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
+	@docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
 
 image-rust: image-server image-prover
 
@@ -162,6 +162,9 @@ flatten:
 	$(call flatten_file,Verifier.sol)
 
 # testing
+
+loadtest:
+	@cd js/tests && yarn loadtest
 
 integration-simple:
 	@cd js/tests && yarn simple
