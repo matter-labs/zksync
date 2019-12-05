@@ -1,14 +1,18 @@
+use super::account::AccountAddress;
+use super::tx::TxSignature;
 use super::AccountId;
 use super::FranklinTx;
 use crate::node::{
-    pack_fee_amount, pack_token_amount, Close, Deposit, FranklinPriorityOp, FullExit, Transfer,
-    Withdraw,
+    pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
+    FranklinPriorityOp, FullExit, Transfer, Withdraw,
 };
 use crate::params::FR_ADDRESS_LEN;
 use crate::primitives::{
-    big_decimal_to_u128, bytes_slice_to_uint128, bytes_slice_to_uint32, u128_to_bigdecimal,
+    big_decimal_to_u128, bytes32_from_slice, bytes_slice_to_uint128, bytes_slice_to_uint16,
+    bytes_slice_to_uint32, u128_to_bigdecimal,
 };
 use bigdecimal::BigDecimal;
+use web3::types::Address;
 
 pub const TX_TYPE_BYTES_LENGTH: usize = 1;
 pub const ACCOUNT_ID_BYTES_LENGTH: usize = 3;
@@ -31,7 +35,6 @@ pub struct DepositOp {
 impl DepositOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x01;
-    pub const OP_LENGTH: usize = 41;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -45,15 +48,37 @@ impl DepositOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != Self::OP_LENGTH {
+        if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
-        let pre_length = 0;
+        let account_id_pre_length = 0;
+        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
+        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
+        let account_address_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LENGTH;
+
+        let account_id = bytes_slice_to_uint32(
+            &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+        )?;
+        let token = bytes_slice_to_uint16(
+            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+        )?;
+        let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
+            &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
+        )?);
+        let account = AccountAddress::from_bytes(
+            &bytes[account_address_pre_length..account_address_pre_length + FR_ADDRESS_LEN],
+        )
+        .ok()?;
+        let sender = Address::zero(); // In current circuit there is no sender in deposit pubdata
+
         Some(Self {
-            priority_op: Deposit::from_bytes(bytes)?,
-            account_id: bytes_slice_to_uint32(
-                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LENGTH],
-            )?,
+            priority_op: Deposit {
+                sender,
+                token,
+                amount,
+                account,
+            },
+            account_id,
         })
     }
 }
@@ -64,7 +89,6 @@ pub struct NoopOp {}
 impl NoopOp {
     pub const CHUNKS: usize = 1;
     pub const OP_CODE: u8 = 0x00;
-    pub const OP_LENGTH: usize = 0;
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes != [0, 0, 0, 0, 0, 0, 0, 0] {
@@ -90,7 +114,6 @@ pub struct TransferToNewOp {
 impl TransferToNewOp {
     pub const CHUNKS: usize = 5;
     pub const OP_CODE: u8 = 0x02;
-    pub const OP_LENGTH: usize = 35;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -106,22 +129,49 @@ impl TransferToNewOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != Self::OP_LENGTH {
+        if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
         let from_pre_length = 0;
-        let to_pre_length = ACCOUNT_ID_BYTES_LENGTH
-            + TOKEN_BYTES_LENGTH
-            + PACKED_AMOUNT_BYTES_LENGTH
-            + FR_ADDRESS_LEN;
+        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
+        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
+        let to_address_pre_length = amount_pre_length + PACKED_AMOUNT_BYTES_LENGTH;
+        let to_id_pre_length = to_address_pre_length + FR_ADDRESS_LEN;
+        let fee_pre_length = to_id_pre_length + ACCOUNT_ID_BYTES_LENGTH;
+
+        let from_id = bytes_slice_to_uint32(
+            &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+        )?;
+        let to_id = bytes_slice_to_uint32(
+            &bytes[to_id_pre_length..to_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+        )?;
+        let from_address = AccountAddress::zero(); // It is unknown from pubdata;
+        let to_address = AccountAddress::from_bytes(
+            &bytes[to_address_pre_length..to_address_pre_length + FR_ADDRESS_LEN],
+        )
+        .ok()?;
+        let token = bytes_slice_to_uint16(
+            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+        )?;
+        let amount = unpack_token_amount(
+            &bytes[amount_pre_length..amount_pre_length + PACKED_AMOUNT_BYTES_LENGTH],
+        )?;
+        let fee = unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LENGTH])?;
+        let nonce = 0; // It is unknown from pubdata
+        let signature = TxSignature::default(); // It is unknown from pubdata
+
         Some(Self {
-            tx: Transfer::from_transfer_to_new_bytes(bytes)?,
-            from: bytes_slice_to_uint32(
-                &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LENGTH],
-            )?,
-            to: bytes_slice_to_uint32(
-                &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LENGTH],
-            )?,
+            tx: Transfer {
+                from: from_address,
+                to: to_address,
+                token,
+                amount,
+                fee,
+                nonce,
+                signature,
+            },
+            from: from_id,
+            to: to_id,
         })
     }
 }
@@ -136,7 +186,6 @@ pub struct TransferOp {
 impl TransferOp {
     pub const CHUNKS: usize = 2;
     pub const OP_CODE: u8 = 0x05;
-    pub const OP_LENGTH: usize = 15;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -151,19 +200,45 @@ impl TransferOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != Self::OP_LENGTH {
+        if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
+
         let from_pre_length = 0;
-        let to_pre_length = ACCOUNT_ID_BYTES_LENGTH + TOKEN_BYTES_LENGTH;
+        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
+        let to_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
+        let amount_pre_length = to_pre_length + ACCOUNT_ID_BYTES_LENGTH;
+        let fee_pre_length = amount_pre_length + PACKED_AMOUNT_BYTES_LENGTH;
+
+        let from_address = AccountAddress::zero(); // From pubdata its unknown
+        let to_address = AccountAddress::zero(); // From pubdata its unknown
+        let token = bytes_slice_to_uint16(
+            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+        )?;
+        let amount = unpack_token_amount(
+            &bytes[amount_pre_length..amount_pre_length + PACKED_AMOUNT_BYTES_LENGTH],
+        )?;
+        let fee = unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LENGTH])?;
+        let nonce = 0; // It is unknown from pubdata
+        let signature = TxSignature::default(); // It is unknown from pubdata
+        let from_id = bytes_slice_to_uint32(
+            &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+        )?;
+        let to_id =
+            bytes_slice_to_uint32(&bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LENGTH])?;
+
         Some(Self {
-            tx: Transfer::from_transfer_bytes(bytes)?,
-            from: bytes_slice_to_uint32(
-                &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LENGTH],
-            )?,
-            to: bytes_slice_to_uint32(
-                &bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LENGTH],
-            )?,
+            tx: Transfer {
+                from: from_address,
+                to: to_address,
+                token,
+                amount,
+                fee,
+                nonce,
+                signature,
+            },
+            from: from_id,
+            to: to_id,
         })
     }
 }
@@ -177,7 +252,6 @@ pub struct WithdrawOp {
 impl WithdrawOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x03;
-    pub const OP_LENGTH: usize = 43;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -192,15 +266,43 @@ impl WithdrawOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != Self::OP_LENGTH {
+        if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
-        let pre_length = 0;
+        let account_pre_length = 0;
+        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
+        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
+        let fee_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LENGTH;
+        let eth_address_pre_length = fee_pre_length + FEE_BYTES_LENGTH;
+
+        let account_id = bytes_slice_to_uint32(
+            &bytes[account_pre_length..account_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+        )?;
+        let account_address = AccountAddress::zero(); // From pubdata it is unknown
+        let token = bytes_slice_to_uint16(
+            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+        )?;
+        let eth_address = Address::from_slice(
+            &bytes[eth_address_pre_length..eth_address_pre_length + ETH_ADDR_BYTES_LENGTH],
+        );
+        let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
+            &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
+        )?);
+        let fee = unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LENGTH])?;
+        let nonce = 0; // From pubdata it is unknown
+        let signature = TxSignature::default(); // From pubdata it is unknown
+
         Some(Self {
-            tx: Withdraw::from_bytes(bytes)?,
-            account_id: bytes_slice_to_uint32(
-                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LENGTH],
-            )?,
+            tx: Withdraw {
+                account: account_address,
+                eth_address,
+                token,
+                amount,
+                fee,
+                nonce,
+                signature,
+            },
+            account_id,
         })
     }
 }
@@ -214,7 +316,6 @@ pub struct CloseOp {
 impl CloseOp {
     pub const CHUNKS: usize = 1;
     pub const OP_CODE: u8 = 0x04;
-    pub const OP_LENGTH: usize = 3;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -225,15 +326,23 @@ impl CloseOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != Self::OP_LENGTH {
+        if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
-        let pre_length = 0;
+        let account_id_pre_length = 0;
+        let account_id = bytes_slice_to_uint32(
+            &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+        )?;
+        let account_address = AccountAddress::zero(); // From pubdata it is unknown
+        let nonce = 0; // From pubdata it is unknown
+        let signature = TxSignature::default(); // From pubdata it is unknown
         Some(Self {
-            tx: Close::from_bytes(bytes)?,
-            account_id: bytes_slice_to_uint32(
-                &bytes[pre_length..pre_length + ACCOUNT_ID_BYTES_LENGTH],
-            )?,
+            tx: Close {
+                account: account_address,
+                nonce,
+                signature,
+            },
+            account_id,
         })
     }
 }
@@ -248,7 +357,6 @@ pub struct FullExitOp {
 impl FullExitOp {
     pub const CHUNKS: usize = 18;
     pub const OP_CODE: u8 = 0x06;
-    pub const OP_LENGTH: usize = 141;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -268,20 +376,40 @@ impl FullExitOp {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != Self::OP_LENGTH {
+        if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
 
-        let to_pre_length = ACCOUNT_ID_BYTES_LENGTH
-            + PUBKEY_PACKED_BYTES_LENGTH
-            + ETH_ADDR_BYTES_LENGTH
-            + TOKEN_BYTES_LENGTH
-            + NONCE_BYTES_LENGTH
-            + SIGNATURE_R_BYTES_LENGTH
-            + SIGNATURE_S_BYTES_LENGTH;
+        let account_id_pre_length = 0;
+        let packed_pubkey_pre_length = ACCOUNT_ID_BYTES_LENGTH;
+        let eth_address_pre_length = packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LENGTH;
+        let token_pre_length = eth_address_pre_length + ETH_ADDR_BYTES_LENGTH;
+        let nonce_pre_length = token_pre_length + TOKEN_BYTES_LENGTH;
+        let signature_r_pre_length = nonce_pre_length + NONCE_BYTES_LENGTH;
+        let signature_s_pre_length = signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH;
+        let amount_pre_length = signature_s_pre_length + SIGNATURE_S_BYTES_LENGTH;
 
+        let account_id = bytes_slice_to_uint32(
+            &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+        )?;
+        let packed_pubkey = Box::from(bytes32_from_slice(
+            &bytes[packed_pubkey_pre_length..packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LENGTH],
+        )?);
+        let eth_address = Address::from_slice(
+            &bytes[eth_address_pre_length..eth_address_pre_length + ETH_ADDR_BYTES_LENGTH],
+        );
+        let token =
+            bytes_slice_to_uint16(&bytes[token_pre_length..token_pre_length + TOKEN_BYTES_LENGTH])?;
+        let nonce =
+            bytes_slice_to_uint32(&bytes[nonce_pre_length..nonce_pre_length + NONCE_BYTES_LENGTH])?;
+        let signature_r = Box::from(bytes32_from_slice(
+            &bytes[signature_r_pre_length..signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH],
+        )?);
+        let signature_s = Box::from(bytes32_from_slice(
+            &bytes[signature_s_pre_length..signature_s_pre_length + SIGNATURE_S_BYTES_LENGTH],
+        )?);
         let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
-            &bytes[to_pre_length..to_pre_length + FULL_AMOUNT_BYTES_LENGTH],
+            &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
         )?);
 
         // If full exit amount is 0 - full exit is considered failed
@@ -292,7 +420,15 @@ impl FullExitOp {
         };
 
         Some(Self {
-            priority_op: FullExit::from_bytes(bytes)?,
+            priority_op: FullExit {
+                account_id,
+                packed_pubkey,
+                eth_address,
+                token,
+                nonce,
+                signature_r,
+                signature_s,
+            },
             withdraw_amount,
         })
     }
@@ -335,19 +471,6 @@ impl FranklinOp {
         }
     }
 
-    pub fn chunks_by_op_number(op_type: u8) -> Option<usize> {
-        match op_type {
-            NoopOp::OP_CODE => Some(NoopOp::CHUNKS),
-            DepositOp::OP_CODE => Some(DepositOp::CHUNKS),
-            TransferToNewOp::OP_CODE => Some(TransferToNewOp::CHUNKS),
-            WithdrawOp::OP_CODE => Some(WithdrawOp::CHUNKS),
-            CloseOp::OP_CODE => Some(CloseOp::CHUNKS),
-            TransferOp::OP_CODE => Some(TransferOp::CHUNKS),
-            FullExitOp::OP_CODE => Some(FullExitOp::CHUNKS),
-            _ => None,
-        }
-    }
-
     pub fn from_bytes(op_type: u8, bytes: &[u8]) -> Option<Self> {
         match op_type {
             NoopOp::OP_CODE => Some(FranklinOp::Noop(NoopOp::from_bytes(&bytes)?)),
@@ -373,13 +496,13 @@ impl FranklinOp {
 
     pub fn public_data_length(op_type: u8) -> Option<usize> {
         match op_type {
-            NoopOp::OP_CODE => Some(NoopOp::OP_LENGTH),
-            DepositOp::OP_CODE => Some(DepositOp::OP_LENGTH),
-            TransferToNewOp::OP_CODE => Some(TransferToNewOp::OP_LENGTH),
-            WithdrawOp::OP_CODE => Some(WithdrawOp::OP_LENGTH),
-            CloseOp::OP_CODE => Some(CloseOp::OP_LENGTH),
-            TransferOp::OP_CODE => Some(TransferOp::OP_LENGTH),
-            FullExitOp::OP_CODE => Some(FullExitOp::OP_LENGTH),
+            NoopOp::OP_CODE => Some(NoopOp::CHUNKS * 8),
+            DepositOp::OP_CODE => Some(DepositOp::CHUNKS * 8),
+            TransferToNewOp::OP_CODE => Some(TransferToNewOp::CHUNKS * 8),
+            WithdrawOp::OP_CODE => Some(WithdrawOp::CHUNKS * 8),
+            CloseOp::OP_CODE => Some(CloseOp::CHUNKS * 8),
+            TransferOp::OP_CODE => Some(TransferOp::CHUNKS * 8),
+            FullExitOp::OP_CODE => Some(FullExitOp::CHUNKS * 8),
             _ => None,
         }
     }

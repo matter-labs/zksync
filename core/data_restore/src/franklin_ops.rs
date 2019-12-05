@@ -63,10 +63,6 @@ impl FranklinOpsBlock {
         while current_pointer < data.len() {
             let op_type: u8 = data[current_pointer];
 
-            let chunks = FranklinOp::chunks_by_op_number(op_type)
-                .ok_or_else(|| DataRestoreError::WrongData("Wrong op type".to_string()))?;
-            let full_size: usize = 8 * chunks;
-
             let pub_data_size = FranklinOp::public_data_length(op_type)
                 .ok_or_else(|| DataRestoreError::WrongData("Wrong op type".to_string()))?;
 
@@ -76,7 +72,7 @@ impl FranklinOpsBlock {
             let op = FranklinOp::from_bytes(op_type, &data[pre..post])
                 .ok_or_else(|| DataRestoreError::WrongData("Wrong data".to_string()))?;
             ops.push(op);
-            current_pointer += full_size;
+            current_pointer += pub_data_size;
         }
         Ok(ops)
     }
