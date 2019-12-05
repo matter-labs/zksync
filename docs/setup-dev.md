@@ -69,19 +69,19 @@ Edit the lines below and add them to your shell profile file (e.g. `~/.bash_prof
 
 ```
 # Add path here:
-export FRANKLIN_HOME=/path/to/franklin
+export ZKSYNC_HOME=/path/to/zksync
 
-export PATH=$FRANKLIN_HOME/bin:$PATH
+export PATH=$ZKSYNC_HOME/bin:$PATH
 
 # If you're like me, uncomment:
-# cd $FRANKLIN_HOME
+# cd $ZKSYNC_HOME
 ```
 
 Autocomplete configuration.
 
 `bash`:
 ```
-complete -W "\`grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $FRANKLIN_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//'\`" franklin
+complete -W "\`grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $ZKSYNC_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//'\`" zksync
 ```
 
 `zsh`:
@@ -90,12 +90,12 @@ echo "fpath=(~/.zsh_comp $fpath)" >> ~/.zshrc
 
 mkdir -p ~/.zsh_comp
 ```
-add `~/.zsh_comp/_franklin`:
+add `~/.zsh_comp/_zksync`:
 ```
-#compdef franklin
+#compdef zksync
 
-cmds=( ${(uf)"$(grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $FRANKLIN_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//')"} )
+cmds=( ${(uf)"$(grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $ZKSYNC_HOME/Makefile | sed 's/[^a-zA-Z0-9_.-]*$//')"} )
 
-_describe 'franklin make cmds' cmds
+_describe 'zksync make cmds' cmds
 ```
 

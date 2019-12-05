@@ -10,7 +10,7 @@
 # cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
 echo "redeploying for the db $DATABASE_URL"
-franklin flatten;
+zksync flatten;
 cd contracts;
 yarn deploy | tee ../deploy.log;
 cd ..;
@@ -22,9 +22,9 @@ VERIFIER_ADDR_NEW_VALUE=`grep "VERIFIER_ADDR" deploy.log`
 PRIORITY_QUEUE_ADDR_NEW_VALUE=`grep "PRIORITY_QUEUE_ADDR" deploy.log`
 if [[ ! -z "$CONTRACT_ADDR_NEW_VALUE" ]]
 then
-    export LABEL=$FRANKLIN_ENV-Contract_deploy-`date +%Y-%m-%d-%H%M%S`
+    export LABEL=$ZKSYNC_ENV-Contract_deploy-`date +%Y-%m-%d-%H%M%S`
     mkdir -p logs/$LABEL/
-    cp ./$ENV_FILE logs/$LABEL/$FRANKLIN_ENV.bak
+    cp ./$ENV_FILE logs/$LABEL/$ZKSYNC_ENV.bak
     cp deploy.log logs/$LABEL/
     echo $CONTRACT_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_ADDR_NEW_VALUE
