@@ -21,4 +21,4 @@ done
 
 do-scale-single `do-main-id` 1
 
-#kubectl scale deployments/$FRANKLIN_ENV-prover --replicas=1
+#kubectl scale deployments/$ZKSYNC_ENV-prover --replicas=1

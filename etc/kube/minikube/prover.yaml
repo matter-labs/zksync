@@ -32,7 +32,7 @@ spec:
           value: ""
         - name: KEY_DIR
           value: "/keys"
-        - name: FRANKLIN_ENV
+        - name: ZKSYNC_ENV
           value: "dev"
         - name: TX_BATCH_SIZE
           value: "50"
