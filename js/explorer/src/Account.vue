@@ -2,7 +2,7 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
         <b-container>
-            <b-navbar-brand href="/">Matter Network</b-navbar-brand>
+            <b-navbar-brand href="/">ZK Sync Network</b-navbar-brand>
             <b-navbar-nav class="ml-auto">
                 <b-nav-form>
                     <SearchField :searchFieldInMenu="true" />

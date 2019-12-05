@@ -3,7 +3,7 @@
     <Alert class="w-100 mb-1" ref="alertLogin"></Alert>
     <b-jumbotron bg-variant="light" border-variant="dark">
         <template slot="header">
-            Matter Network Wallet <span style="font-size: 0.3em"><strong>ALPHA</strong></span>
+            ZK Sync Wallet <span style="font-size: 0.3em"><strong>ALPHA</strong></span>
         </template>
         <template slot="lead">
             <span v-if="isDev" class="local">API at {{ config.API_SERVER }}</span>

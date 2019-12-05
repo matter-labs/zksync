@@ -375,7 +375,7 @@ export class WalletDecorator {
                 return;
             }
 
-            yield info(`Sent transfer to Matter server`);
+            yield info(`Sent transfer to ZK Sync server`);
     
             yield * this.verboseGetFranklinOpStatus(fra_tx.hash);
             return;
