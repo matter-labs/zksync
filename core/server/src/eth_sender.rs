@@ -10,81 +10,73 @@
 //!
 //! Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 //! that state is always recoverable.
+
 // Built-in uses
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
 // External uses
 use bigdecimal::BigDecimal;
+use failure::ensure;
 use ff::{PrimeField, PrimeFieldRepr};
-use futures::Future;
+use futures::{sync::mpsc as fmpsc, Future};
 use web3::contract::Options;
 use web3::transports::Http;
-use web3::types::{Transaction, TransactionId, TransactionReceipt, H256, U256};
+use web3::types::{TransactionReceipt, H256, U256};
 use web3::Transport;
 // Workspace uses
 use crate::{ConfigurationOptions, ThreadPanicNotify};
 use eth_client::{ETHClient, SignedCallResult};
 use models::abi::FRANKLIN_CONTRACT;
-use models::{Action, Operation};
-use storage::ConnectionPool;
+use models::{Action, ActionType, Operation};
+use storage::{ConnectionPool, StorageETHOperation};
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
-// TODO: fix rare nonce bug, when pending nonce is not equal to real pending nonce.
-const MAX_UNCONFIRMED_TX: usize = 1;
-const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
-const WAIT_CONFIRMATIONS: u64 = 10;
+const TX_POLL_PERIOD: Duration = Duration::from_secs(10);
+const WAIT_CONFIRMATIONS: u64 = 4;
 
-#[derive(Debug, Clone)]
-enum SignedTxState {
-    Unsent,
-    Pending { deadline_block: u64 },
-    Executed { confirmations: u64, status: u64 },
-    Confirmed { status: u64 },
-}
-
-impl SignedTxState {
-    fn confirmed_status(&self) -> Option<u64> {
-        match self {
-            SignedTxState::Confirmed { status } => Some(*status),
-            _ => None,
-        }
-    }
-
-    fn stuck(&self, current_block: u64) -> bool {
-        match self {
-            SignedTxState::Pending { deadline_block } => current_block > *deadline_block,
-            _ => false,
-        }
-    }
+struct OperationETHState {
+    operation: Operation,
+    txs: Vec<TransactionETHState>,
 }
 
 #[derive(Debug, Clone)]
-enum OperationState {
-    Pending,
-    InProgress {
-        current_transaction: (SignedCallResult, SignedTxState),
-        previous_transactions: Vec<H256>,
-    },
-    Commited {
-        hash: H256,
-        success: bool,
-    },
+pub struct TransactionETHState {
+    pub op_id: i64,
+    pub deadline_block: u64,
+    pub signed_tx: SignedCallResult,
 }
 
-impl OperationState {
-    fn is_unsent(&self) -> bool {
-        match self {
-            OperationState::Pending { .. } => true,
-            _ => false,
+impl From<StorageETHOperation> for TransactionETHState {
+    fn from(stored: StorageETHOperation) -> Self {
+        TransactionETHState {
+            op_id: stored.op_id,
+            deadline_block: stored.deadline_block as u64,
+            signed_tx: SignedCallResult {
+                raw_tx: stored.raw_tx,
+                gas_price: U256::from_str(&stored.gas_price.to_string()).unwrap(),
+                nonce: U256::from(stored.nonce as u128),
+                hash: H256::from_slice(&stored.tx_hash),
+            },
         }
     }
+}
+
+impl TransactionETHState {
+    fn is_stuck(&self, current_block: u64) -> bool {
+        current_block >= self.deadline_block
+    }
+}
+
+struct ExecutedTxStatus {
+    confirmations: u64,
+    success: bool,
 }
 
 struct ETHSender<T: Transport> {
-    unsent_ops: VecDeque<Operation>,
-    unconfirmed_ops: VecDeque<(Operation, OperationState)>,
+    // unconfirmed operations queue
+    unconfirmed_ops: VecDeque<OperationETHState>,
     db_pool: ConnectionPool,
     eth_client: ETHClient<T>,
 }
@@ -93,7 +85,6 @@ impl<T: Transport> ETHSender<T> {
     fn new(db_pool: ConnectionPool, eth_client: ETHClient<T>) -> Self {
         let mut sender = Self {
             eth_client,
-            unsent_ops: VecDeque::new(),
             unconfirmed_ops: VecDeque::new(),
             db_pool,
         };
@@ -103,107 +94,54 @@ impl<T: Transport> ETHSender<T> {
 
     fn restore_state(&mut self) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
-        self.unsent_ops
-            .extend(storage.load_unsent_ops()?.into_iter());
-        let stored_sent_ops = storage.load_sent_unconfirmed_ops()?;
-        self.unconfirmed_ops = stored_sent_ops
+        self.unconfirmed_ops = storage
+            .load_unconfirmed_operations()?
             .into_iter()
-            .map(|(op, eth_ops)| {
-                let current_transaction = eth_ops
-                    .iter()
-                    .max_by_key(|eth_op| eth_op.gas_price.clone())
-                    .map(|stored_eth_tx| {
-                        let signed_tx = self
-                            .sign_operation_tx(
-                                &op,
-                                Options::with(|opt| {
-                                    opt.gas_price = Some(
-                                        U256::from_dec_str(&stored_eth_tx.gas_price.to_string())
-                                            .expect("U256 parse error"),
-                                    );
-                                    opt.nonce = Some(U256::from(stored_eth_tx.nonce as u32));
-                                }),
-                            )
-                            .expect("Failed when restoring tx");
-                        let tx_state = SignedTxState::Pending {
-                            deadline_block: stored_eth_tx.deadline_block as u64,
-                        };
-                        (signed_tx, tx_state)
-                    })
-                    .unwrap();
-                let previous_transactions = eth_ops
-                    .into_iter()
-                    .filter_map(|eth_op| {
-                        let eth_op_hash = eth_op.tx_hash[2..].parse().unwrap();
-                        if eth_op_hash != current_transaction.0.hash {
-                            Some(eth_op_hash)
-                        } else {
-                            None
-                        }
-                    })
-                    .collect::<Vec<H256>>();
-                (
-                    op,
-                    OperationState::InProgress {
-                        current_transaction,
-                        previous_transactions,
-                    },
-                )
+            .map(|(operation, txs)| OperationETHState {
+                operation,
+                txs: txs.into_iter().map(|tx| tx.into()).collect(),
             })
             .collect();
         Ok(())
     }
 
-    fn run(&mut self, rx_for_eth: Receiver<Operation>) {
+    fn run(&mut self, rx_for_eth: Receiver<Operation>, mut op_notify: fmpsc::Sender<Operation>) {
         loop {
             let last_poll_end_time = Instant::now();
 
-            while let Ok(op) = rx_for_eth.try_recv() {
-                self.unsent_ops.push_back(op);
+            // receive new operations from committer
+            while let Ok(operation) = rx_for_eth.try_recv() {
+                self.unconfirmed_ops.push_back(OperationETHState {
+                    operation,
+                    txs: Vec::new(),
+                });
             }
 
-            while self.unconfirmed_ops.len() < MAX_UNCONFIRMED_TX && !self.unsent_ops.is_empty() {
-                if let Some(op) = self.unsent_ops.pop_front() {
-                    self.unconfirmed_ops
-                        .push_back((op, OperationState::Pending));
-                }
-            }
-
-            // Try sending all txs in queue.
-            let mut sending_error = false;
-            self.unconfirmed_ops = std::mem::replace(&mut self.unconfirmed_ops, VecDeque::new())
-                .into_iter()
-                .map(|(op, mut op_state)| {
-                    if op_state.is_unsent() && !sending_error {
-                        if let Err(e) = self.drive_to_completion(&op, &mut op_state) {
-                            sending_error = true;
-                            warn!("Error while sending unsent op: {}", e);
-                        }
-                    }
-                    (op, op_state)
-                })
-                .collect();
-
-            while let Some((op, mut op_state)) = self.unconfirmed_ops.pop_front() {
-                self.drive_to_completion(&op, &mut op_state)
+            if let Some(mut current_op) = self.unconfirmed_ops.pop_front() {
+                let success = self
+                    .drive_to_completion(&mut current_op)
                     .map_err(|e| {
-                        warn!("Error while trying to complete uncommited op: {}", e);
+                        warn!("Error while trying to complete uncommitted op: {}", e);
                     })
                     .unwrap_or_default();
 
-                if let OperationState::Commited { hash, success } = &op_state {
+                if success {
                     info!(
-                        "Operation {} commited, tx: {:#x} success: {}",
-                        op.id.unwrap(),
-                        hash,
-                        success
+                        "Operation {}, {}  block: {}, confirmed on ETH",
+                        current_op.operation.id.unwrap(),
+                        current_op.operation.action.to_string(),
+                        current_op.operation.block.block_number,
                     );
-                    if !success {
-                        panic!("Operation failed");
+
+                    if current_op.operation.action.get_type() == ActionType::VERIFY {
+                        // we notify about verify only when commit is confirmed on the ethereum
+                        op_notify
+                            .try_send(current_op.operation)
+                            .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
+                            .unwrap_or_default();
                     }
                 } else {
-                    self.unconfirmed_ops.push_front((op, op_state));
-                    break;
+                    self.unconfirmed_ops.push_front(current_op);
                 }
             }
 
@@ -214,9 +152,6 @@ impl<T: Transport> ETHSender<T> {
         }
     }
 
-    fn commited_nonce(&self) -> Result<u64, failure::Error> {
-        Ok(self.eth_client.current_nonce().wait().map(|n| n.as_u64())?)
-    }
     fn block_number(&self) -> Result<u64, failure::Error> {
         Ok(self
             .eth_client
@@ -227,8 +162,7 @@ impl<T: Transport> ETHSender<T> {
             .map(|n| n.as_u64())?)
     }
 
-    fn get_tx_status(&self, hash: &H256) -> Result<Option<(u64, u64)>, failure::Error> {
-        let block_number = self.block_number()?;
+    fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error> {
         match self
             .eth_client
             .web3
@@ -241,27 +175,28 @@ impl<T: Transport> ETHSender<T> {
                 status: Some(status),
                 ..
             }) => {
-                let confirmations = block_number.saturating_sub(tx_block_number.as_u64());
-                Ok(Some((confirmations, status.as_u64())))
+                let confirmations = self
+                    .block_number()?
+                    .saturating_sub(tx_block_number.as_u64());
+                let success = status.as_u64() == 1;
+                Ok(Some(ExecutedTxStatus {
+                    confirmations,
+                    success,
+                }))
             }
             _ => Ok(None),
         }
     }
 
-    fn save_signed_tx_to_db(
-        &self,
-        op: &Operation,
-        signed_tx: &SignedCallResult,
-        deadline_block: u64,
-    ) -> Result<(), failure::Error> {
+    fn save_signed_tx_to_db(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
-        let gas_price = BigDecimal::from_str(&signed_tx.gas_price.to_string()).unwrap();
         Ok(storage.save_operation_eth_tx(
-            op.id.unwrap(),
-            signed_tx.hash,
-            deadline_block,
-            signed_tx.nonce.as_u32(),
-            gas_price,
+            tx.op_id,
+            tx.signed_tx.hash,
+            tx.deadline_block,
+            tx.signed_tx.nonce.as_u32(),
+            BigDecimal::from_str(&tx.signed_tx.gas_price.to_string()).unwrap(),
+            tx.signed_tx.raw_tx.clone(),
         )?)
     }
 
@@ -270,157 +205,150 @@ impl<T: Transport> ETHSender<T> {
         Ok(storage.confirm_eth_tx(hash)?)
     }
 
-    fn drive_tx_to_completion(
-        &self,
-        op: &Operation,
-        tx: &SignedCallResult,
-        tx_state: &mut SignedTxState,
-    ) -> Result<(), failure::Error> {
-        match tx_state {
-            SignedTxState::Unsent => {
-                let deadline_block = self.block_number()? + EXPECTED_WAIT_TIME_BLOCKS;
-                self.save_signed_tx_to_db(op, tx, deadline_block)?;
-                *tx_state = SignedTxState::Pending { deadline_block };
-                let hash = self.eth_client.send_raw_tx(tx.raw_tx.clone())?;
-                assert_eq!(hash, tx.hash, "bug in signed tx offline hash calculation");
-            }
-            SignedTxState::Pending { .. } => {
-                let tx_info = self
-                    .eth_client
-                    .web3
-                    .eth()
-                    .transaction(TransactionId::Hash(tx.hash))
-                    .wait()?;
-                match tx_info {
-                    Some(Transaction {
-                        block_number: Some(_),
-                        ..
-                    }) => {
-                        // transaction was confirmed, get receipt
-                        if let Some((confirmations, status)) = self.get_tx_status(&tx.hash)? {
-                            *tx_state = SignedTxState::Executed {
-                                confirmations,
-                                status,
-                            };
-                        }
-                    }
-                    Some(_) => {}
-                    None => {
-                        // transaction is unknown? try resending
-                        self.eth_client
-                            .send_raw_tx(tx.raw_tx.clone())
-                            .unwrap_or_default();
-                    }
-                }
-            }
-            SignedTxState::Executed {
+    fn drive_to_completion(&self, op: &mut OperationETHState) -> Result<bool, failure::Error> {
+        let current_block = self.block_number()?;
+
+        // check status
+        let mut last_pending_tx: Option<(H256, bool)> = None;
+        let mut failed_txs: HashSet<H256> = HashSet::new();
+
+        for tx in &op.txs {
+            if let Some(ExecutedTxStatus {
                 confirmations,
-                status,
-            } => {
-                if let Some((new_confirmations, new_status)) = self.get_tx_status(&tx.hash)? {
-                    *confirmations = new_confirmations;
-                    *status = new_status;
+                success,
+            }) = self.get_tx_status(&tx.signed_tx.hash)?
+            {
+                if success {
+                    if confirmations >= WAIT_CONFIRMATIONS {
+                        info!(
+                            "Operation {}, {}  block: {}, committed, tx: {:#x}",
+                            op.operation.id.unwrap(),
+                            op.operation.action.to_string(),
+                            op.operation.block.block_number,
+                            tx.signed_tx.hash,
+                        );
+                        self.save_completed_tx_to_db(&tx.signed_tx.hash)?;
+                        return Ok(true);
+                    } else {
+                        info!("Transaction committed, waiting for confirmations: hash {:#x}, confirmations: {}", tx.signed_tx.hash, confirmations);
+                        return Ok(false);
+                    }
+                } else {
+                    // TODO check confirmations for fail
+                    warn!(
+                        "ETH transaction failed: tx: {:#x}, operation_id: {} ",
+                        tx.signed_tx.hash,
+                        op.operation.id.unwrap()
+                    );
+                    failed_txs.insert(tx.signed_tx.hash);
                 }
-                // here reorg can be handled. (receipt of tx was lost => reorg)
-
-                if *confirmations >= WAIT_CONFIRMATIONS {
-                    *tx_state = SignedTxState::Confirmed { status: *status }
-                }
+            } else {
+                let stuck = tx.is_stuck(current_block);
+                last_pending_tx = Some((tx.signed_tx.hash, stuck));
             }
-            SignedTxState::Confirmed { .. } => {}
         }
+        // forget about failed txs
+        //        op.txs.retain(|tx| !failed_txs.contains(&tx.signed_tx.hash));
+
+        // if stuck/not sent yet -> send new tx
+        let deadline_block = current_block + EXPECTED_WAIT_TIME_BLOCKS;
+        let new_tx = if let Some((pending_tx_hash, stuck)) = last_pending_tx {
+            // resend
+            if stuck {
+                warn!("Transaction stuck: {:#x}", pending_tx_hash);
+                let stuck_tx = op
+                    .txs
+                    .iter()
+                    .find(|tx| tx.signed_tx.hash == pending_tx_hash);
+                let new_tx =
+                    self.create_and_save_new_tx(&op.operation, deadline_block, stuck_tx)?;
+                Some(new_tx)
+            } else {
+                None
+            }
+        } else {
+            let new_tx = self.create_and_save_new_tx(&op.operation, deadline_block, None)?;
+            Some(new_tx)
+        };
+        if let Some(new_tx) = new_tx {
+            op.txs.push(new_tx.clone());
+            info!(
+                "Sending tx for op, op_id: {} tx_hash: {:#x}",
+                new_tx.op_id, new_tx.signed_tx.hash
+            );
+            self.send_tx(&new_tx)?;
+        }
+
+        Ok(false)
+    }
+
+    fn send_tx(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
+        let hash = self.eth_client.send_raw_tx(tx.signed_tx.raw_tx.clone())?;
+        ensure!(
+            hash == tx.signed_tx.hash,
+            "Hash from signer and Ethereum node mismatch"
+        );
         Ok(())
     }
 
-    fn drive_to_completion(
+    fn create_and_save_new_tx(
         &self,
         op: &Operation,
-        state: &mut OperationState,
-    ) -> Result<(), failure::Error> {
-        match state {
-            OperationState::Pending => {
-                let signed_tx = self.sign_op_tx(op)?;
-                *state = OperationState::InProgress {
-                    current_transaction: (signed_tx, SignedTxState::Unsent),
-                    previous_transactions: Vec::new(),
-                };
-                return self.drive_to_completion(op, state);
-            }
-            OperationState::InProgress {
-                current_transaction: (tx, tx_state),
-                previous_transactions,
-            } => {
-                let current_nonce = self.commited_nonce()?;
+        deadline_block: u64,
+        stuck_tx: Option<&TransactionETHState>,
+    ) -> Result<TransactionETHState, failure::Error> {
+        // if transaction was stuck we better to up gas price.
+        let tx_options = if let Some(stuck_tx) = stuck_tx {
+            let old_tx_gas_price =
+                U256::from_dec_str(&stuck_tx.signed_tx.gas_price.to_string()).unwrap();
+            let new_gas_price = {
+                let network_price = self.eth_client.get_gas_price()?;
+                // replacement price should be at least 10% higher, we make it 15% higher.
+                let replacement_price = (old_tx_gas_price * U256::from(115)) / U256::from(100);
+                std::cmp::max(network_price, replacement_price)
+            };
 
-                self.drive_tx_to_completion(op, tx, tx_state)?;
+            let new_nonce = self.eth_client.current_nonce().wait()?;
 
-                let current_block = self.block_number()?;
-                if tx_state.stuck(current_block) {
-                    let new_tx = self.resign_op_tx(op, tx)?;
-                    previous_transactions.push(tx.hash);
-                    *tx = new_tx;
-                    *tx_state = SignedTxState::Unsent;
-                    self.drive_tx_to_completion(op, tx, tx_state)?;
-                }
+            info!(
+                "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, old_nonce: {}, new_nonce: {}",
+                stuck_tx.signed_tx.hash,
+                old_tx_gas_price,
+                new_gas_price,
+                stuck_tx.signed_tx.nonce,
+                new_nonce
+            );
 
-                if let Some(status) = tx_state.confirmed_status() {
-                    let success = status == 1;
-                    if success {
-                        self.save_completed_tx_to_db(&tx.hash)?;
-                    }
-                    *state = OperationState::Commited {
-                        success,
-                        hash: tx.hash,
-                    };
-                } else if current_nonce > tx.nonce.as_u64() {
-                    // some older tx was commited.
-                    let new_state = previous_transactions.iter().find_map(|old_tx| {
-                        if let Ok(Some((confirmations, status))) = self.get_tx_status(old_tx) {
-                            if confirmations >= WAIT_CONFIRMATIONS {
-                                let success = status == 1;
-                                if success {
-                                    self.save_completed_tx_to_db(&old_tx).ok()?;
-                                }
-                                return Some(OperationState::Commited {
-                                    success,
-                                    hash: *old_tx,
-                                });
-                            }
-                        }
-                        None
-                    });
-                    if let Some(new_state) = new_state {
-                        *state = new_state;
-                    }
-                }
-            }
-            _ => {}
-        }
-        Ok(())
-    }
-
-    fn sign_op_tx(&self, op: &Operation) -> Result<SignedCallResult, failure::Error> {
-        self.sign_operation_tx(op, Options::default())
-    }
-
-    fn resign_op_tx(
-        &self,
-        op: &Operation,
-        old_tx: &SignedCallResult,
-    ) -> Result<SignedCallResult, failure::Error> {
-        let new_gas_price = {
-            let network_price = self.eth_client.get_gas_price()?;
-            // replacement price should be at least 10% higher, we make it 15% higher.
-            let replacement_price = (old_tx.gas_price * U256::from(15)) / U256::from(100);
-            std::cmp::max(network_price, replacement_price)
+            Options::with(move |opt| {
+                opt.gas_price = Some(new_gas_price);
+                opt.nonce = Some(new_nonce);
+            })
+        } else {
+            Options::default()
         };
 
-        let tx_options = Options::with(move |opt| {
-            opt.gas_price = Some(new_gas_price);
-            opt.nonce = Some(old_tx.nonce);
-        });
+        //        // FAIL TEST
+        //        let rnd: u64 = rand::thread_rng().gen_range(0,10);
+        //        if rnd < 3 {
+        //            error!("Messing with nonce");
+        //            let mut committed_nonce = self.eth_client.current_nonce().wait()?;
+        //            committed_nonce += (rnd + 1).into();
+        //            tx_options.nonce = Some(committed_nonce);
+        //        }
+        //        // TEST
 
-        self.sign_operation_tx(op, tx_options)
+        let signed_tx = self.sign_operation_tx(op, tx_options)?;
+        let new_transaction = TransactionETHState {
+            op_id: op.id.unwrap(),
+            deadline_block,
+            signed_tx,
+        };
+        self.save_signed_tx_to_db(&new_transaction)?;
+        trace!(
+            "Signed new ETH: tx_hash {:#?}",
+            new_transaction.signed_tx.hash
+        );
+        Ok(new_transaction)
     }
 
     fn sign_operation_tx(
@@ -436,12 +364,24 @@ impl<T: Transport> ETHSender<T> {
                     .into_repr()
                     .write_be(be_bytes.as_mut())
                     .expect("Write commit bytes");
+
+                //                let mut block_number = op.block.block_number;
+                //                // FAIL TEST
+                //                let rnd = rand::thread_rng().gen_range(0,10);
+                //                if rnd < 5 {
+                //                    error!("Messing with tx pubdata");
+                //                    block_number += rnd + 1;
+                //                }
+                //                // FAIL TEST
                 let root = H256::from(be_bytes);
+
+                let public_data = op.block.get_eth_public_data();
                 debug!(
-                    "public_data for block_number {}: {:x?}",
+                    "public_data for block_number {}: {}",
                     op.block.block_number,
-                    op.block.get_eth_public_data()
+                    hex::encode(&public_data)
                 );
+
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
                 self.eth_client.sign_call_tx(
                     "commitBlock",
@@ -449,7 +389,7 @@ impl<T: Transport> ETHSender<T> {
                         u64::from(op.block.block_number),
                         u64::from(op.block.fee_account),
                         root,
-                        op.block.get_eth_public_data(),
+                        public_data,
                     ),
                     tx_options,
                 )
@@ -469,6 +409,7 @@ impl<T: Transport> ETHSender<T> {
 pub fn start_eth_sender(
     pool: ConnectionPool,
     panic_notify: Sender<bool>,
+    op_notify_sender: fmpsc::Sender<Operation>,
     config_options: ConfigurationOptions,
 ) -> Sender<Operation> {
     let (tx_for_eth, rx_for_eth) = channel::<Operation>();
@@ -496,7 +437,7 @@ pub fn start_eth_sender(
             );
 
             let mut eth_sender = ETHSender::new(pool, eth_client);
-            eth_sender.run(rx_for_eth);
+            eth_sender.run(rx_for_eth, op_notify_sender);
         })
         .expect("Eth sender thread");
 

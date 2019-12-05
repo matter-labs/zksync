@@ -1,6 +1,6 @@
 use super::tx::{PackedPublicKey, PackedSignature, TxSignature};
-use super::Nonce;
 use super::{AccountAddress, TokenId};
+use super::{AccountId, Nonce};
 use crate::params::FR_ADDRESS_LEN;
 use crate::primitives::{
     bytes32_from_slice, bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
@@ -55,6 +55,7 @@ impl Deposit {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExit {
+    pub account_id: AccountId,
     pub packed_pubkey: Box<[u8; PUBKEY_PACKED_BYTES_LENGTH]>,
     pub eth_address: Address,
     pub token: TokenId,
@@ -66,6 +67,9 @@ pub struct FullExit {
 impl FullExit {
     const TX_TYPE: u8 = 6;
 
+    // TODO:
+    // vd: Why it is here? It should be in `impl FullExitOp` with pub data serialization.
+    // issue: #157
     pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
         if bytes.len() != FullExitOp::OP_LENGTH {
             return None;
@@ -77,6 +81,7 @@ impl FullExit {
         let signature_r_pre_length = nonce_pre_length + NONCE_BYTES_LENGTH;
         let signature_s_pre_length = signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH;
         Some(Self {
+            account_id: bytes_slice_to_uint32(&bytes[0..ACCOUNT_ID_BYTES_LENGTH])?,
             packed_pubkey: Box::from(bytes32_from_slice(
                 &bytes[packed_pubkey_pre_length
                     ..packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LENGTH],
@@ -102,6 +107,7 @@ impl FullExit {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         out.extend_from_slice(self.packed_pubkey.as_ref());
         out.extend_from_slice(&self.eth_address.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
@@ -127,7 +133,10 @@ impl FullExit {
                 return None;
             };
 
-        let restored_signature = TxSignature { pub_key, sign };
+        let restored_signature = TxSignature {
+            pub_key,
+            signature: sign,
+        };
 
         restored_signature
             .verify_musig_pedersen(&self.get_bytes())
@@ -143,21 +152,33 @@ pub enum FranklinPriorityOp {
 }
 
 impl FranklinPriorityOp {
-    pub fn parse_pubdata(pub_data: &[u8], op_type_id: u8) -> Result<Self, failure::Error> {
+    pub fn parse_from_priority_queue_logs(
+        pub_data: &[u8],
+        op_type_id: u8,
+    ) -> Result<Self, failure::Error> {
         match op_type_id {
             DepositOp::OP_CODE => {
-                ensure!(
-                    pub_data.len() == 20 + 2 + 16 + FR_ADDRESS_LEN,
-                    "Pub data len mismatch"
-                );
-                let sender = Address::from_slice(&pub_data[0..20]);
-                let token = u16::from_be_bytes(pub_data[20..(20 + 2)].try_into().unwrap());
-                let amount = {
-                    let amount = u128::from_be_bytes(pub_data[22..(22 + 16)].try_into().unwrap());
-                    amount.to_string().parse().unwrap()
+                let (sender, pub_data_left) = {
+                    let (sender, left) = pub_data.split_at(ETH_ADDR_BYTES_LENGTH);
+                    (Address::from_slice(sender), left)
                 };
-                let account =
-                    AccountAddress::from_bytes(&pub_data[38..(38 + FR_ADDRESS_LEN)]).unwrap();
+                let (token, pub_data_left) = {
+                    let (token, left) = pub_data_left.split_at(TOKEN_BYTES_LENGTH);
+                    (u16::from_be_bytes(token.try_into().unwrap()), left)
+                };
+                let (amount, pub_data_left) = {
+                    let (amount, left) = pub_data_left.split_at(FULL_AMOUNT_BYTES_LENGTH);
+                    let amount = u128::from_be_bytes(amount.try_into().unwrap());
+                    (u128_to_bigdecimal(amount), left)
+                };
+                let (account, pub_data_left) = {
+                    let (account, left) = pub_data_left.split_at(FR_ADDRESS_LEN);
+                    (AccountAddress::from_bytes(account)?, left)
+                };
+                ensure!(
+                    pub_data_left.is_empty(),
+                    "DepositOp parse failed: input too big"
+                );
                 Ok(Self::Deposit(Deposit {
                     sender,
                     token,
@@ -166,17 +187,40 @@ impl FranklinPriorityOp {
                 }))
             }
             FullExitOp::OP_CODE => {
+                let (account_id, pub_data_left) = {
+                    let (account_id, left) = pub_data.split_at(ACCOUNT_ID_BYTES_LENGTH);
+                    (bytes_slice_to_uint32(account_id).unwrap(), left)
+                };
+                let (packed_pubkey, pub_data_left) = {
+                    let (packed_pubkey, left) = pub_data_left.split_at(PUBKEY_PACKED_BYTES_LENGTH);
+                    (Box::new(packed_pubkey.try_into().unwrap()), left)
+                };
+                let (eth_address, pub_data_left) = {
+                    let (eth_address, left) = pub_data_left.split_at(ETH_ADDR_BYTES_LENGTH);
+                    (Address::from_slice(eth_address), left)
+                };
+                let (token, pub_data_left) = {
+                    let (token, left) = pub_data_left.split_at(TOKEN_BYTES_LENGTH);
+                    (u16::from_be_bytes(token.try_into().unwrap()), left)
+                };
+                let (nonce, pub_data_left) = {
+                    let (nonce, left) = pub_data_left.split_at(NONCE_BYTES_LENGTH);
+                    (u32::from_be_bytes(nonce.try_into().unwrap()), left)
+                };
+                let (signature_r, pub_data_left) = {
+                    let (signature_r, left) = pub_data_left.split_at(SIGNATURE_R_BYTES_LENGTH);
+                    (Box::new(signature_r.try_into().unwrap()), left)
+                };
+                let (signature_s, pub_data_left) = {
+                    let (signature_s, left) = pub_data_left.split_at(SIGNATURE_S_BYTES_LENGTH);
+                    (Box::new(signature_s.try_into().unwrap()), left)
+                };
                 ensure!(
-                    pub_data.len() == 32 + 20 + 2 + 64 + 4,
-                    "Pub data len mismatch"
+                    pub_data_left.is_empty(),
+                    "FullExitOp parse failed: input too big"
                 );
-                let packed_pubkey = Box::new(pub_data[0..32].try_into().unwrap());
-                let eth_address = Address::from_slice(&pub_data[32..(32 + 20)]);
-                let token = u16::from_be_bytes(pub_data[52..(52 + 2)].try_into().unwrap());
-                let nonce = u32::from_be_bytes(pub_data[54..(54 + 4)].try_into().unwrap());
-                let signature_r = Box::new(pub_data[58..(58 + 32)].try_into().unwrap());
-                let signature_s = Box::new(pub_data[90..(90 + 32)].try_into().unwrap());
                 Ok(Self::FullExit(FullExit {
+                    account_id,
                     packed_pubkey,
                     eth_address,
                     token,
@@ -239,7 +283,7 @@ impl TryFrom<Log> for PriorityOp {
                     .map(|ui| U256::as_u32(ui) as u8)
                     .unwrap();
                 let op_pubdata = dec_ev.remove(0).to_bytes().unwrap();
-                FranklinPriorityOp::parse_pubdata(&op_pubdata, op_type)
+                FranklinPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type)
                     .expect("Failed to parse priority op data")
             },
             deadline_block: dec_ev

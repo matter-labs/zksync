@@ -5,8 +5,9 @@ CREATE TABLE eth_operations
     nonce          bigint  not null,
     deadline_block bigint  not null,
     gas_price      numeric not null,
-    tx_hash        text    not null,
-    confirmed      bool    not null default false
+    tx_hash        bytea   not null,
+    confirmed      bool    not null default false,
+    raw_tx         bytea   not null
 );
 
 ALTER TABLE operations

@@ -61,7 +61,7 @@ impl RawTransaction {
         // tx.append(&sig.r);
         // tx.append(&sig.s);
 
-        tx.complete_unbounded_list();
+        tx.finalize_unbounded_list();
         tx.out()
     }
 
@@ -72,7 +72,7 @@ impl RawTransaction {
         hash.append(&vec![self.chain_id]);
         hash.append(&U256::zero());
         hash.append(&U256::zero());
-        hash.complete_unbounded_list();
+        hash.finalize_unbounded_list();
         keccak256_hash(&hash.out())
     }
 

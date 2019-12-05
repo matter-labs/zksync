@@ -28,7 +28,55 @@ use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
 use franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::convert::TryInto;
 use web3::types::Address;
+
+#[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
+pub struct TxHash {
+    data: [u8; 32],
+}
+
+impl AsRef<[u8]> for TxHash {
+    fn as_ref(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+impl TxHash {
+    pub fn to_hex(&self) -> String {
+        format!("0x{}", hex::encode(&self.data))
+    }
+
+    pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
+        ensure!(s.starts_with("0x"), "TxHash should start with 0x");
+        let bytes = hex::decode(&s[2..])?;
+        ensure!(bytes.len() == 32, "Size mismatch");
+        Ok(TxHash {
+            data: bytes.as_slice().try_into().unwrap(),
+        })
+    }
+}
+
+impl Serialize for TxHash {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&self.to_hex())
+    }
+}
+
+impl<'de> Deserialize<'de> for TxHash {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        String::deserialize(deserializer).and_then(|string| {
+            Self::from_hex(&string).map_err(|err| Error::custom(err.to_string()))
+        })
+    }
+}
 
 /// Signed by user.
 
@@ -40,6 +88,7 @@ pub enum TxType {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Transfer {
     pub from: AccountAddress,
     pub to: AccountAddress,
@@ -128,12 +177,11 @@ impl Transfer {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Withdraw {
-    // TODO: derrive account address from signature
     pub account: AccountAddress,
     pub eth_address: Address,
     pub token: TokenId,
-    /// None -> withdraw all
     pub amount: BigDecimal,
     pub fee: BigDecimal,
     pub nonce: Nonce,
@@ -195,6 +243,7 @@ impl Withdraw {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Close {
     pub account: AccountAddress,
     pub nonce: Nonce,
@@ -241,7 +290,7 @@ pub enum FranklinTx {
 }
 
 impl FranklinTx {
-    pub fn hash(&self) -> Vec<u8> {
+    pub fn hash(&self) -> TxHash {
         let bytes = match self {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
@@ -250,9 +299,9 @@ impl FranklinTx {
 
         let mut hasher = Sha256::new();
         hasher.input(&bytes);
-        let mut out = vec![0u8; 32];
+        let mut out = [0u8; 32];
         hasher.result(&mut out);
-        out
+        TxHash { data: out }
     }
 
     pub fn account(&self) -> AccountAddress {
@@ -297,16 +346,17 @@ impl FranklinTx {
 }
 
 #[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TxSignature {
     pub pub_key: PackedPublicKey,
-    pub sign: PackedSignature,
+    pub signature: PackedSignature,
 }
 
 impl TxSignature {
     pub fn default() -> Self {
         Self {
             pub_key: PackedPublicKey::deserialize_packed(&[0; 32]).unwrap(),
-            sign: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
+            signature: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
         }
     }
 
@@ -314,7 +364,7 @@ impl TxSignature {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_pedersen(
             &hashed_msg,
-            &self.sign.0,
+            &self.signature.0,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );
@@ -329,7 +379,7 @@ impl TxSignature {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_sha256(
             &hashed_msg,
-            &self.sign.0,
+            &self.signature.0,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );
@@ -355,7 +405,7 @@ impl TxSignature {
                 FixedGenerators::SpendingKeyGenerator,
                 &JUBJUB_PARAMS,
             )),
-            sign: PackedSignature(signature),
+            signature: PackedSignature(signature),
         }
     }
 
@@ -374,7 +424,7 @@ impl TxSignature {
                 FixedGenerators::SpendingKeyGenerator,
                 &JUBJUB_PARAMS,
             )),
-            sign: PackedSignature(signature),
+            signature: PackedSignature(signature),
         }
     }
 }
@@ -382,7 +432,7 @@ impl TxSignature {
 impl std::fmt::Debug for TxSignature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         let hex_pk = hex::encode(&self.pub_key.serialize_packed().unwrap());
-        let hex_sign = hex::encode(&self.sign.serialize_packed().unwrap());
+        let hex_sign = hex::encode(&self.signature.serialize_packed().unwrap());
         write!(f, "{{ pub_key: {}, sign: {} }}", hex_pk, hex_sign)
     }
 }

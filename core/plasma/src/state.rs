@@ -1,5 +1,6 @@
 use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
+use log::trace;
 use models::node::operations::{
     CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
@@ -126,19 +127,39 @@ impl PlasmaState {
     }
 
     fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
-        let account_data = {
-            if priority_op.token < (params::TOTAL_TOKENS as TokenId) {
-                priority_op
-                    .verify_signature()
-                    .and_then(|addr| self.get_account_by_address(&addr))
-                    .map(|(acc_id, account)| (acc_id, account.get_balance(priority_op.token)))
-            } else {
-                None
-            }
-        };
+        assert!(
+            priority_op.token < params::TOTAL_TOKENS as TokenId,
+            "Full exit token is out of range, this should be enforced by contract"
+        );
+        trace!("Processing {:?}", priority_op);
+        let account_balance = priority_op
+            // Check that operation was signed
+            .verify_signature()
+            .and_then(|signed_by| {
+                trace!("Signature correct, by: {}", signed_by.to_hex());
+                // Check if account exists and withdraw was authorized by this account
+                self.get_account(priority_op.account_id).filter(|tree_acc| {
+                    let withdraw_authorized = tree_acc.address == signed_by;
+                    let nonce_correct = tree_acc.nonce == priority_op.nonce;
+                    trace!(
+                        "authorized: {}, nonce ok: {}",
+                        withdraw_authorized,
+                        nonce_correct
+                    );
+                    withdraw_authorized && nonce_correct
+                })
+            })
+            .map(|account| account.get_balance(priority_op.token))
+            .filter(|balance| balance != &BigDecimal::from(0));
+        assert_ne!(
+            account_balance,
+            Some(BigDecimal::from(0)),
+            "FullExit with zero balance should be failed"
+        );
+        trace!("Balance: {:?}", account_balance);
         let op = FullExitOp {
             priority_op,
-            account_with_id: account_data,
+            withdraw_amount: account_balance,
         };
 
         OpSuccess {
@@ -150,26 +171,32 @@ impl PlasmaState {
 
     fn apply_full_exit_op(&mut self, op: &FullExitOp) -> AccountUpdates {
         let mut updates = Vec::new();
-        let (account_id, amount) = if let Some((account_id, amount)) = &op.account_with_id {
-            (*account_id, amount.clone())
-        } else {
-            return updates;
-        };
-        let mut account = if let Some(account) = self.get_account(account_id) {
-            account
+        let amount = if let Some(amount) = &op.withdraw_amount {
+            amount.clone()
         } else {
             return updates;
         };
 
+        let account_id = op.priority_op.account_id;
+
+        // expect is ok since account since existence was verified before
+        let mut account = self
+            .get_account(account_id)
+            .expect("Full exit account not found");
+
         let old_balance = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;
-        if old_nonce != op.priority_op.nonce {
-            return updates;
-        }
+
+        // Nonce should be verified before.
+        assert_eq!(old_nonce, op.priority_op.nonce, "Full exit nonce mismatch");
         account.sub_balance(op.priority_op.token, &amount);
         account.nonce += 1;
         let new_balance = account.get_balance(op.priority_op.token);
-        assert_eq!(new_balance, BigDecimal::from(0));
+        assert_eq!(
+            new_balance,
+            BigDecimal::from(0),
+            "Full exit amount is incorrect"
+        );
         let new_nonce = account.nonce;
 
         self.insert_account(account_id, account);

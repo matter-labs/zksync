@@ -3,6 +3,6 @@ CREATE TABLE server_config(
     id              bool PRIMARY KEY NOT NULL DEFAULT true,
     CONSTRAINT      single_server_config CHECK (id),
 
-    contract_addr   text
-
+    contract_addr   text,
+    gov_contract_addr text
 );

@@ -1,4 +1,4 @@
-import { Contract, utils } from 'ethers';
+import {Contract, utils} from 'ethers';
 import { FranklinProvider, Wallet, Address } from 'franklin_lib';
 import { readableEther, sleep, isReadablyPrintable } from './utils';
 import timeConstants from './timeConstants';
@@ -452,7 +452,7 @@ export class WalletDecorator {
                 let allowance = await erc20DeployedToken.allowance(this.ethAddress, config.CONTRACT_ADDR);
                 if (allowance.toString().length != NUMERIC_LIMITS_UINT_256.length) {
                     let nonce = await this.wallet.ethWallet.getTransactionCount();
-                    this.wallet.approveERC20(token, NUMERIC_LIMITS_UINT_256, { nonce });
+                    await this.wallet.approveERC20(token, NUMERIC_LIMITS_UINT_256, { nonce });
                     eth_tx = await this.wallet.depositApprovedERC20(token, amount, { nonce: nonce + 1});
                 } else {
                     eth_tx = await this.wallet.depositApprovedERC20(token, amount);
@@ -519,7 +519,7 @@ export class WalletDecorator {
     }
 
     async * verboseGetPriorityOpStatus(tx_hash) {
-        let priorityQueueInterface = new Interface(priority_queue_abi.interface);
+        let priorityQueueInterface = new utils.Interface(priority_queue_abi.interface);
         let receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
         let pq_id = receipt.logs
             .map(l => priorityQueueInterface.parseLog(l)) // the only way to get it to work

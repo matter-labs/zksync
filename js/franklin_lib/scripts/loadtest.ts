@@ -17,10 +17,10 @@ async function main() {
     await wallet.updateState();
     // let full_exit_tx = await wallet.emergencyWithdraw({id: 0, address: ethers.constants.AddressZero});
     // console.log(full_exit_tx);
-    let dep_tx = await wallet.deposit(wallet.supportedTokens['0'], ethers.utils.parseEther("0.5"));
+    let dep_tx = await wallet.deposit(wallet.supportedTokens[1], ethers.utils.parseEther("0.5"));
     console.log(dep_tx);
-    dep_tx = await wallet.deposit(wallet.supportedTokens['0'], ethers.utils.parseEther("0.7"));
-    console.log(dep_tx);
+    // dep_tx = await wallet.deposit(wallet.supportedTokens['0'], ethers.utils.parseEther("0.7"));
+    // console.log(dep_tx);
 
     // await wallet.updateState();
     // console.log(wallet.supportedTokens);
@@ -33,8 +33,8 @@ async function main() {
     await wallet2.updateState();
 
 
-    //console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['1'], 5, 1));
-    // await wallet.waitPendingTxsExecuted();
+    console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['1'], 5, 1));
+    await wallet.waitPendingTxsExecuted();
     // console.log(await wallet.transfer(wallet2.address, wallet.supportedTokens['1'], 15,3));
     // await wallet.waitPendingTxsExecuted();
 

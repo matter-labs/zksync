@@ -16,7 +16,7 @@ pub const TOKEN_BYTES_LENGTH: usize = 2;
 pub const FULL_AMOUNT_BYTES_LENGTH: usize = 16;
 pub const FEE_BYTES_LENGTH: usize = 2;
 pub const ETH_ADDR_BYTES_LENGTH: usize = 20;
-pub const PACKED_AMOUNT_BYTES_LENGTH: usize = 3;
+pub const PACKED_AMOUNT_BYTES_LENGTH: usize = 5;
 pub const NONCE_BYTES_LENGTH: usize = 4;
 pub const SIGNATURE_R_BYTES_LENGTH: usize = 32;
 pub const SIGNATURE_S_BYTES_LENGTH: usize = 32;
@@ -90,7 +90,7 @@ pub struct TransferToNewOp {
 impl TransferToNewOp {
     pub const CHUNKS: usize = 5;
     pub const OP_CODE: u8 = 0x02;
-    pub const OP_LENGTH: usize = 33;
+    pub const OP_LENGTH: usize = 35;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -136,7 +136,7 @@ pub struct TransferOp {
 impl TransferOp {
     pub const CHUNKS: usize = 2;
     pub const OP_CODE: u8 = 0x05;
-    pub const OP_LENGTH: usize = 13;
+    pub const OP_LENGTH: usize = 15;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -241,7 +241,8 @@ impl CloseOp {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExitOp {
     pub priority_op: FullExit,
-    pub account_with_id: Option<(AccountId, BigDecimal)>,
+    /// None if withdraw was unsuccessful
+    pub withdraw_amount: Option<BigDecimal>,
 }
 
 impl FullExitOp {
@@ -252,15 +253,16 @@ impl FullExitOp {
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
-        let (account_id, amount) = self.account_with_id.clone().unwrap_or_default();
-        data.extend_from_slice(&account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.priority_op.account_id.to_be_bytes()[1..]);
         data.extend_from_slice(&*self.priority_op.packed_pubkey);
         data.extend_from_slice(self.priority_op.eth_address.as_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(&self.priority_op.nonce.to_be_bytes());
         data.extend_from_slice(&*self.priority_op.signature_r);
         data.extend_from_slice(&*self.priority_op.signature_s);
-        data.extend_from_slice(&big_decimal_to_u128(&amount).to_be_bytes());
+        data.extend_from_slice(
+            &big_decimal_to_u128(&self.withdraw_amount.clone().unwrap_or_default()).to_be_bytes(),
+        );
         data.resize(Self::CHUNKS * 8, 0x00);
         data
     }
@@ -269,7 +271,7 @@ impl FullExitOp {
         if bytes.len() != Self::OP_LENGTH {
             return None;
         }
-        let acc_id_pre_length = 0;
+
         let to_pre_length = ACCOUNT_ID_BYTES_LENGTH
             + PUBKEY_PACKED_BYTES_LENGTH
             + ETH_ADDR_BYTES_LENGTH
@@ -278,16 +280,20 @@ impl FullExitOp {
             + SIGNATURE_R_BYTES_LENGTH
             + SIGNATURE_S_BYTES_LENGTH;
 
-        let acc_id = bytes_slice_to_uint32(
-            &bytes[acc_id_pre_length..acc_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
-        )?;
         let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
             &bytes[to_pre_length..to_pre_length + FULL_AMOUNT_BYTES_LENGTH],
         )?);
 
+        // If full exit amount is 0 - full exit is considered failed
+        let withdraw_amount = if amount == BigDecimal::from(0) {
+            Some(amount)
+        } else {
+            None
+        };
+
         Some(Self {
             priority_op: FullExit::from_bytes(bytes)?,
-            account_with_id: Some((acc_id, amount)),
+            withdraw_amount,
         })
     }
 }

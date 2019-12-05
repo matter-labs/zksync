@@ -326,7 +326,7 @@ impl BabyProver {
                             signature_data,
                             signer_packed_key_bits,
                         ) = prepare_sig_data(
-                            &transfer.tx.signature.sign.serialize_packed().unwrap(),
+                            &transfer.tx.signature.signature.serialize_packed().unwrap(),
                             &transfer.tx.get_bytes(),
                             &transfer.tx.signature.pub_key,
                         );
@@ -355,7 +355,7 @@ impl BabyProver {
                             &transfer_to_new
                                 .tx
                                 .signature
-                                .sign
+                                .signature
                                 .serialize_packed()
                                 .unwrap(),
                             &transfer_to_new.tx.get_bytes(),
@@ -385,7 +385,7 @@ impl BabyProver {
                             signature_data,
                             signer_packed_key_bits,
                         ) = prepare_sig_data(
-                            &withdraw.tx.signature.sign.serialize_packed().unwrap(),
+                            &withdraw.tx.signature.signature.serialize_packed().unwrap(),
                             &withdraw.tx.get_bytes(),
                             &withdraw.tx.signature.pub_key,
                         );
@@ -412,7 +412,7 @@ impl BabyProver {
                             signature_data,
                             signer_packed_key_bits,
                         ) = prepare_sig_data(
-                            &close.tx.signature.sign.serialize_packed().unwrap(),
+                            &close.tx.signature.signature.serialize_packed().unwrap(),
                             &close.tx.get_bytes(),
                             &close.tx.signature.pub_key,
                         );
@@ -430,9 +430,12 @@ impl BabyProver {
                         pub_data.extend(close_account_witness.get_pubdata());
                     }
                     FranklinOp::FullExit(full_exit) => {
-                        let is_sig_correct = full_exit.account_with_id.is_some();
-                        let full_exit_witness =
-                            apply_full_exit_tx(&mut self.accounts_tree, &full_exit, is_sig_correct);
+                        let is_full_exit_success = full_exit.withdraw_amount.is_some();
+                        let full_exit_witness = apply_full_exit_tx(
+                            &mut self.accounts_tree,
+                            &full_exit,
+                            is_full_exit_success,
+                        );
 
                         let r_bits: Vec<_> =
                             bytes_into_be_bits(full_exit.priority_op.signature_r.as_ref())

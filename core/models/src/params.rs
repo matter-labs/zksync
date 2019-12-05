@@ -63,11 +63,11 @@ pub const BLOCK_NUMBER_BIT_WIDTH: usize = 32;
 
 /// Amount bit widths
 pub const AMOUNT_EXPONENT_BIT_WIDTH: usize = 5;
-pub const AMOUNT_MANTISSA_BIT_WIDTH: usize = 19;
+pub const AMOUNT_MANTISSA_BIT_WIDTH: usize = 35;
 
 /// Fee bit widths
-pub const FEE_EXPONENT_BIT_WIDTH: usize = 6;
-pub const FEE_MANTISSA_BIT_WIDTH: usize = 10;
+pub const FEE_EXPONENT_BIT_WIDTH: usize = 5;
+pub const FEE_MANTISSA_BIT_WIDTH: usize = 11;
 
 // Signature data
 pub const SIGNATURE_S_BIT_WIDTH: usize = 254;

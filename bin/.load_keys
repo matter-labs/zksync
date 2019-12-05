@@ -9,6 +9,7 @@ for i in $KEY_FILES; do
     if ! [ -f $DIR/$i ]; then
         echo "Downloading file $SPACE_URL/$i"
         axel -o $DIR/$i -a $SPACE_URL/$i 2>&1
+        echo axel -o $DIR/$i -a $SPACE_URL/$i 2>&1
         #curl -o $KEY_DIR/$i $SPACE_URL/$i 2>&1
     fi
 done

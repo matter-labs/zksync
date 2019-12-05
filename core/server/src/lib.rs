@@ -27,7 +27,9 @@ impl Drop for ThreadPanicNotify {
 
 #[derive(Clone)]
 pub struct ConfigurationOptions {
-    pub api_server_address: SocketAddr,
+    pub rest_api_server_address: SocketAddr,
+    pub json_rpc_http_server_address: SocketAddr,
+    pub json_rpc_ws_server_address: SocketAddr,
     pub contract_eth_addr: H160,
     pub web3_url: String,
     pub governance_eth_addr: H160,
@@ -46,9 +48,15 @@ impl ConfigurationOptions {
             |name| env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e));
 
         ConfigurationOptions {
-            api_server_address: get_env("BIND_TO")
+            rest_api_server_address: get_env("REST_API_BIND")
                 .parse()
-                .expect("Failed to BIND_TO bind address"),
+                .expect("Failed to parse REST_API_BIND bind address"),
+            json_rpc_http_server_address: get_env("HTTP_RPC_API_BIND")
+                .parse()
+                .expect("Failed to parse HTTP_RPC_API_BIND bind address"),
+            json_rpc_ws_server_address: get_env("WS_API_BIND")
+                .parse()
+                .expect("Failed to parse WS_API_BIND bind address"),
             contract_eth_addr: get_env("CONTRACT_ADDR")[2..]
                 .parse()
                 .expect("Failed to parse CONTRACT_ADDR as ETH contract address"),

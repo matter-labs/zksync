@@ -71,8 +71,9 @@ table! {
         nonce -> Int8,
         deadline_block -> Int8,
         gas_price -> Numeric,
-        tx_hash -> Text,
+        tx_hash -> Bytea,
         confirmed -> Bool,
+        raw_tx -> Bytea,
     }
 }
 
@@ -168,6 +169,7 @@ table! {
     server_config (id) {
         id -> Bool,
         contract_addr -> Nullable<Text>,
+        gov_contract_addr -> Nullable<Text>,
     }
 }
 

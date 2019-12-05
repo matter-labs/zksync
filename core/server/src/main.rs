@@ -7,6 +7,7 @@ use std::thread;
 use std::time::Duration;
 // External uses
 use clap::{App, Arg};
+use futures::sync::mpsc as fmpsc;
 // Workspace uses
 use models::StateKeeperRequest;
 use server::api_server::start_api_server;
@@ -77,13 +78,6 @@ fn main() {
 
     info!("starting actors");
 
-    let (tx_for_state, rx_for_state) = channel();
-    start_api_server(
-        tx_for_state.clone(),
-        connection_pool.clone(),
-        stop_signal_sender.clone(),
-        config_opts.clone(),
-    );
     let shared_eth_state = start_eth_watch(
         connection_pool.clone(),
         stop_signal_sender.clone(),
@@ -94,24 +88,33 @@ fn main() {
         connection_pool.clone(),
         shared_eth_state,
         config_opts.operator_franklin_addr.clone(),
-        config_opts.tx_batch_size,
     );
+    let (tx_for_state, rx_for_state) = channel();
     start_state_keeper(
         state_keeper,
         rx_for_state,
         tx_for_ops.clone(),
         stop_signal_sender.clone(),
     );
+    let (op_notify_sender, op_notify_receiver) = fmpsc::channel(256);
     let tx_for_eth = eth_sender::start_eth_sender(
         connection_pool.clone(),
         stop_signal_sender.clone(),
+        op_notify_sender.clone(),
         config_opts.clone(),
     );
     start_committer(
         rx_for_ops,
         tx_for_eth,
+        op_notify_sender,
         connection_pool.clone(),
         stop_signal_sender.clone(),
+    );
+    start_api_server(
+        op_notify_receiver,
+        connection_pool.clone(),
+        stop_signal_sender.clone(),
+        config_opts.clone(),
     );
 
     // Simple timer, pings every 100 ms

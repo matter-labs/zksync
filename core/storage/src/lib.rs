@@ -43,6 +43,7 @@ use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
 
 use itertools::Itertools;
 use models::node::AccountAddress;
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
@@ -94,7 +95,9 @@ struct StorageBalance {
     pub balance: BigDecimal,
 }
 
-#[derive(Insertable, QueryableByName, Queryable, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Insertable, QueryableByName, Queryable, Serialize, Deserialize, AsChangeset,
+)]
 #[table_name = "tokens"]
 pub struct Token {
     pub id: i32,
@@ -152,7 +155,7 @@ impl NewExecutedTransaction {
     fn prepare_stored_tx(exec_tx: &ExecutedTx, block: BlockNumber) -> Self {
         Self {
             block_number: i64::from(block),
-            tx_hash: exec_tx.tx.hash(),
+            tx_hash: exec_tx.tx.hash().as_ref().to_vec(),
             operation: exec_tx.op.clone().map(|o| serde_json::to_value(o).unwrap()),
             success: exec_tx.success,
             fail_reason: exec_tx.fail_reason.clone(),
@@ -230,15 +233,15 @@ impl NewExecutedPriorityOperation {
 
 #[derive(Debug, Queryable, QueryableByName)]
 #[table_name = "executed_priority_operations"]
-struct StoredExecutedPriorityOperation {
-    id: i32,
-    block_number: i64,
-    block_index: i32,
-    operation: Value,
-    priority_op_serialid: i64,
-    deadline_block: i64,
-    eth_fee: BigDecimal,
-    eth_hash: Vec<u8>,
+pub struct StoredExecutedPriorityOperation {
+    pub id: i32,
+    pub block_number: i64,
+    pub block_index: i32,
+    pub operation: Value,
+    pub priority_op_serialid: i64,
+    pub deadline_block: i64,
+    pub eth_fee: BigDecimal,
+    pub eth_hash: Vec<u8>,
 }
 
 impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
@@ -261,14 +264,14 @@ impl Into<ExecutedPriorityOp> for StoredExecutedPriorityOperation {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxReceiptResponse {
-    tx_hash: Vec<u8>,
-    block_number: i64,
-    success: bool,
-    verified: bool,
-    fail_reason: Option<String>,
-    prover_run: Option<ProverRun>,
+    pub tx_hash: String,
+    pub block_number: i64,
+    pub success: bool,
+    pub verified: bool,
+    pub fail_reason: Option<String>,
+    pub prover_run: Option<ProverRun>,
 }
 
 // TODO: jazzandrock add more info(?)
@@ -418,8 +421,9 @@ pub struct StorageETHOperation {
     pub nonce: i64,
     pub deadline_block: i64,
     pub gas_price: BigDecimal,
-    pub tx_hash: String,
+    pub tx_hash: Vec<u8>,
     pub confirmed: bool,
+    pub raw_tx: Vec<u8>,
 }
 
 #[derive(Debug, Insertable)]
@@ -429,7 +433,8 @@ struct NewETHOperation {
     nonce: i64,
     deadline_block: i64,
     gas_price: BigDecimal,
-    tx_hash: String,
+    tx_hash: Vec<u8>,
+    raw_tx: Vec<u8>,
 }
 
 #[derive(Debug, Insertable, Queryable)]
@@ -486,7 +491,7 @@ pub struct StoredProof {
 }
 
 // Every time before a prover worker starts generating the proof, a prover run is recorded for monitoring purposes
-#[derive(Debug, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
+#[derive(Debug, Clone, Insertable, Queryable, QueryableByName, Serialize, Deserialize)]
 #[table_name = "prover_runs"]
 pub struct ProverRun {
     pub id: i32,
@@ -516,6 +521,7 @@ pub struct IntegerNumber {
 pub struct ServerConfig {
     pub id: bool,
     pub contract_addr: Option<String>,
+    pub gov_contract_addr: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, QueryableByName)]
@@ -635,8 +641,7 @@ struct InsertTx {
     tx: Value,
 }
 
-#[derive(Debug, Queryable, QueryableByName)]
-#[table_name = "mempool"]
+#[derive(Debug, Queryable)]
 struct ReadTx {
     hash: Vec<u8>,
     primary_account_address: Vec<u8>,
@@ -712,6 +717,11 @@ fn restore_account(
         data: stored_account.address.as_slice().try_into().unwrap(),
     };
     (stored_account.id as u32, account)
+}
+
+pub struct StoredAccountState {
+    pub committed: Option<(AccountId, Account)>,
+    pub verified: Option<(AccountId, Account)>,
 }
 
 impl StorageProcessor {
@@ -825,13 +835,13 @@ impl StorageProcessor {
 
                 let commit = operations::table
                     .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-                    .filter(operations::action_type.eq("Commit"))
+                    .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
                     .first::<StoredOperation>(self.conn())
                     .optional()?;
 
                 let confirm = operations::table
                     .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
-                    .filter(operations::action_type.eq("Verify"))
+                    .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
                     .first::<StoredOperation>(self.conn())
                     .optional()?;
 
@@ -989,7 +999,7 @@ impl StorageProcessor {
                 coalesce(commited, false) as commited,
                 coalesce(verified, false) as verified
             from (
-                select 
+                select
                     *
                 from (
                     select
@@ -1001,16 +1011,16 @@ impl StorageProcessor {
                         block_number
                     from
                         mempool
-                    left join 
+                    left join
                         executed_transactions
-                    on 
+                    on
                         tx_hash = hash
-                    where 
+                    where
                         encode(primary_account_address, 'hex') = '{address}'
-                        or 
+                        or
                         tx->>'to' = '0x{address}'
                     union all
-                    select 
+                    select
                         operation as tx,
                         eth_hash as hash,
                         priority_op_serialid as pq_id,
@@ -1092,7 +1102,7 @@ impl StorageProcessor {
                     res.fail_reason = executed_tx.fail_reason;
                 }
                 if let Some(operation) = operation {
-                    if operation.action_type == "Commit" {
+                    if operation.action_type == ActionType::COMMIT.to_string() {
                         res.committed = operation.confirmed;
                     } else {
                         res.verified = operation.confirmed;
@@ -1100,7 +1110,7 @@ impl StorageProcessor {
                 }
                 if let Some((_mempool_tx, _executed_tx, operation)) = group_iter.next() {
                     if let Some(operation) = operation {
-                        if operation.action_type == "Commit" {
+                        if operation.action_type == ActionType::COMMIT.to_string() {
                             res.committed = operation.confirmed;
                         } else {
                             res.verified = operation.confirmed;
@@ -1180,6 +1190,18 @@ impl StorageProcessor {
 
             Ok(executed_operations)
         })
+    }
+
+    pub fn get_executed_priority_op(
+        &self,
+        priority_op_id: u32,
+    ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
+        executed_priority_operations::table
+            .filter(
+                executed_priority_operations::priority_op_serialid.eq(i64::from(priority_op_id)),
+            )
+            .first::<StoredExecutedPriorityOperation>(self.conn())
+            .optional()
     }
 
     pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
@@ -1346,7 +1368,6 @@ impl StorageProcessor {
             let balances: Vec<Vec<StorageBalance>> = StorageBalance::belonging_to(&accounts)
                 .load(self.conn())?
                 .grouped_by(&accounts);
-
             let last_block = accounts
                 .iter()
                 .map(|a| a.last_block as u32)
@@ -1377,48 +1398,42 @@ impl StorageProcessor {
         to_block: Option<u32>,
     ) -> QueryResult<Option<(u32, AccountUpdates)>> {
         self.conn().transaction(|| {
-            let (to_block, unbounded) = if let Some(to_block) = to_block {
-                (to_block, false)
+            let to_block_resolved = if let Some(to_block) = to_block {
+                to_block
             } else {
-                (0, true)
+                let last_block = blocks::table
+                    .select(max(blocks::number))
+                    .first::<Option<i64>>(self.conn())?;
+                last_block.map(|n| n as u32).unwrap_or(0)
             };
 
-            let (time_forward, start_block, end_block) = if unbounded {
-                (true, from_block, 0)
-            } else {
-                (
-                    from_block <= to_block,
-                    cmp::min(from_block, to_block),
-                    cmp::max(from_block, to_block),
-                )
-            };
+            let (time_forward, start_block, end_block) = (
+                from_block <= to_block_resolved,
+                cmp::min(from_block, to_block_resolved),
+                cmp::max(from_block, to_block_resolved),
+            );
 
             let account_balance_diff = account_balance_updates::table
                 .filter(
                     account_balance_updates::block_number
                         .gt(&(i64::from(start_block)))
-                        .and(
-                            account_balance_updates::block_number
-                                .le(&(i64::from(end_block)))
-                                .or(unbounded),
-                        ),
+                        .and(account_balance_updates::block_number.le(&(i64::from(end_block)))),
                 )
                 .load::<StorageAccountUpdate>(self.conn())?;
             let account_creation_diff = account_creates::table
                 .filter(
                     account_creates::block_number
                         .gt(&(i64::from(start_block)))
-                        .and(
-                            account_creates::block_number
-                                .le(&(i64::from(end_block)))
-                                .or(unbounded),
-                        ),
+                        .and(account_creates::block_number.le(&(i64::from(end_block)))),
                 )
                 .load::<StorageAccountCreation>(self.conn())?;
 
             debug!(
                 "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
-                time_forward, start_block, end_block, unbounded
+                time_forward,
+                start_block,
+                end_block,
+                to_block.is_none()
             );
             debug!("Loaded account balance diff: {:#?}", account_balance_diff);
             debug!("Loaded account creation diff: {:#?}", account_creation_diff);
@@ -1454,7 +1469,11 @@ impl StorageProcessor {
                 reverse_updates(&mut account_updates);
             }
 
-            let block_after_updates = if time_forward { last_block } else { to_block };
+            let block_after_updates = if time_forward {
+                last_block
+            } else {
+                start_block
+            };
 
             if !account_updates.is_empty() {
                 Ok(Some((block_after_updates, account_updates)))
@@ -1493,7 +1512,7 @@ impl StorageProcessor {
             with eth_ops as (
             	select
             		operations.block_number,
-            		eth_operations.tx_hash,
+                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
             		operations.action_type,
             		operations.created_at
             	from operations
@@ -1508,9 +1527,9 @@ impl StorageProcessor {
             	verified.created_at as verified_at
             from blocks
             inner join eth_ops commited on
-            	commited.block_number = blocks.number and commited.action_type = 'Commit'
+            	commited.block_number = blocks.number and commited.action_type = 'COMMIT'
             left join eth_ops verified on
-            	verified.block_number = blocks.number and verified.action_type = 'Verify'
+            	verified.block_number = blocks.number and verified.action_type = 'VERIFY'
             where
             	blocks.number <= {max_block}
             order by blocks.number desc
@@ -1527,10 +1546,10 @@ impl StorageProcessor {
         let l_query = query.to_lowercase();
         let sql_query = format!(
             "
-                        with eth_ops as (
+            with eth_ops as (
             	select
             		operations.block_number,
-            		eth_operations.tx_hash,
+                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
             		operations.action_type,
             		operations.created_at
             	from operations
@@ -1545,9 +1564,9 @@ impl StorageProcessor {
             	verified.created_at as verified_at
             from blocks
             inner join eth_ops commited on
-            	commited.block_number = blocks.number and commited.action_type = 'Commit'
+            	commited.block_number = blocks.number and commited.action_type = 'COMMIT'
             left join eth_ops verified on
-            	verified.block_number = blocks.number and verified.action_type = 'Verify'
+            	verified.block_number = blocks.number and verified.action_type = 'VERIFY'
             where false
                 or lower(commited.tx_hash) = $1
                 or lower(verified.tx_hash) = $1
@@ -1571,6 +1590,50 @@ impl StorageProcessor {
 
     pub fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block> {
         self.load_commit_op(block_number).map(|r| r.block)
+    }
+
+    pub fn load_unconfirmed_operations(
+        &self,
+        // TODO: move Eth transaction state to models and add it here
+    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
+        self.conn().transaction(|| {
+            let ops: Vec<_> = operations::table
+                .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
+                .filter(operations::confirmed.eq(false))
+                .order(operations::id.asc())
+                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.conn())?;
+
+            let mut ops = ops
+                .into_iter()
+                .map(|(o, e)| o.into_op(self).map(|o| (o, e)))
+                .collect::<QueryResult<Vec<_>>>()?;
+            ops.sort_by_key(|(o, _)| o.id.unwrap()); // operations from db MUST have and id.
+
+            Ok(ops
+                .into_iter()
+                .group_by(|(o, _)| o.id.unwrap())
+                .into_iter()
+                .map(|(_op_id, group_iter)| {
+                    let fold_result = group_iter.fold(
+                        (None, Vec::new()),
+                        |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _),
+                         (op, eth_op)| {
+                            if let Some(accum_op) = accum_op.as_ref() {
+                                assert_eq!(accum_op.id, op.id);
+                            } else {
+                                accum_op = Some(op);
+                            }
+                            if let Some(eth_op) = eth_op {
+                                accum_eth_ops.push(eth_op);
+                            }
+
+                            (accum_op, accum_eth_ops)
+                        },
+                    );
+                    (fold_result.0.unwrap(), fold_result.1)
+                })
+                .collect())
+        })
     }
 
     pub fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>> {
@@ -1629,6 +1692,7 @@ impl StorageProcessor {
         deadline_block: u64,
         nonce: u32,
         gas_price: BigDecimal,
+        raw_tx: Vec<u8>,
     ) -> QueryResult<()> {
         insert_into(eth_operations::table)
             .values(&NewETHOperation {
@@ -1636,7 +1700,8 @@ impl StorageProcessor {
                 nonce: i64::from(nonce),
                 deadline_block: deadline_block as i64,
                 gas_price,
-                tx_hash: format!("{:#x}", hash),
+                tx_hash: hash.as_bytes().to_vec(),
+                raw_tx,
             })
             .execute(self.conn())
             .map(drop)
@@ -1644,15 +1709,13 @@ impl StorageProcessor {
 
     pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
         self.conn().transaction(|| {
-            update(
-                eth_operations::table.filter(eth_operations::tx_hash.eq(format!("{:#x}", hash))),
-            )
-            .set(eth_operations::confirmed.eq(true))
-            .execute(self.conn())
-            .map(drop)?;
+            update(eth_operations::table.filter(eth_operations::tx_hash.eq(hash.as_bytes())))
+                .set(eth_operations::confirmed.eq(true))
+                .execute(self.conn())
+                .map(drop)?;
             let (op, _) = operations::table
                 .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
-                .filter(eth_operations::tx_hash.eq(format!("{:#x}", hash)))
+                .filter(eth_operations::tx_hash.eq(hash.as_bytes()))
                 .first::<(StoredOperation, StorageETHOperation)>(self.conn())?;
 
             update(operations::table.filter(operations::id.eq(op.id)))
@@ -1667,11 +1730,11 @@ impl StorageProcessor {
             let ops: Vec<StoredOperation> = diesel::sql_query(
                 "
                 SELECT * FROM operations
-                WHERE action_type = 'Commit'
+                WHERE action_type = 'COMMIT'
                 AND block_number > (
                     SELECT COALESCE(max(block_number), 0)  
                     FROM operations 
-                    WHERE action_type = 'Verify'
+                    WHERE action_type = 'VERIFY'
                 )
             ",
             )
@@ -1706,7 +1769,7 @@ impl StorageProcessor {
     pub fn account_state_by_address(
         &self,
         address: &AccountAddress,
-    ) -> QueryResult<(Option<AccountId>, Option<Account>, Option<Account>)> {
+    ) -> QueryResult<StoredAccountState> {
         let account_create_record = account_creates::table
             .filter(account_creates::address.eq(address.data.to_vec()))
             .filter(account_creates::is_create.eq(true))
@@ -1717,12 +1780,22 @@ impl StorageProcessor {
         let account_id = if let Some(account_create_record) = account_create_record {
             account_create_record.account_id as AccountId
         } else {
-            return Ok((None, None, None));
+            return Ok(StoredAccountState {
+                committed: None,
+                verified: None,
+            });
         };
 
-        let commited_state = self.last_committed_state_for_account(account_id)?;
-        let verified_state = self.last_verified_state_for_account(account_id)?;
-        Ok((Some(account_id), verified_state, commited_state))
+        let commited = self
+            .last_committed_state_for_account(account_id)?
+            .map(|a| (account_id, a));
+        let verified = self
+            .last_verified_state_for_account(account_id)?
+            .map(|a| (account_id, a));
+        Ok(StoredAccountState {
+            committed: commited,
+            verified,
+        })
     }
 
     pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
@@ -1733,11 +1806,24 @@ impl StorageProcessor {
                 .optional()?;
 
             if let Some(tx) = tx {
-                let confirm = operations::table
+                let commited = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
-                    .filter(operations::action_type.eq("Verify"))
+                    .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
                     .first::<StoredOperation>(self.conn())
-                    .optional()?;
+                    .optional()?
+                    .is_some();
+
+                if !commited {
+                    return Ok(None);
+                }
+
+                let verified = operations::table
+                    .filter(operations::block_number.eq(tx.block_number))
+                    .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
+                    .first::<StoredOperation>(self.conn())
+                    .optional()?
+                    .map(|v| v.confirmed)
+                    .unwrap_or(false);
 
                 let prover_run: Option<ProverRun> = prover_runs::table
                     .filter(prover_runs::block_number.eq(tx.block_number))
@@ -1745,10 +1831,10 @@ impl StorageProcessor {
                     .optional()?;
 
                 Ok(Some(TxReceiptResponse {
-                    tx_hash: hash.to_vec(),
+                    tx_hash: hex::encode(&hash),
                     block_number: tx.block_number,
                     success: tx.success,
-                    verified: confirm.is_some(),
+                    verified,
                     fail_reason: tx.fail_reason,
                     prover_run,
                 }))
@@ -1860,9 +1946,9 @@ impl StorageProcessor {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
                     SELECT min(block_number) as integer_value FROM operations o
-                    WHERE action_type = 'Commit'
+                    WHERE action_type = 'COMMIT'
                     AND block_number >
-                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'Verify')
+                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
                     AND NOT EXISTS 
                         (SELECT * FROM proofs WHERE block_number = o.block_number)
                     AND NOT EXISTS
@@ -2085,16 +2171,19 @@ impl StorageProcessor {
         };
         diesel::insert_into(tokens::table)
             .values(&new_token)
-            .on_conflict_do_nothing()
+            .on_conflict(tokens::id)
+            .do_update()
+            // update token address but not symbol -- so we can update it externally
+            .set(tokens::address.eq(new_token.address.clone()))
             .execute(self.conn())
             .map(drop)
     }
 
-    pub fn load_tokens(&self) -> QueryResult<Vec<Token>> {
+    pub fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
         let tokens = tokens::table
             .order(tokens::id.asc())
             .load::<Token>(self.conn())?;
-        Ok(tokens.into_iter().collect())
+        Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
     }
 
     pub fn mempool_get_size(&self) -> QueryResult<usize> {
@@ -2112,14 +2201,19 @@ impl StorageProcessor {
             return Ok(Err(TxAddError::IncorrectTx));
         }
 
-        let (_, _, commited_state) = self.account_state_by_address(&tx.account())?;
-        let lowest_possible_nonce = commited_state.map(|a| a.nonce as u32).unwrap_or_default();
+        let StoredAccountState {
+            committed: commited_state,
+            ..
+        } = self.account_state_by_address(&tx.account())?;
+        let lowest_possible_nonce = commited_state
+            .map(|(_, a)| a.nonce as u32)
+            .unwrap_or_default();
         if tx.nonce() < lowest_possible_nonce {
             return Ok(Err(TxAddError::NonceTooLow));
         }
 
         let tx_failed = executed_transactions::table
-            .filter(executed_transactions::tx_hash.eq(tx.hash()))
+            .filter(executed_transactions::tx_hash.eq(tx.hash().as_ref().to_vec()))
             .filter(executed_transactions::success.eq(false))
             .first::<StoredExecutedTransaction>(self.conn())
             .optional()?;
@@ -2133,7 +2227,7 @@ impl StorageProcessor {
             // TODO Check tx and add only txs with valid nonce.
             insert_into(mempool::table)
                 .values(&InsertTx {
-                    hash: tx.hash(),
+                    hash: tx.hash().as_ref().to_vec(),
                     primary_account_address: tx.account().data.to_vec(),
                     nonce: i64::from(tx.nonce()),
                     tx: serde_json::to_value(tx).unwrap(),
@@ -2146,9 +2240,12 @@ impl StorageProcessor {
     }
 
     pub fn get_pending_txs(&self, address: &AccountAddress) -> QueryResult<Vec<FranklinTx>> {
-        let (_, _, commited_state) = self.account_state_by_address(address)?;
+        let StoredAccountState {
+            committed: commited_state,
+            ..
+        } = self.account_state_by_address(address)?;
         let commited_nonce = commited_state
-            .map(|a| i64::from(a.nonce))
+            .map(|(_, a)| i64::from(a.nonce))
             .unwrap_or_default();
 
         let pending_txs: Vec<_> = mempool::table
@@ -2168,7 +2265,7 @@ impl StorageProcessor {
 
     pub fn mempool_get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
         //TODO use "gaps and islands" sql solution for this.
-        let stored_txs: Vec<_> = mempool::table
+        let query = mempool::table
             .left_join(
                 executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
             )
@@ -2177,15 +2274,16 @@ impl StorageProcessor {
             .filter(
                 accounts::nonce
                     .is_null()
-                    .or(accounts::nonce.ge(mempool::nonce)),
+                    .or(mempool::nonce.ge(accounts::nonce)),
             )
             .order(mempool::created_at.asc())
-            .limit(max_size as i64)
-            .load::<(
-                ReadTx,
-                Option<StoredExecutedTransaction>,
-                Option<StorageAccount>,
-            )>(self.conn())?;
+            .limit(max_size as i64);
+
+        let stored_txs: Vec<_> = query.load::<(
+            ReadTx,
+            Option<StoredExecutedTransaction>,
+            Option<StorageAccount>,
+        )>(self.conn())?;
 
         Ok(stored_txs
             .into_iter()

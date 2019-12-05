@@ -1,6 +1,6 @@
 // External uses
 use web3::futures::Future;
-use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256, U64};
+use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 // Workspace uses
 use crate::events::{EventData, EventType};
 use crate::helpers::{DataRestoreError, DATA_RESTORE_CONFIG};
@@ -118,8 +118,8 @@ impl EventsState {
             from_block_number_u64 + eth_blocks_delta
         };
 
-        let to_block_number = BlockNumber::Number(U64::from(to_block_number_u64));
-        let from_block_number = BlockNumber::Number(U64::from(from_block_number_u64));
+        let to_block_number = BlockNumber::Number(to_block_number_u64);
+        let from_block_number = BlockNumber::Number(from_block_number_u64);
 
         let logs = EventsState::get_logs(from_block_number, to_block_number)?;
         let sorted_logs = EventsState::sort_logs(&logs)?;

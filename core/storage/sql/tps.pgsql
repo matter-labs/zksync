@@ -7,7 +7,7 @@ with blocks as (
         70 as to_block   -- 265
     from operations
     where
-        action_type = 'Verify'
+        action_type = 'VERIFY'
         and data->'block'->'block_data'->>'type' = 'Transfer'
     order by block_number desc
 )

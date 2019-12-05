@@ -17,7 +17,7 @@ use crate::circuit::utils::pub_key_hash_bytes;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use franklin_crypto::eddsa::PublicKey;
 
-#[derive(Clone, PartialEq, Default, Eq, Hash)]
+#[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct AccountAddress {
     pub data: [u8; params::FR_ADDRESS_LEN],
 }
@@ -42,10 +42,7 @@ impl AccountAddress {
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
         ensure!(s.starts_with("0x"), "Address should start with 0x");
         let bytes = hex::decode(&s[2..])?;
-        ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
-        Ok(AccountAddress {
-            data: bytes.as_slice().try_into().unwrap(),
-        })
+        Self::from_bytes(&bytes)
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
@@ -188,6 +185,12 @@ impl GetBits for Account {
 }
 
 impl Account {
+    pub fn default_with_address(address: &AccountAddress) -> Account {
+        let mut account = Account::default();
+        account.address = address.clone();
+        account
+    }
+
     pub fn create_account(id: AccountId, address: AccountAddress) -> (Account, AccountUpdates) {
         let mut account = Account::default();
         account.address = address;
@@ -219,6 +222,13 @@ impl Account {
         let mut balance = self.balances.remove(&token).unwrap_or_default();
         balance -= amount;
         self.balances.insert(token, balance);
+    }
+
+    pub fn apply_updates(mut account: Option<Self>, updates: &[AccountUpdate]) -> Option<Self> {
+        for update in updates {
+            account = Account::apply_update(account, update.clone());
+        }
+        account
     }
 
     pub fn apply_update(account: Option<Self>, update: AccountUpdate) -> Option<Self> {
@@ -255,6 +265,12 @@ impl Account {
                 }
             },
         }
+    }
+
+    pub fn get_nonzero_balances(&self) -> HashMap<TokenId, BigDecimal> {
+        let mut balances = self.balances.clone();
+        balances.retain(|_, v| v != &BigDecimal::from(0));
+        balances
     }
 }
 

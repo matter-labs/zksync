@@ -6,18 +6,19 @@ import {
     privateKeyToPublicKey,
     pubkeyToAddress, serializePointPacked, signTransactionBytes,
 } from './crypto';
-import { curve } from 'elliptic';
+import {curve} from 'elliptic';
 import EdwardsPoint = curve.edwards.EdwardsPoint;
 import {Contract, ethers} from 'ethers';
 import edwards = curve.edwards;
 import {packAmount, packFee} from "./utils";
+import {log} from "util";
 
 // ! can't import from 'ethers/utils' it won't work in the browser.
 type BigNumber = ethers.utils.BigNumber;
 type BigNumberish = ethers.utils.BigNumberish;
 const parseEther = ethers.utils.parseEther;
 const bigNumberify = ethers.utils.bigNumberify;
-const PUBKEY_HASH_LEN=20;
+const PUBKEY_HASH_LEN = 20;
 const IERC20Conract = require("../abi/IERC20.json");
 const franklinContractCode = require("../abi/Franklin.json");
 
@@ -25,8 +26,8 @@ export type Address = Buffer;
 export type AddressLike = Buffer | string;
 
 export function toAddress(addressLike: AddressLike): Address {
-    if (typeof(addressLike) == "string") {
-        return Buffer.from(addressLike.substr(2),"hex");
+    if (typeof (addressLike) == "string") {
+        return Buffer.from(addressLike.substr(2), "hex");
     } else {
         return addressLike;
     }
@@ -35,7 +36,8 @@ export function toAddress(addressLike: AddressLike): Address {
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
 export class FranklinProvider {
-    constructor(public providerAddress: string = 'http://127.0.0.1:3000', public contractAddress: string = process.env.CONTRACT_ADDR) {}
+    constructor(public providerAddress: string = 'http://127.0.0.1:3000', public contractAddress: string = process.env.CONTRACT_ADDR) {
+    }
 
     static prepareTransferRequestForNode(tx: TransferTx, signature) {
         let req: any = tx;
@@ -70,7 +72,8 @@ export class FranklinProvider {
     private static async axiosRequest(promise) {
         promise = promise
             .then(reps => reps.data)
-            .catch(error => { 
+            .catch(error => {
+                console.log(error)
                 let response;
                 if (!error.response) {
                     response = 'Error: Network Error';
@@ -136,6 +139,7 @@ export interface FranklinAccountState {
     verified: FranklinAccountBalanceState,
     pending_txs: any[],
 }
+
 interface ETHAccountState {
     onchainBalances: BigNumber[],
     contractBalances: BigNumber[],
@@ -152,7 +156,7 @@ export interface TransferTx {
 
 export interface WithdrawTx {
     account: Address,
-    eth_address: String,
+    ethAddress: String,
     token: number,
     amount: BigNumberish,
     fee: BigNumberish,
@@ -182,8 +186,8 @@ export class WalletKeys {
         let from = tx.from;
         let to = tx.to;
         let token = Buffer.alloc(2);
-        token.writeUInt16BE(tx.token,0);
-        let bnAmount = new BN(bigNumberify(tx.amount).toString() );
+        token.writeUInt16BE(tx.token, 0);
+        let bnAmount = new BN(bigNumberify(tx.amount).toString());
         let amount = packAmount(bnAmount);
         let bnFee = new BN(bigNumberify(tx.fee).toString());
         let fee = packFee(bnFee);
@@ -196,9 +200,9 @@ export class WalletKeys {
     signWithdraw(tx: WithdrawTx) {
         let type = Buffer.from([3]);
         let account = tx.account;
-        let eth_address = Buffer.from(tx.eth_address.slice(2),"hex")
+        let eth_address = Buffer.from(tx.ethAddress.slice(2), "hex")
         let token = Buffer.alloc(2);
-        token.writeUInt16BE(tx.token,0);
+        token.writeUInt16BE(tx.token, 0);
         let bnAmount = new BN(bigNumberify(tx.amount).toString());
         let amount = bnAmount.toArrayLike(Buffer, "be", 16);
         let bnFee = new BN(bigNumberify(tx.fee).toString());
@@ -224,13 +228,13 @@ export class WalletKeys {
     signFullExit(op: FullExitReq) {
         let type = Buffer.from([6]);
         let packed_pubkey = serializePointPacked(this.publicKey);
-        let eth_address = Buffer.from(op.eth_address.slice(2),"hex")
+        let eth_address = Buffer.from(op.eth_address.slice(2), "hex")
         let token = Buffer.alloc(2);
-        token.writeUInt16BE(op.token,0);
+        token.writeUInt16BE(op.token, 0);
         let nonce = Buffer.alloc(4);
         nonce.writeUInt32BE(op.nonce, 0);
         let msg = Buffer.concat([type, packed_pubkey, eth_address, token, nonce]);
-        return Buffer.from(signTransactionBytes(this.privateKey, msg).sign, "hex");
+        return Buffer.from(signTransactionBytes(this.privateKey, msg).signature, "hex");
     }
 }
 
@@ -252,20 +256,26 @@ export class Wallet {
 
     protected async depositETH(amount: BigNumberish) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
-        return await franklinDeployedContract.depositETH(this.address, {value: amount, gasLimit: bigNumberify("200000")});
+        const maxFee = bigNumberify(179000).mul(2).mul(await this.ethWallet.provider.getGasPrice()).mul(3).div(2);
+        return await franklinDeployedContract.depositETH(amount, this.address, {
+            value: maxFee.add(amount),
+            gasLimit: bigNumberify("200000")
+        });
     }
 
     protected async approveERC20(token: Token, amount: BigNumberish, options?: Object) {
-        const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
-        return await erc20DeployedToken.approve(franklinDeployedContract.address, amount, options);
+        console.log(this.provider.contractAddress, amount, token.address);
+        return await erc20DeployedToken.approve(this.provider.contractAddress, amount,
+            Object.assign({}, options));
     }
 
     protected async depositApprovedERC20(token: Token, amount: BigNumberish, options?: Object) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         const erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
+        const maxFee = bigNumberify(214000).mul(2).mul(await this.ethWallet.provider.getGasPrice()).mul(3).div(2);
         return await franklinDeployedContract.depositERC20(erc20DeployedToken.address, amount, this.address,
-            Object.assign({gasLimit: bigNumberify("300000"), value: parseEther("0.05")}, options));
+            Object.assign({gasLimit: bigNumberify("300000"), value: maxFee}, options));
     }
 
     async deposit(token: Token, amount: BigNumberish) {
@@ -280,7 +290,7 @@ export class Wallet {
     // TODO: remove this method
     async waitTxReceipt(tx_hash) {
         while (true) {
-        let receipt = await this.provider.getTxReceipt(tx_hash);
+            let receipt = await this.provider.getTxReceipt(tx_hash);
             if (receipt != null) {
                 return receipt
             }
@@ -301,7 +311,7 @@ export class Wallet {
     async widthdrawOffchain(token: Token, amount: BigNumberish, fee: BigNumberish) {
         let tx = {
             account: this.address,
-            eth_address: await this.ethWallet.getAddress(),
+            ethAddress: await this.ethWallet.getAddress(),
             token: token.id,
             amount,
             fee,
@@ -316,8 +326,12 @@ export class Wallet {
     async emergencyWithdraw(token: Token) {
         const franklinDeployedContract = new Contract(this.provider.contractAddress, franklinContractCode.interface, this.ethWallet);
         let nonce = await this.getNonce();
-        let signature = this.walletKeys.signFullExit({token: token.id, eth_address: await this.ethWallet.getAddress(), nonce});
-        let tx = await franklinDeployedContract.fullExit(serializePointPacked(this.walletKeys.publicKey), token.address,  signature, nonce,
+        let signature = this.walletKeys.signFullExit({
+            token: token.id,
+            eth_address: await this.ethWallet.getAddress(),
+            nonce
+        });
+        let tx = await franklinDeployedContract.fullExit(serializePointPacked(this.walletKeys.publicKey), token.address, signature, nonce,
             {gasLimit: bigNumberify("500000"), value: parseEther("0.02")});
         return tx.hash;
     }
@@ -353,7 +367,7 @@ export class Wallet {
         // TODO: reconsider nonce logic 
         if (this.pendingNonce == null) {
             await this.fetchFranklinState();
-            this.pendingNonce = this.franklinState.commited.nonce + this.franklinState.pending_txs.length;
+            this.pendingNonce = this.franklinState.commited.nonce;
         }
         return this.pendingNonce++;
     }
@@ -371,7 +385,7 @@ export class Wallet {
         let amounts = tokens
             .map(async token => {
                 let amount = await franklinDeployedContract.balancesToWithdraw(this.ethAddress, token.id);
-                return { token, amount };
+                return {token, amount};
             });
         return await Promise.all(amounts);
     }
@@ -382,7 +396,7 @@ export class Wallet {
         let allowances = tokens.map(async token => {
             let erc20DeployedToken = new Contract(token.address, IERC20Conract.abi, this.ethWallet);
             let amount = await erc20DeployedToken.allowance(this.ethAddress, this.provider.contractAddress);
-            return { token, amount };
+            return {token, amount};
         });
         return await Promise.all(allowances);
     }
@@ -401,7 +415,6 @@ export class Wallet {
             }
             contractBalances[token.id] = await franklinDeployedContract.balancesToWithdraw(this.ethAddress, token.id);
         }
-
         this.ethState = {onchainBalances, contractBalances};
     }
 

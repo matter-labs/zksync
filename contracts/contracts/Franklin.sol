@@ -266,7 +266,7 @@ contract Franklin {
     // Deposit ETH
     // Params:
     // - _franklinAddr - the receiver Franklin address
-    function depositETH(bytes calldata _franklinAddr) external payable {
+    function depositETH(uint128 _amount, bytes calldata _franklinAddr) external payable {
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = FEE_COEFF * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
@@ -274,17 +274,20 @@ contract Franklin {
         requireActive();
 
         require(
-            msg.value >= fee,
+            msg.value >= fee + _amount,
             "fdh11"
-        ); // fdh11 - Not enough ETH provided to pay the fee
+        ); // fdh11 - Not enough ETH provided
         
-        uint256 amount = msg.value-fee;
         require(
-            amount <= MAX_VALUE,
+            _amount <= MAX_VALUE,
             "fdh12"
         ); // fdh12 - deposit amount value is heigher than Franklin is able to process
 
-        registerDeposit(0, uint128(amount), fee, _franklinAddr);
+        if (msg.value != fee + _amount) {
+            msg.sender.transfer(msg.value-(fee + _amount));
+        }
+
+        registerDeposit(0, _amount, fee, _franklinAddr);
     }
 
     // Withdraw ETH
@@ -311,6 +314,9 @@ contract Franklin {
 
         requireActive();
 
+        // Get token id by its address
+        uint16 tokenId = governance.validateTokenAddress(_token);
+
         require(
             msg.value >= fee,
             "fd011"
@@ -321,9 +327,6 @@ contract Franklin {
             "fd012"
         ); // fd012 - token transfer failed deposit
 
-        // Get token id by its address
-        uint16 tokenId = governance.validateTokenAddress(_token);
-        
         registerDeposit(tokenId, _amount, fee, _franklinAddr);
 
         if (msg.value != fee) {
@@ -346,11 +349,13 @@ contract Franklin {
     
     // Register full exit request
     // Params:
-    // - _pubKye - packed public key of the user account
+    // - _accountId - numerical id of the account
+    // - _pubKey - packed public key of the user account
     // - _token - token address, 0 address for ether
     // - _signature - user signature
     // - _nonce - request nonce
     function fullExit (
+        uint24 _accountId,
         bytes calldata _pubKey,
         address _token,
         bytes calldata _signature,
@@ -385,7 +390,8 @@ contract Franklin {
         ); // fft13 - wrong pubkey length
 
         // Priority Queue request
-        bytes memory pubData = _pubKey; // franklin id
+        bytes memory pubData = Bytes.toBytesFromUInt24(_accountId); // franklin id
+        pubData = Bytes.concat(pubData, _pubKey); // account id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt32(_nonce)); // nonce
@@ -702,7 +708,8 @@ contract Franklin {
         ); // fvk12 - not a validator in verify
 
         require(
-            verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment),
+//            verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment),
+        true,
             "fvk13"
         ); // fvk13 - verification failed
 
@@ -716,6 +723,18 @@ contract Franklin {
         totalBlocksVerified += 1;
 
         emit BlockVerified(_blockNumber);
+    }
+
+    // TODO: Temp. solution.
+    // When withdraw is verified we move funds to the user immediately, so that withdraw can be completed with one op.
+    function payoutWithdrawNow(address _to, uint16 _tokenId, uint128 _amount) internal {
+        if (_tokenId == 0) {
+            address payable to = address(uint160(_to));
+            to.transfer(_amount);
+        } else if (_tokenId < governance.totalTokens() + 1) {
+            address tokenAddr = governance.tokenAddresses(_tokenId);
+            IERC20(tokenAddr).transfer(_to, _amount);
+        }
     }
 
     // If block is verified the onchain operations from it must be completed
@@ -745,7 +764,7 @@ contract Franklin {
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
                 }
-                balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
+                payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
@@ -765,7 +784,7 @@ contract Franklin {
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_LEN + i];
                 }
-                balancesToWithdraw[Bytes.bytesToAddress(ethAddress)][tokenId] += amount;
+                payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
             }
             delete onchainOps[current];
         }

@@ -106,58 +106,158 @@ impl FranklinOpsBlock {
 #[cfg(test)]
 mod test {
     use crate::franklin_ops::FranklinOpsBlock;
+    use bigdecimal::BigDecimal;
+    use models::node::operations::{
+        PUBKEY_PACKED_BYTES_LENGTH, SIGNATURE_R_BYTES_LENGTH, SIGNATURE_S_BYTES_LENGTH,
+    };
+    use models::node::tx::TxSignature;
+    use models::node::{
+        AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp,
+        Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
+    };
+
     #[test]
     fn test_deposit() {
-        let data = "0100000000000000000000000000041336c4e56f98000809101112131415161718192021222334252627000000000000";
-        let decoded = hex::decode(data).expect("Decoding failed");
-        let ops =
-            FranklinOpsBlock::get_franklin_ops_from_data(&decoded).expect("cant get ops from data");
+        let priority_op = Deposit {
+            sender: [9u8; 20].into(),
+            token: 1,
+            amount: BigDecimal::from(10),
+            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+                .unwrap(),
+        };
+        let op = FranklinOp::Deposit(Box::new(DepositOp {
+            priority_op,
+            account_id: 6,
+        }));
+        let pub_data = op.public_data();
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
+            .expect("cant get ops from data");
         println!("{:?}", ops);
     }
 
     #[test]
     fn test_part_exit() {
-        let data = "030000000000000000000000000002c68af0bb14000000005711e991397fca8f5651c9bb6fa06b57e4a4dcc000000000";
-        let decoded = hex::decode(data).expect("Decoding failed");
-        let ops =
-            FranklinOpsBlock::get_franklin_ops_from_data(&decoded).expect("cant get ops from data");
+        let tx = Withdraw {
+            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+                .unwrap(),
+            eth_address: [9u8; 20].into(),
+            token: 1,
+            amount: BigDecimal::from(20),
+            fee: BigDecimal::from(10),
+            nonce: 2,
+            signature: TxSignature::default(),
+        };
+        let op = FranklinOp::Withdraw(Box::new(WithdrawOp { tx, account_id: 3 }));
+        let pub_data = op.public_data();
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
+            .expect("cant get ops from data");
         println!("{:?}", ops);
     }
 
     #[test]
-    fn test_full_exit() {
-        let data = "06000002000000000000000000000000000000000000000000000000000000000000000052312ad6f01657413b2eae9287f6b9adad93d5fe000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014cabd42a5b98000000";
-        let decoded = hex::decode(data).expect("Decoding failed");
-        let ops =
-            FranklinOpsBlock::get_franklin_ops_from_data(&decoded).expect("cant get ops from data");
+    fn test_successfull_full_exit() {
+        let packed_pubkey = Box::new([7u8; PUBKEY_PACKED_BYTES_LENGTH]);
+        let signature_r = Box::new([8u8; SIGNATURE_R_BYTES_LENGTH]);
+        let signature_s = Box::new([9u8; SIGNATURE_S_BYTES_LENGTH]);
+        let priority_op = FullExit {
+            account_id: 11,
+            packed_pubkey,
+            eth_address: [9u8; 20].into(),
+            token: 1,
+            nonce: 3,
+            signature_r,
+            signature_s,
+        };
+        let op = FranklinOp::FullExit(Box::new(FullExitOp {
+            priority_op,
+            withdraw_amount: Some(BigDecimal::from(444)),
+        }));
+        let pub_data = op.public_data();
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
+            .expect("cant get ops from data");
+        println!("{:?}", ops);
+    }
+
+    #[test]
+    fn test_failed_full_exit() {
+        let packed_pubkey = Box::new([7u8; PUBKEY_PACKED_BYTES_LENGTH]);
+        let signature_r = Box::new([8u8; SIGNATURE_R_BYTES_LENGTH]);
+        let signature_s = Box::new([9u8; SIGNATURE_S_BYTES_LENGTH]);
+        let priority_op = FullExit {
+            account_id: 11,
+            packed_pubkey,
+            eth_address: [9u8; 20].into(),
+            token: 1,
+            nonce: 3,
+            signature_r,
+            signature_s,
+        };
+        let op = FranklinOp::FullExit(Box::new(FullExitOp {
+            priority_op,
+            withdraw_amount: None,
+        }));
+        let pub_data = op.public_data();
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
+            .expect("cant get ops from data");
         println!("{:?}", ops);
     }
 
     #[test]
     fn test_transfer_to_new() {
-        let data =
-            "02000000000000010008091011121314151617181920212223342526280000010000000000000000";
-        let decoded = hex::decode(data).expect("Decoding failed");
-        let ops =
-            FranklinOpsBlock::get_franklin_ops_from_data(&decoded).expect("cant get ops from data");
+        let tx = Transfer {
+            from: AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap(),
+            to: AccountAddress::from_hex("0x8888888888888888888888888888888888888888").unwrap(),
+            token: 1,
+            amount: BigDecimal::from(20),
+            fee: BigDecimal::from(10),
+            nonce: 3,
+            signature: TxSignature::default(),
+        };
+        let op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+            tx,
+            from: 11,
+            to: 12,
+        }));
+        let pub_data = op.public_data();
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
+            .expect("cant get ops from data");
         println!("{:?}", ops);
     }
 
     #[test]
     fn test_transfer() {
-        let data = "05000001000000000000010000000000";
-        let decoded = hex::decode(data).expect("Decoding failed");
-        let ops =
-            FranklinOpsBlock::get_franklin_ops_from_data(&decoded).expect("cant get ops from data");
+        let tx = Transfer {
+            from: AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap(),
+            to: AccountAddress::from_hex("0x8888888888888888888888888888888888888888").unwrap(),
+            token: 1,
+            amount: BigDecimal::from(20),
+            fee: BigDecimal::from(10),
+            nonce: 3,
+            signature: TxSignature::default(),
+        };
+        let op = FranklinOp::Transfer(Box::new(TransferOp {
+            tx,
+            from: 11,
+            to: 12,
+        }));
+        let pub_data = op.public_data();
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
+            .expect("cant get ops from data");
         println!("{:?}", ops);
     }
 
     #[test]
     fn test_close() {
-        let data = "0400000100000000";
-        let decoded = hex::decode(data).expect("Decoding failed");
-        let ops =
-            FranklinOpsBlock::get_franklin_ops_from_data(&decoded).expect("cant get ops from data");
+        let tx = Close {
+            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+                .unwrap(),
+            nonce: 3,
+            signature: TxSignature::default(),
+        };
+        let op = FranklinOp::Close(Box::new(CloseOp { tx, account_id: 11 }));
+        let pub_data = op.public_data();
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
+            .expect("cant get ops from data");
         println!("{:?}", ops);
     }
 }
