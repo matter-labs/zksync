@@ -2,7 +2,7 @@
 
 . .setup_env
 
-cd $FRANKLIN_HOME
+cd $ZKSYNC_HOME
 
 IN_DIR=./contracts/contracts/
 OUT_DIR=./contracts/contracts/generated

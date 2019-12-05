@@ -16,10 +16,6 @@ In other words, ZK Rollup strictly inherits the security guarantees of the under
 
 To learn how to use ZK Sync, please refer to the [ZK Sync SDK documentation](https://www.zksync.io).
 
-# Development
-
-The legacy name `franklin` is still used in many places of the code.
-
 ## Prerequisites
 
 Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md)
@@ -29,14 +25,14 @@ Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md
 Setup:
 
 ```
-franklin dev-up
-franklin init
+zksync dev-up
+zksync init
 ```
 
 To completely reset the dev environment:
 
 - Stop services:
-```franklin dev-down```
+```zksync dev-down```
 - Remove containers data:
 ```
 ssh minikube
@@ -46,7 +42,7 @@ rm -r /data/*
 
 # (Re)deploy db and contraсts:
 
-```franklin redeploy```
+```zksync redeploy```
 
 ## Environment configurations
 
@@ -54,11 +50,11 @@ Env config files are held in `etc/env/`
 
 List configurations:
 
-```franklin env```
+```zksync env```
 
 Switch between configurations:
 
-```franklin env <ENV_NAME>```
+```zksync env <ENV_NAME>```
 
 ## Monitoring & management:
 
@@ -71,51 +67,51 @@ NOTE: if you are resetting geth, each Metamask account must be manually reset vi
 
 Run server:
 ```
-franklin server
+zksync server
 ```
 
 By default block chunk size set to `100`. For testing & development purposes you
 ca change it to smaller values. Two places requires a change:
 1. Environment variable value in `./etc/env/dev.env` `BLOCK_SIZE_CHUNKS`
 2. Rust constant at `./core/models/params.rs` `BLOCK_SIZE_CHUNKS`
-If you apply changes, do not forget to redeploy contracts `franklin redeploy`.
+If you apply changes, do not forget to redeploy contracts `zksync redeploy`.
 
 You must prepare keys. This only needs to be done once:
 ```
 ./bin/gen-keys
-franklin redeploy
+zksync redeploy
 ```
 Run prover:
 ```
-franklin prover
+zksync prover
 ```
 
 Run client
 ```
-franklin client
+zksync client
 ```
 
 Client UI will be available at http://localhost:8080.
 Make sure you have environment variables set right, you can check it by running:
-```franklin env```. You should see `* dev` in output.
+```zksync env```. You should see `* dev` in output.
 
 ## Start server and prover in minikube (this setup is closest to prod):
 
-- Prerequisite: ```franklin dev-up; franklin init```
+- Prerequisite: ```zksync dev-up; zksync init```
 
 - Start:
-```franklin start```
+```zksync start```
 
 - Watch logs:
-Server: ```franklin log-server```
-Prover: ```franklin log-prover```
+Server: ```zksync log-server```
+Prover: ```zksync log-prover```
 
 - Stop:
-```franklin stop```
+```zksync stop```
 
 ## Build and push images to dockerhub:
 
-```franklin dockerhub-push```
+```zksync dockerhub-push```
 
 # Development
 
@@ -124,7 +120,7 @@ Prover: ```franklin log-prover```
 - ```cd core/storage```
 - Add diesel migration
 - Rename `core/storage/schema.rs.generated` to `schema.rs`
-- Run tests: ```franklin db-tests```
+- Run tests: ```zksync db-tests```
 
 ## Generating keys
 
@@ -160,7 +156,7 @@ So you need to rebuild the code on every change (to be automated).
 ### Publish source code on etherscan
 
 ```
-franklin publish-source
+zksync publish-source
 ```
 
 # License

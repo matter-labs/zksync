@@ -4,7 +4,7 @@ if [ -z $1 ]
 then
     for i in `ls etc/env | grep -v .bak | grep -v example | grep -v current`; do
         ENV=${i%.*}
-        if [ "$ENV" == "$FRANKLIN_ENV" ]
+        if [ "$ENV" == "$ZKSYNC_ENV" ]
         then
             echo -n " * "
         else
