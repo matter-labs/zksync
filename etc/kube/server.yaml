@@ -57,7 +57,7 @@ spec:
           ports:
             - containerPort: 80
       nodeSelector:
-        doks.digitalocean.com/node-pool: prover
+        doks.digitalocean.com/node-pool: server
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -100,4 +100,4 @@ spec:
               fieldRef:
                 fieldPath: metadata.name
       nodeSelector:
-        doks.digitalocean.com/node-pool: prover
+        doks.digitalocean.com/node-pool: server
