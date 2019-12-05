@@ -136,7 +136,7 @@ export default {
                     fee = `${formatToken(tx.tx.fee, token)} ${token}`;
                 } else if (type == "Withdraw") {
                     from = formatAddress(tx.tx.account);
-                    to = formatAddress(tx.tx.eth_address);
+                    to = formatAddress(tx.tx.ethAddress);
                     from_explorer_link = `/accounts/${tx.tx.account}`;
                     to_explorer_link = `${this.blockchain_explorer_address}/${tx.tx.account}`;
                     from_onchain_icon = '';
