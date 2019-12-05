@@ -93,7 +93,6 @@ export default {
             this.status          = block.verified_at ? 'Verified' : 'Committed';
 
             let txs = await client.getBlockTransactions(this.blockNumber);
-            console.log('block txs:', txs);
             let tokens = await client.getTokens();
             this.transactions = txs.map((tx, index) => {
                 let type = "";
@@ -195,9 +194,13 @@ export default {
                 { name: 'New root hash',    value: `<code>${this.new_state_root}</code>`},
                 // { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
-                { name: 'Commit tx hash',   value: `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.commit_tx_hash}">${this.commit_tx_hash} <span class="onchain_icon">onchain</span></a></code>`, },
+                { name: 'Commit tx hash',   value: this.commit_tx_hash
+                    ? `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.commit_tx_hash}">${this.commit_tx_hash} <span class="onchain_icon">onchain</span></a></code>`
+                    : `<b>Not yet sent on the chain.</b>` },
                 { name: 'Committed at',     value: formatDate(this.committed_at)},
-                { name: 'Verify tx hash',   value: `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.verify_tx_hash}">${this.verify_tx_hash} <span class="onchain_icon">onchain</span></a></code>`, },
+                { name: 'Verify tx hash',   value: this.verify_tx_hash
+                    ? `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.verify_tx_hash}">${this.verify_tx_hash} <span class="onchain_icon">onchain</span></a></code>`
+                    : `<b>Not yet sent on the chain.</b>` },
                 { name: 'Verified at',      value: formatDate(this.verified_at)},
             ];
         },

@@ -159,7 +159,6 @@ export default {
             if (max < 0) return;
 
             let blocks = await client.loadBlocks(max);
-            console.log({blocks});
             if (blocks) {
                 this.blocks = blocks.map( b => ({
                     block_number:   b.block_number,
