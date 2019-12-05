@@ -1019,7 +1019,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         // SHOULD be true for successful exit
-        // otherwise it is impossible to decide from pub data if nonce should be updated?
+        // otherwise it is impossible to decide from pub data if nonce should be updated
         let is_balance_not_zero = Boolean::from(Expression::equals(
             cs.namespace(|| "is_balance_not_zero"),
             &cur.balance.get_number(),
@@ -1049,14 +1049,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 is_balance_not_zero,
             ],
         )?;
-        //        let amount_to_exit = CircuitElement::conditionally_select_with_number_strict(
-        //            cs.namespace(|| "amount_to_exit"),
-        //            Expression::constant::<CS>(E::Fr::zero()),
-        //            &cur.balance,
-        //            &lhs_valid_success.not(),
-        //        )?;
-        //        let updated_balance = Expression::from(&cur.balance.get_number())
-        //            - Expression::from(&amount_to_exit.get_number());
 
         //mutate current branch if it is first chunk of a successful withdraw transaction
         cur.balance = CircuitElement::conditionally_select_with_number_strict(

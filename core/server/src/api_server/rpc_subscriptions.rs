@@ -1,6 +1,6 @@
 #![allow(clippy::needless_return)]
 
-use super::event_notify::{start_sub_notifier, EventSubscribe};
+use super::event_notify::{start_sub_notifier, EventSubscribeRequest};
 use crate::api_server::event_notify::EventNotifierRequest;
 use crate::api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp};
 use crate::ThreadPanicNotify;
@@ -95,11 +95,13 @@ impl RpcPubSub for RpcSubApp {
     ) {
         self.event_sub_sender
             .clone()
-            .try_send(EventNotifierRequest::Sub(EventSubscribe::Transaction {
-                hash,
-                action,
-                subscriber,
-            }))
+            .try_send(EventNotifierRequest::Sub(
+                EventSubscribeRequest::Transaction {
+                    hash,
+                    action,
+                    subscriber,
+                },
+            ))
             .unwrap_or_default();
     }
     fn unsubscribe_tx(&self, _meta: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
@@ -119,11 +121,13 @@ impl RpcPubSub for RpcSubApp {
     ) {
         self.event_sub_sender
             .clone()
-            .try_send(EventNotifierRequest::Sub(EventSubscribe::PriorityOp {
-                serial_id,
-                action,
-                subscriber,
-            }))
+            .try_send(EventNotifierRequest::Sub(
+                EventSubscribeRequest::PriorityOp {
+                    serial_id,
+                    action,
+                    subscriber,
+                },
+            ))
             .unwrap_or_default();
     }
     fn unsubscribe_ethop(&self, _meta: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
@@ -143,7 +147,7 @@ impl RpcPubSub for RpcSubApp {
     ) {
         self.event_sub_sender
             .clone()
-            .try_send(EventNotifierRequest::Sub(EventSubscribe::Account {
+            .try_send(EventNotifierRequest::Sub(EventSubscribeRequest::Account {
                 address,
                 action,
                 subscriber,
