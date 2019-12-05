@@ -13,15 +13,20 @@
     <br>
     <b-container>
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-        <h5>Block data</h5>
-        <b-card no-body>
-            <b-table responsive id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
-                <template v-slot:cell(value)="data"><span v-html="data.item.value"></span></template>
-            </b-table>
-        </b-card>
-        <br>
-        <h5>Transactions in this block</h5>
-        <TransactionList :transactions="transactions"></TransactionList>
+        <div v-if="loading">
+            <img style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
+        </div>
+        <div v-else>
+            <h5>Block data</h5>
+            <b-card no-body>
+                <b-table responsive id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
+                    <template v-slot:cell(value)="data"><span v-html="data.item.value"></span></template>
+                </b-table>
+            </b-card>
+            <br>
+            <h5>Transactions in this block</h5>
+            <TransactionList :transactions="transactions"></TransactionList>
+        </div>
     </b-container>
 </div>
 </template>
@@ -76,7 +81,6 @@ export default {
     },
     methods: {
         async update() {
-            this.loading = true;
             const block = await client.getBlock(this.blockNumber);
             if (!block) return;
 
@@ -152,6 +156,8 @@ export default {
                     ? ''
                     : `_target="_blank" rel="noopener noreferrer"`;
 
+                this.loading = false;
+
                 return {
                     type: `<b>${type}</b>`,
                     from: `<code><a href="${from_explorer_link}" ${from_target}>${from} ${from_onchain_icon}</a></code>`,
@@ -206,6 +212,7 @@ export default {
             verified_at:    null,
             status:         null,
             transactions:   [  ],
+            loading:        true,
         };
     },
     components,

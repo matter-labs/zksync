@@ -159,13 +159,14 @@ export default {
             if (max < 0) return;
 
             let blocks = await client.loadBlocks(max);
+            console.log({blocks});
             if (blocks) {
                 this.blocks = blocks.map( b => ({
                     block_number:   b.block_number,
                     status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
                     new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
                     committed_at:   b.committed_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0],
-                    verified_at:    b.verified_at ? (b.verified_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0]) : null,
+                    verified_at:    b.verified_at ? (b.verified_at.toString().split('T')[0] + " " + b.verified_at.toString().split('T')[1].split('.')[0]) : null,
                 }));
                 this.currentPage = this.page;
                 this.ready = true;
