@@ -1,19 +1,19 @@
 #!/bin/bash
 
-if [ -z "$FRANKLIN_ENV" ]
+if [ -z "$ZKSYNC_ENV" ]
 then
 
     pushd `dirname $0`/.. > /dev/null
 
     if [ -f etc/env/current ]; then
-        export FRANKLIN_ENV=`cat etc/env/current`
+        export ZKSYNC_ENV=`cat etc/env/current`
     else 
-        export FRANKLIN_ENV=dev
+        export ZKSYNC_ENV=dev
     fi
 
-    export ENV_FILE=./etc/env/$FRANKLIN_ENV.env
+    export ENV_FILE=./etc/env/$ZKSYNC_ENV.env
 
-    if [ "dev" = "$FRANKLIN_ENV" ] && [ ! -f etc/env/dev.env ]
+    if [ "dev" = "$ZKSYNC_ENV" ] && [ ! -f etc/env/dev.env ]
     then
         cp etc/env/dev.env.example etc/env/dev.env
     fi
@@ -28,7 +28,7 @@ then
     eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
     set +o allexport
 
-    if [ "dev" != "$FRANKLIN_ENV" ]
+    if [ "dev" != "$ZKSYNC_ENV" ]
     then
         export KUBECONFIG=etc/kube/clusters/kubeconfig-main.yaml
     fi

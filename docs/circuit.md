@@ -1,4 +1,4 @@
-# Franklin circuit
+# ZKSync circuit
 Circuit describes R1CS, for further theoretical information look here: https://github.com/matter-labs/awesome-zero-knowledge-proofs
 
 ## State structure

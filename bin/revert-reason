@@ -13,6 +13,6 @@ fi
 # geth --exec "$SCRIPT" attach http://localhost:8545 | cut -d '"' -f 2 | cut -c139- | xxd -r -p
 # echo
 
-FRANKLIN_HOME=`dirname $0`/../
-cd $FRANKLIN_HOME/contracts/
+ZKSYNC_HOME=`dirname $0`/../
+cd $ZKSYNC_HOME/contracts/
 f npx ts-node scripts/revert-reason.ts $1

@@ -1,10 +1,10 @@
 #!/bin/bash
 
-if [ "$FRANKLIN_ENV" != "dev" ] && [ "$FRANKLIN_ENV" != "ci" ]
+if [ "$ZKSYNC_ENV" != "dev" ] && [ "$ZKSYNC_ENV" != "ci" ]
 then
-    echo -n "Dangerous action. Type environment name ('$FRANKLIN_ENV') to confirm: "
+    echo -n "Dangerous action. Type environment name ('$ZKSYNC_ENV') to confirm: "
     read CONFIRMED
-    if [ ! "$FRANKLIN_ENV" == "$CONFIRMED" ]; then
+    if [ ! "$ZKSYNC_ENV" == "$CONFIRMED" ]; then
         exit 1
     fi
 fi

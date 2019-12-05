@@ -20,33 +20,33 @@ steps:
 - name: init
   image: matterlabs/ci
   commands:
-  - export FRANKLIN_HOME=`pwd`
-  - export PATH=$FRANKLIN_HOME/bin:$PATH
-  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - ci-prepare-env.sh
-  - franklin env ci
-  - franklin yarn
-  - franklin db-wait
-  - franklin db-setup
+  - zksync env ci
+  - zksync yarn
+  - zksync db-wait
+  - zksync db-setup
   depends_on:
   - restore-cache
 
 - name: build-contracts
   image: matterlabs/ci
   commands:
-  - export FRANKLIN_HOME=`pwd`
-  - export PATH=$FRANKLIN_HOME/bin:$PATH
-  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
-  - franklin build-contracts
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync build-contracts
   depends_on:
   - init
 
 - name: rust-checks
   image: matterlabs/ci
   commands:
-  - export FRANKLIN_HOME=`pwd`
-  - export PATH=$FRANKLIN_HOME/bin:$PATH
-  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - cargo fmt -- --check
   - f cargo clippy --tests --benches -- -D warnings
   depends_on:
@@ -55,9 +55,9 @@ steps:
 - name: rust-tests
   image: matterlabs/ci
   commands:
-  - export FRANKLIN_HOME=`pwd`
-  - export PATH=$FRANKLIN_HOME/bin:$PATH
-  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo test
   depends_on:
   - rust-checks
@@ -65,21 +65,21 @@ steps:
 - name: deploy-test
   image: matterlabs/ci
   commands:
-  - export FRANKLIN_HOME=`pwd`
-  - export PATH=$FRANKLIN_HOME/bin:$PATH
-  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
-  - franklin genesis
-  - franklin redeploy
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync genesis
+  - zksync redeploy
   depends_on:
   - rust-tests
 
 - name: contract-test
   image: matterlabs/ci
   commands:
-  - export FRANKLIN_HOME=`pwd`
-  - export PATH=$FRANKLIN_HOME/bin:$PATH
-  - export CARGO_HOME=$FRANKLIN_HOME/target/cargo
-  - franklin test-contracts
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync test-contracts
   depends_on:
   - build-contracts
 
