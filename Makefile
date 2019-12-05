@@ -163,32 +163,8 @@ flatten:
 
 # testing
 
-loadtest:
-	@cd js/tests && yarn loadtest1 &
-	@cd js/tests && yarn loadtest2 &
-	@cd js/tests && yarn loadtest3 &
-	@cd js/tests && yarn loadtest4 &
-	@cd js/tests && yarn loadtest5 &
-	@cd js/tests && yarn loadtest6 &
-	@cd js/tests && yarn loadtest7 &
-	@cd js/tests && yarn loadtest8 &
-	@cd js/tests && yarn loadtest9 &
-	@cd js/tests && yarn loadtest10 &
-	@cd js/tests && yarn loadtest11 &
-	@cd js/tests && yarn loadtest12 &
-	@cd js/tests && yarn loadtest13 &
-	@cd js/tests && yarn loadtest14 &
-	@cd js/tests && yarn loadtest15 &
-	@cd js/tests && yarn loadtest16 &
-	@cd js/tests && yarn loadtest17 &
-	@cd js/tests && yarn loadtest18 &
-	@cd js/tests && yarn loadtest19 &
-	@cd js/tests && yarn loadtest20 &
-	@cd js/tests && yarn loadtest21 &
-	@cd js/tests && yarn loadtest22 &
-	@cd js/tests && yarn loadtest23 &
-	@cd js/tests && yarn loadtest24 &
-	@cd js/tests && yarn loadtest25 &
+loadtest: confirm_action
+	@bin/loadtest.sh
 
 integration-simple:
 	@cd js/tests && yarn simple

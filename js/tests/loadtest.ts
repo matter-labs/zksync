@@ -9,13 +9,14 @@ import {
 
 let syncProvider: Provider;
 
-const CLIENTS_TOTAL = 10;
+const CLIENTS_TOTAL = 2;
 const INIT_DEPOSIT_AMOUNT = "0.001";
 const TRANSFER_DIVISOR = 1000;
 const FEE_DIVISOR = 50;
 
 (async () => {
-    const privateKey = process.argv[2];
+    const walletPath = "m/44'/60'/0'/0/1/" + process.argv[2];
+
     const WEB3_URL = process.env.WEB3_URL;
     const ERC20_TOKEN = process.env.TEST_ERC20;
 
@@ -31,8 +32,7 @@ const FEE_DIVISOR = 50;
         const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
-        const ethWallet = new ethers.Wallet(privateKey, ethersProvider);
-
+        const ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, walletPath).connect(ethersProvider);
         const syncWallet = await Wallet.fromEthSigner(
             ethWallet,
             syncProvider,
