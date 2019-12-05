@@ -34,7 +34,7 @@ use storage::{ConnectionPool, StorageETHOperation};
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(10);
-const WAIT_CONFIRMATIONS: u64 = 10;
+const WAIT_CONFIRMATIONS: u64 = 4;
 
 struct OperationETHState {
     operation: Operation,

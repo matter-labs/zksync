@@ -95,13 +95,11 @@ impl RpcPubSub for RpcSubApp {
     ) {
         self.event_sub_sender
             .clone()
-            .try_send(EventNotifierRequest::Sub(
-                EventSubscribe::Transaction {
-                    hash,
-                    action,
-                    subscriber,
-                }, //TODO PRINT ERR
-            ))
+            .try_send(EventNotifierRequest::Sub(EventSubscribe::Transaction {
+                hash,
+                action,
+                subscriber,
+            }))
             .unwrap_or_default();
     }
     fn unsubscribe_tx(&self, _meta: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
@@ -121,13 +119,11 @@ impl RpcPubSub for RpcSubApp {
     ) {
         self.event_sub_sender
             .clone()
-            .try_send(EventNotifierRequest::Sub(
-                EventSubscribe::PriorityOp {
-                    serial_id,
-                    action,
-                    subscriber,
-                }, //TODO PRINT ERR
-            ))
+            .try_send(EventNotifierRequest::Sub(EventSubscribe::PriorityOp {
+                serial_id,
+                action,
+                subscriber,
+            }))
             .unwrap_or_default();
     }
     fn unsubscribe_ethop(&self, _meta: Option<Self::Metadata>, id: SubscriptionId) -> Result<bool> {
@@ -147,13 +143,11 @@ impl RpcPubSub for RpcSubApp {
     ) {
         self.event_sub_sender
             .clone()
-            .try_send(EventNotifierRequest::Sub(
-                EventSubscribe::Account {
-                    address,
-                    action,
-                    subscriber,
-                }, //TODO PRINT ERR
-            ))
+            .try_send(EventNotifierRequest::Sub(EventSubscribe::Account {
+                address,
+                action,
+                subscriber,
+            }))
             .unwrap_or_default();
     }
 
