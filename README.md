@@ -14,7 +14,7 @@ This architecture provides the following guarantees:
 
 In other words, ZK Rollup strictly inherits the security guarantees of the underlying L1.
 
-To learn how to use ZK Sync, please refer to the [ZK Sync SDK documentation](https://matter-labs.io/zksync.js-docs/).
+To learn how to use ZK Sync, please refer to the [ZK Sync SDK documentation](https://www.zksync.io).
 
 # Development
 
