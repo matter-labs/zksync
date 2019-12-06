@@ -408,9 +408,9 @@ impl FullExitOp {
 
         // If full exit amount is 0 - full exit is considered failed
         let withdraw_amount = if amount == BigDecimal::from(0) {
-            Some(amount)
-        } else {
             None
+        } else {
+            Some(amount)
         };
 
         Some(Self {

@@ -3,7 +3,6 @@ use crate::helpers::{
     get_ethereum_transaction, get_input_data_from_ethereum_transaction, DataRestoreError,
 };
 use models::node::operations::FranklinOp;
-use models::params::TX_TYPE_BIT_WIDTH;
 use models::primitives::bytes_slice_to_uint32;
 
 const BLOCK_NUMBER_LENGTH: usize = 32;
@@ -123,14 +122,17 @@ mod test {
             account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
                 .unwrap(),
         };
-        let op = FranklinOp::Deposit(Box::new(DepositOp {
+        let op1 = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op,
             account_id: 6,
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("ops {:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -145,11 +147,14 @@ mod test {
             nonce: 2,
             signature: TxSignature::default(),
         };
-        let op = FranklinOp::Withdraw(Box::new(WithdrawOp { tx, account_id: 3 }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("ops {:?}", ops);
+        let op1 = FranklinOp::Withdraw(Box::new(WithdrawOp { tx, account_id: 3 }));
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -166,14 +171,17 @@ mod test {
             signature_r,
             signature_s,
         };
-        let op = FranklinOp::FullExit(Box::new(FullExitOp {
+        let op1 = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
             withdraw_amount: Some(BigDecimal::from(444)),
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("ops {:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -190,14 +198,17 @@ mod test {
             signature_r,
             signature_s,
         };
-        let op = FranklinOp::FullExit(Box::new(FullExitOp {
+        let op1 = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
             withdraw_amount: None,
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("ops {:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -211,15 +222,18 @@ mod test {
             nonce: 3,
             signature: TxSignature::default(),
         };
-        let op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+        let op1 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx,
             from: 11,
             to: 12,
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("ops {:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -233,15 +247,18 @@ mod test {
             nonce: 3,
             signature: TxSignature::default(),
         };
-        let op = FranklinOp::Transfer(Box::new(TransferOp {
+        let op1 = FranklinOp::Transfer(Box::new(TransferOp {
             tx,
             from: 11,
             to: 12,
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("ops {:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -252,10 +269,13 @@ mod test {
             nonce: 3,
             signature: TxSignature::default(),
         };
-        let op = FranklinOp::Close(Box::new(CloseOp { tx, account_id: 11 }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("ops {:?}", ops);
+        let op1 = FranklinOp::Close(Box::new(CloseOp { tx, account_id: 11 }));
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 }
