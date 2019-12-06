@@ -6,5 +6,5 @@
 
 .confirm_action || exit 1
 
-cd $FRANKLIN_HOME/contracts
+cd $ZKSYNC_HOME/contracts
 f npx ts-node scripts/add-erc20-token.ts $1

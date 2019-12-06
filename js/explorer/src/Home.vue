@@ -2,11 +2,11 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand>Matter Network</b-navbar-brand>
+        <b-navbar-brand>ZK Sync Network</b-navbar-brand>
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
-            <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">MatterMask</b-nav-item>
+            <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">ZK Sync Wallet</b-nav-item>
             <b-nav-item v-bind:href="`${blockchain_explorer_address}/${store.config.CONTRACT_ADDR}`" target="_blank" rel="noopener noreferrer">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
@@ -23,7 +23,7 @@
     <b-container>
         <ClosableJumbotron></ClosableJumbotron>
         <b-card bg-variant="light" >
-            <h4>Matter Testnet Block Explorer</h4> 
+            <h4>ZK Sync Devnet Block Explorer</h4> 
             <SearchField :searchFieldInMenu="false" />
         </b-card>
         <br>
@@ -165,7 +165,7 @@ export default {
                     status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
                     new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
                     committed_at:   b.committed_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0],
-                    verified_at:    b.verified_at ? (b.verified_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0]) : null,
+                    verified_at:    b.verified_at ? (b.verified_at.toString().split('T')[0] + " " + b.verified_at.toString().split('T')[1].split('.')[0]) : null,
                 }));
                 this.currentPage = this.page;
                 this.ready = true;

@@ -4,12 +4,12 @@ set -e
 
 check-environment.sh
 
-franklin dev-up
-franklin env
-franklin yarn || true # It can fail.
-franklin db-wait
-franklin db-setup
-franklin build-contracts
-franklin genesis
-franklin redeploy
+zksync dev-up
+zksync env
+zksync yarn || true # It can fail.
+zksync db-wait
+zksync db-setup
+zksync build-contracts
+zksync genesis
+zksync redeploy
 echo done.

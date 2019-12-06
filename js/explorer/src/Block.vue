@@ -2,7 +2,7 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand href="/">Matter Network</b-navbar-brand>
+        <b-navbar-brand href="/">ZK Sync Network</b-navbar-brand>
         <b-navbar-nav class="ml-auto">
             <b-nav-form>
                 <SearchField :searchFieldInMenu="true" />
@@ -13,15 +13,20 @@
     <br>
     <b-container>
         <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-        <h5>Block data</h5>
-        <b-card no-body>
-            <b-table responsive id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
-                <template v-slot:cell(value)="data"><span v-html="data.item.value"></span></template>
-            </b-table>
-        </b-card>
-        <br>
-        <h5>Transactions in this block</h5>
-        <TransactionList :transactions="transactions"></TransactionList>
+        <div v-if="loading">
+            <img style="margin-right: 1.5em" src="./assets/loading.gif" width="100em">
+        </div>
+        <div v-else>
+            <h5>Block data</h5>
+            <b-card no-body>
+                <b-table responsive id="my-table" thead-class="hidden_header" :items="props" :busy="isBusy">
+                    <template v-slot:cell(value)="data"><span v-html="data.item.value"></span></template>
+                </b-table>
+            </b-card>
+            <br>
+            <h5>Transactions in this block</h5>
+            <TransactionList :transactions="transactions"></TransactionList>
+        </div>
     </b-container>
 </div>
 </template>
@@ -76,7 +81,6 @@ export default {
     },
     methods: {
         async update() {
-            this.loading = true;
             const block = await client.getBlock(this.blockNumber);
             if (!block) return;
 
@@ -89,7 +93,6 @@ export default {
             this.status          = block.verified_at ? 'Verified' : 'Committed';
 
             let txs = await client.getBlockTransactions(this.blockNumber);
-            console.log('block txs:', txs);
             let tokens = await client.getTokens();
             this.transactions = txs.map((tx, index) => {
                 let type = "";
@@ -133,7 +136,7 @@ export default {
                     fee = `${formatToken(tx.tx.fee, token)} ${token}`;
                 } else if (type == "Withdraw") {
                     from = formatAddress(tx.tx.account);
-                    to = formatAddress(tx.tx.eth_address);
+                    to = formatAddress(tx.tx.ethAddress);
                     from_explorer_link = `/accounts/${tx.tx.account}`;
                     to_explorer_link = `${this.blockchain_explorer_address}/${tx.tx.account}`;
                     from_onchain_icon = '';
@@ -151,6 +154,8 @@ export default {
                 let to_target = to_explorer_link.startsWith('/')
                     ? ''
                     : `_target="_blank" rel="noopener noreferrer"`;
+
+                this.loading = false;
 
                 return {
                     type: `<b>${type}</b>`,
@@ -189,9 +194,13 @@ export default {
                 { name: 'New root hash',    value: `<code>${this.new_state_root}</code>`},
                 // { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
-                { name: 'Commit tx hash',   value: `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.commit_tx_hash}">${this.commit_tx_hash} <span class="onchain_icon">onchain</span></a></code>`, },
+                { name: 'Commit tx hash',   value: this.commit_tx_hash
+                    ? `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.commit_tx_hash}">${this.commit_tx_hash} <span class="onchain_icon">onchain</span></a></code>`
+                    : `<b>Not yet sent on the chain.</b>` },
                 { name: 'Committed at',     value: formatDate(this.committed_at)},
-                { name: 'Verify tx hash',   value: `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.verify_tx_hash}">${this.verify_tx_hash} <span class="onchain_icon">onchain</span></a></code>`, },
+                { name: 'Verify tx hash',   value: this.verify_tx_hash
+                    ? `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.verify_tx_hash}">${this.verify_tx_hash} <span class="onchain_icon">onchain</span></a></code>`
+                    : `<b>Not yet sent on the chain.</b>` },
                 { name: 'Verified at',      value: formatDate(this.verified_at)},
             ];
         },
@@ -206,6 +215,7 @@ export default {
             verified_at:    null,
             status:         null,
             transactions:   [  ],
+            loading:        true,
         };
     },
     components,

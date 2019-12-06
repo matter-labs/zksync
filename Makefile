@@ -1,7 +1,7 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:latest
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:latest
-export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(FRANKLIN_ENV)
+export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(ZKSYNC_ENV)
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
@@ -98,7 +98,7 @@ push-image-ci:
 	docker push "${CI_DOCKER_IMAGE}"
 
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
-docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(FRANKLIN_HOME)/etc/env/$(FRANKLIN_ENV).env
+docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
 rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 
@@ -192,13 +192,13 @@ deposit: confirm_action
 # Devops: main
 
 # (Re)deploy contracts and database
-ifeq (dev,$(FRANKLIN_ENV))
+ifeq (dev,$(ZKSYNC_ENV))
 redeploy: confirm_action stop deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
 else
 redeploy: confirm_action stop deploy-contracts db-insert-contract
 endif
 
-ifeq (dev,$(FRANKLIN_ENV))
+ifeq (dev,$(ZKSYNC_ENV))
 init-deploy: confirm_action deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
 else
 init-deploy: confirm_action deploy-contracts db-insert-contract
@@ -218,23 +218,23 @@ apply-kubeconfig:
 	@bin/k8s-apply
 
 update-rust: push-image-rust apply-kubeconfig
-	@kubectl patch deployment $(FRANKLIN_ENV)-server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
-	@kubectl patch deployment $(FRANKLIN_ENV)-prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@kubectl patch deployment $(ZKSYNC_ENV)-server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@kubectl patch deployment $(ZKSYNC_ENV)-prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
 update-nginx: push-image-nginx apply-kubeconfig
-	@kubectl patch deployment $(FRANKLIN_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@kubectl patch deployment $(ZKSYNC_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
 update-all: update-rust update-nginx apply-kubeconfig
 
 start-kube: apply-kubeconfig
 
-ifeq (dev,$(FRANKLIN_ENV))
+ifeq (dev,$(ZKSYNC_ENV))
 start: image-nginx image-rust start-local
 else
 start: apply-kubeconfig start-prover start-server start-nginx
 endif
 
-ifeq (dev,$(FRANKLIN_ENV))
+ifeq (dev,$(ZKSYNC_ENV))
 stop: confirm_action
 	@echo TODO: fix minikube local dev
 #	@kubectl delete deployments --selector=app=dev-server
@@ -244,7 +244,7 @@ stop: confirm_action
 #	@kubectl delete svc --selector=app=dev-nginx
 #	@kubectl delete -f ./etc/kube/minikube/postgres.yaml
 #	@kubectl delete -f ./etc/kube/minikube/geth.yaml
-else ifeq (ci,$(FRANKLIN_ENV))
+else ifeq (ci,$(ZKSYNC_ENV))
 stop:
 else
 stop: confirm_action stop-prover stop-server stop-nginx
@@ -253,22 +253,22 @@ endif
 restart: stop start
 
 start-prover:
-	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --replicas=1
 
 start-nginx:
-	@bin/kube scale deployments/$(FRANKLIN_ENV)-nginx --replicas=1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --replicas=1
 
 start-server:
-	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=1
 
 stop-prover:
-	@bin/kube scale deployments/$(FRANKLIN_ENV)-prover --replicas=0
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --replicas=0
 
 stop-server:
-	@bin/kube scale deployments/$(FRANKLIN_ENV)-server --replicas=0
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=0
 
 stop-nginx:
-	@bin/kube scale deployments/$(FRANKLIN_ENV)-nginx --replicas=0
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --replicas=0
 
 # Monitoring
 
@@ -276,10 +276,10 @@ status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
 
 log-server:
-	kubectl logs -f deployments/$(FRANKLIN_ENV)-server
+	kubectl logs -f deployments/$(ZKSYNC_ENV)-server
 
 log-prover:
-	kubectl logs --tail 300 -f deployments/$(FRANKLIN_ENV)-prover
+	kubectl logs --tail 300 -f deployments/$(ZKSYNC_ENV)-prover
 
 # Kubernetes: monitoring shortcuts
 

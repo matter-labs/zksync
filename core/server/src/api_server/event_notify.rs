@@ -21,9 +21,9 @@ use tokio::spawn;
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
 const TX_SUB_PREFIX: &str = "txsub";
 const ETHOP_SUB_PREFIX: &str = "eosub";
-const ACCOUTN_SUB_PREFIX: &str = "acsub";
+const ACCOUNT_SUB_PREFIX: &str = "acsub";
 
-pub enum EventSubscribe {
+pub enum EventSubscribeRequest {
     Transaction {
         hash: TxHash,
         action: ActionType,
@@ -42,13 +42,13 @@ pub enum EventSubscribe {
 }
 
 pub enum EventNotifierRequest {
-    Sub(EventSubscribe),
+    Sub(EventSubscribeRequest),
     Unsub(SubscriptionId),
 }
 
 enum BlockNotifierInput {
-    NewOperationCommited(Operation),
-    EventNotifiyRequest(EventNotifierRequest),
+    NewOperationCommitted(Operation),
+    EventNotifyRequest(EventNotifierRequest),
 }
 
 struct SubscriptionSender<T> {
@@ -75,10 +75,10 @@ impl OperationNotifier {
         input_stream
             .map(move |input| {
                 let res = match input {
-                    BlockNotifierInput::EventNotifiyRequest(sub) => self
+                    BlockNotifierInput::EventNotifyRequest(sub) => self
                         .handle_notify_req(sub)
                         .map_err(|e| format_err!("Failed to handle sub request: {}", e)),
-                    BlockNotifierInput::NewOperationCommited(op) => self
+                    BlockNotifierInput::NewOperationCommitted(op) => self
                         .handle_new_block(op)
                         .map_err(|e| format_err!("Failed to handle new block: {}", e)),
                 };
@@ -121,7 +121,7 @@ impl OperationNotifier {
                     }
                 }
             }
-            ACCOUTN_SUB_PREFIX => {
+            ACCOUNT_SUB_PREFIX => {
                 let account_id: AccountId = sub_unique_id.parse()?;
                 if let Some(mut subs) = self.account_subs.remove(&(account_id, sub_action)) {
                     subs.retain(|sub| sub.id != sub_id);
@@ -138,17 +138,17 @@ impl OperationNotifier {
     fn handle_notify_req(&mut self, new_sub: EventNotifierRequest) -> Result<(), failure::Error> {
         match new_sub {
             EventNotifierRequest::Sub(event_sub) => match event_sub {
-                EventSubscribe::Transaction {
+                EventSubscribeRequest::Transaction {
                     hash,
                     action,
                     subscriber,
                 } => self.handle_transaction_sub(hash, action, subscriber),
-                EventSubscribe::PriorityOp {
+                EventSubscribeRequest::PriorityOp {
                     serial_id,
                     action,
                     subscriber,
                 } => self.handle_priority_op_sub(serial_id, action, subscriber),
-                EventSubscribe::Account {
+                EventSubscribeRequest::Account {
                     address,
                     action,
                     subscriber,
@@ -320,7 +320,7 @@ impl OperationNotifier {
 
         let sub_id = SubscriptionId::String(format!(
             "{}/{}/{}/{}",
-            ACCOUTN_SUB_PREFIX,
+            ACCOUNT_SUB_PREFIX,
             address.to_hex(),
             action.to_string(),
             rand::random::<u64>()
@@ -452,8 +452,8 @@ pub fn start_sub_notifier<BStream, SStream>(
         account_subs: BTreeMap::new(),
     };
     let input_stream = new_block_stream
-        .map(BlockNotifierInput::NewOperationCommited)
-        .select(subscription_stream.map(BlockNotifierInput::EventNotifiyRequest));
+        .map(BlockNotifierInput::NewOperationCommitted)
+        .select(subscription_stream.map(BlockNotifierInput::EventNotifyRequest));
     std::thread::Builder::new()
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
