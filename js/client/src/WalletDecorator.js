@@ -112,7 +112,7 @@ export class WalletDecorator {
 
     async updateState() {
         await this.wallet.updateState();
-    
+
         const onchainBalances = [];
         const contractBalances = [];
         await Promise.all(
@@ -125,18 +125,18 @@ export class WalletDecorator {
                     onchainBalances.push(
                         await zksync.getEthereumBalance(window.ethSigner, token)
                     );
-
-                    contractBalances.push( 
-                        await window.ethProxy.balanceToWithdraw(
-                            await window.ethSigner.getAddress(), 
-                            tokenInfo.id
-                        )
-                    );
+                    
+                    // contractBalances.push( 
+                    //     await window.ethProxy.balanceToWithdraw(
+                    //         address, 
+                    //         tokenInfo.id
+                    //     )
+                    // );
                 }
             )
         );
         
-        this.ethState = {onchainBalances, contractBalances};
+        this.ethState = {onchainBalances};
         this.syncState = await window.syncWallet.getAccountState();
     }
 
@@ -315,22 +315,21 @@ export class WalletDecorator {
 
         return await Promise.all(res);
     }
-    async pendingDepositsAsRenderableList() {
-        let allowances = await this.wallet.getAllowancesForAllTokens();
-        return allowances
-            .map(a => ({
-                token: a.token,
-                amount: a.amount.toString()
-            }))
-            .filter(a => a.amount != '0')
-            .map((op, i) => {
-                op.operation = 'Deposit';
-                op.elem_id = `pendingDeposit_${i}`;
-                op.amountRenderable = readableEther(op.amount);
-                return op;
-            });
-    }
-    
+    // async pendingDepositsAsRenderableList() {
+    //     let allowances = await this.wallet.getAllowancesForAllTokens();
+    //     return allowances
+    //         .map(a => ({
+    //             token: a.token,
+    //             amount: a.amount.toString()
+    //         }))
+    //         .filter(a => a.amount != '0')
+    //         .map((op, i) => {
+    //             op.operation = 'Deposit';
+    //             op.elem_id = `pendingDeposit_${i}`;
+    //             op.amountRenderable = readableEther(op.amount);
+    //             return op;
+    //         });
+    // }
     setPendingWithdrawStatus(withdrawTokenId, status) {
         let withdrawsStatusesDict = JSON.parse(localStorage.getItem('withdrawsStatusesDict') || "{}");
         withdrawsStatusesDict[withdrawTokenId] = status;
@@ -373,15 +372,15 @@ export class WalletDecorator {
             }))
             .filter(tokenInfo => Number(tokenInfo.amount));
     }
-    contractBalancesAsRenderableList() {
-        return this.ethState.contractBalances
-            .map((balance, tokenId) => ({
-                tokenName: this.tokenNameFromId(tokenId),
-                address: window.tokensList[tokenId].address,
-                amount: `${balance.toString()}`
-            }))
-            .filter(tokenInfo => Number(tokenInfo.amount));
-    }
+    // contractBalancesAsRenderableList() {
+    //     return this.ethState.contractBalances
+    //         .map((balance, tokenId) => ({
+    //             tokenName: this.tokenNameFromId(tokenId),
+    //             address: window.tokensList[tokenId].address,
+    //             amount: `${balance.toString()}`
+    //         }))
+    //         .filter(tokenInfo => Number(tokenInfo.amount));
+    // }
     franklinBalancesAsRenderableListWithInfo() {
         if (this.syncState == undefined) return [];
 
@@ -434,13 +433,10 @@ export class WalletDecorator {
                 amount, 
                 fee
             });
-
-            // Wait wait till transaction is commited
-            const transactionReceipt = await transferTransaction.awaitReceipt();
     
             yield info(`Sent transfer to Matter server`);
     
-            yield * this.verboseGetFranklinOpStatus(transferTransaction.txHash);
+            yield * this.verboseGetSyncOpStatus(transferTransaction);
             return;
         } catch (e) {
             console.log(e);
@@ -458,25 +454,14 @@ export class WalletDecorator {
         try {
             yield info(`Sending withdraw...`);
 
-            const withdraw = {
+            const withdrawTransaction = await window.syncWallet.withdrawTo({
                 ethAddress: await window.ethSigner.getAddress(),
                 token,
                 amount,
                 fee,
-            };
-            console.log({withdraw});
-            const withdrawTransaction = await window.syncWallet.withdrawTo(withdraw);
-            
-            // Wait wait till transaction is verified
-            const transactionReceipt = await withdrawTransaction.awaitVerifyReceipt();            
-            this.removePendingWithdraw(`${tokenInfo.id}`);
-            
-            // if (fra_tx.err) {
-            //     yield error(`Offchain withdraw failed with ${fra_tx.err}`);
-            //     return;
-            // }
+            });
 
-            yield * this.verboseGetFranklinOpStatus(withdrawTransaction.txHash);
+            yield * this.verboseGetSyncOpStatus(withdrawTransaction);
 
             yield info(`Offchain withdraw succeeded!`);
         } catch (e) {
@@ -489,8 +474,8 @@ export class WalletDecorator {
     }
 
     async * verboseWithdrawOnchain(options) {
-        let token = options.token
-        let amount = utils.bigNumberify(options.amount);
+        const token = options.token === "ETH" ? "ETH" : tokenInfoFromSymbol(options.token).address;
+        const amount = utils.bigNumberify(options.amount);
 
         try {
             this.setPendingWithdrawStatus(`${token.id}`, 'loading');
@@ -514,7 +499,7 @@ export class WalletDecorator {
     }
 
     async * verboseDeposit(options) {
-        const token = options.token === "ETH" ? "ETH" : tokenInfoFromSymbol(options.token);
+        const token = options.token === "ETH" ? "ETH" : tokenInfoFromSymbol(options.token).address;
         const amount = utils.bigNumberify(options.amount);
         try {
             yield info(`Sending deposit...`);
@@ -528,10 +513,13 @@ export class WalletDecorator {
                 maxFeeInETHToken
             });
         
-            deposit.awaitEthereumTxCommit();
+            await deposit.awaitEthereumTxCommit();
 
             const tx_hash_html = shortenedTxHash(deposit.ethTx.hash);
             yield info(`Deposit ${tx_hash_html} sent to Mainchain...`);
+
+            const receipt = await window.syncProvider.getPriorityOpStatus(deposit.priorityOpId.toNumber());
+            console.log({deposit, receipt});
 
             yield * await this.verboseGetRevertReason(deposit.ethTx.hash);
             
@@ -545,16 +533,40 @@ export class WalletDecorator {
         }
     }
 
-    async * verboseGetFranklinOpStatus(tx_hash) {
-        let tx_hash_html = shortenedTxHash(tx_hash);
+    async * verboseGetSyncOpStatus(syncOp) {
+        const tx_hash_html = shortenedTxHash(syncOp.txHash);
+    
+        await syncOp.awaitReceipt();
+        const receipt = await window.syncProvider.getTxReceipt(syncOp.txHash);
 
-        let receipt = await this.wallet.waitTxReceipt(tx_hash);
-
-        if (receipt.fail_reason) {
-            yield error(`Transaction ${tx_hash_html} failed with <code>${receipt.fail_reason}</code>`);
+        if (receipt.failReason) {
+            yield error(`Transaction ${tx_hash_html} with <code>${receipt.failReason}</code>`, { countdown: 10 });
             return;
-        } 
-        
+        }
+
+        yield combineMessages(
+            info(`Transaction ${tx_hash_html} got included in block <code>${receipt.block.blockNumber}</code>, waiting for prover...`),
+            start_progress_bar({variant: 'half', duration: timeConstants.waitingForProverHalfLife})
+        );
+
+        await syncOp.awaitVerifyReceipt();
+
+        yield combineMessages(
+            info(`Transaction ${tx_hash_html} got verified!`, { countdown: 10 }),
+            stop_progress_bar()
+        );
+    }
+
+    async * verboseGetSyncPriorityOpStatus(syncOp) {
+        console.log({syncOp});
+        let tx_hash_html = shortenedTxHash(syncOp.ethTx.hash);
+
+        await syncOp.awaitEthereumTxCommit();
+
+        await syncOp.awaitReceipt();
+
+        const receipt = window.syncProvider.getPriorityOpStatus(syncOp.priorityOpId.toNumber());
+
         yield combineMessages(
             info(`Transaction ${tx_hash_html} got included in block <code>${receipt.block_number}</code>, waiting for prover...`),
             start_progress_bar({variant: 'half', duration: timeConstants.waitingForProverHalfLife})
@@ -592,9 +604,9 @@ export class WalletDecorator {
 
     async * verboseGetPriorityOpStatus(tx_hash) {
         let priorityQueueInterface = new utils.Interface(priority_queue_abi.interface);
-        let receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
+        let receipt = await window.ethProvider.getTransactionReceipt(tx_hash);
         let pq_id = receipt.logs
-            .map(l => priorityQueueInterface.parseLog(l)) // the only way to get it to work
+            .map(l => priorityQueueInterface.parseLog(l))
             .filter(Boolean)
             .filter(log => log.name == 'NewPriorityRequest');
 
@@ -650,7 +662,7 @@ export class WalletDecorator {
 
         let receipt;
         while (true) {
-            receipt = await this.wallet.ethWallet.provider.getTransactionReceipt(tx_hash);
+            receipt = await window.ethProvider.getTransactionReceipt(tx_hash);
             
             if (receipt) break;
             await sleep(timeConstants.ethereumReceiptRetry);
@@ -662,8 +674,8 @@ export class WalletDecorator {
                 stop_progress_bar()
             );
         } else {
-            const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
-            const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
+            const tx = await window.ethProvider.getTransaction(tx_hash);
+            const code = await window.ethProvider.call(tx, tx.blockNumber);
 
             if (code == '0x') {
                 yield error(`Transaction ${tx_hash_html} failed with empty revert reason.`);

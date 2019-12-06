@@ -41,7 +41,12 @@ export default {
             try {
                 const syncProvider = await zksync.getDefaultProvider(this.currentLocationNetworkName);
                 
-                const tokensList = await syncProvider.getTokens();
+                const tokensList = Object.values(await syncProvider.getTokens())
+                    .sort((a, b) => a.id - b.id)
+                    .map(info => {
+                        info.symbol = info.symbol || `erc20_${info.id}`;
+                        return info;
+                    });
                 window.tokensList = tokensList;
 
                 await window.ethereum.enable();
@@ -57,7 +62,10 @@ export default {
                 window.syncProvider = syncProvider;
                 window.ethProxy = ethProxy;
 
+                console.log(window.tokensList);
+
                 const franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
+                window.franklinProvider = franklinProvider;
                 window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
                 window.walletDecorator = await WalletDecorator.new(window.wallet);
 
