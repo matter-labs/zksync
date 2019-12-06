@@ -2,10 +2,9 @@ use super::tx::{PackedPublicKey, PackedSignature, TxSignature};
 use super::{AccountAddress, TokenId};
 use super::{AccountId, Nonce};
 use crate::params::{
-    FR_ADDRESS_LEN, ACCOUNT_ID_BIT_WIDTH,
-    TOKEN_BIT_WIDTH, BALANCE_BIT_WIDTH,
-    NONCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, SIGNATURE_S_BIT_WIDTH_PADDED,
-    SIGNATURE_R_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED
+    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, FR_ADDRESS_LEN,
+    NONCE_BIT_WIDTH, SIGNATURE_R_BIT_WIDTH_PADDED, SIGNATURE_S_BIT_WIDTH_PADDED,
+    SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
 };
 use crate::primitives::{bytes_slice_to_uint32, u128_to_bigdecimal};
 use bigdecimal::BigDecimal;
@@ -127,7 +126,8 @@ impl FranklinPriorityOp {
                     (bytes_slice_to_uint32(account_id).unwrap(), left)
                 };
                 let (packed_pubkey, pub_data_left) = {
-                    let (packed_pubkey, left) = pub_data_left.split_at(SUBTREE_HASH_WIDTH_PADDED / 8);
+                    let (packed_pubkey, left) =
+                        pub_data_left.split_at(SUBTREE_HASH_WIDTH_PADDED / 8);
                     (Box::new(packed_pubkey.try_into().unwrap()), left)
                 };
                 let (eth_address, pub_data_left) = {
@@ -143,11 +143,13 @@ impl FranklinPriorityOp {
                     (u32::from_be_bytes(nonce.try_into().unwrap()), left)
                 };
                 let (signature_r, pub_data_left) = {
-                    let (signature_r, left) = pub_data_left.split_at(SIGNATURE_R_BIT_WIDTH_PADDED / 8);
+                    let (signature_r, left) =
+                        pub_data_left.split_at(SIGNATURE_R_BIT_WIDTH_PADDED / 8);
                     (Box::new(signature_r.try_into().unwrap()), left)
                 };
                 let (signature_s, pub_data_left) = {
-                    let (signature_s, left) = pub_data_left.split_at(SIGNATURE_S_BIT_WIDTH_PADDED / 8);
+                    let (signature_s, left) =
+                        pub_data_left.split_at(SIGNATURE_S_BIT_WIDTH_PADDED / 8);
                     (Box::new(signature_s.try_into().unwrap()), left)
                 };
                 ensure!(

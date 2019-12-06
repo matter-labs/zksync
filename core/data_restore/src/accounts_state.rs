@@ -192,8 +192,8 @@ mod test {
     use bigdecimal::BigDecimal;
     use models::node::tx::TxSignature;
     use models::node::{
-        AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp,
-        Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
+        AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp, Transfer, TransferOp,
+        TransferToNewOp, Withdraw, WithdrawOp,
     };
 
     #[test]
@@ -228,7 +228,10 @@ mod test {
             nonce: 1,
             signature: TxSignature::default(),
         };
-        let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp { tx: tx2, account_id: 0 }));
+        let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
+            tx: tx2,
+            account_id: 0,
+        }));
         let pub_data2 = op2.public_data();
         let ops2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data2)
             .expect("cant get ops from data 2");
@@ -290,7 +293,10 @@ mod test {
             nonce: 2,
             signature: TxSignature::default(),
         };
-        let op5 = FranklinOp::Close(Box::new(CloseOp { tx: tx5, account_id: 1 }));
+        let op5 = FranklinOp::Close(Box::new(CloseOp {
+            tx: tx5,
+            account_id: 1,
+        }));
         let pub_data5 = op5.public_data();
         let ops5 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data5)
             .expect("cant get ops from data 5");
@@ -301,20 +307,15 @@ mod test {
         };
 
         let mut tree = FranklinAccountsState::new();
-        tree
-            .update_accounts_states_from_ops_block(&block1)
+        tree.update_accounts_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
-        tree
-            .update_accounts_states_from_ops_block(&block2)
+        tree.update_accounts_states_from_ops_block(&block2)
             .expect("Cant update state from block 2");
-        tree
-            .update_accounts_states_from_ops_block(&block3)
+        tree.update_accounts_states_from_ops_block(&block3)
             .expect("Cant update state from block 3");
-        tree
-            .update_accounts_states_from_ops_block(&block4)
+        tree.update_accounts_states_from_ops_block(&block4)
             .expect("Cant update state from block 4");
-        tree
-            .update_accounts_states_from_ops_block(&block5)
+        tree.update_accounts_states_from_ops_block(&block5)
             .expect("Cant update state from block 5");
 
         assert_eq!(
@@ -348,7 +349,10 @@ mod test {
             nonce: 1,
             signature: TxSignature::default(),
         };
-        let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp { tx: tx2, account_id: 0 }));
+        let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
+            tx: tx2,
+            account_id: 0,
+        }));
         let pub_data2 = op2.public_data();
 
         let tx3 = Transfer {
@@ -389,7 +393,10 @@ mod test {
             nonce: 2,
             signature: TxSignature::default(),
         };
-        let op5 = FranklinOp::Close(Box::new(CloseOp { tx: tx5, account_id: 1 }));
+        let op5 = FranklinOp::Close(Box::new(CloseOp {
+            tx: tx5,
+            account_id: 1,
+        }));
         let pub_data5 = op5.public_data();
 
         let mut pub_data = Vec::new();

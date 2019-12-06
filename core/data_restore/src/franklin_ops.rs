@@ -103,14 +103,13 @@ impl FranklinOpsBlock {
 mod test {
     use crate::franklin_ops::FranklinOpsBlock;
     use bigdecimal::BigDecimal;
-    use models::params::{
-        SIGNATURE_S_BIT_WIDTH_PADDED,
-        SIGNATURE_R_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED
-    };
     use models::node::tx::TxSignature;
     use models::node::{
         AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp,
         Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
+    };
+    use models::params::{
+        SIGNATURE_R_BIT_WIDTH_PADDED, SIGNATURE_S_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED,
     };
 
     #[test]
