@@ -6,25 +6,19 @@ use crate::node::{
     pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
     FranklinPriorityOp, FullExit, Transfer, Withdraw,
 };
-use crate::params::FR_ADDRESS_LEN;
+use crate::params::{
+    FR_ADDRESS_LEN, TX_TYPE_BIT_WIDTH, ACCOUNT_ID_BIT_WIDTH,
+    TOKEN_BIT_WIDTH, BALANCE_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
+    FEE_EXPONENT_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
+    NONCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, SIGNATURE_S_BIT_WIDTH_PADDED,
+    SIGNATURE_R_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED
+};
 use crate::primitives::{
     big_decimal_to_u128, bytes32_from_slice, bytes_slice_to_uint128, bytes_slice_to_uint16,
     bytes_slice_to_uint32, u128_to_bigdecimal,
 };
 use bigdecimal::BigDecimal;
 use web3::types::Address;
-
-pub const TX_TYPE_BYTES_LENGTH: usize = 1;
-pub const ACCOUNT_ID_BYTES_LENGTH: usize = 3;
-pub const TOKEN_BYTES_LENGTH: usize = 2;
-pub const FULL_AMOUNT_BYTES_LENGTH: usize = 16;
-pub const FEE_BYTES_LENGTH: usize = 2;
-pub const ETH_ADDR_BYTES_LENGTH: usize = 20;
-pub const PACKED_AMOUNT_BYTES_LENGTH: usize = 5;
-pub const NONCE_BYTES_LENGTH: usize = 4;
-pub const SIGNATURE_R_BYTES_LENGTH: usize = 32;
-pub const SIGNATURE_S_BYTES_LENGTH: usize = 32;
-pub const PUBKEY_PACKED_BYTES_LENGTH: usize = 32;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
@@ -52,18 +46,18 @@ impl DepositOp {
             return None;
         }
         let account_id_pre_length = 0;
-        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
-        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
-        let account_address_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LENGTH;
+        let token_id_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let amount_pre_length = token_id_pre_length + TOKEN_BIT_WIDTH / 8;
+        let account_address_pre_length = amount_pre_length + BALANCE_BIT_WIDTH / 8;
 
         let account_id = bytes_slice_to_uint32(
-            &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+            &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BIT_WIDTH / 8],
         )?;
         let token = bytes_slice_to_uint16(
-            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BIT_WIDTH / 8],
         )?;
         let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
-            &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
+            &bytes[amount_pre_length..amount_pre_length + BALANCE_BIT_WIDTH / 8],
         )?);
         let account = AccountAddress::from_bytes(
             &bytes[account_address_pre_length..account_address_pre_length + FR_ADDRESS_LEN],
@@ -133,17 +127,17 @@ impl TransferToNewOp {
             return None;
         }
         let from_pre_length = 0;
-        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
-        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
-        let to_address_pre_length = amount_pre_length + PACKED_AMOUNT_BYTES_LENGTH;
+        let token_id_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let amount_pre_length = token_id_pre_length + TOKEN_BIT_WIDTH / 8;
+        let to_address_pre_length = amount_pre_length + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8;
         let to_id_pre_length = to_address_pre_length + FR_ADDRESS_LEN;
-        let fee_pre_length = to_id_pre_length + ACCOUNT_ID_BYTES_LENGTH;
+        let fee_pre_length = to_id_pre_length + ACCOUNT_ID_BIT_WIDTH / 8;
 
         let from_id = bytes_slice_to_uint32(
-            &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+            &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BIT_WIDTH / 8],
         )?;
         let to_id = bytes_slice_to_uint32(
-            &bytes[to_id_pre_length..to_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+            &bytes[to_id_pre_length..to_id_pre_length + ACCOUNT_ID_BIT_WIDTH / 8],
         )?;
         let from_address = AccountAddress::zero(); // It is unknown from pubdata;
         let to_address = AccountAddress::from_bytes(
@@ -151,12 +145,12 @@ impl TransferToNewOp {
         )
         .ok()?;
         let token = bytes_slice_to_uint16(
-            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BIT_WIDTH / 8],
         )?;
         let amount = unpack_token_amount(
-            &bytes[amount_pre_length..amount_pre_length + PACKED_AMOUNT_BYTES_LENGTH],
+            &bytes[amount_pre_length..amount_pre_length + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8],
         )?;
-        let fee = unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LENGTH])?;
+        let fee = unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8])?;
         let nonce = 0; // It is unknown from pubdata
         let signature = TxSignature::default(); // It is unknown from pubdata
 
@@ -205,27 +199,27 @@ impl TransferOp {
         }
 
         let from_pre_length = 0;
-        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
-        let to_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
-        let amount_pre_length = to_pre_length + ACCOUNT_ID_BYTES_LENGTH;
-        let fee_pre_length = amount_pre_length + PACKED_AMOUNT_BYTES_LENGTH;
+        let token_id_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let to_pre_length = token_id_pre_length + TOKEN_BIT_WIDTH / 8;
+        let amount_pre_length = to_pre_length + ACCOUNT_ID_BIT_WIDTH / 8;
+        let fee_pre_length = amount_pre_length + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8;
 
         let from_address = AccountAddress::zero(); // From pubdata its unknown
         let to_address = AccountAddress::zero(); // From pubdata its unknown
         let token = bytes_slice_to_uint16(
-            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BIT_WIDTH / 8],
         )?;
         let amount = unpack_token_amount(
-            &bytes[amount_pre_length..amount_pre_length + PACKED_AMOUNT_BYTES_LENGTH],
+            &bytes[amount_pre_length..amount_pre_length + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8],
         )?;
-        let fee = unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LENGTH])?;
+        let fee = unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8])?;
         let nonce = 0; // It is unknown from pubdata
         let signature = TxSignature::default(); // It is unknown from pubdata
         let from_id = bytes_slice_to_uint32(
-            &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+            &bytes[from_pre_length..from_pre_length + ACCOUNT_ID_BIT_WIDTH / 8],
         )?;
         let to_id =
-            bytes_slice_to_uint32(&bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BYTES_LENGTH])?;
+            bytes_slice_to_uint32(&bytes[to_pre_length..to_pre_length + ACCOUNT_ID_BIT_WIDTH / 8])?;
 
         Some(Self {
             tx: Transfer {
@@ -270,25 +264,25 @@ impl WithdrawOp {
             return None;
         }
         let account_pre_length = 0;
-        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
-        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
-        let fee_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LENGTH;
-        let eth_address_pre_length = fee_pre_length + FEE_BYTES_LENGTH;
+        let token_id_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let amount_pre_length = token_id_pre_length + TOKEN_BIT_WIDTH / 8;
+        let fee_pre_length = amount_pre_length + BALANCE_BIT_WIDTH / 8;
+        let eth_address_pre_length = fee_pre_length + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
 
         let account_id = bytes_slice_to_uint32(
-            &bytes[account_pre_length..account_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+            &bytes[account_pre_length..account_pre_length + ACCOUNT_ID_BIT_WIDTH / 8],
         )?;
         let account_address = AccountAddress::zero(); // From pubdata it is unknown
         let token = bytes_slice_to_uint16(
-            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
+            &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BIT_WIDTH / 8],
         )?;
         let eth_address = Address::from_slice(
-            &bytes[eth_address_pre_length..eth_address_pre_length + ETH_ADDR_BYTES_LENGTH],
+            &bytes[eth_address_pre_length..eth_address_pre_length + ETHEREUM_KEY_BIT_WIDTH / 8],
         );
         let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
-            &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
+            &bytes[amount_pre_length..amount_pre_length + BALANCE_BIT_WIDTH / 8],
         )?);
-        let fee = unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + FEE_BYTES_LENGTH])?;
+        let fee = unpack_fee_amount(&bytes[fee_pre_length..fee_pre_length + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8])?;
         let nonce = 0; // From pubdata it is unknown
         let signature = TxSignature::default(); // From pubdata it is unknown
 
@@ -331,7 +325,7 @@ impl CloseOp {
         }
         let account_id_pre_length = 0;
         let account_id = bytes_slice_to_uint32(
-            &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+            &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BIT_WIDTH / 8],
         )?;
         let account_address = AccountAddress::zero(); // From pubdata it is unknown
         let nonce = 0; // From pubdata it is unknown
@@ -381,35 +375,35 @@ impl FullExitOp {
         }
 
         let account_id_pre_length = 0;
-        let packed_pubkey_pre_length = ACCOUNT_ID_BYTES_LENGTH;
-        let eth_address_pre_length = packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LENGTH;
-        let token_pre_length = eth_address_pre_length + ETH_ADDR_BYTES_LENGTH;
-        let nonce_pre_length = token_pre_length + TOKEN_BYTES_LENGTH;
-        let signature_r_pre_length = nonce_pre_length + NONCE_BYTES_LENGTH;
-        let signature_s_pre_length = signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH;
-        let amount_pre_length = signature_s_pre_length + SIGNATURE_S_BYTES_LENGTH;
+        let packed_pubkey_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let eth_address_pre_length = packed_pubkey_pre_length + SUBTREE_HASH_WIDTH_PADDED / 8;
+        let token_pre_length = eth_address_pre_length + ETHEREUM_KEY_BIT_WIDTH / 8;
+        let nonce_pre_length = token_pre_length + TOKEN_BIT_WIDTH / 8;
+        let signature_r_pre_length = nonce_pre_length + NONCE_BIT_WIDTH / 8;
+        let signature_s_pre_length = signature_r_pre_length + SIGNATURE_R_BIT_WIDTH_PADDED / 8;
+        let amount_pre_length = signature_s_pre_length + SIGNATURE_S_BIT_WIDTH_PADDED / 8;
 
         let account_id = bytes_slice_to_uint32(
-            &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BYTES_LENGTH],
+            &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BIT_WIDTH / 8],
         )?;
         let packed_pubkey = Box::from(bytes32_from_slice(
-            &bytes[packed_pubkey_pre_length..packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LENGTH],
+            &bytes[packed_pubkey_pre_length..packed_pubkey_pre_length + SUBTREE_HASH_WIDTH_PADDED / 8],
         )?);
         let eth_address = Address::from_slice(
-            &bytes[eth_address_pre_length..eth_address_pre_length + ETH_ADDR_BYTES_LENGTH],
+            &bytes[eth_address_pre_length..eth_address_pre_length + ETHEREUM_KEY_BIT_WIDTH / 8],
         );
         let token =
-            bytes_slice_to_uint16(&bytes[token_pre_length..token_pre_length + TOKEN_BYTES_LENGTH])?;
+            bytes_slice_to_uint16(&bytes[token_pre_length..token_pre_length + TOKEN_BIT_WIDTH / 8])?;
         let nonce =
-            bytes_slice_to_uint32(&bytes[nonce_pre_length..nonce_pre_length + NONCE_BYTES_LENGTH])?;
+            bytes_slice_to_uint32(&bytes[nonce_pre_length..nonce_pre_length + NONCE_BIT_WIDTH / 8])?;
         let signature_r = Box::from(bytes32_from_slice(
-            &bytes[signature_r_pre_length..signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH],
+            &bytes[signature_r_pre_length..signature_r_pre_length + SIGNATURE_R_BIT_WIDTH_PADDED / 8],
         )?);
         let signature_s = Box::from(bytes32_from_slice(
-            &bytes[signature_s_pre_length..signature_s_pre_length + SIGNATURE_S_BYTES_LENGTH],
+            &bytes[signature_s_pre_length..signature_s_pre_length + SIGNATURE_S_BIT_WIDTH_PADDED / 8],
         )?);
         let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
-            &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
+            &bytes[amount_pre_length..amount_pre_length + BALANCE_BIT_WIDTH / 8],
         )?);
 
         // If full exit amount is 0 - full exit is considered failed

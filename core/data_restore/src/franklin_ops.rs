@@ -2,7 +2,8 @@ use crate::events::EventData;
 use crate::helpers::{
     get_ethereum_transaction, get_input_data_from_ethereum_transaction, DataRestoreError,
 };
-use models::node::operations::{FranklinOp, TX_TYPE_BYTES_LENGTH};
+use models::node::operations::FranklinOp;
+use models::params::TX_TYPE_BIT_WIDTH;
 use models::primitives::bytes_slice_to_uint32;
 
 const BLOCK_NUMBER_LENGTH: usize = 32;
@@ -66,7 +67,7 @@ impl FranklinOpsBlock {
             let pub_data_size = FranklinOp::public_data_length(op_type)
                 .ok_or_else(|| DataRestoreError::WrongData("Wrong op type".to_string()))?;
 
-            let pre = current_pointer + TX_TYPE_BYTES_LENGTH;
+            let pre = current_pointer + TX_TYPE_BIT_WIDTH / 8;
             let post = pre + pub_data_size;
 
             let op = FranklinOp::from_bytes(op_type, &data[pre..post])
@@ -103,8 +104,9 @@ impl FranklinOpsBlock {
 mod test {
     use crate::franklin_ops::FranklinOpsBlock;
     use bigdecimal::BigDecimal;
-    use models::node::operations::{
-        PUBKEY_PACKED_BYTES_LENGTH, SIGNATURE_R_BYTES_LENGTH, SIGNATURE_S_BYTES_LENGTH,
+    use models::params::{
+        SIGNATURE_S_BIT_WIDTH_PADDED,
+        SIGNATURE_R_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED
     };
     use models::node::tx::TxSignature;
     use models::node::{
@@ -152,9 +154,9 @@ mod test {
 
     #[test]
     fn test_successfull_full_exit() {
-        let packed_pubkey = Box::new([7u8; PUBKEY_PACKED_BYTES_LENGTH]);
-        let signature_r = Box::new([8u8; SIGNATURE_R_BYTES_LENGTH]);
-        let signature_s = Box::new([9u8; SIGNATURE_S_BYTES_LENGTH]);
+        let packed_pubkey = Box::new([7u8; SUBTREE_HASH_WIDTH_PADDED / 8]);
+        let signature_r = Box::new([8u8; SIGNATURE_R_BIT_WIDTH_PADDED / 8]);
+        let signature_s = Box::new([9u8; SIGNATURE_S_BIT_WIDTH_PADDED / 8]);
         let priority_op = FullExit {
             account_id: 11,
             packed_pubkey,
@@ -176,9 +178,9 @@ mod test {
 
     #[test]
     fn test_failed_full_exit() {
-        let packed_pubkey = Box::new([7u8; PUBKEY_PACKED_BYTES_LENGTH]);
-        let signature_r = Box::new([8u8; SIGNATURE_R_BYTES_LENGTH]);
-        let signature_s = Box::new([9u8; SIGNATURE_S_BYTES_LENGTH]);
+        let packed_pubkey = Box::new([7u8; SUBTREE_HASH_WIDTH_PADDED / 8]);
+        let signature_r = Box::new([8u8; SIGNATURE_R_BIT_WIDTH_PADDED / 8]);
+        let signature_s = Box::new([9u8; SIGNATURE_S_BIT_WIDTH_PADDED / 8]);
         let priority_op = FullExit {
             account_id: 11,
             packed_pubkey,
