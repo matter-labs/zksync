@@ -7,7 +7,7 @@ use crate::node::{
     FranklinPriorityOp, FullExit, Transfer, Withdraw,
 };
 use crate::params::{
-    FR_ADDRESS_LEN, TX_TYPE_BIT_WIDTH, ACCOUNT_ID_BIT_WIDTH,
+    FR_ADDRESS_LEN, ACCOUNT_ID_BIT_WIDTH,
     TOKEN_BIT_WIDTH, BALANCE_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
     FEE_EXPONENT_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
     NONCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, SIGNATURE_S_BIT_WIDTH_PADDED,
@@ -45,8 +45,8 @@ impl DepositOp {
         if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
-        let account_id_pre_length = 0;
-        let token_id_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let account_id_pre_length = 1;
+        let token_id_pre_length = account_id_pre_length + ACCOUNT_ID_BIT_WIDTH / 8;
         let amount_pre_length = token_id_pre_length + TOKEN_BIT_WIDTH / 8;
         let account_address_pre_length = amount_pre_length + BALANCE_BIT_WIDTH / 8;
 
@@ -126,8 +126,8 @@ impl TransferToNewOp {
         if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
-        let from_pre_length = 0;
-        let token_id_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let from_pre_length = 1;
+        let token_id_pre_length = from_pre_length + ACCOUNT_ID_BIT_WIDTH / 8;
         let amount_pre_length = token_id_pre_length + TOKEN_BIT_WIDTH / 8;
         let to_address_pre_length = amount_pre_length + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8;
         let to_id_pre_length = to_address_pre_length + FR_ADDRESS_LEN;
@@ -198,8 +198,8 @@ impl TransferOp {
             return None;
         }
 
-        let from_pre_length = 0;
-        let token_id_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let from_pre_length = 1;
+        let token_id_pre_length = from_pre_length + ACCOUNT_ID_BIT_WIDTH / 8;
         let to_pre_length = token_id_pre_length + TOKEN_BIT_WIDTH / 8;
         let amount_pre_length = to_pre_length + ACCOUNT_ID_BIT_WIDTH / 8;
         let fee_pre_length = amount_pre_length + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8;
@@ -263,8 +263,8 @@ impl WithdrawOp {
         if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
-        let account_pre_length = 0;
-        let token_id_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let account_pre_length = 1;
+        let token_id_pre_length = account_pre_length + ACCOUNT_ID_BIT_WIDTH / 8;
         let amount_pre_length = token_id_pre_length + TOKEN_BIT_WIDTH / 8;
         let fee_pre_length = amount_pre_length + BALANCE_BIT_WIDTH / 8;
         let eth_address_pre_length = fee_pre_length + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8;
@@ -323,7 +323,7 @@ impl CloseOp {
         if bytes.len() != Self::CHUNKS * 8 {
             return None;
         }
-        let account_id_pre_length = 0;
+        let account_id_pre_length = 1;
         let account_id = bytes_slice_to_uint32(
             &bytes[account_id_pre_length..account_id_pre_length + ACCOUNT_ID_BIT_WIDTH / 8],
         )?;
@@ -374,8 +374,8 @@ impl FullExitOp {
             return None;
         }
 
-        let account_id_pre_length = 0;
-        let packed_pubkey_pre_length = ACCOUNT_ID_BIT_WIDTH / 8;
+        let account_id_pre_length = 1;
+        let packed_pubkey_pre_length = account_id_pre_length + ACCOUNT_ID_BIT_WIDTH / 8;
         let eth_address_pre_length = packed_pubkey_pre_length + SUBTREE_HASH_WIDTH_PADDED / 8;
         let token_pre_length = eth_address_pre_length + ETHEREUM_KEY_BIT_WIDTH / 8;
         let nonce_pre_length = token_pre_length + TOKEN_BIT_WIDTH / 8;
@@ -465,7 +465,8 @@ impl FranklinOp {
         }
     }
 
-    pub fn from_bytes(op_type: u8, bytes: &[u8]) -> Option<Self> {
+    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
+        let op_type: u8 = bytes[0];
         match op_type {
             NoopOp::OP_CODE => Some(FranklinOp::Noop(NoopOp::from_bytes(&bytes)?)),
             DepositOp::OP_CODE => Some(FranklinOp::Deposit(Box::new(DepositOp::from_bytes(

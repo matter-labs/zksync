@@ -67,10 +67,10 @@ impl FranklinOpsBlock {
             let pub_data_size = FranklinOp::public_data_length(op_type)
                 .ok_or_else(|| DataRestoreError::WrongData("Wrong op type".to_string()))?;
 
-            let pre = current_pointer + TX_TYPE_BIT_WIDTH / 8;
+            let pre = current_pointer;
             let post = pre + pub_data_size;
 
-            let op = FranklinOp::from_bytes(op_type, &data[pre..post])
+            let op = FranklinOp::from_bytes(&data[pre..post])
                 .ok_or_else(|| DataRestoreError::WrongData("Wrong data".to_string()))?;
             ops.push(op);
             current_pointer += pub_data_size;
@@ -130,7 +130,7 @@ mod test {
         let pub_data = op.public_data();
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
             .expect("cant get ops from data");
-        println!("{:?}", ops);
+        println!("ops {:?}", ops);
     }
 
     #[test]
@@ -149,7 +149,7 @@ mod test {
         let pub_data = op.public_data();
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
             .expect("cant get ops from data");
-        println!("{:?}", ops);
+        println!("ops {:?}", ops);
     }
 
     #[test]
@@ -173,7 +173,7 @@ mod test {
         let pub_data = op.public_data();
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
             .expect("cant get ops from data");
-        println!("{:?}", ops);
+        println!("ops {:?}", ops);
     }
 
     #[test]
@@ -197,7 +197,7 @@ mod test {
         let pub_data = op.public_data();
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
             .expect("cant get ops from data");
-        println!("{:?}", ops);
+        println!("ops {:?}", ops);
     }
 
     #[test]
@@ -219,7 +219,7 @@ mod test {
         let pub_data = op.public_data();
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
             .expect("cant get ops from data");
-        println!("{:?}", ops);
+        println!("ops {:?}", ops);
     }
 
     #[test]
@@ -241,7 +241,7 @@ mod test {
         let pub_data = op.public_data();
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
             .expect("cant get ops from data");
-        println!("{:?}", ops);
+        println!("ops {:?}", ops);
     }
 
     #[test]
@@ -256,6 +256,6 @@ mod test {
         let pub_data = op.public_data();
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
             .expect("cant get ops from data");
-        println!("{:?}", ops);
+        println!("ops {:?}", ops);
     }
 }
