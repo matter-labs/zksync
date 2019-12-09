@@ -1,6 +1,6 @@
 #![allow(clippy::needless_return)]
 
-use super::event_notify::{start_sub_notifier, EventSubscribe};
+use super::event_notify::{start_sub_notifier, EventSubscribeRequest};
 use crate::api_server::event_notify::EventNotifierRequest;
 use crate::api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp};
 use crate::ThreadPanicNotify;
@@ -96,11 +96,11 @@ impl RpcPubSub for RpcSubApp {
         self.event_sub_sender
             .clone()
             .try_send(EventNotifierRequest::Sub(
-                EventSubscribe::Transaction {
+                EventSubscribeRequest::Transaction {
                     hash,
                     action,
                     subscriber,
-                }, //TODO PRINT ERR
+                },
             ))
             .unwrap_or_default();
     }
@@ -122,11 +122,11 @@ impl RpcPubSub for RpcSubApp {
         self.event_sub_sender
             .clone()
             .try_send(EventNotifierRequest::Sub(
-                EventSubscribe::PriorityOp {
+                EventSubscribeRequest::PriorityOp {
                     serial_id,
                     action,
                     subscriber,
-                }, //TODO PRINT ERR
+                },
             ))
             .unwrap_or_default();
     }
@@ -147,13 +147,11 @@ impl RpcPubSub for RpcSubApp {
     ) {
         self.event_sub_sender
             .clone()
-            .try_send(EventNotifierRequest::Sub(
-                EventSubscribe::Account {
-                    address,
-                    action,
-                    subscriber,
-                }, //TODO PRINT ERR
-            ))
+            .try_send(EventNotifierRequest::Sub(EventSubscribeRequest::Account {
+                address,
+                action,
+                subscriber,
+            }))
             .unwrap_or_default();
     }
 

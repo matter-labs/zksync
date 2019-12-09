@@ -49,7 +49,6 @@ impl AppState {
                 let pool = state.connection_pool.clone();
                 let storage = pool.access_storage().expect("db failed");
 
-                // TODO: add flag for failure?
                 let last_verified = storage.get_last_verified_block().unwrap_or(0);
                 let status = NetworkStatus {
                     next_block_at_max: None,
@@ -58,8 +57,6 @@ impl AppState {
                     total_transactions: storage.count_total_transactions().unwrap_or(0),
                     outstanding_txs: storage.count_outstanding_proofs(last_verified).unwrap_or(0),
                 };
-
-                // TODO: send StateKeeperRequest::GetNetworkStatus(tx) and get result
 
                 // save status to state
                 *state.network_status.0.as_ref().write().unwrap() = status;
@@ -79,7 +76,6 @@ struct TestnetConfigResponse {
     address: String,
 }
 
-// TODO: remove, JSON-rpc get contract should be used instead
 fn handle_get_testnet_config(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let address = data.contract_address.clone();
     Ok(HttpResponse::Ok().json(TestnetConfigResponse { address }))

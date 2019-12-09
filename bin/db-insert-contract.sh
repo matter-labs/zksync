@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Force read env -- this is important, sp that we re-ready the new contract value after redeploy!!!
-FRANKLIN_ENV=
+ZKSYNC_ENV=
 . .setup_env
 
 psql "$DATABASE_URL" -c "INSERT INTO server_config (contract_addr, gov_contract_addr) \

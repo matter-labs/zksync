@@ -1,5 +1,5 @@
 use super::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
-use crate::api_server::rpc_server::ResponseAccountState;
+use crate::api_server::rpc_server::{BlockInfo, ResponseAccountState};
 use crate::ThreadPanicNotify;
 use actix::FinishStream;
 use failure::{bail, format_err};
@@ -21,9 +21,9 @@ use tokio::spawn;
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
 const TX_SUB_PREFIX: &str = "txsub";
 const ETHOP_SUB_PREFIX: &str = "eosub";
-const ACCOUTN_SUB_PREFIX: &str = "acsub";
+const ACCOUNT_SUB_PREFIX: &str = "acsub";
 
-pub enum EventSubscribe {
+pub enum EventSubscribeRequest {
     Transaction {
         hash: TxHash,
         action: ActionType,
@@ -42,13 +42,13 @@ pub enum EventSubscribe {
 }
 
 pub enum EventNotifierRequest {
-    Sub(EventSubscribe),
+    Sub(EventSubscribeRequest),
     Unsub(SubscriptionId),
 }
 
 enum BlockNotifierInput {
-    NewOperationCommited(Operation),
-    EventNotifiyRequest(EventNotifierRequest),
+    NewOperationCommitted(Operation),
+    EventNotifyRequest(EventNotifierRequest),
 }
 
 struct SubscriptionSender<T> {
@@ -75,10 +75,10 @@ impl OperationNotifier {
         input_stream
             .map(move |input| {
                 let res = match input {
-                    BlockNotifierInput::EventNotifiyRequest(sub) => self
+                    BlockNotifierInput::EventNotifyRequest(sub) => self
                         .handle_notify_req(sub)
                         .map_err(|e| format_err!("Failed to handle sub request: {}", e)),
-                    BlockNotifierInput::NewOperationCommited(op) => self
+                    BlockNotifierInput::NewOperationCommitted(op) => self
                         .handle_new_block(op)
                         .map_err(|e| format_err!("Failed to handle new block: {}", e)),
                 };
@@ -121,7 +121,7 @@ impl OperationNotifier {
                     }
                 }
             }
-            ACCOUTN_SUB_PREFIX => {
+            ACCOUNT_SUB_PREFIX => {
                 let account_id: AccountId = sub_unique_id.parse()?;
                 if let Some(mut subs) = self.account_subs.remove(&(account_id, sub_action)) {
                     subs.retain(|sub| sub.id != sub_id);
@@ -138,17 +138,17 @@ impl OperationNotifier {
     fn handle_notify_req(&mut self, new_sub: EventNotifierRequest) -> Result<(), failure::Error> {
         match new_sub {
             EventNotifierRequest::Sub(event_sub) => match event_sub {
-                EventSubscribe::Transaction {
+                EventSubscribeRequest::Transaction {
                     hash,
                     action,
                     subscriber,
                 } => self.handle_transaction_sub(hash, action, subscriber),
-                EventSubscribe::PriorityOp {
+                EventSubscribeRequest::PriorityOp {
                     serial_id,
                     action,
                     subscriber,
                 } => self.handle_priority_op_sub(serial_id, action, subscriber),
-                EventSubscribe::Account {
+                EventSubscribeRequest::Account {
                     address,
                     action,
                     subscriber,
@@ -175,38 +175,58 @@ impl OperationNotifier {
             rand::random::<u64>()
         ));
 
-        // TODO: tmp
-        let rec = ETHOpInfoResp {
-            executed: true,
-            block: None,
-        };
-
         // Maybe it was executed already
         let storage = self.db_pool.access_storage()?;
         let executed_op = storage.get_executed_priority_op(serial_id as u32)?;
         if let Some(executed_op) = executed_op {
+            let block_info = if let Some(block_with_op) =
+                storage.get_block(executed_op.block_number as u32)?
+            {
+                let verified = if let Some(block_verify) = storage.load_stored_op_with_block_number(
+                    executed_op.block_number as u32,
+                    ActionType::VERIFY,
+                ) {
+                    block_verify.confirmed
+                } else {
+                    false
+                };
+
+                BlockInfo {
+                    block_number: block_with_op.block_number as i64,
+                    committed: true,
+                    verified,
+                }
+            } else {
+                bail!("Transaction is executed but block is not committed. (bug)");
+            };
+
             match action {
                 ActionType::COMMIT => {
                     let sink = sub
                         .assign_id(sub_id)
                         .map_err(|_| format_err!("SubIdAssign"))?;
-                    // TODO:
-                    send_once(sink, rec);
+                    send_once(
+                        sink,
+                        ETHOpInfoResp {
+                            executed: true,
+                            block: Some(block_info),
+                        },
+                    );
                     return Ok(());
                 }
                 ActionType::VERIFY => {
-                    if let Some(block_verify) = storage.load_stored_op_with_block_number(
-                        executed_op.block_number as u32,
-                        ActionType::VERIFY,
-                    ) {
-                        if block_verify.confirmed {
-                            let sink = sub
-                                .assign_id(sub_id)
-                                .map_err(|_| format_err!("SubIdAssign"))?;
-                            // TODO:
-                            send_once(sink, rec);
-                            return Ok(());
-                        }
+                    if block_info.verified {
+                        let sink = sub
+                            .assign_id(sub_id)
+                            .map_err(|_| format_err!("SubIdAssign"))?;
+                        send_once(
+                            sink,
+                            ETHOpInfoResp {
+                                executed: true,
+                                block: Some(block_info),
+                            },
+                        );
+                        return Ok(());
                     }
                 }
             }
@@ -232,16 +252,6 @@ impl OperationNotifier {
         action: ActionType,
         sub: Subscriber<TransactionInfoResp>,
     ) -> Result<(), failure::Error> {
-        // Maybe tx was executed already.
-        let receipt = self.db_pool.access_storage()?.tx_receipt(hash.as_ref())?;
-        // TODO: change to good.
-        let rec = TransactionInfoResp {
-            executed: true,
-            success: None,
-            fail_reason: None,
-            block: None,
-        };
-
         let id = SubscriptionId::String(format!(
             "{}/{}/{}/{}",
             TX_SUB_PREFIX,
@@ -250,19 +260,28 @@ impl OperationNotifier {
             rand::random::<u64>()
         ));
 
-        if let Some(receipt) = receipt {
+        // Maybe tx was executed already.
+        if let Some(receipt) = self.db_pool.access_storage()?.tx_receipt(hash.as_ref())? {
+            let tx_info_resp = TransactionInfoResp {
+                executed: true,
+                success: Some(receipt.success),
+                fail_reason: receipt.fail_reason,
+                block: Some(BlockInfo {
+                    block_number: receipt.block_number,
+                    committed: receipt.success,
+                    verified: receipt.verified,
+                }),
+            };
             match action {
                 ActionType::COMMIT => {
                     let sink = sub.assign_id(id).map_err(|_| format_err!("SubIdAssign"))?;
-                    // TODO:
-                    send_once(sink, rec);
+                    send_once(sink, tx_info_resp);
                     return Ok(());
                 }
                 ActionType::VERIFY => {
                     if receipt.verified {
                         let sink = sub.assign_id(id).map_err(|_| format_err!("SubIdAssign"))?;
-                        // TODO:
-                        send_once(sink, rec);
+                        send_once(sink, tx_info_resp);
                         return Ok(());
                     }
                 }
@@ -301,7 +320,7 @@ impl OperationNotifier {
 
         let sub_id = SubscriptionId::String(format!(
             "{}/{}/{}/{}",
-            ACCOUTN_SUB_PREFIX,
+            ACCOUNT_SUB_PREFIX,
             address.to_hex(),
             action.to_string(),
             rand::random::<u64>()
@@ -345,12 +364,15 @@ impl OperationNotifier {
                 ExecutedOperations::Tx(tx) => {
                     let hash = tx.tx.hash();
                     if let Some(subs) = self.tx_subs.remove(&(hash, action)) {
-                        // TODO: change to good.
                         let rec = TransactionInfoResp {
                             executed: true,
-                            success: None,
-                            fail_reason: None,
-                            block: None,
+                            success: Some(tx.success),
+                            fail_reason: tx.fail_reason,
+                            block: Some(BlockInfo {
+                                block_number: op.block.block_number as i64,
+                                committed: true,
+                                verified: action == ActionType::VERIFY,
+                            }),
                         };
                         for sub in subs {
                             send_once(sub.sink, rec.clone());
@@ -360,10 +382,13 @@ impl OperationNotifier {
                 ExecutedOperations::PriorityOp(prior_op) => {
                     let id = prior_op.priority_op.serial_id;
                     if let Some(subs) = self.prior_op_subs.remove(&(id, action)) {
-                        // TODO: tmp
                         let rec = ETHOpInfoResp {
                             executed: true,
-                            block: None,
+                            block: Some(BlockInfo {
+                                block_number: op.block.block_number as i64,
+                                committed: true,
+                                verified: action == ActionType::VERIFY,
+                            }),
                         };
                         for sub in subs {
                             send_once(sub.sink, rec.clone());
@@ -427,8 +452,8 @@ pub fn start_sub_notifier<BStream, SStream>(
         account_subs: BTreeMap::new(),
     };
     let input_stream = new_block_stream
-        .map(BlockNotifierInput::NewOperationCommited)
-        .select(subscription_stream.map(BlockNotifierInput::EventNotifiyRequest));
+        .map(BlockNotifierInput::NewOperationCommitted)
+        .select(subscription_stream.map(BlockNotifierInput::EventNotifyRequest));
     std::thread::Builder::new()
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);

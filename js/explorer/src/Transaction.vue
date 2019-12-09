@@ -12,19 +12,23 @@
     </b-navbar>
     <br>
     <b-container>
-        <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
-        <h5 class="mt-3">Transaction data</h5>
-        <img 
+        <div v-if="loading">
+            <h5 class="mt-3">Transaction data</h5>
+            <img 
             src="./assets/loading.gif" 
             width="100" 
-            height="100"
-            v-if="loading">
-        <b-card v-else no-body class="table-margin-hack">
-            <b-table responsive thead-class="hidden_header" :items="props">
-                <template v-slot:cell(value)="data"><span v-html="data.item['value']" /></template>
-            </b-table>
-        </b-card>
-        <br>
+            height="100">
+        </div>
+        <div v-else>
+            <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
+            <h5 class="mt-3">Transaction data</h5>
+            <b-card no-body class="table-margin-hack">
+                <b-table responsive thead-class="hidden_header" :items="props">
+                    <template v-slot:cell(value)="data"><span v-html="data.item['value']" /></template>
+                </b-table>
+            </b-card>
+            <br>
+        </div>
     </b-container>
 </div>
 </template>
