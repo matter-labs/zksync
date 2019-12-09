@@ -197,7 +197,7 @@ mod test {
     };
 
     #[test]
-    fn test_tree_consistent_update() {
+    fn test_update_tree_with_one_tx_per_block() {
         let tx1 = Deposit {
             sender: [9u8; 20].into(),
             token: 1,
@@ -319,13 +319,35 @@ mod test {
             .expect("Cant update state from block 5");
 
         assert_eq!(
-            tree.root_hash().to_string(),
-            "Fr(0x06210ec05cbdd8a974447f23aa9a2e2a6c6fe500620bd4ffc0d9752d1034a062)".to_string()
+            tree.get_accounts().len(),
+            2
+        );
+
+        let zero_acc = tree.get_account(0)
+            .expect("Cant get 0 account");
+        assert_eq!(
+            zero_acc.address,
+            AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap()
+        );
+        assert_eq!(
+            zero_acc.get_balance(1),
+            BigDecimal::from(980)
+        );
+
+        let first_acc = tree.get_account(1)
+            .expect("Cant get 0 account");
+        assert_eq!(
+            first_acc.address,
+            AccountAddress::from_hex("0x0000000000000000000000000000000000000000").unwrap()
+        );
+        assert_eq!(
+            first_acc.get_balance(1),
+            BigDecimal::from(0)
         );
     }
 
     #[test]
-    fn test_tree_inconsistent_update() {
+    fn test_update_tree_with_multiple_txs_per_block() {
         let tx1 = Deposit {
             sender: [9u8; 20].into(),
             token: 1,
@@ -415,13 +437,35 @@ mod test {
         };
 
         let mut tree = FranklinAccountsState::new();
-        let updates = tree
+        tree
             .update_accounts_states_from_ops_block(&block)
             .expect("Cant update state from block");
 
         assert_eq!(
-            tree.root_hash().to_string(),
-            "Fr(0x06210ec05cbdd8a974447f23aa9a2e2a6c6fe500620bd4ffc0d9752d1034a062)".to_string()
+            tree.get_accounts().len(),
+            2
+        );
+
+        let zero_acc = tree.get_account(0)
+            .expect("Cant get 0 account");
+        assert_eq!(
+            zero_acc.address,
+            AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap()
+        );
+        assert_eq!(
+            zero_acc.get_balance(1),
+            BigDecimal::from(980)
+        );
+
+        let first_acc = tree.get_account(1)
+            .expect("Cant get 0 account");
+        assert_eq!(
+            first_acc.address,
+            AccountAddress::from_hex("0x0000000000000000000000000000000000000000").unwrap()
+        );
+        assert_eq!(
+            first_acc.get_balance(1),
+            BigDecimal::from(0)
         );
     }
 }
