@@ -498,6 +498,27 @@ export class WalletDecorator {
         }
     }
 
+    async revertReason(tx_hash) {
+        const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
+        const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
+
+        console.log({tx, code});
+
+        if (code == '0x') {
+            return '';
+        } else {
+            return code
+                .substr(138)
+                .match(/../g)
+                .map(h => parseInt(h, 16))
+                .map(String.fromCharCode)
+                .join('')
+                .split('')
+                .filter(c => /\w/.test(c))
+                .join('');
+        }
+    }
+
     async * verboseDeposit(options) {
         const token = options.token === "ETH" ? "ETH" : tokenInfoFromSymbol(options.token).address;
         const amount = utils.bigNumberify(options.amount);
@@ -681,11 +702,14 @@ export class WalletDecorator {
                 yield error(`Transaction ${tx_hash_html} failed with empty revert reason.`);
             } else {
                 const reason = code
-                    .substr(138)
-                    .match(/../g)
-                    .map(h => parseInt(h, 16))
-                    .map(String.fromCharCode)
-                    .join('');
+                .substr(138)
+                .match(/../g)
+                .map(h => parseInt(h, 16))
+                .map(String.fromCharCode)
+                .join('')
+                .split('')
+                .filter(c => /\w/.test(c))
+                .join('');
                 yield error(`Transaction ${tx_hash_html} failed with <code>${reason}<code>.`);
             }
         }
