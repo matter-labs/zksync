@@ -1,10 +1,6 @@
 <template>
     <b-card title="Main chain">
         <b-col>
-            <label for="ethereumAddressFormInput">Address</label> 
-                (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+ethereumAddress"
-                    target="blanc">block explorer</a>):
-            <CopyableAddress id="ethereumAddressFormInput" :address="ethereumAddress"></CopyableAddress>
             <img v-if="disabledReason == 'Not loaded yet.'" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
             <p class="mt-3" v-else-if="disabledReason == 'No tokens'">
                 <b>Your Main chain balance is empty.</b>
@@ -38,12 +34,10 @@ import { ethers } from 'ethers';
 import { readableEther, getDisplayableBalanceList, sleep } from '../utils';
 
 import TokenNameButton from './TokenNameButton.vue';
-import CopyableAddress from './CopyableAddress.vue';
 import CompleteOperationButton from './CompleteOperationButton.vue';
 
 const components = {
     TokenNameButton,
-    CopyableAddress,
     CompleteOperationButton,
 };
 

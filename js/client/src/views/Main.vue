@@ -3,7 +3,7 @@
         <header>
             <b-navbar toggleable="md" type="dark" variant="info" class="mb-4">
                 <b-container>
-                    <a href="/explorer/"><b-navbar-brand>Matter Network</b-navbar-brand></a>
+                    <a href="/explorer/"><b-navbar-brand>ZK Sync Devnet</b-navbar-brand></a>
                     <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
                     <b-collapse id="nav-collapse" is-nav>
                         <b-navbar-nav target>
@@ -111,7 +111,7 @@ export default {
                 let message = e.message;
                 let franklinServerReachable = await isReachable(this.config.API_SERVER);
                 if (franklinServerReachable == false) {
-                    message = "Franklin server unavailable, check your internet connection.";
+                    message = "ZK Sync server unavailable, check your internet connection.";
                 }
                 
                 this.displayAlert({

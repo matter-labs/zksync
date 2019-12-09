@@ -18,7 +18,7 @@
                 </FeeSelector>
             </div>
             <div v-else>
-                The fee is <b>ETH</b> {{ depositFee }}. The change will be put on your Matter account.
+                The fee is <b>ETH</b> {{ depositFee }}. The change will be put on your ZK Sync account.
             </div>
             <p v-if="alertVisible"> {{ alertText }} </p>
             <b-button class="w-50 mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
