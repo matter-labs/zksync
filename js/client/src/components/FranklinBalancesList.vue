@@ -1,10 +1,6 @@
 <template>
     <b-card title="ZK Sync Devnet">
         <b-col>
-            <label for="franklinAddressFormInput">Address</label> 
-                <!-- (<a v-bind:href="'https://rinkeby.etherscan.io/address/'+franklinAddress"
-                    target="blanc">block explorer</a>): -->
-            <CopyableAddress id="franklinAddressFormInput" :address="franklinAddress"></CopyableAddress>
             <img v-if="disabledReason == 'Not loaded'" style="margin-right: 1.5em" src="../assets/loading.gif" width="100em">
             <p class="mt-3" v-else-if="disabledReason == 'No tokens'">
                 <b>Your ZK Sync balance is empty.</b>
@@ -41,11 +37,9 @@
 import { readableEther, isReadablyPrintable, readablyPrintableTokens } from '../utils';
 
 import TokenNameButton from './TokenNameButton.vue';
-import CopyableAddress from './CopyableAddress.vue';
 
 const components = {
     TokenNameButton,
-    CopyableAddress,
 };
 
 export default {
