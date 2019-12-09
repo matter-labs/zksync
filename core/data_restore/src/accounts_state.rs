@@ -1,5 +1,5 @@
 use crate::franklin_ops::FranklinOpsBlock;
-use crate::helpers::DataRestoreError;
+use failure::format_err;
 use models::node::account::{Account, AccountAddress};
 use models::node::operations::FranklinOp;
 use models::node::priority_ops::FranklinPriorityOp;
@@ -50,7 +50,7 @@ impl FranklinAccountsState {
     pub fn update_accounts_states_from_ops_block(
         &mut self,
         block: &FranklinOpsBlock,
-    ) -> Result<AccountUpdates, DataRestoreError> {
+    ) -> Result<AccountUpdates, failure::Error> {
         let operations = block.ops.clone();
 
         let mut accounts_updated = Vec::new();
@@ -71,7 +71,7 @@ impl FranklinAccountsState {
                 }
                 FranklinOp::TransferToNew(mut op) => {
                     let from = self.state.get_account(op.from).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
+                        format_err!("Nonexistent account")
                     })?;
                     op.tx.from = from.address;
                     op.tx.nonce = from.nonce;
@@ -88,7 +88,7 @@ impl FranklinAccountsState {
                 FranklinOp::Withdraw(mut op) => {
                     // Withdraw op comes with empty Account Address and Nonce fields
                     let account = self.state.get_account(op.account_id).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
+                        format_err!("Nonexistent account")
                     })?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
@@ -105,7 +105,7 @@ impl FranklinAccountsState {
                 FranklinOp::Close(mut op) => {
                     // Close op comes with empty Account Address and Nonce fields
                     let account = self.state.get_account(op.account_id).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
+                        format_err!("Nonexistent account")
                     })?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
@@ -121,10 +121,10 @@ impl FranklinAccountsState {
                 }
                 FranklinOp::Transfer(mut op) => {
                     let from = self.state.get_account(op.from).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
+                        format_err!("Nonexistent account")
                     })?;
                     let to = self.state.get_account(op.to).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
+                        format_err!("Nonexistent account")
                     })?;
                     op.tx.from = from.address;
                     op.tx.to = to.address;
@@ -156,7 +156,7 @@ impl FranklinAccountsState {
         }
         let fee_account_address = self
             .get_account(block.fee_account)
-            .ok_or_else(|| DataRestoreError::WrongData("Nonexistent fee account".to_string()))?
+            .ok_or_else(|| format_err!("Nonexistent account"))?
             .address;
         let (_, fee_updates) = self.state.collect_fee(&fees, &fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());

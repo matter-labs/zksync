@@ -8,6 +8,7 @@ use serde_json;
 use web3::futures::Future;
 use web3::types::{Address, H256};
 use web3::types::{Transaction, TransactionId};
+use failure::format_err;
 // Workspace uses
 use models::abi::FRANKLIN_CONTRACT;
 
@@ -74,14 +75,12 @@ impl DataRestoreConfig {
 ///
 pub fn get_input_data_from_ethereum_transaction(
     transaction: &Transaction,
-) -> Result<Vec<u8>, DataRestoreError> {
+) -> Result<Vec<u8>, failure::Error> {
     let input_data = transaction.clone().input.0;
     if input_data.len() > FUNC_NAME_HASH_LENGTH {
         Ok(input_data[FUNC_NAME_HASH_LENGTH..input_data.len()].to_vec())
     } else {
-        Err(DataRestoreError::NoData(
-            "No commitment data in tx".to_string(),
-        ))
+        Err(format_err!("No commitment data in tx"))
     }
 }
 
@@ -91,59 +90,17 @@ pub fn get_input_data_from_ethereum_transaction(
 ///
 /// * `transaction_hash` - The identifier of the particular Ethereum transaction
 ///
-pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, DataRestoreError> {
+pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, failure::Error> {
     let tx_id = TransactionId::Hash(*transaction_hash);
     let (_eloop, transport) =
         web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-            .map_err(|_| DataRestoreError::WrongEndpoint)?;
+            .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
     let web3 = web3::Web3::new(transport);
     let web3_transaction = web3
         .eth()
         .transaction(tx_id)
         .wait()
-        .map_err(|e| DataRestoreError::Unknown(e.to_string()))?
-        .ok_or_else(|| DataRestoreError::NoData("No tx by this hash".to_string()))?;
+        .map_err(|e| format_err!("No response from web3: {}", e.to_string()))?
+        .ok_or_else(|| format_err!("No tx with this hash"))?;
     Ok(web3_transaction)
-}
-
-/// Specific errors that may occure during data restoring
-#[derive(Debug, Clone)]
-pub enum DataRestoreError {
-    /// Unknown error with description
-    Unknown(String),
-    /// Storage error with description
-    Storage(String),
-    /// Wrong data with description
-    WrongData(String),
-    /// Got no data with description
-    NoData(String),
-    /// Wrong endpoint
-    WrongEndpoint,
-    /// Updating failed with description
-    StateUpdate(String),
-}
-
-impl std::string::ToString for DataRestoreError {
-    fn to_string(&self) -> String {
-        match self {
-            DataRestoreError::Unknown(text) => format!("Unknown {}", text),
-            DataRestoreError::Storage(text) => format!("Storage {}", text),
-            DataRestoreError::WrongData(text) => format!("Wrong data {}", text),
-            DataRestoreError::NoData(text) => format!("No data {}", text),
-            DataRestoreError::WrongEndpoint => "Wrong endpoint".to_owned(),
-            DataRestoreError::StateUpdate(text) => format!("Error during state update {}", text),
-        }
-    }
-}
-
-impl std::convert::From<&str> for DataRestoreError {
-    fn from(a: &str) -> Self {
-        DataRestoreError::Unknown(a.to_string())
-    }
-}
-
-impl std::convert::From<String> for DataRestoreError {
-    fn from(a: String) -> Self {
-        DataRestoreError::Unknown(a)
-    }
 }

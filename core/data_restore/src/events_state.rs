@@ -1,9 +1,10 @@
 // External uses
+use failure::{ensure, format_err};
 use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 // Workspace uses
 use crate::events::{EventData, EventType};
-use crate::helpers::{DataRestoreError, DATA_RESTORE_CONFIG};
+use crate::helpers::DATA_RESTORE_CONFIG;
 
 type CommittedAndVerifiedEvents = (Vec<EventData>, Vec<EventData>);
 // type BlockNumber256 = U256;
@@ -55,7 +56,7 @@ impl EventsState {
         &mut self,
         eth_blocks_delta: u64,
         end_eth_blocks_delta: u64,
-    ) -> Result<Vec<EventData>, DataRestoreError> {
+    ) -> Result<Vec<EventData>, failure::Error> {
         self.remove_verified_events();
 
         let (events, to_block_number): (CommittedAndVerifiedEvents, u64) =
@@ -76,17 +77,15 @@ impl EventsState {
     }
 
     /// Return last watched ethereum block number
-    pub fn get_last_block_number() -> Result<u64, DataRestoreError> {
-        let (_eloop, transport) =
-            web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-                .map_err(|_| DataRestoreError::WrongEndpoint)?;
+    pub fn get_last_block_number() -> Result<u64, failure::Error> {
+        let (_eloop, transport) = web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+            .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
         let web3 = web3::Web3::new(transport);
-        let last_block_number = web3
+        Ok(web3
             .eth()
             .block_number()
             .wait()
-            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
-        Ok(last_block_number.as_u64())
+            .map(|n| n.as_u64())?)
     }
 
     /// Return tuple (committed blocks logs, verified blocks logs) from last watched block
@@ -101,7 +100,7 @@ impl EventsState {
         last_watched_block_number: u64,
         eth_blocks_delta: u64,
         end_eth_blocks_delta: u64,
-    ) -> Result<(CommittedAndVerifiedEvents, u64), DataRestoreError> {
+    ) -> Result<(CommittedAndVerifiedEvents, u64), failure::Error> {
         let latest_eth_block_minus_delta =
             EventsState::get_last_block_number()? - end_eth_blocks_delta;
         if latest_eth_block_minus_delta == last_watched_block_number {
@@ -137,17 +136,17 @@ impl EventsState {
     fn get_logs(
         from_block_number: BlockNumber,
         to_block_number: BlockNumber,
-    ) -> Result<Vec<Log>, DataRestoreError> {
+    ) -> Result<Vec<Log>, failure::Error> {
         let block_verified_topic = DATA_RESTORE_CONFIG
             .franklin_contract
             .event("BlockVerified")
-            .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
+            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
 
         let block_comitted_topic = DATA_RESTORE_CONFIG
             .franklin_contract
             .event("BlockCommitted")
-            .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
+            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
 
         let topics_vec: Vec<H256> = vec![block_verified_topic, block_comitted_topic];
@@ -159,15 +158,14 @@ impl EventsState {
             .topics(Some(topics_vec), None, None, None)
             .build();
 
-        let (_eloop, transport) =
-            web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-                .map_err(|_| DataRestoreError::WrongEndpoint)?;
+        let (_eloop, transport) = web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+            .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
         let web3 = web3::Web3::new(transport);
         let result = web3
             .eth()
             .logs(filter)
             .wait()
-            .map_err(|e| DataRestoreError::NoData(e.to_string()))?;
+            .map_err(|e| format_err!("No new logs: {}", e.to_string()))?;
         Ok(result)
     }
 
@@ -177,7 +175,7 @@ impl EventsState {
     ///
     /// * `logs` - Logs slice
     ///
-    fn sort_logs(logs: &[Log]) -> Result<CommittedAndVerifiedEvents, DataRestoreError> {
+    fn sort_logs(logs: &[Log]) -> Result<CommittedAndVerifiedEvents, failure::Error> {
         if logs.is_empty() {
             return Ok((vec![], vec![]));
         }
@@ -187,12 +185,12 @@ impl EventsState {
         let block_verified_topic = DATA_RESTORE_CONFIG
             .franklin_contract
             .event("BlockVerified")
-            .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
+            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
         let block_comitted_topic = DATA_RESTORE_CONFIG
             .franklin_contract
             .event("BlockCommitted")
-            .map_err(|_| DataRestoreError::NoData("Main contract abi error".to_string()))?
+            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
 
         for log in logs {
@@ -202,6 +200,8 @@ impl EventsState {
                 block_type: EventType::Committed,
             };
             let tx_hash = log.transaction_hash;
+            
+            ensure!(log.topics.len() >= 2, "Cant get enouth topics from event");
             let topic = log.topics[0];
             let block_num = log.topics[1];
 
@@ -216,11 +216,9 @@ impl EventsState {
                     } else if topic == block_comitted_topic {
                         committed_events.push(block);
                     }
-                }
+                },
                 None => {
-                    return Err(DataRestoreError::NoData(
-                        "No tx hash in block event".to_string(),
-                    ))
+                    return Err(format_err!("No tx hash in block event"));
                 }
             };
         }

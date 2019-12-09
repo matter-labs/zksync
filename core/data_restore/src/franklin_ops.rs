@@ -1,9 +1,10 @@
 use crate::events::EventData;
 use crate::helpers::{
-    get_ethereum_transaction, get_input_data_from_ethereum_transaction, DataRestoreError,
+    get_ethereum_transaction, get_input_data_from_ethereum_transaction,
 };
 use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
+use failure::format_err;
 
 const BLOCK_NUMBER_LENGTH: usize = 32;
 const FEE_ACC_LENGTH: usize = 32;
@@ -23,7 +24,7 @@ pub struct FranklinOpsBlock {
 
 impl FranklinOpsBlock {
     // Get ops block from Franklin Contract event description
-    pub fn get_from_event(event_data: &EventData) -> Result<Self, DataRestoreError> {
+    pub fn get_from_event(event_data: &EventData) -> Result<Self, failure::Error> {
         let ops_block = FranklinOpsBlock::get_franklin_ops_block(event_data)?;
         Ok(ops_block)
     }
@@ -36,7 +37,7 @@ impl FranklinOpsBlock {
     ///
     fn get_franklin_ops_block(
         event_data: &EventData,
-    ) -> Result<FranklinOpsBlock, DataRestoreError> {
+    ) -> Result<FranklinOpsBlock, failure::Error> {
         let transaction = get_ethereum_transaction(&event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
         let commitment_data = &input_data
@@ -57,20 +58,20 @@ impl FranklinOpsBlock {
     ///
     /// * `data` - Franklin Contract event input data
     ///
-    pub fn get_franklin_ops_from_data(data: &[u8]) -> Result<Vec<FranklinOp>, DataRestoreError> {
+    pub fn get_franklin_ops_from_data(data: &[u8]) -> Result<Vec<FranklinOp>, failure::Error> {
         let mut current_pointer = 0;
         let mut ops = vec![];
         while current_pointer < data.len() {
             let op_type: u8 = data[current_pointer];
 
             let pub_data_size = FranklinOp::public_data_length(op_type)
-                .ok_or_else(|| DataRestoreError::WrongData("Wrong op type".to_string()))?;
+                .ok_or_else(|| format_err!("Wrong op type"))?;
 
             let pre = current_pointer;
             let post = pre + pub_data_size;
 
-            let op = FranklinOp::from_bytes(&data[pre..post])
-                .ok_or_else(|| DataRestoreError::WrongData("Wrong data".to_string()))?;
+            let op = FranklinOp::from_public_data(&data[pre..post])
+                .ok_or_else(|| format_err!("Wrong data"))?;
             ops.push(op);
             current_pointer += pub_data_size;
         }
@@ -83,18 +84,16 @@ impl FranklinOpsBlock {
     ///
     /// * `input` - Ethereum transaction input
     ///
-    fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, DataRestoreError> {
+    fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, failure::Error> {
         if input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH {
             Ok(bytes_slice_to_uint32(
                 &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
             )
             .ok_or_else(|| {
-                DataRestoreError::NoData("Cant convert bytes to fee account number".to_string())
+                format_err!("Cant convert bytes to fee account number")
             })?)
         } else {
-            Err(DataRestoreError::NoData(
-                "No fee account data in tx".to_string(),
-            ))
+            Err(format_err!("No fee account data in tx"))
         }
     }
 }
