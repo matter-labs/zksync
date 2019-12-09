@@ -375,7 +375,7 @@ export class WalletDecorator {
                 return;
             }
 
-            yield info(`Sent transfer to Matter server`);
+            yield info(`Sent transfer to ZK Sync server`);
     
             yield * this.verboseGetFranklinOpStatus(fra_tx.hash);
             return;
@@ -434,6 +434,27 @@ export class WalletDecorator {
                 error('Withdraw failed with ', e.message, { timeout: 7 }),
             );
             return;
+        }
+    }
+
+    async revertReason(tx_hash) {
+        const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
+        const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
+
+        console.log({tx, code});
+
+        if (code == '0x') {
+            return '';
+        } else {
+            return code
+                .substr(138)
+                .match(/../g)
+                .map(h => parseInt(h, 16))
+                .map(String.fromCharCode)
+                .join('')
+                .split('')
+                .filter(c => /\w/.test(c))
+                .join('');
         }
     }
 
@@ -597,11 +618,14 @@ export class WalletDecorator {
                 yield error(`Transaction ${tx_hash_html} failed with empty revert reason.`);
             } else {
                 const reason = code
-                    .substr(138)
-                    .match(/../g)
-                    .map(h => parseInt(h, 16))
-                    .map(String.fromCharCode)
-                    .join('');
+                .substr(138)
+                .match(/../g)
+                .map(h => parseInt(h, 16))
+                .map(String.fromCharCode)
+                .join('')
+                .split('')
+                .filter(c => /\w/.test(c))
+                .join('');
                 yield error(`Transaction ${tx_hash_html} failed with <code>${reason}<code>.`);
             }
         }
