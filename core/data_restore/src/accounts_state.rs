@@ -70,9 +70,10 @@ impl FranklinAccountsState {
                     accounts_updated.append(&mut updates);
                 }
                 FranklinOp::TransferToNew(mut op) => {
-                    let from = self.state.get_account(op.from).ok_or_else(|| {
-                        format_err!("Nonexistent account")
-                    })?;
+                    let from = self
+                        .state
+                        .get_account(op.from)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.nonce = from.nonce;
                     if let Ok(OpSuccess {
@@ -87,9 +88,10 @@ impl FranklinAccountsState {
                 }
                 FranklinOp::Withdraw(mut op) => {
                     // Withdraw op comes with empty Account Address and Nonce fields
-                    let account = self.state.get_account(op.account_id).ok_or_else(|| {
-                        format_err!("Nonexistent account")
-                    })?;
+                    let account = self
+                        .state
+                        .get_account(op.account_id)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
@@ -104,9 +106,10 @@ impl FranklinAccountsState {
                 }
                 FranklinOp::Close(mut op) => {
                     // Close op comes with empty Account Address and Nonce fields
-                    let account = self.state.get_account(op.account_id).ok_or_else(|| {
-                        format_err!("Nonexistent account")
-                    })?;
+                    let account = self
+                        .state
+                        .get_account(op.account_id)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
@@ -120,12 +123,14 @@ impl FranklinAccountsState {
                     }
                 }
                 FranklinOp::Transfer(mut op) => {
-                    let from = self.state.get_account(op.from).ok_or_else(|| {
-                        format_err!("Nonexistent account")
-                    })?;
-                    let to = self.state.get_account(op.to).ok_or_else(|| {
-                        format_err!("Nonexistent account")
-                    })?;
+                    let from = self
+                        .state
+                        .get_account(op.from)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                    let to = self
+                        .state
+                        .get_account(op.to)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.to = to.address;
                     op.tx.nonce = from.nonce;
@@ -318,32 +323,21 @@ mod test {
         tree.update_accounts_states_from_ops_block(&block5)
             .expect("Cant update state from block 5");
 
-        assert_eq!(
-            tree.get_accounts().len(),
-            2
-        );
+        assert_eq!(tree.get_accounts().len(), 2);
 
-        let zero_acc = tree.get_account(0)
-            .expect("Cant get 0 account");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
         assert_eq!(
             zero_acc.address,
             AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap()
         );
-        assert_eq!(
-            zero_acc.get_balance(1),
-            BigDecimal::from(980)
-        );
+        assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
 
-        let first_acc = tree.get_account(1)
-            .expect("Cant get 0 account");
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(
             first_acc.address,
             AccountAddress::from_hex("0x0000000000000000000000000000000000000000").unwrap()
         );
-        assert_eq!(
-            first_acc.get_balance(1),
-            BigDecimal::from(0)
-        );
+        assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }
 
     #[test]
@@ -437,35 +431,23 @@ mod test {
         };
 
         let mut tree = FranklinAccountsState::new();
-        tree
-            .update_accounts_states_from_ops_block(&block)
+        tree.update_accounts_states_from_ops_block(&block)
             .expect("Cant update state from block");
 
-        assert_eq!(
-            tree.get_accounts().len(),
-            2
-        );
+        assert_eq!(tree.get_accounts().len(), 2);
 
-        let zero_acc = tree.get_account(0)
-            .expect("Cant get 0 account");
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
         assert_eq!(
             zero_acc.address,
             AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap()
         );
-        assert_eq!(
-            zero_acc.get_balance(1),
-            BigDecimal::from(980)
-        );
+        assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
 
-        let first_acc = tree.get_account(1)
-            .expect("Cant get 0 account");
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(
             first_acc.address,
             AccountAddress::from_hex("0x0000000000000000000000000000000000000000").unwrap()
         );
-        assert_eq!(
-            first_acc.get_balance(1),
-            BigDecimal::from(0)
-        );
+        assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }
 }

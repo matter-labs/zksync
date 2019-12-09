@@ -1,13 +1,12 @@
 use crate::helpers::{
-    get_ethereum_transaction, get_input_data_from_ethereum_transaction,
-    DATA_RESTORE_CONFIG,
+    get_ethereum_transaction, get_input_data_from_ethereum_transaction, DATA_RESTORE_CONFIG,
 };
+use failure::format_err;
 use models::node::{
     account::{Account, AccountAddress},
     AccountMap,
 };
 use models::params::FR_ADDRESS_LEN;
-use failure::format_err;
 
 const ROOT_HASH_LENGTH: usize = 32;
 

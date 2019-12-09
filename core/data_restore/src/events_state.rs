@@ -78,14 +78,11 @@ impl EventsState {
 
     /// Return last watched ethereum block number
     pub fn get_last_block_number() -> Result<u64, failure::Error> {
-        let (_eloop, transport) = web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-            .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
+        let (_eloop, transport) =
+            web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+                .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
         let web3 = web3::Web3::new(transport);
-        Ok(web3
-            .eth()
-            .block_number()
-            .wait()
-            .map(|n| n.as_u64())?)
+        Ok(web3.eth().block_number().wait().map(|n| n.as_u64())?)
     }
 
     /// Return tuple (committed blocks logs, verified blocks logs) from last watched block
@@ -158,8 +155,9 @@ impl EventsState {
             .topics(Some(topics_vec), None, None, None)
             .build();
 
-        let (_eloop, transport) = web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-            .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
+        let (_eloop, transport) =
+            web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+                .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
         let web3 = web3::Web3::new(transport);
         let result = web3
             .eth()
@@ -200,7 +198,7 @@ impl EventsState {
                 block_type: EventType::Committed,
             };
             let tx_hash = log.transaction_hash;
-            
+
             ensure!(log.topics.len() >= 2, "Cant get enouth topics from event");
             let topic = log.topics[0];
             let block_num = log.topics[1];
@@ -216,7 +214,7 @@ impl EventsState {
                     } else if topic == block_comitted_topic {
                         committed_events.push(block);
                     }
-                },
+                }
                 None => {
                     return Err(format_err!("No tx hash in block event"));
                 }

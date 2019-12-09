@@ -1,10 +1,8 @@
 use crate::events::EventData;
-use crate::helpers::{
-    get_ethereum_transaction, get_input_data_from_ethereum_transaction,
-};
+use crate::helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
+use failure::format_err;
 use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
-use failure::format_err;
 
 const BLOCK_NUMBER_LENGTH: usize = 32;
 const FEE_ACC_LENGTH: usize = 32;
@@ -35,9 +33,7 @@ impl FranklinOpsBlock {
     ///
     /// * `event_data` - Franklin Contract event description
     ///
-    fn get_franklin_ops_block(
-        event_data: &EventData,
-    ) -> Result<FranklinOpsBlock, failure::Error> {
+    fn get_franklin_ops_block(event_data: &EventData) -> Result<FranklinOpsBlock, failure::Error> {
         let transaction = get_ethereum_transaction(&event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
         let commitment_data = &input_data
@@ -89,9 +85,7 @@ impl FranklinOpsBlock {
             Ok(bytes_slice_to_uint32(
                 &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
             )
-            .ok_or_else(|| {
-                format_err!("Cant convert bytes to fee account number")
-            })?)
+            .ok_or_else(|| format_err!("Cant convert bytes to fee account number"))?)
         } else {
             Err(format_err!("No fee account data in tx"))
         }

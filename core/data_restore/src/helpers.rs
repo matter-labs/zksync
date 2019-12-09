@@ -3,12 +3,12 @@ use std::env;
 use std::str::FromStr;
 // External uses
 use ethabi::Contract;
+use failure::format_err;
 use lazy_static::lazy_static;
 use serde_json;
 use web3::futures::Future;
 use web3::types::{Address, H256};
 use web3::types::{Transaction, TransactionId};
-use failure::format_err;
 // Workspace uses
 use models::abi::FRANKLIN_CONTRACT;
 
