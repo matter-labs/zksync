@@ -9,30 +9,30 @@ import {
 
 let syncProvider: Provider;
 
-const CLIENTS_TOTAL = 2;
-const INIT_DEPOSIT_AMOUNT = "0.001";
+let CLIENTS_TOTAL = 25;
+const DEPOSIT_AMOUNT = "0.01";
 const TRANSFER_DIVISOR = 1000;
 const FEE_DIVISOR = 50;
 
 (async () => {
-    const walletPath = "m/44'/60'/0'/0/1/" + process.argv[2];
+    const baseWalletPath = "m/44'/60'/0'/0/1/";
 
     const WEB3_URL = process.env.WEB3_URL;
     const ERC20_TOKEN = process.env.TEST_ERC20;
 
     const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
-    console.log(`Running loadtest for ${process.argv[2]} on the ${network} network`);
+    console.log(`Running loadtest on the ${network} network`);
 
     syncProvider = await getDefaultProvider(network);
 
-    const initDepositAmount = utils.parseEther(INIT_DEPOSIT_AMOUNT);
-    const depositAmount = initDepositAmount.div(CLIENTS_TOTAL);
+    const depositAmount = utils.parseEther(DEPOSIT_AMOUNT);
+    const transferAmount = depositAmount.div(CLIENTS_TOTAL * TRANSFER_DIVISOR);
 
     try {
         const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
-        const ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, walletPath).connect(ethersProvider);
+        const ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, baseWalletPath + "0").connect(ethersProvider);
         const syncWallet = await Wallet.fromEthSigner(
             ethWallet,
             syncProvider,
@@ -47,7 +47,7 @@ const FEE_DIVISOR = 50;
 
         // Create wallets
         for (let i = 1; i < CLIENTS_TOTAL; i++) {
-            const ew = ethers.Wallet.createRandom().connect(ethersProvider);
+            const ew = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, `${baseWalletPath}${i}`).connect(ethersProvider);
             const sw = await Wallet.fromEthSigner(
                 ew,
                 syncProvider,
@@ -58,14 +58,32 @@ const FEE_DIVISOR = 50;
         }
 
         // Deposits
-        await deposit(ethWallets[0], syncWallets[0], ["ETH", ERC20_TOKEN], initDepositAmount);
-        await transfer(syncWallets[0], syncWallets, ["ETH", ERC20_TOKEN], depositAmount);
+        await deposit(ethWallets[0], syncWallets[0], ["ETH", ERC20_TOKEN], depositAmount);
 
+        // Transfers to new
+        for (let i = 1; i < CLIENTS_TOTAL * 2; i *= 2) {
+            let promises = [];
+            const senders_total = ~~(i / 2);
+            for (let j = 0; j < senders_total; j++) {
+                if (senders_total + j >= CLIENTS_TOTAL) {
+                    break;
+                }
+                promises.push(transfer1to1(syncWallets[j], syncWallets[senders_total + j], ["ETH", ERC20_TOKEN], depositAmount.div(i + 1)));
+                console.log(`Initiated transfer to new: ${j} to ${senders_total + j}`);
+            }
+            let results = await Promise.all(promises.map(reflect));
+
+            let failedPromises = results.filter((p) => p.status === "rejected");
+            for (const promise of failedPromises) {
+                console.log(`Failed transfer: ${promise.reason}`);
+            }
+        }
+        
         // Transfers
         let promises = [];
 
         for (const wallet of syncWallets) {
-            promises.push(transfer(wallet, syncWallets, ["ETH", ERC20_TOKEN], depositAmount.div(TRANSFER_DIVISOR)));
+            promises.push(transfer1toAll(wallet, syncWallets, ["ETH", ERC20_TOKEN], transferAmount));
         }
         let results = await Promise.all(promises.map(reflect));
 
@@ -90,6 +108,8 @@ const FEE_DIVISOR = 50;
         for (const promise of failedPromises) {
             console.log(`Failed withdraw: ${promise.reason}`);
         }
+
+        console.log(`Finished loadtest`);
 
         await syncProvider.disconnect();
     } catch (err) {
@@ -120,7 +140,32 @@ async function deposit(ethWallet: ethers.Wallet, syncWallet: Wallet, tokens: typ
     }
 }
 
-async function transfer(fromWallet: Wallet, toWallets: Wallet[], tokens: types.Token[], amount: utils.BigNumber) {
+async function transfer1to1(fromWallet: Wallet, toWallet: Wallet, tokens: types.Token[], amount: utils.BigNumber) {
+    try {
+        const transferAmount = syncutils.closestPackableTransactionAmount(amount);
+        const fee = syncutils.closestPackableTransactionFee(transferAmount.div(FEE_DIVISOR));
+
+        if (toWallet.address() !== fromWallet.address()) {
+            for (const token of tokens) {
+                const tx = await fromWallet.syncTransfer({
+                    to: toWallet.address(),
+                    token,
+                    amount: transferAmount,
+                    fee,
+                });
+
+                await tx.awaitReceipt();
+                console.log(`${token} transfer ok, from: ${fromWallet.address()}, to: ${toWallet.address()}, amount: ${utils.formatEther(amount)}, fee: ${utils.formatEther(fee)}`);
+            }
+        }
+
+    } catch (err) {
+        console.log(`Transfer error: ${err}`);
+        throw err;
+    }
+}
+
+async function transfer1toAll(fromWallet: Wallet, toWallets: Wallet[], tokens: types.Token[], amount: utils.BigNumber) {
     try {
         const transferAmount = syncutils.closestPackableTransactionAmount(amount);
         const fee = syncutils.closestPackableTransactionFee(transferAmount.div(FEE_DIVISOR));

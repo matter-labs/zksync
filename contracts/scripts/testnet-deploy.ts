@@ -75,20 +75,14 @@ async function main() {
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
         const erc20 = await addTestERC20Token(wallet, governance);
 
-        // Setup test wallets
-        if (process.env.ETH_NETWORK === "localhost") {
-            let i = 0;
-            while (i < +process.env.TEST_WALLETS_TOTAL) {
-                const path = "m/44'/60'/0'/0/1/" + i;
-                const testWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, path).connect(provider);
-                await wallet.sendTransaction({
-                    to: testWallet.address,
-                    value: ethers.utils.parseEther("10.0"),
-                });
-                await mintTestERC20Token(testWallet, erc20);
-                i++;
-            }
-        }
+        // Setup test wallet
+        const path = "m/44'/60'/0'/0/1/0";
+        const testWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, path).connect(provider);
+        await wallet.sendTransaction({
+            to: testWallet.address,
+            value: ethers.utils.parseEther("10.0"),
+        });
+        await mintTestERC20Token(testWallet, erc20);
     }
 
     if (args.publish) {
