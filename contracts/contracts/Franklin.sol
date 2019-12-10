@@ -257,9 +257,7 @@ contract Franklin {
     function depositETH(uint128 _amount, bytes calldata _franklinAddr) external payable {
         requireActive();
 
-        // Fee is:
-        //   fee gas price multiplier coeff * base tx gas cost
-        uint256 fee = governance.FEE_GAS_PRICE_MULTIPLIER() * governance.BASE_DEPOSIT_ETH_GAS();
+        uint256 fee = governance.getDepositEtherFee();
         require(
             msg.value >= fee + _amount,
             "fdh11"
@@ -270,11 +268,11 @@ contract Franklin {
             "fdh12"
         ); // fdh12 - deposit amount value is heigher than Franklin is able to process
 
+        registerDeposit(0, _amount, fee, _franklinAddr);
+
         if (msg.value != fee + _amount) {
             msg.sender.transfer(msg.value - (fee + _amount));
         }
-
-        registerDeposit(0, _amount, fee, _franklinAddr);
     }
 
     // Withdraw ETH
@@ -297,17 +295,15 @@ contract Franklin {
     ) external payable {
         requireActive();
 
-        // Fee is:
-        //   fee gas price multiplier coeff * base tx gas cost
-        uint256 fee = governance.FEE_GAS_PRICE_MULTIPLIER() * governance.BASE_DEPOSIT_ERC_GAS();
-
-        // Get token id by its address
-        uint16 tokenId = governance.validateTokenAddress(_token);
+        uint256 fee = governance.getDepositERC20Fee();
 
         require(
             msg.value >= fee,
             "fd011"
         ); // fd011 - Not enough ETH provided to pay the fee
+
+        // Get token id by its address
+        uint16 tokenId = governance.validateTokenAddress(_token);
 
         require(
             IERC20(_token).transferFrom(msg.sender, address(this), _amount),
@@ -350,9 +346,7 @@ contract Franklin {
     ) external payable {
         requireActive();
 
-        // Fee is:
-        //   fee gas price multiplier coeff * base tx gas cost
-        uint256 fee = governance.FEE_GAS_PRICE_MULTIPLIER() * governance.BASE_FULL_EXIT_GAS();
+        uint256 fee = governance.getFullExitFee();
 
         require(
             msg.value >= fee,

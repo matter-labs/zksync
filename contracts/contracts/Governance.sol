@@ -4,12 +4,6 @@ contract Governance {
 
     // Fee gas price for transactions - operators can change it depending on block generation cost
     uint256 public FEE_GAS_PRICE_MULTIPLIER = 2000000000; // 2 Gwei
-    // Base gas cost for deposit eth transaction
-    uint256 constant public BASE_DEPOSIT_ETH_GAS = 179000;
-    // Base gas cost for deposit erc transaction
-    uint256 constant public BASE_DEPOSIT_ERC_GAS = 214000;
-    // Base gas cost for full exit transaction
-    uint256 constant public BASE_FULL_EXIT_GAS = 170000;
 
     // Token added to Franklin net
     // Structure:
@@ -107,5 +101,17 @@ contract Governance {
     function changeFeeGasPriceMultiplier(uint256 _value) external {
         requireGovernor();
         FEE_GAS_PRICE_MULTIPLIER = _value;
+    }
+
+    function getDepositEtherFee() external returns (uint256) {
+        return FEE_GAS_PRICE_MULTIPLIER * 179000;  // 179000 is base gas cost for deposit eth transaction
+    }
+
+    function getDepositERC20Fee() external returns (uint256) {
+        return FEE_GAS_PRICE_MULTIPLIER * 214000;  // 214000 is base gas cost for deposit erc transaction
+    }
+
+    function getFullExitFee() external returns (uint256) {
+        return FEE_GAS_PRICE_MULTIPLIER * 170000;  // 170000 is base gas cost for full exits transaction
     }
 }
