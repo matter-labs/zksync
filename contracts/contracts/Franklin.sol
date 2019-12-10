@@ -258,8 +258,8 @@ contract Franklin {
         requireActive();
 
         // Fee is:
-        //   fee coeff * base tx gas cost * gas price
-        uint256 fee = governance.FEE_COEFF * governance.BASE_DEPOSIT_ETH_GAS * governance.BASE_GAS_PRICE;
+        //   fee gas price multiplier coeff * base tx gas cost
+        uint256 fee = governance.FEE_GAS_PRICE_MULTIPLIER() * governance.BASE_DEPOSIT_ETH_GAS();
         require(
             msg.value >= fee + _amount,
             "fdh11"
@@ -298,8 +298,8 @@ contract Franklin {
         requireActive();
 
         // Fee is:
-        //   fee coeff * base tx gas cost * gas price
-        uint256 fee = governance.FEE_COEFF * governance.BASE_DEPOSIT_ERC_GAS * governance.BASE_GAS_PRICE;
+        //   fee gas price multiplier coeff * base tx gas cost
+        uint256 fee = governance.FEE_GAS_PRICE_MULTIPLIER() * governance.BASE_DEPOSIT_ERC_GAS();
 
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(_token);
@@ -351,8 +351,8 @@ contract Franklin {
         requireActive();
 
         // Fee is:
-        //   fee coeff * base tx gas cost * gas price
-        uint256 fee = governance.FEE_COEFF * governance.BASE_FULL_EXIT_GAS * governance.BASE_GAS_PRICE;
+        //   fee gas price multiplier coeff * base tx gas cost
+        uint256 fee = governance.FEE_GAS_PRICE_MULTIPLIER() * governance.BASE_FULL_EXIT_GAS();
 
         require(
             msg.value >= fee,

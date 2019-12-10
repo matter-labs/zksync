@@ -2,10 +2,8 @@ pragma solidity 0.5.10;
 
 contract Governance {
 
-    // Base gas price for transactions
-    uint256 constant public BASE_GAS_PRICE = 1000000000; // 1 Gwei
-    // Fees multiplier
-    uint256 constant public FEE_MULTIPLIER = 2;
+    // Fee gas price for transactions - operators can change it depending on block generation cost
+    uint256 public FEE_GAS_PRICE_MULTIPLIER = 2000000000; // 2 Gwei
     // Base gas cost for deposit eth transaction
     uint256 constant public BASE_DEPOSIT_ETH_GAS = 179000;
     // Base gas cost for deposit erc transaction
@@ -106,4 +104,8 @@ contract Governance {
         return tokenId;
     }
 
+    function changeFeeGasPriceMultiplier(uint256 _value) external {
+        requireGovernor();
+        FEE_GAS_PRICE_MULTIPLIER = _value;
+    }
 }
