@@ -426,7 +426,7 @@ mod test {
             .expect("cant get ops from data 1");
         let block = FranklinOpsBlock {
             block_num: 1,
-            ops: ops,
+            ops,
             fee_account: 0,
         };
 
