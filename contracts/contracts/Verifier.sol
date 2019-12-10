@@ -3,13 +3,15 @@ pragma solidity 0.5.10;
 
 import "./VerificationKey.sol";
 
+/// @title Verifier Contract
+/// @author Matter Labs
 contract Verifier is VerificationKey {
+    /// @notice If this flag is true - dummy verification is used instead of full verifier
     bool constant DUMMY_VERIFIER = false;
 
-    // Proof verification
-    // Params:
-    // - _proof - block number
-    // - _commitment - block commitment
+    /// @notice Rollup block proof verification
+    /// @param _proof Block proof
+    /// @param _commitment Block commitment
     function verifyBlockProof(
         uint256[8] calldata _proof,
         bytes32 _commitment
@@ -23,6 +25,11 @@ contract Verifier is VerificationKey {
         return Verify(vk, gammaABC, _proof, inputs);
     }
 
+    /// @notice Verifies exit proof
+    /// @param _tokenId Token id
+    /// @param _owner Token owner (user)
+    /// @param _amount Token amount
+    /// @param _proof Proof that user committed
     function verifyExitProof(
         uint16 _tokenId,
         address _owner,
@@ -43,26 +50,34 @@ contract Verifier is VerificationKey {
         return Verify(vk, gammaABC, _proof, inputs);
     }
 
-    function NegateY(uint256 Y) internal pure returns (uint256) {
+    /// @notice Negates Y value
+    /// @param y Y value
+    function NegateY(uint256 y) internal pure returns (uint256) {
         uint256 q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-        return q - (Y % q);
+        return q - (y % q);
     }
 
+    /// @notice Verifies exit proof
+    /// @param in_vk Verification key inputs
+    /// @param vk_gammaABC Verification key gamma
+    /// @param in_proof Proof input (Block proof)
+    /// @param public_inputs Public inputs (commitment & mask)
     function Verify(
         uint256[14] memory in_vk,
         uint256[] memory vk_gammaABC,
         uint256[8] memory in_proof,
-        uint256[] memory proof_inputs
+        uint256[] memory public_inputs
     ) internal view returns (bool) {
+        // If DUMMY_VERIFIER constant is true than return true
         if (DUMMY_VERIFIER) {
             return true;
         }
 
         // Start
         require(
-            ((vk_gammaABC.length / 2) - 1) == proof_inputs.length,
-            "vvy11"
-        ); // vvy11 - Invalid number of public inputs
+            ((vk_gammaABC.length / 2) - 1) == public_inputs.length,
+            "vrvy11"
+        ); // vrvy11 - Invalid number of public inputs
 
         // Compute the linear combination vk_x
         uint256[3] memory mul_input;
@@ -74,11 +89,11 @@ contract Verifier is VerificationKey {
         add_input[0] = vk_gammaABC[0];
         add_input[1] = vk_gammaABC[1];
 
-        // Performs a sum of gammaABC[0] + sum[ gammaABC[i+1]^proof_inputs[i] ]
-        for (uint256 i = 0; i < proof_inputs.length; i++) {
+        // Performs a sum of gammaABC[0] + sum[ gammaABC[i+1]^public_inputs[i] ]
+        for (uint256 i = 0; i < public_inputs.length; i++) {
             mul_input[0] = vk_gammaABC[m++];
             mul_input[1] = vk_gammaABC[m++];
-            mul_input[2] = proof_inputs[i];
+            mul_input[2] = public_inputs[i];
 
             // solhint-disable-next-line no-inline-assembly
             assembly {
@@ -94,8 +109,8 @@ contract Verifier is VerificationKey {
             }
             require(
                 success,
-                "vvy12"
-            ); // vvy12 - Failed to call ECMUL precompile
+                "vrvy12"
+            ); // vrvy12 - Failed to call ECMUL precompile
 
             assembly {
                 // ECADD
@@ -110,8 +125,8 @@ contract Verifier is VerificationKey {
             }
             require(
                 success,
-                "vvy13"
-            ); // vvy13 - Failed to call ECADD precompile
+                "vrvy13"
+            ); // vrvy13 - Failed to call ECADD precompile
         }
 
         uint256[24] memory input = [
@@ -151,8 +166,8 @@ contract Verifier is VerificationKey {
         }
         require(
             success,
-            "vvy14"
-        ); // vvy14 - Failed to call pairing precompile
+            "vrvy14"
+        ); // vrvy14 - Failed to call pairing precompile
         return out[0] == 1;
     }
 }
