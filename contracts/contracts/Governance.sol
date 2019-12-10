@@ -103,15 +103,15 @@ contract Governance {
         FEE_GAS_PRICE_MULTIPLIER = _value;
     }
 
-    function getDepositEtherFee() external returns (uint256) {
+    function getDepositEtherFee() external view returns (uint256) {
         return FEE_GAS_PRICE_MULTIPLIER * 179000;  // 179000 is base gas cost for deposit eth transaction
     }
 
-    function getDepositERC20Fee() external returns (uint256) {
+    function getDepositERC20Fee() external view returns (uint256) {
         return FEE_GAS_PRICE_MULTIPLIER * 214000;  // 214000 is base gas cost for deposit erc transaction
     }
 
-    function getFullExitFee() external returns (uint256) {
+    function getFullExitFee() external view returns (uint256) {
         return FEE_GAS_PRICE_MULTIPLIER * 170000;  // 170000 is base gas cost for full exits transaction
     }
 }
