@@ -39,15 +39,18 @@ export default {
     methods: {
         async login() {
             try {
-                const syncProvider = await zksync.getDefaultProvider(this.currentLocationNetworkName);
+                const net = this.currentLocationNetworkName == 'localhost' 
+                    ? 'localhost'
+                    : 'testnet';
+                const syncProvider = await zksync.getDefaultProvider(net);
                 
-                const tokensList = Object.values(await syncProvider.getTokens())
-                    .sort((a, b) => a.id - b.id)
-                    .map(info => {
-                        info.symbol = info.symbol || `erc20_${info.id}`;
-                        return info;
-                    });
-                window.tokensList = tokensList;
+                const tokensList = await syncProvider.getTokens()
+                window.tokensList = Object.values(tokensList)
+                    .map(token => ({
+                        ...token,
+                        symbol: token.symbol || `${token.id.toString().padStart(3, '0')}`,
+                    }))
+                    .sort((a, b) => a.id - b.id);
 
                 await window.ethereum.enable();
                 const ethersProvider = new ethers.providers.Web3Provider(window.ethereum);
@@ -62,12 +65,10 @@ export default {
                 window.syncProvider = syncProvider;
                 window.ethProxy = ethProxy;
 
-                console.log(window.tokensList);
-
+                
                 const franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
                 window.franklinProvider = franklinProvider;
-                window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
-                window.walletDecorator = await WalletDecorator.new(window.wallet);
+                window.walletDecorator = await WalletDecorator.new();
 
                 this.$parent.$router.push('/main')
             } catch (e) {

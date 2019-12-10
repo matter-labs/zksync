@@ -1,14 +1,13 @@
 import {Contract, utils} from 'ethers';
-import { FranklinProvider, Wallet, Address } from 'franklin_lib';
 import { readableEther, sleep, isReadablyPrintable } from './utils';
 import timeConstants from './timeConstants';
-import IERC20Conract from '../../franklin_lib/abi/IERC20.json';
 import config from './env-config';
 import Axios from 'axios';
 const zksync = require('zksync');
 const ethers = require('ethers');
 window.ethers = ethers;
 import priority_queue_abi from '../../../contracts/build/PriorityQueue.json'
+import franklin_abi from '../../../contracts/build/Franklin.json'
 
 const NUMERIC_LIMITS_UINT_256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
 
@@ -92,14 +91,13 @@ function shortenedTxHash(tx_hash) {
 
 export class WalletDecorator {
     // #region everything
-    constructor (wallet) {
-        this.wallet = wallet;
+    constructor () {
         this.address = window.syncWallet.address();
     }
 
     static async new(wallet) {
-        let res = new WalletDecorator(wallet);
-        res.ethAddress = await wallet.ethWallet.getAddress();
+        let res = new WalletDecorator();
+        res.ethAddress = await window.ethSigner.getAddress();
         return res;
     }
 
@@ -111,8 +109,6 @@ export class WalletDecorator {
     }
 
     async updateState() {
-        await this.wallet.updateState();
-
         const onchainBalances = [];
         const contractBalances = [];
         await Promise.all(
@@ -210,7 +206,7 @@ export class WalletDecorator {
                 if (tx.commited == false) return 'Nothing';
                 if (hash == null) return 'hash_null';
 
-                let receipt = await this.wallet.provider.getTxReceipt(hash);
+                let receipt = await window.franklinProvider.getTxReceipt(hash);
                 /**
                 pub struct ProverRun {
                     pub id: i32,
@@ -315,21 +311,6 @@ export class WalletDecorator {
 
         return await Promise.all(res);
     }
-    // async pendingDepositsAsRenderableList() {
-    //     let allowances = await this.wallet.getAllowancesForAllTokens();
-    //     return allowances
-    //         .map(a => ({
-    //             token: a.token,
-    //             amount: a.amount.toString()
-    //         }))
-    //         .filter(a => a.amount != '0')
-    //         .map((op, i) => {
-    //             op.operation = 'Deposit';
-    //             op.elem_id = `pendingDeposit_${i}`;
-    //             op.amountRenderable = readableEther(op.amount);
-    //             return op;
-    //         });
-    // }
     setPendingWithdrawStatus(withdrawTokenId, status) {
         let withdrawsStatusesDict = JSON.parse(localStorage.getItem('withdrawsStatusesDict') || "{}");
         withdrawsStatusesDict[withdrawTokenId] = status;
@@ -344,7 +325,25 @@ export class WalletDecorator {
         return JSON.parse(localStorage.getItem('withdrawsStatusesDict') || "{}")[withdrawTokenId];
     }
     async pendingWithdrawsAsRenderableList() {
-        let balances = await this.wallet.getBalancesToWithdraw();
+        const contract = new Contract(
+            config.CONTRACT_ADDR, 
+            franklin_abi.interface, 
+            window.ethSigner
+        );
+
+        const balances = await Promise.all(
+            window.tokensList
+                .map(async token => {
+                    const amount = await contract.balancesToWithdraw(
+                        await window.ethSigner.getAddress(),
+                        token.id
+                    );
+    
+                    return { token, amount };
+                }
+            )
+        );
+
         return balances
             .map(a => ({
                 token: a.token,
@@ -465,9 +464,9 @@ export class WalletDecorator {
 
             yield info(`Offchain withdraw succeeded!`);
         } catch (e) {
-            console.log('error in verboseWithdrawOnchain', e);
+            console.log('error in verboseWithdrawOffchain', e);
             yield combineMessages(
-                error('Withdraw failed with ', e.message, { timeout: 7 }),
+                error(`Withdraw failed with ${e.message}`, { timeout: 7 }),
             );
             return;
         }
@@ -481,8 +480,17 @@ export class WalletDecorator {
             this.setPendingWithdrawStatus(`${token.id}`, 'loading');
 
             yield info(`Completing withdraw...`);
-            let eth_tx = await this.wallet.widthdrawOnchain(token, amount);
-            
+            const contract = new Contract(
+                config.CONTRACT_ADDR, 
+                franklin_abi.interface, 
+                window.ethSigner
+            );
+            if (token == "ETH") {
+                await contract.withdrawETH(amount);
+            } else {
+                await contract.withdrawERC20(token, amount, {gasLimit: bigNumberify("150000")});
+            }
+
             this.setPendingWithdrawStatus(`${token.id}`, 'hidden');
             
             await eth_tx.wait(2);
@@ -499,8 +507,8 @@ export class WalletDecorator {
     }
 
     async revertReason(tx_hash) {
-        const tx = await this.wallet.ethWallet.provider.getTransaction(tx_hash);
-        const code = await this.wallet.ethWallet.provider.call(tx, tx.blockNumber);
+        const tx = await window.ethProvider.getTransaction(tx_hash);
+        const code = await window.ethProvider.call(tx, tx.blockNumber);
 
         console.log({tx, code});
 
@@ -525,13 +533,11 @@ export class WalletDecorator {
         try {
             yield info(`Sending deposit...`);
             
-            const maxFeeInETHToken = ethers.utils.parseEther("0.1");
             const deposit = await zksync.depositFromETH({
                 depositFrom: window.ethSigner,
                 depositTo: window.syncWallet,
                 token,
-                amount,
-                maxFeeInETHToken
+                amount
             });
         
             await deposit.awaitEthereumTxCommit();
@@ -542,7 +548,7 @@ export class WalletDecorator {
             const receipt = await window.syncProvider.getPriorityOpStatus(deposit.priorityOpId.toNumber());
             console.log({deposit, receipt});
 
-            yield * await this.verboseGetRevertReason(deposit.ethTx.hash);
+            yield * this.verboseGetRevertReason(deposit.ethTx.hash);
             
             yield * this.verboseGetPriorityOpStatus(deposit.ethTx.hash);
         } catch (e) {
@@ -594,7 +600,7 @@ export class WalletDecorator {
         );
 
         while ( ! receipt.prover_run) {
-            receipt = await this.wallet.provider.getTxReceipt(tx_hash);
+            receipt = await window.franklinProvider.getTxReceipt(tx_hash);
             await sleep(2000);
         }
 
@@ -612,7 +618,7 @@ export class WalletDecorator {
                 + `proving block <code>${receipt.prover_run.block_number}</code> `
                 + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`);
 
-            receipt = await this.wallet.provider.getTxReceipt(tx_hash);
+            receipt = await window.franklinProvider.getTxReceipt(tx_hash);
             await sleep(1000);
         }
 
@@ -642,10 +648,10 @@ export class WalletDecorator {
             return;
         }
 
-        let pq_op = await this.wallet.provider.getPriorityOpReceipt(pq_id);
+        let pq_op = await window.franklinProvider.getPriorityOpReceipt(pq_id);
         while (pq_op.prover_run == undefined) {
             await sleep(2000);
-            pq_op = await this.wallet.provider.getPriorityOpReceipt(pq_id);
+            pq_op = await window.franklinProvider.getPriorityOpReceipt(pq_id);
         }
 
         let proverStart = new Date();
@@ -662,7 +668,7 @@ export class WalletDecorator {
                 + `proving block <code>${pq_op.prover_run.block_number}</code> `
                 + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`);
 
-            pq_op = await this.wallet.provider.getPriorityOpReceipt(pq_id);
+            pq_op = await window.franklinProvider.getPriorityOpReceipt(pq_id);
 
             await sleep(1000);
         }
