@@ -318,18 +318,15 @@ dev-push-geth:
 make-keys:
 	@cargo run -p key_generator --release --bin key_generator
 
- # Data Restore
+# Node Restore
 
-data-restore-setup-and-run: data-restore-build data-restore-restart
+node-restore: node-restore-build node-restore-run
 
-data-restore-db-prepare: db-drop db-wait db-setup
+node-restore-db-clear: db-drop db-wait db-setup
 
-data-restore-build:
-	@cargo build -p data_restore --release --bin data_restore
+node-restore-build:
+	@cargo build -p node_restore --release --bin node_restore
 
-data-restore-restart: confirm_action data-restore-db-prepare
-	@./target/release/data_restore
-
-data-restore-continue:
-	@./target/release/data_restore
+node-restore-run:
+	@cargo rusn --bin node_restore --release
 	

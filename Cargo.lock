@@ -741,7 +741,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "data_restore"
+name = "node_restore"
 version = "0.1.0"
 dependencies = [
  "bigdecimal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",

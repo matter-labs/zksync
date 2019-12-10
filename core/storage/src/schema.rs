@@ -58,7 +58,7 @@ table! {
 }
 
 table! {
-    data_restore_last_watched_eth_block (id) {
+    node_restore_last_watched_eth_block (id) {
         id -> Int4,
         block_number -> Text,
     }
@@ -201,7 +201,7 @@ allow_tables_to_appear_in_same_query!(
     active_provers,
     balances,
     blocks,
-    data_restore_last_watched_eth_block,
+    node_restore_last_watched_eth_block,
     eth_operations,
     events_state,
     executed_priority_operations,

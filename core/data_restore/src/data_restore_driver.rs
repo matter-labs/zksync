@@ -12,8 +12,8 @@ pub enum StorageUpdateState {
     Operations,
 }
 
-/// Description of data restore driver
-pub struct DataRestoreDriver {
+/// Description of node restore driver
+pub struct NodeRestoreDriver {
     /// Database connection pool
     pub connection_pool: ConnectionPool,
     /// Step of the considered blocks ethereum block
@@ -28,8 +28,8 @@ pub struct DataRestoreDriver {
     pub accounts_state: FranklinAccountsState,
 }
 
-impl DataRestoreDriver {
-    /// Create new data restore driver
+impl NodeRestoreDriver {
+    /// Create new node restore driver
     ///
     /// # Arguments
     ///

@@ -559,13 +559,13 @@ pub struct StoredStorageState {
 }
 
 #[derive(Insertable)]
-#[table_name = "data_restore_last_watched_eth_block"]
+#[table_name = "node_restore_last_watched_eth_block"]
 pub struct NewLastWatchedEthBlockNumber {
     pub block_number: String,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "data_restore_last_watched_eth_block"]
+#[table_name = "node_restore_last_watched_eth_block"]
 pub struct StoredLastWatchedEthBlockNumber {
     pub id: i32,
     pub block_number: String,
@@ -2063,7 +2063,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn delete_data_restore_storage_state_status(&self) -> QueryResult<()> {
+    pub fn delete_node_restore_storage_state_status(&self) -> QueryResult<()> {
         diesel::delete(storage_state_update::table).execute(self.conn())?;
         Ok(())
     }
@@ -2076,19 +2076,19 @@ impl StorageProcessor {
         &self,
         number: &NewLastWatchedEthBlockNumber,
     ) -> QueryResult<()> {
-        diesel::insert_into(data_restore_last_watched_eth_block::table)
+        diesel::insert_into(node_restore_last_watched_eth_block::table)
             .values(number)
             .execute(self.conn())?;
         Ok(())
     }
 
     pub fn delete_last_watched_block_number(&self) -> QueryResult<()> {
-        diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
+        diesel::delete(node_restore_last_watched_eth_block::table).execute(self.conn())?;
         Ok(())
     }
 
     pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
-        data_restore_last_watched_eth_block::table.first(self.conn())
+        node_restore_last_watched_eth_block::table.first(self.conn())
     }
 
     pub fn save_franklin_ops_block(

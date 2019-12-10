@@ -4,7 +4,7 @@ use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 // Workspace uses
 use crate::events::{EventData, EventType};
-use crate::helpers::DATA_RESTORE_CONFIG;
+use crate::helpers::NODE_RESTORE_CONFIG;
 
 type CommittedAndVerifiedEvents = (Vec<EventData>, Vec<EventData>);
 // type BlockNumber256 = U256;
@@ -35,11 +35,10 @@ impl Default for EventsState {
 impl EventsState {
     /// Create new franklin contract events state
     pub fn new() -> Self {
-        let genesis_block_number = DATA_RESTORE_CONFIG.genesis_block_number;
         Self {
             committed_events: Vec::new(),
             verified_events: Vec::new(),
-            last_watched_eth_block_number: genesis_block_number,
+            last_watched_eth_block_number: 0,
         }
     }
 
@@ -78,7 +77,7 @@ impl EventsState {
 
     /// Return last watched ethereum block number
     pub fn get_last_block_number() -> Result<u64, failure::Error> {
-        let (_eloop, transport) = web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+        let (_eloop, transport) = web3::transports::Http::new(NODE_RESTORE_CONFIG.web3_endpoint.as_str())
             .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
         let web3 = web3::Web3::new(transport);
         Ok(web3
@@ -137,13 +136,13 @@ impl EventsState {
         from_block_number: BlockNumber,
         to_block_number: BlockNumber,
     ) -> Result<Vec<Log>, failure::Error> {
-        let block_verified_topic = DATA_RESTORE_CONFIG
+        let block_verified_topic = NODE_RESTORE_CONFIG
             .franklin_contract
             .event("BlockVerified")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
 
-        let block_comitted_topic = DATA_RESTORE_CONFIG
+        let block_comitted_topic = NODE_RESTORE_CONFIG
             .franklin_contract
             .event("BlockCommitted")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
@@ -152,13 +151,13 @@ impl EventsState {
         let topics_vec: Vec<H256> = vec![block_verified_topic, block_comitted_topic];
 
         let filter = FilterBuilder::default()
-            .address(vec![DATA_RESTORE_CONFIG.franklin_contract_address])
+            .address(vec![NODE_RESTORE_CONFIG.franklin_contract_address])
             .from_block(from_block_number)
             .to_block(to_block_number)
             .topics(Some(topics_vec), None, None, None)
             .build();
 
-        let (_eloop, transport) = web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+        let (_eloop, transport) = web3::transports::Http::new(NODE_RESTORE_CONFIG.web3_endpoint.as_str())
             .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
         let web3 = web3::Web3::new(transport);
         let result = web3
@@ -182,12 +181,12 @@ impl EventsState {
         let mut committed_events: Vec<EventData> = vec![];
         let mut verified_events: Vec<EventData> = vec![];
 
-        let block_verified_topic = DATA_RESTORE_CONFIG
+        let block_verified_topic = NODE_RESTORE_CONFIG
             .franklin_contract
             .event("BlockVerified")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
-        let block_comitted_topic = DATA_RESTORE_CONFIG
+        let block_comitted_topic = NODE_RESTORE_CONFIG
             .franklin_contract
             .event("BlockCommitted")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?

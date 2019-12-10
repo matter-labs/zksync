@@ -7,7 +7,7 @@ use models::node::tx::FranklinTx;
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
 use plasma::state::{OpSuccess, PlasmaState};
 
-/// Franklin Accounts states with data restore configuration
+/// Franklin Accounts states with node restore configuration
 pub struct FranklinAccountsState {
     /// Accounts stored in a spase merkle tree
     pub state: PlasmaState,
@@ -432,7 +432,7 @@ mod test {
             .expect("cant get ops from data 1");
         let block = FranklinOpsBlock {
             block_num: 1,
-            ops: ops,
+            ops,
             fee_account: 0,
         };
 

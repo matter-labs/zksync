@@ -1,5 +1,5 @@
 -- Your SQL goes here
-CREATE TABLE data_restore_last_watched_eth_block (
+CREATE TABLE node_restore_last_watched_eth_block (
     id SERIAL PRIMARY KEY,
     block_number TEXT NOT NULL
 );

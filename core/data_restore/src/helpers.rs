@@ -15,12 +15,12 @@ use models::abi::FRANKLIN_CONTRACT;
 pub const FUNC_NAME_HASH_LENGTH: usize = 4;
 
 lazy_static! {
-    pub static ref DATA_RESTORE_CONFIG: DataRestoreConfig = DataRestoreConfig::from_env();
+    pub static ref NODE_RESTORE_CONFIG: NodeRestoreConfig = NodeRestoreConfig::from_env();
 }
 
-/// Configuratoin of DataRestore driver
+/// Configuratoin of NodeRestore driver
 #[derive(Debug, Clone)]
-pub struct DataRestoreConfig {
+pub struct NodeRestoreConfig {
     /// Web3 endpoint url string
     pub web3_endpoint: String,
     /// Provides Ethereum Franklin contract unterface
@@ -33,9 +33,12 @@ pub struct DataRestoreConfig {
     pub genesis_tx_hash: H256,
 }
 
-impl DataRestoreConfig {
+impl NodeRestoreConfig {
     /// Return the configuration for setted Infura web3 endpoint
     pub fn from_env() -> Self {
+        let get_env =
+            |name| env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e));
+
         let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
             .expect("Cant get plasma contract")
             .get("abi")
@@ -44,19 +47,8 @@ impl DataRestoreConfig {
         Self {
             web3_endpoint: env::var("WEB3_URL").expect("WEB3_URL env missing"), //"https://rinkeby.infura.io/".to_string(),
             franklin_contract: ethabi::Contract::load(abi_string.as_bytes())
-                .expect("Cant get plasma contract in data restore config"),
-            franklin_contract_address: env::var("CONTRACT_ADDR")
-                .expect("CONTRACT_ADDR env missing")
-                .as_str()
-                .parse()
-                .expect("Cant create data restore config"), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
-            genesis_block_number: u64::from_str_radix(
-                std::env::var("FRANKLIN_GENESIS_NUMBER")
-                    .expect("FRANKLIN_GENESIS_NUMBER env missing")
-                    .as_str(),
-                10,
-            )
-            .expect("Cant get genesis number"), // 0
+                .expect("Cant get plasma contract in node restore config"),
+
             genesis_tx_hash: H256::from_str(
                 std::env::var("GENESIS_TX_HASH")
                     .expect("GENESIS_TX_HASH env missing")
@@ -93,7 +85,7 @@ pub fn get_input_data_from_ethereum_transaction(
 pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, failure::Error> {
     let tx_id = TransactionId::Hash(*transaction_hash);
     let (_eloop, transport) =
-        web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
+        web3::transports::Http::new(NODE_RESTORE_CONFIG.web3_endpoint.as_str())
             .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
     let web3 = web3::Web3::new(transport);
     let web3_transaction = web3

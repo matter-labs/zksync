@@ -5,7 +5,7 @@ use std::str::FromStr;
 use web3::types::H256;
 use failure::format_err;
 // Workspace uses
-use crate::data_restore_driver::StorageUpdateState;
+use crate::node_restore_driver::StorageUpdateState;
 use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
 use crate::franklin_ops::FranklinOpsBlock;
@@ -29,7 +29,7 @@ pub fn update_tree_state(
     connection_pool: ConnectionPool,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore save tree state: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore save tree state: {}", e.to_string()))?;
     storage
         .update_tree_state(block_number, &account_updates)
         .map_err(|e| format_err!("Cant save tree state: {}", e.to_string()))?;
@@ -54,7 +54,7 @@ pub fn save_events_state(
         })?);
     }
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore save events: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore save events: {}", e.to_string()))?;
     storage
         .save_events_state(new_events.as_slice())
         .map_err(|e| format_err!("Cant save events state: {}", e.to_string()))?;
@@ -93,7 +93,7 @@ pub fn save_last_watched_block_number(
         block_number: number.to_string(),
     };
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore save block number: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore save block number: {}", e.to_string()))?;
     storage
         .save_last_watched_block_number(&block_number)
         .map_err(|e| format_err!("Cant save last watched block number: {}", e.to_string()))?;
@@ -120,7 +120,7 @@ pub fn save_storage_state(
         storage_state: string,
     };
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore save storage state: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore save storage state: {}", e.to_string()))?;
     storage
         .save_storage_state(&storage_state)
         .map_err(|e| format_err!("Cant save storage state: {}", e.to_string()))?;
@@ -139,7 +139,7 @@ pub fn save_franklin_ops_blocks(
     connection_pool: ConnectionPool,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore save ops blocks: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore save ops blocks: {}", e.to_string()))?;
     for block in blocks {
         storage
             .save_franklin_ops_block(block.ops.as_slice(), block.block_num, block.fee_account)
@@ -156,7 +156,7 @@ pub fn save_franklin_ops_blocks(
 ///
 pub fn remove_events_state(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore remove events state: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore remove events state: {}", e.to_string()))?;
     storage
         .delete_events_state()
         .map_err(|e| format_err!("No events state to delete: {}", e.to_string()))?;
@@ -171,7 +171,7 @@ pub fn remove_events_state(connection_pool: ConnectionPool) -> Result<(), failur
 ///
 pub fn remove_franklin_ops(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore remove franklin ops: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore remove franklin ops: {}", e.to_string()))?;
     storage
         .delete_franklin_ops()
         .map_err(|e| format_err!("No franklin ops to delete: {}", e.to_string()))?;
@@ -186,7 +186,7 @@ pub fn remove_franklin_ops(connection_pool: ConnectionPool) -> Result<(), failur
 ///
 pub fn remove_tree_state(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore remove tree data: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore remove tree data: {}", e.to_string()))?;
     storage
         .delete_tree_state()
         .map_err(|e| format_err!("No tree state to delete: {}", e.to_string()))?;
@@ -203,7 +203,7 @@ pub fn remove_last_watched_block_number(
     connection_pool: ConnectionPool,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore remove last watched block number: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore remove last watched block number: {}", e.to_string()))?;
     storage
         .delete_last_watched_block_number()
         .map_err(|e| format_err!("No last watched block number to delete: {}", e.to_string()))?;
@@ -220,9 +220,9 @@ pub fn remove_storage_state_status(
     connection_pool: ConnectionPool,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore remove storage state status: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore remove storage state status: {}", e.to_string()))?;
     storage
-        .delete_data_restore_storage_state_status()
+        .delete_node_restore_storage_state_status()
         .map_err(|e| format_err!("No storage state status to delete: {}", e.to_string()))?;
     Ok(())
 }
@@ -237,7 +237,7 @@ pub fn get_ops_blocks_from_storage(
     connection_pool: ConnectionPool,
 ) -> Result<Vec<FranklinOpsBlock>, failure::Error> {
     let storage = connection_pool.access_storage()
-    .map_err(|e| format_err!("Db connection failed for data restore get ops blocks: {}", e.to_string()))?;
+    .map_err(|e| format_err!("Db connection failed for node restore get ops blocks: {}", e.to_string()))?;
     let committed_blocks = storage
         .load_franklin_ops_blocks()
         .map_err(|e| format_err!("No ops blocks to delete: {}", e.to_string()))?;
@@ -273,7 +273,7 @@ pub fn get_storage_state(
 ) -> Result<StorageUpdateState, failure::Error> {
     let storage = connection_pool
         .access_storage()
-        .map_err(|e| format_err!("Db connection failed for data restore get storage state: {}", e.to_string()))?;
+        .map_err(|e| format_err!("Db connection failed for node restore get storage state: {}", e.to_string()))?;
 
     let storage_state_string = storage
         .load_storage_state()
@@ -284,7 +284,7 @@ pub fn get_storage_state(
         "Events" => StorageUpdateState::Events,
         "Operations" => StorageUpdateState::Operations,
         "None" => StorageUpdateState::None,
-        _ => return Err(format_err!("Unknown storage state for data restores")),
+        _ => return Err(format_err!("Unknown storage state for node restores")),
     };
 
     Ok(state)

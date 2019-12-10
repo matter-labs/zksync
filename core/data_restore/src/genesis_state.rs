@@ -1,6 +1,6 @@
 use crate::helpers::{
     get_ethereum_transaction, get_input_data_from_ethereum_transaction,
-    DATA_RESTORE_CONFIG,
+    NODE_RESTORE_CONFIG,
 };
 use models::node::{
     account::{Account, AccountAddress},
@@ -13,7 +13,7 @@ const ROOT_HASH_LENGTH: usize = 32;
 
 // Returns contracts genesis accounts state
 pub fn get_genesis_state() -> Result<(u32, AccountMap), failure::Error> {
-    let genesis_tx_hash = DATA_RESTORE_CONFIG.genesis_tx_hash;
+    let genesis_tx_hash = NODE_RESTORE_CONFIG.genesis_tx_hash;
     let transaction = get_ethereum_transaction(&genesis_tx_hash)?;
     let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
     let genesis_operator_address = AccountAddress::from_bytes(
