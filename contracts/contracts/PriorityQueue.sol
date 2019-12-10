@@ -14,16 +14,14 @@ contract PriorityQueue {
     // Operation fields bytes lengths
     uint8 constant TOKEN_BYTES = 2; // token id
     uint8 constant AMOUNT_BYTES = 16; // token amount
-    uint8 constant ETH_ADDR_BYTES = 20; // ethereum address
+    uint8 constant ADDR_BYTES = 20; // address
     uint8 constant ACC_NUM_BYTES = 3; // franklin account id
     uint8 constant NONCE_BYTES = 4; // franklin nonce
 
-    // Franklin chain address length
-    uint8 constant PUBKEY_HASH_LEN = 20;
     // Signature (for example full exit signature) length
-    uint8 constant SIGNATURE_LEN = 64;
+    uint8 constant SIGNATURE_BYTES = 64;
     // Public key length
-    uint8 constant PUBKEY_LEN = 32;
+    uint8 constant PUBKEY_BYTES = 32;
     // Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 4 * 60 * 24; // One day
 
@@ -151,11 +149,11 @@ contract PriorityQueue {
         bytes memory priorityPubData;
         bytes memory onchainPubData;
         if (_opType == DEPOSIT_OP && priorityRequests[_priorityRequestId].opType == DEPOSIT_OP) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, PUBKEY_HASH_LEN + AMOUNT_BYTES + TOKEN_BYTES);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ADDR_BYTES, ADDR_BYTES + AMOUNT_BYTES + TOKEN_BYTES);
             onchainPubData = _pubData;
         } else if (_opType == FULL_EXIT_OP && priorityRequests[_priorityRequestId].opType == FULL_EXIT_OP) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN);
-            onchainPubData = Bytes.slice(_pubData, 0, ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + PUBKEY_BYTES + ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES);
+            onchainPubData = Bytes.slice(_pubData, 0, ACC_NUM_BYTES + PUBKEY_BYTES + ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES);
         } else {
             revert("pid11"); // pid11 - wrong operation
         }

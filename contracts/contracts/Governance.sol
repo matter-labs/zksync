@@ -2,6 +2,17 @@ pragma solidity 0.5.10;
 
 contract Governance {
 
+    // Base gas price for transactions
+    uint256 constant public BASE_GAS_PRICE = 1000000000; // 1 Gwei
+    // Fees multiplier
+    uint256 constant public FEE_MULTIPLIER = 2;
+    // Base gas cost for deposit eth transaction
+    uint256 constant public BASE_DEPOSIT_ETH_GAS = 179000;
+    // Base gas cost for deposit erc transaction
+    uint256 constant public BASE_DEPOSIT_ERC_GAS = 214000;
+    // Base gas cost for full exit transaction
+    uint256 constant public BASE_FULL_EXIT_GAS = 170000;
+
     // Token added to Franklin net
     // Structure:
     // - token - added token address
