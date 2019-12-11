@@ -76,8 +76,8 @@ async function main() {
         const erc20 = await addTestERC20Token(wallet, governance);
 
         // Setup test wallet
-        const path = "m/44'/60'/0'/0/1/0";
-        const testWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, path).connect(provider);
+        const path = "m/44'/60'/0'/0/0";
+        const testWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, path).connect(provider);
         await wallet.sendTransaction({
             to: testWallet.address,
             value: ethers.utils.parseEther("10.0"),
