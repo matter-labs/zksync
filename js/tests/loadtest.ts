@@ -4,6 +4,7 @@ import {
     ETHProxy,
     getDefaultProvider,
     Provider,
+    Signer,
     types, utils as syncutils, Wallet,
 } from "zksync";
 
@@ -33,7 +34,7 @@ const FEE_DIVISOR = 50;
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
         const ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, baseWalletPath + "0").connect(ethersProvider);
-        const syncWallet = await Wallet.fromEthSigner(
+        const syncWallet = await createRandomZKSyncWallet(
             ethWallet,
             syncProvider,
             ethProxy,
@@ -48,7 +49,7 @@ const FEE_DIVISOR = 50;
         // Create wallets
         for (let i = 1; i < CLIENTS_TOTAL; i++) {
             const ew = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, `${baseWalletPath}${i}`).connect(ethersProvider);
-            const sw = await Wallet.fromEthSigner(
+            const sw = await createRandomZKSyncWallet(
                 ew,
                 syncProvider,
                 ethProxy,
@@ -119,6 +120,14 @@ const FEE_DIVISOR = 50;
     }
 
 })();
+
+async function createRandomZKSyncWallet(ethWallet: ethers.Wallet, provider: Provider, ethProxy: ETHProxy) {
+    const random = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const seedHex = (await ethWallet.signMessage(random)).substr(2);
+    const seed = Buffer.from(seedHex, "hex");
+    const signer = Signer.fromSeed(seed);
+    return new Wallet(signer, provider, ethProxy);
+}
 
 async function deposit(ethWallet: ethers.Wallet, syncWallet: Wallet, tokens: types.Token[], amount: utils.BigNumber) {
     try {
