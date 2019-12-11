@@ -1,6 +1,6 @@
 use crate::events::EventData;
 use crate::helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
-use failure::format_err;
+use failure::{ensure, format_err};
 use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
 
@@ -60,14 +60,12 @@ impl FranklinOpsBlock {
         while current_pointer < data.len() {
             let op_type: u8 = data[current_pointer];
 
-            let pub_data_size = FranklinOp::public_data_length(op_type)
-                .ok_or_else(|| format_err!("Wrong op type"))?;
+            let pub_data_size = FranklinOp::public_data_length(op_type)?;
 
             let pre = current_pointer;
             let post = pre + pub_data_size;
 
-            let op = FranklinOp::from_public_data(&data[pre..post])
-                .ok_or_else(|| format_err!("Wrong data"))?;
+            let op = FranklinOp::from_public_data(&data[pre..post])?;
             ops.push(op);
             current_pointer += pub_data_size;
         }
@@ -81,14 +79,11 @@ impl FranklinOpsBlock {
     /// * `input` - Ethereum transaction input
     ///
     fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, failure::Error> {
-        if input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH {
-            Ok(bytes_slice_to_uint32(
-                &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
-            )
-            .ok_or_else(|| format_err!("Cant convert bytes to fee account number"))?)
-        } else {
-            Err(format_err!("No fee account data in tx"))
-        }
+        ensure!(input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH, "No fee account data in tx");
+        Ok(bytes_slice_to_uint32(
+            &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
+        )
+        .ok_or(format_err!("Cant convert bytes to fee account number"))?)
     }
 }
 

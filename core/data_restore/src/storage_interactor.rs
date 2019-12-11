@@ -55,7 +55,6 @@ pub fn save_events_state(
     for event in events {
         new_events.push(
             block_event_into_stored_block_event(event)
-                .ok_or_else(|| format_err!("Cant perform bock event into stored"))?,
         );
     }
     let storage = connection_pool.access_storage().map_err(|e| {
@@ -70,21 +69,21 @@ pub fn save_events_state(
     Ok(())
 }
 
-/// Get Optional new stored representation of the Franklin Contract event from itself
+/// Get new stored representation of the Franklin Contract event from itself
 ///
 /// # Arguments
 ///
 /// * `evnet` - Franklin Contract event description
 ///
-pub fn block_event_into_stored_block_event(event: &EventData) -> Option<NewBlockEvent> {
-    Some(NewBlockEvent {
+pub fn block_event_into_stored_block_event(event: &EventData) -> NewBlockEvent {
+    NewBlockEvent {
         block_type: match event.block_type {
             EventType::Committed => "Committed".to_string(),
             EventType::Verified => "Verified".to_string(),
         },
         transaction_hash: event.transaction_hash.as_bytes().to_vec(),
         block_num: i64::from(event.block_num),
-    })
+    }
 }
 
 /// Saves last watched Ethereum block number in storage
@@ -392,8 +391,7 @@ pub fn get_events_state_from_storage(
 
     let mut committed_events: Vec<EventData> = vec![];
     for event in committed {
-        let block_event = stored_block_event_into_block_event(event.clone())
-            .ok_or_else(|| format_err!("Block events db is broken"))?;
+        let block_event = stored_block_event_into_block_event(event.clone())?;
         committed_events.push(block_event);
     }
 
@@ -402,8 +400,7 @@ pub fn get_events_state_from_storage(
         .map_err(|e| format_err!("Db connection failed for past events: {}", e.to_string()))?;
     let mut verified_events: Vec<EventData> = vec![];
     for event in verified {
-        let block_event = stored_block_event_into_block_event(event.clone())
-            .ok_or_else(|| format_err!("Block events db is broken"))?;
+        let block_event = stored_block_event_into_block_event(event.clone())?;
         verified_events.push(block_event);
     }
 
@@ -420,14 +417,14 @@ pub fn get_events_state_from_storage(
 ///
 /// * `block` - Stored representation of Franklin Contract event
 ///
-pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> Option<EventData> {
-    Some(EventData {
-        block_num: u32::try_from(block.block_num).ok()?,
+pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> Result<EventData, failure::Error> {
+    Ok(EventData {
+        block_num: u32::try_from(block.block_num)?,
         transaction_hash: H256::from_slice(block.transaction_hash.as_slice()),
         block_type: match &block.block_type {
             c if c == "Committed" => EventType::Committed,
             v if v == "Verified" => EventType::Verified,
-            _ => return None,
+            _ => return Err(format_err!("Wrong block type: {}", &block.block_type)),
         },
     })
 }
