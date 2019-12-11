@@ -1,71 +1,10 @@
-// Built-in uses
-use std::env;
-use std::str::FromStr;
 // External uses
-use ethabi::Contract;
 use failure::format_err;
-use lazy_static::lazy_static;
-use serde_json;
 use web3::futures::Future;
-use web3::types::{Address, H256};
+use web3::types::H256;
 use web3::types::{Transaction, TransactionId};
-// Workspace uses
-use models::abi::FRANKLIN_CONTRACT;
 
 pub const FUNC_NAME_HASH_LENGTH: usize = 4;
-
-lazy_static! {
-    pub static ref DATA_RESTORE_CONFIG: DataRestoreConfig = DataRestoreConfig::from_env();
-}
-
-/// Configuratoin of DataRestore driver
-#[derive(Debug, Clone)]
-pub struct DataRestoreConfig {
-    /// Web3 endpoint url string
-    pub web3_endpoint: String,
-    /// Provides Ethereum Franklin contract unterface
-    pub franklin_contract: Contract,
-    /// Ethereum Franklin contract address is type of H160
-    pub franklin_contract_address: Address,
-    /// Franklin contract genesis block number: u64
-    pub genesis_block_number: u64,
-    /// Franklin contract creation tx hash
-    pub genesis_tx_hash: H256,
-}
-
-impl DataRestoreConfig {
-    /// Return the configuration for setted Infura web3 endpoint
-    pub fn from_env() -> Self {
-        let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
-            .expect("Cant get plasma contract")
-            .get("abi")
-            .expect("Cant get plasma contract abi")
-            .to_string();
-        Self {
-            web3_endpoint: env::var("WEB3_URL").expect("WEB3_URL env missing"), //"https://rinkeby.infura.io/".to_string(),
-            franklin_contract: ethabi::Contract::load(abi_string.as_bytes())
-                .expect("Cant get plasma contract in data restore config"),
-            franklin_contract_address: env::var("CONTRACT_ADDR")
-                .expect("CONTRACT_ADDR env missing")
-                .as_str()
-                .parse()
-                .expect("Cant create data restore config"), //"4fbf331db438c88a83b1316d072b7d73d8366367".parse().unwrap()
-            genesis_block_number: u64::from_str_radix(
-                std::env::var("FRANKLIN_GENESIS_NUMBER")
-                    .expect("FRANKLIN_GENESIS_NUMBER env missing")
-                    .as_str(),
-                10,
-            )
-            .expect("Cant get genesis number"), // 0
-            genesis_tx_hash: H256::from_str(
-                std::env::var("GENESIS_TX_HASH")
-                    .expect("GENESIS_TX_HASH env missing")
-                    .as_str(),
-            )
-            .expect("Cant get genesis tx hash"),
-        }
-    }
-}
 
 /// Return Ethereum transaction input data
 ///

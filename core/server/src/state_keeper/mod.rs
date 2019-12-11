@@ -91,6 +91,10 @@ impl PlasmaStateKeeper {
         keeper
     }
 
+    pub fn restore_from_layer1(pool: ConnectionPool, web3_url: String, contract_eth_addr: H160) {
+        let 
+    }
+
     pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &AccountAddress) {
         let storage = pool
             .access_storage()

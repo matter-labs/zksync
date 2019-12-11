@@ -31,6 +31,7 @@ pub struct ConfigurationOptions {
     pub json_rpc_http_server_address: SocketAddr,
     pub json_rpc_ws_server_address: SocketAddr,
     pub contract_eth_addr: H160,
+    pub contract_genesis_tx_hash: H256,
     pub web3_url: String,
     pub governance_eth_addr: H160,
     pub priority_queue_eth_addr: H160,
@@ -60,6 +61,9 @@ impl ConfigurationOptions {
             contract_eth_addr: get_env("CONTRACT_ADDR")[2..]
                 .parse()
                 .expect("Failed to parse CONTRACT_ADDR as ETH contract address"),
+            contract_genesis_tx_hash: get_env("CONTRACT_GENESIS_TX_HASH")
+                .parse()
+                .expect("Failed to parse CONTRACT_GENESIS_TX_HASH"),
             web3_url: get_env("WEB3_URL"),
             governance_eth_addr: get_env("GOVERNANCE_ADDR")[2..]
                 .parse()

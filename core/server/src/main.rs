@@ -41,6 +41,14 @@ fn main() {
             &config_opts.operator_franklin_addr,
         );
         return;
+    } else if cli.is_present("restore") {
+        info!("Restoring node.");
+        PlasmaStateKeeper::restore_from_layer1(
+            connection_pool.clone(),
+            &config_opts.web3_url,
+            &config_opts.contract_eth_addr,
+        );
+        return;
     }
 
     debug!("starting server");
