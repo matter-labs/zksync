@@ -91,8 +91,13 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn restore_from_layer1(pool: ConnectionPool, web3_url: String, contract_eth_addr: H160) {
-        let 
+    pub fn restore_from_layer1(pool: ConnectionPool, web3_url: String, contract_eth_addr: H160, contract_genesis_tx_hash: H256) {
+        let storage = pool
+            .access_storage()
+            .expect("db connection failed for statekeeper");
+        
+        // load accounts state from data restore
+         
     }
 
     pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &AccountAddress) {

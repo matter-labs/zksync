@@ -47,6 +47,7 @@ fn main() {
             connection_pool.clone(),
             &config_opts.web3_url,
             &config_opts.contract_eth_addr,
+            &config_opts.contract_genesis_tx_hash,
         );
         return;
     }

@@ -1,9 +1,17 @@
 use crate::accounts_state::FranklinAccountsState;
 use crate::events_state::EventsState;
+use ethabi::Contract;
+use models::abi::FRANKLIN_CONTRACT;
 use crate::franklin_ops::FranklinOpsBlock;
 use crate::genesis_state::get_genesis_state;
 use crate::storage_interactor;
 use storage::ConnectionPool;
+use web3::contract::Contract;
+use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
+use web3::{Transport, Web3};
+use ethabi::{decode, ParamType};
+use failure::format_err;
+use futures::Future;
 
 /// Storage state update
 pub enum StorageUpdateState {
@@ -16,10 +24,10 @@ pub enum StorageUpdateState {
 pub struct DataRestoreDriver {
     /// Database connection pool
     pub connection_pool: ConnectionPool,
-    /// Step of the considered blocks ethereum block
-    pub eth_blocks_delta: u64,
-    /// Delta between last ethereum block and last watched ethereum block
-    pub end_eth_blocks_delta: u64,
+    /// Web3 endpoint
+    pub web3: Web3<T>,
+    /// Provides Ethereum Franklin contract unterface
+    pub franklin_contract: (ethabi::Contract, Contract<T>),
     /// Flag that indicates that state updates are running
     pub run_updates: bool,
     /// Franklin contract events state
@@ -39,15 +47,32 @@ impl DataRestoreDriver {
     ///
     pub fn new(
         connection_pool: ConnectionPool,
+        web3_endpoint: String,
+        contract_eth_addr: H160,
+        contract_genesis_tx_hash: H256,
         eth_blocks_delta: u64,
         end_eth_blocks_delta: u64,
     ) -> Self {
+        let (_eloop, transport) = web3::transports::Http::new(&web3_endpoint).unwrap();
+        let web3 = web3::Web3::new(transport);
+        let contract = {
+            let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
+                .unwrap()
+                .get("abi")
+                .unwrap()
+                .to_string();
+            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
+            (
+                abi.clone(),
+                Contract::new(web3.eth(), contract_eth_addr, abi.clone()),
+            )
+        };
         Self {
             connection_pool,
-            eth_blocks_delta,
-            end_eth_blocks_delta,
+            web3,
+            franklin_contract: contract,
             run_updates: false,
-            events_state: EventsState::new(),
+            events_state: EventsState::new(web3, contract, contract_genesis_tx_hash, eth_blocks_delta, end_eth_blocks_delta),
             accounts_state: FranklinAccountsState::new(),
         }
     }
