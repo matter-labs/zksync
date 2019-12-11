@@ -28,7 +28,6 @@ const components = {
 const ethers = require('ethers');
 const zksync = require('zksync');
 
-import { Wallet, FranklinProvider } from 'franklin_lib'
 import { WalletDecorator } from '../WalletDecorator'
 
 export default {
@@ -65,9 +64,6 @@ export default {
                 window.syncProvider = syncProvider;
                 window.ethProxy = ethProxy;
 
-                
-                const franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
-                window.franklinProvider = franklinProvider;
                 window.walletDecorator = await WalletDecorator.new();
 
                 this.$parent.$router.push('/main')

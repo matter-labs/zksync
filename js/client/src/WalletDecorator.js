@@ -8,6 +8,7 @@ const ethers = require('ethers');
 window.ethers = ethers;
 import priority_queue_abi from '../../../contracts/build/PriorityQueue.json'
 import franklin_abi from '../../../contracts/build/Franklin.json'
+import { BlockExplorerClient } from './BlockExplorerClient';
 
 const NUMERIC_LIMITS_UINT_256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
 
@@ -93,6 +94,7 @@ export class WalletDecorator {
     // #region everything
     constructor () {
         this.address = window.syncWallet.address();
+        this.blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
     }
 
     static async new(wallet) {
@@ -170,16 +172,15 @@ export class WalletDecorator {
             console.log(this.address);
             return [];
         }
-        let transactionsUrl = `${config.API_SERVER}/api/v0.1/account/${this.address}/history/${offset}/${limit}`;
-        console.log(transactionsUrl);
-        let transactions = await Axios.get(transactionsUrl).then(res => res.data);
+        let transactions = await this.blockExplorerClient.getAccountTransactions(this.address, offset, limit);
         let res = transactions.map(async (tx, index) => {
             let elem_id      = `history_${index}`;
             let type         = tx.tx.type || '';
             let hash         = tx.hash;
             let direction    = 
                 (type == 'Deposit') || (type == 'Transfer' && tx.tx.to == this.address)
-                ? 'incoming' : 'outcoming';
+                ? 'incoming' 
+                : 'outcoming';
 
             // pub hash: Option<String>,
             // pub tx: Value,
@@ -206,7 +207,7 @@ export class WalletDecorator {
                 if (tx.commited == false) return 'Nothing';
                 if (hash == null) return 'hash_null';
 
-                let receipt = await window.franklinProvider.getTxReceipt(hash);
+                let receipt = await this.blockExplorerClient.getTxReceipt(hash);
                 /**
                 pub struct ProverRun {
                     pub id: i32,
@@ -600,7 +601,7 @@ export class WalletDecorator {
         );
 
         while ( ! receipt.prover_run) {
-            receipt = await window.franklinProvider.getTxReceipt(tx_hash);
+            receipt = await this.blockExplorerClient.getTxReceipt(tx_hash);
             await sleep(2000);
         }
 
@@ -618,7 +619,7 @@ export class WalletDecorator {
                 + `proving block <code>${receipt.prover_run.block_number}</code> `
                 + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`);
 
-            receipt = await window.franklinProvider.getTxReceipt(tx_hash);
+            receipt = await this.blockExplorerClient.getTxReceipt(tx_hash);
             await sleep(1000);
         }
 
@@ -648,10 +649,10 @@ export class WalletDecorator {
             return;
         }
 
-        let pq_op = await window.franklinProvider.getPriorityOpReceipt(pq_id);
+        let pq_op = await this.blockExplorerClient.getPriorityOpReceipt(pq_id);
         while (pq_op.prover_run == undefined) {
             await sleep(2000);
-            pq_op = await window.franklinProvider.getPriorityOpReceipt(pq_id);
+            pq_op = await this.blockExplorerClient.getPriorityOpReceipt(pq_id);
         }
 
         let proverStart = new Date();
@@ -668,7 +669,7 @@ export class WalletDecorator {
                 + `proving block <code>${pq_op.prover_run.block_number}</code> `
                 + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`);
 
-            pq_op = await window.franklinProvider.getPriorityOpReceipt(pq_id);
+            pq_op = await this.blockExplorerClient.getPriorityOpReceipt(pq_id);
 
             await sleep(1000);
         }
