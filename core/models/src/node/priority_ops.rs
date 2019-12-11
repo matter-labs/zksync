@@ -1,11 +1,12 @@
 use super::tx::{PackedPublicKey, PackedSignature, TxSignature};
 use super::{AccountAddress, TokenId};
 use super::{AccountId, Nonce};
-use crate::params::FR_ADDRESS_LEN;
-use crate::primitives::{
-    bytes32_from_slice, bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
-    u128_to_bigdecimal,
+use crate::params::{
+    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, FR_ADDRESS_LEN,
+    NONCE_BIT_WIDTH, SIGNATURE_R_BIT_WIDTH_PADDED, SIGNATURE_S_BIT_WIDTH_PADDED,
+    SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
 };
+use crate::primitives::{bytes_slice_to_uint32, u128_to_bigdecimal};
 use bigdecimal::BigDecimal;
 use ethabi::{decode, ParamType};
 use failure::{bail, ensure, format_err};
@@ -13,11 +14,7 @@ use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use web3::types::{Address, Log, U256};
 
-use super::operations::{
-    DepositOp, FullExitOp, ACCOUNT_ID_BYTES_LENGTH, ETH_ADDR_BYTES_LENGTH,
-    FULL_AMOUNT_BYTES_LENGTH, NONCE_BYTES_LENGTH, PUBKEY_PACKED_BYTES_LENGTH,
-    SIGNATURE_R_BYTES_LENGTH, SIGNATURE_S_BYTES_LENGTH, TOKEN_BYTES_LENGTH,
-};
+use super::operations::{DepositOp, FullExitOp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
@@ -27,82 +24,19 @@ pub struct Deposit {
     pub account: AccountAddress,
 }
 
-impl Deposit {
-    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != DepositOp::OP_LENGTH {
-            return None;
-        }
-
-        let token_id_pre_length = ACCOUNT_ID_BYTES_LENGTH;
-        let amount_pre_length = token_id_pre_length + TOKEN_BYTES_LENGTH;
-        let account_pre_length = amount_pre_length + FULL_AMOUNT_BYTES_LENGTH;
-
-        Some(Self {
-            sender: Address::zero(), // In current circuit there is no sender in deposit pubdata
-            token: bytes_slice_to_uint16(
-                &bytes[token_id_pre_length..token_id_pre_length + TOKEN_BYTES_LENGTH],
-            )?,
-            amount: u128_to_bigdecimal(bytes_slice_to_uint128(
-                &bytes[amount_pre_length..amount_pre_length + FULL_AMOUNT_BYTES_LENGTH],
-            )?),
-            account: AccountAddress::from_bytes(
-                &bytes[account_pre_length..account_pre_length + FR_ADDRESS_LEN],
-            )
-            .ok()?,
-        })
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExit {
     pub account_id: AccountId,
-    pub packed_pubkey: Box<[u8; PUBKEY_PACKED_BYTES_LENGTH]>,
+    pub packed_pubkey: Box<[u8; SUBTREE_HASH_WIDTH_PADDED / 8]>,
     pub eth_address: Address,
     pub token: TokenId,
     pub nonce: Nonce,
-    pub signature_r: Box<[u8; SIGNATURE_R_BYTES_LENGTH]>,
-    pub signature_s: Box<[u8; SIGNATURE_S_BYTES_LENGTH]>,
+    pub signature_r: Box<[u8; SIGNATURE_R_BIT_WIDTH_PADDED / 8]>,
+    pub signature_s: Box<[u8; SIGNATURE_S_BIT_WIDTH_PADDED / 8]>,
 }
 
 impl FullExit {
     const TX_TYPE: u8 = 6;
-
-    // TODO:
-    // vd: Why it is here? It should be in `impl FullExitOp` with pub data serialization.
-    // issue: #157
-    pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != FullExitOp::OP_LENGTH {
-            return None;
-        }
-        let packed_pubkey_pre_length = ACCOUNT_ID_BYTES_LENGTH;
-        let eth_address_pre_length = packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LENGTH;
-        let token_pre_length = eth_address_pre_length + ETH_ADDR_BYTES_LENGTH;
-        let nonce_pre_length = token_pre_length + TOKEN_BYTES_LENGTH;
-        let signature_r_pre_length = nonce_pre_length + NONCE_BYTES_LENGTH;
-        let signature_s_pre_length = signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH;
-        Some(Self {
-            account_id: bytes_slice_to_uint32(&bytes[0..ACCOUNT_ID_BYTES_LENGTH])?,
-            packed_pubkey: Box::from(bytes32_from_slice(
-                &bytes[packed_pubkey_pre_length
-                    ..packed_pubkey_pre_length + PUBKEY_PACKED_BYTES_LENGTH],
-            )?),
-            eth_address: Address::from_slice(
-                &bytes[eth_address_pre_length..eth_address_pre_length + ETH_ADDR_BYTES_LENGTH],
-            ),
-            token: bytes_slice_to_uint16(
-                &bytes[token_pre_length..token_pre_length + TOKEN_BYTES_LENGTH],
-            )?,
-            nonce: bytes_slice_to_uint32(
-                &bytes[nonce_pre_length..nonce_pre_length + NONCE_BYTES_LENGTH],
-            )?,
-            signature_r: Box::from(bytes32_from_slice(
-                &bytes[signature_r_pre_length..signature_r_pre_length + SIGNATURE_R_BYTES_LENGTH],
-            )?),
-            signature_s: Box::from(bytes32_from_slice(
-                &bytes[signature_s_pre_length..signature_s_pre_length + SIGNATURE_S_BYTES_LENGTH],
-            )?),
-        })
-    }
 
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
@@ -159,15 +93,15 @@ impl FranklinPriorityOp {
         match op_type_id {
             DepositOp::OP_CODE => {
                 let (sender, pub_data_left) = {
-                    let (sender, left) = pub_data.split_at(ETH_ADDR_BYTES_LENGTH);
+                    let (sender, left) = pub_data.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
                     (Address::from_slice(sender), left)
                 };
                 let (token, pub_data_left) = {
-                    let (token, left) = pub_data_left.split_at(TOKEN_BYTES_LENGTH);
+                    let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u16::from_be_bytes(token.try_into().unwrap()), left)
                 };
                 let (amount, pub_data_left) = {
-                    let (amount, left) = pub_data_left.split_at(FULL_AMOUNT_BYTES_LENGTH);
+                    let (amount, left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
                     let amount = u128::from_be_bytes(amount.try_into().unwrap());
                     (u128_to_bigdecimal(amount), left)
                 };
@@ -188,31 +122,34 @@ impl FranklinPriorityOp {
             }
             FullExitOp::OP_CODE => {
                 let (account_id, pub_data_left) = {
-                    let (account_id, left) = pub_data.split_at(ACCOUNT_ID_BYTES_LENGTH);
+                    let (account_id, left) = pub_data.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
                     (bytes_slice_to_uint32(account_id).unwrap(), left)
                 };
                 let (packed_pubkey, pub_data_left) = {
-                    let (packed_pubkey, left) = pub_data_left.split_at(PUBKEY_PACKED_BYTES_LENGTH);
+                    let (packed_pubkey, left) =
+                        pub_data_left.split_at(SUBTREE_HASH_WIDTH_PADDED / 8);
                     (Box::new(packed_pubkey.try_into().unwrap()), left)
                 };
                 let (eth_address, pub_data_left) = {
-                    let (eth_address, left) = pub_data_left.split_at(ETH_ADDR_BYTES_LENGTH);
+                    let (eth_address, left) = pub_data_left.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
                     (Address::from_slice(eth_address), left)
                 };
                 let (token, pub_data_left) = {
-                    let (token, left) = pub_data_left.split_at(TOKEN_BYTES_LENGTH);
+                    let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u16::from_be_bytes(token.try_into().unwrap()), left)
                 };
                 let (nonce, pub_data_left) = {
-                    let (nonce, left) = pub_data_left.split_at(NONCE_BYTES_LENGTH);
+                    let (nonce, left) = pub_data_left.split_at(NONCE_BIT_WIDTH / 8);
                     (u32::from_be_bytes(nonce.try_into().unwrap()), left)
                 };
                 let (signature_r, pub_data_left) = {
-                    let (signature_r, left) = pub_data_left.split_at(SIGNATURE_R_BYTES_LENGTH);
+                    let (signature_r, left) =
+                        pub_data_left.split_at(SIGNATURE_R_BIT_WIDTH_PADDED / 8);
                     (Box::new(signature_r.try_into().unwrap()), left)
                 };
                 let (signature_s, pub_data_left) = {
-                    let (signature_s, left) = pub_data_left.split_at(SIGNATURE_S_BYTES_LENGTH);
+                    let (signature_s, left) =
+                        pub_data_left.split_at(SIGNATURE_S_BIT_WIDTH_PADDED / 8);
                     (Box::new(signature_s.try_into().unwrap()), left)
                 };
                 ensure!(

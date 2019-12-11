@@ -192,7 +192,7 @@ impl OperationNotifier {
                 };
 
                 BlockInfo {
-                    block_number: block_with_op.block_number as i64,
+                    block_number: i64::from(block_with_op.block_number),
                     committed: true,
                     verified,
                 }
@@ -369,7 +369,7 @@ impl OperationNotifier {
                             success: Some(tx.success),
                             fail_reason: tx.fail_reason,
                             block: Some(BlockInfo {
-                                block_number: op.block.block_number as i64,
+                                block_number: i64::from(op.block.block_number),
                                 committed: true,
                                 verified: action == ActionType::VERIFY,
                             }),
@@ -385,7 +385,7 @@ impl OperationNotifier {
                         let rec = ETHOpInfoResp {
                             executed: true,
                             block: Some(BlockInfo {
-                                block_number: op.block.block_number as i64,
+                                block_number: i64::from(op.block.block_number),
                                 committed: true,
                                 verified: action == ActionType::VERIFY,
                             }),
