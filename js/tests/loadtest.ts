@@ -16,7 +16,7 @@ const TRANSFER_DIVISOR = 1000;
 const FEE_DIVISOR = 50;
 
 (async () => {
-    const baseWalletPath = "m/44'/60'/0'/0/1/";
+    const baseWalletPath = "m/44'/60'/0'/0/";
 
     const WEB3_URL = process.env.WEB3_URL;
     const ERC20_TOKEN = process.env.TEST_ERC20;
@@ -33,7 +33,7 @@ const FEE_DIVISOR = 50;
         const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
-        const ethWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, baseWalletPath + "0").connect(ethersProvider);
+        const ethWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, baseWalletPath + "0").connect(ethersProvider);
         const syncWallet = await createRandomZKSyncWallet(
             ethWallet,
             syncProvider,
@@ -48,7 +48,7 @@ const FEE_DIVISOR = 50;
 
         // Create wallets
         for (let i = 1; i < CLIENTS_TOTAL; i++) {
-            const ew = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, `${baseWalletPath}${i}`).connect(ethersProvider);
+            const ew = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, `${baseWalletPath}${i}`).connect(ethersProvider);
             const sw = await createRandomZKSyncWallet(
                 ew,
                 syncProvider,
