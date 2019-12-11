@@ -86,7 +86,7 @@ impl FranklinOpsBlock {
         Ok(bytes_slice_to_uint32(
             &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
         )
-        .ok_or(format_err!("Cant convert bytes to fee account number"))?)
+        .ok_or_else(|| format_err!("Cant convert bytes to fee account number"))?)
     }
 }
 

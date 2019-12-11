@@ -101,6 +101,6 @@ pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, 
         .transaction(tx_id)
         .wait()
         .map_err(|e| format_err!("No response from web3: {}", e.to_string()))?
-        .ok_or(format_err!("No tx with this hash"))?;
+        .ok_or_else(|| format_err!("No tx with this hash"))?;
     Ok(web3_transaction)
 }

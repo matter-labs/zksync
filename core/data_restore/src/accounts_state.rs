@@ -73,7 +73,7 @@ impl FranklinAccountsState {
                     let from = self
                         .state
                         .get_account(op.from)
-                        .ok_or(format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.nonce = from.nonce;
                     if let Ok(OpSuccess {
@@ -91,7 +91,7 @@ impl FranklinAccountsState {
                     let account = self
                         .state
                         .get_account(op.account_id)
-                        .ok_or(format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
@@ -109,7 +109,7 @@ impl FranklinAccountsState {
                     let account = self
                         .state
                         .get_account(op.account_id)
-                        .ok_or(format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
@@ -126,11 +126,11 @@ impl FranklinAccountsState {
                     let from = self
                         .state
                         .get_account(op.from)
-                        .ok_or(format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     let to = self
                         .state
                         .get_account(op.to)
-                        .ok_or(format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.to = to.address;
                     op.tx.nonce = from.nonce;
@@ -161,7 +161,7 @@ impl FranklinAccountsState {
         }
         let fee_account_address = self
             .get_account(block.fee_account)
-            .ok_or(format_err!("Nonexistent account"))?
+            .ok_or_else(|| format_err!("Nonexistent account"))?
             .address;
         let (_, fee_updates) = self.state.collect_fee(&fees, &fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
