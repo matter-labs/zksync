@@ -17,8 +17,8 @@ use crate::primitives::{
     bytes_slice_to_uint32, u128_to_bigdecimal,
 };
 use bigdecimal::BigDecimal;
-use web3::types::Address;
 use failure::{ensure, format_err};
+use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DepositOp {
@@ -42,7 +42,10 @@ impl DepositOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == Self::CHUNKS * 8, "Wrong bytes length for deposit pubdata");
+        ensure!(
+            bytes.len() == Self::CHUNKS * 8,
+            "Wrong bytes length for deposit pubdata"
+        );
 
         let account_id_offset = 1;
         let token_id_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
@@ -51,19 +54,15 @@ impl DepositOp {
 
         let account_id = bytes_slice_to_uint32(
             &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
-        ).ok_or(
-            format_err!("Cant get account id from deposit pubdata")
-        )?;
-        let token = bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-        .ok_or(
-            format_err!("Cant get token id from deposit pubdata")
-        )?;
-        let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
-            &bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8],
         )
-        .ok_or(
-            format_err!("Cant get amount from deposit pubdata")
-        )?);
+        .ok_or(format_err!("Cant get account id from deposit pubdata"))?;
+        let token =
+            bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
+                .ok_or(format_err!("Cant get token id from deposit pubdata"))?;
+        let amount = u128_to_bigdecimal(
+            bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
+                .ok_or(format_err!("Cant get amount from deposit pubdata"))?,
+        );
         let account = AccountAddress::from_bytes(
             &bytes[account_address_offset..account_address_offset + FR_ADDRESS_LEN],
         )?;
@@ -89,7 +88,10 @@ impl NoopOp {
     pub const OP_CODE: u8 = 0x00;
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes == [0, 0, 0, 0, 0, 0, 0, 0], "Wrong pubdata for noop operation");
+        ensure!(
+            bytes == [0, 0, 0, 0, 0, 0, 0, 0],
+            "Wrong pubdata for noop operation"
+        );
         Ok(Self {})
     }
 
@@ -125,7 +127,10 @@ impl TransferToNewOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == Self::CHUNKS * 8, "Wrong bytes length for transfer to new pubdata");
+        ensure!(
+            bytes.len() == Self::CHUNKS * 8,
+            "Wrong bytes length for transfer to new pubdata"
+        );
 
         let from_offset = 1;
         let token_id_offset = from_offset + ACCOUNT_ID_BIT_WIDTH / 8;
@@ -137,34 +142,32 @@ impl TransferToNewOp {
 
         let from_id =
             bytes_slice_to_uint32(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-            .ok_or(
-                format_err!("Cant get from account id from transfer to new pubdata")
-            )?;
+                .ok_or(format_err!(
+                    "Cant get from account id from transfer to new pubdata"
+                ))?;
         let to_id =
             bytes_slice_to_uint32(&bytes[to_id_offset..to_id_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-            .ok_or(
-                format_err!("Cant get to account id from transfer to new pubdata")
-            )?;
+                .ok_or(format_err!(
+                    "Cant get to account id from transfer to new pubdata"
+                ))?;
         let from_address = AccountAddress::zero(); // It is unknown from pubdata;
         let to_address = AccountAddress::from_bytes(
             &bytes[to_address_offset..to_address_offset + FR_ADDRESS_LEN],
         )?;
         let token =
             bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-            .ok_or(
-                format_err!("Cant get token id from transfer to new pubdata")
-            )?;
+                .ok_or(format_err!(
+                "Cant get token id from transfer to new pubdata"
+            ))?;
         let amount = unpack_token_amount(
             &bytes[amount_offset
-                ..amount_offset + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8]
-        ).ok_or(
-            format_err!("Cant get amount from transfer to new pubdata")
-        )?;
+                ..amount_offset + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8],
+        )
+        .ok_or(format_err!("Cant get amount from transfer to new pubdata"))?;
         let fee = unpack_fee_amount(
-            &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8]
-        ).ok_or(
-            format_err!("Cant get fee from transfer to new pubdata")
-        )?;
+            &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
+        )
+        .ok_or(format_err!("Cant get fee from transfer to new pubdata"))?;
         let nonce = 0; // It is unknown from pubdata
         let signature = TxSignature::default(); // It is unknown from pubdata
 
@@ -208,7 +211,10 @@ impl TransferOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == Self::CHUNKS * 8, "Wrong bytes length for transfer pubdata");
+        ensure!(
+            bytes.len() == Self::CHUNKS * 8,
+            "Wrong bytes length for transfer pubdata"
+        );
 
         let from_offset = 1;
         let token_id_offset = from_offset + ACCOUNT_ID_BIT_WIDTH / 8;
@@ -221,31 +227,25 @@ impl TransferOp {
         let to_address = AccountAddress::zero(); // From pubdata its unknown
         let token =
             bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-            .ok_or(
-                format_err!("Cant get token id from transfer pubdata")
-            )?;
+                .ok_or(format_err!("Cant get token id from transfer pubdata"))?;
         let amount = unpack_token_amount(
             &bytes[amount_offset
                 ..amount_offset + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8],
-        ).ok_or(
-            format_err!("Cant get amount from transfer pubdata")
-        )?;
+        )
+        .ok_or(format_err!("Cant get amount from transfer pubdata"))?;
         let fee = unpack_fee_amount(
             &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
-        ).ok_or(
-            format_err!("Cant get fee from transfer pubdata")
-        )?;
+        )
+        .ok_or(format_err!("Cant get fee from transfer pubdata"))?;
         let nonce = 0; // It is unknown from pubdata
         let signature = TxSignature::default(); // It is unknown from pubdata
         let from_id =
             bytes_slice_to_uint32(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-            .ok_or(
-                format_err!("Cant get from account id from transfer pubdata")
-            )?;
+                .ok_or(format_err!(
+                    "Cant get from account id from transfer pubdata"
+                ))?;
         let to_id = bytes_slice_to_uint32(&bytes[to_offset..to_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-        .ok_or(
-            format_err!("Cant get to account id from transfer pubdata")
-        )?;
+            .ok_or(format_err!("Cant get to account id from transfer pubdata"))?;
 
         Ok(Self {
             tx: Transfer {
@@ -286,8 +286,11 @@ impl WithdrawOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == Self::CHUNKS * 8, "Wrong bytes length for withdraw pubdata");
-        
+        ensure!(
+            bytes.len() == Self::CHUNKS * 8,
+            "Wrong bytes length for withdraw pubdata"
+        );
+
         let account_offset = 1;
         let token_id_offset = account_offset + ACCOUNT_ID_BIT_WIDTH / 8;
         let amount_offset = token_id_offset + TOKEN_BIT_WIDTH / 8;
@@ -296,28 +299,23 @@ impl WithdrawOp {
 
         let account_id = bytes_slice_to_uint32(
             &bytes[account_offset..account_offset + ACCOUNT_ID_BIT_WIDTH / 8],
-        ).ok_or(
-            format_err!("Cant get account id from withdraw pubdata")
-        )?;
+        )
+        .ok_or(format_err!("Cant get account id from withdraw pubdata"))?;
         let account_address = AccountAddress::zero(); // From pubdata it is unknown
         let token =
             bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-            .ok_or(
-                format_err!("Cant get token id from withdraw pubdata")
-            )?;
+                .ok_or(format_err!("Cant get token id from withdraw pubdata"))?;
         let eth_address = Address::from_slice(
             &bytes[eth_address_offset..eth_address_offset + ETHEREUM_KEY_BIT_WIDTH / 8],
         );
-        let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
-            &bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8],
-        ).ok_or(
-            format_err!("Cant get amount from withdraw pubdata")
-        )?);
+        let amount = u128_to_bigdecimal(
+            bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
+                .ok_or(format_err!("Cant get amount from withdraw pubdata"))?,
+        );
         let fee = unpack_fee_amount(
             &bytes[fee_offset..fee_offset + (FEE_EXPONENT_BIT_WIDTH + FEE_MANTISSA_BIT_WIDTH) / 8],
-        ).ok_or(
-            format_err!("Cant get fee from withdraw pubdata")
-        )?;
+        )
+        .ok_or(format_err!("Cant get fee from withdraw pubdata"))?;
         let nonce = 0; // From pubdata it is unknown
         let signature = TxSignature::default(); // From pubdata it is unknown
 
@@ -355,14 +353,16 @@ impl CloseOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == Self::CHUNKS * 8, "Wrong bytes length for close pubdata");
+        ensure!(
+            bytes.len() == Self::CHUNKS * 8,
+            "Wrong bytes length for close pubdata"
+        );
 
         let account_id_offset = 1;
         let account_id = bytes_slice_to_uint32(
             &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
-        ).ok_or(
-            format_err!("Cant get from account id from close pubdata")
-        )?;
+        )
+        .ok_or(format_err!("Cant get from account id from close pubdata"))?;
         let account_address = AccountAddress::zero(); // From pubdata it is unknown
         let nonce = 0; // From pubdata it is unknown
         let signature = TxSignature::default(); // From pubdata it is unknown
@@ -406,7 +406,10 @@ impl FullExitOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(bytes.len() == Self::CHUNKS * 8, "Wrong bytes length for full exit pubdata");
+        ensure!(
+            bytes.len() == Self::CHUNKS * 8,
+            "Wrong bytes length for full exit pubdata"
+        );
 
         let account_id_offset = 1;
         let packed_pubkey_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
@@ -419,42 +422,37 @@ impl FullExitOp {
 
         let account_id = bytes_slice_to_uint32(
             &bytes[account_id_offset..account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8],
-        ).ok_or(
-            format_err!("Cant get account id from full exit pubdata")
-        )?;
-        let packed_pubkey = Box::from(bytes32_from_slice(
-            &bytes[packed_pubkey_offset..packed_pubkey_offset + SUBTREE_HASH_WIDTH_PADDED / 8],
-        ).ok_or(
-            format_err!("Cant get packed pubkey from full exit pubdata")
-        )?);
+        )
+        .ok_or(format_err!("Cant get account id from full exit pubdata"))?;
+        let packed_pubkey = Box::from(
+            bytes32_from_slice(
+                &bytes[packed_pubkey_offset..packed_pubkey_offset + SUBTREE_HASH_WIDTH_PADDED / 8],
+            )
+            .ok_or(format_err!("Cant get packed pubkey from full exit pubdata"))?,
+        );
         let eth_address = Address::from_slice(
             &bytes[eth_address_offset..eth_address_offset + ETHEREUM_KEY_BIT_WIDTH / 8],
         );
-        let token =
-            bytes_slice_to_uint16(&bytes[token_offset..token_offset + TOKEN_BIT_WIDTH / 8])
-            .ok_or(
-                format_err!("Cant get token id from full exit pubdata")
-            )?;
-        let nonce =
-            bytes_slice_to_uint32(&bytes[nonce_offset..nonce_offset + NONCE_BIT_WIDTH / 8])
-            .ok_or(
-                format_err!("Cant get nonce from full exit pubdata")
-            )?;
-        let signature_r = Box::from(bytes32_from_slice(
-            &bytes[signature_r_offset..signature_r_offset + SIGNATURE_R_BIT_WIDTH_PADDED / 8],
-        ).ok_or(
-            format_err!("Cant get signature r from full exit pubdata")
-        )?);
-        let signature_s = Box::from(bytes32_from_slice(
-            &bytes[signature_s_offset..signature_s_offset + SIGNATURE_S_BIT_WIDTH_PADDED / 8],
-        ).ok_or(
-            format_err!("Cant get signature s from full exit pubdata")
-        )?);
-        let amount = u128_to_bigdecimal(bytes_slice_to_uint128(
-            &bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8],
-        ).ok_or(
-            format_err!("Cant get amount from full exit pubdata")
-        )?);
+        let token = bytes_slice_to_uint16(&bytes[token_offset..token_offset + TOKEN_BIT_WIDTH / 8])
+            .ok_or(format_err!("Cant get token id from full exit pubdata"))?;
+        let nonce = bytes_slice_to_uint32(&bytes[nonce_offset..nonce_offset + NONCE_BIT_WIDTH / 8])
+            .ok_or(format_err!("Cant get nonce from full exit pubdata"))?;
+        let signature_r = Box::from(
+            bytes32_from_slice(
+                &bytes[signature_r_offset..signature_r_offset + SIGNATURE_R_BIT_WIDTH_PADDED / 8],
+            )
+            .ok_or(format_err!("Cant get signature r from full exit pubdata"))?,
+        );
+        let signature_s = Box::from(
+            bytes32_from_slice(
+                &bytes[signature_s_offset..signature_s_offset + SIGNATURE_S_BIT_WIDTH_PADDED / 8],
+            )
+            .ok_or(format_err!("Cant get signature s from full exit pubdata"))?,
+        );
+        let amount = u128_to_bigdecimal(
+            bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
+                .ok_or(format_err!("Cant get amount from full exit pubdata"))?,
+        );
 
         // If full exit amount is 0 - full exit is considered failed
         let withdraw_amount = if amount == BigDecimal::from(0) {
@@ -516,10 +514,7 @@ impl FranklinOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        let op_type: u8 = *bytes.first()
-        .ok_or(
-            format_err!("Empty pubdata")
-        )?;
+        let op_type: u8 = *bytes.first().ok_or(format_err!("Empty pubdata"))?;
         match op_type {
             NoopOp::OP_CODE => Ok(FranklinOp::Noop(NoopOp::from_public_data(&bytes)?)),
             DepositOp::OP_CODE => Ok(FranklinOp::Deposit(Box::new(DepositOp::from_public_data(

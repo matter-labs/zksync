@@ -79,7 +79,10 @@ impl FranklinOpsBlock {
     /// * `input` - Ethereum transaction input
     ///
     fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, failure::Error> {
-        ensure!(input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH, "No fee account data in tx");
+        ensure!(
+            input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH,
+            "No fee account data in tx"
+        );
         Ok(bytes_slice_to_uint32(
             &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
         )

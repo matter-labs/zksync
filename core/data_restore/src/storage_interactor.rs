@@ -53,9 +53,7 @@ pub fn save_events_state(
 ) -> Result<(), failure::Error> {
     let mut new_events: Vec<NewBlockEvent> = vec![];
     for event in events {
-        new_events.push(
-            block_event_into_stored_block_event(event)
-        );
+        new_events.push(block_event_into_stored_block_event(event));
     }
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -417,7 +415,9 @@ pub fn get_events_state_from_storage(
 ///
 /// * `block` - Stored representation of Franklin Contract event
 ///
-pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> Result<EventData, failure::Error> {
+pub fn stored_block_event_into_block_event(
+    block: StoredBlockEvent,
+) -> Result<EventData, failure::Error> {
     Ok(EventData {
         block_num: u32::try_from(block.block_num)?,
         transaction_hash: H256::from_slice(block.transaction_hash.as_slice()),
