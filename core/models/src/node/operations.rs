@@ -142,23 +142,21 @@ impl TransferToNewOp {
 
         let from_id =
             bytes_slice_to_uint32(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!(
-                    "Cant get from account id from transfer to new pubdata"
-                ))?;
+                .ok_or_else(|| {
+                    format_err!("Cant get from account id from transfer to new pubdata")
+                })?;
         let to_id =
             bytes_slice_to_uint32(&bytes[to_id_offset..to_id_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!(
-                    "Cant get to account id from transfer to new pubdata"
-                ))?;
+                .ok_or_else(|| {
+                    format_err!("Cant get to account id from transfer to new pubdata")
+                })?;
         let from_address = AccountAddress::zero(); // It is unknown from pubdata;
         let to_address = AccountAddress::from_bytes(
             &bytes[to_address_offset..to_address_offset + FR_ADDRESS_LEN],
         )?;
         let token =
             bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!(
-                "Cant get token id from transfer to new pubdata"
-            ))?;
+                .ok_or_else(|| format_err!("Cant get token id from transfer to new pubdata"))?;
         let amount = unpack_token_amount(
             &bytes[amount_offset
                 ..amount_offset + (AMOUNT_EXPONENT_BIT_WIDTH + AMOUNT_MANTISSA_BIT_WIDTH) / 8],
@@ -241,9 +239,7 @@ impl TransferOp {
         let signature = TxSignature::default(); // It is unknown from pubdata
         let from_id =
             bytes_slice_to_uint32(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
-                .ok_or_else(|| format_err!(
-                    "Cant get from account id from transfer pubdata"
-                ))?;
+                .ok_or_else(|| format_err!("Cant get from account id from transfer pubdata"))?;
         let to_id = bytes_slice_to_uint32(&bytes[to_offset..to_offset + ACCOUNT_ID_BIT_WIDTH / 8])
             .ok_or_else(|| format_err!("Cant get to account id from transfer pubdata"))?;
 
