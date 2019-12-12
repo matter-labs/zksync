@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use ff::{Field, PrimeField};
 use rand::Rng;
 // Workspace uses
+use testhelper::TestAccount;
 use prover;
 
 #[test]
@@ -67,7 +68,8 @@ fn prover_proves_a_block_and_publishes_result() {
     let verify_key = bellman::groth16::prepare_verifying_key(&circuit_params.vk);
     let stop_signal = Arc::new(AtomicBool::new(false));
     let (proof_tx, proof_rx) = mpsc::channel();
-    let (prover_data, public_data_commitment) = new_test_data_for_prover();
+    let prover_data = new_test_data_for_prover();
+    let public_data_commitment = prover_data.public_data_commitment;
 
     // Run prover in separate thread.
     let stop_signal_ar = Arc::clone(&stop_signal);
@@ -105,39 +107,7 @@ fn prover_proves_a_block_and_publishes_result() {
     assert!(verify_result.unwrap(), "invalid proof");
 }
 
-/// TestAccount is an account with random generated keys and address.
-struct TestAccount {
-    pub private_key: franklin_crypto::eddsa::PrivateKey<pairing::bn256::Bn256>,
-    pub public_key: franklin_crypto::eddsa::PublicKey<pairing::bn256::Bn256>,
-    pub address: models::node::account::AccountAddress
-}
-
-impl TestAccount {
-    pub fn new() -> Self {
-        let rng = &mut rand::thread_rng();
-        let p_g = franklin_crypto::alt_babyjubjub::FixedGenerators::SpendingKeyGenerator;
-        let jubjub_params = &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
-        let private_key = franklin_crypto::eddsa::PrivateKey::<pairing::bn256::Bn256>(rng.gen());
-        let public_key = franklin_crypto::eddsa::PublicKey::<pairing::bn256::Bn256>::from_private(
-            &private_key,
-            p_g,
-            jubjub_params,
-        );
-        let address = models::node::account::AccountAddress::from_pubkey(public_key);
-        let public_key = franklin_crypto::eddsa::PublicKey::<pairing::bn256::Bn256>::from_private(
-            &private_key,
-            p_g,
-            jubjub_params,
-        );
-        TestAccount{
-            private_key,
-            public_key,
-            address,
-        }
-    }
-}
-
-fn new_test_data_for_prover() -> (prover::ProverData, models::node::Fr) {
+fn new_test_data_for_prover() -> prover::ProverData {
     let mut circuit_tree = models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
     println!("Empty tree root hash: {}", circuit_tree.root_hash());
 
@@ -279,7 +249,7 @@ fn new_test_data_for_prover() -> (prover::ProverData, models::node::Fr) {
         Some(models::node::Fr::from_str(&(block.block_number).to_string()).unwrap()),
     );
 
-    (prover::ProverData{
+    prover::ProverData{
         public_data_commitment,
         old_root: genesis_root_hash,
         new_root: block.new_root_hash,
@@ -288,7 +258,7 @@ fn new_test_data_for_prover() -> (prover::ProverData, models::node::Fr) {
         validator_balances,
         validator_audit_path,
         validator_account: validator_account_witness,
-    }, public_data_commitment)
+    }
 }
 
 fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engine> {

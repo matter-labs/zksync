@@ -2243,6 +2243,7 @@ dependencies = [
  "serde_json 1.0.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "signal-hook 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
  "storage 0.0.1",
+ "testhelper 0.1.0",
  "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "web3 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -2995,6 +2996,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "testhelper"
+version = "0.1.0"
+dependencies = [
+ "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto)",
+ "models 0.0.1",
+ "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "textwrap"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3667,6 +3678,7 @@ dependencies = [
  "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "storage 0.0.1",
+ "testhelper 0.1.0",
  "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "web3 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]

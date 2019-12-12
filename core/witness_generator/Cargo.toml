@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 storage = { path = "../storage", version = "0.0.1" }
 models = { path = "../models", version = "0.0.1" }
+testhelper = { path = "../testhelper", version = "0.1.0" }
 prover = { path = "../prover", version = "0.0.1" }
 plasma = { path = "../plasma", version = "0.1.1" }
 circuit = { path = "../circuit", version = "0.1.1"}
