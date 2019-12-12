@@ -116,7 +116,7 @@ export default {
                     from = formatAddress(tx.priority_op.data.sender);
                     to = formatAddress(tx.priority_op.data.account);
                     from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.account}`;
-                    to_explorer_link = `/accounts/${tx.priority_op.data.account}`;
+                    to_explorer_link = `${this.routerBase}accounts/${tx.priority_op.data.account}`;
                     from_onchain_icon = `<span class="onchain_icon">onchain</span>`;
                     to_onchain_icon = '';
                     token = tx.priority_op.data.token;
@@ -126,8 +126,8 @@ export default {
                 } else if (type == "Transfer") {
                     from = formatAddress(tx.tx.from);
                     to = formatAddress(tx.tx.to);
-                    from_explorer_link = `/accounts/${tx.tx.from}`;
-                    to_explorer_link = `/accounts/${tx.tx.to}`;
+                    from_explorer_link = `${this.routerBase}accounts/${tx.tx.from}`;
+                    to_explorer_link = `${this.routerBase}accounts/${tx.tx.to}`;
                     from_onchain_icon = '';
                     to_onchain_icon = '';
                     token = tx.tx.token;
@@ -137,7 +137,7 @@ export default {
                 } else if (type == "Withdraw") {
                     from = formatAddress(tx.tx.account);
                     to = formatAddress(tx.tx.ethAddress);
-                    from_explorer_link = `/accounts/${tx.tx.account}`;
+                    from_explorer_link = `${this.routerBase}accounts/${tx.tx.account}`;
                     to_explorer_link = `${this.blockchain_explorer_address}/${tx.tx.account}`;
                     from_onchain_icon = '';
                     to_onchain_icon = `<span class="onchain_icon">onchain</span>`;
