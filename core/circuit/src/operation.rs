@@ -4,7 +4,7 @@ use serde::{Serialize};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct OperationBranchWitness<E: JubjubEngine> {
     pub account_witness: AccountWitness<E>,
     pub account_path: Vec<Option<E::Fr>>,
@@ -13,7 +13,7 @@ pub struct OperationBranchWitness<E: JubjubEngine> {
     pub balance_subtree_path: Vec<Option<E::Fr>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct OperationBranch<E: JubjubEngine> {
     pub address: Option<E::Fr>,
     pub token: Option<E::Fr>,
@@ -21,7 +21,7 @@ pub struct OperationBranch<E: JubjubEngine> {
     pub witness: OperationBranchWitness<E>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Operation<E: JubjubEngine> {
     pub new_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
@@ -66,7 +66,7 @@ impl<E: JubjubEngine> TransactionSignature<E> {
     }
 }
 
-#[derive(Clone, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 pub struct SignatureData {
     pub r_packed: Vec<Option<bool>>,
     pub s: Vec<Option<bool>>,

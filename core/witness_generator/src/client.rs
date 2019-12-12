@@ -2,7 +2,7 @@ use std::{net, fmt};
 use std::sync::Mutex;
 use std::str::FromStr;
 use bellman::groth16;
-use crate::{ProverReq, BlockToProveRes, WorkingOnReq, block_to_prove};
+use crate::server;
 use prover::Prover;
 
 #[derive(Debug)]
@@ -43,7 +43,7 @@ impl ApiClient {
         // TODO: handle errors
         let client = reqwest::Client::new();
         let mut res = client.post(&self.register_url)
-            .json(&ProverReq{name: self.worker.clone()})
+            .json(&server::ProverReq{name: self.worker.clone()})
             .send().unwrap();
         let id = i32::from_str(&res.text().unwrap()).unwrap();
         Ok(id)
@@ -56,10 +56,10 @@ impl prover::ApiClient for ApiClient {
         let mut current_prover_run_id = self.current_prover_run_id.lock().unwrap();
         let client = reqwest::Client::new();
         let mut res = client.get(&self.block_to_prove_url)
-            .json(&ProverReq{name: self.worker.clone()})
+            .json(&server::ProverReq{name: self.worker.clone()})
             .send().unwrap();
         let text = res.text().unwrap();
-        let res: BlockToProveRes = serde_json::from_str(&text).unwrap();
+        let res: server::BlockToProveRes = serde_json::from_str(&text).unwrap();
         if res.block != 0 {
             *current_prover_run_id = res.prover_run_id;
             return Ok(Some(res.block))
@@ -71,7 +71,7 @@ impl prover::ApiClient for ApiClient {
         // TODO: handle errors
         let client = reqwest::Client::new();
         let mut res = client.post(&self.working_on_url)
-            .json(&WorkingOnReq{prover_run_id: *self.current_prover_run_id.lock().unwrap()})
+            .json(&server::WorkingOnReq{prover_run_id: *self.current_prover_run_id.lock().unwrap()})
             .send().unwrap();
     }
 
