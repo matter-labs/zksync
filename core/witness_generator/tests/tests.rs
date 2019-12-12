@@ -3,10 +3,10 @@ use std::str::FromStr;
 use std::{net, thread, time};
 // External uses
 use ff::{Field, PrimeField};
-use rand::Rng;
 // Workspace uses
 use witness_generator::{client, server};
 use prover::ApiClient;
+use testhelper::TestAccount;
 
 
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
@@ -40,40 +40,54 @@ fn api_client_register_prover() {
     storage.prover_by_id(id).expect("failed to select registered prover");
 }
 
-/// TestAccount is an account with random generated keys and address.
-struct TestAccount {
-    pub private_key: franklin_crypto::eddsa::PrivateKey<pairing::bn256::Bn256>,
-    pub public_key: franklin_crypto::eddsa::PublicKey<pairing::bn256::Bn256>,
-    pub address: models::node::account::AccountAddress
+#[test]
+fn api_client_simple_simulation(){
+    let prover_timeout = time::Duration::from_secs(1);
+    let rounds_interval = time::Duration::from_millis(100);
+
+    let addr = spawn_server(prover_timeout, rounds_interval);
+
+    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
+
+    // call block_to_prove and check its none
+    let block = client.block_to_prove().expect("failed to get block to prove");
+    assert_eq!(block, None);
+
+    let storage = access_storage();
+
+    let (op, _wanted_prover_data) = test_operation_and_wanted_prover_data();
+
+    // write test commit operation to db
+    storage.execute_operation(&op).expect("failed to mock commit operation");
+
+    // should return block
+    let block = client.block_to_prove().expect("failed to bet block to prove");
+    assert_eq!(Some(1), block);
+
+    // block is taken unless no heartbeat from prover within prover_timeout period
+    // should return None at this moment
+    let block = client.block_to_prove().expect("failed to get block to prove");
+    assert!(block.is_none());
+
+    // make block available
+    thread::sleep(prover_timeout * 2);
+
+    let block = client.block_to_prove().expect("failed to get block to prove");
+    assert_eq!(Some(1), block);
+
+    // sleep for prover_timeout and send heartbeat
+    thread::sleep(prover_timeout * 2);
+    client.working_on(block.unwrap());
+
+    let block = client.block_to_prove().expect("failed to get block to prove");
+    assert!(block.is_none());
+
+    // let prover_data = client.prover_data(1).expect("failed to get prover data");
+    // assert_eq!(prover_data.public_data_commitment, wanted_prover_data.public_data_commitment);
 }
 
-// TODO: move to helper crate
-impl TestAccount {
-    pub fn new() -> Self {
-        let rng = &mut rand::thread_rng();
-        let p_g = franklin_crypto::alt_babyjubjub::FixedGenerators::SpendingKeyGenerator;
-        let jubjub_params = &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
-        let private_key = franklin_crypto::eddsa::PrivateKey::<pairing::bn256::Bn256>(rng.gen());
-        let public_key = franklin_crypto::eddsa::PublicKey::<pairing::bn256::Bn256>::from_private(
-            &private_key,
-            p_g,
-            jubjub_params,
-        );
-        let address = models::node::account::AccountAddress::from_pubkey(public_key);
-        let public_key = franklin_crypto::eddsa::PublicKey::<pairing::bn256::Bn256>::from_private(
-            &private_key,
-            p_g,
-            jubjub_params,
-        );
-        TestAccount{
-            private_key,
-            public_key,
-            address,
-        }
-    }
-}
 
-fn test_operation_and_wanted_prover_data() -> (models::Operation, prover::ProverData) {
+pub fn test_operation_and_wanted_prover_data() -> (models::Operation, prover::ProverData) {
     let mut circuit_tree = models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
 
     let validator_test_account = TestAccount::new();
@@ -224,50 +238,4 @@ fn test_operation_and_wanted_prover_data() -> (models::Operation, prover::Prover
         validator_audit_path,
         validator_account: validator_account_witness,
     })
-}
-
-#[test]
-fn api_client_simple_simulation(){
-    let prover_timeout = time::Duration::from_secs(1);
-    let rounds_interval = time::Duration::from_millis(100);
-
-    let addr = spawn_server(prover_timeout, rounds_interval);
-
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
-
-    // call block_to_prove and check its none
-    let block = client.block_to_prove().expect("failed to get block to prove");
-    assert_eq!(block, None);
-
-    let storage = access_storage();
-
-    let (op, _wanted_prover_data) = test_operation_and_wanted_prover_data();
-
-    // write test commit operation to db
-    storage.execute_operation(&op).expect("failed to mock commit operation");
-
-    // should return block
-    let block = client.block_to_prove().expect("failed to bet block to prove");
-    assert_eq!(Some(1), block);
-
-    // block is taken unless no heartbeat from prover within prover_timeout period
-    // should return None at this moment
-    let block = client.block_to_prove().expect("failed to get block to prove");
-    assert!(block.is_none());
-
-    // make block available
-    thread::sleep(prover_timeout * 2);
-
-    let block = client.block_to_prove().expect("failed to get block to prove");
-    assert_eq!(Some(1), block);
-
-    // sleep for prover_timeout and send heartbeat
-    thread::sleep(prover_timeout * 2);
-    client.working_on(block.unwrap());
-
-    let block = client.block_to_prove().expect("failed to get block to prove");
-    assert!(block.is_none());
-
-    // let prover_data = client.prover_data(1).expect("failed to get prover data");
-    // assert_eq!(prover_data.public_data_commitment, wanted_prover_data.public_data_commitment);
 }

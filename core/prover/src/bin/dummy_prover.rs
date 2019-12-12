@@ -1,3 +1,4 @@
+use std::time;
 use log::info;
 use models::node::config::{PROVER_CYCLE_WAIT, PROVER_TIMEOUT};
 use models::EncodedProof;
@@ -13,7 +14,7 @@ fn main() {
     loop {
         let storage = pool.access_storage().expect("Storage access");
         let job = storage
-            .job_for_unverified_block(worker, PROVER_TIMEOUT)
+            .job_for_unverified_block(worker, time::Duration::from_secs(PROVER_TIMEOUT as u64))
             .expect("prover job, db access");
         if let Some(job) = job {
             info!("Received job for block: {}", job.block_number);
