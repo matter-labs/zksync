@@ -210,11 +210,11 @@ export default {
 
                     let link_from
                         = tx.data.type == 'Deposit' ? `${this.blockchain_explorer_address}/${tx.data.from}`
-                        : `/accounts/${tx.data.from}`;
+                        : `${this.routerBase}accounts/${tx.data.from}`;
 
                     let link_to
                         = tx.data.type == 'Withdraw' ? `${this.blockchain_explorer_address}/${tx.data.to}`
-                        : `/accounts/${tx.data.to}`;
+                        : `${this.routerBase}accounts/${tx.data.to}`;
 
                     let target_from
                         = tx.data.type == 'Deposit' ? `target="_blank" rel="noopener noreferrer"`
