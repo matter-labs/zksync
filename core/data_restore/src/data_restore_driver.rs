@@ -68,7 +68,7 @@ impl DataRestoreDriver {
             )
         };
 
-        let genesis_acc_map = get_genesis_state(web3, contract_genesis_tx_hash)?;
+        let genesis_acc_map = get_genesis_state(&web3, contract_genesis_tx_hash)?;
         let accounts_state = FranklinAccountsState::load(genesis_acc_map.0, genesis_acc_map.1);
 
         Self {

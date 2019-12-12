@@ -1,5 +1,5 @@
 use crate::helpers::{
-    get_ethereum_transaction, get_input_data_from_ethereum_transaction, DATA_RESTORE_CONFIG,
+    get_ethereum_transaction, get_input_data_from_ethereum_transaction,
 };
 use failure::format_err;
 use models::node::{
@@ -7,13 +7,14 @@ use models::node::{
     AccountMap,
 };
 use models::params::FR_ADDRESS_LEN;
+use web3::{Transport, Web3};
+use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
 
 const ROOT_HASH_LENGTH: usize = 32;
 
 // Returns contracts genesis accounts state
-pub fn get_genesis_state() -> Result<(u32, AccountMap), failure::Error> {
-    let genesis_tx_hash = DATA_RESTORE_CONFIG.genesis_tx_hash;
-    let transaction = get_ethereum_transaction(&genesis_tx_hash)?;
+pub fn get_genesis_state(web3: &Web3<T>, genesis_tx_hash: H256) -> Result<(u32, AccountMap), failure::Error> {
+    let transaction = get_ethereum_transaction(&web3, &genesis_tx_hash)?;
     let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
     let genesis_operator_address = AccountAddress::from_bytes(
         &input_data[input_data.len() - ROOT_HASH_LENGTH - FR_ADDRESS_LEN

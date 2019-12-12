@@ -2,6 +2,7 @@
 use failure::format_err;
 use web3::futures::Future;
 use web3::types::H256;
+use web3::{Transport, Web3};
 use web3::types::{Transaction, TransactionId};
 
 pub const FUNC_NAME_HASH_LENGTH: usize = 4;
@@ -29,12 +30,8 @@ pub fn get_input_data_from_ethereum_transaction(
 ///
 /// * `transaction_hash` - The identifier of the particular Ethereum transaction
 ///
-pub fn get_ethereum_transaction(transaction_hash: &H256) -> Result<Transaction, failure::Error> {
+pub fn get_ethereum_transaction(web3: &Web3<T>, transaction_hash: &H256) -> Result<Transaction, failure::Error> {
     let tx_id = TransactionId::Hash(*transaction_hash);
-    let (_eloop, transport) =
-        web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-            .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
-    let web3 = web3::Web3::new(transport);
     let web3_transaction = web3
         .eth()
         .transaction(tx_id)
