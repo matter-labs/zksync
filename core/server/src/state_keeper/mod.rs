@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 // External uses
 use itertools::Itertools;
-use web3::types::H256;
+use web3::types::{H160, H256};
 // Workspace uses
 use crate::eth_watch::ETHState;
 use crate::ThreadPanicNotify;
@@ -91,7 +91,7 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn restore_from_layer1(pool: ConnectionPool, web3_url: String, contract_eth_addr: H160, contract_genesis_tx_hash: H256) {
+    pub fn restore_from_layer1(pool: ConnectionPool, web3_url: &String, contract_eth_addr: &H160, contract_genesis_tx_hash: &H256) {
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");

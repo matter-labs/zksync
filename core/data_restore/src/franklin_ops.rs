@@ -3,6 +3,7 @@ use crate::helpers::{get_ethereum_transaction, get_input_data_from_ethereum_tran
 use failure::{ensure, format_err};
 use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
+use web3::{Transport, Web3};
 
 const BLOCK_NUMBER_LENGTH: usize = 32;
 const FEE_ACC_LENGTH: usize = 32;
@@ -21,11 +22,11 @@ pub struct FranklinOpsBlock {
 }
 
 impl FranklinOpsBlock {
-    // Get ops block from Franklin Contract event description
-    pub fn get_from_event(event_data: &EventData) -> Result<Self, failure::Error> {
-        let ops_block = FranklinOpsBlock::get_franklin_ops_block(event_data)?;
-        Ok(ops_block)
-    }
+    // // Get ops block from Franklin Contract event description
+    // pub fn get_from_event(event_data: &EventData) -> Result<Self, failure::Error> {
+    //     let ops_block = FranklinOpsBlock::get_franklin_ops_block(event_data)?;
+    //     Ok(ops_block)
+    // }
 
     /// Return Franklin operations block description
     ///
@@ -33,8 +34,8 @@ impl FranklinOpsBlock {
     ///
     /// * `event_data` - Franklin Contract event description
     ///
-    fn get_franklin_ops_block(event_data: &EventData) -> Result<FranklinOpsBlock, failure::Error> {
-        let transaction = get_ethereum_transaction(&event_data.transaction_hash)?;
+    pub fn get_franklin_ops_block<T: Transport>(web3: &Web3<T>, event_data: &EventData) -> Result<Self, failure::Error> {
+        let transaction = get_ethereum_transaction(&web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
         let commitment_data = &input_data
             [BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH + ROOT_LENGTH + EMPTY_LENGTH..input_data.len()];

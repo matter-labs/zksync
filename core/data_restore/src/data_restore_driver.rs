@@ -1,6 +1,6 @@
 use crate::accounts_state::FranklinAccountsState;
 use crate::events_state::EventsState;
-use ethabi::Contract;
+use ethabi;
 use models::abi::FRANKLIN_CONTRACT;
 use crate::franklin_ops::FranklinOpsBlock;
 use crate::genesis_state::get_genesis_state;
@@ -9,9 +9,12 @@ use storage::ConnectionPool;
 use web3::contract::Contract;
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
 use web3::{Transport, Web3};
+use web3::types::H256;
 use ethabi::{decode, ParamType};
 use failure::format_err;
 use futures::Future;
+use crate::helpers::get_ethereum_transaction;
+use std::str::FromStr;
 
 /// Storage state update
 pub enum StorageUpdateState {
@@ -21,7 +24,7 @@ pub enum StorageUpdateState {
 }
 
 /// Description of data restore driver
-pub struct DataRestoreDriver {
+pub struct DataRestoreDriver<T: Transport> {
     /// Database connection pool
     pub connection_pool: ConnectionPool,
     /// Web3 endpoint
@@ -34,27 +37,27 @@ pub struct DataRestoreDriver {
     pub events_state: EventsState,
     /// Franklin accounts state
     pub accounts_state: FranklinAccountsState,
+    pub eth_blocks_step: u64,
+    pub end_eth_blocks_offset: u64
 }
 
-impl DataRestoreDriver {
+impl<T: Transport> DataRestoreDriver<T> {
     /// Create new data restore driver
     ///
     /// # Arguments
     ///
     /// * `connection_pool` - Database connection pool
-    /// * `eth_blocks_delta` - Step of the considered blocks ethereum block
+    /// * `eth_blocks_step` - Step of the considered blocks ethereum block
     /// * `eth_end_blocks_delta` - Delta between last ethereum block and last watched ethereum block
     ///
     pub fn new(
         connection_pool: ConnectionPool,
-        web3_endpoint: String,
+        web3: Web3<T>,
         contract_eth_addr: H160,
         contract_genesis_tx_hash: H256,
-        eth_blocks_delta: u64,
-        end_eth_blocks_delta: u64,
-    ) -> Self {
-        let (_eloop, transport) = web3::transports::Http::new(&web3_endpoint).unwrap();
-        let web3 = web3::Web3::new(transport);
+        eth_blocks_step: u64,
+        end_eth_blocks_offset: u64,
+    ) -> Result<Self, failure::Error> {
         let franklin_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
                 .unwrap()
@@ -68,17 +71,21 @@ impl DataRestoreDriver {
             )
         };
 
-        let genesis_acc_map = get_genesis_state(&web3, contract_genesis_tx_hash)?;
+        let genesis_transaction = get_ethereum_transaction(&web3, &contract_genesis_tx_hash)?;
+        let genesis_acc_map = get_genesis_state(&genesis_transaction)?;
         let accounts_state = FranklinAccountsState::load(genesis_acc_map.0, genesis_acc_map.1);
+        let events_state = EventsState::new(&genesis_transaction)?;
 
-        Self {
+        Ok(Self {
             connection_pool,
             web3,
             franklin_contract,
             run_updates: false,
-            events_state: EventsState::new(web3, contract, contract_genesis_tx_hash, eth_blocks_delta, end_eth_blocks_delta),
+            events_state,
             accounts_state,
-        }
+            eth_blocks_step,
+            end_eth_blocks_offset
+        })
     }
 
     /// Stop states updates by setting run_updates flag to false
@@ -148,7 +155,7 @@ impl DataRestoreDriver {
     fn update_events_state(&mut self) -> Result<(), failure::Error> {
         let events = self
             .events_state
-            .update_events_state(self.eth_blocks_delta, self.end_eth_blocks_delta)?;
+            .update_events_state(&self.web3, &self.franklin_contract, self.eth_blocks_step, self.end_eth_blocks_offset)?;
         info!("Got new events");
 
         // Store events
@@ -218,7 +225,7 @@ impl DataRestoreDriver {
         let committed_events = self.events_state.get_only_verified_committed_events();
         let mut blocks: Vec<FranklinOpsBlock> = vec![];
         for event in committed_events {
-            let mut _block = FranklinOpsBlock::get_from_event(&event)?;
+            let mut _block = FranklinOpsBlock::get_franklin_ops_block(&self.web3, &event)?;
             blocks.push(_block);
         }
         Ok(blocks)

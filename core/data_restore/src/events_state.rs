@@ -1,10 +1,12 @@
-// External uses
 use failure::{ensure, format_err};
 use web3::futures::Future;
+use ethabi;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
-// Workspace uses
 use crate::events::{EventData, EventType};
-use crate::helpers::DATA_RESTORE_CONFIG;
+use crate::helpers::get_block_number_from_ethereum_transaction;
+use web3::{Transport, Web3};
+use web3::contract::Contract;
+use web3::types::{Transaction, TransactionId};
 
 type CommittedAndVerifiedEvents = (Vec<EventData>, Vec<EventData>);
 // type BlockNumber256 = U256;
@@ -20,12 +22,6 @@ pub struct EventsState {
     pub last_watched_eth_block_number: u64,
 }
 
-impl Default for EventsState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Set new
 /// Get last block
 /// Get blocks till last - delta, set last watching block
@@ -34,13 +30,15 @@ impl Default for EventsState {
 /// Check if txs in last watching block
 impl EventsState {
     /// Create new franklin contract events state
-    pub fn new() -> Self {
-        let genesis_block_number = DATA_RESTORE_CONFIG.genesis_block_number;
-        Self {
+    pub fn new(
+        genesis_transaction: &Transaction
+    ) -> Result<Self, failure::Error> {
+        let genesis_block_number = get_block_number_from_ethereum_transaction(&genesis_transaction)?;
+        Ok(Self {
             committed_events: Vec::new(),
             verified_events: Vec::new(),
             last_watched_eth_block_number: genesis_block_number,
-        }
+        })
     }
 
     /// Update past events state from last watched ethereum block
@@ -49,21 +47,25 @@ impl EventsState {
     ///
     /// # Arguments
     ///
-    /// * `eth_blocks_delta` - Blocks step for watching
-    /// * `end_eth_blocks_delta` - Delta between last eth block and last watched block
+    /// * `eth_blocks_step` - Blocks step for watching
+    /// * `end_eth_blocks_offset` - Delta between last eth block and last watched block
     ///
-    pub fn update_events_state(
+    pub fn update_events_state<T: Transport>(
         &mut self,
-        eth_blocks_delta: u64,
-        end_eth_blocks_delta: u64,
+        web3: &Web3<T>,
+        contract: &(ethabi::Contract, Contract<T>),
+        eth_blocks_step: u64,
+        end_eth_blocks_offset: u64,
     ) -> Result<Vec<EventData>, failure::Error> {
         self.remove_verified_events();
 
         let (events, to_block_number): (CommittedAndVerifiedEvents, u64) =
             EventsState::update_events_and_last_watched_block(
+                &web3,
+                &contract,
                 self.last_watched_eth_block_number,
-                eth_blocks_delta,
-                end_eth_blocks_delta,
+                eth_blocks_step,
+                end_eth_blocks_offset,
             )?;
 
         self.committed_events.extend(events.0);
@@ -77,11 +79,9 @@ impl EventsState {
     }
 
     /// Return last watched ethereum block number
-    pub fn get_last_block_number() -> Result<u64, failure::Error> {
-        let (_eloop, transport) =
-            web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-                .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
-        let web3 = web3::Web3::new(transport);
+    pub fn get_last_block_number<T: Transport>(
+        web3: &Web3<T>
+    ) -> Result<u64, failure::Error> {
         Ok(web3.eth().block_number().wait().map(|n| n.as_u64())?)
     }
 
@@ -90,16 +90,18 @@ impl EventsState {
     /// # Arguments
     ///
     /// * `last_watched_block_number` - the laste watched eth block
-    /// * `eth_blocks_delta` - Ethereum blocks delta step
-    /// * `end_eth_blocks_delta` - last block delta
+    /// * `eth_blocks_step` - Ethereum blocks delta step
+    /// * `end_eth_blocks_offset` - last block delta
     ///
-    fn update_events_and_last_watched_block(
+    fn update_events_and_last_watched_block<T: Transport>(
+        web3: &Web3<T>,
+        contract: &(ethabi::Contract, Contract<T>),
         last_watched_block_number: u64,
-        eth_blocks_delta: u64,
-        end_eth_blocks_delta: u64,
+        eth_blocks_step: u64,
+        end_eth_blocks_offset: u64,
     ) -> Result<(CommittedAndVerifiedEvents, u64), failure::Error> {
         let latest_eth_block_minus_delta =
-            EventsState::get_last_block_number()? - end_eth_blocks_delta;
+            EventsState::get_last_block_number(&web3)? - end_eth_blocks_offset;
         if latest_eth_block_minus_delta == last_watched_block_number {
             return Ok(((vec![], vec![]), last_watched_block_number)); // No new eth blocks
         }
@@ -108,17 +110,25 @@ impl EventsState {
 
         let to_block_number_u64 =
         // if (latest eth block < last watched + delta) then choose it
-        if from_block_number_u64 + eth_blocks_delta >= latest_eth_block_minus_delta {
+        if from_block_number_u64 + eth_blocks_step >= latest_eth_block_minus_delta {
             latest_eth_block_minus_delta
         } else {
-            from_block_number_u64 + eth_blocks_delta
+            from_block_number_u64 + eth_blocks_step
         };
 
         let to_block_number = BlockNumber::Number(to_block_number_u64);
         let from_block_number = BlockNumber::Number(from_block_number_u64);
 
-        let logs = EventsState::get_logs(from_block_number, to_block_number)?;
-        let sorted_logs = EventsState::sort_logs(&logs)?;
+        let logs = EventsState::get_logs(
+            web3,
+            contract,
+            from_block_number,
+            to_block_number
+        )?;
+        let sorted_logs = EventsState::sort_logs(
+            &contract.0,
+            &logs
+        )?;
 
         Ok((sorted_logs, to_block_number_u64))
     }
@@ -130,18 +140,18 @@ impl EventsState {
     /// * `from_block_number` - Start ethereum block number
     /// * `to_block_number` - End ethereum block number
     ///
-    fn get_logs(
+    fn get_logs<T: Transport>(
+        web3: &Web3<T>,
+        contract: &(ethabi::Contract, Contract<T>),
         from_block_number: BlockNumber,
         to_block_number: BlockNumber,
     ) -> Result<Vec<Log>, failure::Error> {
-        let block_verified_topic = DATA_RESTORE_CONFIG
-            .franklin_contract
+        let block_verified_topic = contract.0
             .event("BlockVerified")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
 
-        let block_comitted_topic = DATA_RESTORE_CONFIG
-            .franklin_contract
+        let block_comitted_topic = contract.0
             .event("BlockCommitted")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
@@ -149,16 +159,12 @@ impl EventsState {
         let topics_vec: Vec<H256> = vec![block_verified_topic, block_comitted_topic];
 
         let filter = FilterBuilder::default()
-            .address(vec![DATA_RESTORE_CONFIG.franklin_contract_address])
+            .address(vec![contract.1.address()])
             .from_block(from_block_number)
             .to_block(to_block_number)
             .topics(Some(topics_vec), None, None, None)
             .build();
 
-        let (_eloop, transport) =
-            web3::transports::Http::new(DATA_RESTORE_CONFIG.web3_endpoint.as_str())
-                .map_err(|e| format_err!("Wrong endpoint: {}", e.to_string()))?;
-        let web3 = web3::Web3::new(transport);
         let result = web3
             .eth()
             .logs(filter)
@@ -173,20 +179,21 @@ impl EventsState {
     ///
     /// * `logs` - Logs slice
     ///
-    fn sort_logs(logs: &[Log]) -> Result<CommittedAndVerifiedEvents, failure::Error> {
+    fn sort_logs(
+        contract: &ethabi::Contract,
+        logs: &[Log]
+    ) -> Result<CommittedAndVerifiedEvents, failure::Error> {
         if logs.is_empty() {
             return Ok((vec![], vec![]));
         }
         let mut committed_events: Vec<EventData> = vec![];
         let mut verified_events: Vec<EventData> = vec![];
 
-        let block_verified_topic = DATA_RESTORE_CONFIG
-            .franklin_contract
+        let block_verified_topic = contract
             .event("BlockVerified")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
-        let block_comitted_topic = DATA_RESTORE_CONFIG
-            .franklin_contract
+        let block_comitted_topic = contract
             .event("BlockCommitted")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
