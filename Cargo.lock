@@ -3652,16 +3652,23 @@ version = "0.1.0"
 dependencies = [
  "actix-web 1.0.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "bellman_ce 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bigdecimal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "circuit 0.1.1",
  "diesel 1.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto)",
  "futures 0.1.29 (registry+https://github.com/rust-lang/crates.io-index)",
  "models 0.0.1",
+ "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "plasma 0.1.1",
  "prover 0.0.1",
+ "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "reqwest 0.9.22 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "storage 0.0.1",
  "tokio 0.1.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "web3 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

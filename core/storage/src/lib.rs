@@ -1726,7 +1726,27 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
+    pub fn load_unverified_commits_after_block(&self, block: i64, limit: i64) -> QueryResult<Vec<Operation>> {
+        self.conn().transaction(|| {
+            let ops: Vec<StoredOperation> = diesel::sql_query(
+                format!("
+                SELECT * FROM operations
+                  WHERE action_type = 'COMMIT'
+                   AND block_number > (
+                     SELECT COALESCE(max(block_number), 0)
+                       FROM operations
+                       WHERE action_type = 'VERIFY'
+                   AND block_number > {}
+                  LIMIT {}
+                )
+            ", block, limit),
+            )
+                .load(self.conn())?;
+            ops.into_iter().map(|o| o.into_op(self)).collect()
+        })
+    }
+
+    pub fn load_unverified_commits(&self) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
             let ops: Vec<StoredOperation> = diesel::sql_query(
                 "
@@ -1938,6 +1958,7 @@ impl StorageProcessor {
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
 
+    // TODO: remove this method
     pub fn job_for_unverified_block(
         &self,
         worker_: &str,
@@ -2452,7 +2473,7 @@ mod test {
         conn.execute_operation(&dummy_op(Action::Commit, 1))
             .unwrap();
 
-        let pending = conn.load_unverified_commitments().unwrap();
+        let pending = conn.load_unverified_commits().unwrap();
         assert_eq!(pending.len(), 1);
 
         conn.execute_operation(&dummy_op(
@@ -2463,7 +2484,7 @@ mod test {
         ))
         .unwrap();
 
-        let pending = conn.load_unverified_commitments().unwrap();
+        let pending = conn.load_unverified_commits().unwrap();
         assert_eq!(pending.len(), 0);
     }
 

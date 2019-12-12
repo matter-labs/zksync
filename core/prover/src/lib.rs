@@ -19,6 +19,7 @@ pub struct Prover<C: ApiClient> {
 }
 
 pub trait ApiClient {
+    // TODO: fn block_to_prove(&self) -> Result<Option<(i64, ProverData)>, String>
     fn block_to_prove(&self) -> Result<Option<i64>, String>;
     fn working_on(&self, block: i64);
     fn prover_data(&self, block: i64) -> Result<ProverData, String>;
@@ -39,7 +40,7 @@ pub fn start<'a, C: 'static + Sync + Send + ApiClient>(prover: Prover<C>) {
 }
 
 /// ProverData is data prover needs to calculate proof of the given block.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct ProverData {
     pub public_data_commitment: models::node::Fr,
     pub old_root: models::node::Fr,
