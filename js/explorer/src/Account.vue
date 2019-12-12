@@ -85,7 +85,7 @@
 import store from './store';
 import timeConstants from './timeConstants';
 import { WalletDecorator } from './WalletDecorator';
-import { readableEther } from './utils';
+import { readableEther, shortenHash } from './utils';
 
 import SearchField from './SearchField.vue';
 
@@ -204,7 +204,7 @@ export default {
                 .map(tx => {
                     let TxnHash = `<code>
                         <a href="/transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
-                            ${tx.data.hash.slice(0, 8)}..${tx.data.hash.slice(-8)}
+                            ${shortenHash(tx.data.hash, 'unknown hash')}
                         </a>
                     </code>`;                    
 
@@ -226,13 +226,13 @@ export default {
 
                     let From = `<code>
                         <a href="${link_from}" ${target_from}>
-                            ${tx.data.from.slice(0, 8)}..${tx.data.from.slice(-8)}
+                            ${shortenHash(tx.data.from, 'unknown from')}
                         </a>
                     </code>`;
 
                     let To = `<code>
                         <a href="${link_to}" ${target_to}>
-                            ${tx.data.to.slice(0, 8)}..${tx.data.to.slice(-8)}
+                            ${shortenHash(tx.data.to, 'unknown to')}
                         </a>
                     </code>`;
 
