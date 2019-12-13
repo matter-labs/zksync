@@ -4,9 +4,6 @@ pragma solidity 0.5.10;
 /// @author Matter Labs
 contract Governance {
 
-    /// @notice Fee gas price for transactions - operators can change it depending on block generation cost
-    uint256 public FEE_GAS_PRICE_MULTIPLIER = 2000000000; // 2 Gwei
-
     // @notice Address which will excercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
 
@@ -38,14 +35,14 @@ contract Governance {
     /// @notice Change current governor
     /// @param _newGovernor Address of the new governor
     function changeGovernor(address _newGovernor) external {
-        requireGovernor();
+        requireGovernor(msg.sender);
         networkGovernor = _newGovernor;
     }
 
     /// @notice Add token to the list of networks tokens
     /// @param _token Token address
     function addToken(address _token) external {
-        requireGovernor();
+        requireGovernor(msg.sender);
         require(
             tokenIds[_token] == 0,
             "gean11"
@@ -62,14 +59,14 @@ contract Governance {
     /// @param _address Validator address
     /// @param _active Active flag
     function setValidator(address _address, bool _active) external {
-        requireGovernor();
+        requireGovernor(msg.sender);
         validators[_address] = _active;
     }
 
     /// @notice Check if the sender is governor
-    function requireGovernor() public view {
+    function requireGovernor(address _address) public view {
         require(
-            msg.sender == networkGovernor,
+            _address == networkGovernor,
             "gerr11"
         ); // gerr11 - only by governor
     }
@@ -107,27 +104,5 @@ contract Governance {
             "gevs11"
         ); // gevs11 - unknown ERC20 token address
         return tokenId;
-    }
-
-    /// @notice Change fee gas price multiplier. It is used in fees calculation. Validators need to change it depending on block creation cost
-    /// @param _value New fee gas price multiplier
-    function changeFeeGasPriceMultiplier(uint256 _value) external {
-        requireGovernor();
-        FEE_GAS_PRICE_MULTIPLIER = _value;
-    }
-
-    /// @notice Returns calculated ether deposit fee in wei
-    function getDepositEtherFee() external view returns (uint256) {
-        return FEE_GAS_PRICE_MULTIPLIER * 179000;  // 179000 is base gas cost for deposit eth transaction
-    }
-
-    /// @notice Returns calculated erc20 deposit fee in wei
-    function getDepositERC20Fee() external view returns (uint256) {
-        return FEE_GAS_PRICE_MULTIPLIER * 214000;  // 214000 is base gas cost for deposit erc transaction
-    }
-
-    /// @notice Returns calculated full exit fee in wei
-    function getFullExitFee() external view returns (uint256) {
-        return FEE_GAS_PRICE_MULTIPLIER * 170000;  // 170000 is base gas cost for full exits transaction
     }
 }

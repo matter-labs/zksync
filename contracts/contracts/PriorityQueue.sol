@@ -95,7 +95,7 @@ contract PriorityQueue {
         ); // pcs11 - frankin address is already setted
         
         // Check for governor
-        governance.requireGovernor();
+        governance.requireGovernor(msg.sender);
 
         // Set rollup address
         rollupAddress = _rollupAddress;

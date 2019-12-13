@@ -19,6 +19,18 @@ contract Franklin {
     /// @notice Priority Queue contract. Contains priority requests list
     PriorityQueue internal priorityQueue;
 
+    /// @notice Fee gas price for transactions
+    uint256 constant FEE_GAS_PRICE_MULTIPLIER = 2; // 2 Gwei
+
+    /// @notice Base gas for deposit eth transaction
+    uint256 constant BASE_DEPOSIT_ETH_GAS = 179000;
+
+    /// @notice Base gas for deposit erc20 transaction
+    uint256 constant BASE_DEPOSIT_ERC20_GAS = 214000;
+
+    /// @notice Base gas for full exit transaction
+    uint256 constant BASE_FULL_EXIT_GAS = 170000;
+
     /// @notice Token id bytes lengths
     uint8 constant TOKEN_BYTES = 2;
 
@@ -268,7 +280,7 @@ contract Franklin {
     function depositETH(uint128 _amount, address _franklinAddr) external payable {
         requireActive();
 
-        uint256 fee = governance.getDepositEtherFee();
+        uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
         require(
             msg.value >= fee + _amount,
             "fndh11"
@@ -304,7 +316,7 @@ contract Franklin {
     ) external payable {
         requireActive();
 
-        uint256 fee = governance.getDepositERC20Fee();
+        uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ERC20_GAS * tx.gasprice;
 
         require(
             msg.value >= fee,
@@ -353,7 +365,7 @@ contract Franklin {
     ) external payable {
         requireActive();
 
-        uint256 fee = governance.getFullExitFee();
+        uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_FULL_EXIT_GAS * tx.gasprice;
 
         require(
             msg.value >= fee,
