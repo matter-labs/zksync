@@ -77,12 +77,17 @@ contract Governance {
         return validators[_sender];
     }
 
-    // Check if token is known
+    // Fail if token is unknown
     function requireValidTokenId(uint16 _tokenId) external view {
         require(
             _tokenId < totalTokens + 1,
             "grd11"
         ); // grd11 - unknown token id
+    }
+
+    // Check if token is known
+    function isValidTokenId(uint16 _tokenId) external view returns (bool) {
+        return _tokenId < totalTokens + 1;
     }
 
     // Validate token address

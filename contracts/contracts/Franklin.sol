@@ -730,10 +730,14 @@ contract Franklin {
     function payoutWithdrawNow(address _to, uint16 _tokenId, uint128 _amount) internal {
         if (_tokenId == 0) {
             address payable to = address(uint160(_to));
-            to.transfer(_amount);
-        } else if (_tokenId < governance.totalTokens() + 1) {
+            if (!to.send(_amount)) {
+                balancesToWithdraw[_to][_tokenId] += _amount;
+            }
+        } else if (governance.isValidTokenId(_tokenId)) {
             address tokenAddr = governance.tokenAddresses(_tokenId);
-            IERC20(tokenAddr).transfer(_to, _amount);
+            if(!IERC20(tokenAddr).transfer(_to, _amount)) {
+                balancesToWithdraw[_to][_tokenId] += _amount;
+            }
         }
     }
 
