@@ -6,19 +6,15 @@ use models::node::{
     account::{Account, AccountAddress},
     AccountMap,
 };
-use web3::types::{Transaction, TransactionId};
-use models::params::FR_ADDRESS_LEN;
-use web3::{Transport, Web3};
-use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
-
-const ROOT_HASH_LENGTH: usize = 32;
+use web3::types::Transaction;
+use models::params::{FR_ADDRESS_LEN, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
 
 // Returns contracts genesis accounts state
 pub fn get_genesis_state(genesis_transaction: &Transaction) -> Result<(u32, AccountMap), failure::Error> {
     let input_data = get_input_data_from_ethereum_transaction(&genesis_transaction)?;
     let genesis_operator_address = AccountAddress::from_bytes(
-        &input_data[input_data.len() - ROOT_HASH_LENGTH - FR_ADDRESS_LEN
-            ..input_data.len() - ROOT_HASH_LENGTH],
+        &input_data[input_data.len() - INPUT_DATA_ROOT_HASH_BYTES_WIDTH - FR_ADDRESS_LEN
+            ..input_data.len() - INPUT_DATA_ROOT_HASH_BYTES_WIDTH],
     )
     .map_err(|e| format_err!("No genesis account address: {}", e.to_string()))?;
     let mut acc = Account::default();

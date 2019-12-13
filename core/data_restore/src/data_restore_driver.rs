@@ -1,18 +1,14 @@
 use crate::accounts_state::FranklinAccountsState;
 use crate::events_state::EventsState;
 use ethabi;
-use models::abi::FRANKLIN_CONTRACT;
 use crate::franklin_ops::FranklinOpsBlock;
 use crate::genesis_state::get_genesis_state;
 use crate::storage_interactor;
 use storage::ConnectionPool;
 use web3::contract::Contract;
-use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
+use web3::types::H160;
 use web3::{Transport, Web3};
 use web3::types::H256;
-use ethabi::{decode, ParamType};
-use failure::format_err;
-use futures::Future;
 use crate::helpers::get_ethereum_transaction;
 use std::str::FromStr;
 

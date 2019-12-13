@@ -1,7 +1,7 @@
 // External uses
 use failure::{ensure, format_err};
 use web3::futures::Future;
-use web3::types::{U64, H256};
+use web3::types::H256;
 use web3::{Transport, Web3};
 use web3::types::{Transaction, TransactionId};
 

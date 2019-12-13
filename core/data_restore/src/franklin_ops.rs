@@ -5,10 +5,12 @@ use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
 use web3::{Transport, Web3};
 
-const BLOCK_NUMBER_LENGTH: usize = 32;
-const FEE_ACC_LENGTH: usize = 32;
-const ROOT_LENGTH: usize = 32;
-const EMPTY_LENGTH: usize = 64;
+use models::params::{
+    INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH,
+    INPUT_DATA_FEE_ACC_BYTES_WIDTH,
+    INPUT_DATA_ROOT_BYTES_WIDTH,
+    INPUT_DATA_EMPTY_BYTES_WIDTH
+};
 
 /// Description of a Franklin operations block
 #[derive(Debug, Clone)]
@@ -22,11 +24,6 @@ pub struct FranklinOpsBlock {
 }
 
 impl FranklinOpsBlock {
-    // // Get ops block from Franklin Contract event description
-    // pub fn get_from_event(event_data: &EventData) -> Result<Self, failure::Error> {
-    //     let ops_block = FranklinOpsBlock::get_franklin_ops_block(event_data)?;
-    //     Ok(ops_block)
-    // }
 
     /// Return Franklin operations block description
     ///
@@ -38,7 +35,7 @@ impl FranklinOpsBlock {
         let transaction = get_ethereum_transaction(&web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
         let commitment_data = &input_data
-            [BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH + ROOT_LENGTH + EMPTY_LENGTH..input_data.len()];
+            [INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH + INPUT_DATA_ROOT_BYTES_WIDTH + INPUT_DATA_EMPTY_BYTES_WIDTH..input_data.len()];
         let fee_account = FranklinOpsBlock::get_fee_account_from_tx_input(&input_data)?;
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(commitment_data)?;
         let block = FranklinOpsBlock {
@@ -81,11 +78,11 @@ impl FranklinOpsBlock {
     ///
     fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, failure::Error> {
         ensure!(
-            input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH,
+            input_data.len() == INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH,
             "No fee account data in tx"
         );
         Ok(bytes_slice_to_uint32(
-            &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
+            &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH..INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH],
         )
         .ok_or_else(|| format_err!("Cant convert bytes to fee account number"))?)
     }

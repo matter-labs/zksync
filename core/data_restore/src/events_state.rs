@@ -6,7 +6,7 @@ use crate::events::{EventData, EventType};
 use crate::helpers::get_block_number_from_ethereum_transaction;
 use web3::{Transport, Web3};
 use web3::contract::Contract;
-use web3::types::{Transaction, TransactionId};
+use web3::types::Transaction;
 
 type CommittedAndVerifiedEvents = (Vec<EventData>, Vec<EventData>);
 // type BlockNumber256 = U256;
