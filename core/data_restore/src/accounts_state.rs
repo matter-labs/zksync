@@ -4,13 +4,18 @@ use models::node::account::{Account, AccountAddress};
 use models::node::operations::FranklinOp;
 use models::node::priority_ops::FranklinPriorityOp;
 use models::node::tx::FranklinTx;
+use models::CommitRequest;
+use models::node::priority_ops::PriorityOp;
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
-use plasma::state::{OpSuccess, PlasmaState};
+use plasma::state::{OpSuccess, PlasmaState, CollectedFee};
+use bigdecimal::BigDecimal;
+use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 
 /// Franklin Accounts states with data restore configuration
 pub struct FranklinAccountsState {
     /// Accounts stored in a spase merkle tree
     pub state: PlasmaState,
+    pub current_unprocessed_priority_op: u64
 }
 
 impl Default for FranklinAccountsState {
@@ -24,6 +29,7 @@ impl FranklinAccountsState {
     pub fn new() -> Self {
         Self {
             state: PlasmaState::empty(),
+            current_unprocessed_priority_op: 0
         }
     }
 
@@ -37,6 +43,7 @@ impl FranklinAccountsState {
     pub fn load(current_block: u32, accounts: AccountMap) -> Self {
         Self {
             state: PlasmaState::new(accounts, current_block),
+            current_unprocessed_priority_op: 0
         }
     }
 
@@ -44,17 +51,16 @@ impl FranklinAccountsState {
         &mut self,
         priority_op: FranklinPriorityOp,
         op_result: OpSuccess,
-        fees: &mut Vec<Option<CollectedFee>>,
+        fees: &mut Vec<CollectedFee>,
         accounts_updated: &mut AccountUpdates,
-        current_op_block_index: &mut u32,
+        current_op_block_index: u32,
         ops: &mut Vec<ExecutedOperations>
-    ) {
-        accounts_updated.append(&mut op_result.updates);
+    ) -> u32 {
+        accounts_updated.append(&mut op_result.updates.clone());
         if let Some(fee) = op_result.fee {
             fees.push(fee);
         }
         let block_index = current_op_block_index;
-        current_op_block_index += 1;
         let exec_result = ExecutedPriorityOp {
             op: op_result.executed_op,
             priority_op: PriorityOp {
@@ -62,23 +68,24 @@ impl FranklinAccountsState {
                 data: priority_op,
                 deadline_block: 0,
                 eth_fee: BigDecimal::from(0),
-                eth_hash: Vec<u8>::zero(),
+                eth_hash: Vec::new(),
             },
             block_index,
         };
         ops.push(ExecutedOperations::PriorityOp(Box::new(exec_result)));
         self.current_unprocessed_priority_op += 1;
+        return current_op_block_index + 1
     }
 
     fn update_from_tx(
         &mut self,
         tx: FranklinTx,
-        tx_result: OpSuccess,
-        fees: &mut Vec<Option<CollectedFee>>,
+        tx_result: Result<OpSuccess, failure::Error>,
+        fees: &mut Vec<CollectedFee>,
         accounts_updated: &mut AccountUpdates,
-        current_op_block_index: &mut u32,
+        current_op_block_index: u32,
         ops: &mut Vec<ExecutedOperations>
-    ) {
+    ) -> u32 {
         match tx_result {
             Ok(OpSuccess {
                 fee,
@@ -90,7 +97,6 @@ impl FranklinAccountsState {
                     fees.push(fee);
                 }
                 let block_index = current_op_block_index;
-                current_op_block_index += 1;
                 let exec_result = ExecutedTx {
                     tx,
                     success: true,
@@ -99,7 +105,8 @@ impl FranklinAccountsState {
                     block_index: Some(block_index),
                 };
                 ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
-            }
+                return current_op_block_index + 1
+            },
             Err(e) => {
                 let exec_result = ExecutedTx {
                     tx,
@@ -109,8 +116,10 @@ impl FranklinAccountsState {
                     block_index: None,
                 };
                 ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
+                return current_op_block_index
             }
         };
+
     }
 
     /// Updates Franklin Accounts states from Franklin operations block
@@ -122,9 +131,9 @@ impl FranklinAccountsState {
     ///
     pub fn update_accounts_states_from_ops_block(
         &mut self,
-        block: &FranklinOpsBlock,
+        ops_block: &FranklinOpsBlock,
     ) -> Result<CommitRequest, failure::Error> {
-        let operations = block.ops.clone();
+        let operations = ops_block.ops.clone();
 
         let mut accounts_updated = Vec::new();
         let mut fees = Vec::new();
@@ -139,14 +148,14 @@ impl FranklinAccountsState {
                     let op_result = self
                         .state
                         .execute_priority_op(priority_op.clone());
-                    self.update_from_priority_operation(
+                    current_op_block_index = self.update_from_priority_operation(
                         priority_op,
                         op_result,
                         &mut fees,
                         &mut accounts_updated,
-                        &mut current_op_block_index,
+                        current_op_block_index,
                         &mut ops
-                    )
+                    );
                 }
                 FranklinOp::TransferToNew(mut op) => {
                     let from = self
@@ -157,13 +166,13 @@ impl FranklinAccountsState {
                     op.tx.nonce = from.nonce;
 
                     let tx = FranklinTx::Transfer(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone);
-                    self.update_from_tx(
+                    let tx_result = self.state.execute_tx(tx.clone());
+                    current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
                         &mut fees,
                         &mut accounts_updated,
-                        &mut current_op_block_index,
+                        current_op_block_index,
                         &mut ops
                     );
                 }
@@ -177,13 +186,13 @@ impl FranklinAccountsState {
                     op.tx.nonce = account.nonce;
 
                     let tx = FranklinTx::Withdraw(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone);
-                    self.update_from_tx(
+                    let tx_result = self.state.execute_tx(tx.clone());
+                    current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
                         &mut fees,
                         &mut accounts_updated,
-                        &mut current_op_block_index,
+                        current_op_block_index,
                         &mut ops
                     );
                 }
@@ -197,13 +206,13 @@ impl FranklinAccountsState {
                     op.tx.nonce = account.nonce;
                     
                     let tx = FranklinTx::Close(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone);
-                    self.update_from_tx(
+                    let tx_result = self.state.execute_tx(tx.clone());
+                    current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
                         &mut fees,
                         &mut accounts_updated,
-                        &mut current_op_block_index,
+                        current_op_block_index,
                         &mut ops
                     );
                 }
@@ -221,13 +230,13 @@ impl FranklinAccountsState {
                     op.tx.nonce = from.nonce;
 
                     let tx = FranklinTx::Transfer(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone);
-                    self.update_from_tx(
+                    let tx_result = self.state.execute_tx(tx.clone());
+                    current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
                         &mut fees,
                         &mut accounts_updated,
-                        &mut current_op_block_index,
+                        current_op_block_index,
                         &mut ops
                     );
                 }
@@ -237,27 +246,27 @@ impl FranklinAccountsState {
                     let op_result = self
                         .state
                         .execute_priority_op(priority_op.clone());
-                    self.update_from_priority_operation(
+                    current_op_block_index = self.update_from_priority_operation(
                         priority_op,
                         op_result,
                         &mut fees,
                         &mut accounts_updated,
-                        &mut current_op_block_index,
+                        current_op_block_index,
                         &mut ops
-                    )
+                    );
                 }
                 _ => {}
             }
         }
         let fee_account_address = self
-            .get_account(block.fee_account)
+            .get_account(ops_block.fee_account)
             .ok_or_else(|| format_err!("Nonexistent account"))?
             .address;
         let (fee_account_id, fee_updates) = self.state.collect_fee(&fees, &fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
 
         let block = Block {
-            block_number: block.block_number,
+            block_number: ops_block.block_num,
             new_root_hash: self.state.root_hash(),
             fee_account: fee_account_id,
             block_transactions: ops,

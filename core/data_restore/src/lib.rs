@@ -25,7 +25,7 @@ fn create_data_restore_driver(
     connection_pool: ConnectionPool,
     web3_url: String,
     contract_eth_addr: H160,
-    contract_genesis_tx_hash: H256б
+    contract_genesis_tx_hash: H256,
     eth_blocks_step: u64,
     end_eth_blocks_offset: u64
 ) -> Result<DataRestoreDriver<web3::transports::Http>, failure::Error> {

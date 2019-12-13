@@ -177,11 +177,11 @@ impl<T: Transport> DataRestoreDriver<T> {
             let state = self
                 .accounts_state
                 .update_accounts_states_from_ops_block(&block)?;
-            storage_interactor::update_tree_state(
-                block.block_num,
-                &state,
-                self.connection_pool.clone(),
-            )?;
+            // storage_interactor::update_tree_state(
+            //     block.block_num,
+            //     &state,
+            //     self.connection_pool.clone(),
+            // )?;
         }
 
         storage_interactor::remove_storage_state_status(self.connection_pool.clone())?;
