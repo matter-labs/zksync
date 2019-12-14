@@ -1,21 +1,23 @@
+pub mod witness_generator;
+
 // Built-in uses
-use std::{thread, time};
-use std::sync::{mpsc, Arc};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc};
+use std::{thread, time};
 // External uses
-use pairing::bn256;
 use bellman::groth16;
 use ff::PrimeField;
 use log::error;
+use pairing::bn256;
 // Workspace uses
-
+use witness_generator::ProverData;
 
 pub struct Prover<C: ApiClient> {
     circuit_params: groth16::Parameters<bn256::Bn256>,
     jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
     api_client: C,
     heartbeat_interval: time::Duration,
-    stop_signal: Arc<AtomicBool>
+    stop_signal: Arc<AtomicBool>,
 }
 
 pub trait ApiClient {
@@ -39,27 +41,15 @@ pub fn start<'a, C: 'static + Sync + Send + ApiClient>(prover: Prover<C>) {
     join_handle.join();
 }
 
-/// ProverData is data prover needs to calculate proof of the given block.
-#[derive(Clone, Debug)]
-pub struct ProverData {
-    pub public_data_commitment: models::node::Fr,
-    pub old_root: models::node::Fr,
-    pub new_root: models::node::Fr,
-    pub validator_address: models::node::Fr,
-    pub operations: Vec<circuit::operation::Operation<models::node::Engine>>,
-    pub validator_balances: Vec<Option<models::node::Fr>>,
-    pub validator_audit_path: Vec<Option<models::node::Fr>>,
-    pub validator_account: circuit::account::AccountWitness<models::node::Engine>,
-}
-
 impl<C: ApiClient> Prover<C> {
-    pub fn new(circuit_params: groth16::Parameters<bn256::Bn256>,
-               jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
-               api_client: C,
-               heartbeat_interval: time::Duration,
-               stop_signal: Arc<AtomicBool>,
+    pub fn new(
+        circuit_params: groth16::Parameters<bn256::Bn256>,
+        jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
+        api_client: C,
+        heartbeat_interval: time::Duration,
+        stop_signal: Arc<AtomicBool>,
     ) -> Self {
-        Prover{
+        Prover {
             circuit_params,
             jubjub_params,
             api_client,
@@ -79,7 +69,7 @@ impl<C: ApiClient> Prover<C> {
                 start_heartbeats_tx.send(block);
 
                 if let Some(block) = block {
-                    let prover_data = match self.api_client.prover_data(block){
+                    let prover_data = match self.api_client.prover_data(block) {
                         Ok(v) => v,
                         Err(err) => {
                             error!("could not get prover data for block {}: {}", block, err);
@@ -87,7 +77,7 @@ impl<C: ApiClient> Prover<C> {
                         }
                     };
 
-                    let instance = circuit::circuit::FranklinCircuit{
+                    let instance = circuit::circuit::FranklinCircuit {
                         params: &self.jubjub_params,
                         operation_batch_size: models::params::block_size_chunks(),
                         old_root: Some(prover_data.old_root),

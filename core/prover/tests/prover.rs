@@ -1,13 +1,13 @@
 // Built-in uses
-use std::{env, path, fs, io, thread, time};
-use std::sync::{Mutex, Arc, mpsc};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
+use std::{env, fs, io, path, thread, time};
 // External uses
 use ff::{Field, PrimeField};
 use rand::Rng;
 // Workspace uses
-use testhelper::TestAccount;
 use prover;
+use testhelper::TestAccount;
 
 #[test]
 fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
@@ -28,10 +28,10 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     thread::spawn(move || {
         // Create channel for proofs, not using in this test.
         let (tx, _) = mpsc::channel();
-        let p =prover::Prover::new(
+        let p = prover::Prover::new(
             circuit_parameters,
             jubjub_params,
-            MockApiClient{
+            MockApiClient {
                 block_to_prove: Mutex::new(Some(1)),
                 heartbeats_tx: Arc::new(Mutex::new(heartbeat_tx)),
                 publishes_tx: Arc::new(Mutex::new(tx)),
@@ -48,8 +48,12 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     let timeout = time::Duration::from_millis(500);
 
     // Must receive heartbeat requests.
-    heartbeat_rx.recv_timeout(timeout).expect("heartbeat request is not received");
-    heartbeat_rx.recv_timeout(timeout).expect("heartbeat request is not received");
+    heartbeat_rx
+        .recv_timeout(timeout)
+        .expect("heartbeat request is not received");
+    heartbeat_rx
+        .recv_timeout(timeout)
+        .expect("heartbeat request is not received");
 
     // Send stop signal.
     println!("sending stop signal.");
@@ -80,13 +84,11 @@ fn prover_proves_a_block_and_publishes_result() {
         let p = prover::Prover::new(
             circuit_params,
             jubjub_params,
-            MockApiClient{
+            MockApiClient {
                 block_to_prove: Mutex::new(Some(1)),
                 heartbeats_tx: Arc::new(Mutex::new(tx)),
                 publishes_tx: Arc::new(Mutex::new(proof_tx)),
-                prover_data_fn: move || {
-                    Some(prover_data.clone())
-                },
+                prover_data_fn: move || Some(prover_data.clone()),
             },
             time::Duration::from_secs(1),
             stop_signal_ar,
@@ -95,24 +97,28 @@ fn prover_proves_a_block_and_publishes_result() {
         prover::start(p);
     });
 
-    let timeout = time::Duration::from_secs(60*30); // 10 minutes
-    let proof = proof_rx.recv_timeout(timeout).expect("didn't receive proof");
+    let timeout = time::Duration::from_secs(60 * 30); // 10 minutes
+    let proof = proof_rx
+        .recv_timeout(timeout)
+        .expect("didn't receive proof");
     stop_signal.store(true, Ordering::SeqCst);
     println!("verifying proof...");
-    let verify_result = bellman::groth16::verify_proof(
-        &verify_key,
-        &proof.clone(),
-        &[public_data_commitment]);
+    let verify_result =
+        bellman::groth16::verify_proof(&verify_key, &proof.clone(), &[public_data_commitment]);
     assert!(!verify_result.is_err());
     assert!(verify_result.unwrap(), "invalid proof");
 }
 
-fn new_test_data_for_prover() -> prover::ProverData {
-    let mut circuit_tree = models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+fn new_test_data_for_prover() -> prover::witness_generator::ProverData {
+    let mut circuit_tree =
+        models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
     println!("Empty tree root hash: {}", circuit_tree.root_hash());
 
     let validator_test_account = TestAccount::new();
-    println!("validator account address: {}", validator_test_account.address.to_hex());
+    println!(
+        "validator account address: {}",
+        validator_test_account.address.to_hex()
+    );
 
     // Fee account
     let mut accounts = models::node::AccountMap::default();
@@ -124,17 +130,18 @@ fn new_test_data_for_prover() -> prover::ProverData {
     let mut state = plasma::state::PlasmaState::new(accounts, 1);
     let genesis_root_hash = state.root_hash();
     println!("Genesis block root hash: {}", genesis_root_hash);
-    circuit_tree.insert(0, models::circuit::account::CircuitAccount::from(validator_account.clone()));
+    circuit_tree.insert(
+        0,
+        models::circuit::account::CircuitAccount::from(validator_account.clone()),
+    );
     assert_eq!(circuit_tree.root_hash(), genesis_root_hash);
 
-    let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(
-        models::node::Deposit{
-            sender: web3::types::Address::zero(),
-            token: 0,
-            amount: bigdecimal::BigDecimal::from(10),
-            account: validator_test_account.address.clone(),
-        },
-    );
+    let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
+        sender: web3::types::Address::zero(),
+        token: 0,
+        amount: bigdecimal::BigDecimal::from(10),
+        account: validator_test_account.address.clone(),
+    });
     let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
     let mut fees = Vec::new();
     let mut ops = Vec::new();
@@ -146,17 +153,19 @@ fn new_test_data_for_prover() -> prover::ProverData {
 
     accounts_updated.append(&mut op_success.updates);
 
-    ops.push(models::node::ExecutedOperations::PriorityOp(Box::new(models::node::ExecutedPriorityOp{
-        op: op_success.executed_op,
-        priority_op: models::node::PriorityOp{
-            serial_id: 0,
-            data: deposit_priority_op.clone(),
-            deadline_block: 2,
-            eth_fee: bigdecimal::BigDecimal::from(0),
-            eth_hash: vec![0; 8],
+    ops.push(models::node::ExecutedOperations::PriorityOp(Box::new(
+        models::node::ExecutedPriorityOp {
+            op: op_success.executed_op,
+            priority_op: models::node::PriorityOp {
+                serial_id: 0,
+                data: deposit_priority_op.clone(),
+                deadline_block: 2,
+                eth_fee: bigdecimal::BigDecimal::from(0),
+                eth_hash: vec![0; 8],
+            },
+            block_index: 0,
         },
-        block_index: 0,
-    })));
+    )));
 
     let (fee_account_id, fee_updates) = state.collect_fee(&fees, &validator_test_account.address);
     accounts_updated.extend(fee_updates.into_iter());
@@ -174,22 +183,26 @@ fn new_test_data_for_prover() -> prover::ProverData {
     let mut operations = vec![];
 
     if let models::node::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
-        let deposit_witness = circuit::witness::deposit::apply_deposit_tx(&mut circuit_tree, &models::node::operations::DepositOp{
-            priority_op: deposit_op,
-            account_id: 0,
-        });
-
-        let deposit_operations = circuit::witness::deposit::calculate_deposit_operations_from_witness(
-            &deposit_witness,
-            &models::node::Fr::zero(),
-            &models::node::Fr::zero(),
-            &models::node::Fr::zero(),
-            &circuit::operation::SignatureData{
-                r_packed: vec![Some(false); 256],
-                s: vec![Some(false); 256],
+        let deposit_witness = circuit::witness::deposit::apply_deposit_tx(
+            &mut circuit_tree,
+            &models::node::operations::DepositOp {
+                priority_op: deposit_op,
+                account_id: 0,
             },
-            &[Some(false); 256],
         );
+
+        let deposit_operations =
+            circuit::witness::deposit::calculate_deposit_operations_from_witness(
+                &deposit_witness,
+                &models::node::Fr::zero(),
+                &models::node::Fr::zero(),
+                &models::node::Fr::zero(),
+                &circuit::operation::SignatureData {
+                    r_packed: vec![Some(false); 256],
+                    s: vec![Some(false); 256],
+                },
+                &[Some(false); 256],
+            );
         operations.extend(deposit_operations);
         pub_data.extend(deposit_witness.get_pubdata());
     }
@@ -197,14 +210,8 @@ fn new_test_data_for_prover() -> prover::ProverData {
     let phaser = models::merkle_tree::PedersenHasher::<models::node::Engine>::default();
     let jubjub_params = &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     for _ in 0..models::params::block_size_chunks() - operations.len() {
-        let (
-            signature,
-            first_sig_msg,
-            second_sig_msg,
-            third_sig_msg,
-            _a,
-            _b,
-        ) = circuit::witness::utils::generate_dummy_sig_data(&[false], &phaser, &jubjub_params);
+        let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _a, _b) =
+            circuit::witness::utils::generate_dummy_sig_data(&[false], &phaser, &jubjub_params);
 
         operations.push(circuit::witness::noop::noop_operation(
             &circuit_tree,
@@ -241,15 +248,16 @@ fn new_test_data_for_prover() -> prover::ProverData {
     let (validator_audit_path, _) =
         circuit::witness::utils::get_audits(&circuit_tree, block.fee_account as u32, 0);
 
-    let public_data_commitment = circuit::witness::utils::public_data_commitment::<models::node::Engine>(
-        &pub_data,
-        Some(genesis_root_hash),
-        Some(root_after_fee),
-        Some(models::node::Fr::from_str(&block.fee_account.to_string()).unwrap()),
-        Some(models::node::Fr::from_str(&(block.block_number).to_string()).unwrap()),
-    );
+    let public_data_commitment =
+        circuit::witness::utils::public_data_commitment::<models::node::Engine>(
+            &pub_data,
+            Some(genesis_root_hash),
+            Some(root_after_fee),
+            Some(models::node::Fr::from_str(&block.fee_account.to_string()).unwrap()),
+            Some(models::node::Fr::from_str(&(block.block_number).to_string()).unwrap()),
+        );
 
-    prover::ProverData{
+    prover::witness_generator::ProverData {
         public_data_commitment,
         old_root: genesis_root_hash,
         new_root: block.new_root_hash,
@@ -279,14 +287,16 @@ fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engin
         .expect("Unable to read proving key")
 }
 
-struct MockApiClient<F: Fn() -> Option<prover::ProverData>> {
+struct MockApiClient<F: Fn() -> Option<prover::witness_generator::ProverData>> {
     block_to_prove: Mutex<Option<i64>>,
     heartbeats_tx: Arc<Mutex<mpsc::Sender<()>>>,
     publishes_tx: Arc<Mutex<mpsc::Sender<bellman::groth16::Proof<models::node::Engine>>>>,
     prover_data_fn: F,
 }
 
-impl<F: Fn() -> Option<prover::ProverData>> prover::ApiClient for MockApiClient<F> {
+impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
+    for MockApiClient<F>
+{
     fn block_to_prove(&self) -> Result<Option<i64>, String> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         Ok(*block_to_prove)
@@ -296,21 +306,21 @@ impl<F: Fn() -> Option<prover::ProverData>> prover::ApiClient for MockApiClient<
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if let Some(stored) = *block_to_prove {
             if stored != block {
-                return
+                return;
             }
             self.heartbeats_tx.lock().unwrap().send(());
         }
     }
 
-    fn prover_data(&self, block: i64) -> Result<prover::ProverData, String> {
+    fn prover_data(&self, block: i64) -> Result<prover::witness_generator::ProverData, String> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if let Some(stored) = *block_to_prove {
             if stored != block {
-                return Err("unexpected block".to_string())
+                return Err("unexpected block".to_string());
             }
             let v = (self.prover_data_fn)();
             if let Some(pd) = v {
-                return Ok(pd)
+                return Ok(pd);
             }
         }
         Err("mock not configured".to_string())

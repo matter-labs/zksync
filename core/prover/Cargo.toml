@@ -35,3 +35,5 @@ chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
 env_logger = "0.6"
 num-traits = "0.2"
+actix-web = "1.0"
+reqwest = "0.9.22"

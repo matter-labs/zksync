@@ -1,33 +1,31 @@
+mod pool;
+
 // Built-in
-use std::{error, net, time};
 use std::collections::HashMap;
-use std::sync::{RwLock, Arc};
-use std::thread;
 use std::str::FromStr;
+use std::sync::{Arc, RwLock};
+use std::thread;
+use std::{error, net, time};
 // External
-use ff::{Field, PrimeField};
-use actix_web::{
-    App,
-    HttpServer,
-    HttpRequest,
-    HttpResponse,
-    web,
-    Responder,
-};
-use serde::{Serialize, Deserialize};
 use actix_web::web::delete;
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use pairing::bn256::Bn256;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 // Workspace uses
-use models::node::{Fr, Engine};
-use models::node::tx::PackedPublicKey;
+use circuit::account::AccountWitness;
+use circuit::operation::{
+    Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
+};
 use models::merkle_tree::PedersenHasher;
-use circuit::operation::SignatureData;
-use crate::pool;
+use models::node::tx::PackedPublicKey;
+use models::node::{Engine, Fr};
 
 struct AppState {
     connection_pool: storage::ConnectionPool,
     preparing_data_pool: Arc<RwLock<pool::ProversDataPool>>,
-    prover_timeout: time::Duration
+    prover_timeout: time::Duration,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -37,19 +35,15 @@ pub struct ProverReq {
 
 fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Result<String> {
     if r.name == "" {
-        return Err(actix_web::error::ErrorBadRequest("empty name"))
+        return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
-    let storage = match data.connection_pool.access_storage(){
+    let storage = match data.connection_pool.access_storage() {
         Ok(s) => s,
-        Err(e) => {
-            return Err(actix_web::error::ErrorInternalServerError(e))
-        },
+        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
     let id = match storage.register_prover(&r.name) {
         Ok(id) => id,
-        Err(e) => {
-            return Err(actix_web::error::ErrorInternalServerError(e))
-        }
+        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
     Ok(id.to_string())
 }
@@ -60,29 +54,37 @@ pub struct BlockToProveRes {
     pub block: i64,
 }
 
-fn block_to_prove(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Result<HttpResponse> {
+fn block_to_prove(
+    data: web::Data<AppState>,
+    r: web::Json<ProverReq>,
+) -> actix_web::Result<HttpResponse> {
     if r.name == "" {
-        return Err(actix_web::error::ErrorBadRequest("empty name"))
+        return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
-    let storage = match data.connection_pool.access_storage(){
+    let storage = match data.connection_pool.access_storage() {
         Ok(s) => s,
-        Err(e) => {
-            return Err(actix_web::error::ErrorInternalServerError(e))
-        },
+        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
     // TODO: handle errors
-    let ret = storage.job_for_unverified_block(&r.name, data.prover_timeout).unwrap();
+    let ret = storage
+        .job_for_unverified_block(&r.name, data.prover_timeout)
+        .unwrap();
     if let Some(prover_run) = ret {
-        return Ok(HttpResponse::Ok().json(BlockToProveRes{
+        return Ok(HttpResponse::Ok().json(BlockToProveRes {
             prover_run_id: prover_run.id,
             block: prover_run.block_number,
-        }))
+        }));
     }
-    Ok(HttpResponse::Ok().json(BlockToProveRes{
+    Ok(HttpResponse::Ok().json(BlockToProveRes {
         prover_run_id: 0,
         block: 0,
     }))
 }
+
+// fn prover_data(data: web::Data<AppState>, block: web::Json<i64>) -> actix_web::Result<HttpResponse> {
+//     let data_pool = data.preparing_data_pool.read().unwrap();
+//     data_pool.get(block)
+// }
 
 #[derive(Serialize, Deserialize)]
 pub struct WorkingOnReq {
@@ -90,11 +92,9 @@ pub struct WorkingOnReq {
 }
 
 fn working_on(data: web::Data<AppState>, r: web::Json<WorkingOnReq>) -> actix_web::Result<()> {
-    let storage = match data.connection_pool.access_storage(){
+    let storage = match data.connection_pool.access_storage() {
         Ok(s) => s,
-        Err(e) => {
-            return Err(actix_web::error::ErrorInternalServerError(e))
-        },
+        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
     // TODO: handle errors
     // TODO: handle case when proof calculation was taken over by other prover
@@ -102,7 +102,11 @@ fn working_on(data: web::Data<AppState>, r: web::Json<WorkingOnReq>) -> actix_we
     Ok(())
 }
 
-pub fn start_server(bind_to: &net::SocketAddr, prover_timeout: time::Duration, rounds_interval: time::Duration) {
+pub fn start_server(
+    bind_to: &net::SocketAddr,
+    prover_timeout: time::Duration,
+    rounds_interval: time::Duration,
+) {
     // TODO: receive limit
     // TODO: add logging
     let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new()));
@@ -125,8 +129,8 @@ pub fn start_server(bind_to: &net::SocketAddr, prover_timeout: time::Duration, r
             .route("/block_to_prove", web::get().to(block_to_prove))
             .route("/working_on", web::post().to(working_on))
     })
-        .bind(bind_to)
-        .unwrap()
-        .run()
-        .unwrap();
+    .bind(bind_to)
+    .unwrap()
+    .run()
+    .unwrap();
 }

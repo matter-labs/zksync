@@ -5,7 +5,6 @@ members = [
     "core/eth_client",
     "core/plasma",
     "core/server",
-    "core/witness_generator",
     "core/storage",
     "core/circuit",
     "core/models",
