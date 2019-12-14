@@ -1,8 +1,8 @@
 use crate::account::AccountWitness;
 use ff::Field;
-use serde::{Serialize};
 use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug)]
 pub struct OperationBranchWitness<E: JubjubEngine> {
@@ -66,7 +66,7 @@ impl<E: JubjubEngine> TransactionSignature<E> {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct SignatureData {
     pub r_packed: Vec<Option<bool>>,
     pub s: Vec<Option<bool>>,

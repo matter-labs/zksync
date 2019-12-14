@@ -1,11 +1,10 @@
 // External uses
-use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::circuit::Assignment;
+use franklin_crypto::jubjub::JubjubEngine;
 // Workspace uses
 use crate::element::CircuitElement;
 use bellman::{ConstraintSystem, SynthesisError};
 use models::params as franklin_constants;
-
 
 #[derive(Clone, Debug)]
 pub struct AccountWitness<E: JubjubEngine> {

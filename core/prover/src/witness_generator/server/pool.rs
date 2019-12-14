@@ -1,40 +1,34 @@
 // Built-in
-use std::{error, net, time};
 use std::collections::HashMap;
-use std::sync::{RwLock, Arc};
-use std::thread;
 use std::str::FromStr;
+use std::sync::{Arc, RwLock};
+use std::thread;
+use std::{error, net, time};
 // External
-use ff::{Field, PrimeField};
-use actix_web::{
-    App,
-    HttpServer,
-    HttpRequest,
-    HttpResponse,
-    web,
-    Responder,
-};
-use serde::{Serialize, Deserialize};
 use actix_web::web::delete;
+use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use franklin_crypto::bellman::groth16::prepare_prover;
+use serde::{Deserialize, Serialize};
 // Workspace uses
-use models::node::{Fr, Engine};
-use models::node::tx::PackedPublicKey;
-use models::merkle_tree::PedersenHasher;
+use crate::ProverData;
 use circuit::operation::SignatureData;
+use models::merkle_tree::PedersenHasher;
+use models::node::tx::PackedPublicKey;
+use models::node::{Engine, Fr};
 
 pub struct ProversDataPool {
     last_prepared: i64,
     last_loaded: i64,
     limit: i64,
     operations: HashMap<i64, models::Operation>,
-    prepared: HashMap<i64, prover::ProverData>,
+    prepared: HashMap<i64, ProverData>,
 }
 
 impl ProversDataPool {
     pub fn new() -> Self {
-        ProversDataPool{
+        ProversDataPool {
             last_prepared: 0,
             last_loaded: 0,
             limit: 10,
@@ -43,7 +37,7 @@ impl ProversDataPool {
         }
     }
 
-    pub fn get(&self, block: i64) -> Option<&prover::ProverData> {
+    pub fn get(&self, block: i64) -> Option<&ProverData> {
         self.prepared.get(&block)
     }
 
@@ -56,7 +50,11 @@ impl ProversDataPool {
     }
 }
 
-pub fn maintain(conn_pool: storage::ConnectionPool, data: Arc<RwLock<ProversDataPool>>, rounds_interval: time::Duration) {
+pub fn maintain(
+    conn_pool: storage::ConnectionPool,
+    data: Arc<RwLock<ProversDataPool>>,
+    rounds_interval: time::Duration,
+) {
     let storage = conn_pool.access_storage().unwrap();
     loop {
         if has_capacity(&data) {
@@ -79,7 +77,9 @@ fn has_capacity(data: &Arc<RwLock<ProversDataPool>>) -> bool {
 
 fn fill(storage: &storage::StorageProcessor, data: &Arc<RwLock<ProversDataPool>>) {
     let d = data.read().unwrap();
-    let ops = storage.load_unverified_commits_after_block(d.last_loaded, d.limit).unwrap();
+    let ops = storage
+        .load_unverified_commits_after_block(d.last_loaded, d.limit)
+        .unwrap();
     drop(d);
 
     if ops.len() > 0 {
@@ -98,14 +98,17 @@ fn all_prepared(data: &Arc<RwLock<ProversDataPool>>) -> bool {
 fn prepare_next(storage: &storage::StorageProcessor, data: &Arc<RwLock<ProversDataPool>>) {
     // TODO: errors
     let mut d = data.write().unwrap();
-    let mut current = (*d).last_prepared+1;
+    let mut current = (*d).last_prepared + 1;
     let op = d.operations.remove(&mut current).unwrap();
     let pd = build_prover_data(&storage, &op);
     (*d).last_prepared += 1;
     (*d).prepared.insert(op.block.block_number as i64, pd);
 }
 
-fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &models::Operation) -> prover::ProverData {
+fn build_prover_data(
+    storage: &storage::StorageProcessor,
+    commit_operation: &models::Operation,
+) -> ProverData {
     // TODO: this is expensive time operation, move out and don't repeat
     let phasher = PedersenHasher::<Engine>::default();
     let params = &AltJubjubBn256::new();
@@ -113,7 +116,8 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
     let block_number = commit_operation.block.block_number;
 
     let (_, accounts) = storage.load_committed_state(Some(block_number)).unwrap();
-    let mut accounts_tree = models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+    let mut accounts_tree =
+        models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
     for acc in accounts {
         let acc_number = acc.0;
         let leaf_copy = models::circuit::account::CircuitAccount::from(acc.1.clone());
@@ -123,26 +127,33 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
     let ops = storage.get_block_operations(block_number).unwrap();
     // TODO: use conn pool
 
-    circuit::witness::utils::apply_fee(&mut accounts_tree, commit_operation.block.fee_account, 0, 0);
+    circuit::witness::utils::apply_fee(
+        &mut accounts_tree,
+        commit_operation.block.fee_account,
+        0,
+        0,
+    );
     let mut operations = vec![];
     let mut pub_data = vec![];
     let mut fees = vec![];
     for op in ops {
         match op {
             models::node::FranklinOp::Deposit(deposit) => {
-                let deposit_witness = circuit::witness::deposit::apply_deposit_tx(&mut accounts_tree, &deposit);
+                let deposit_witness =
+                    circuit::witness::deposit::apply_deposit_tx(&mut accounts_tree, &deposit);
 
-                let deposit_operations = circuit::witness::deposit::calculate_deposit_operations_from_witness(
-                    &deposit_witness,
-                    &Fr::zero(),
-                    &Fr::zero(),
-                    &Fr::zero(),
-                    &SignatureData {
-                        r_packed: vec![Some(false); 256],
-                        s: vec![Some(false); 256],
-                    },
-                    &[Some(false); 256], //doesn't matter for deposit
-                );
+                let deposit_operations =
+                    circuit::witness::deposit::calculate_deposit_operations_from_witness(
+                        &deposit_witness,
+                        &Fr::zero(),
+                        &Fr::zero(),
+                        &Fr::zero(),
+                        &SignatureData {
+                            r_packed: vec![Some(false); 256],
+                            s: vec![Some(false); 256],
+                        },
+                        &[Some(false); 256], //doesn't matter for deposit
+                    );
                 operations.extend(deposit_operations);
                 pub_data.extend(deposit_witness.get_pubdata());
             }
@@ -160,21 +171,25 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
                     &transfer.tx.get_bytes(),
                     &transfer.tx.signature.pub_key,
                 );
-                let transfer_operations = circuit::witness::transfer::calculate_transfer_operations_from_witness(
-                    &transfer_witness,
-                    &first_sig_msg,
-                    &second_sig_msg,
-                    &third_sig_msg,
-                    &signature_data,
-                    &signer_packed_key_bits,
-                );
+                let transfer_operations =
+                    circuit::witness::transfer::calculate_transfer_operations_from_witness(
+                        &transfer_witness,
+                        &first_sig_msg,
+                        &second_sig_msg,
+                        &third_sig_msg,
+                        &signature_data,
+                        &signer_packed_key_bits,
+                    );
                 operations.extend(transfer_operations);
                 fees.push((transfer.tx.fee, transfer.tx.token));
                 pub_data.extend(transfer_witness.get_pubdata());
             }
             models::node::FranklinOp::TransferToNew(transfer_to_new) => {
                 let transfer_to_new_witness =
-                    circuit::witness::transfer_to_new::apply_transfer_to_new_tx(&mut accounts_tree, &transfer_to_new);
+                    circuit::witness::transfer_to_new::apply_transfer_to_new_tx(
+                        &mut accounts_tree,
+                        &transfer_to_new,
+                    );
                 let (
                     first_sig_msg,
                     second_sig_msg,
@@ -220,21 +235,24 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
                     &withdraw.tx.signature.pub_key,
                 );
 
-                let withdraw_operations = circuit::witness::withdraw::calculate_withdraw_operations_from_witness(
-                    &withdraw_witness,
-                    &first_sig_msg,
-                    &second_sig_msg,
-                    &third_sig_msg,
-                    &signature_data,
-                    &signer_packed_key_bits,
-                );
+                let withdraw_operations =
+                    circuit::witness::withdraw::calculate_withdraw_operations_from_witness(
+                        &withdraw_witness,
+                        &first_sig_msg,
+                        &second_sig_msg,
+                        &third_sig_msg,
+                        &signature_data,
+                        &signer_packed_key_bits,
+                    );
                 operations.extend(withdraw_operations);
                 fees.push((withdraw.tx.fee, withdraw.tx.token));
                 pub_data.extend(withdraw_witness.get_pubdata());
             }
             models::node::FranklinOp::Close(close) => {
-                let close_account_witness =
-                    circuit::witness::close_account::apply_close_account_tx(&mut accounts_tree, &close);
+                let close_account_witness = circuit::witness::close_account::apply_close_account_tx(
+                    &mut accounts_tree,
+                    &close,
+                );
                 let (
                     first_sig_msg,
                     second_sig_msg,
@@ -267,16 +285,18 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
                     is_full_exit_success,
                 );
 
-                let r_bits: Vec<_> =
-                    models::primitives::bytes_into_be_bits(full_exit.priority_op.signature_r.as_ref())
-                        .iter()
-                        .map(|x| Some(*x))
-                        .collect();
-                let s_bits: Vec<_> =
-                    models::primitives::bytes_into_be_bits(full_exit.priority_op.signature_s.as_ref())
-                        .iter()
-                        .map(|x| Some(*x))
-                        .collect();
+                let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(
+                    full_exit.priority_op.signature_r.as_ref(),
+                )
+                .iter()
+                .map(|x| Some(*x))
+                .collect();
+                let s_bits: Vec<_> = models::primitives::bytes_into_be_bits(
+                    full_exit.priority_op.signature_s.as_ref(),
+                )
+                .iter()
+                .map(|x| Some(*x))
+                .collect();
                 let signature = SignatureData {
                     r_packed: r_bits,
                     s: s_bits,
@@ -293,14 +313,15 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
                         .map(|x| Some(*x))
                         .collect();
 
-                let full_exit_operations = circuit::witness::full_exit::calculate_full_exit_operations_from_witness(
-                    &full_exit_witness,
-                    &first_sig_msg,
-                    &second_sig_msg,
-                    &third_sig_msg,
-                    &signature,
-                    &signer_packed_key_bits,
-                );
+                let full_exit_operations =
+                    circuit::witness::full_exit::calculate_full_exit_operations_from_witness(
+                        &full_exit_witness,
+                        &first_sig_msg,
+                        &second_sig_msg,
+                        &third_sig_msg,
+                        &signature,
+                        &signer_packed_key_bits,
+                    );
                 operations.extend(full_exit_operations);
                 pub_data.extend(full_exit_witness.get_pubdata(
                     &signature,
@@ -312,15 +333,9 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
     }
     if operations.len() < models::params::block_size_chunks() {
         for _ in 0..models::params::block_size_chunks() - operations.len() {
-            let (
-                signature,
-                first_sig_msg,
-                second_sig_msg,
-                third_sig_msg,
-                _sender_x,
-                _sender_y,
-            ) = circuit::witness::utils::generate_dummy_sig_data(&[false], &phasher, &params);
-            operations.push( circuit::witness::noop::noop_operation(
+            let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _sender_x, _sender_y) =
+                circuit::witness::utils::generate_dummy_sig_data(&[false], &phasher, &params);
+            operations.push(circuit::witness::noop::noop_operation(
                 &accounts_tree,
                 commit_operation.block.fee_account,
                 &first_sig_msg,
@@ -349,8 +364,12 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
         validator_balances.push(Some(balance_value));
     }
     accounts_tree.root_hash();
-    let (mut root_after_fee, mut validator_account_witness) =
-        circuit::witness::utils::apply_fee(&mut accounts_tree, commit_operation.block.fee_account, 0, 0);
+    let (mut root_after_fee, mut validator_account_witness) = circuit::witness::utils::apply_fee(
+        &mut accounts_tree,
+        commit_operation.block.fee_account,
+        0,
+        0,
+    );
     for (fee, token) in fees {
         let (root, acc_witness) = circuit::witness::utils::apply_fee(
             &mut accounts_tree,
@@ -364,8 +383,11 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
 
     // TODO: replace asserts with errors
     assert_eq!(root_after_fee, commit_operation.block.new_root_hash);
-    let (validator_audit_path, _) =
-        circuit::witness::utils::get_audits(&accounts_tree, commit_operation.block.fee_account as u32, 0);
+    let (validator_audit_path, _) = circuit::witness::utils::get_audits(
+        &accounts_tree,
+        commit_operation.block.fee_account as u32,
+        0,
+    );
 
     let public_data_commitment = circuit::witness::utils::public_data_commitment::<Engine>(
         &pub_data,
@@ -375,7 +397,7 @@ fn build_prover_data(storage: &storage::StorageProcessor, commit_operation: &mod
         Some(Fr::from_str(&(block_number).to_string()).unwrap()),
     );
 
-    prover::ProverData{
+    ProverData {
         public_data_commitment,
         old_root: initial_root,
         new_root: commit_operation.block.new_root_hash,
@@ -407,17 +429,19 @@ pub fn prepare_sig_data(
     };
     let sig_bits: Vec<bool> = models::primitives::bytes_into_be_bits(&tx_bytes);
 
-    let (first_sig_msg, second_sig_msg, third_sig_msg) = circuit::witness::utils::generate_sig_witness(
-        &sig_bits,
-        &models::params::PEDERSEN_HASHER,
-        &models::params::JUBJUB_PARAMS,
-    );
+    let (first_sig_msg, second_sig_msg, third_sig_msg) =
+        circuit::witness::utils::generate_sig_witness(
+            &sig_bits,
+            &models::params::PEDERSEN_HASHER,
+            &models::params::JUBJUB_PARAMS,
+        );
 
     let signer_packed_key_bytes = pub_key.serialize_packed().unwrap();
-    let signer_packed_key_bits: Vec<_> = models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
-        .iter()
-        .map(|x| Some(*x))
-        .collect();
+    let signer_packed_key_bits: Vec<_> =
+        models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
     (
         first_sig_msg,
         second_sig_msg,
