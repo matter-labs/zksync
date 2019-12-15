@@ -15,7 +15,7 @@ use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, Execute
 pub struct FranklinAccountsState {
     /// Accounts stored in a spase merkle tree
     pub state: PlasmaState,
-    pub current_unprocessed_priority_op: u64
+    pub current_unprocessed_priority_op: u64,
 }
 
 impl Default for FranklinAccountsState {
@@ -275,6 +275,8 @@ impl FranklinAccountsState {
                 self.current_unprocessed_priority_op,
             ),
         };
+
+        self.state.block_number += 1;
 
         Ok(CommitRequest {
             block,
