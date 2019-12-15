@@ -35,7 +35,7 @@ fn create_data_restore_driver(
 }
 
 /// Loads states from storage and start update
-fn load_state<T: Transport>(driver: &mut DataRestoreDriver<T>) {
+fn load_state_from_storage<T: Transport>(driver: &mut DataRestoreDriver<T>) {
     driver
         .load_state_from_storage()
         .expect("Cant load state");
@@ -47,8 +47,8 @@ fn load_state<T: Transport>(driver: &mut DataRestoreDriver<T>) {
 ///
 /// * `driver` - DataRestore Driver config
 ///
-fn run_state_updates<T: Transport>(driver: &mut DataRestoreDriver<T>) {
-    driver.run_state_updates();
+fn update_state<T: Transport>(driver: &mut DataRestoreDriver<T>) {
+    driver.update_state();
 }
 
 fn stop_state_updates<T: Transport>(driver: &mut DataRestoreDriver<T>) {

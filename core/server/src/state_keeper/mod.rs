@@ -91,13 +91,38 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn restore_from_layer1(pool: ConnectionPool, web3_url: &String, contract_eth_addr: &H160, contract_genesis_tx_hash: &H256) {
-        let storage = pool
-            .access_storage()
-            .expect("db connection failed for statekeeper");
-        
-        // load accounts state from data restore
-         
+    pub fn restore_from_layer1(
+        pool: ConnectionPool,
+        eth_state: Arc<RwLock<ETHState>>,
+        web3_url: &String,
+        contract_eth_addr: &H160,
+        contract_genesis_tx_hash: &H256
+    ) -> Self {
+        let mut driver = data_restore::create_data_restore_driver(
+            pool,
+            web3_url,
+            contract_eth_addr,
+            contract_genesis_tx_hash,
+            1000,
+            40
+        );
+        data_restore::load_state_from_storage(&mut driver);
+        data_restore::update_state(&mut driver);
+
+        let keeper = PlasmaStateKeeper {
+            state: driver.accounts_state.state,
+            next_block_try_timer: Instant::now(),
+            block_tries: 0,
+            db_conn_pool: pool,
+            fee_account_address: driver.accounts_state.current_fee_account_address,
+            eth_state,
+            current_unprocessed_priority_op: driver.accounts_state.current_unprocessed_priority_op,
+        };
+
+        let root = keeper.state.root_hash();
+        info!("created state keeper, root hash = {}", root);
+
+        keeper
     }
 
     pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &AccountAddress) {
