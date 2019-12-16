@@ -14,7 +14,7 @@ use models::Operation;
 use std::sync::mpsc;
 use storage::ConnectionPool;
 
-use futures::sync::mpsc as fmpsc;
+use futures::channel::mpsc as fmpsc;
 
 pub fn start_api_server(
     op_notify_receiver: fmpsc::Receiver<Operation>,
