@@ -467,7 +467,7 @@ contract Franklin {
             "fnck11"
         ); // fnck11 - only commit next block
         governance.requireActiveValidator(msg.sender);
-        if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfeeded()) {
+        if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
             require(
                 totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS,
                 "fnck13"
@@ -819,7 +819,7 @@ contract Franklin {
     /// @dev Returns bool flag that is true if the Exodus mode must be entered.
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
-    function triggerExodusIfeeded() internal returns (bool) {
+    function triggerExodusIfNeeded() internal returns (bool) {
         if (priorityQueue.triggerExodusIfNeeded()) {
             exodusMode = true;
             cancelOutstandingDepositsForExodusMode();
