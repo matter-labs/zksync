@@ -10,6 +10,7 @@ use clap::{App, Arg};
 use futures::sync::mpsc as fmpsc;
 // Workspace uses
 use models::StateKeeperRequest;
+use data_restore;
 use server::api_server::start_api_server;
 use server::committer::start_committer;
 use server::eth_watch::start_eth_watch;
@@ -41,16 +42,17 @@ fn main() {
             &config_opts.operator_franklin_addr,
         );
         return;
-    } else if cli.is_present("restore") {
-        info!("Restoring node.");
-        PlasmaStateKeeper::restore_from_layer1(
-            connection_pool.clone(),
-            &config_opts.web3_url,
-            &config_opts.contract_eth_addr,
-            &config_opts.contract_genesis_tx_hash,
-        );
-        return;
-    }
+    } 
+    // else if cli.is_present("restore") {
+    //     info!("Restoring node.");
+    //     PlasmaStateKeeper::restore_from_layer1(
+    //         connection_pool.clone(),
+    //         &config_opts.web3_url,
+    //         &config_opts.contract_eth_addr,
+    //         &config_opts.contract_genesis_tx_hash,
+    //     );
+    //     return;
+    // }
 
     debug!("starting server");
 

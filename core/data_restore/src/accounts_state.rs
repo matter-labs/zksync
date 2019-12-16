@@ -16,6 +16,7 @@ pub struct FranklinAccountsState {
     /// Accounts stored in a spase merkle tree
     pub state: PlasmaState,
     pub current_unprocessed_priority_op: u64,
+    pub last_fee_account_address: AccountAddress
 }
 
 impl Default for FranklinAccountsState {
@@ -29,7 +30,8 @@ impl FranklinAccountsState {
     pub fn new() -> Self {
         Self {
             state: PlasmaState::empty(),
-            current_unprocessed_priority_op: 0
+            current_unprocessed_priority_op: 0,
+            last_fee_account_address: AccountAddress::default()
         }
     }
 
@@ -40,86 +42,17 @@ impl FranklinAccountsState {
     /// * `current_block` - current block number
     /// * `accounts` - accounts map
     ///
-    pub fn load(current_block: u32, accounts: AccountMap) -> Self {
+    pub fn load(
+        current_block: u32,
+        accounts: AccountMap,
+        fee_account: AccountAddress,
+        current_unprocessed_priority_op: u64
+    ) -> Self {
         Self {
             state: PlasmaState::new(accounts, current_block),
-            current_unprocessed_priority_op: 0
+            current_unprocessed_priority_op: current_unprocessed_priority_op,
+            last_fee_account_address: fee_account
         }
-    }
-
-    fn update_from_priority_operation(
-        &mut self,
-        priority_op: FranklinPriorityOp,
-        op_result: OpSuccess,
-        fees: &mut Vec<CollectedFee>,
-        accounts_updated: &mut AccountUpdates,
-        current_op_block_index: u32,
-        ops: &mut Vec<ExecutedOperations>
-    ) -> u32 {
-        accounts_updated.append(&mut op_result.updates.clone());
-        if let Some(fee) = op_result.fee {
-            fees.push(fee);
-        }
-        let block_index = current_op_block_index;
-        let exec_result = ExecutedPriorityOp {
-            op: op_result.executed_op,
-            priority_op: PriorityOp {
-                serial_id: 0,
-                data: priority_op,
-                deadline_block: 0,
-                eth_fee: BigDecimal::from(0),
-                eth_hash: Vec::new(),
-            },
-            block_index,
-        };
-        ops.push(ExecutedOperations::PriorityOp(Box::new(exec_result)));
-        self.current_unprocessed_priority_op += 1;
-        return current_op_block_index + 1
-    }
-
-    fn update_from_tx(
-        &mut self,
-        tx: FranklinTx,
-        tx_result: Result<OpSuccess, failure::Error>,
-        fees: &mut Vec<CollectedFee>,
-        accounts_updated: &mut AccountUpdates,
-        current_op_block_index: u32,
-        ops: &mut Vec<ExecutedOperations>
-    ) -> u32 {
-        match tx_result {
-            Ok(OpSuccess {
-                fee,
-                mut updates,
-                executed_op,
-            }) => {
-                accounts_updated.append(&mut updates);
-                if let Some(fee) = fee {
-                    fees.push(fee);
-                }
-                let block_index = current_op_block_index;
-                let exec_result = ExecutedTx {
-                    tx,
-                    success: true,
-                    op: Some(executed_op),
-                    fail_reason: None,
-                    block_index: Some(block_index),
-                };
-                ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
-                return current_op_block_index + 1
-            },
-            Err(e) => {
-                let exec_result = ExecutedTx {
-                    tx,
-                    success: false,
-                    op: None,
-                    fail_reason: Some(e.to_string()),
-                    block_index: None,
-                };
-                ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
-                return current_op_block_index
-            }
-        };
-
     }
 
     /// Updates Franklin Accounts states from Franklin operations block
@@ -265,6 +198,8 @@ impl FranklinAccountsState {
         let (fee_account_id, fee_updates) = self.state.collect_fee(&fees, &fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
 
+        self.last_fee_account_address = fee_account_address;
+
         let block = Block {
             block_number: ops_block.block_num,
             new_root_hash: self.state.root_hash(),
@@ -282,6 +217,80 @@ impl FranklinAccountsState {
             block,
             accounts_updated,
         })
+    }
+
+    fn update_from_priority_operation(
+        &mut self,
+        priority_op: FranklinPriorityOp,
+        op_result: OpSuccess,
+        fees: &mut Vec<CollectedFee>,
+        accounts_updated: &mut AccountUpdates,
+        current_op_block_index: u32,
+        ops: &mut Vec<ExecutedOperations>
+    ) -> u32 {
+        accounts_updated.append(&mut op_result.updates.clone());
+        if let Some(fee) = op_result.fee {
+            fees.push(fee);
+        }
+        let block_index = current_op_block_index;
+        let exec_result = ExecutedPriorityOp {
+            op: op_result.executed_op,
+            priority_op: PriorityOp {
+                serial_id: 0,
+                data: priority_op,
+                deadline_block: 0,
+                eth_fee: BigDecimal::from(0),
+                eth_hash: Vec::new(),
+            },
+            block_index,
+        };
+        ops.push(ExecutedOperations::PriorityOp(Box::new(exec_result)));
+        self.current_unprocessed_priority_op += 1;
+        current_op_block_index + 1
+    }
+
+    fn update_from_tx(
+        &mut self,
+        tx: FranklinTx,
+        tx_result: Result<OpSuccess, failure::Error>,
+        fees: &mut Vec<CollectedFee>,
+        accounts_updated: &mut AccountUpdates,
+        current_op_block_index: u32,
+        ops: &mut Vec<ExecutedOperations>
+    ) -> u32 {
+        match tx_result {
+            Ok(OpSuccess {
+                fee,
+                mut updates,
+                executed_op,
+            }) => {
+                accounts_updated.append(&mut updates);
+                if let Some(fee) = fee {
+                    fees.push(fee);
+                }
+                let block_index = current_op_block_index;
+                let exec_result = ExecutedTx {
+                    tx,
+                    success: true,
+                    op: Some(executed_op),
+                    fail_reason: None,
+                    block_index: Some(block_index),
+                };
+                ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
+                current_op_block_index + 1
+            },
+            Err(e) => {
+                let exec_result = ExecutedTx {
+                    tx,
+                    success: false,
+                    op: None,
+                    fail_reason: Some(e.to_string()),
+                    block_index: None,
+                };
+                ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
+                current_op_block_index
+            }
+        }
     }
 
     /// Returns map of Franklin accounts ids and their descriptions

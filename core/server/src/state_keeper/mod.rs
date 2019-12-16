@@ -94,19 +94,21 @@ impl PlasmaStateKeeper {
     pub fn restore_from_layer1(
         pool: ConnectionPool,
         eth_state: Arc<RwLock<ETHState>>,
-        web3_url: &String,
-        contract_eth_addr: &H160,
-        contract_genesis_tx_hash: &H256
+        web3_url: String,
+        contract_eth_addr: H160,
+        contract_genesis_tx_hash: H256,
+        eth_blocks_step: u64,
+        end_eth_blocks_offset: u64
     ) -> Self {
         let mut driver = data_restore::create_data_restore_driver(
-            pool,
+            pool.clone(),
             web3_url,
             contract_eth_addr,
-            contract_genesis_tx_hash,
-            1000,
-            40
-        );
-        data_restore::load_state_from_storage(&mut driver);
+            eth_blocks_step,
+            end_eth_blocks_offset
+        ).expect("Cant create data restore driver"); // Error processing
+        // TODO: - check for storage
+        data_restore::load_genesis_state(&mut driver, contract_genesis_tx_hash);
         data_restore::update_state(&mut driver);
 
         let keeper = PlasmaStateKeeper {
@@ -114,7 +116,7 @@ impl PlasmaStateKeeper {
             next_block_try_timer: Instant::now(),
             block_tries: 0,
             db_conn_pool: pool,
-            fee_account_address: driver.accounts_state.current_fee_account_address,
+            fee_account_address: driver.accounts_state.last_fee_account_address,
             eth_state,
             current_unprocessed_priority_op: driver.accounts_state.current_unprocessed_priority_op,
         };

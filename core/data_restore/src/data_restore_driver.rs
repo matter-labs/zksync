@@ -5,6 +5,7 @@ use crate::franklin_ops::FranklinOpsBlock;
 use crate::genesis_state::get_genesis_state;
 use crate::storage_interactor;
 use storage::ConnectionPool;
+use models::node::account::AccountAddress;
 use web3::contract::Contract;
 use web3::types::H160;
 use web3::{Transport, Web3};
@@ -28,7 +29,7 @@ pub struct DataRestoreDriver<T: Transport> {
     /// Provides Ethereum Franklin contract unterface
     pub franklin_contract: (ethabi::Contract, Contract<T>),
     /// Flag that indicates that state updates are running
-    pub run_updates: bool,
+    pub run_update: bool,
     /// Franklin contract events state
     pub events_state: EventsState,
     /// Franklin accounts state
@@ -50,7 +51,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         connection_pool: ConnectionPool,
         web3: Web3<T>,
         contract_eth_addr: H160,
-        contract_genesis_tx_hash: H256,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<Self, failure::Error> {
@@ -67,16 +67,15 @@ impl<T: Transport> DataRestoreDriver<T> {
             )
         };
 
-        let genesis_transaction = get_ethereum_transaction(&web3, &contract_genesis_tx_hash)?;
-        let genesis_acc_map = get_genesis_state(&genesis_transaction)?;
-        let accounts_state = FranklinAccountsState::load(genesis_acc_map.0, genesis_acc_map.1);
-        let events_state = EventsState::new(&genesis_transaction)?;
+        
+        let events_state = EventsState::new();
+        let accounts_state = FranklinAccountsState::new();
 
         Ok(Self {
             connection_pool,
             web3,
             franklin_contract,
-            run_updates: false,
+            run_update: false,
             events_state,
             accounts_state,
             eth_blocks_step,
@@ -84,44 +83,61 @@ impl<T: Transport> DataRestoreDriver<T> {
         })
     }
 
-    /// Stop states updates by setting run_updates flag to false
-    pub fn stop_state_updates(&mut self) {
-        self.run_updates = false
-    }
-
-    pub fn load_state_from_storage(&mut self) -> Result<(), failure::Error> {
-        let state = storage_interactor::get_storage_state(self.connection_pool.clone())?;
-        let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;
-        self.accounts_state = FranklinAccountsState::load(tree_state.0, tree_state.1);
-        match state {
-            StorageUpdateState::Events => {
-                self.events_state = storage_interactor::get_events_state_from_storage(
-                    self.connection_pool.clone(),
-                )?;
-                // Update operations
-                let new_ops_blocks = self.update_operations_state()?;
-                // Update tree
-                self.update_tree_state(new_ops_blocks)?;
-            }
-            StorageUpdateState::Operations => {
-                self.events_state = storage_interactor::get_events_state_from_storage(
-                    self.connection_pool.clone(),
-                )?;
-                // Update operations
-                let new_ops_blocks = storage_interactor::get_ops_blocks_from_storage(
-                    self.connection_pool.clone(),
-                )?;
-                // Update tree
-                self.update_tree_state(new_ops_blocks)?;
-            }
-            StorageUpdateState::None => {}
-        }
+    pub fn load_genesis_state(
+        &mut self,
+        contract_genesis_tx_hash: H256
+    ) -> Result<(), failure::Error> {
+        let genesis_transaction = get_ethereum_transaction(&self.web3, &contract_genesis_tx_hash)?;
+        let genesis_acc_map = get_genesis_state(&genesis_transaction)?;
+        
+        self.events_state.set_genesis_block_number(&genesis_transaction)?;
+        self.accounts_state = FranklinAccountsState::load(
+            genesis_acc_map.0,
+            genesis_acc_map.1,
+            AccountAddress::default(),
+            0
+        );
         Ok(())
     }
 
-    pub fn run_state_updates(&mut self) -> Result<(), failure::Error> {
-        self.run_updates = true;
-        while self.run_updates {
+    /// Stop states updates by setting run_update flag to false
+    pub fn stop_state_update(&mut self) {
+        self.run_update = false
+    }
+
+    pub fn load_state_from_storage(&mut self) -> Result<(), failure::Error> {
+        // let state = storage_interactor::get_storage_state(self.connection_pool.clone())?;
+        // let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;
+        // self.accounts_state = FranklinAccountsState::load(tree_state.0, tree_state.1);
+        // match state {
+        //     StorageUpdateState::Events => {
+        //         self.events_state = storage_interactor::get_events_state_from_storage(
+        //             self.connection_pool.clone(),
+        //         )?;
+        //         // Update operations
+        //         let new_ops_blocks = self.update_operations_state()?;
+        //         // Update tree
+        //         self.update_tree_state(new_ops_blocks)?;
+        //     }
+        //     StorageUpdateState::Operations => {
+        //         self.events_state = storage_interactor::get_events_state_from_storage(
+        //             self.connection_pool.clone(),
+        //         )?;
+        //         // Update operations
+        //         let new_ops_blocks = storage_interactor::get_ops_blocks_from_storage(
+        //             self.connection_pool.clone(),
+        //         )?;
+        //         // Update tree
+        //         self.update_tree_state(new_ops_blocks)?;
+        //     }
+        //     StorageUpdateState::None => {}
+        // }
+        Ok(())
+    }
+
+    pub fn run_state_update(&mut self) -> Result<(), failure::Error> {
+        self.run_update = true;
+        while self.run_update {
             info!(
                 "Last watched ethereum block: {:?}",
                 &self.events_state.last_watched_eth_block_number

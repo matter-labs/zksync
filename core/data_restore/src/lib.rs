@@ -21,21 +21,27 @@ use web3::Transport;
 ///
 /// * `connection_pool` - Database connection pool
 ///
-fn create_data_restore_driver(
+pub fn create_data_restore_driver(
     connection_pool: ConnectionPool,
     web3_url: String,
     contract_eth_addr: H160,
-    contract_genesis_tx_hash: H256,
     eth_blocks_step: u64,
     end_eth_blocks_offset: u64
 ) -> Result<DataRestoreDriver<web3::transports::Http>, failure::Error> {
     let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
     let web3 = web3::Web3::new(transport);
-    return DataRestoreDriver::new(connection_pool, web3, contract_eth_addr, contract_genesis_tx_hash, eth_blocks_step, end_eth_blocks_offset)
+    DataRestoreDriver::new(connection_pool, web3, contract_eth_addr, eth_blocks_step, end_eth_blocks_offset)
+}
+
+pub fn load_genesis_state<T: Transport>(
+    driver: &mut DataRestoreDriver<T>,
+    contract_genesis_tx_hash: H256,
+) -> Result<(), failure::Error> {
+    driver.load_genesis_state(contract_genesis_tx_hash)
 }
 
 /// Loads states from storage and start update
-fn load_state_from_storage<T: Transport>(driver: &mut DataRestoreDriver<T>) {
+pub fn load_state_from_storage<T: Transport>(driver: &mut DataRestoreDriver<T>) {
     driver
         .load_state_from_storage()
         .expect("Cant load state");
@@ -47,10 +53,10 @@ fn load_state_from_storage<T: Transport>(driver: &mut DataRestoreDriver<T>) {
 ///
 /// * `driver` - DataRestore Driver config
 ///
-fn update_state<T: Transport>(driver: &mut DataRestoreDriver<T>) {
-    driver.update_state();
+pub fn update_state<T: Transport>(driver: &mut DataRestoreDriver<T>) {
+    driver.run_state_update();
 }
 
-fn stop_state_updates<T: Transport>(driver: &mut DataRestoreDriver<T>) {
-    // driver.stop_state_updates().expect("Cant stop updates");
+pub fn stop_state_update<T: Transport>(driver: &mut DataRestoreDriver<T>) {
+    driver.stop_state_update();
 }

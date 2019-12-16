@@ -30,15 +30,21 @@ pub struct EventsState {
 /// Check if txs in last watching block
 impl EventsState {
     /// Create new franklin contract events state
-    pub fn new(
-        genesis_transaction: &Transaction
-    ) -> Result<Self, failure::Error> {
-        let genesis_block_number = get_block_number_from_ethereum_transaction(&genesis_transaction)?;
-        Ok(Self {
+    pub fn new() -> Self {
+        Self {
             committed_events: Vec::new(),
             verified_events: Vec::new(),
-            last_watched_eth_block_number: genesis_block_number,
-        })
+            last_watched_eth_block_number: 0,
+        }
+    }
+
+    pub fn set_genesis_block_number(
+        &mut self,
+        genesis_transaction: &Transaction
+    ) -> Result<(), failure::Error> {
+        let genesis_block_number = get_block_number_from_ethereum_transaction(&genesis_transaction)?;
+        self.last_watched_eth_block_number = genesis_block_number;
+        Ok(())
     }
 
     /// Update past events state from last watched ethereum block
