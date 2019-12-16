@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate serde_derive;
 
-use futures::Future;
+use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::types::{Address, BlockNumber, Bytes};
@@ -50,26 +50,30 @@ impl<T: Transport> ETHClient<T> {
         }
     }
 
-    pub fn current_nonce(&self) -> impl Future<Item = U256, Error = Error> {
+    pub async fn current_nonce(&self) -> Result<U256, Error> {
         self.web3
             .eth()
             .transaction_count(self.sender_account, Some(BlockNumber::Latest))
+            .compat()
+            .await
     }
 
-    pub fn pending_nonce(&self) -> impl Future<Item = U256, Error = Error> {
+    pub async fn pending_nonce(&self) -> Result<U256, Error> {
         self.web3
             .eth()
             .transaction_count(self.sender_account, Some(BlockNumber::Pending))
+            .compat()
+            .await
     }
 
-    pub fn get_gas_price(&self) -> Result<U256, failure::Error> {
-        let mut network_gas_price = self.web3.eth().gas_price().wait()?;
+    pub async fn get_gas_price(&self) -> Result<U256, failure::Error> {
+        let mut network_gas_price = self.web3.eth().gas_price().compat().await?;
         network_gas_price *= U256::from(self.gas_price_factor);
         Ok(network_gas_price)
     }
 
     /// Fills in gas/nonce if not supplied inside options.
-    pub fn sign_call_tx<P: Tokenize>(
+    pub async fn sign_call_tx<P: Tokenize>(
         &self,
         func: &str,
         params: P,
@@ -86,16 +90,12 @@ impl<T: Transport> ETHClient<T> {
         // fetch current gas_price
         let gas_price = match options.gas_price {
             Some(gas_price) => gas_price,
-            None => {
-                let mut network_gas_price = self.web3.eth().gas_price().wait()?;
-                network_gas_price *= U256::from(self.gas_price_factor);
-                network_gas_price
-            }
+            None => self.get_gas_price().await?,
         };
 
         let nonce = match options.nonce {
             Some(nonce) => nonce,
-            None => self.pending_nonce().wait()?,
+            None => self.pending_nonce().await?,
         };
 
         // form and sign tx
@@ -110,7 +110,12 @@ impl<T: Transport> ETHClient<T> {
         };
 
         let signed_tx = tx.sign(&self.private_key);
-        let hash = self.web3.web3().sha3(Bytes(signed_tx.clone())).wait()?;
+        let hash = self
+            .web3
+            .web3()
+            .sha3(Bytes(signed_tx.clone()))
+            .compat()
+            .await?;
 
         Ok(SignedCallResult {
             raw_tx: signed_tx,
@@ -120,7 +125,12 @@ impl<T: Transport> ETHClient<T> {
         })
     }
 
-    pub fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, failure::Error> {
-        Ok(self.web3.eth().send_raw_transaction(Bytes(tx)).wait()?)
+    pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, failure::Error> {
+        Ok(self
+            .web3
+            .eth()
+            .send_raw_transaction(Bytes(tx))
+            .compat()
+            .await?)
     }
 }
