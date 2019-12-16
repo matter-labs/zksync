@@ -41,10 +41,10 @@ impl EventsState {
     pub fn set_genesis_block_number(
         &mut self,
         genesis_transaction: &Transaction
-    ) -> Result<(), failure::Error> {
+    ) -> Result<u64, failure::Error> {
         let genesis_block_number = get_block_number_from_ethereum_transaction(&genesis_transaction)?;
         self.last_watched_eth_block_number = genesis_block_number;
-        Ok(())
+        Ok(genesis_block_number)
     }
 
     /// Update past events state from last watched ethereum block
@@ -62,7 +62,7 @@ impl EventsState {
         contract: &(ethabi::Contract, Contract<T>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-    ) -> Result<Vec<EventData>, failure::Error> {
+    ) -> Result<(Vec<EventData>, u64), failure::Error> {
         self.remove_verified_events();
 
         let (events, to_block_number): (CommittedAndVerifiedEvents, u64) =
@@ -81,7 +81,7 @@ impl EventsState {
         let mut events_to_return: Vec<EventData> = self.committed_events.clone();
         events_to_return.extend(self.verified_events.clone());
 
-        Ok(events_to_return)
+        Ok((events_to_return, to_block_number))
     }
 
     /// Return last watched ethereum block number

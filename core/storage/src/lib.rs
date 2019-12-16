@@ -589,7 +589,7 @@ pub struct StoredBlockEvent {
 }
 
 #[derive(Debug, Insertable)]
-#[table_name = "franklin_ops"]
+#[table_name = "rollup_ops"]
 pub struct NewFranklinOp {
     pub block_num: i64,
     pub operation: Value,
@@ -611,7 +611,7 @@ impl NewFranklinOp {
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "franklin_ops"]
+#[table_name = "rollup_ops"]
 pub struct StoredFranklinOp {
     pub id: i32,
     pub block_num: i64,
@@ -626,7 +626,7 @@ impl StoredFranklinOp {
 }
 
 #[derive(Debug, Clone, Queryable)]
-pub struct StoredFranklinOpsBlock {
+pub struct StoredRollupOpsBlock {
     pub block_num: BlockNumber,
     pub ops: Vec<FranklinOp>,
     pub fee_account: AccountId,
@@ -2091,7 +2091,7 @@ impl StorageProcessor {
         data_restore_last_watched_eth_block::table.first(self.conn())
     }
 
-    pub fn save_franklin_ops_block(
+    pub fn save_rollup_ops(
         &self,
         ops: &[FranklinOp],
         block_num: BlockNumber,
@@ -2099,23 +2099,23 @@ impl StorageProcessor {
     ) -> QueryResult<()> {
         for op in ops.iter() {
             let stored_op = NewFranklinOp::prepare_stored_op(&op, block_num, fee_account);
-            diesel::insert_into(franklin_ops::table)
+            diesel::insert_into(rollup_ops::table)
                 .values(&stored_op)
                 .execute(self.conn())?;
         }
         Ok(())
     }
 
-    pub fn delete_franklin_ops(&self) -> QueryResult<()> {
-        diesel::delete(franklin_ops::table).execute(self.conn())?;
+    pub fn delete_rollup_ops(&self) -> QueryResult<()> {
+        diesel::delete(rollup_ops::table).execute(self.conn())?;
         Ok(())
     }
 
-    pub fn load_franklin_ops_blocks(&self) -> QueryResult<Vec<StoredFranklinOpsBlock>> {
-        let stored_operations = franklin_ops::table
-            .order(franklin_ops::id.asc())
+    pub fn load_rollup_ops_blocks(&self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
+        let stored_operations = rollup_ops::table
+            .order(rollup_ops::id.asc())
             .load::<StoredFranklinOp>(self.conn())?;
-        let ops_blocks: Vec<StoredFranklinOpsBlock> = stored_operations
+        let ops_blocks: Vec<StoredRollupOpsBlock> = stored_operations
             .into_iter()
             .group_by(|op| op.block_num)
             .into_iter()
@@ -2131,7 +2131,7 @@ impl StorageProcessor {
                         stored_op.into_franklin_op()
                     })
                     .collect();
-                StoredFranklinOpsBlock {
+                StoredRollupOpsBlock {
                     block_num: block_num as u32,
                     ops,
                     fee_account: fee_account as u32,

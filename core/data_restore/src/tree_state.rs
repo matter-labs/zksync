@@ -1,4 +1,4 @@
-use crate::franklin_ops::FranklinOpsBlock;
+use crate::rollup_ops::RollupOpsBlock;
 use failure::format_err;
 use models::node::account::{Account, AccountAddress};
 use models::node::operations::FranklinOp;
@@ -12,21 +12,20 @@ use bigdecimal::BigDecimal;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 
 /// Franklin Accounts states with data restore configuration
-pub struct FranklinAccountsState {
+pub struct TreeState {
     /// Accounts stored in a spase merkle tree
     pub state: PlasmaState,
     pub current_unprocessed_priority_op: u64,
     pub last_fee_account_address: AccountAddress
 }
 
-impl Default for FranklinAccountsState {
+impl Default for TreeState {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl FranklinAccountsState {
-    /// Returns new FranklinAccountsState instance
+impl TreeState {
     pub fn new() -> Self {
         Self {
             state: PlasmaState::empty(),
@@ -35,7 +34,7 @@ impl FranklinAccountsState {
         }
     }
 
-    /// Returns FranklinAccountsState from accounts map and current block number
+    /// Returns TreeState from accounts map and current block number
     ///
     /// # Arguments
     ///
@@ -45,8 +44,8 @@ impl FranklinAccountsState {
     pub fn load(
         current_block: u32,
         accounts: AccountMap,
+        current_unprocessed_priority_op: u64,
         fee_account: AccountAddress,
-        current_unprocessed_priority_op: u64
     ) -> Self {
         Self {
             state: PlasmaState::new(accounts, current_block),
@@ -62,9 +61,9 @@ impl FranklinAccountsState {
     ///
     /// * `block` - Franklin operations blocks
     ///
-    pub fn update_accounts_states_from_ops_block(
+    pub fn update_tree_states_from_ops_block(
         &mut self,
-        ops_block: &FranklinOpsBlock,
+        ops_block: &RollupOpsBlock,
     ) -> Result<CommitRequest, failure::Error> {
         let operations = ops_block.ops.clone();
 
@@ -316,8 +315,8 @@ impl FranklinAccountsState {
 
 #[cfg(test)]
 mod test {
-    use crate::accounts_state::FranklinAccountsState;
-    use crate::franklin_ops::FranklinOpsBlock;
+    use crate::tree_state::TreeState;
+    use crate::rollup_ops::RollupOpsBlock;
     use bigdecimal::BigDecimal;
     use models::node::tx::TxSignature;
     use models::node::{
@@ -339,9 +338,9 @@ mod test {
             account_id: 0,
         }));
         let pub_data1 = op1.public_data();
-        let ops1 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+        let ops1 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data 1");
-        let block1 = FranklinOpsBlock {
+        let block1 = RollupOpsBlock {
             block_num: 1,
             ops: ops1,
             fee_account: 0,
@@ -362,9 +361,9 @@ mod test {
             account_id: 0,
         }));
         let pub_data2 = op2.public_data();
-        let ops2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data2)
+        let ops2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data2)
             .expect("cant get ops from data 2");
-        let block2 = FranklinOpsBlock {
+        let block2 = RollupOpsBlock {
             block_num: 2,
             ops: ops2,
             fee_account: 0,
@@ -385,9 +384,9 @@ mod test {
             to: 1,
         }));
         let pub_data3 = op3.public_data();
-        let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data3)
+        let ops3 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data3)
             .expect("cant get ops from data 3");
-        let block3 = FranklinOpsBlock {
+        let block3 = RollupOpsBlock {
             block_num: 3,
             ops: ops3,
             fee_account: 0,
@@ -408,9 +407,9 @@ mod test {
             to: 0,
         }));
         let pub_data4 = op4.public_data();
-        let ops4 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data4)
+        let ops4 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data4)
             .expect("cant get ops from data 4");
-        let block4 = FranklinOpsBlock {
+        let block4 = RollupOpsBlock {
             block_num: 4,
             ops: ops4,
             fee_account: 0,
@@ -427,24 +426,24 @@ mod test {
             account_id: 1,
         }));
         let pub_data5 = op5.public_data();
-        let ops5 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data5)
+        let ops5 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data5)
             .expect("cant get ops from data 5");
-        let block5 = FranklinOpsBlock {
+        let block5 = RollupOpsBlock {
             block_num: 5,
             ops: ops5,
             fee_account: 0,
         };
 
-        let mut tree = FranklinAccountsState::new();
-        tree.update_accounts_states_from_ops_block(&block1)
+        let mut tree = TreeState::new();
+        tree.update_tree_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
-        tree.update_accounts_states_from_ops_block(&block2)
+        tree.update_tree_states_from_ops_block(&block2)
             .expect("Cant update state from block 2");
-        tree.update_accounts_states_from_ops_block(&block3)
+        tree.update_tree_states_from_ops_block(&block3)
             .expect("Cant update state from block 3");
-        tree.update_accounts_states_from_ops_block(&block4)
+        tree.update_tree_states_from_ops_block(&block4)
             .expect("Cant update state from block 4");
-        tree.update_accounts_states_from_ops_block(&block5)
+        tree.update_tree_states_from_ops_block(&block5)
             .expect("Cant update state from block 5");
 
         assert_eq!(tree.get_accounts().len(), 2);
@@ -546,16 +545,16 @@ mod test {
         pub_data.extend_from_slice(&pub_data4);
         pub_data.extend_from_slice(&pub_data5);
 
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(pub_data.as_slice())
+        let ops = RollupOpsBlock::get_rollup_ops_from_data(pub_data.as_slice())
             .expect("cant get ops from data 1");
-        let block = FranklinOpsBlock {
+        let block = RollupOpsBlock {
             block_num: 1,
             ops,
             fee_account: 0,
         };
 
-        let mut tree = FranklinAccountsState::new();
-        tree.update_accounts_states_from_ops_block(&block)
+        let mut tree = TreeState::new();
+        tree.update_tree_states_from_ops_block(&block)
             .expect("Cant update state from block");
 
         assert_eq!(tree.get_accounts().len(), 2);

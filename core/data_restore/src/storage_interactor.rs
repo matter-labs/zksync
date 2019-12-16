@@ -8,12 +8,34 @@ use web3::types::H256;
 use crate::data_restore_driver::StorageUpdateState;
 use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
-use crate::franklin_ops::FranklinOpsBlock;
+use crate::rollup_ops::RollupOpsBlock;
+use models::node::account::AccountAddress;
+use models::CommitRequest;
+use crate::tree_state::TreeState;
 use models::node::{AccountMap, AccountUpdate};
 use storage::{
     ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
-    StoredFranklinOpsBlock,
+    StoredRollupOpsBlock,
 };
+
+pub fn save_tree_state(
+    connection_pool: ConnectionPool,
+    current_block_number: u32,
+    accounts: &AccountMap,
+    current_unprocessed_priority_op: u64,
+    last_fee_account_address: AccountAddress
+) -> Result<(), failure::Error> {
+    // let storage = connection_pool.access_storage().map_err(|e| {
+    //     format_err!(
+    //         "Db connection failed for data restore save tree state: {}",
+    //         e.to_string()
+    //     )
+    // })?;
+    // storage
+    //     .update_tree_state(block_number, &account_updates)
+    //     .map_err(|e| format_err!("Cant save tree state: {}", e.to_string()))?;
+    Ok(())
+}
 
 /// Updates stored tree state
 ///
@@ -24,19 +46,20 @@ use storage::{
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn update_tree_state(
-    block_number: u32,
-    account_updates: &[(u32, AccountUpdate)],
     connection_pool: ConnectionPool,
+    commit_request: CommitRequest,
+    current_unprocessed_priority_op: u64,
+    last_fee_account_address: AccountAddress
 ) -> Result<(), failure::Error> {
-    let storage = connection_pool.access_storage().map_err(|e| {
-        format_err!(
-            "Db connection failed for data restore save tree state: {}",
-            e.to_string()
-        )
-    })?;
-    storage
-        .update_tree_state(block_number, &account_updates)
-        .map_err(|e| format_err!("Cant save tree state: {}", e.to_string()))?;
+    // let storage = connection_pool.access_storage().map_err(|e| {
+    //     format_err!(
+    //         "Db connection failed for data restore save tree state: {}",
+    //         e.to_string()
+    //     )
+    // })?;
+    // storage
+    //     .update_tree_state(block_number, &account_updates)
+    //     .map_err(|e| format_err!("Cant save tree state: {}", e.to_string()))?;
     Ok(())
 }
 
@@ -48,8 +71,9 @@ pub fn update_tree_state(
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn save_events_state(
-    events: &[EventData],
     connection_pool: ConnectionPool,
+    events: &[EventData],
+    last_watched_eth_block_number: u64
 ) -> Result<(), failure::Error> {
     let mut new_events: Vec<NewBlockEvent> = vec![];
     for event in events {
@@ -92,8 +116,8 @@ pub fn block_event_into_stored_block_event(event: &EventData) -> NewBlockEvent {
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn save_last_watched_block_number(
-    number: u64,
     connection_pool: ConnectionPool,
+    number: u64,
 ) -> Result<(), failure::Error> {
     let block_number = NewLastWatchedEthBlockNumber {
         block_number: number.to_string(),
@@ -118,8 +142,8 @@ pub fn save_last_watched_block_number(
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn save_storage_state(
-    state: StorageUpdateState,
     connection_pool: ConnectionPool,
+    state: StorageUpdateState,
 ) -> Result<(), failure::Error> {
     let string = match state {
         StorageUpdateState::None => "None".to_string(),
@@ -148,9 +172,9 @@ pub fn save_storage_state(
 /// * `blocks` - Franklin operations blocks
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn save_franklin_ops_blocks(
-    blocks: &[FranklinOpsBlock],
+pub fn save_rollup_ops(
     connection_pool: ConnectionPool,
+    blocks: &[RollupOpsBlock],
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -160,7 +184,7 @@ pub fn save_franklin_ops_blocks(
     })?;
     for block in blocks {
         storage
-            .save_franklin_ops_block(block.ops.as_slice(), block.block_num, block.fee_account)
+            .save_rollup_ops(block.ops.as_slice(), block.block_num, block.fee_account)
             .map_err(|e| format_err!("Cant save franklin transaction: {}", e.to_string()))?;
     }
     Ok(())
@@ -191,7 +215,7 @@ pub fn remove_events_state(connection_pool: ConnectionPool) -> Result<(), failur
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn remove_franklin_ops(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
+pub fn remove_rollup_ops(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
             "Db connection failed for data restore remove franklin ops: {}",
@@ -199,7 +223,7 @@ pub fn remove_franklin_ops(connection_pool: ConnectionPool) -> Result<(), failur
         )
     })?;
     storage
-        .delete_franklin_ops()
+        .delete_rollup_ops()
         .map_err(|e| format_err!("No franklin ops to delete: {}", e.to_string()))?;
     Ok(())
 }
@@ -271,7 +295,7 @@ pub fn remove_storage_state_status(connection_pool: ConnectionPool) -> Result<()
 ///
 pub fn get_ops_blocks_from_storage(
     connection_pool: ConnectionPool,
-) -> Result<Vec<FranklinOpsBlock>, failure::Error> {
+) -> Result<Vec<RollupOpsBlock>, failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
             "Db connection failed for data restore get ops blocks: {}",
@@ -279,9 +303,9 @@ pub fn get_ops_blocks_from_storage(
         )
     })?;
     let committed_blocks = storage
-        .load_franklin_ops_blocks()
+        .load_rollup_ops_blocks()
         .map_err(|e| format_err!("No ops blocks to delete: {}", e.to_string()))?;
-    let mut blocks: Vec<FranklinOpsBlock> = vec![];
+    let mut blocks: Vec<RollupOpsBlock> = vec![];
     for block in committed_blocks {
         blocks.push(stored_ops_block_into_ops_block(&block));
     }
@@ -294,8 +318,8 @@ pub fn get_ops_blocks_from_storage(
 ///
 /// * `op_block` - Stored Franklin operations block description
 ///
-pub fn stored_ops_block_into_ops_block(op_block: &StoredFranklinOpsBlock) -> FranklinOpsBlock {
-    FranklinOpsBlock {
+pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> RollupOpsBlock {
+    RollupOpsBlock {
         block_num: op_block.block_num,
         ops: op_block.ops.clone(),
         fee_account: op_block.fee_account,
@@ -437,7 +461,7 @@ pub fn stored_block_event_into_block_event(
 ///
 pub fn get_tree_state(
     connection_pool: ConnectionPool,
-) -> Result<(u32, AccountMap), failure::Error> {
+) -> Result<(u32, AccountMap, u64, AccountAddress), failure::Error> {
     let storage = connection_pool
         .access_storage()
         .map_err(|e| format_err!("Db connection failed for tree state: {}", e.to_string()))?;

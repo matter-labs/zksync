@@ -112,13 +112,13 @@ impl PlasmaStateKeeper {
         data_restore::update_state(&mut driver);
 
         let keeper = PlasmaStateKeeper {
-            state: driver.accounts_state.state,
+            state: driver.tree_state.state,
             next_block_try_timer: Instant::now(),
             block_tries: 0,
             db_conn_pool: pool,
-            fee_account_address: driver.accounts_state.last_fee_account_address,
+            fee_account_address: driver.tree_state.last_fee_account_address,
             eth_state,
-            current_unprocessed_priority_op: driver.accounts_state.current_unprocessed_priority_op,
+            current_unprocessed_priority_op: driver.tree_state.current_unprocessed_priority_op,
         };
 
         let root = keeper.state.root_hash();
