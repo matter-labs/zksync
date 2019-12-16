@@ -14,12 +14,10 @@ const store = {
 };
 
 Vue.mixin({
-	data: () => {
-		return {
-			isDev: process.env.NODE_ENV !== 'production',
-            config
-		}
-    },
+	data: () => ({
+        isDev: process.env.NODE_ENV !== 'production',
+        config,
+    }),
 	computed: {
         store() {
             return store;

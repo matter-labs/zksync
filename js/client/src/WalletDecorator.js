@@ -103,16 +103,19 @@ export class WalletDecorator {
         return res;
     }
 
-    async getDepositFee() {
-        let gasPrice = await window.ethProvider.getGasPrice();
-        let gasLimit = utils.bigNumberify(200000); // from wallet.ts
-        let fee = gasPrice.mul(gasLimit);
-        return readableEther(fee);
+    async getDepositFeeReadable() {
+        return readableEther(await this.getDepositFee());
+    }
+
+    async getDepositFee(token) {
+        const gasPrice = await window.ethSigner.provider.getGasPrice();
+        const multiplier = token == "ETH" ? 179000 : 214000;
+        const redundancyCoef = 5;
+        return gasPrice.mul(redundancyCoef * 2 * multiplier);
     }
 
     async updateState() {
         const onchainBalances = [];
-        const contractBalances = [];
         await Promise.all(
             window.tokensList.map(
                 async tokenInfo => {
@@ -123,13 +126,6 @@ export class WalletDecorator {
                     onchainBalances.push(
                         await zksync.getEthereumBalance(window.ethSigner, token)
                     );
-                    
-                    // contractBalances.push( 
-                    //     await window.ethProxy.balanceToWithdraw(
-                    //         address, 
-                    //         tokenInfo.id
-                    //     )
-                    // );
                 }
             )
         );
@@ -203,35 +199,11 @@ export class WalletDecorator {
                 : tx.fail_reason  ? `<span style="color: red">Failed with ${tx.fail_reason}</span>`
                 : `<span style="color: red">(Unknown status)</span>`
 
-            let status_tooltip = await (async () => {
-                if (tx.commited == false) return 'Nothing';
-                if (hash == null) return 'hash_null';
-
-                let receipt = await this.blockExplorerClient.getTxReceipt(hash);
-                /**
-                pub struct ProverRun {
-                    pub id: i32,
-                    pub block_number: i64,
-                    pub worker: Option<String>,
-                    pub created_at: NaiveDateTime,
-                    pub updated_at: NaiveDateTime,
-                }
-                */
-                
-                if (receipt == null || receipt.prover_run == null) {
-                    return 'Waiting for prover..';
-                }
-
-                let prover_name = receipt.prover_run.worker;
-                let started_time = receipt.prover_run.created;
-                return `Is being proved since ${started_time}`;
-            })();
-
             // here is common data to all tx types
             let data = {
                 elem_id,
                 type, direction,
-                status, status_tooltip, row_status,
+                status, row_status,
             };
 
             switch (true) {
@@ -409,13 +381,16 @@ export class WalletDecorator {
     franklinBalancesAsRenderableList() {
         return Object.entries(this.syncState.committed.balances)
             .map(([token, balance]) => {
+                const tokenInfo = tokenInfoFromToken(token);
                 return {
-                    tokenName: tokenInfoFromToken(token).symbol,
+                    tokenInfo,
+                    tokenName: tokenInfo.symbol,
                     amount: balance
                 };
             })
-            .filter(bal => Number(bal.amount));
-    }
+            .filter(bal => Number(bal.amount))
+            .sort((a, b) => a.tokenInfo.id - b.tokenInfo.id);
+        }
     // #endregion
 
     // #region actions
@@ -533,164 +508,133 @@ export class WalletDecorator {
         const amount = utils.bigNumberify(options.amount);
         try {
             yield info(`Sending deposit...`);
-            
+            const maxFeeInETHToken = await this.getDepositFee(token);
             const deposit = await zksync.depositFromETH({
                 depositFrom: window.ethSigner,
                 depositTo: window.syncWallet,
+                maxFeeInETHToken,
                 token,
-                amount
+                amount,
             });
-        
+
             await deposit.awaitEthereumTxCommit();
 
-            const tx_hash_html = shortenedTxHash(deposit.ethTx.hash);
-            yield info(`Deposit ${tx_hash_html} sent to Mainchain...`);
+            const txHashHtml = shortenedTxHash(deposit.ethTx.hash);
+            yield info(`Deposit ${txHashHtml} sent to Mainchain...`);
+
+            
+            yield * this.verboseGetRevertReason(deposit.ethTx.hash);
+            
+            yield * this.verboseGetSyncPriorityOpStatus(deposit);
 
             const receipt = await window.syncProvider.getPriorityOpStatus(deposit.priorityOpId.toNumber());
             console.log({deposit, receipt});
-
-            yield * this.verboseGetRevertReason(deposit.ethTx.hash);
-            
-            yield * this.verboseGetPriorityOpStatus(deposit.ethTx.hash);
         } catch (e) {
-            console.log(e);
             yield combineMessages(
-                error(`Onchain deposit failed with "${e.message}"`, { timeout: 7 }),
+                info(`Onchain deposit failed with "${e.message}"`, { countdown: 7 }),
             );
+            await sleep(5000);
             return;
         }
     }
 
     async * verboseGetSyncOpStatus(syncOp) {
-        const tx_hash_html = shortenedTxHash(syncOp.txHash);
+        const txHashHtml = shortenedTxHash(syncOp.txHash);
     
-        await syncOp.awaitReceipt();
-        const receipt = await window.syncProvider.getTxReceipt(syncOp.txHash);
+        const receipt = await syncOp.awaitReceipt();
+        console.log({receipt});
 
         if (receipt.failReason) {
-            yield error(`Transaction ${tx_hash_html} with <code>${receipt.failReason}</code>`, { countdown: 10 });
+            yield error(`Transaction ${txHashHtml} with <code>${receipt.failReason}</code>`, { countdown: 10 });
             return;
         }
 
         yield combineMessages(
-            info(`Transaction ${tx_hash_html} got included in block <code>${receipt.block.blockNumber}</code>, waiting for prover...`),
+            info(`Transaction ${txHashHtml} got included in block <code>${receipt.block.blockNumber}</code>, waiting for prover...`),
             start_progress_bar({variant: 'half', duration: timeConstants.waitingForProverHalfLife})
         );
 
-        await syncOp.awaitVerifyReceipt();
+        let verified = false;
+        syncOp.awaitVerifyReceipt()
+            .then(verifyReceipt => {
+                verified = true;
+            });
+
+        const proverStart = new Date();
+
+        const sendProvingFrame = () => info(
+            `Block <code>${receipt.block.blockNumber}</code> is being proved `
+            + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`
+        );
 
         yield combineMessages(
-            info(`Transaction ${tx_hash_html} got verified!`, { countdown: 10 }),
+            sendProvingFrame(),
+            start_progress_bar({variant: 'half', duration: timeConstants.provingHalfLife}) 
+        );
+
+        while (verified == false) {
+            yield sendProvingFrame();
+            await sleep(1000);
+        }
+
+        yield combineMessages(
+            info(`Transaction ${txHashHtml} got proved!`, { countdown: 10 }),
             stop_progress_bar()
         );
     }
 
     async * verboseGetSyncPriorityOpStatus(syncOp) {
-        console.log({syncOp});
-        let tx_hash_html = shortenedTxHash(syncOp.ethTx.hash);
+        let txHashHtml = shortenedTxHash(syncOp.ethTx.hash);
 
         await syncOp.awaitEthereumTxCommit();
 
-        await syncOp.awaitReceipt();
-
-        const receipt = window.syncProvider.getPriorityOpStatus(syncOp.priorityOpId.toNumber());
+        const receipt = await syncOp.awaitReceipt();
 
         yield combineMessages(
-            info(`Transaction ${tx_hash_html} got included in block <code>${receipt.block_number}</code>, waiting for prover...`),
+            info(`Transaction ${txHashHtml} got included in block <code>${receipt.block.blockNumber}</code>, waiting for prover...`),
             start_progress_bar({variant: 'half', duration: timeConstants.waitingForProverHalfLife})
         );
 
-        while ( ! receipt.prover_run) {
-            receipt = await this.blockExplorerClient.getTxReceipt(tx_hash);
-            await sleep(2000);
-        }
+        let verified = false;
+        syncOp.awaitVerifyReceipt()
+            .then(verifyReceipt => {
+                verified = true;
+            });
 
-        let proverStart = new Date();
-        
+        const proverStart = new Date();
+
+        const sendProvingFrame = () => info(
+            `Block <code>${receipt.block.blockNumber}</code> is being proved `
+            + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`
+        );
+
         yield combineMessages(
-            info(`Prover <code>${receipt.prover_run.worker}</code> is `
-                + `proving block <code>${receipt.prover_run.block_number}</code> `
-                + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`),
+            sendProvingFrame(),
             start_progress_bar({variant: 'half', duration: timeConstants.provingHalfLife}) 
         );
 
-        while ( ! receipt.verified) {
-            yield info(`Prover <code>${receipt.prover_run.worker}</code> is `
-                + `proving block <code>${receipt.prover_run.block_number}</code> `
-                + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`);
-
-            receipt = await this.blockExplorerClient.getTxReceipt(tx_hash);
+        while (verified == false) {
+            yield sendProvingFrame();
             await sleep(1000);
         }
 
         yield combineMessages(
-            info(`Transaction ${tx_hash_html} got proved!`, { countdown: 10 }),
+            info(`Transaction ${txHashHtml} got proved!`, { countdown: 10 }),
             stop_progress_bar()
         );
         return;
     }
 
-    async * verboseGetPriorityOpStatus(tx_hash) {
-        let priorityQueueInterface = new utils.Interface(priority_queue_abi.interface);
-        let receipt = await window.ethProvider.getTransactionReceipt(tx_hash);
-        let pq_id = receipt.logs
-            .map(l => priorityQueueInterface.parseLog(l))
-            .filter(Boolean)
-            .filter(log => log.name == 'NewPriorityRequest');
-
-        if (pq_id.length == 1) {
-            pq_id = pq_id[0].values[0].toString();
-            yield combineMessages(
-                info(`Priority operation id is <code>${pq_id}</code>. Waiting for prover..`),
-                start_progress_bar({variant: 'half', duration: timeConstants.waitingForProverHalfLife})
-            );
-        } else {
-            yield error(`Found ${pq_id.length} PQ ids.`);
-            return;
-        }
-
-        let pq_op = await this.blockExplorerClient.getPriorityOpReceipt(pq_id);
-        while (pq_op.prover_run == undefined) {
-            await sleep(2000);
-            pq_op = await this.blockExplorerClient.getPriorityOpReceipt(pq_id);
-        }
-
-        let proverStart = new Date();
-
+    async * verboseGetRevertReason(txHash) {
+        const txHashHtml = shortenedTxHash(txHash);
         yield combineMessages(
-            info(`Prover <code>${pq_op.prover_run.worker}</code> is `
-                + `proving block <code>${pq_op.prover_run.block_number}</code> `
-                + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`),
-            start_progress_bar({variant: 'half', duration: timeConstants.provingHalfLife}) 
-        );
-
-        while ( ! pq_op.verified) {
-            yield info(`Prover <code>${pq_op.prover_run.worker}</code> is `
-                + `proving block <code>${pq_op.prover_run.block_number}</code> `
-                + `for <code>${Math.round((new Date() - proverStart) / 1000)}</code> seconds`);
-
-            pq_op = await this.blockExplorerClient.getPriorityOpReceipt(pq_id);
-
-            await sleep(1000);
-        }
-        
-        yield combineMessages(
-            info (`Priority op <code>${pq_id}</code> got proved!`, { countdown: 10 }),
-            stop_progress_bar()
-        );
-        return;
-    }
-
-    async * verboseGetRevertReason(tx_hash) {
-        const tx_hash_html = shortenedTxHash(tx_hash);
-        yield combineMessages(
-            info(`Waiting for transaction ${tx_hash_html} to mine...`),
+            info(`Waiting for transaction ${txHashHtml} to mine...`),
             start_progress_bar({variant: 'half', duration: timeConstants.ethereumMiningHalfLife})
         );
 
         let receipt;
         while (true) {
-            receipt = await window.ethProvider.getTransactionReceipt(tx_hash);
+            receipt = await window.ethProvider.getTransactionReceipt(txHash);
             
             if (receipt) break;
             await sleep(timeConstants.ethereumReceiptRetry);
@@ -698,26 +642,26 @@ export class WalletDecorator {
 
         if (receipt.status) {
             yield combineMessages(
-                info(`Transaction ${tx_hash_html} succeeded.`),
+                info(`Transaction ${txHashHtml} succeeded.`),
                 stop_progress_bar()
             );
         } else {
-            const tx = await window.ethProvider.getTransaction(tx_hash);
+            const tx = await window.ethProvider.getTransaction(txHash);
             const code = await window.ethProvider.call(tx, tx.blockNumber);
 
             if (code == '0x') {
-                yield error(`Transaction ${tx_hash_html} failed with empty revert reason.`);
+                yield error(`Transaction ${txHashHtml} failed with empty revert reason.`);
             } else {
                 const reason = code
-                .substr(138)
-                .match(/../g)
-                .map(h => parseInt(h, 16))
-                .map(String.fromCharCode)
-                .join('')
-                .split('')
-                .filter(c => /\w/.test(c))
-                .join('');
-                yield error(`Transaction ${tx_hash_html} failed with <code>${reason}<code>.`);
+                    .substr(138)
+                    .match(/../g)
+                    .map(h => parseInt(h, 16))
+                    .map(String.fromCharCode)
+                    .join('')
+                    .split('')
+                    .filter(c => /\w/.test(c))
+                    .join('');
+                yield error(`Transaction ${txHashHtml} failed with <code>${reason}<code>.`);
             }
         }
     }
