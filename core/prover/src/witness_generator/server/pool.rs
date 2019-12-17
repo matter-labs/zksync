@@ -42,7 +42,7 @@ impl ProversDataPool {
     }
 
     fn has_capacity(&self) -> bool {
-        self.last_loaded - self.last_prepared - (self.prepared.len() as i64) < self.limit as i64
+        self.last_loaded - self.last_prepared + (self.prepared.len() as i64) < self.limit as i64
     }
 
     fn all_prepared(&self) -> bool {
@@ -59,7 +59,7 @@ pub fn maintain(
     loop {
         if has_capacity(&data) {
             // TODO: handle errors
-            fill(&storage, &data);
+            take_next_commits(&storage, &data);
         }
         if all_prepared(&data) {
             thread::sleep(rounds_interval);
@@ -75,7 +75,7 @@ fn has_capacity(data: &Arc<RwLock<ProversDataPool>>) -> bool {
     d.has_capacity()
 }
 
-fn fill(storage: &storage::StorageProcessor, data: &Arc<RwLock<ProversDataPool>>) {
+fn take_next_commits(storage: &storage::StorageProcessor, data: &Arc<RwLock<ProversDataPool>>) {
     let d = data.read().unwrap();
     let ops = storage
         .load_unverified_commits_after_block(d.last_loaded, d.limit)
@@ -85,7 +85,9 @@ fn fill(storage: &storage::StorageProcessor, data: &Arc<RwLock<ProversDataPool>>
     if ops.len() > 0 {
         let mut d = data.write().unwrap();
         for op in ops.into_iter() {
-            (*d).operations.insert(op.block.block_number as i64, op);
+            let block = op.block.block_number as i64;
+            (*d).operations.insert(block, op);
+            (*d).last_loaded = block;
         }
     }
 }
@@ -100,27 +102,38 @@ fn prepare_next(storage: &storage::StorageProcessor, data: &Arc<RwLock<ProversDa
     let mut d = data.write().unwrap();
     let mut current = (*d).last_prepared + 1;
     let op = d.operations.remove(&mut current).unwrap();
+    drop(d);
     let pd = build_prover_data(&storage, &op);
-    (*d).last_prepared += 1;
+    let mut d = data.write().unwrap();
+    (*d).last_prepared += current;
     (*d).prepared.insert(op.block.block_number as i64, pd);
+    println!("prepared {}", op.block.block_number);
 }
 
 fn build_prover_data(
     storage: &storage::StorageProcessor,
     commit_operation: &models::Operation,
 ) -> ProverData {
+    println!("building prover data...");
     // TODO: this is expensive time operation, move out and don't repeat
     let phasher = PedersenHasher::<Engine>::default();
     let params = &AltJubjubBn256::new();
 
     let block_number = commit_operation.block.block_number;
 
-    let (_, accounts) = storage.load_committed_state(Some(block_number)).unwrap();
+    let (_, accounts) = storage
+        .load_committed_state(Some(block_number - 1))
+        .unwrap();
     let mut accounts_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+    println!("accounts {:?}", accounts);
     for acc in accounts {
         let acc_number = acc.0;
         let leaf_copy = models::circuit::account::CircuitAccount::from(acc.1.clone());
+        println!(
+            "acc_number {}, acc {:?}",
+            acc_number, leaf_copy.pub_key_hash
+        );
         accounts_tree.insert(acc_number, leaf_copy);
     }
     let initial_root = accounts_tree.root_hash();
@@ -363,7 +376,7 @@ fn build_prover_data(
         };
         validator_balances.push(Some(balance_value));
     }
-    accounts_tree.root_hash();
+    let _: Fr = accounts_tree.root_hash();
     let (mut root_after_fee, mut validator_account_witness) = circuit::witness::utils::apply_fee(
         &mut accounts_tree,
         commit_operation.block.fee_account,
@@ -395,6 +408,14 @@ fn build_prover_data(
         Some(root_after_fee),
         Some(Fr::from_str(&commit_operation.block.fee_account.to_string()).unwrap()),
         Some(Fr::from_str(&(block_number).to_string()).unwrap()),
+    );
+
+    println!(
+        "initial: {}, new: {}, pdc: {}, validator account: {:?}",
+        initial_root,
+        commit_operation.block.new_root_hash,
+        Fr::from_str(&commit_operation.block.fee_account.to_string()).unwrap(),
+        validator_account_witness,
     );
 
     ProverData {

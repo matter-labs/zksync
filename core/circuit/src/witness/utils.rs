@@ -124,6 +124,10 @@ pub fn public_data_commitment<E: JubjubEngine>(
     validator_address: Option<E::Fr>,
     block_number: Option<E::Fr>,
 ) -> E::Fr {
+    println!(
+        "pubdata {:?},\n initial_root {:?},\n new_root {:?},\n validator_address {:?},\n block_number {:?}",
+        pubdata_bits, initial_root, new_root, validator_address, block_number
+    );
     let mut public_data_initial_bits = vec![];
 
     // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior
@@ -288,7 +292,7 @@ pub fn apply_fee(
     let fee_fe = Fr::from_str(&fee.to_string()).unwrap();
     let mut validator_leaf = tree
         .remove(validator_address)
-        .expect("validator_leaf not empty");
+        .expect("validator_leaf is empty");
     let validator_account_witness = AccountWitness {
         nonce: Some(validator_leaf.nonce),
         pub_key_hash: Some(validator_leaf.pub_key_hash),

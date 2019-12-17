@@ -81,10 +81,14 @@ fn block_to_prove(
     }))
 }
 
-// fn prover_data(data: web::Data<AppState>, block: web::Json<i64>) -> actix_web::Result<HttpResponse> {
-//     let data_pool = data.preparing_data_pool.read().unwrap();
-//     data_pool.get(block)
-// }
+fn prover_data(
+    data: web::Data<AppState>,
+    block: web::Json<i64>,
+) -> actix_web::Result<HttpResponse> {
+    println!("requesting prover_data for block {}", *block);
+    let data_pool = data.preparing_data_pool.read().unwrap();
+    Ok(HttpResponse::Ok().json(data_pool.get(*block)))
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct WorkingOnReq {
@@ -99,6 +103,23 @@ fn working_on(data: web::Data<AppState>, r: web::Json<WorkingOnReq>) -> actix_we
     // TODO: handle errors
     // TODO: handle case when proof calculation was taken over by other prover
     storage.record_prover_is_working(r.prover_run_id).unwrap();
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PublishReq {
+    pub block: u32,
+    pub proof: models::EncodedProof,
+}
+
+fn publish(data: web::Data<AppState>, r: web::Json<PublishReq>) -> actix_web::Result<()> {
+    let storage = match data.connection_pool.access_storage() {
+        Ok(s) => s,
+        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
+    };
+    // TODO: handle errors
+    // TODO: handle case when proof calculation was taken over by other prover
+    storage.store_proof(r.block, &r.proof).unwrap();
     Ok(())
 }
 
@@ -128,6 +149,7 @@ pub fn start_server(
             .route("/register", web::post().to(register))
             .route("/block_to_prove", web::get().to(block_to_prove))
             .route("/working_on", web::post().to(working_on))
+            .route("/prover_data", web::get().to(prover_data))
     })
     .bind(bind_to)
     .unwrap()

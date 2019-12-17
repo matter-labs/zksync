@@ -13,12 +13,15 @@ use circuit::operation::{
     Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
 
-#[derive(Serialize, Deserialize)]
-pub struct ProverData2 {
+/// ProverData is data prover needs to calculate proof of the given block.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProverData {
     pub public_data_commitment: Fr,
     pub old_root: Fr,
     pub new_root: Fr,
     pub validator_address: Fr,
+    pub validator_balances: Vec<Option<Fr>>,
+    pub validator_audit_path: Vec<Option<Fr>>,
     #[serde(
         serialize_with = "vec_operations_ser",
         deserialize_with = "vec_operations_de"
@@ -108,17 +111,4 @@ pub struct OperationBranchWitnessDef {
 
     pub balance_value: Option<Fr>,
     pub balance_subtree_path: Vec<Option<Fr>>,
-}
-
-/// ProverData is data prover needs to calculate proof of the given block.
-#[derive(Clone, Debug)]
-pub struct ProverData {
-    pub public_data_commitment: Fr,
-    pub old_root: Fr,
-    pub new_root: Fr,
-    pub validator_address: Fr,
-    pub operations: Vec<circuit::operation::Operation<Bn256>>,
-    pub validator_balances: Vec<Option<Fr>>,
-    pub validator_audit_path: Vec<Option<Fr>>,
-    pub validator_account: circuit::account::AccountWitness<Bn256>,
 }

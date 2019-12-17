@@ -26,8 +26,8 @@ use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::convert::TryInto;
-use web3::types::H256;
 use std::time;
+use web3::types::H256;
 
 mod schema;
 
@@ -1301,6 +1301,7 @@ impl StorageProcessor {
             };
 
             debug!("Sorted account update list: {:?}", account_updates);
+            println!("Sorted account update list: {:?}", account_updates);
 
             for acc_update in account_updates.into_iter() {
                 match acc_update {
@@ -1726,22 +1727,27 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_unverified_commits_after_block(&self, block: i64, limit: i64) -> QueryResult<Vec<Operation>> {
+    pub fn load_unverified_commits_after_block(
+        &self,
+        block: i64,
+        limit: i64,
+    ) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
-            let ops: Vec<StoredOperation> = diesel::sql_query(
-                format!("
+            let ops: Vec<StoredOperation> = diesel::sql_query(format!(
+                "
                 SELECT * FROM operations
                   WHERE action_type = 'COMMIT'
                    AND block_number > (
                      SELECT COALESCE(max(block_number), 0)
                        FROM operations
                        WHERE action_type = 'VERIFY'
+                   )
                    AND block_number > {}
                   LIMIT {}
-                )
-            ", block, limit),
-            )
-                .load(self.conn())?;
+            ",
+                block, limit
+            ))
+            .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
     }

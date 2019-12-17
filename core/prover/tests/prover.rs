@@ -312,12 +312,12 @@ impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
         }
     }
 
-    fn prover_data(&self, block: i64) -> Result<prover::witness_generator::ProverData, String> {
+    fn prover_data(
+        &self,
+        _timeout: time::Duration,
+    ) -> Result<prover::witness_generator::ProverData, String> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if let Some(stored) = *block_to_prove {
-            if stored != block {
-                return Err("unexpected block".to_string());
-            }
             let v = (self.prover_data_fn)();
             if let Some(pd) = v {
                 return Ok(pd);
@@ -326,7 +326,12 @@ impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
         Err("mock not configured".to_string())
     }
 
-    fn publish(&self, p: bellman::groth16::Proof<models::node::Engine>) -> Result<(), String> {
+    fn publish(
+        &self,
+        _block: i64,
+        p: bellman::groth16::Proof<models::node::Engine>,
+        public_data_commitment: models::node::Fr,
+    ) -> Result<(), String> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();
         *block_to_prove = None;

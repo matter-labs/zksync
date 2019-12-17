@@ -24,8 +24,13 @@ pub trait ApiClient {
     // TODO: fn block_to_prove(&self) -> Result<Option<(i64, ProverData)>, String>
     fn block_to_prove(&self) -> Result<Option<i64>, String>;
     fn working_on(&self, block: i64);
-    fn prover_data(&self, block: i64) -> Result<ProverData, String>;
-    fn publish(&self, p: groth16::Proof<models::node::Engine>) -> Result<(), String>;
+    fn prover_data(&self, timeout: time::Duration) -> Result<ProverData, String>;
+    fn publish(
+        &self,
+        block: i64,
+        p: groth16::Proof<models::node::Engine>,
+        public_data_commitment: models::node::Fr,
+    ) -> Result<(), String>;
 }
 
 pub fn start<'a, C: 'static + Sync + Send + ApiClient>(prover: Prover<C>) {
@@ -64,50 +69,70 @@ impl<C: ApiClient> Prover<C> {
 
         while !self.stop_signal.load(Ordering::SeqCst) {
             let block_to_prove = self.api_client.block_to_prove();
-            if let Ok(block) = block_to_prove {
-                // Notify heartbeat routine that work on new block has started.
-                start_heartbeats_tx.send(block);
+            let block = match block_to_prove {
+                Ok(b) => b,
+                // TODO: log error
+                _ => continue,
+            };
+            // Notify heartbeat routine on new proving block or None.
+            start_heartbeats_tx.send(block);
 
-                if let Some(block) = block {
-                    let prover_data = match self.api_client.prover_data(block) {
-                        Ok(v) => v,
-                        Err(err) => {
-                            error!("could not get prover data for block {}: {}", block, err);
-                            continue;
-                        }
-                    };
-
-                    let instance = circuit::circuit::FranklinCircuit {
-                        params: &self.jubjub_params,
-                        operation_batch_size: models::params::block_size_chunks(),
-                        old_root: Some(prover_data.old_root),
-                        new_root: Some(prover_data.new_root),
-                        block_number: models::node::Fr::from_str(&(block).to_string()),
-                        validator_address: Some(prover_data.validator_address),
-                        pub_data_commitment: Some(prover_data.public_data_commitment),
-                        operations: prover_data.operations,
-                        validator_balances: prover_data.validator_balances,
-                        validator_audit_path: prover_data.validator_audit_path,
-                        validator_account: prover_data.validator_account,
-                    };
-
-                    let proof = bellman::groth16::create_random_proof(
-                        instance,
-                        &self.circuit_params,
-                        &mut rng,
-                    );
-
-                    if proof.is_err() {
-                        // TODO: panic?
-                        panic!("proof can not be created: {}", proof.err().unwrap());
-                    }
-
-                    // TODO: handle error.
-                    let p = proof.unwrap();
-
-                    self.api_client.publish(p);
+            let block = match block {
+                Some(b) => b,
+                _ => continue,
+            };
+            // TODO: timeout
+            let prover_data = match self.api_client.prover_data(time::Duration::from_secs(10)) {
+                Ok(v) => v,
+                Err(err) => {
+                    error!("could not get prover data for block {}: {}", block, err);
+                    continue;
                 }
+            };
+
+            let instance = circuit::circuit::FranklinCircuit {
+                params: &self.jubjub_params,
+                operation_batch_size: models::params::block_size_chunks(),
+                old_root: Some(prover_data.old_root),
+                new_root: Some(prover_data.new_root),
+                block_number: models::node::Fr::from_str(&(block).to_string()),
+                validator_address: Some(prover_data.validator_address),
+                pub_data_commitment: Some(prover_data.public_data_commitment),
+                operations: prover_data.operations,
+                validator_balances: prover_data.validator_balances,
+                validator_audit_path: prover_data.validator_audit_path,
+                validator_account: prover_data.validator_account,
+            };
+
+            let proof =
+                bellman::groth16::create_random_proof(instance, &self.circuit_params, &mut rng);
+
+            if proof.is_err() {
+                // TODO: panic?
+                panic!("proof can not be created: {}", proof.err().unwrap());
             }
+
+            // TODO: handle error.
+            let p = proof.unwrap();
+
+            let pvk = bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
+
+            let res = bellman::groth16::verify_proof(
+                &pvk,
+                &p.clone(),
+                &[prover_data.public_data_commitment],
+            );
+            if res.is_err() {
+                panic!("err")
+                // return Err("Proof verification has failed".to_owned());
+            }
+            if !res.unwrap() {
+                panic!("err")
+                // return Err("Proof is invalid".to_owned());
+            }
+
+            self.api_client
+                .publish(block, p, prover_data.public_data_commitment);
         }
     }
 
