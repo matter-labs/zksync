@@ -1,9 +1,9 @@
-// Built-in uses
+// Built-in deps
 use std::str::FromStr;
 use std::{net, thread, time};
-// External uses
+// External deps
 use ff::{Field, PrimeField};
-// Workspace uses
+// Workspace deps
 use prover::witness_generator::{client, server};
 use prover::ApiClient;
 use testhelper::TestAccount;
@@ -51,10 +51,10 @@ fn api_client_simple_simulation() {
     let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
 
     // call block_to_prove and check its none
-    let block = client
+    let to_prove = client
         .block_to_prove()
         .expect("failed to get block to prove");
-    assert_eq!(block, None);
+    assert!(to_prove.is_none());
 
     let storage = access_storage();
 
@@ -67,37 +67,38 @@ fn api_client_simple_simulation() {
         .expect("failed to mock commit operation");
 
     // should return block
-    let block = client
+    let to_prove = client
         .block_to_prove()
         .expect("failed to bet block to prove");
-    assert_eq!(Some(1), block);
+    assert!(to_prove.is_some());
 
     // block is taken unless no heartbeat from prover within prover_timeout period
     // should return None at this moment
-    let block = client
+    let to_prove = client
         .block_to_prove()
         .expect("failed to get block to prove");
-    assert!(block.is_none());
+    assert!(to_prove.is_none());
 
     // make block available
     thread::sleep(prover_timeout * 2);
 
-    let block = client
+    let to_prove = client
         .block_to_prove()
         .expect("failed to get block to prove");
-    assert_eq!(Some(1), block);
+    assert!(to_prove.is_some());
 
+    let (block, job) = to_prove.unwrap();
     // sleep for prover_timeout and send heartbeat
     thread::sleep(prover_timeout * 2);
-    client.working_on(block.unwrap());
+    client.working_on(job);
 
-    let block = client
+    let to_prove = client
         .block_to_prove()
         .expect("failed to get block to prove");
-    assert!(block.is_none());
+    assert!(to_prove.is_none());
 
     let prover_data = client
-        .prover_data(time::Duration::from_secs(30 * 60))
+        .prover_data(block, time::Duration::from_secs(30 * 60))
         .expect("failed to get prover data");
     assert_eq!(prover_data.old_root, wanted_prover_data.old_root);
     assert_eq!(prover_data.new_root, wanted_prover_data.new_root);

@@ -52,7 +52,6 @@ impl AccountAddress {
         })
     }
 
-    // TODO: change to reference.
     pub fn from_pubkey(public_key: PublicKey<Engine>) -> Self {
         let mut pk_hash =
             pub_key_hash_bytes(&public_key, &params::PEDERSEN_HASHER as &BabyPedersenHasher);

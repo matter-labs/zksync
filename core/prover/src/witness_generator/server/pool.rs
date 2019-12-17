@@ -11,8 +11,8 @@ use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use franklin_crypto::bellman::groth16::prepare_prover;
 use serde::{Deserialize, Serialize};
-// Workspace uses
-use crate::ProverData;
+// Workspace deps
+use crate::witness_generator::ProverData;
 use circuit::operation::SignatureData;
 use models::merkle_tree::PedersenHasher;
 use models::node::tx::PackedPublicKey;

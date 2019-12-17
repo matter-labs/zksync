@@ -1,8 +1,10 @@
-use crate::account::AccountWitness;
+// External
 use ff::Field;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Serialize};
+// Workspace
+use crate::account::AccountWitness;
 
 #[derive(Clone, Debug)]
 pub struct OperationBranchWitness<E: JubjubEngine> {

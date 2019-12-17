@@ -1,10 +1,9 @@
-// External uses
+// External deps
+use bellman::{ConstraintSystem, SynthesisError};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::JubjubEngine;
-// Workspace uses
+// Workspace deps
 use crate::element::CircuitElement;
-use bellman::{ConstraintSystem, SynthesisError};
-use models::params as franklin_constants;
 
 #[derive(Clone, Debug)]
 pub struct AccountWitness<E: JubjubEngine> {
@@ -25,13 +24,13 @@ impl<E: JubjubEngine> AccountContent<E> {
         let nonce = CircuitElement::from_fe_strict(
             cs.namespace(|| "nonce"),
             || Ok(witness.nonce.grab()?),
-            franklin_constants::NONCE_BIT_WIDTH,
+            models::params::NONCE_BIT_WIDTH,
         )?;
 
         let pub_key_hash = CircuitElement::from_fe_strict(
             cs.namespace(|| "pub_key_hash"),
             || witness.pub_key_hash.grab(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            models::params::NEW_PUBKEY_HASH_WIDTH,
         )?;
 
         Ok(Self {

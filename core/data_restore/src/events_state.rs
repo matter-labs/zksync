@@ -1,8 +1,8 @@
-// External uses
+// External deps
 use failure::{ensure, format_err};
 use web3::futures::Future;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
-// Workspace uses
+// Workspace deps
 use crate::events::{EventData, EventType};
 use crate::helpers::DATA_RESTORE_CONFIG;
 

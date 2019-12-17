@@ -124,10 +124,6 @@ pub fn public_data_commitment<E: JubjubEngine>(
     validator_address: Option<E::Fr>,
     block_number: Option<E::Fr>,
 ) -> E::Fr {
-    println!(
-        "pubdata {:?},\n initial_root {:?},\n new_root {:?},\n validator_address {:?},\n block_number {:?}",
-        pubdata_bits, initial_root, new_root, validator_address, block_number
-    );
     let mut public_data_initial_bits = vec![];
 
     // these two are BE encodings because an iterator is BE. This is also an Ethereum standard behavior

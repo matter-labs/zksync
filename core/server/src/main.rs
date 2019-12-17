@@ -1,14 +1,14 @@
 //use tokio::runtime::Runtime;
 #[macro_use]
 extern crate log;
-// Built-in uses
+// Built-in deps
 use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
-// External uses
+// External deps
 use clap::{App, Arg};
 use futures::channel::mpsc as fmpsc;
-// Workspace uses
+// Workspace deps
 use models::StateKeeperRequest;
 use server::api_server::start_api_server;
 use server::committer::start_committer;
