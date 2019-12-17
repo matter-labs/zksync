@@ -1,15 +1,13 @@
-use crate::helpers::{
-    get_input_data_from_ethereum_transaction,
-};
+use crate::helpers::get_input_data_from_ethereum_transaction;
 use failure::format_err;
-use models::node::{
-    account::{Account, AccountAddress},
-};
-use web3::types::Transaction;
+use models::node::account::{Account, AccountAddress};
 use models::params::{FR_ADDRESS_LEN, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
+use web3::types::Transaction;
 
 // Returns contracts genesis accounts state
-pub fn get_genesis_state(genesis_transaction: &Transaction) -> Result<(u32, Account), failure::Error> {
+pub fn get_genesis_state(
+    genesis_transaction: &Transaction,
+) -> Result<(u32, Account), failure::Error> {
     let input_data = get_input_data_from_ethereum_transaction(&genesis_transaction)?;
     let genesis_operator_address = AccountAddress::from_bytes(
         &input_data[input_data.len() - INPUT_DATA_ROOT_HASH_BYTES_WIDTH - FR_ADDRESS_LEN

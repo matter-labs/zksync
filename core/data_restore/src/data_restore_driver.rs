@@ -1,19 +1,19 @@
-use crate::tree_state::TreeState;
 use crate::events_state::EventsState;
+use crate::genesis_state::get_genesis_state;
+use crate::helpers::get_ethereum_transaction;
+use crate::rollup_ops::RollupOpsBlock;
+use crate::storage_interactor;
+use crate::tree_state::TreeState;
 use ethabi;
 use failure::format_err;
-use crate::rollup_ops::RollupOpsBlock;
-use crate::genesis_state::get_genesis_state;
-use crate::storage_interactor;
-use storage::ConnectionPool;
-use models::node::{AccountMap, AccountUpdates, AccountUpdate};
 use models::node::block::Block;
+use models::node::{AccountMap, AccountUpdate};
+use std::str::FromStr;
+use storage::ConnectionPool;
 use web3::contract::Contract;
 use web3::types::H160;
-use web3::{Transport, Web3};
 use web3::types::H256;
-use crate::helpers::get_ethereum_transaction;
-use std::str::FromStr;
+use web3::{Transport, Web3};
 
 /// Storage state update
 pub enum StorageUpdateState {
@@ -37,7 +37,7 @@ pub struct DataRestoreDriver<T: Transport> {
     /// Franklin accounts state
     pub tree_state: TreeState,
     pub eth_blocks_step: u64,
-    pub end_eth_blocks_offset: u64
+    pub end_eth_blocks_offset: u64,
 }
 
 impl<T: Transport> DataRestoreDriver<T> {
@@ -46,15 +46,16 @@ impl<T: Transport> DataRestoreDriver<T> {
         web3: Web3<T>,
         contract_eth_addr: H160,
         eth_blocks_step: u64,
-        end_eth_blocks_offset: u64
+        end_eth_blocks_offset: u64,
     ) -> Result<Self, failure::Error> {
         let franklin_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
-                .unwrap()
+                .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?
                 .get("abi")
-                .unwrap()
+                .ok_or_else(|| format_err!("No franklin contract abi"))?
                 .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
+            let abi = ethabi::Contract::load(abi_string.as_bytes())
+                .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?;
             (
                 abi.clone(),
                 Contract::new(web3.eth(), contract_eth_addr, abi.clone()),
@@ -62,7 +63,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         };
 
         let events_state = EventsState::new();
-        
+
         let tree_state = TreeState::new();
 
         Ok(Self {
@@ -73,7 +74,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             events_state,
             tree_state,
             eth_blocks_step,
-            end_eth_blocks_offset
+            end_eth_blocks_offset,
         })
     }
 
@@ -95,11 +96,12 @@ impl<T: Transport> DataRestoreDriver<T> {
     ) -> Result<Self, failure::Error> {
         let franklin_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
-                .unwrap()
+                .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?
                 .get("abi")
-                .unwrap()
+                .ok_or_else(|| format_err!("No franklin contract abi"))?
                 .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
+            let abi = ethabi::Contract::load(abi_string.as_bytes())
+                .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?;
             (
                 abi.clone(),
                 Contract::new(web3.eth(), contract_eth_addr, abi.clone()),
@@ -110,8 +112,9 @@ impl<T: Transport> DataRestoreDriver<T> {
 
         let genesis_transaction = get_ethereum_transaction(&web3, &contract_genesis_tx_hash)?;
         let (id, genesis_account) = get_genesis_state(&genesis_transaction)?;
-        
-        let genesis_eth_block_number = events_state.set_genesis_block_number(&genesis_transaction)?;
+
+        let genesis_eth_block_number =
+            events_state.set_genesis_block_number(&genesis_transaction)?;
 
         let account_update = AccountUpdate::Create {
             address: genesis_account.address.clone(),
@@ -120,18 +123,13 @@ impl<T: Transport> DataRestoreDriver<T> {
 
         let mut account_map = AccountMap::default();
         account_map.insert(id, genesis_account);
-        
-        let mut tree_state = TreeState::load(
-            0,
-            account_map,
-            0,
-            id,
-        );
+
+        let tree_state = TreeState::load(0, account_map, 0, id);
 
         storage_interactor::save_events_state(
             connection_pool.clone(),
             &vec![],
-            genesis_eth_block_number
+            genesis_eth_block_number,
         )?;
 
         storage_interactor::update_tree_state(
@@ -154,7 +152,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             events_state,
             tree_state,
             eth_blocks_step,
-            end_eth_blocks_offset
+            end_eth_blocks_offset,
         })
     }
 
@@ -170,7 +168,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             tree_state.0, // current block
             tree_state.1, // account map
             tree_state.2, // unprocessed priority op
-            tree_state.3 // fee account
+            tree_state.3, // fee account
         );
         match state {
             StorageUpdateState::Events => {
@@ -187,9 +185,8 @@ impl<T: Transport> DataRestoreDriver<T> {
                     self.connection_pool.clone(),
                 )?;
                 // Update operations
-                let new_ops_blocks = storage_interactor::get_ops_blocks_from_storage(
-                    self.connection_pool.clone(),
-                )?;
+                let new_ops_blocks =
+                    storage_interactor::get_ops_blocks_from_storage(self.connection_pool.clone())?;
                 // Update tree
                 self.update_tree_state(new_ops_blocks)?;
             }
@@ -228,9 +225,12 @@ impl<T: Transport> DataRestoreDriver<T> {
     }
 
     fn update_events_state(&mut self) -> Result<(), failure::Error> {
-        let (events, last_watched_eth_block_number) = self
-            .events_state
-            .update_events_state(&self.web3, &self.franklin_contract, self.eth_blocks_step, self.end_eth_blocks_offset)?;
+        let (events, last_watched_eth_block_number) = self.events_state.update_events_state(
+            &self.web3,
+            &self.franklin_contract,
+            self.eth_blocks_step,
+            self.end_eth_blocks_offset,
+        )?;
         info!("Got new events");
 
         // Store events
@@ -238,7 +238,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         storage_interactor::save_events_state(
             self.connection_pool.clone(),
             &events,
-            last_watched_eth_block_number
+            last_watched_eth_block_number,
         )?;
 
         storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;
@@ -263,7 +263,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             storage_interactor::update_tree_state(
                 self.connection_pool.clone(),
                 block,
-                acc_updates
+                acc_updates,
             )?;
         }
 

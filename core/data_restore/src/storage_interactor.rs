@@ -9,14 +9,13 @@ use crate::data_restore_driver::StorageUpdateState;
 use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
-use crate::tree_state::TreeState;
-use models::node::{AccountAddress, AccountMap, AccountUpdates};
+use models::node::block::Block;
+use models::node::{AccountMap, AccountUpdates};
+use models::{Action, EncodedProof, Operation};
 use storage::{
     ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
     StoredRollupOpsBlock,
 };
-use models::{EncodedProof, Action, Operation};
-use models::node::block::Block;
 
 /// Updates stored tree state
 ///
@@ -29,7 +28,7 @@ use models::node::block::Block;
 pub fn update_tree_state(
     connection_pool: ConnectionPool,
     block: Block,
-    accounts_updated: AccountUpdates
+    accounts_updated: AccountUpdates,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -39,9 +38,11 @@ pub fn update_tree_state(
     })?;
     storage
         .commit_state_update(block.block_number, accounts_updated.as_slice())
-        .expect("db fail");
-    storage.apply_state_update(block.block_number).expect("db fail");
-    
+        .map_err(|e| format_err!("Cant commit state update: {}", e.to_string()))?;
+    storage
+        .apply_state_update(block.block_number)
+        .map_err(|e| format_err!("Cant apply state update: {}", e.to_string()))?;
+
     if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
         info!(
             "Failed transactions commited block: #{}",
@@ -49,7 +50,7 @@ pub fn update_tree_state(
         );
         storage
             .save_block_transactions(&block)
-            .expect("commiter failed tx save");
+            .map_err(|e| format_err!("Cant save block transactions: {}", e.to_string()))?;
     }
 
     let commit_op = Operation {
@@ -60,8 +61,8 @@ pub fn update_tree_state(
     };
     storage
         .execute_operation(&commit_op)
-        .expect("committer must commit the op into db");
-    
+        .map_err(|e| format_err!("Cant execute commit operations: {}", e.to_string()))?;
+
     // Cant get proof at this point
     let verify_op = Operation {
         action: Action::Verify {
@@ -73,7 +74,7 @@ pub fn update_tree_state(
     };
     storage
         .execute_operation(&verify_op)
-        .expect("committer must commit the op into db");
+        .map_err(|e| format_err!("Cant execute verify operations: {}", e.to_string()))?;
 
     Ok(())
 }
@@ -88,7 +89,7 @@ pub fn update_tree_state(
 pub fn save_events_state(
     connection_pool: ConnectionPool,
     events: &[EventData],
-    last_watched_eth_block_number: u64
+    last_watched_eth_block_number: u64,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -104,9 +105,7 @@ pub fn save_events_state(
         block_number: last_watched_eth_block_number.to_string(),
     };
     storage
-        .save_events_state(
-            new_events.as_slice()
-        )
+        .save_events_state(new_events.as_slice())
         .map_err(|e| format_err!("Cant save events state: {}", e.to_string()))?;
     storage
         .save_last_watched_block_number(&block_number)
@@ -455,7 +454,7 @@ pub fn get_tree_state(
         .ok_or_else(|| format_err!("get_tree_state: db must work"))?;
 
     let unprocessed_prior_ops = block.processed_priority_ops.1;
-    
+
     let fee_acc_id = block.fee_account;
 
     Ok((last_block, account_map, unprocessed_prior_ops, fee_acc_id))

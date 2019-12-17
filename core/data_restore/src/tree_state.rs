@@ -1,21 +1,21 @@
 use crate::rollup_ops::RollupOpsBlock;
+use bigdecimal::BigDecimal;
 use failure::format_err;
 use models::node::account::{Account, AccountAddress};
+use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::operations::FranklinOp;
 use models::node::priority_ops::FranklinPriorityOp;
-use models::node::tx::FranklinTx;
 use models::node::priority_ops::PriorityOp;
+use models::node::tx::FranklinTx;
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
-use plasma::state::{OpSuccess, PlasmaState, CollectedFee};
-use bigdecimal::BigDecimal;
-use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 
 /// Franklin Accounts states with data restore configuration
 pub struct TreeState {
     /// Accounts stored in a spase merkle tree
     pub state: PlasmaState,
     pub current_unprocessed_priority_op: u64,
-    pub last_fee_account_address: AccountAddress
+    pub last_fee_account_address: AccountAddress,
 }
 
 impl Default for TreeState {
@@ -29,7 +29,7 @@ impl TreeState {
         Self {
             state: PlasmaState::empty(),
             current_unprocessed_priority_op: 0,
-            last_fee_account_address: AccountAddress::default()
+            last_fee_account_address: AccountAddress::default(),
         }
     }
 
@@ -51,7 +51,7 @@ impl TreeState {
         Self {
             state,
             current_unprocessed_priority_op,
-            last_fee_account_address
+            last_fee_account_address,
         }
     }
 
@@ -78,16 +78,14 @@ impl TreeState {
             match operation {
                 FranklinOp::Deposit(op) => {
                     let priority_op = FranklinPriorityOp::Deposit(op.priority_op);
-                    let op_result = self
-                        .state
-                        .execute_priority_op(priority_op.clone());
+                    let op_result = self.state.execute_priority_op(priority_op.clone());
                     current_op_block_index = self.update_from_priority_operation(
                         priority_op,
                         op_result,
                         &mut fees,
                         &mut accounts_updated,
                         current_op_block_index,
-                        &mut ops
+                        &mut ops,
                     );
                 }
                 FranklinOp::TransferToNew(mut op) => {
@@ -106,7 +104,7 @@ impl TreeState {
                         &mut fees,
                         &mut accounts_updated,
                         current_op_block_index,
-                        &mut ops
+                        &mut ops,
                     );
                 }
                 FranklinOp::Withdraw(mut op) => {
@@ -126,7 +124,7 @@ impl TreeState {
                         &mut fees,
                         &mut accounts_updated,
                         current_op_block_index,
-                        &mut ops
+                        &mut ops,
                     );
                 }
                 FranklinOp::Close(mut op) => {
@@ -137,7 +135,7 @@ impl TreeState {
                         .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
-                    
+
                     let tx = FranklinTx::Close(op.tx);
                     let tx_result = self.state.execute_tx(tx.clone());
                     current_op_block_index = self.update_from_tx(
@@ -146,7 +144,7 @@ impl TreeState {
                         &mut fees,
                         &mut accounts_updated,
                         current_op_block_index,
-                        &mut ops
+                        &mut ops,
                     );
                 }
                 FranklinOp::Transfer(mut op) => {
@@ -170,22 +168,20 @@ impl TreeState {
                         &mut fees,
                         &mut accounts_updated,
                         current_op_block_index,
-                        &mut ops
+                        &mut ops,
                     );
                 }
                 FranklinOp::FullExit(mut op) => {
                     op.priority_op.nonce -= 1;
                     let priority_op = FranklinPriorityOp::FullExit(op.priority_op);
-                    let op_result = self
-                        .state
-                        .execute_priority_op(priority_op.clone());
+                    let op_result = self.state.execute_priority_op(priority_op.clone());
                     current_op_block_index = self.update_from_priority_operation(
                         priority_op,
                         op_result,
                         &mut fees,
                         &mut accounts_updated,
                         current_op_block_index,
-                        &mut ops
+                        &mut ops,
                     );
                 }
                 _ => {}
@@ -223,7 +219,7 @@ impl TreeState {
         fees: &mut Vec<CollectedFee>,
         accounts_updated: &mut AccountUpdates,
         current_op_block_index: u32,
-        ops: &mut Vec<ExecutedOperations>
+        ops: &mut Vec<ExecutedOperations>,
     ) -> u32 {
         accounts_updated.append(&mut op_result.updates.clone());
         if let Some(fee) = op_result.fee {
@@ -253,7 +249,7 @@ impl TreeState {
         fees: &mut Vec<CollectedFee>,
         accounts_updated: &mut AccountUpdates,
         current_op_block_index: u32,
-        ops: &mut Vec<ExecutedOperations>
+        ops: &mut Vec<ExecutedOperations>,
     ) -> u32 {
         match tx_result {
             Ok(OpSuccess {
@@ -275,7 +271,7 @@ impl TreeState {
                 };
                 ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
                 current_op_block_index + 1
-            },
+            }
             Err(e) => {
                 let exec_result = ExecutedTx {
                     tx,
@@ -313,8 +309,8 @@ impl TreeState {
 
 #[cfg(test)]
 mod test {
-    use crate::tree_state::TreeState;
     use crate::rollup_ops::RollupOpsBlock;
+    use crate::tree_state::TreeState;
     use bigdecimal::BigDecimal;
     use models::node::tx::TxSignature;
     use models::node::{
@@ -336,8 +332,8 @@ mod test {
             account_id: 0,
         }));
         let pub_data1 = op1.public_data();
-        let ops1 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
-            .expect("cant get ops from data 1");
+        let ops1 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data1).expect("cant get ops from data 1");
         let block1 = RollupOpsBlock {
             block_num: 1,
             ops: ops1,
@@ -359,8 +355,8 @@ mod test {
             account_id: 0,
         }));
         let pub_data2 = op2.public_data();
-        let ops2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data2)
-            .expect("cant get ops from data 2");
+        let ops2 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data2).expect("cant get ops from data 2");
         let block2 = RollupOpsBlock {
             block_num: 2,
             ops: ops2,
@@ -382,8 +378,8 @@ mod test {
             to: 1,
         }));
         let pub_data3 = op3.public_data();
-        let ops3 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data3)
-            .expect("cant get ops from data 3");
+        let ops3 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data3).expect("cant get ops from data 3");
         let block3 = RollupOpsBlock {
             block_num: 3,
             ops: ops3,
@@ -405,8 +401,8 @@ mod test {
             to: 0,
         }));
         let pub_data4 = op4.public_data();
-        let ops4 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data4)
-            .expect("cant get ops from data 4");
+        let ops4 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data4).expect("cant get ops from data 4");
         let block4 = RollupOpsBlock {
             block_num: 4,
             ops: ops4,
@@ -424,8 +420,8 @@ mod test {
             account_id: 1,
         }));
         let pub_data5 = op5.public_data();
-        let ops5 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data5)
-            .expect("cant get ops from data 5");
+        let ops5 =
+            RollupOpsBlock::get_rollup_ops_from_data(&pub_data5).expect("cant get ops from data 5");
         let block5 = RollupOpsBlock {
             block_num: 5,
             ops: ops5,

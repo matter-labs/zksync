@@ -1,12 +1,12 @@
-use failure::{ensure, format_err};
-use web3::futures::Future;
-use ethabi;
-use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 use crate::events::{EventData, EventType};
 use crate::helpers::get_block_number_from_ethereum_transaction;
-use web3::{Transport, Web3};
+use ethabi;
+use failure::{ensure, format_err};
 use web3::contract::Contract;
+use web3::futures::Future;
 use web3::types::Transaction;
+use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
+use web3::{Transport, Web3};
 
 type CommittedAndVerifiedEvents = (Vec<EventData>, Vec<EventData>);
 // type BlockNumber256 = U256;
@@ -40,9 +40,10 @@ impl EventsState {
 
     pub fn set_genesis_block_number(
         &mut self,
-        genesis_transaction: &Transaction
+        genesis_transaction: &Transaction,
     ) -> Result<u64, failure::Error> {
-        let genesis_block_number = get_block_number_from_ethereum_transaction(&genesis_transaction)?;
+        let genesis_block_number =
+            get_block_number_from_ethereum_transaction(&genesis_transaction)?;
         self.last_watched_eth_block_number = genesis_block_number;
         Ok(genesis_block_number)
     }
@@ -85,9 +86,7 @@ impl EventsState {
     }
 
     /// Return last watched ethereum block number
-    pub fn get_last_block_number<T: Transport>(
-        web3: &Web3<T>
-    ) -> Result<u64, failure::Error> {
+    pub fn get_last_block_number<T: Transport>(web3: &Web3<T>) -> Result<u64, failure::Error> {
         Ok(web3.eth().block_number().wait().map(|n| n.as_u64())?)
     }
 
@@ -125,16 +124,8 @@ impl EventsState {
         let to_block_number = BlockNumber::Number(to_block_number_u64);
         let from_block_number = BlockNumber::Number(from_block_number_u64);
 
-        let logs = EventsState::get_logs(
-            web3,
-            contract,
-            from_block_number,
-            to_block_number
-        )?;
-        let sorted_logs = EventsState::sort_logs(
-            &contract.0,
-            &logs
-        )?;
+        let logs = EventsState::get_logs(web3, contract, from_block_number, to_block_number)?;
+        let sorted_logs = EventsState::sort_logs(&contract.0, &logs)?;
 
         Ok((sorted_logs, to_block_number_u64))
     }
@@ -152,12 +143,14 @@ impl EventsState {
         from_block_number: BlockNumber,
         to_block_number: BlockNumber,
     ) -> Result<Vec<Log>, failure::Error> {
-        let block_verified_topic = contract.0
+        let block_verified_topic = contract
+            .0
             .event("BlockVerified")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
 
-        let block_comitted_topic = contract.0
+        let block_comitted_topic = contract
+            .0
             .event("BlockCommitted")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
@@ -187,7 +180,7 @@ impl EventsState {
     ///
     fn sort_logs(
         contract: &ethabi::Contract,
-        logs: &[Log]
+        logs: &[Log],
     ) -> Result<CommittedAndVerifiedEvents, failure::Error> {
         if logs.is_empty() {
             return Ok((vec![], vec![]));

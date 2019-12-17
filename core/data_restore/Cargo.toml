@@ -20,7 +20,9 @@ serde_json = "1.0.0"
 env_logger = "0.6"
 signal-hook = { version = "0.1.8", features = ["tokio-support"] }
 failure = "0.1"
+clap = "2.33.0"
 
 plasma = { path = "../plasma", version = "0.1.1" }
 models = { path = "../models", version = "0.0.1" }
 storage = { path = "../storage", version = "0.0.1" }
+server = { path = "../server", version = "0.0.1" }
