@@ -2141,28 +2141,6 @@ impl StorageProcessor {
         Ok(ops_blocks)
     }
 
-    pub fn update_tree_state(
-        &self,
-        block_number: BlockNumber,
-        updates: &[(u32, AccountUpdate)],
-    ) -> QueryResult<()> {
-        self.commit_state_update(block_number, &updates)?;
-        self.apply_state_update(block_number)?;
-        Ok(())
-    }
-
-    pub fn load_tree_state(&self) -> QueryResult<(u32, AccountMap)> {
-        Ok(self.load_verified_state()?)
-    }
-
-    pub fn delete_tree_state(&self) -> QueryResult<()> {
-        diesel::delete(balances::table).execute(self.conn())?;
-        diesel::delete(accounts::table).execute(self.conn())?;
-        diesel::delete(account_creates::table).execute(self.conn())?;
-        diesel::delete(account_balance_updates::table).execute(self.conn())?;
-        Ok(())
-    }
-
     pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
         let new_token = Token {
             id: i32::from(id),

@@ -1,12 +1,13 @@
 use crate::tree_state::TreeState;
 use crate::events_state::EventsState;
 use ethabi;
+use failure::format_err;
 use crate::rollup_ops::RollupOpsBlock;
 use crate::genesis_state::get_genesis_state;
 use crate::storage_interactor;
 use storage::ConnectionPool;
-use models::node::account::AccountAddress;
-use models::node::{AccountMap, AccountUpdate};
+use models::node::{AccountMap, AccountUpdates, AccountUpdate};
+use models::node::block::Block;
 use web3::contract::Contract;
 use web3::types::H160;
 use web3::{Transport, Web3};
@@ -47,11 +48,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64
     ) -> Result<Self, failure::Error> {
-
-        storage_interactor::remove_events_state(connection_pool.clone())?;
-        storage_interactor::remove_rollup_ops(connection_pool.clone())?;
-        storage_interactor::remove_tree_state(connection_pool.clone())?;
-
         let franklin_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
                 .unwrap()
@@ -97,11 +93,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<Self, failure::Error> {
-
-        storage_interactor::remove_events_state(connection_pool.clone())?;
-        storage_interactor::remove_rollup_ops(connection_pool.clone())?;
-        storage_interactor::remove_tree_state(connection_pool.clone())?;
-
         let franklin_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
                 .unwrap()
@@ -115,10 +106,10 @@ impl<T: Transport> DataRestoreDriver<T> {
             )
         };
 
-        let events_state = EventsState::new();
+        let mut events_state = EventsState::new();
 
         let genesis_transaction = get_ethereum_transaction(&web3, &contract_genesis_tx_hash)?;
-        let (block_number, genesis_account) = get_genesis_state(&genesis_transaction)?;
+        let (id, genesis_account) = get_genesis_state(&genesis_transaction)?;
         
         let genesis_eth_block_number = events_state.set_genesis_block_number(&genesis_transaction)?;
 
@@ -128,13 +119,13 @@ impl<T: Transport> DataRestoreDriver<T> {
         };
 
         let mut account_map = AccountMap::default();
-        account_map.insert(block_number, genesis_account);
+        account_map.insert(id, genesis_account);
         
-        let tree_state = TreeState::load(
-            block_number,
+        let mut tree_state = TreeState::load(
+            0,
             account_map,
             0,
-            genesis_account.address.clone(),
+            id,
         );
 
         storage_interactor::save_events_state(
@@ -143,12 +134,16 @@ impl<T: Transport> DataRestoreDriver<T> {
             genesis_eth_block_number
         )?;
 
-        storage_interactor::save_tree_state(
+        storage_interactor::update_tree_state(
             connection_pool.clone(),
-            block_number,
-            &account_map,
-            0,
-            genesis_account.address.clone(),
+            Block {
+                block_number: 0,
+                new_root_hash: tree_state.root_hash(),
+                fee_account: id,
+                block_transactions: Vec::new(),
+                processed_priority_ops: (0, 0),
+            },
+            [(0, account_update)].to_vec(),
         )?;
 
         Ok(Self {
@@ -172,7 +167,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         let state = storage_interactor::get_storage_state(self.connection_pool.clone())?;
         let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;
         self.tree_state = TreeState::load(
-            tree_state.0, // current bblock
+            tree_state.0, // current block
             tree_state.1, // account map
             tree_state.2, // unprocessed priority op
             tree_state.3 // fee account
@@ -239,14 +234,14 @@ impl<T: Transport> DataRestoreDriver<T> {
         info!("Got new events");
 
         // Store events
-        storage_interactor::remove_events_state(self.connection_pool.clone())?;
+        storage_interactor::delete_events_state(self.connection_pool.clone())?;
         storage_interactor::save_events_state(
             self.connection_pool.clone(),
             &events,
             last_watched_eth_block_number
         )?;
 
-        storage_interactor::remove_storage_state_status(self.connection_pool.clone())?;
+        storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
             self.connection_pool.clone(),
             StorageUpdateState::Events,
@@ -261,19 +256,18 @@ impl<T: Transport> DataRestoreDriver<T> {
         &mut self,
         new_ops_blocks: Vec<RollupOpsBlock>,
     ) -> Result<(), failure::Error> {
-        for block in new_ops_blocks {
-            let commit = self
+        for op_block in new_ops_blocks {
+            let (block, acc_updates) = self
                 .tree_state
-                .update_tree_states_from_ops_block(&block)?;
+                .update_tree_states_from_ops_block(&op_block)?;
             storage_interactor::update_tree_state(
                 self.connection_pool.clone(),
-                commit,
-                self.tree_state.current_unprocessed_priority_op,
-                self.tree_state.last_fee_account_address.clone()
+                block,
+                acc_updates
             )?;
         }
 
-        storage_interactor::remove_storage_state_status(self.connection_pool.clone())?;
+        storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
             self.connection_pool.clone(),
             StorageUpdateState::None,
@@ -288,10 +282,10 @@ impl<T: Transport> DataRestoreDriver<T> {
         let new_blocks = self.get_new_operation_blocks_from_events()?;
         info!("Parsed events to operation blocks");
 
-        storage_interactor::remove_rollup_ops(self.connection_pool.clone())?;
+        storage_interactor::delete_rollup_ops(self.connection_pool.clone())?;
         storage_interactor::save_rollup_ops(self.connection_pool.clone(), &new_blocks)?;
 
-        storage_interactor::remove_storage_state_status(self.connection_pool.clone())?;
+        storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
             self.connection_pool.clone(),
             StorageUpdateState::Operations,

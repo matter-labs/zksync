@@ -4,7 +4,6 @@ use models::node::account::{Account, AccountAddress};
 use models::node::operations::FranklinOp;
 use models::node::priority_ops::FranklinPriorityOp;
 use models::node::tx::FranklinTx;
-use models::CommitRequest;
 use models::node::priority_ops::PriorityOp;
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
 use plasma::state::{OpSuccess, PlasmaState, CollectedFee};
@@ -45,12 +44,14 @@ impl TreeState {
         current_block: u32,
         accounts: AccountMap,
         current_unprocessed_priority_op: u64,
-        fee_account: AccountAddress,
+        fee_account: AccountId,
     ) -> Self {
+        let state = PlasmaState::new(accounts, current_block);
+        let last_fee_account_address = state.get_account(fee_account).unwrap().address;
         Self {
-            state: PlasmaState::new(accounts, current_block),
-            current_unprocessed_priority_op: current_unprocessed_priority_op,
-            last_fee_account_address: fee_account
+            state,
+            current_unprocessed_priority_op,
+            last_fee_account_address
         }
     }
 
@@ -64,7 +65,7 @@ impl TreeState {
     pub fn update_tree_states_from_ops_block(
         &mut self,
         ops_block: &RollupOpsBlock,
-    ) -> Result<CommitRequest, failure::Error> {
+    ) -> Result<(Block, AccountUpdates), failure::Error> {
         let operations = ops_block.ops.clone();
 
         let mut accounts_updated = Vec::new();
@@ -212,10 +213,7 @@ impl TreeState {
 
         self.state.block_number += 1;
 
-        Ok(CommitRequest {
-            block,
-            accounts_updated,
-        })
+        Ok((block, accounts_updated))
     }
 
     fn update_from_priority_operation(

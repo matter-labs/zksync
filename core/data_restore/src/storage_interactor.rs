@@ -9,33 +9,14 @@ use crate::data_restore_driver::StorageUpdateState;
 use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
-use models::node::account::AccountAddress;
-use models::CommitRequest;
 use crate::tree_state::TreeState;
-use models::node::{AccountMap, AccountUpdate};
+use models::node::{AccountAddress, AccountMap, AccountUpdates};
 use storage::{
     ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
     StoredRollupOpsBlock,
 };
-
-pub fn save_tree_state(
-    connection_pool: ConnectionPool,
-    current_block_number: u32,
-    accounts: &AccountMap,
-    current_unprocessed_priority_op: u64,
-    last_fee_account_address: AccountAddress
-) -> Result<(), failure::Error> {
-    // let storage = connection_pool.access_storage().map_err(|e| {
-    //     format_err!(
-    //         "Db connection failed for data restore save tree state: {}",
-    //         e.to_string()
-    //     )
-    // })?;
-    // storage
-    //     .update_tree_state(block_number, &account_updates)
-    //     .map_err(|e| format_err!("Cant save tree state: {}", e.to_string()))?;
-    Ok(())
-}
+use models::{EncodedProof, Action, Operation};
+use models::node::block::Block;
 
 /// Updates stored tree state
 ///
@@ -47,19 +28,53 @@ pub fn save_tree_state(
 ///
 pub fn update_tree_state(
     connection_pool: ConnectionPool,
-    commit_request: CommitRequest,
-    current_unprocessed_priority_op: u64,
-    last_fee_account_address: AccountAddress
+    block: Block,
+    accounts_updated: AccountUpdates
 ) -> Result<(), failure::Error> {
-    // let storage = connection_pool.access_storage().map_err(|e| {
-    //     format_err!(
-    //         "Db connection failed for data restore save tree state: {}",
-    //         e.to_string()
-    //     )
-    // })?;
-    // storage
-    //     .update_tree_state(block_number, &account_updates)
-    //     .map_err(|e| format_err!("Cant save tree state: {}", e.to_string()))?;
+    let storage = connection_pool.access_storage().map_err(|e| {
+        format_err!(
+            "Db connection failed for data restore save tree state: {}",
+            e.to_string()
+        )
+    })?;
+    storage
+        .commit_state_update(block.block_number, accounts_updated.as_slice())
+        .expect("db fail");
+    storage.apply_state_update(block.block_number).expect("db fail");
+    
+    if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
+        info!(
+            "Failed transactions commited block: #{}",
+            block.block_number
+        );
+        storage
+            .save_block_transactions(&block)
+            .expect("commiter failed tx save");
+    }
+
+    let commit_op = Operation {
+        action: Action::Commit,
+        block: block.clone(),
+        accounts_updated,
+        id: None,
+    };
+    storage
+        .execute_operation(&commit_op)
+        .expect("committer must commit the op into db");
+    
+    // Cant get proof at this point
+    let verify_op = Operation {
+        action: Action::Verify {
+            proof: Box::new(EncodedProof::default()),
+        },
+        block: block.clone(),
+        accounts_updated: Vec::new(),
+        id: None,
+    };
+    storage
+        .execute_operation(&verify_op)
+        .expect("committer must commit the op into db");
+
     Ok(())
 }
 
@@ -75,19 +90,27 @@ pub fn save_events_state(
     events: &[EventData],
     last_watched_eth_block_number: u64
 ) -> Result<(), failure::Error> {
-    let mut new_events: Vec<NewBlockEvent> = vec![];
-    for event in events {
-        new_events.push(block_event_into_stored_block_event(event));
-    }
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
             "Db connection failed for data restore save events: {}",
             e.to_string()
         )
     })?;
+    let mut new_events: Vec<NewBlockEvent> = vec![];
+    for event in events {
+        new_events.push(block_event_into_stored_block_event(event));
+    }
+    let block_number = NewLastWatchedEthBlockNumber {
+        block_number: last_watched_eth_block_number.to_string(),
+    };
     storage
-        .save_events_state(new_events.as_slice())
+        .save_events_state(
+            new_events.as_slice()
+        )
         .map_err(|e| format_err!("Cant save events state: {}", e.to_string()))?;
+    storage
+        .save_last_watched_block_number(&block_number)
+        .map_err(|e| format_err!("Cant save last watched block number: {}", e.to_string()))?;
     Ok(())
 }
 
@@ -106,32 +129,6 @@ pub fn block_event_into_stored_block_event(event: &EventData) -> NewBlockEvent {
         transaction_hash: event.transaction_hash.as_bytes().to_vec(),
         block_num: i64::from(event.block_num),
     }
-}
-
-/// Saves last watched Ethereum block number in storage
-///
-/// # Arguments
-///
-/// * `number` - Last watched Ethereum block number
-/// * `connection_pool` - Database Connection Pool
-///
-pub fn save_last_watched_block_number(
-    connection_pool: ConnectionPool,
-    number: u64,
-) -> Result<(), failure::Error> {
-    let block_number = NewLastWatchedEthBlockNumber {
-        block_number: number.to_string(),
-    };
-    let storage = connection_pool.access_storage().map_err(|e| {
-        format_err!(
-            "Db connection failed for data restore save block number: {}",
-            e.to_string()
-        )
-    })?;
-    storage
-        .save_last_watched_block_number(&block_number)
-        .map_err(|e| format_err!("Cant save last watched block number: {}", e.to_string()))?;
-    Ok(())
 }
 
 /// Saves update storage state
@@ -196,7 +193,7 @@ pub fn save_rollup_ops(
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn remove_events_state(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
+pub fn delete_events_state(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
             "Db connection failed for data restore remove events state: {}",
@@ -215,7 +212,7 @@ pub fn remove_events_state(connection_pool: ConnectionPool) -> Result<(), failur
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn remove_rollup_ops(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
+pub fn delete_rollup_ops(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
             "Db connection failed for data restore remove franklin ops: {}",
@@ -228,32 +225,13 @@ pub fn remove_rollup_ops(connection_pool: ConnectionPool) -> Result<(), failure:
     Ok(())
 }
 
-/// Removes tree state from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub fn remove_tree_state(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
-    let storage = connection_pool.access_storage().map_err(|e| {
-        format_err!(
-            "Db connection failed for data restore remove tree data: {}",
-            e.to_string()
-        )
-    })?;
-    storage
-        .delete_tree_state()
-        .map_err(|e| format_err!("No tree state to delete: {}", e.to_string()))?;
-    Ok(())
-}
-
 /// Removes last watched block number from storage
 ///
 /// # Arguments
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn remove_last_watched_block_number(
+pub fn delete_last_watched_block_number(
     connection_pool: ConnectionPool,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
@@ -274,7 +252,7 @@ pub fn remove_last_watched_block_number(
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn remove_storage_state_status(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
+pub fn delete_storage_state_status(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
             "Db connection failed for data restore remove storage state status: {}",
@@ -459,16 +437,26 @@ pub fn stored_block_event_into_block_event(
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
+/// connection_pool: ConnectionPool,
 pub fn get_tree_state(
     connection_pool: ConnectionPool,
-) -> Result<(u32, AccountMap, u64, AccountAddress), failure::Error> {
+) -> Result<(u32, AccountMap, u64, u32), failure::Error> {
     let storage = connection_pool
         .access_storage()
         .map_err(|e| format_err!("Db connection failed for tree state: {}", e.to_string()))?;
 
-    let tree_state = storage
-        .load_tree_state()
+    let (last_block, account_map) = storage
+        .load_verified_state()
         .map_err(|e| format_err!("get_tree_state: db must work: {}", e.to_string()))?;
 
-    Ok(tree_state)
+    let block = storage
+        .get_block(last_block)
+        .map_err(|e| format_err!("get_tree_state: db must work: {}", e.to_string()))?
+        .ok_or_else(|| format_err!("get_tree_state: db must work"))?;
+
+    let unprocessed_prior_ops = block.processed_priority_ops.1;
+    
+    let fee_acc_id = block.fee_account;
+
+    Ok((last_block, account_map, unprocessed_prior_ops, fee_acc_id))
 }

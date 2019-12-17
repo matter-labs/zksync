@@ -100,15 +100,15 @@ impl PlasmaStateKeeper {
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64
     ) -> Self {
-        let mut driver = data_restore::create_data_restore_driver(
+        let mut driver = data_restore::create_data_restore_driver_with_genesis(
             pool.clone(),
             web3_url,
             contract_eth_addr,
+            contract_genesis_tx_hash,
             eth_blocks_step,
             end_eth_blocks_offset
         ).expect("Cant create data restore driver"); // Error processing
         // TODO: - check for storage
-        data_restore::load_genesis_state(&mut driver, contract_genesis_tx_hash);
         data_restore::update_state(&mut driver);
 
         let keeper = PlasmaStateKeeper {

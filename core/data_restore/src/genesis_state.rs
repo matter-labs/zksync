@@ -4,7 +4,6 @@ use crate::helpers::{
 use failure::format_err;
 use models::node::{
     account::{Account, AccountAddress},
-    AccountMap,
 };
 use web3::types::Transaction;
 use models::params::{FR_ADDRESS_LEN, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
