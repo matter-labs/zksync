@@ -44,7 +44,7 @@ fn api_client_register_prover() {
 #[test]
 fn api_client_simple_simulation() {
     let prover_timeout = time::Duration::from_secs(1);
-    let rounds_interval = time::Duration::from_millis(100);
+    let rounds_interval = time::Duration::from_secs(10);
 
     let addr = spawn_server(prover_timeout, rounds_interval);
 
@@ -58,8 +58,9 @@ fn api_client_simple_simulation() {
 
     let storage = access_storage();
 
-    let (op, _wanted_prover_data) = test_operation_and_wanted_prover_data();
+    let (op, wanted_prover_data) = test_operation_and_wanted_prover_data();
 
+    println!("inserting test operation");
     // write test commit operation to db
     storage
         .execute_operation(&op)
@@ -95,14 +96,23 @@ fn api_client_simple_simulation() {
         .expect("failed to get block to prove");
     assert!(block.is_none());
 
-    // let prover_data = client.prover_data(1).expect("failed to get prover data");
-    // assert_eq!(prover_data.public_data_commitment, wanted_prover_data.public_data_commitment);
+    let prover_data = client
+        .prover_data(time::Duration::from_secs(30 * 60))
+        .expect("failed to get prover data");
+    assert_eq!(prover_data.old_root, wanted_prover_data.old_root);
+    assert_eq!(prover_data.new_root, wanted_prover_data.new_root);
+    assert_eq!(
+        prover_data.public_data_commitment,
+        wanted_prover_data.public_data_commitment,
+    );
 }
 
 pub fn test_operation_and_wanted_prover_data(
 ) -> (models::Operation, prover::witness_generator::ProverData) {
     let mut circuit_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+    // insert account and its balance
+    let storage = access_storage();
 
     let validator_test_account = TestAccount::new();
 
@@ -114,13 +124,16 @@ pub fn test_operation_and_wanted_prover_data(
     accounts.insert(validator_account_id, validator_account.clone());
 
     let mut state = plasma::state::PlasmaState::new(accounts, 1);
-    let genesis_root_hash = state.root_hash();
+    println!(
+        "acc_number {}, acc {:?}",
+        0,
+        models::circuit::account::CircuitAccount::from(validator_account.clone()).pub_key_hash,
+    );
     circuit_tree.insert(
         0,
         models::circuit::account::CircuitAccount::from(validator_account.clone()),
     );
-    assert_eq!(circuit_tree.root_hash(), genesis_root_hash);
-
+    let initial_root = circuit_tree.root_hash();
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
         sender: web3::types::Address::zero(),
         token: 0,
@@ -137,6 +150,18 @@ pub fn test_operation_and_wanted_prover_data(
     }
 
     accounts_updated.append(&mut op_success.updates);
+
+    storage.commit_state_update(
+        0,
+        &[(
+            0,
+            models::node::AccountUpdate::Create {
+                address: validator_account.address,
+                nonce: validator_account.nonce,
+            },
+        )],
+    );
+    storage.apply_state_update(0);
 
     ops.push(models::node::ExecutedOperations::PriorityOp(Box::new(
         models::node::ExecutedPriorityOp {
@@ -229,11 +254,10 @@ pub fn test_operation_and_wanted_prover_data(
     assert_eq!(root_after_fee, block.new_root_hash);
     let (validator_audit_path, _) =
         circuit::witness::utils::get_audits(&circuit_tree, block.fee_account as u32, 0);
-
     let public_data_commitment =
         circuit::witness::utils::public_data_commitment::<models::node::Engine>(
             &pub_data,
-            Some(genesis_root_hash),
+            Some(initial_root),
             Some(root_after_fee),
             Some(models::node::Fr::from_str(&block.fee_account.to_string()).unwrap()),
             Some(models::node::Fr::from_str(&(block.block_number).to_string()).unwrap()),
@@ -248,7 +272,7 @@ pub fn test_operation_and_wanted_prover_data(
         },
         prover::witness_generator::ProverData {
             public_data_commitment,
-            old_root: genesis_root_hash,
+            old_root: initial_root,
             new_root: block.new_root_hash,
             validator_address: models::node::Fr::from_str(&block.fee_account.to_string()).unwrap(),
             operations,
@@ -257,4 +281,21 @@ pub fn test_operation_and_wanted_prover_data(
             validator_account: validator_account_witness,
         },
     )
+}
+
+#[test]
+fn api_server_publish_dummy() {
+    let prover_timeout = time::Duration::from_secs(1);
+    let rounds_interval = time::Duration::from_secs(10);
+    let addr = spawn_server(prover_timeout, rounds_interval);
+
+    let client = reqwest::Client::new();
+    client
+        .post(&format!("http://{}/publish", &addr))
+        .json(&server::PublishReq {
+            block: 1,
+            proof: models::EncodedProof::default(),
+        })
+        .send()
+        .expect("failed to send publish request");
 }
