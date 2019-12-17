@@ -181,7 +181,7 @@ export async function depositFromETH(deposit: {
     if (deposit.token == "ETH") {
         ethTransaction = await mainZkSyncContract.depositETH(
             deposit.amount,
-            deposit.depositTo.address(),
+            deposit.depositTo.address().replace('sync:', '0x'),
             {
                 value: utils.bigNumberify(deposit.amount).add(maxFeeInETHToken),
                 gasLimit: utils.bigNumberify("200000"),
@@ -202,7 +202,7 @@ export async function depositFromETH(deposit: {
         ethTransaction = await mainZkSyncContract.depositERC20(
             deposit.token,
             deposit.amount,
-            deposit.depositTo.address(),
+            deposit.depositTo.address().replace('sync:', '0x'),
             {
                 gasLimit: utils.bigNumberify("250000"),
                 value: maxFeeInETHToken,
