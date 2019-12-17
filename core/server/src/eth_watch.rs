@@ -8,7 +8,7 @@ use std::time::Duration;
 // External uses
 use ethabi::{decode, ParamType};
 use failure::format_err;
-use futures::Future;
+use futures::{compat::Future01CompatExt, executor::block_on};
 use web3::contract::Contract;
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
 use web3::{Transport, Web3};
@@ -133,10 +133,7 @@ impl<T: Transport> EthWatch<T> {
     ) -> Result<Vec<TokenAddedEvent>, failure::Error> {
         let filter = self.get_new_token_event_filter(from, to);
 
-        self.web3
-            .eth()
-            .logs(filter)
-            .wait()?
+        block_on(self.web3.eth().logs(filter).compat())?
             .into_iter()
             .map(|event| {
                 TokenAddedEvent::try_from(event).map_err(|e| {
@@ -167,10 +164,7 @@ impl<T: Transport> EthWatch<T> {
         to: BlockNumber,
     ) -> Result<Vec<PriorityOp>, failure::Error> {
         let filter = self.get_priority_op_event_filter(from, to);
-        self.web3
-            .eth()
-            .logs(filter)
-            .wait()?
+        block_on(self.web3.eth().logs(filter).compat())?
             .into_iter()
             .map(|event| {
                 PriorityOp::try_from(event).map_err(|e| {
@@ -255,11 +249,7 @@ impl<T: Transport> EthWatch<T> {
     }
 
     pub fn run(mut self) {
-        let block = self
-            .web3
-            .eth()
-            .block_number()
-            .wait()
+        let block = block_on(self.web3.eth().block_number().compat())
             .expect("Block number")
             .as_u64();
         self.processed_block = block;
@@ -267,7 +257,7 @@ impl<T: Transport> EthWatch<T> {
 
         loop {
             std::thread::sleep(Duration::from_secs(1));
-            let last_block_number = self.web3.eth().block_number().wait();
+            let last_block_number = block_on(self.web3.eth().block_number().compat());
             let block = if let Ok(block) = last_block_number {
                 block.as_u64()
             } else {

@@ -3,7 +3,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
 // External uses
-use futures::sync::mpsc as fmpsc;
+use futures::channel::mpsc as fmpsc;
 // Workspace uses
 use crate::ThreadPanicNotify;
 use models::{Action, CommitRequest, Operation};
