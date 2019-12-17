@@ -1016,9 +1016,9 @@ impl StorageProcessor {
                     on
                         tx_hash = hash
                     where
-                        encode(primary_account_address, 'hex') = '{address}'
+                        concat('sync:', encode(primary_account_address, 'hex')) = '{address}'
                         or
-                        tx->>'to' = '0x{address}'
+                        tx->>'to' = '{address}'
                     union all
                     select
                         operation as tx,
@@ -1030,7 +1030,7 @@ impl StorageProcessor {
                     from 
                         executed_priority_operations
                     where 
-                        operation->'priority_op'->>'account' = '0x{address}') t
+                        operation->'priority_op'->>'account' = '{address}') t
                 order by
                     block_number desc
                 offset 
@@ -1055,7 +1055,7 @@ impl StorageProcessor {
             using 
                 (block_number)
             ",
-            address = hex::encode(address.data),
+            address = address.to_hex(),
             offset = offset,
             limit = limit
         );

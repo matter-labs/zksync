@@ -6,7 +6,7 @@
     "serve": "yarn gen_config && yarn update_zksync.js && vue-cli-service serve --port=8080",
     "build": "yarn gen_config && yarn update_zksync.js && vue-cli-service build",
     "gen_config": "f ../../bin/.gen_js_config > src/env-config.js",
-    "update_zksync.js": "cd ../zksync.js && yarn build && cd ../client && yarn upgrade zksync.js",
+    "update_zksync.js": "cd ../../../zksync.js && yarn build && cd ../zksync/js/client && yarn upgrade zksync.js",
     "set_token_name": "psql --host=localhost --user=postgres --dbname=plasma --command=\"update tokens set symbol='FAU' where id=1\"",
     "lint": "vue-cli-service lint"
   },
@@ -23,7 +23,7 @@
     "sass-loader": "^8.0.0",
     "vue": "^2.6.10",
     "vue-router": "^3.0.3",
-    "zksync": "../zksync.js"
+    "zksync": "../../../zksync.js"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.11.0",

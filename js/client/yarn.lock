@@ -9687,7 +9687,7 @@ yorkie@^2.0.0:
     normalize-path "^1.0.0"
     strip-indent "^2.0.0"
 
-zksync@../zksync.js:
+zksync@../../../zksync.js:
   version "0.3.7"
   dependencies:
     axios "^0.19.0"

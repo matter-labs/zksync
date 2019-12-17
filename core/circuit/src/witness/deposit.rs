@@ -93,7 +93,7 @@ pub fn apply_deposit_tx(
     tree: &mut CircuitAccountTree,
     deposit: &DepositOp,
 ) -> DepositWitness<Bn256> {
-    let alt_new_pubkey_hash = Fr::from_hex(&deposit.priority_op.account.to_hex()).unwrap();
+    let alt_new_pubkey_hash = deposit.priority_op.account.to_fr();
     let deposit_data = DepositData {
         amount: deposit.priority_op.amount.to_string().parse().unwrap(),
         token: u32::from(deposit.priority_op.token),
