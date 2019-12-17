@@ -1,8 +1,11 @@
+// Built-in deps
 use std::time;
+use std::time::Duration;
+// External deps
 use log::info;
+// Workspace deps
 use models::node::config::{PROVER_CYCLE_WAIT, PROVER_TIMEOUT};
 use models::EncodedProof;
-use std::time::Duration;
 use storage::ConnectionPool;
 
 fn main() {
@@ -14,7 +17,7 @@ fn main() {
     loop {
         let storage = pool.access_storage().expect("Storage access");
         let job = storage
-            .job_for_unverified_block(worker, time::Duration::from_secs(PROVER_TIMEOUT as u64))
+            .next_unverified_commit(worker, time::Duration::from_secs(PROVER_TIMEOUT as u64))
             .expect("prover job, db access");
         if let Some(job) = job {
             info!("Received job for block: {}", job.block_number);

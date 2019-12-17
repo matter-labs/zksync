@@ -1,7 +1,7 @@
-// Built-in uses
+// Built-in deps
 use std::convert::TryInto;
 use std::str::FromStr;
-// External uses
+// External deps
 use bigdecimal::BigDecimal;
 use failure::bail;
 use ff::ScalarEngine;
@@ -10,7 +10,7 @@ use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use pairing::bn256::Bn256;
 use pairing::{CurveAffine, Engine};
 use web3::types::U256;
-// Workspace uses
+// Workspace deps
 use crate::circuit::utils::append_le_fixed_width;
 use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
 use crate::params;

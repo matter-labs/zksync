@@ -1965,7 +1965,7 @@ impl StorageProcessor {
     }
 
     // TODO: remove this method
-    pub fn job_for_unverified_block(
+    pub fn next_unverified_commit(
         &self,
         worker_: &str,
         prover_timeout: time::Duration,

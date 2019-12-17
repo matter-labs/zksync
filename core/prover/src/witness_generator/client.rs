@@ -1,5 +1,4 @@
-use crate::witness_generator::server;
-use crate::ProverData;
+use crate::witness_generator::{server, ProverData};
 use bellman::groth16;
 use std::str::FromStr;
 use std::sync::Mutex;
@@ -20,8 +19,6 @@ pub struct ApiClient {
     prover_data_url: String,
     publish_url: String,
     worker: String,
-    current_prover_run_id: Mutex<i32>,
-    current_proving_block: Mutex<i64>,
 }
 
 #[derive(Debug)]
@@ -47,8 +44,6 @@ impl ApiClient {
             prover_data_url: format!("{}/prover_data", base_url),
             publish_url: format!("{}/publish", base_url),
             worker: worker.to_string(),
-            current_prover_run_id: Mutex::new(0),
-            current_proving_block: Mutex::new(0),
         }
     }
 
@@ -68,10 +63,8 @@ impl ApiClient {
 }
 
 impl crate::ApiClient for ApiClient {
-    fn block_to_prove(&self) -> Result<Option<i64>, String> {
+    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, String> {
         // TODO: handle errors
-        let mut current_prover_run_id = self.current_prover_run_id.lock().unwrap();
-        let mut current_proving_block = self.current_proving_block.lock().unwrap();
         let client = reqwest::Client::new();
         let mut res = client
             .get(&self.block_to_prove_url)
@@ -83,35 +76,31 @@ impl crate::ApiClient for ApiClient {
         let text = res.text().unwrap();
         let res: server::BlockToProveRes = serde_json::from_str(&text).unwrap();
         if res.block != 0 {
-            *current_prover_run_id = res.prover_run_id;
-            *current_proving_block = res.block;
-            return Ok(Some(res.block));
+            return Ok(Some((res.block, res.prover_run_id)));
         }
         Ok(None)
     }
 
-    fn working_on(&self, block: i64) {
+    fn working_on(&self, job_id: i32) {
         // TODO: handle errors
         let client = reqwest::Client::new();
         client
             .post(&self.working_on_url)
             .json(&server::WorkingOnReq {
-                prover_run_id: *self.current_prover_run_id.lock().unwrap(),
+                prover_run_id: job_id,
             })
             .send()
             .unwrap();
     }
 
-    fn prover_data(&self, timeout: time::Duration) -> Result<ProverData, String> {
-        let block = self.current_proving_block.lock().unwrap();
-        println!("client::prover_data {}", *block);
+    fn prover_data(&self, block: i64, timeout: time::Duration) -> Result<ProverData, String> {
         let client = reqwest::Client::new();
         // TODO: whats the idiomatic way of cancallation by timeout.
         let now = time::SystemTime::now();
         while now.elapsed().unwrap() < timeout {
             let mut res = client
                 .get(&self.prover_data_url)
-                .json(&(*block))
+                .json(&block)
                 .send()
                 .unwrap();
             let text = res.text().unwrap();

@@ -1,18 +1,17 @@
 pub mod witness_generator;
 
-// Built-in uses
+// Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::{thread, time};
-// External uses
+// External deps
 use bellman::groth16;
 use ff::PrimeField;
 use log::error;
 use pairing::bn256;
-// Workspace uses
-use witness_generator::ProverData;
+// Workspace deps
 
-pub struct Prover<C: ApiClient> {
+pub struct Worker<C: ApiClient> {
     circuit_params: groth16::Parameters<bn256::Bn256>,
     jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
     api_client: C,
@@ -21,10 +20,13 @@ pub struct Prover<C: ApiClient> {
 }
 
 pub trait ApiClient {
-    // TODO: fn block_to_prove(&self) -> Result<Option<(i64, ProverData)>, String>
-    fn block_to_prove(&self) -> Result<Option<i64>, String>;
-    fn working_on(&self, block: i64);
-    fn prover_data(&self, timeout: time::Duration) -> Result<ProverData, String>;
+    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, String>;
+    fn working_on(&self, job_id: i32);
+    fn prover_data(
+        &self,
+        block: i64,
+        timeout: time::Duration,
+    ) -> Result<witness_generator::ProverData, String>;
     fn publish(
         &self,
         block: i64,
@@ -33,20 +35,18 @@ pub trait ApiClient {
     ) -> Result<(), String>;
 }
 
-pub fn start<'a, C: 'static + Sync + Send + ApiClient>(prover: Prover<C>) {
+pub fn start<'a, C: 'static + Sync + Send + ApiClient>(prover: Worker<C>) {
     let (tx_block_start, rx_block_start) = mpsc::channel();
     let prover = Arc::new(prover);
     let prover_rc = Arc::clone(&prover);
     let join_handle = thread::spawn(move || {
         prover.run_rounds(tx_block_start);
-        println!("exit run_rounds.");
     });
     prover_rc.keep_sending_work_heartbeats(rx_block_start);
-    println!("exit keep_sending_work_heartbeats");
     join_handle.join();
 }
 
-impl<C: ApiClient> Prover<C> {
+impl<C: ApiClient> Worker<C> {
     pub fn new(
         circuit_params: groth16::Parameters<bn256::Bn256>,
         jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
@@ -54,7 +54,7 @@ impl<C: ApiClient> Prover<C> {
         heartbeat_interval: time::Duration,
         stop_signal: Arc<AtomicBool>,
     ) -> Self {
-        Prover {
+        Worker {
             circuit_params,
             jubjub_params,
             api_client,
@@ -63,26 +63,32 @@ impl<C: ApiClient> Prover<C> {
         }
     }
 
-    fn run_rounds(&self, start_heartbeats_tx: mpsc::Sender<Option<i64>>) {
+    fn run_rounds(&self, start_heartbeats_tx: mpsc::Sender<i32>) {
         // TODO: add PROVER_CYCLE_WAIT usage
         let mut rng = rand::OsRng::new().unwrap();
 
         while !self.stop_signal.load(Ordering::SeqCst) {
             let block_to_prove = self.api_client.block_to_prove();
-            let block = match block_to_prove {
+            let block_to_prove = match block_to_prove {
                 Ok(b) => b,
                 // TODO: log error
                 _ => continue,
             };
-            // Notify heartbeat routine on new proving block or None.
-            start_heartbeats_tx.send(block);
 
-            let block = match block {
+            let (block, job_id) = match block_to_prove {
                 Some(b) => b,
-                _ => continue,
+                _ => (0, 0),
             };
+            // Notify heartbeat routine on new proving block or None.
+            start_heartbeats_tx.send(job_id);
+            if job_id == 0 {
+                continue;
+            }
             // TODO: timeout
-            let prover_data = match self.api_client.prover_data(time::Duration::from_secs(10)) {
+            let prover_data = match self
+                .api_client
+                .prover_data(block, time::Duration::from_secs(10))
+            {
                 Ok(v) => v,
                 Err(err) => {
                     error!("could not get prover data for block {}: {}", block, err);
@@ -136,18 +142,18 @@ impl<C: ApiClient> Prover<C> {
         }
     }
 
-    fn keep_sending_work_heartbeats(&self, start_heartbeats_rx: mpsc::Receiver<Option<i64>>) {
-        let mut proving_block = 0;
+    fn keep_sending_work_heartbeats(&self, start_heartbeats_rx: mpsc::Receiver<i32>) {
+        let mut job_id = 0;
         while !self.stop_signal.load(Ordering::SeqCst) {
             thread::sleep(self.heartbeat_interval);
-            proving_block = match start_heartbeats_rx.try_recv() {
-                Ok(Some(v)) => v,
-                Err(mpsc::TryRecvError::Empty) => proving_block,
-                Ok(None) => 0,
-                _ => break,
+            job_id = match start_heartbeats_rx.try_recv() {
+                Ok(v) => v,
+                Err(mpsc::TryRecvError::Empty) => job_id,
+                Err(e) => break,
+                _ => 0,
             };
-            if proving_block != 0 {
-                self.api_client.working_on(proving_block);
+            if job_id != 0 {
+                self.api_client.working_on(job_id);
             }
         }
     }

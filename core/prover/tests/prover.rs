@@ -1,19 +1,19 @@
-// Built-in uses
+// Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{env, fs, io, path, thread, time};
-// External uses
+// External deps
 use ff::{Field, PrimeField};
 use rand::Rng;
-// Workspace uses
+// Workspace deps
 use prover;
 use testhelper::TestAccount;
 
 #[test]
 fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // Testing [black box] that:
-    // - Prover sends `working_on` requests (heartbeat) over api client
-    // - Prover stops running upon receiving data over stop channel
+    // - Worker sends `working_on` requests (heartbeat) over api client
+    // - Worker stops running upon receiving data over stop channel
 
     // Create a channel to notify on provers exit.
     let (done_tx, done_rx) = mpsc::channel();
@@ -28,11 +28,11 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     thread::spawn(move || {
         // Create channel for proofs, not using in this test.
         let (tx, _) = mpsc::channel();
-        let p = prover::Prover::new(
+        let p = prover::Worker::new(
             circuit_parameters,
             jubjub_params,
             MockApiClient {
-                block_to_prove: Mutex::new(Some(1)),
+                block_to_prove: Mutex::new(Some((1, 1))),
                 heartbeats_tx: Arc::new(Mutex::new(heartbeat_tx)),
                 publishes_tx: Arc::new(Mutex::new(tx)),
                 prover_data_fn: || None,
@@ -61,7 +61,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     heartbeat_rx.recv_timeout(timeout);
     heartbeat_rx.recv_timeout(timeout);
     println!("finishing up");
-    // Prover must be stopped.
+    // Worker must be stopped.
     done_rx.recv_timeout(timeout).unwrap();
 }
 
@@ -81,11 +81,11 @@ fn prover_proves_a_block_and_publishes_result() {
     thread::spawn(move || {
         // Work heartbeat channel, not used in this test.
         let (tx, _) = mpsc::channel();
-        let p = prover::Prover::new(
+        let p = prover::Worker::new(
             circuit_params,
             jubjub_params,
             MockApiClient {
-                block_to_prove: Mutex::new(Some(1)),
+                block_to_prove: Mutex::new(Some((1, 1))),
                 heartbeats_tx: Arc::new(Mutex::new(tx)),
                 publishes_tx: Arc::new(Mutex::new(proof_tx)),
                 prover_data_fn: move || Some(prover_data.clone()),
@@ -288,7 +288,7 @@ fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engin
 }
 
 struct MockApiClient<F: Fn() -> Option<prover::witness_generator::ProverData>> {
-    block_to_prove: Mutex<Option<i64>>,
+    block_to_prove: Mutex<Option<(i64, i32)>>,
     heartbeats_tx: Arc<Mutex<mpsc::Sender<()>>>,
     publishes_tx: Arc<Mutex<mpsc::Sender<bellman::groth16::Proof<models::node::Engine>>>>,
     prover_data_fn: F,
@@ -297,15 +297,15 @@ struct MockApiClient<F: Fn() -> Option<prover::witness_generator::ProverData>> {
 impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
     for MockApiClient<F>
 {
-    fn block_to_prove(&self) -> Result<Option<i64>, String> {
+    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, String> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         Ok(*block_to_prove)
     }
 
-    fn working_on(&self, block: i64) {
-        let block_to_prove = self.block_to_prove.lock().unwrap();
-        if let Some(stored) = *block_to_prove {
-            if stored != block {
+    fn working_on(&self, job: i32) {
+        let stored = self.block_to_prove.lock().unwrap();
+        if let Some((_, stored)) = *stored {
+            if stored != job {
                 return;
             }
             self.heartbeats_tx.lock().unwrap().send(());
@@ -314,6 +314,7 @@ impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
 
     fn prover_data(
         &self,
+        _block: i64,
         _timeout: time::Duration,
     ) -> Result<prover::witness_generator::ProverData, String> {
         let block_to_prove = self.block_to_prove.lock().unwrap();

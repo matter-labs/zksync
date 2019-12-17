@@ -1,11 +1,11 @@
-// Built-in uses
+// Built-in deps
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-// External uses
+// External deps
 use itertools::Itertools;
 use web3::types::H256;
-// Workspace uses
+// Workspace deps
 use crate::eth_watch::ETHState;
 use crate::ThreadPanicNotify;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};

@@ -13,7 +13,7 @@ use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use pairing::bn256::Bn256;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-// Workspace uses
+// Workspace deps
 use circuit::account::AccountWitness;
 use circuit::operation::{
     Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
@@ -67,7 +67,7 @@ fn block_to_prove(
     };
     // TODO: handle errors
     let ret = storage
-        .job_for_unverified_block(&r.name, data.prover_timeout)
+        .next_unverified_commit(&r.name, data.prover_timeout)
         .unwrap();
     if let Some(prover_run) = ret {
         return Ok(HttpResponse::Ok().json(BlockToProveRes {
