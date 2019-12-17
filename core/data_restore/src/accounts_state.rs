@@ -1,5 +1,5 @@
 use crate::franklin_ops::FranklinOpsBlock;
-use crate::helpers::DataRestoreError;
+use failure::format_err;
 use models::node::account::{Account, AccountAddress};
 use models::node::operations::FranklinOp;
 use models::node::priority_ops::FranklinPriorityOp;
@@ -50,7 +50,7 @@ impl FranklinAccountsState {
     pub fn update_accounts_states_from_ops_block(
         &mut self,
         block: &FranklinOpsBlock,
-    ) -> Result<AccountUpdates, DataRestoreError> {
+    ) -> Result<AccountUpdates, failure::Error> {
         let operations = block.ops.clone();
 
         let mut accounts_updated = Vec::new();
@@ -70,9 +70,10 @@ impl FranklinAccountsState {
                     accounts_updated.append(&mut updates);
                 }
                 FranklinOp::TransferToNew(mut op) => {
-                    let from = self.state.get_account(op.from).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
-                    })?;
+                    let from = self
+                        .state
+                        .get_account(op.from)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.nonce = from.nonce;
                     if let Ok(OpSuccess {
@@ -87,9 +88,10 @@ impl FranklinAccountsState {
                 }
                 FranklinOp::Withdraw(mut op) => {
                     // Withdraw op comes with empty Account Address and Nonce fields
-                    let account = self.state.get_account(op.account_id).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
-                    })?;
+                    let account = self
+                        .state
+                        .get_account(op.account_id)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
@@ -104,9 +106,10 @@ impl FranklinAccountsState {
                 }
                 FranklinOp::Close(mut op) => {
                     // Close op comes with empty Account Address and Nonce fields
-                    let account = self.state.get_account(op.account_id).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
-                    })?;
+                    let account = self
+                        .state
+                        .get_account(op.account_id)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
@@ -120,12 +123,14 @@ impl FranklinAccountsState {
                     }
                 }
                 FranklinOp::Transfer(mut op) => {
-                    let from = self.state.get_account(op.from).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
-                    })?;
-                    let to = self.state.get_account(op.to).ok_or_else(|| {
-                        DataRestoreError::WrongData("Nonexistent account".to_string())
-                    })?;
+                    let from = self
+                        .state
+                        .get_account(op.from)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                    let to = self
+                        .state
+                        .get_account(op.to)
+                        .ok_or_else(|| format_err!("Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.to = to.address;
                     op.tx.nonce = from.nonce;
@@ -156,7 +161,7 @@ impl FranklinAccountsState {
         }
         let fee_account_address = self
             .get_account(block.fee_account)
-            .ok_or_else(|| DataRestoreError::WrongData("Nonexistent fee account".to_string()))?
+            .ok_or_else(|| format_err!("Nonexistent account"))?
             .address;
         let (_, fee_updates) = self.state.collect_fee(&fees, &fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
@@ -189,14 +194,28 @@ impl FranklinAccountsState {
 mod test {
     use crate::accounts_state::FranklinAccountsState;
     use crate::franklin_ops::FranklinOpsBlock;
+    use bigdecimal::BigDecimal;
+    use models::node::tx::TxSignature;
+    use models::node::{
+        AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp, Transfer, TransferOp,
+        TransferToNewOp, Withdraw, WithdrawOp,
+    };
 
     #[test]
-    // TODO: Fix test of tree restore
-    #[ignore]
-    fn test_tree_consistent_update() {
-        let data1 = "0100000000000000000000000000041336c4e56f98000809101112131415161718192021222334252627000000000000";
-        let decoded1 = hex::decode(data1).expect("Decoding failed");
-        let ops1 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded1)
+    fn test_update_tree_with_one_tx_per_block() {
+        let tx1 = Deposit {
+            sender: [9u8; 20].into(),
+            token: 1,
+            amount: BigDecimal::from(1000),
+            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+                .unwrap(),
+        };
+        let op1 = FranklinOp::Deposit(Box::new(DepositOp {
+            priority_op: tx1,
+            account_id: 0,
+        }));
+        let pub_data1 = op1.public_data();
+        let ops1 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
             .expect("cant get ops from data 1");
         let block1 = FranklinOpsBlock {
             block_num: 1,
@@ -204,9 +223,22 @@ mod test {
             fee_account: 0,
         };
 
-        let data2 = "030000000000000000000000000002c68af0bb14000000005711e991397fca8f5651c9bb6fa06b57e4a4dcc000000000";
-        let decoded2 = hex::decode(data2).expect("Decoding failed");
-        let ops2 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded2)
+        let tx2 = Withdraw {
+            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+                .unwrap(),
+            eth_address: [9u8; 20].into(),
+            token: 1,
+            amount: BigDecimal::from(20),
+            fee: BigDecimal::from(1),
+            nonce: 1,
+            signature: TxSignature::default(),
+        };
+        let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
+            tx: tx2,
+            account_id: 0,
+        }));
+        let pub_data2 = op2.public_data();
+        let ops2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data2)
             .expect("cant get ops from data 2");
         let block2 = FranklinOpsBlock {
             block_num: 2,
@@ -214,10 +246,22 @@ mod test {
             fee_account: 0,
         };
 
-        let data3 =
-            "02000000000000010008091011121314151617181920212223342526280000010000000000000000";
-        let decoded3 = hex::decode(data3).expect("Decoding failed");
-        let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded3)
+        let tx3 = Transfer {
+            from: AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap(),
+            to: AccountAddress::from_hex("0x8888888888888888888888888888888888888888").unwrap(),
+            token: 1,
+            amount: BigDecimal::from(20),
+            fee: BigDecimal::from(1),
+            nonce: 3,
+            signature: TxSignature::default(),
+        };
+        let op3 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+            tx: tx3,
+            from: 0,
+            to: 1,
+        }));
+        let pub_data3 = op3.public_data();
+        let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data3)
             .expect("cant get ops from data 3");
         let block3 = FranklinOpsBlock {
             block_num: 3,
@@ -225,9 +269,22 @@ mod test {
             fee_account: 0,
         };
 
-        let data4 = "05000001000000000000010000000000";
-        let decoded4 = hex::decode(data4).expect("Decoding failed");
-        let ops4 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded4)
+        let tx4 = Transfer {
+            from: AccountAddress::from_hex("0x8888888888888888888888888888888888888888").unwrap(),
+            to: AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap(),
+            token: 1,
+            amount: BigDecimal::from(19),
+            fee: BigDecimal::from(1),
+            nonce: 1,
+            signature: TxSignature::default(),
+        };
+        let op4 = FranklinOp::Transfer(Box::new(TransferOp {
+            tx: tx4,
+            from: 1,
+            to: 0,
+        }));
+        let pub_data4 = op4.public_data();
+        let ops4 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data4)
             .expect("cant get ops from data 4");
         let block4 = FranklinOpsBlock {
             block_num: 4,
@@ -235,9 +292,18 @@ mod test {
             fee_account: 0,
         };
 
-        let data5 = "0400000100000000";
-        let decoded5 = hex::decode(data5).expect("Decoding failed");
-        let ops5 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded5)
+        let tx5 = Close {
+            account: AccountAddress::from_hex("0x8888888888888888888888888888888888888888")
+                .unwrap(),
+            nonce: 2,
+            signature: TxSignature::default(),
+        };
+        let op5 = FranklinOp::Close(Box::new(CloseOp {
+            tx: tx5,
+            account_id: 1,
+        }));
+        let pub_data5 = op5.public_data();
+        let ops5 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data5)
             .expect("cant get ops from data 5");
         let block5 = FranklinOpsBlock {
             block_num: 5,
@@ -245,80 +311,143 @@ mod test {
             fee_account: 0,
         };
 
-        // FULL EXIT WILL WORK WITH SIGNATURE
-        // let data3 = "06000002000000000000000000000000000000000000000000000000000000000000000052312ad6f01657413b2eae9287f6b9adad93d5fe000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000014cabd42a5b98000000";
-        // let decoded3 = hex::decode(data3).expect("Decoding failed");
-        // let ops3 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded3)
-        //     .expect("cant get ops from data");
-        // println!("ops3 {:?} \n", ops3);
-        // let block3 = FranklinOpsBlock {
-        //     block_num: 3,
-        //     ops: ops3,
-        // };
-
         let mut tree = FranklinAccountsState::new();
-        let updates1 = tree
-            .update_accounts_states_from_ops_block(&block1)
+        tree.update_accounts_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
-        println!("updates 1 {:?} \n", updates1);
-        println!("root hash 1 {:?} \n", tree.root_hash());
-        println!("accounts 1 {:?} \n", tree.get_accounts());
-        let updates2 = tree
-            .update_accounts_states_from_ops_block(&block2)
+        tree.update_accounts_states_from_ops_block(&block2)
             .expect("Cant update state from block 2");
-        println!("updates 2 {:?} \n", updates2);
-        println!("root hash 2 {:?} \n", tree.root_hash());
-        println!("accounts 2 {:?} \n", tree.get_accounts());
-        let updates3 = tree
-            .update_accounts_states_from_ops_block(&block3)
+        tree.update_accounts_states_from_ops_block(&block3)
             .expect("Cant update state from block 3");
-        println!("updates 3 {:?} \n", updates3);
-        println!("root hash 3 {:?} \n", tree.root_hash());
-        println!("accounts 3 {:?} \n", tree.get_accounts());
-        let updates4 = tree
-            .update_accounts_states_from_ops_block(&block4)
+        tree.update_accounts_states_from_ops_block(&block4)
             .expect("Cant update state from block 4");
-        println!("updates 4 {:?} \n", updates4);
-        println!("root hash 4 {:?} \n", tree.root_hash());
-        println!("accounts 4 {:?} \n", tree.get_accounts());
-        let updates5 = tree
-            .update_accounts_states_from_ops_block(&block5)
-            .expect("Cant update state from block 4");
-        println!("updates 5 {:?} \n", updates5);
-        println!("root hash 5 {:?} \n", tree.root_hash());
-        println!("accounts 5 {:?} \n", tree.get_accounts());
+        tree.update_accounts_states_from_ops_block(&block5)
+            .expect("Cant update state from block 5");
 
+        assert_eq!(tree.get_accounts().len(), 2);
+
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
         assert_eq!(
-            tree.root_hash().to_string(),
-            "Fr(0x0f220069602ed8f8c4557fdde71baf5220bbf237790adf67f49280b84588acf2)".to_string()
+            zero_acc.address,
+            AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap()
         );
+        assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
+
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
+        assert_eq!(
+            first_acc.address,
+            AccountAddress::from_hex("0x0000000000000000000000000000000000000000").unwrap()
+        );
+        assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }
 
     #[test]
-    // TODO: Fix test of tree restore
-    #[ignore]
-    fn test_tree_inconsistent_update() {
-        let data1 = "0100000000000000000000000000041336c4e56f98000809101112131415161718192021222334252627000000000000030000000000000000000000000002c68af0bb14000000005711e991397fca8f5651c9bb6fa06b57e4a4dcc00000000002000000000000010008091011121314151617181920212223342526280000010000000000000000050000010000000000000100000000000400000100000000";
-        let decoded1 = hex::decode(data1).expect("Decoding failed");
-        let ops1 = FranklinOpsBlock::get_franklin_ops_from_data(&decoded1)
+    fn test_update_tree_with_multiple_txs_per_block() {
+        let tx1 = Deposit {
+            sender: [9u8; 20].into(),
+            token: 1,
+            amount: BigDecimal::from(1000),
+            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+                .unwrap(),
+        };
+        let op1 = FranklinOp::Deposit(Box::new(DepositOp {
+            priority_op: tx1,
+            account_id: 0,
+        }));
+        let pub_data1 = op1.public_data();
+
+        let tx2 = Withdraw {
+            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+                .unwrap(),
+            eth_address: [9u8; 20].into(),
+            token: 1,
+            amount: BigDecimal::from(20),
+            fee: BigDecimal::from(1),
+            nonce: 1,
+            signature: TxSignature::default(),
+        };
+        let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
+            tx: tx2,
+            account_id: 0,
+        }));
+        let pub_data2 = op2.public_data();
+
+        let tx3 = Transfer {
+            from: AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap(),
+            to: AccountAddress::from_hex("0x8888888888888888888888888888888888888888").unwrap(),
+            token: 1,
+            amount: BigDecimal::from(20),
+            fee: BigDecimal::from(1),
+            nonce: 3,
+            signature: TxSignature::default(),
+        };
+        let op3 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+            tx: tx3,
+            from: 0,
+            to: 1,
+        }));
+        let pub_data3 = op3.public_data();
+
+        let tx4 = Transfer {
+            from: AccountAddress::from_hex("0x8888888888888888888888888888888888888888").unwrap(),
+            to: AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap(),
+            token: 1,
+            amount: BigDecimal::from(19),
+            fee: BigDecimal::from(1),
+            nonce: 1,
+            signature: TxSignature::default(),
+        };
+        let op4 = FranklinOp::Transfer(Box::new(TransferOp {
+            tx: tx4,
+            from: 1,
+            to: 0,
+        }));
+        let pub_data4 = op4.public_data();
+
+        let tx5 = Close {
+            account: AccountAddress::from_hex("0x8888888888888888888888888888888888888888")
+                .unwrap(),
+            nonce: 2,
+            signature: TxSignature::default(),
+        };
+        let op5 = FranklinOp::Close(Box::new(CloseOp {
+            tx: tx5,
+            account_id: 1,
+        }));
+        let pub_data5 = op5.public_data();
+
+        let mut pub_data = Vec::new();
+        pub_data.extend_from_slice(&pub_data1);
+        pub_data.extend_from_slice(&pub_data2);
+        pub_data.extend_from_slice(&pub_data3);
+        pub_data.extend_from_slice(&pub_data4);
+        pub_data.extend_from_slice(&pub_data5);
+
+        let ops = FranklinOpsBlock::get_franklin_ops_from_data(pub_data.as_slice())
             .expect("cant get ops from data 1");
-        let block1 = FranklinOpsBlock {
+        let block = FranklinOpsBlock {
             block_num: 1,
-            ops: ops1,
+            ops,
             fee_account: 0,
         };
 
         let mut tree = FranklinAccountsState::new();
-        let updates1 = tree
-            .update_accounts_states_from_ops_block(&block1)
-            .expect("Cant update state from block 1");
-        println!("updates 1 {:?} \n", updates1);
-        println!("root hash 1 {:?} \n", tree.root_hash());
-        println!("accounts 1 {:?} \n", tree.get_accounts());
+        tree.update_accounts_states_from_ops_block(&block)
+            .expect("Cant update state from block");
 
+        assert_eq!(tree.get_accounts().len(), 2);
+
+        let zero_acc = tree.get_account(0).expect("Cant get 0 account");
         assert_eq!(
-            tree.root_hash().to_string(),
-            "Fr(0x0f220069602ed8f8c4557fdde71baf5220bbf237790adf67f49280b84588acf2)".to_string()
+            zero_acc.address,
+            AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap()
         );
+        assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
+
+        let first_acc = tree.get_account(1).expect("Cant get 0 account");
+        assert_eq!(
+            first_acc.address,
+            AccountAddress::from_hex("0x0000000000000000000000000000000000000000").unwrap()
+        );
+        assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }
 }

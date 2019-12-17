@@ -1,4 +1,4 @@
 export default {
-    accountUpdate: 5000,
+    accountUpdate: 10000,
     transactionUpdate: 5000,
 };

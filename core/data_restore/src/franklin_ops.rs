@@ -1,8 +1,7 @@
 use crate::events::EventData;
-use crate::helpers::{
-    get_ethereum_transaction, get_input_data_from_ethereum_transaction, DataRestoreError,
-};
-use models::node::operations::{FranklinOp, TX_TYPE_BYTES_LENGTH};
+use crate::helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
+use failure::{ensure, format_err};
+use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
 
 const BLOCK_NUMBER_LENGTH: usize = 32;
@@ -23,7 +22,7 @@ pub struct FranklinOpsBlock {
 
 impl FranklinOpsBlock {
     // Get ops block from Franklin Contract event description
-    pub fn get_from_event(event_data: &EventData) -> Result<Self, DataRestoreError> {
+    pub fn get_from_event(event_data: &EventData) -> Result<Self, failure::Error> {
         let ops_block = FranklinOpsBlock::get_franklin_ops_block(event_data)?;
         Ok(ops_block)
     }
@@ -34,9 +33,7 @@ impl FranklinOpsBlock {
     ///
     /// * `event_data` - Franklin Contract event description
     ///
-    fn get_franklin_ops_block(
-        event_data: &EventData,
-    ) -> Result<FranklinOpsBlock, DataRestoreError> {
+    fn get_franklin_ops_block(event_data: &EventData) -> Result<FranklinOpsBlock, failure::Error> {
         let transaction = get_ethereum_transaction(&event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
         let commitment_data = &input_data
@@ -57,26 +54,20 @@ impl FranklinOpsBlock {
     ///
     /// * `data` - Franklin Contract event input data
     ///
-    pub fn get_franklin_ops_from_data(data: &[u8]) -> Result<Vec<FranklinOp>, DataRestoreError> {
+    pub fn get_franklin_ops_from_data(data: &[u8]) -> Result<Vec<FranklinOp>, failure::Error> {
         let mut current_pointer = 0;
         let mut ops = vec![];
         while current_pointer < data.len() {
             let op_type: u8 = data[current_pointer];
 
-            let chunks = FranklinOp::chunks_by_op_number(op_type)
-                .ok_or_else(|| DataRestoreError::WrongData("Wrong op type".to_string()))?;
-            let full_size: usize = 8 * chunks;
+            let pub_data_size = FranklinOp::public_data_length(op_type)?;
 
-            let pub_data_size = FranklinOp::public_data_length(op_type)
-                .ok_or_else(|| DataRestoreError::WrongData("Wrong op type".to_string()))?;
-
-            let pre = current_pointer + TX_TYPE_BYTES_LENGTH;
+            let pre = current_pointer;
             let post = pre + pub_data_size;
 
-            let op = FranklinOp::from_bytes(op_type, &data[pre..post])
-                .ok_or_else(|| DataRestoreError::WrongData("Wrong data".to_string()))?;
+            let op = FranklinOp::from_public_data(&data[pre..post])?;
             ops.push(op);
-            current_pointer += full_size;
+            current_pointer += pub_data_size;
         }
         Ok(ops)
     }
@@ -87,19 +78,15 @@ impl FranklinOpsBlock {
     ///
     /// * `input` - Ethereum transaction input
     ///
-    fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, DataRestoreError> {
-        if input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH {
-            Ok(bytes_slice_to_uint32(
-                &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
-            )
-            .ok_or_else(|| {
-                DataRestoreError::NoData("Cant convert bytes to fee account number".to_string())
-            })?)
-        } else {
-            Err(DataRestoreError::NoData(
-                "No fee account data in tx".to_string(),
-            ))
-        }
+    fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, failure::Error> {
+        ensure!(
+            input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH,
+            "No fee account data in tx"
+        );
+        Ok(bytes_slice_to_uint32(
+            &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
+        )
+        .ok_or_else(|| format_err!("Cant convert bytes to fee account number"))?)
     }
 }
 
@@ -107,13 +94,13 @@ impl FranklinOpsBlock {
 mod test {
     use crate::franklin_ops::FranklinOpsBlock;
     use bigdecimal::BigDecimal;
-    use models::node::operations::{
-        PUBKEY_PACKED_BYTES_LENGTH, SIGNATURE_R_BYTES_LENGTH, SIGNATURE_S_BYTES_LENGTH,
-    };
     use models::node::tx::TxSignature;
     use models::node::{
         AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp,
         Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
+    };
+    use models::params::{
+        SIGNATURE_R_BIT_WIDTH_PADDED, SIGNATURE_S_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED,
     };
 
     #[test]
@@ -125,14 +112,17 @@ mod test {
             account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
                 .unwrap(),
         };
-        let op = FranklinOp::Deposit(Box::new(DepositOp {
+        let op1 = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op,
             account_id: 6,
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("{:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -147,18 +137,21 @@ mod test {
             nonce: 2,
             signature: TxSignature::default(),
         };
-        let op = FranklinOp::Withdraw(Box::new(WithdrawOp { tx, account_id: 3 }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("{:?}", ops);
+        let op1 = FranklinOp::Withdraw(Box::new(WithdrawOp { tx, account_id: 3 }));
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
     fn test_successfull_full_exit() {
-        let packed_pubkey = Box::new([7u8; PUBKEY_PACKED_BYTES_LENGTH]);
-        let signature_r = Box::new([8u8; SIGNATURE_R_BYTES_LENGTH]);
-        let signature_s = Box::new([9u8; SIGNATURE_S_BYTES_LENGTH]);
+        let packed_pubkey = Box::new([7u8; SUBTREE_HASH_WIDTH_PADDED / 8]);
+        let signature_r = Box::new([8u8; SIGNATURE_R_BIT_WIDTH_PADDED / 8]);
+        let signature_s = Box::new([9u8; SIGNATURE_S_BIT_WIDTH_PADDED / 8]);
         let priority_op = FullExit {
             account_id: 11,
             packed_pubkey,
@@ -168,21 +161,24 @@ mod test {
             signature_r,
             signature_s,
         };
-        let op = FranklinOp::FullExit(Box::new(FullExitOp {
+        let op1 = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
             withdraw_amount: Some(BigDecimal::from(444)),
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("{:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
     fn test_failed_full_exit() {
-        let packed_pubkey = Box::new([7u8; PUBKEY_PACKED_BYTES_LENGTH]);
-        let signature_r = Box::new([8u8; SIGNATURE_R_BYTES_LENGTH]);
-        let signature_s = Box::new([9u8; SIGNATURE_S_BYTES_LENGTH]);
+        let packed_pubkey = Box::new([7u8; SUBTREE_HASH_WIDTH_PADDED / 8]);
+        let signature_r = Box::new([8u8; SIGNATURE_R_BIT_WIDTH_PADDED / 8]);
+        let signature_s = Box::new([9u8; SIGNATURE_S_BIT_WIDTH_PADDED / 8]);
         let priority_op = FullExit {
             account_id: 11,
             packed_pubkey,
@@ -192,14 +188,17 @@ mod test {
             signature_r,
             signature_s,
         };
-        let op = FranklinOp::FullExit(Box::new(FullExitOp {
+        let op1 = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
             withdraw_amount: None,
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("{:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -213,15 +212,18 @@ mod test {
             nonce: 3,
             signature: TxSignature::default(),
         };
-        let op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+        let op1 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx,
             from: 11,
             to: 12,
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("{:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -235,15 +237,18 @@ mod test {
             nonce: 3,
             signature: TxSignature::default(),
         };
-        let op = FranklinOp::Transfer(Box::new(TransferOp {
+        let op1 = FranklinOp::Transfer(Box::new(TransferOp {
             tx,
             from: 11,
             to: 12,
         }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("{:?}", ops);
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 
     #[test]
@@ -254,10 +259,13 @@ mod test {
             nonce: 3,
             signature: TxSignature::default(),
         };
-        let op = FranklinOp::Close(Box::new(CloseOp { tx, account_id: 11 }));
-        let pub_data = op.public_data();
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data)
-            .expect("cant get ops from data");
-        println!("{:?}", ops);
+        let op1 = FranklinOp::Close(Box::new(CloseOp { tx, account_id: 11 }));
+        let pub_data1 = op1.public_data();
+        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
     }
 }

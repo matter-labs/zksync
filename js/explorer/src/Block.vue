@@ -42,7 +42,7 @@
 import store from './store';
 import client from './client';
 import { ethers } from 'ethers';
-import { readableEther } from './utils';
+import { readableEther, shortenHash } from './utils';
 
 import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
@@ -58,11 +58,6 @@ function formatToken(amount, token) {
     //     return ethers.utils.formatEther(amount);
     // }
     // return amount;
-}
-
-function formatAddress(address) {
-    return `${address.slice(0, 8)}..${address.slice(-8)}`;
-    // return address;
 }
 
 function defaultTokenSymbol(tokenId) {
@@ -113,10 +108,10 @@ export default {
                 let to_onchain_icon = "";
 
                 if (type == "Deposit") {
-                    from = formatAddress(tx.priority_op.data.sender);
-                    to = formatAddress(tx.priority_op.data.account);
+                    from = shortenHash(tx.priority_op.data.sender, 'unknown sender');
+                    to = shortenHash(tx.priority_op.data.account, 'unknown account');
                     from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.account}`;
-                    to_explorer_link = `/accounts/${tx.priority_op.data.account}`;
+                    to_explorer_link = `${this.routerBase}accounts/${tx.priority_op.data.account}`;
                     from_onchain_icon = `<span class="onchain_icon">onchain</span>`;
                     to_onchain_icon = '';
                     token = tx.priority_op.data.token;
@@ -124,10 +119,10 @@ export default {
                     amount =  `${formatToken(tx.priority_op.data.amount, token)} ${token}`;
                     fee = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
                 } else if (type == "Transfer") {
-                    from = formatAddress(tx.tx.from);
-                    to = formatAddress(tx.tx.to);
-                    from_explorer_link = `/accounts/${tx.tx.from}`;
-                    to_explorer_link = `/accounts/${tx.tx.to}`;
+                    from = shortenHash(tx.tx.from, 'unknown from');
+                    to = shortenHash(tx.tx.to, 'unknown to');
+                    from_explorer_link = `${this.routerBase}accounts/${tx.tx.from}`;
+                    to_explorer_link = `${this.routerBase}accounts/${tx.tx.to}`;
                     from_onchain_icon = '';
                     to_onchain_icon = '';
                     token = tx.tx.token;
@@ -135,10 +130,10 @@ export default {
                     amount =  `${formatToken(tx.tx.amount, token)} ${token}`;
                     fee = `${formatToken(tx.tx.fee, token)} ${token}`;
                 } else if (type == "Withdraw") {
-                    from = formatAddress(tx.tx.account);
-                    to = formatAddress(tx.tx.ethAddress);
-                    from_explorer_link = `/accounts/${tx.tx.account}`;
-                    to_explorer_link = `${this.blockchain_explorer_address}/${tx.tx.account}`;
+                    from = shortenHash(tx.tx.account, 'unknown account');
+                    to = shortenHash(tx.tx.ethAddress, 'unknown ethAddress');
+                    from_explorer_link = `${this.routerBase}accounts/${tx.tx.account}`;
+                    to_explorer_link = `${this.blockchain_explorer_address}/${tx.tx.ethAddress}`;
                     from_onchain_icon = '';
                     to_onchain_icon = `<span class="onchain_icon">onchain</span>`;
                     token = tx.tx.token;

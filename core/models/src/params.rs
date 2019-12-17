@@ -44,6 +44,7 @@ pub const TX_TYPE_BIT_WIDTH: usize = 8;
 
 /// Account subtree hash width
 pub const SUBTREE_HASH_WIDTH: usize = 254; //seems to be equal to Bn256::NUM_BITS could be replaced
+pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
 
 /// balance bit width
 pub const BALANCE_BIT_WIDTH: usize = 128;
@@ -71,8 +72,10 @@ pub const FEE_MANTISSA_BIT_WIDTH: usize = 11;
 
 // Signature data
 pub const SIGNATURE_S_BIT_WIDTH: usize = 254;
+pub const SIGNATURE_S_BIT_WIDTH_PADDED: usize = 256;
 pub const SIGNATURE_R_X_BIT_WIDTH: usize = 254;
 pub const SIGNATURE_R_Y_BIT_WIDTH: usize = 254;
+pub const SIGNATURE_R_BIT_WIDTH_PADDED: usize = 256;
 
 // Fr element encoding
 pub const FR_BIT_WIDTH: usize = 254;
