@@ -12,8 +12,8 @@ use testhelper::TestAccount;
 #[test]
 fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // Testing [black box] that:
-    // - Worker sends `working_on` requests (heartbeat) over api client
-    // - Worker stops running upon receiving data over stop channel
+    // - BabyProver sends `working_on` requests (heartbeat) over api client
+    // - BabyProver stops running upon receiving data over stop channel
 
     // Create a channel to notify on provers exit.
     let (done_tx, done_rx) = mpsc::channel();
@@ -28,7 +28,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     thread::spawn(move || {
         // Create channel for proofs, not using in this test.
         let (tx, _) = mpsc::channel();
-        let p = prover::Worker::new(
+        let p = prover::BabyProver::new(
             circuit_parameters,
             jubjub_params,
             MockApiClient {
@@ -40,7 +40,8 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
             time::Duration::from_millis(100),
             stop_signal_ar,
         );
-        prover::start(p);
+        let (tx, _) = mpsc::channel();
+        prover::start(p, tx);
         println!("run exited!");
         done_tx.send(());
     });
@@ -61,7 +62,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     heartbeat_rx.recv_timeout(timeout);
     heartbeat_rx.recv_timeout(timeout);
     println!("finishing up");
-    // Worker must be stopped.
+    // BabyProver must be stopped.
     done_rx.recv_timeout(timeout).unwrap();
 }
 
@@ -81,7 +82,7 @@ fn prover_proves_a_block_and_publishes_result() {
     thread::spawn(move || {
         // Work heartbeat channel, not used in this test.
         let (tx, _) = mpsc::channel();
-        let p = prover::Worker::new(
+        let p = prover::BabyProver::new(
             circuit_params,
             jubjub_params,
             MockApiClient {
@@ -302,14 +303,15 @@ impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
         Ok(*block_to_prove)
     }
 
-    fn working_on(&self, job: i32) {
+    fn working_on(&self, job: i32) -> Result<(), String> {
         let stored = self.block_to_prove.lock().unwrap();
         if let Some((_, stored)) = *stored {
             if stored != job {
-                return;
+                return Err("unexpected job id".to_owned());
             }
             self.heartbeats_tx.lock().unwrap().send(());
         }
+        Ok(())
     }
 
     fn prover_data(

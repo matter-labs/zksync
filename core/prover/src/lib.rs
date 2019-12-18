@@ -3,25 +3,26 @@ pub mod witness_generator;
 // Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
-use std::{thread, time};
+use std::{fmt, thread, time};
 // External deps
 use bellman::groth16;
 use ff::PrimeField;
-use log::error;
+use log::{debug, error, info};
 use pairing::bn256;
 // Workspace deps
 
-pub struct Worker<C: ApiClient> {
+pub struct BabyProver<C: ApiClient> {
     circuit_params: groth16::Parameters<bn256::Bn256>,
     jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
     api_client: C,
     heartbeat_interval: time::Duration,
+    get_prover_data_timeout: time::Duration,
     stop_signal: Arc<AtomicBool>,
 }
 
 pub trait ApiClient {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, String>;
-    fn working_on(&self, job_id: i32);
+    fn working_on(&self, job_id: i32) -> Result<(), String>;
     fn prover_data(
         &self,
         block: i64,
@@ -35,72 +36,123 @@ pub trait ApiClient {
     ) -> Result<(), String>;
 }
 
-pub fn start<'a, C: 'static + Sync + Send + ApiClient>(prover: Worker<C>) {
+pub enum BabyProverError {
+    Api(String),
+    Internal(String),
+    Stop,
+}
+
+impl fmt::Display for BabyProverError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        let desc = match self {
+            BabyProverError::Api(s) => s,
+            BabyProverError::Internal(s) => s,
+            BabyProverError::Stop => "stop",
+        };
+        write!(f, "{}", desc)
+    }
+}
+
+pub fn start<'a, C: 'static + Sync + Send + ApiClient>(
+    prover: BabyProver<C>,
+    exit_err_tx: mpsc::Sender<BabyProverError>,
+) {
     let (tx_block_start, rx_block_start) = mpsc::channel();
     let prover = Arc::new(prover);
     let prover_rc = Arc::clone(&prover);
-    let join_handle = thread::spawn(move || {
-        prover.run_rounds(tx_block_start);
+    thread::spawn(move || {
+        let tx_block_start2 = tx_block_start.clone();
+        exit_err_tx.send(prover.run_rounds(tx_block_start));
+        tx_block_start2.send((0, true)); // exit heartbeat routine request.
     });
     prover_rc.keep_sending_work_heartbeats(rx_block_start);
-    join_handle.join();
 }
 
-impl<C: ApiClient> Worker<C> {
+impl<C: ApiClient> BabyProver<C> {
     pub fn new(
         circuit_params: groth16::Parameters<bn256::Bn256>,
         jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
         api_client: C,
         heartbeat_interval: time::Duration,
+        get_prover_data_timeout: time::Duration,
         stop_signal: Arc<AtomicBool>,
     ) -> Self {
-        Worker {
+        BabyProver {
             circuit_params,
             jubjub_params,
             api_client,
             heartbeat_interval,
+            get_prover_data_timeout,
             stop_signal,
         }
     }
 
-    fn run_rounds(&self, start_heartbeats_tx: mpsc::Sender<i32>) {
+    fn run_rounds(&self, start_heartbeats_tx: mpsc::Sender<(i32, bool)>) -> BabyProverError {
         let mut rng = rand::OsRng::new().unwrap();
         let pause_duration = time::Duration::from_secs(models::node::config::PROVER_CYCLE_WAIT);
 
+        info!("Running worker rounds");
+
         while !self.stop_signal.load(Ordering::SeqCst) {
-            self.next_round(&mut rng, &start_heartbeats_tx);
+            info!("Starting a next round");
+            let ret = self.next_round(&mut rng, &start_heartbeats_tx);
+            if let Err(err) = ret {
+                match err {
+                    BabyProverError::Api(text) => {
+                        error!("could not reach api server: {}", text);
+                    }
+                    BabyProverError::Internal(_) => {
+                        return err;
+                    }
+                    _ => {}
+                };
+            }
+            info!("round completed.");
             thread::sleep(pause_duration);
         }
+        BabyProverError::Stop
     }
 
-    fn next_round(&self, rng: &mut rand::OsRng, start_heartbeats_tx: &mpsc::Sender<i32>) {
+    fn next_round(
+        &self,
+        rng: &mut rand::OsRng,
+        start_heartbeats_tx: &mpsc::Sender<(i32, bool)>,
+    ) -> Result<(), BabyProverError> {
         let block_to_prove = self.api_client.block_to_prove();
         let block_to_prove = match block_to_prove {
             Ok(b) => b,
-            // TODO: log error
-            _ => return,
+            Err(e) => {
+                let e = format!("failed to get block to prove {}", e);
+                return Err(BabyProverError::Api(e));
+            }
         };
 
         let (block, job_id) = match block_to_prove {
             Some(b) => b,
-            _ => (0, 0),
+            _ => {
+                info!("no block to prove from the server");
+                (0, 0)
+            }
         };
-        // Notify heartbeat routine on new proving block or None.
-        start_heartbeats_tx.send(job_id);
+        // Notify heartbeat routine on new proving block job or None.
+        start_heartbeats_tx.send((job_id, false));
         if job_id == 0 {
-            return;
+            return Ok(());
         }
-        // TODO: timeout
         let prover_data = match self
             .api_client
-            .prover_data(block, time::Duration::from_secs(10))
+            .prover_data(block, self.get_prover_data_timeout)
         {
             Ok(v) => v,
             Err(err) => {
-                error!("could not get prover data for block {}: {}", block, err);
-                return;
+                return Err(BabyProverError::Api(format!(
+                    "could not get prover data for block {}: {}",
+                    block, err
+                )));
             }
         };
+
+        info!("starting to compute proof for block {}", block);
 
         let instance = circuit::circuit::FranklinCircuit {
             params: &self.jubjub_params,
@@ -118,9 +170,11 @@ impl<C: ApiClient> Worker<C> {
 
         let proof = bellman::groth16::create_random_proof(instance, &self.circuit_params, rng);
 
-        if proof.is_err() {
-            // TODO: panic?
-            panic!("proof can not be created: {}", proof.err().unwrap());
+        if let Err(e) = proof {
+            return Err(BabyProverError::Internal(format!(
+                "failed to create a proof: {}",
+                e
+            )));
         }
 
         // TODO: handle error.
@@ -130,30 +184,48 @@ impl<C: ApiClient> Worker<C> {
 
         let res =
             bellman::groth16::verify_proof(&pvk, &p.clone(), &[prover_data.public_data_commitment]);
-        if res.is_err() {
-            panic!("err")
-            // return Err("Proof verification has failed".to_owned());
+        if let Err(e) = res {
+            return Err(BabyProverError::Internal(format!(
+                "failed to verify created proof: {}",
+                e
+            )));
         }
         if !res.unwrap() {
-            panic!("err")
-            // return Err("Proof is invalid".to_owned());
+            return Err(BabyProverError::Internal(
+                "created proof did not pass verification".to_owned(),
+            ));
         }
 
-        self.api_client
+        let ret = self
+            .api_client
             .publish(block, p, prover_data.public_data_commitment);
+        if let Err(e) = ret {
+            return Err(BabyProverError::Api(format!(
+                "failed to publish proof: {}",
+                e
+            )));
+        }
+
+        info!("finished and published proof for block {}", block);
+
+        Ok(())
     }
 
-    fn keep_sending_work_heartbeats(&self, start_heartbeats_rx: mpsc::Receiver<i32>) {
+    fn keep_sending_work_heartbeats(&self, start_heartbeats_rx: mpsc::Receiver<(i32, bool)>) {
         let mut job_id = 0;
         while !self.stop_signal.load(Ordering::SeqCst) {
             thread::sleep(self.heartbeat_interval);
-            job_id = match start_heartbeats_rx.try_recv() {
+            let (j, quit) = match start_heartbeats_rx.try_recv() {
                 Ok(v) => v,
-                Err(mpsc::TryRecvError::Empty) => job_id,
-                Err(e) => break,
-                _ => 0,
+                Err(mpsc::TryRecvError::Empty) => (job_id, false),
+                Err(e) => return,
             };
+            if quit {
+                return;
+            }
+            job_id = j;
             if job_id != 0 {
+                info!("sending working_on request for job_id: {}", job_id);
                 self.api_client.working_on(job_id);
             }
         }
