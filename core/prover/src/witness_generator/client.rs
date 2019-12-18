@@ -81,16 +81,19 @@ impl crate::ApiClient for ApiClient {
         Ok(None)
     }
 
-    fn working_on(&self, job_id: i32) {
+    fn working_on(&self, job_id: i32) -> Result<(), String> {
         // TODO: handle errors
         let client = reqwest::Client::new();
-        client
+        let ret = client
             .post(&self.working_on_url)
             .json(&server::WorkingOnReq {
                 prover_run_id: job_id,
             })
-            .send()
-            .unwrap();
+            .send();
+        if let Err(e) = ret {
+            return Err(format!("response not ok: {}", e));
+        }
+        Ok(())
     }
 
     fn prover_data(&self, block: i64, timeout: time::Duration) -> Result<ProverData, String> {

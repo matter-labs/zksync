@@ -1,19 +1,20 @@
 // Built-in deps
 use std::str::FromStr;
+use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::{env, thread, time};
 // External deps
 use bellman::groth16;
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use log::{debug, error, info};
+use log::{debug, info};
 use pairing::bn256;
 use signal_hook::iterator::Signals;
 use tokio::runtime::current_thread::Runtime;
 use tokio::sync::oneshot;
 // Workspace deps
-use models::node::config::PROVER_HEARTBEAT_INTERVAL;
+use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_HEARTBEAT_INTERVAL};
 use prover::witness_generator::client;
-use prover::{start, Worker};
+use prover::{start, BabyProver};
 
 fn main() {
     env_logger::init();
@@ -38,33 +39,44 @@ fn main() {
     let jubjub_params = AltJubjubBn256::new();
     let circuit_params = read_from_key_dir(key_dir);
     let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
-    let worker = Worker::new(
+    let prover_timeout = time::Duration::from_secs(PROVER_GONE_TIMEOUT as u64);
+    let worker = BabyProver::new(
         circuit_params,
         jubjub_params,
         api_client,
         heartbeat_interval,
+        prover_timeout,
         stop_signal,
     );
     // Register prover
-    let api_client = client::ApiClient::new(&api_url, "");
-    let _prover_id = api_client
+    let _prover_id = client::ApiClient::new(&api_url, "")
         .register_prover()
         .expect("failed to register prover");
     // Start prover
+    let (exit_err_tx, exit_err_rx) = mpsc::channel();
     thread::spawn(move || {
-        start(worker);
+        start(worker, exit_err_tx);
     });
 
-    let signals = Signals::new(&[
-        signal_hook::SIGTERM,
-        signal_hook::SIGINT,
-        signal_hook::SIGQUIT,
-    ])
-    .expect("Signals::new() failed");
-    for _ in signals.forever() {
-        info!("Termination signal received. Prover will finish the job and shut down gracefully");
-        // TODO: on terminate signal, send prover stop request
-    }
+    // Handle termination requests.
+    thread::spawn(move || {
+        let signals = Signals::new(&[
+            signal_hook::SIGTERM,
+            signal_hook::SIGINT,
+            signal_hook::SIGQUIT,
+        ])
+        .expect("Signals::new() failed");
+        for _ in signals.forever() {
+            info!(
+                "Termination signal received. Prover will finish the job and shut down gracefully"
+            );
+            // TODO: on terminate signal, send prover stop request
+        }
+    });
+
+    // Handle prover exit errors.
+    let _err = exit_err_rx.recv();
+    // TODO: send prover stop request
 }
 
 fn read_from_key_dir(key_dir: String) -> groth16::Parameters<bn256::Bn256> {
