@@ -38,6 +38,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
                 prover_data_fn: || None,
             },
             time::Duration::from_millis(100),
+            time::Duration::from_secs(1),
             stop_signal_ar,
         );
         let (tx, _) = mpsc::channel();
@@ -92,10 +93,12 @@ fn prover_proves_a_block_and_publishes_result() {
                 prover_data_fn: move || Some(prover_data.clone()),
             },
             time::Duration::from_secs(1),
+            time::Duration::from_secs(1),
             stop_signal_ar,
         );
 
-        prover::start(p);
+        let (tx, _) = mpsc::channel();
+        prover::start(p, tx);
     });
 
     let timeout = time::Duration::from_secs(60 * 30); // 10 minutes

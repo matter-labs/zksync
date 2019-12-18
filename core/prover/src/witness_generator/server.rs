@@ -11,6 +11,7 @@ use actix_web::web::delete;
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use log::{error, info};
 use pairing::bn256::Bn256;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 // Workspace deps
@@ -34,6 +35,7 @@ pub struct ProverReq {
 }
 
 fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Result<String> {
+    info!("register request for prover with name: {}", r.name);
     if r.name == "" {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
@@ -58,6 +60,7 @@ fn block_to_prove(
     data: web::Data<AppState>,
     r: web::Json<ProverReq>,
 ) -> actix_web::Result<HttpResponse> {
+    info!("request block to prove from worker: {}", r.name);
     if r.name == "" {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
@@ -65,27 +68,33 @@ fn block_to_prove(
         Ok(s) => s,
         Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
-    // TODO: handle errors
-    let ret = storage
-        .next_unverified_commit(&r.name, data.prover_timeout)
-        .unwrap();
-    if let Some(prover_run) = ret {
-        return Ok(HttpResponse::Ok().json(BlockToProveRes {
-            prover_run_id: prover_run.id,
-            block: prover_run.block_number,
-        }));
+    match storage.next_unverified_commit(&r.name, data.prover_timeout) {
+        Ok(ret) => {
+            if let Some(prover_run) = ret {
+                return Ok(HttpResponse::Ok().json(BlockToProveRes {
+                    prover_run_id: prover_run.id,
+                    block: prover_run.block_number,
+                }));
+            }
+            Ok(HttpResponse::Ok().json(BlockToProveRes {
+                prover_run_id: 0,
+                block: 0,
+            }))
+        }
+        Err(e) => {
+            error!("could not get next unverified commit operation: {}", e);
+            Err(actix_web::error::ErrorInternalServerError(
+                "storage layer error",
+            ))
+        }
     }
-    Ok(HttpResponse::Ok().json(BlockToProveRes {
-        prover_run_id: 0,
-        block: 0,
-    }))
 }
 
 fn prover_data(
     data: web::Data<AppState>,
     block: web::Json<i64>,
 ) -> actix_web::Result<HttpResponse> {
-    println!("requesting prover_data for block {}", *block);
+    info!("requesting prover_data for block {}", *block);
     let data_pool = data.preparing_data_pool.read().unwrap();
     Ok(HttpResponse::Ok().json(data_pool.get(*block)))
 }
@@ -96,14 +105,23 @@ pub struct WorkingOnReq {
 }
 
 fn working_on(data: web::Data<AppState>, r: web::Json<WorkingOnReq>) -> actix_web::Result<()> {
+    info!(
+        "working on request for prover_run with id: {}",
+        r.prover_run_id
+    );
     let storage = match data.connection_pool.access_storage() {
         Ok(s) => s,
         Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
-    // TODO: handle errors
-    // TODO: handle case when proof calculation was taken over by other prover
-    storage.record_prover_is_working(r.prover_run_id).unwrap();
-    Ok(())
+    match storage.record_prover_is_working(r.prover_run_id) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            error!("failed to record prover work in progress request: {}", e);
+            Err(actix_web::error::ErrorInternalServerError(
+                "storage layer error",
+            ))
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -113,14 +131,24 @@ pub struct PublishReq {
 }
 
 fn publish(data: web::Data<AppState>, r: web::Json<PublishReq>) -> actix_web::Result<()> {
+    info!("publish of a proof for block: {}", r.block);
     let storage = match data.connection_pool.access_storage() {
         Ok(s) => s,
         Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
-    // TODO: handle errors
-    // TODO: handle case when proof calculation was taken over by other prover
-    storage.store_proof(r.block, &r.proof).unwrap();
-    Ok(())
+    match storage.store_proof(r.block, &r.proof) {
+        Ok(_) => {
+            let mut data_pool = data.preparing_data_pool.write().unwrap();
+            data_pool.clean_up(r.block as i64);
+            Ok(())
+        }
+        Err(e) => {
+            error!("failed to store received proof: {}", e);
+            Err(actix_web::error::ErrorInternalServerError(
+                "storage layer error",
+            ))
+        }
+    }
 }
 
 pub fn start_server(
@@ -128,7 +156,6 @@ pub fn start_server(
     prover_timeout: time::Duration,
     rounds_interval: time::Duration,
 ) {
-    // TODO: add logging
     let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new()));
     // TODO: graceful thread exit?
     let data_pool_copy = Arc::clone(&data_pool);
