@@ -10,14 +10,12 @@ mod rpc_server;
 mod rpc_subscriptions;
 
 use crate::ConfigurationOptions;
+use futures::channel::mpsc;
 use models::Operation;
-use std::sync::mpsc;
 use storage::ConnectionPool;
 
-use futures::channel::mpsc as fmpsc;
-
 pub fn start_api_server(
-    op_notify_receiver: fmpsc::Receiver<Operation>,
+    op_notify_receiver: mpsc::Receiver<Operation>,
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     config_options: ConfigurationOptions,

@@ -4,6 +4,7 @@ use crate::ThreadPanicNotify;
 use failure::{bail, format_err};
 use futures::task::LocalSpawnExt;
 use futures::{
+    channel::mpsc,
     compat::Future01CompatExt,
     executor, select,
     stream::{FusedStream, Stream, StreamExt},
@@ -422,7 +423,7 @@ pub fn start_sub_notifier<BStream, SStream>(
     db_pool: ConnectionPool,
     mut new_block_stream: BStream,
     mut subscription_stream: SStream,
-    panic_notify: std::sync::mpsc::Sender<bool>,
+    panic_notify: mpsc::Sender<bool>,
 ) where
     BStream: Stream<Item = Operation> + FusedStream + Unpin + Send + 'static,
     SStream: Stream<Item = EventNotifierRequest> + FusedStream + Unpin + Send + 'static,
@@ -432,7 +433,6 @@ pub fn start_sub_notifier<BStream, SStream>(
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
 
             let mut local_pool = executor::LocalPool::new();
-
 
             let mut notifier = OperationNotifier {
                 db_pool,
@@ -445,24 +445,29 @@ pub fn start_sub_notifier<BStream, SStream>(
             let sub_notifier_task = async move {
                 loop {
                     select! {
-                    new_block = new_block_stream.next() => {
-                        if let Some(new_block) = new_block {
-                            notifier.handle_new_block(new_block)
-                                .map_err(|e| warn!("Failed to handle new block: {}",e)).unwrap_or_default();
-                        }
-                    },
-                    new_sub = subscription_stream.next() => {
-                        if let Some(new_sub) = new_sub {
-                            notifier.handle_notify_req(new_sub)
-                                .map_err(|e| warn!("Failed to handle notify request: {}",e)).unwrap_or_default();
-                        }
-                    },
-                    complete => break,
-            }
+                        new_block = new_block_stream.next() => {
+                            if let Some(new_block) = new_block {
+                                notifier.handle_new_block(new_block)
+                                    .map_err(|e| warn!("Failed to handle new block: {}",e))
+                                    .unwrap_or_default();
+                            }
+                        },
+                        new_sub = subscription_stream.next() => {
+                            if let Some(new_sub) = new_sub {
+                                notifier.handle_notify_req(new_sub)
+                                    .map_err(|e| warn!("Failed to handle notify request: {}",e))
+                                    .unwrap_or_default();
+                            }
+                        },
+                        complete => break,
+                    }
                 }
             };
 
-            local_pool.spawner().spawn_local(sub_notifier_task).expect("sub notify future spawn");
+            local_pool
+                .spawner()
+                .spawn_local(sub_notifier_task)
+                .expect("sub notify future spawn");
             local_pool.run();
         })
         .expect("thread start");

@@ -3,24 +3,27 @@ extern crate serde_derive;
 #[macro_use]
 extern crate log;
 
+use futures::{channel::mpsc, executor::block_on, SinkExt};
 use models::node::AccountAddress;
 use std::env;
 use std::net::SocketAddr;
 use web3::types::{H160, H256};
 
 pub mod api_server;
+pub mod block_proposer;
 pub mod committer;
 pub mod eth_sender;
 pub mod eth_watch;
+pub mod mempool;
 pub mod state_keeper;
 
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
-pub struct ThreadPanicNotify(pub std::sync::mpsc::Sender<bool>);
+pub struct ThreadPanicNotify(pub mpsc::Sender<bool>);
 
 impl Drop for ThreadPanicNotify {
     fn drop(&mut self) {
         if std::thread::panicking() {
-            self.0.send(true).unwrap();
+            block_on(self.0.send(true)).unwrap();
         }
     }
 }

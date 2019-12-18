@@ -2,13 +2,13 @@
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
-use std::sync::mpsc::{self, sync_channel};
+use std::sync::mpsc::sync_channel;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 // External uses
 use ethabi::{decode, ParamType};
 use failure::format_err;
-use futures::{compat::Future01CompatExt, executor::block_on};
+use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on};
 use web3::contract::Contract;
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
 use web3::{Transport, Web3};

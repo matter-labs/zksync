@@ -4,9 +4,9 @@ use actix_web::{
     web::{self},
     App, HttpResponse, HttpServer, Result as ActixResult,
 };
+use futures::channel::mpsc;
 use models::node::{Account, AccountAddress, AccountId, ExecutedOperations, FranklinTx};
 use models::NetworkStatus;
-use std::sync::mpsc;
 use storage::{ConnectionPool, StorageProcessor};
 
 use crate::ThreadPanicNotify;
@@ -16,6 +16,7 @@ use std::time::Duration;
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
 
+// todo future aware lock
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 

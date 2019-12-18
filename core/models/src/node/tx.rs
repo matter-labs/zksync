@@ -1,7 +1,8 @@
 use super::{Nonce, TokenId};
 
 use crate::node::{
-    is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
+    is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount, CloseOp,
+    FranklinPriorityOp, TransferOp, WithdrawOp,
 };
 use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
@@ -19,6 +20,7 @@ use franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
+use web3::futures::sink::With;
 use web3::types::Address;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
@@ -247,6 +249,14 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
+        }
+    }
+
+    pub fn min_chunks(&self) -> usize {
+        match self {
+            FranklinTx::Transfer(_) => TransferOp::CHUNKS,
+            FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
+            FranklinTx::Close(_) => CloseOp::CHUNKS,
         }
     }
 }

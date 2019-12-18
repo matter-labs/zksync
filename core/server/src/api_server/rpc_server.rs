@@ -1,5 +1,6 @@
 use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
+use futures::channel::mpsc;
 use jsonrpc_core::{Error, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
@@ -8,7 +9,6 @@ use models::node::tx::TxHash;
 use models::node::{Account, AccountAddress, AccountId, FranklinTx, Nonce, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::mpsc;
 use storage::{ConnectionPool, StorageProcessor, Token, TxAddError};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

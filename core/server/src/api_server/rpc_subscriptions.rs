@@ -14,7 +14,7 @@ use models::node::tx::TxHash;
 use models::node::AccountAddress;
 use models::{ActionType, Operation};
 use std::net::SocketAddr;
-use std::sync::{mpsc, Arc};
+use std::sync::Arc;
 use storage::ConnectionPool;
 
 #[rpc]
@@ -175,7 +175,7 @@ pub fn start_ws_server(
     op_recv: fmpsc::Receiver<Operation>,
     db_pool: ConnectionPool,
     addr: SocketAddr,
-    panic_notify: mpsc::Sender<bool>,
+    panic_notify: fmpsc::Sender<bool>,
 ) {
     let (event_sub_sender, event_sub_receiver) = fmpsc::channel(2048);
 
@@ -199,7 +199,7 @@ pub fn start_ws_server(
 
             let server = jsonrpc_ws_server::ServerBuilder::with_meta_extractor(
                 io,
-                |context: &RequestContext| std::sync::Arc::new(Session::new(context.sender())),
+                |context: &RequestContext| Arc::new(Session::new(context.sender())),
             )
             .start(&addr)
             .expect("Unable to start RPC ws server");
