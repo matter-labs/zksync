@@ -11,6 +11,7 @@ use signal_hook::iterator::Signals;
 use tokio::runtime::current_thread::Runtime;
 use tokio::sync::oneshot;
 // Workspace deps
+use models::node::config::PROVER_HEARTBEAT_INTERVAL;
 use prover::witness_generator::client;
 use prover::{start, Worker};
 
@@ -36,10 +37,7 @@ fn main() {
     // Create prover
     let jubjub_params = AltJubjubBn256::new();
     let circuit_params = read_from_key_dir(key_dir);
-    let heartbeat_interval =
-        env::var("HEARTBEAT_INTERVAL_MILLISEC").unwrap_or_else(|_| "1000".to_owned());
-    let heartbeat_interval = u64::from_str(&heartbeat_interval).unwrap();
-    let heartbeat_interval = time::Duration::from_millis(heartbeat_interval);
+    let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
     let worker = Worker::new(
         circuit_params,
         jubjub_params,

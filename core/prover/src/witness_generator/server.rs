@@ -19,6 +19,7 @@ use circuit::operation::{
     Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
 use models::merkle_tree::PedersenHasher;
+use models::node::config::PROVER_GONE_TIMEOUT;
 use models::node::tx::PackedPublicKey;
 use models::node::{Engine, Fr};
 
@@ -123,11 +124,8 @@ fn publish(data: web::Data<AppState>, r: web::Json<PublishReq>) -> actix_web::Re
     Ok(())
 }
 
-pub fn start_server(
-    bind_to: &net::SocketAddr,
-    prover_timeout: time::Duration,
-    rounds_interval: time::Duration,
-) {
+pub fn start_server(bind_to: &net::SocketAddr, rounds_interval: time::Duration) {
+    let prover_timeout = time::Duration::from_secs(PROVER_GONE_TIMEOUT as u64);
     // TODO: receive limit
     // TODO: add logging
     let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new()));
