@@ -105,7 +105,7 @@ fn handle_submit_tx(
         Err(HttpResponse::NotAcceptable().body(e.to_string()).into())
     } else {
         Ok(HttpResponse::Ok().json(NewTxResponse {
-            hash: req.hash().to_hex(),
+            hash: req.hash().to_str(),
         }))
     }
 }

@@ -43,13 +43,13 @@ impl AsRef<[u8]> for TxHash {
 }
 
 impl TxHash {
-    pub fn to_hex(&self) -> String {
-        format!("0x{}", hex::encode(&self.data))
+    pub fn to_str(&self) -> String {
+        format!("sync-tx:{}", hex::encode(&self.data))
     }
 
-    pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
-        ensure!(s.starts_with("0x"), "TxHash should start with 0x");
-        let bytes = hex::decode(&s[2..])?;
+    pub fn from_str(s: &str) -> Result<Self, failure::Error> {
+        ensure!(s.starts_with("sync-tx:"), "TxHash should start with sync-tx:");
+        let bytes = hex::decode(&s[8..])?;
         ensure!(bytes.len() == 32, "Size mismatch");
         Ok(TxHash {
             data: bytes.as_slice().try_into().unwrap(),
@@ -62,7 +62,7 @@ impl Serialize for TxHash {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.to_hex())
+        serializer.serialize_str(&self.to_str())
     }
 }
 
@@ -73,7 +73,7 @@ impl<'de> Deserialize<'de> for TxHash {
     {
         use serde::de::Error;
         String::deserialize(deserializer).and_then(|string| {
-            Self::from_hex(&string).map_err(|err| Error::custom(err.to_string()))
+            Self::from_str(&string).map_err(|err| Error::custom(err.to_string()))
         })
     }
 }

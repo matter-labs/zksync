@@ -113,7 +113,7 @@ impl OperationNotifier {
                 }
             }
             TX_SUB_PREFIX => {
-                let hash = TxHash::from_hex(sub_unique_id)?;
+                let hash = TxHash::from_str(sub_unique_id)?;
                 if let Some(mut subs) = self.tx_subs.remove(&(hash.clone(), sub_action)) {
                     subs.retain(|sub| sub.id != sub_id);
                     if !subs.is_empty() {
@@ -255,7 +255,7 @@ impl OperationNotifier {
         let id = SubscriptionId::String(format!(
             "{}/{}/{}/{}",
             TX_SUB_PREFIX,
-            hash.to_hex(),
+            hash.to_str(),
             action.to_string(),
             rand::random::<u64>()
         ));
@@ -297,7 +297,7 @@ impl OperationNotifier {
                 .assign_id(id.clone())
                 .map_err(|_| format_err!("SubIdAssign"))?;
             subs.push(SubscriptionSender { id, sink });
-            trace!("tx sub added: {}", hash.to_hex());
+            trace!("tx sub added: {}", hash.to_str());
         }
         self.tx_subs.insert((hash, action), subs);
         Ok(())
