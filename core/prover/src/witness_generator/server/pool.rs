@@ -41,6 +41,11 @@ impl ProversDataPool {
         self.prepared.get(&block)
     }
 
+    pub fn clean_up(&mut self, block: i64) {
+        self.operations.remove(&block);
+        self.prepared.remove(&block);
+    }
+
     fn has_capacity(&self) -> bool {
         self.last_loaded - self.last_prepared + (self.prepared.len() as i64) < self.limit as i64
     }
