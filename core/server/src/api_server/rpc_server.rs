@@ -1,6 +1,5 @@
 use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
-use futures::Future;
 use jsonrpc_core::{Error, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
