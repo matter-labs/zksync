@@ -1,19 +1,13 @@
 // Built-in
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
-use std::thread;
-use std::{error, io, net, time};
+use std::{thread, time};
 // External
-use actix_web::web::delete;
-use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use franklin_crypto::bellman::groth16::prepare_prover;
 use log::info;
-use serde::{Deserialize, Serialize};
 // Workspace deps
-use crate::witness_generator::ProverData;
+use crate::prover_data::ProverData;
 use circuit::operation::SignatureData;
 use models::merkle_tree::PedersenHasher;
 use models::node::tx::PackedPublicKey;

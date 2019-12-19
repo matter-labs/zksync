@@ -1,8 +1,11 @@
-use crate::witness_generator::{server, ProverData};
-use bellman::groth16;
+// Built-in deps
 use std::str::FromStr;
-use std::sync::Mutex;
-use std::{fmt, net, thread, time};
+use std::{fmt, thread, time};
+// External deps
+use bellman::groth16;
+// Workspace deps
+use crate::prover_data::ProverData;
+use crate::server;
 
 #[derive(Debug)]
 pub struct FullBabyProof {
@@ -18,6 +21,7 @@ pub struct ApiClient {
     working_on_url: String,
     prover_data_url: String,
     publish_url: String,
+    stopped_url: String,
     worker: String,
 }
 
@@ -43,22 +47,55 @@ impl ApiClient {
             working_on_url: format!("{}/working_on", base_url),
             prover_data_url: format!("{}/prover_data", base_url),
             publish_url: format!("{}/publish", base_url),
+            stopped_url: format!("{}/stopped", base_url),
             worker: worker.to_string(),
         }
     }
 
-    pub fn register_prover(&self) -> Result<i32, Error> {
-        // TODO: handle errors
+    pub fn register_prover(&self) -> Result<i32, String> {
         let client = reqwest::Client::new();
-        let mut res = client
+        let res = client
             .post(&self.register_url)
             .json(&server::ProverReq {
                 name: self.worker.clone(),
             })
-            .send()
-            .unwrap();
-        let id = i32::from_str(&res.text().unwrap()).unwrap();
-        Ok(id)
+            .send();
+        let mut res = match res {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("register request failed: {}", e));
+            }
+        };
+        let text = match res.text() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("failed to read register response: {}", e));
+            }
+        };
+        match i32::from_str(&text) {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                return Err(format!("failed to parse register prover id: {}", e));
+            }
+        }
+    }
+
+    pub fn prover_stopped(&self, prover_run_id: i32) -> Result<(), String> {
+        let client = reqwest::Client::new();
+        let res = client.post(&self.stopped_url).json(&prover_run_id).send();
+        let res = match res {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("prover stopped request failed: {}", e));
+            }
+        };
+        if res.status() != reqwest::StatusCode::OK {
+            return Err(format!(
+                "prover stopped request failed with status: {}",
+                res.status()
+            ));
+        }
+        Ok(())
     }
 }
 
@@ -66,15 +103,26 @@ impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, String> {
         // TODO: handle errors
         let client = reqwest::Client::new();
-        let mut res = client
+        let res = client
             .get(&self.block_to_prove_url)
             .json(&server::ProverReq {
                 name: self.worker.clone(),
             })
-            .send()
-            .unwrap();
-        let text = res.text().unwrap();
+            .send();
+        let mut res = match res {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("block to prove request failed: {}", e));
+            }
+        };
+        let text = match res.text() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("failed to read block to prove response: {}", e));
+            }
+        };
         let res: server::BlockToProveRes = serde_json::from_str(&text).unwrap();
+        println!("response: {:?}", res);
         if res.block != 0 {
             return Ok(Some((res.block, res.prover_run_id)));
         }
@@ -84,14 +132,23 @@ impl crate::ApiClient for ApiClient {
     fn working_on(&self, job_id: i32) -> Result<(), String> {
         // TODO: handle errors
         let client = reqwest::Client::new();
-        let ret = client
+        let res = client
             .post(&self.working_on_url)
             .json(&server::WorkingOnReq {
                 prover_run_id: job_id,
             })
             .send();
-        if let Err(e) = ret {
-            return Err(format!("response not ok: {}", e));
+        let res = match res {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("failed to send working on request: {}", e));
+            }
+        };
+        if res.status() != reqwest::StatusCode::OK {
+            return Err(format!(
+                "working on request failed with status: {}",
+                res.status()
+            ));
         }
         Ok(())
     }
@@ -101,12 +158,19 @@ impl crate::ApiClient for ApiClient {
         // TODO: whats the idiomatic way of cancallation by timeout.
         let now = time::SystemTime::now();
         while now.elapsed().unwrap() < timeout {
-            let mut res = client
-                .get(&self.prover_data_url)
-                .json(&block)
-                .send()
-                .unwrap();
-            let text = res.text().unwrap();
+            let res = client.get(&self.prover_data_url).json(&block).send();
+            let mut res = match res {
+                Ok(v) => v,
+                Err(e) => {
+                    return Err(format!("failed to request prover data: {}", e));
+                }
+            };
+            let text = match res.text() {
+                Ok(v) => v,
+                Err(e) => {
+                    return Err(format!("failed to read prover data response: {}", e));
+                }
+            };
             let res: Option<ProverData> = serde_json::from_str(&text).unwrap();
             if let Some(res) = res {
                 return Ok(res);
@@ -138,10 +202,18 @@ impl crate::ApiClient for ApiClient {
                 block: block as u32,
                 proof: encoded,
             })
-            .send()
-            .unwrap();
+            .send();
+        let res = match res {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("failed to send publish request: {}", e));
+            }
+        };
         if res.status() != reqwest::StatusCode::OK {
-            return Err("err".to_owned());
+            return Err(format!(
+                "publish request failed with status: {}",
+                res.status()
+            ));
         }
 
         Ok(())

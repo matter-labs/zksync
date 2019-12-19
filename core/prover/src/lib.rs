@@ -1,4 +1,6 @@
-pub mod witness_generator;
+pub mod client;
+pub mod prover_data;
+pub mod server;
 
 // Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -7,7 +9,7 @@ use std::{fmt, thread, time};
 // External deps
 use bellman::groth16;
 use ff::PrimeField;
-use log::{debug, error, info};
+use log::{error, info};
 use pairing::bn256;
 // Workspace deps
 
@@ -27,7 +29,7 @@ pub trait ApiClient {
         &self,
         block: i64,
         timeout: time::Duration,
-    ) -> Result<witness_generator::ProverData, String>;
+    ) -> Result<prover_data::ProverData, String>;
     fn publish(
         &self,
         block: i64,
@@ -36,6 +38,7 @@ pub trait ApiClient {
     ) -> Result<(), String>;
 }
 
+#[derive(Debug)]
 pub enum BabyProverError {
     Api(String),
     Internal(String),
@@ -62,8 +65,12 @@ pub fn start<'a, C: 'static + Sync + Send + ApiClient>(
     let prover_rc = Arc::clone(&prover);
     thread::spawn(move || {
         let tx_block_start2 = tx_block_start.clone();
-        exit_err_tx.send(prover.run_rounds(tx_block_start));
-        tx_block_start2.send((0, true)); // exit heartbeat routine request.
+        exit_err_tx
+            .send(prover.run_rounds(tx_block_start))
+            .expect("failed to send exit error");
+        tx_block_start2
+            .send((0, true))
+            .expect("failed to send heartbeat exit request"); // exit heartbeat routine request.
     });
     prover_rc.keep_sending_work_heartbeats(rx_block_start);
 }
@@ -135,7 +142,9 @@ impl<C: ApiClient> BabyProver<C> {
             }
         };
         // Notify heartbeat routine on new proving block job or None.
-        start_heartbeats_tx.send((job_id, false));
+        start_heartbeats_tx
+            .send((job_id, false))
+            .expect("failed to send new job to heartbeat routine");
         if job_id == 0 {
             return Ok(());
         }
@@ -218,7 +227,9 @@ impl<C: ApiClient> BabyProver<C> {
             let (j, quit) = match start_heartbeats_rx.try_recv() {
                 Ok(v) => v,
                 Err(mpsc::TryRecvError::Empty) => (job_id, false),
-                Err(e) => return,
+                Err(e) => {
+                    panic!("error receiving from hearbeat channel: {}", e);
+                }
             };
             if quit {
                 return;
@@ -226,7 +237,10 @@ impl<C: ApiClient> BabyProver<C> {
             job_id = j;
             if job_id != 0 {
                 info!("sending working_on request for job_id: {}", job_id);
-                self.api_client.working_on(job_id);
+                let ret = self.api_client.working_on(job_id);
+                if let Err(e) = ret {
+                    error!("working_on request errored: {}", e);
+                }
             }
         }
     }
