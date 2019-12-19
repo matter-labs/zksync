@@ -163,7 +163,7 @@ pub fn start_server(
         let conn_pool = storage::ConnectionPool::new();
         pool::maintain(conn_pool, data_pool_copy, rounds_interval);
     });
-    HttpServer::new(move || {
+    let ret = HttpServer::new(move || {
         App::new()
             .wrap(actix_web::middleware::Logger::default())
             .data(AppState {
@@ -179,6 +179,5 @@ pub fn start_server(
     })
     .bind(bind_to)
     .unwrap()
-    .run()
-    .unwrap();
+    .run();
 }

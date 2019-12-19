@@ -3,13 +3,14 @@ use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::{error, net, time};
+use std::{error, io, net, time};
 // External
 use actix_web::web::delete;
 use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use franklin_crypto::bellman::groth16::prepare_prover;
+use log::info;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::witness_generator::ProverData;
@@ -60,89 +61,107 @@ pub fn maintain(
     data: Arc<RwLock<ProversDataPool>>,
     rounds_interval: time::Duration,
 ) {
-    let storage = conn_pool.access_storage().unwrap();
+    info!("preparing prover data routine started");
+    let phasher = PedersenHasher::<Engine>::default();
+    let params = AltJubjubBn256::new();
+    let storage = conn_pool.access_storage().expect("failed to connect to db");
     loop {
         if has_capacity(&data) {
-            // TODO: handle errors
-            take_next_commits(&storage, &data);
+            take_next_commits(&storage, &data).unwrap();
         }
         if all_prepared(&data) {
             thread::sleep(rounds_interval);
         } else {
-            prepare_next(&storage, &data);
+            prepare_next(&storage, &data, &phasher, &params).unwrap();
         }
     }
 }
 
 fn has_capacity(data: &Arc<RwLock<ProversDataPool>>) -> bool {
-    // TODO: handle errors
-    let d = data.read().unwrap();
+    let d = data.write().expect("failed to acquire a lock");
     d.has_capacity()
 }
 
-fn take_next_commits(storage: &storage::StorageProcessor, data: &Arc<RwLock<ProversDataPool>>) {
-    let d = data.read().unwrap();
-    let ops = storage
-        .load_unverified_commits_after_block(d.last_loaded, d.limit)
-        .unwrap();
+fn take_next_commits(
+    storage: &storage::StorageProcessor,
+    data: &Arc<RwLock<ProversDataPool>>,
+) -> Result<(), String> {
+    let d = data.write().expect("failed to acquire a lock");
+    let ops = match storage.load_unverified_commits_after_block(d.last_loaded, d.limit) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(format!("failed to read commit operations: {}", e));
+        }
+    };
     drop(d);
 
     if ops.len() > 0 {
-        let mut d = data.write().unwrap();
+        let mut d = data.write().expect("failed to acquire a lock");
         for op in ops.into_iter() {
             let block = op.block.block_number as i64;
             (*d).operations.insert(block, op);
             (*d).last_loaded = block;
         }
     }
+
+    Ok(())
 }
 
 fn all_prepared(data: &Arc<RwLock<ProversDataPool>>) -> bool {
-    let d = data.read().unwrap();
+    let d = data.read().expect("failed to acquire a lock");
     d.all_prepared()
 }
 
-fn prepare_next(storage: &storage::StorageProcessor, data: &Arc<RwLock<ProversDataPool>>) {
-    // TODO: errors
-    let mut d = data.write().unwrap();
+fn prepare_next(
+    storage: &storage::StorageProcessor,
+    data: &Arc<RwLock<ProversDataPool>>,
+    phasher: &PedersenHasher<Engine>,
+    params: &AltJubjubBn256,
+) -> Result<(), String> {
+    let mut d = data.write().expect("failed to acquire a lock");
     let mut current = (*d).last_prepared + 1;
     let op = d.operations.remove(&mut current).unwrap();
     drop(d);
-    let pd = build_prover_data(&storage, &op);
-    let mut d = data.write().unwrap();
+    let pd = build_prover_data(&storage, &op, phasher, params)?;
+    let mut d = data.write().expect("failed to acquire a lock");
     (*d).last_prepared += current;
     (*d).prepared.insert(op.block.block_number as i64, pd);
-    println!("prepared {}", op.block.block_number);
+    Ok(())
 }
 
 fn build_prover_data(
     storage: &storage::StorageProcessor,
     commit_operation: &models::Operation,
-) -> ProverData {
-    println!("building prover data...");
-    // TODO: this is expensive time operation, move out and don't repeat
-    let phasher = PedersenHasher::<Engine>::default();
-    let params = &AltJubjubBn256::new();
+    phasher: &PedersenHasher<Engine>,
+    params: &AltJubjubBn256,
+) -> Result<ProverData, String> {
+    info!(
+        "building prover data for block {}",
+        commit_operation.block.block_number
+    );
 
     let block_number = commit_operation.block.block_number;
 
-    let (_, accounts) = storage
-        .load_committed_state(Some(block_number - 1))
-        .unwrap();
+    let (_, accounts) = match storage.load_committed_state(Some(block_number - 1)) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(format!("failed to load commited state: {}", e));
+        }
+    };
     let mut accounts_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
-    println!("accounts {:?}", accounts);
     for acc in accounts {
         let acc_number = acc.0;
         let leaf_copy = models::circuit::account::CircuitAccount::from(acc.1.clone());
-        println!(
-            "acc_number {}, acc {:?}",
-            acc_number, leaf_copy.pub_key_hash
-        );
         accounts_tree.insert(acc_number, leaf_copy);
     }
     let initial_root = accounts_tree.root_hash();
-    let ops = storage.get_block_operations(block_number).unwrap();
+    let ops = match storage.get_block_operations(block_number) {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(format!("failed to get block operations {}", e));
+        }
+    };
     // TODO: use conn pool
 
     circuit::witness::utils::apply_fee(
@@ -178,6 +197,12 @@ fn build_prover_data(
             models::node::FranklinOp::Transfer(transfer) => {
                 let transfer_witness =
                     circuit::witness::transfer::apply_transfer_tx(&mut accounts_tree, &transfer);
+                let sig_packed = match transfer.tx.signature.signature.serialize_packed() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Err(format!("failed to pack transaction signature {}", e));
+                    }
+                };
                 let (
                     first_sig_msg,
                     second_sig_msg,
@@ -185,10 +210,10 @@ fn build_prover_data(
                     signature_data,
                     signer_packed_key_bits,
                 ) = prepare_sig_data(
-                    &transfer.tx.signature.signature.serialize_packed().unwrap(),
+                    &sig_packed,
                     &transfer.tx.get_bytes(),
                     &transfer.tx.signature.pub_key,
-                );
+                )?;
                 let transfer_operations =
                     circuit::witness::transfer::calculate_transfer_operations_from_witness(
                         &transfer_witness,
@@ -208,6 +233,12 @@ fn build_prover_data(
                         &mut accounts_tree,
                         &transfer_to_new,
                     );
+                let sig_packed = match transfer_to_new.tx.signature.signature.serialize_packed() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Err(format!("failed to pack transaction signature {}", e));
+                    }
+                };
                 let (
                     first_sig_msg,
                     second_sig_msg,
@@ -215,15 +246,10 @@ fn build_prover_data(
                     signature_data,
                     signer_packed_key_bits,
                 ) = prepare_sig_data(
-                    &transfer_to_new
-                        .tx
-                        .signature
-                        .signature
-                        .serialize_packed()
-                        .unwrap(),
+                    &sig_packed,
                     &transfer_to_new.tx.get_bytes(),
                     &transfer_to_new.tx.signature.pub_key,
-                );
+                )?;
 
                 let transfer_to_new_operations =
                     circuit::witness::transfer_to_new::calculate_transfer_to_new_operations_from_witness(
@@ -241,6 +267,12 @@ fn build_prover_data(
             models::node::FranklinOp::Withdraw(withdraw) => {
                 let withdraw_witness =
                     circuit::witness::withdraw::apply_withdraw_tx(&mut accounts_tree, &withdraw);
+                let sig_packed = match withdraw.tx.signature.signature.serialize_packed() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Err(format!("failed to pack transaction signature {}", e));
+                    }
+                };
                 let (
                     first_sig_msg,
                     second_sig_msg,
@@ -248,10 +280,10 @@ fn build_prover_data(
                     signature_data,
                     signer_packed_key_bits,
                 ) = prepare_sig_data(
-                    &withdraw.tx.signature.signature.serialize_packed().unwrap(),
+                    &sig_packed,
                     &withdraw.tx.get_bytes(),
                     &withdraw.tx.signature.pub_key,
-                );
+                )?;
 
                 let withdraw_operations =
                     circuit::witness::withdraw::calculate_withdraw_operations_from_witness(
@@ -271,6 +303,12 @@ fn build_prover_data(
                     &mut accounts_tree,
                     &close,
                 );
+                let sig_packed = match close.tx.signature.signature.serialize_packed() {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return Err(format!("failed to pack signature: {}", e));
+                    }
+                };
                 let (
                     first_sig_msg,
                     second_sig_msg,
@@ -278,10 +316,10 @@ fn build_prover_data(
                     signature_data,
                     signer_packed_key_bits,
                 ) = prepare_sig_data(
-                    &close.tx.signature.signature.serialize_packed().unwrap(),
+                    &sig_packed,
                     &close.tx.get_bytes(),
                     &close.tx.signature.pub_key,
-                );
+                )?;
 
                 let close_account_operations =
                     circuit::witness::close_account::calculate_close_account_operations_from_witness(
@@ -368,10 +406,12 @@ fn build_prover_data(
     assert_eq!(pub_data.len(), 64 * models::params::block_size_chunks());
     assert_eq!(operations.len(), models::params::block_size_chunks());
 
-    // TODO: errors
-    let validator_acc = accounts_tree
-        .get(commit_operation.block.fee_account as u32)
-        .unwrap();
+    let validator_acc = match accounts_tree.get(commit_operation.block.fee_account as u32) {
+        Some(v) => v,
+        None => {
+            return Err(format!("validator account is absent in the tree"));
+        }
+    };
     let mut validator_balances = vec![];
     for i in 0..1 << models::params::BALANCE_TREE_DEPTH {
         //    validator_balances.push(Some(validator_acc.subtree.get(i as u32).map(|s| s.clone()).unwrap_or(Balance::default())));
@@ -393,13 +433,17 @@ fn build_prover_data(
             &mut accounts_tree,
             commit_operation.block.fee_account,
             u32::from(token),
-            fee.to_string().parse().unwrap(),
+            match fee.to_string().parse() {
+                Ok(v) => v,
+                Err(e) => {
+                    return Err(format!("failed to parse fee: {}", e));
+                }
+            },
         );
         root_after_fee = root;
         validator_account_witness = acc_witness;
     }
 
-    // TODO: replace asserts with errors
     assert_eq!(root_after_fee, commit_operation.block.new_root_hash);
     let (validator_audit_path, _) = circuit::witness::utils::get_audits(
         &accounts_tree,
@@ -415,15 +459,7 @@ fn build_prover_data(
         Some(Fr::from_str(&(block_number).to_string()).unwrap()),
     );
 
-    println!(
-        "initial: {}, new: {}, pdc: {}, validator account: {:?}",
-        initial_root,
-        commit_operation.block.new_root_hash,
-        Fr::from_str(&commit_operation.block.fee_account.to_string()).unwrap(),
-        validator_account_witness,
-    );
-
-    ProverData {
+    Ok(ProverData {
         public_data_commitment,
         old_root: initial_root,
         new_root: commit_operation.block.new_root_hash,
@@ -432,14 +468,14 @@ fn build_prover_data(
         validator_balances,
         validator_audit_path,
         validator_account: validator_account_witness,
-    }
+    })
 }
 
 pub fn prepare_sig_data(
     sig_bytes: &[u8],
     tx_bytes: &[u8],
     pub_key: &PackedPublicKey,
-) -> (Fr, Fr, Fr, SignatureData, Vec<Option<bool>>) {
+) -> Result<(Fr, Fr, Fr, SignatureData, Vec<Option<bool>>), String> {
     let (r_bytes, s_bytes) = sig_bytes.split_at(32);
     let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(&r_bytes)
         .iter()
@@ -462,17 +498,22 @@ pub fn prepare_sig_data(
             &models::params::JUBJUB_PARAMS,
         );
 
-    let signer_packed_key_bytes = pub_key.serialize_packed().unwrap();
+    let signer_packed_key_bytes = match pub_key.serialize_packed() {
+        Ok(v) => v,
+        Err(e) => {
+            return Err(format!("failed to prepare signature data: {}", e));
+        }
+    };
     let signer_packed_key_bits: Vec<_> =
         models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
-    (
+    Ok((
         first_sig_msg,
         second_sig_msg,
         third_sig_msg,
         signature,
         signer_packed_key_bits,
-    )
+    ))
 }
