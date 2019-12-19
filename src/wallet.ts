@@ -17,11 +17,17 @@ import {
 import { serializePointPacked } from "./crypto";
 
 export class Wallet {
+    public provider: Provider;
+    public ethProxy: ETHProxy;
+
     constructor(
         public signer: Signer,
-        public provider: Provider,
-        public ethProxy: ETHProxy
     ) {}
+
+    connect(provider: Provider, ethProxy: ETHProxy) {
+        this.provider = provider;
+        this.ethProxy = ethProxy;
+    }
 
     async syncTransfer(transfer: {
         to: Address;
@@ -120,13 +126,17 @@ export class Wallet {
 
     static async fromEthSigner(
         ethWallet: ethers.Signer,
-        provider: Provider,
-        ethProxy: ETHProxy
+        provider?: Provider,
+        ethProxy?: ETHProxy
     ): Promise<Wallet> {
         const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
         const seed = Buffer.from(seedHex, "hex");
         const signer = Signer.fromSeed(seed);
-        return new Wallet(signer, provider, ethProxy);
+        const wallet = new Wallet(signer);
+        if (provider && ethProxy) {
+            wallet.connect(provider, ethProxy);
+        }
+        return wallet;
     }
 
     async getAccountState(): Promise<AccountState> {

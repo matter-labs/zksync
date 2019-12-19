@@ -62,7 +62,7 @@ export class Provider {
         return provider;
     }
 
-    // return transaction hash (e.g. 0xdead..beef)
+    // return transaction hash (e.g. sync-tx:dead..beef)
     async submitTx(tx: any): Promise<string> {
         return await this.transport.request("tx_submit", [tx]);
     }
