@@ -1,27 +1,14 @@
 mod pool;
 
 // Built-in
-use std::collections::HashMap;
-use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::thread;
-use std::{error, net, time};
+use std::{net, time};
 // External
-use actix_web::web::delete;
-use actix_web::{web, App, HttpRequest, HttpResponse, HttpServer, Responder};
-use ff::{Field, PrimeField};
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use actix_web::{web, App, HttpResponse, HttpServer};
 use log::{error, info};
-use pairing::bn256::Bn256;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 // Workspace deps
-use circuit::account::AccountWitness;
-use circuit::operation::{
-    Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
-};
-use models::merkle_tree::PedersenHasher;
-use models::node::tx::PackedPublicKey;
-use models::node::{Engine, Fr};
 
 struct AppState {
     connection_pool: storage::ConnectionPool,
@@ -50,7 +37,7 @@ fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Re
     Ok(id.to_string())
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BlockToProveRes {
     pub prover_run_id: i32,
     pub block: i64,
@@ -70,6 +57,7 @@ fn block_to_prove(
     };
     match storage.next_unverified_commit(&r.name, data.prover_timeout) {
         Ok(ret) => {
+            println!("next unverified commit: {:?}", ret);
             if let Some(prover_run) = ret {
                 return Ok(HttpResponse::Ok().json(BlockToProveRes {
                     prover_run_id: prover_run.id,
@@ -151,6 +139,26 @@ fn publish(data: web::Data<AppState>, r: web::Json<PublishReq>) -> actix_web::Re
     }
 }
 
+fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::Result<()> {
+    info!(
+        "prover sent stopped request with prover_run id: {}",
+        prover_id
+    );
+    let storage = match data.connection_pool.access_storage() {
+        Ok(s) => s,
+        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
+    };
+    match storage.record_prover_stop(*prover_id) {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            error!("failed to record prover stop: {}", e);
+            Err(actix_web::error::ErrorInternalServerError(
+                "storage layer error",
+            ))
+        }
+    }
+}
+
 pub fn start_server(
     bind_to: &net::SocketAddr,
     prover_timeout: time::Duration,
@@ -163,7 +171,7 @@ pub fn start_server(
         let conn_pool = storage::ConnectionPool::new();
         pool::maintain(conn_pool, data_pool_copy, rounds_interval);
     });
-    let ret = HttpServer::new(move || {
+    HttpServer::new(move || {
         App::new()
             .wrap(actix_web::middleware::Logger::default())
             .data(AppState {
@@ -176,8 +184,11 @@ pub fn start_server(
             .route("/block_to_prove", web::get().to(block_to_prove))
             .route("/working_on", web::post().to(working_on))
             .route("/prover_data", web::get().to(prover_data))
+            .route("publish", web::post().to(publish))
+            .route("/stopped", web::post().to(stopped))
     })
     .bind(bind_to)
     .unwrap()
-    .run();
+    .run()
+    .unwrap();
 }

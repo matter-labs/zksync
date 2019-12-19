@@ -1,9 +1,4 @@
-pub mod client;
-pub mod server;
-
 // Built-in
-use std::fmt;
-use std::str::FromStr;
 // External
 use pairing::bn256::{Bn256, Fr};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

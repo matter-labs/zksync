@@ -4,7 +4,6 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::{env, fs, io, path, thread, time};
 // External deps
 use ff::{Field, PrimeField};
-use rand::Rng;
 // Workspace deps
 use prover;
 use testhelper::TestAccount;
@@ -41,10 +40,13 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
             time::Duration::from_secs(1),
             stop_signal_ar,
         );
-        let (tx, _) = mpsc::channel();
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || {
+            rx.recv().unwrap(); // mock receive exit error.
+        });
         prover::start(p, tx);
         println!("run exited!");
-        done_tx.send(());
+        done_tx.send(()).expect("unexpected failure");
     });
 
     let timeout = time::Duration::from_millis(500);
@@ -59,12 +61,14 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
 
     // Send stop signal.
     println!("sending stop signal.");
+    let jh = thread::spawn(move || {
+        heartbeat_rx.recv_timeout(timeout).unwrap();
+        heartbeat_rx.recv_timeout(timeout).unwrap();
+        // BabyProver must be stopped.
+        done_rx.recv_timeout(timeout).unwrap();
+    });
     stop_signal.store(true, Ordering::SeqCst);
-    heartbeat_rx.recv_timeout(timeout);
-    heartbeat_rx.recv_timeout(timeout);
-    println!("finishing up");
-    // BabyProver must be stopped.
-    done_rx.recv_timeout(timeout).unwrap();
+    jh.join();
 }
 
 #[test]
@@ -97,7 +101,10 @@ fn prover_proves_a_block_and_publishes_result() {
             stop_signal_ar,
         );
 
-        let (tx, _) = mpsc::channel();
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || {
+            rx.recv().unwrap();
+        });
         prover::start(p, tx);
     });
 
@@ -113,7 +120,7 @@ fn prover_proves_a_block_and_publishes_result() {
     assert!(verify_result.unwrap(), "invalid proof");
 }
 
-fn new_test_data_for_prover() -> prover::witness_generator::ProverData {
+fn new_test_data_for_prover() -> prover::prover_data::ProverData {
     let mut circuit_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
     println!("Empty tree root hash: {}", circuit_tree.root_hash());
@@ -261,7 +268,7 @@ fn new_test_data_for_prover() -> prover::witness_generator::ProverData {
             Some(models::node::Fr::from_str(&(block.block_number).to_string()).unwrap()),
         );
 
-    prover::witness_generator::ProverData {
+    prover::prover_data::ProverData {
         public_data_commitment,
         old_root: genesis_root_hash,
         new_root: block.new_root_hash,
@@ -291,16 +298,14 @@ fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engin
         .expect("Unable to read proving key")
 }
 
-struct MockApiClient<F: Fn() -> Option<prover::witness_generator::ProverData>> {
+struct MockApiClient<F: Fn() -> Option<prover::prover_data::ProverData>> {
     block_to_prove: Mutex<Option<(i64, i32)>>,
     heartbeats_tx: Arc<Mutex<mpsc::Sender<()>>>,
     publishes_tx: Arc<Mutex<mpsc::Sender<bellman::groth16::Proof<models::node::Engine>>>>,
     prover_data_fn: F,
 }
 
-impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
-    for MockApiClient<F>
-{
+impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for MockApiClient<F> {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, String> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         Ok(*block_to_prove)
@@ -312,7 +317,7 @@ impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
             if stored != job {
                 return Err("unexpected job id".to_owned());
             }
-            self.heartbeats_tx.lock().unwrap().send(());
+            let _ = self.heartbeats_tx.lock().unwrap().send(());
         }
         Ok(())
     }
@@ -321,9 +326,9 @@ impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
         &self,
         _block: i64,
         _timeout: time::Duration,
-    ) -> Result<prover::witness_generator::ProverData, String> {
+    ) -> Result<prover::prover_data::ProverData, String> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
-        if let Some(stored) = *block_to_prove {
+        if let Some(_) = *block_to_prove {
             let v = (self.prover_data_fn)();
             if let Some(pd) = v {
                 return Ok(pd);
@@ -336,13 +341,13 @@ impl<F: Fn() -> Option<prover::witness_generator::ProverData>> prover::ApiClient
         &self,
         _block: i64,
         p: bellman::groth16::Proof<models::node::Engine>,
-        public_data_commitment: models::node::Fr,
+        _public_data_commitment: models::node::Fr,
     ) -> Result<(), String> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();
         *block_to_prove = None;
 
-        self.publishes_tx.lock().unwrap().send(p);
+        let _ = self.publishes_tx.lock().unwrap().send(p);
         Ok(())
     }
 }

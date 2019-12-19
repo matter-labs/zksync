@@ -4,8 +4,8 @@ use std::{net, thread, time};
 // External deps
 use ff::{Field, PrimeField};
 // Workspace deps
-use prover::witness_generator::{client, server};
 use prover::ApiClient;
+use prover::{client, server};
 use testhelper::TestAccount;
 
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
@@ -31,7 +31,7 @@ fn client_with_empty_worker_name_panics() {
 }
 
 #[test]
-fn api_client_register_prover() {
+fn api_client_register_start_and_stop_of_prover() {
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
     let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
     let id = client.register_prover().expect("failed to register");
@@ -39,6 +39,11 @@ fn api_client_register_prover() {
     storage
         .prover_by_id(id)
         .expect("failed to select registered prover");
+    client.prover_stopped(id).expect("unexpected error");
+    let prover = storage
+        .prover_by_id(id)
+        .expect("failed to select registered prover");
+    prover.stopped_at.expect("expected not empty");
 }
 
 #[test]
@@ -66,6 +71,8 @@ fn api_client_simple_simulation() {
         .execute_operation(&op)
         .expect("failed to mock commit operation");
 
+    thread::sleep(time::Duration::from_secs(10));
+
     // should return block
     let to_prove = client
         .block_to_prove()
@@ -80,7 +87,7 @@ fn api_client_simple_simulation() {
     assert!(to_prove.is_none());
 
     // make block available
-    thread::sleep(prover_timeout * 2);
+    thread::sleep(prover_timeout * 10);
 
     let to_prove = client
         .block_to_prove()
@@ -90,7 +97,7 @@ fn api_client_simple_simulation() {
     let (block, job) = to_prove.unwrap();
     // sleep for prover_timeout and send heartbeat
     thread::sleep(prover_timeout * 2);
-    client.working_on(job);
+    client.working_on(job).unwrap();
 
     let to_prove = client
         .block_to_prove()
@@ -109,7 +116,7 @@ fn api_client_simple_simulation() {
 }
 
 pub fn test_operation_and_wanted_prover_data(
-) -> (models::Operation, prover::witness_generator::ProverData) {
+) -> (models::Operation, prover::prover_data::ProverData) {
     let mut circuit_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
     // insert account and its balance
@@ -152,17 +159,19 @@ pub fn test_operation_and_wanted_prover_data(
 
     accounts_updated.append(&mut op_success.updates);
 
-    storage.commit_state_update(
-        0,
-        &[(
+    storage
+        .commit_state_update(
             0,
-            models::node::AccountUpdate::Create {
-                address: validator_account.address,
-                nonce: validator_account.nonce,
-            },
-        )],
-    );
-    storage.apply_state_update(0);
+            &[(
+                0,
+                models::node::AccountUpdate::Create {
+                    address: validator_account.address,
+                    nonce: validator_account.nonce,
+                },
+            )],
+        )
+        .unwrap();
+    storage.apply_state_update(0).unwrap();
 
     ops.push(models::node::ExecutedOperations::PriorityOp(Box::new(
         models::node::ExecutedPriorityOp {
@@ -271,7 +280,7 @@ pub fn test_operation_and_wanted_prover_data(
             block: block.clone(),
             accounts_updated,
         },
-        prover::witness_generator::ProverData {
+        prover::prover_data::ProverData {
             public_data_commitment,
             old_root: initial_root,
             new_root: block.new_root_hash,
@@ -291,7 +300,7 @@ fn api_server_publish_dummy() {
     let addr = spawn_server(prover_timeout, rounds_interval);
 
     let client = reqwest::Client::new();
-    client
+    let res = client
         .post(&format!("http://{}/publish", &addr))
         .json(&server::PublishReq {
             block: 1,
@@ -299,4 +308,6 @@ fn api_server_publish_dummy() {
         })
         .send()
         .expect("failed to send publish request");
+
+    assert_eq!(res.status(), reqwest::StatusCode::OK);
 }

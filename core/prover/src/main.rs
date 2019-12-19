@@ -1,19 +1,16 @@
 // Built-in deps
-use std::str::FromStr;
 use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::{env, thread, time};
 // External deps
 use bellman::groth16;
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use log::{debug, info};
+use log::{debug, error, info};
 use pairing::bn256;
 use signal_hook::iterator::Signals;
-use tokio::runtime::current_thread::Runtime;
-use tokio::sync::oneshot;
 // Workspace deps
 use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_HEARTBEAT_INTERVAL};
-use prover::witness_generator::client;
+use prover::client;
 use prover::{start, BabyProver};
 
 fn main() {
@@ -49,7 +46,7 @@ fn main() {
         stop_signal,
     );
     // Register prover
-    let _prover_id = client::ApiClient::new(&api_url, "")
+    let prover_id = client::ApiClient::new(&api_url, "")
         .register_prover()
         .expect("failed to register prover");
     // Start prover
@@ -59,6 +56,8 @@ fn main() {
     });
 
     // Handle termination requests.
+    let prover_id_copy = prover_id;
+    let api_url_copy = api_url.clone();
     thread::spawn(move || {
         let signals = Signals::new(&[
             signal_hook::SIGTERM,
@@ -70,13 +69,18 @@ fn main() {
             info!(
                 "Termination signal received. Prover will finish the job and shut down gracefully"
             );
-            // TODO: on terminate signal, send prover stop request
+            client::ApiClient::new(&api_url_copy, "")
+                .prover_stopped(prover_id_copy)
+                .unwrap();
         }
     });
 
     // Handle prover exit errors.
-    let _err = exit_err_rx.recv();
-    // TODO: send prover stop request
+    let err = exit_err_rx.recv();
+    error!("prover exited with error: {:?}", err);
+    client::ApiClient::new(&api_url, "")
+        .prover_stopped(prover_id)
+        .unwrap();
 }
 
 fn read_from_key_dir(key_dir: String) -> groth16::Parameters<bn256::Bn256> {
