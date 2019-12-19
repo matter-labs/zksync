@@ -4,7 +4,7 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 // External uses
 use itertools::Itertools;
-use web3::types::{H160, H256};
+use web3::types::H256;
 // Workspace uses
 use crate::eth_watch::ETHState;
 use crate::ThreadPanicNotify;

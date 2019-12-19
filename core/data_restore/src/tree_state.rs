@@ -187,10 +187,12 @@ impl TreeState {
                 _ => {}
             }
         }
+
         let fee_account_address = self
             .get_account(ops_block.fee_account)
             .ok_or_else(|| format_err!("Nonexistent account"))?
             .address;
+
         let (fee_account_id, fee_updates) = self.state.collect_fee(&fees, &fee_account_address);
         accounts_updated.extend(fee_updates.into_iter());
 

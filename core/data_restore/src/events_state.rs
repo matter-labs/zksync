@@ -57,10 +57,10 @@ impl EventsState {
     /// * `eth_blocks_step` - Blocks step for watching
     /// * `end_eth_blocks_offset` - Delta between last eth block and last watched block
     ///
-    pub fn update_events_state<T: Transport>(
+    pub fn update_events_state(
         &mut self,
-        web3: &Web3<T>,
-        contract: &(ethabi::Contract, Contract<T>),
+        web3_url: &String,
+        contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<(Vec<EventData>, u64), failure::Error> {
@@ -68,16 +68,18 @@ impl EventsState {
 
         let (events, to_block_number): (CommittedAndVerifiedEvents, u64) =
             EventsState::update_events_and_last_watched_block(
-                &web3,
-                &contract,
+                web3_url,
+                contract,
                 self.last_watched_eth_block_number,
                 eth_blocks_step,
                 end_eth_blocks_offset,
             )?;
+        
+        self.last_watched_eth_block_number = to_block_number;
 
         self.committed_events.extend(events.0);
+
         self.verified_events.extend(events.1);
-        self.last_watched_eth_block_number = to_block_number;
 
         let mut events_to_return: Vec<EventData> = self.committed_events.clone();
         events_to_return.extend(self.verified_events.clone());
@@ -86,7 +88,10 @@ impl EventsState {
     }
 
     /// Return last watched ethereum block number
-    pub fn get_last_block_number<T: Transport>(web3: &Web3<T>) -> Result<u64, failure::Error> {
+    pub fn get_last_block_number(web3_url: &String) -> Result<u64, failure::Error> {
+        let (_eloop, transport) = web3::transports::Http::new(web3_url).unwrap();
+        let web3 = web3::Web3::new(transport);
+        
         Ok(web3.eth().block_number().wait().map(|n| n.as_u64())?)
     }
 
@@ -98,15 +103,16 @@ impl EventsState {
     /// * `eth_blocks_step` - Ethereum blocks delta step
     /// * `end_eth_blocks_offset` - last block delta
     ///
-    fn update_events_and_last_watched_block<T: Transport>(
-        web3: &Web3<T>,
-        contract: &(ethabi::Contract, Contract<T>),
+    fn update_events_and_last_watched_block(
+        web3_url: &String,
+        contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
         last_watched_block_number: u64,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<(CommittedAndVerifiedEvents, u64), failure::Error> {
         let latest_eth_block_minus_delta =
-            EventsState::get_last_block_number(&web3)? - end_eth_blocks_offset;
+            EventsState::get_last_block_number(web3_url)? - end_eth_blocks_offset;
+
         if latest_eth_block_minus_delta == last_watched_block_number {
             return Ok(((vec![], vec![]), last_watched_block_number)); // No new eth blocks
         }
@@ -122,9 +128,10 @@ impl EventsState {
         };
 
         let to_block_number = BlockNumber::Number(to_block_number_u64);
+
         let from_block_number = BlockNumber::Number(from_block_number_u64);
 
-        let logs = EventsState::get_logs(web3, contract, from_block_number, to_block_number)?;
+        let logs = EventsState::get_logs(web3_url, contract, from_block_number, to_block_number)?;
         let sorted_logs = EventsState::sort_logs(&contract.0, &logs)?;
 
         Ok((sorted_logs, to_block_number_u64))
@@ -137,9 +144,9 @@ impl EventsState {
     /// * `from_block_number` - Start ethereum block number
     /// * `to_block_number` - End ethereum block number
     ///
-    fn get_logs<T: Transport>(
-        web3: &Web3<T>,
-        contract: &(ethabi::Contract, Contract<T>),
+    fn get_logs(
+        web3_url: &String,
+        contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
         from_block_number: BlockNumber,
         to_block_number: BlockNumber,
     ) -> Result<Vec<Log>, failure::Error> {
@@ -163,6 +170,9 @@ impl EventsState {
             .to_block(to_block_number)
             .topics(Some(topics_vec), None, None, None)
             .build();
+
+        let (_eloop, transport) = web3::transports::Http::new(web3_url).unwrap();
+        let web3 = web3::Web3::new(transport);
 
         let result = web3
             .eth()

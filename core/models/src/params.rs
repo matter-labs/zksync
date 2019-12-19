@@ -36,7 +36,8 @@ pub fn account_tree_depth() -> usize {
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 24;
 
 pub const INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH: usize = 32;
-pub const INPUT_DATA_FEE_ACC_BYTES_WIDTH: usize = 32;
+pub const INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET: usize = 32;
+pub const INPUT_DATA_FEE_ACC_BYTES_WIDTH: usize = 3;
 pub const INPUT_DATA_ROOT_BYTES_WIDTH: usize = 32;
 pub const INPUT_DATA_EMPTY_BYTES_WIDTH: usize = 64;
 pub const INPUT_DATA_ROOT_HASH_BYTES_WIDTH: usize = 32;

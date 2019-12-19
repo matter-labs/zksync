@@ -5,9 +5,9 @@ use models::params::{FR_ADDRESS_LEN, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
 use web3::types::Transaction;
 
 // Returns contracts genesis accounts state
-pub fn get_genesis_state(
+pub fn get_genesis_account(
     genesis_transaction: &Transaction,
-) -> Result<(u32, Account), failure::Error> {
+) -> Result<Account, failure::Error> {
     let input_data = get_input_data_from_ethereum_transaction(&genesis_transaction)?;
     let genesis_operator_address = AccountAddress::from_bytes(
         &input_data[input_data.len() - INPUT_DATA_ROOT_HASH_BYTES_WIDTH - FR_ADDRESS_LEN
@@ -16,5 +16,5 @@ pub fn get_genesis_state(
     .map_err(|e| format_err!("No genesis account address: {}", e.to_string()))?;
     let mut acc = Account::default();
     acc.address = genesis_operator_address;
-    Ok((0, acc))
+    Ok(acc)
 }

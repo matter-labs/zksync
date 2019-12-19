@@ -328,8 +328,8 @@ data-restore-build:
 	@cargo build -p data_restore --release --bin data_restore
 
 data-restore-restart: confirm_action data-restore-db-prepare
-	@./target/release/data_restore
+	@cargo run --bin data_restore --release -- --genesis
 
 data-restore-continue:
-	@./target/release/data_restore
+	@cargo run --bin data_restore --release -- --continue
 	

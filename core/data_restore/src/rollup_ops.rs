@@ -7,7 +7,7 @@ use web3::{Transport, Web3};
 
 use models::params::{
     INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH, INPUT_DATA_EMPTY_BYTES_WIDTH,
-    INPUT_DATA_FEE_ACC_BYTES_WIDTH, INPUT_DATA_ROOT_BYTES_WIDTH,
+    INPUT_DATA_FEE_ACC_BYTES_WIDTH, INPUT_DATA_ROOT_BYTES_WIDTH, INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
 };
 
 /// Description of a Franklin operations block
@@ -28,17 +28,19 @@ impl RollupOpsBlock {
     ///
     /// * `event_data` - Franklin Contract event description
     ///
-    pub fn get_rollup_ops_block<T: Transport>(
-        web3: &Web3<T>,
+    pub fn get_rollup_ops_block(
+        web3_url: &String,
         event_data: &EventData,
     ) -> Result<Self, failure::Error> {
-        let transaction = get_ethereum_transaction(&web3, &event_data.transaction_hash)?;
+        let transaction = get_ethereum_transaction(web3_url, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
+        // info!("New ops block input_data: {:?}", &input_data);
         let commitment_data = &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
-            + INPUT_DATA_FEE_ACC_BYTES_WIDTH
+            + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
             + INPUT_DATA_ROOT_BYTES_WIDTH
             + INPUT_DATA_EMPTY_BYTES_WIDTH
             ..input_data.len()];
+        // info!("New ops block commitment_data: {:?}", &commitment_data);
         let fee_account = RollupOpsBlock::get_fee_account_from_tx_input(&input_data)?;
         let ops = RollupOpsBlock::get_rollup_ops_from_data(commitment_data)?;
         let block = RollupOpsBlock {
@@ -67,6 +69,8 @@ impl RollupOpsBlock {
             let post = pre + pub_data_size;
 
             let op = FranklinOp::from_public_data(&data[pre..post])?;
+            // info!("New op: {:?}", &op);
+
             ops.push(op);
             current_pointer += pub_data_size;
         }
@@ -80,14 +84,14 @@ impl RollupOpsBlock {
     /// * `input` - Ethereum transaction input
     ///
     fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, failure::Error> {
-        ensure!(
-            input_data.len()
-                == INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH,
-            "No fee account data in tx"
-        );
+        // ensure!(
+        //     input_data.len()
+        //         == INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH,
+        //     "No fee account data in tx"
+        // );
         Ok(bytes_slice_to_uint32(
-            &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
-                ..INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH],
+            &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET - INPUT_DATA_FEE_ACC_BYTES_WIDTH
+                ..INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET],
         )
         .ok_or_else(|| format_err!("Cant convert bytes to fee account number"))?)
     }

@@ -1,5 +1,5 @@
 use crate::events_state::EventsState;
-use crate::genesis_state::get_genesis_state;
+use crate::genesis_state::get_genesis_account;
 use crate::helpers::get_ethereum_transaction;
 use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor;
@@ -23,13 +23,13 @@ pub enum StorageUpdateState {
 }
 
 /// Description of data restore driver
-pub struct DataRestoreDriver<T: Transport> {
+pub struct DataRestoreDriver {
     /// Database connection pool
     pub connection_pool: ConnectionPool,
     /// Web3 endpoint
-    pub web3: Web3<T>,
+    pub web3_url: String,
     /// Provides Ethereum Franklin contract unterface
-    pub franklin_contract: (ethabi::Contract, Contract<T>),
+    pub franklin_contract: (ethabi::Contract, Contract<web3::transports::http::Http>),
     /// Flag that indicates that state updates are running
     pub run_update: bool,
     /// Franklin contract events state
@@ -40,14 +40,17 @@ pub struct DataRestoreDriver<T: Transport> {
     pub end_eth_blocks_offset: u64,
 }
 
-impl<T: Transport> DataRestoreDriver<T> {
+impl DataRestoreDriver {
     pub fn new_empty(
         connection_pool: ConnectionPool,
-        web3: Web3<T>,
+        web3_url: String,
         contract_eth_addr: H160,
+        contract_genesis_tx_hash: H256,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<Self, failure::Error> {
+        let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
+        let web3 = web3::Web3::new(transport);
         let franklin_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
                 .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?
@@ -62,13 +65,25 @@ impl<T: Transport> DataRestoreDriver<T> {
             )
         };
 
-        let events_state = EventsState::new();
+        let mut events_state = EventsState::new();
+
+        let genesis_transaction = get_ethereum_transaction(&web3_url, &contract_genesis_tx_hash)?;
+
+        let genesis_eth_block_number =
+            events_state.set_genesis_block_number(&genesis_transaction)?;
+        info!("Genesis eth block number: {:?}", &genesis_eth_block_number);
+
+        storage_interactor::save_events_state(
+            connection_pool.clone(),
+            &vec![],
+            genesis_eth_block_number,
+        )?;
 
         let tree_state = TreeState::new();
 
         Ok(Self {
             connection_pool,
-            web3,
+            web3_url,
             franklin_contract,
             run_update: false,
             events_state,
@@ -86,14 +101,17 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `eth_blocks_step` - Step of the considered blocks ethereum block
     /// * `eth_end_blocks_delta` - Delta between last ethereum block and last watched ethereum block
     ///
-    pub fn new_from_genesis(
+    pub fn new_with_genesis_acc(
         connection_pool: ConnectionPool,
-        web3: Web3<T>,
+        web3_url: String,
         contract_eth_addr: H160,
         contract_genesis_tx_hash: H256,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<Self, failure::Error> {
+        let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
+        let web3 = web3::Web3::new(transport);
+
         let franklin_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
                 .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?
@@ -110,21 +128,11 @@ impl<T: Transport> DataRestoreDriver<T> {
 
         let mut events_state = EventsState::new();
 
-        let genesis_transaction = get_ethereum_transaction(&web3, &contract_genesis_tx_hash)?;
-        let (id, genesis_account) = get_genesis_state(&genesis_transaction)?;
+        let genesis_transaction = get_ethereum_transaction(&web3_url, &contract_genesis_tx_hash)?;
 
         let genesis_eth_block_number =
             events_state.set_genesis_block_number(&genesis_transaction)?;
-
-        let account_update = AccountUpdate::Create {
-            address: genesis_account.address.clone(),
-            nonce: genesis_account.nonce.clone(),
-        };
-
-        let mut account_map = AccountMap::default();
-        account_map.insert(id, genesis_account);
-
-        let tree_state = TreeState::load(0, account_map, 0, id);
+        info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
         storage_interactor::save_events_state(
             connection_pool.clone(),
@@ -132,21 +140,37 @@ impl<T: Transport> DataRestoreDriver<T> {
             genesis_eth_block_number,
         )?;
 
-        storage_interactor::update_tree_state(
+        let genesis_account = get_genesis_account(&genesis_transaction)?;
+
+        let account_update = AccountUpdate::Create {
+            address: genesis_account.address.clone(),
+            nonce: genesis_account.nonce.clone(),
+        };
+
+        let mut account_map = AccountMap::default();
+        account_map.insert(0, genesis_account.clone());
+
+        let current_block = 0;
+        let current_unprocessed_priority_op = 0;
+
+        let tree_state = TreeState::load(current_block, account_map, current_unprocessed_priority_op, 0);
+
+        info!("Genesis block number: {:?}", tree_state.state.block_number);
+        info!("Genesis tree root hash: {:?}", tree_state.root_hash());
+        info!("Genesis accounts: {:?}", tree_state.get_accounts());;
+
+        storage_interactor::save_genesis_tree_state(
             connection_pool.clone(),
-            Block {
-                block_number: 0,
-                new_root_hash: tree_state.root_hash(),
-                fee_account: id,
-                block_transactions: Vec::new(),
-                processed_priority_ops: (0, 0),
-            },
-            [(0, account_update)].to_vec(),
+            account_update
         )?;
+
+        println!("Saved genesis tree state");
+
+        // println!("current storage tree: {:?}", storage_interactor::get_tree_state(connection_pool.clone()));
 
         Ok(Self {
             connection_pool,
-            web3,
+            web3_url,
             franklin_contract,
             run_update: false,
             events_state,
@@ -217,6 +241,8 @@ impl<T: Transport> DataRestoreDriver<T> {
             // Update operations
             let new_ops_blocks = self.update_operations_state()?;
 
+            // info!("new_ops_blocks: {:?}", &new_ops_blocks);
+
             // Update tree
             self.update_tree_state(new_ops_blocks)?;
         }
@@ -226,7 +252,7 @@ impl<T: Transport> DataRestoreDriver<T> {
 
     fn update_events_state(&mut self) -> Result<(), failure::Error> {
         let (events, last_watched_eth_block_number) = self.events_state.update_events_state(
-            &self.web3,
+            &self.web3_url,
             &self.franklin_contract,
             self.eth_blocks_step,
             self.end_eth_blocks_offset,
@@ -260,6 +286,9 @@ impl<T: Transport> DataRestoreDriver<T> {
             let (block, acc_updates) = self
                 .tree_state
                 .update_tree_states_from_ops_block(&op_block)?;
+            info!("New block number: {:?}", &self.tree_state.state.block_number);
+            info!("Tree root hash: {:?}", self.tree_state.root_hash());
+            info!("Accounts: {:?}", self.tree_state.get_accounts());
             storage_interactor::update_tree_state(
                 self.connection_pool.clone(),
                 block,
@@ -291,7 +320,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             StorageUpdateState::Operations,
         )?;
 
-        info!("Updated events storage");
+        info!("Updated operations storage");
 
         Ok(new_blocks)
     }
@@ -304,7 +333,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         let committed_events = self.events_state.get_only_verified_committed_events();
         let mut blocks: Vec<RollupOpsBlock> = vec![];
         for event in committed_events {
-            let mut _block = RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)?;
+            let mut _block = RollupOpsBlock::get_rollup_ops_block(&self.web3_url, &event)?;
             blocks.push(_block);
         }
         Ok(blocks)

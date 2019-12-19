@@ -17,6 +17,7 @@ pub fn get_input_data_from_ethereum_transaction(
     transaction: &Transaction,
 ) -> Result<Vec<u8>, failure::Error> {
     let input_data = transaction.clone().input.0;
+    // info!("Start input: {:?}", &input_data);
     ensure!(
         input_data.len() > FUNC_NAME_HASH_LENGTH,
         format_err!("No commitment data in tx")
@@ -46,10 +47,12 @@ pub fn get_block_number_from_ethereum_transaction(
 ///
 /// * `transaction_hash` - The identifier of the particular Ethereum transaction
 ///
-pub fn get_ethereum_transaction<T: Transport>(
-    web3: &Web3<T>,
+pub fn get_ethereum_transaction(
+    web3_url: &String,
     transaction_hash: &H256,
 ) -> Result<Transaction, failure::Error> {
+    let (_eloop, transport) = web3::transports::Http::new(web3_url).unwrap();
+    let web3 = web3::Web3::new(transport);
     let tx_id = TransactionId::Hash(*transaction_hash);
     let web3_transaction = web3
         .eth()

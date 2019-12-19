@@ -10,6 +10,7 @@ pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
 
+// use std::str::FromStr;
 use crate::data_restore_driver::DataRestoreDriver;
 use clap::{App, Arg};
 use server::ConfigurationOptions;
@@ -41,7 +42,7 @@ fn main() {
         .get_matches();
 
     let mut driver = if cli.is_present("genesis") {
-        create_data_restore_driver_with_genesis(
+        create_data_restore_driver_with_genesis_acc(
             connection_pool,
             config_opts.web3_url.clone(),
             config_opts.contract_eth_addr.clone(),
@@ -52,6 +53,9 @@ fn main() {
     } else {
         create_data_restore_driver_empty(
             connection_pool,
+            // String::from("https://rinkeby.infura.io/v3/4406c3acf862426c83991f1752c46dd8"),
+            // H160::from_str("d4047737804c4b9c6ceb7e8e051b42b249fafbf9").unwrap(),
+            // H256::from_str("b99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e").unwrap(),
             config_opts.web3_url.clone(),
             config_opts.contract_eth_addr.clone(),
             ETH_BLOCKS_STEP,
@@ -71,15 +75,17 @@ pub fn create_data_restore_driver_empty(
     connection_pool: ConnectionPool,
     web3_url: String,
     contract_eth_addr: H160,
+    contract_genesis_tx_hash: H256,
     eth_blocks_step: u64,
     end_eth_blocks_offset: u64,
-) -> Result<DataRestoreDriver<web3::transports::Http>, failure::Error> {
-    let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
-    let web3 = web3::Web3::new(transport);
+) -> Result<DataRestoreDriver, failure::Error> {
+    // let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
+    // let web3 = web3::Web3::new(transport);
     DataRestoreDriver::new_empty(
         connection_pool,
-        web3,
+        web3_url,
         contract_eth_addr,
+        contract_genesis_tx_hash,
         eth_blocks_step,
         end_eth_blocks_offset,
     )
@@ -91,19 +97,19 @@ pub fn create_data_restore_driver_empty(
 ///
 /// * `connection_pool` - Database connection pool
 ///
-pub fn create_data_restore_driver_with_genesis(
+pub fn create_data_restore_driver_with_genesis_acc(
     connection_pool: ConnectionPool,
     web3_url: String,
     contract_eth_addr: H160,
     contract_genesis_tx_hash: H256,
     eth_blocks_step: u64,
     end_eth_blocks_offset: u64,
-) -> Result<DataRestoreDriver<web3::transports::Http>, failure::Error> {
-    let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
-    let web3 = web3::Web3::new(transport);
-    DataRestoreDriver::new_from_genesis(
+) -> Result<DataRestoreDriver, failure::Error> {
+    // let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
+    // let web3 = web3::Web3::new(transport);
+    DataRestoreDriver::new_with_genesis_acc(
         connection_pool,
-        web3,
+        web3_url,
         contract_eth_addr,
         contract_genesis_tx_hash,
         eth_blocks_step,
@@ -112,7 +118,7 @@ pub fn create_data_restore_driver_with_genesis(
 }
 
 /// Loads states from storage and start update
-pub fn load_state_from_storage<T: Transport>(driver: &mut DataRestoreDriver<T>) {
+pub fn load_state_from_storage(driver: &mut DataRestoreDriver) {
     driver.load_state_from_storage().expect("Cant load state");
 }
 
@@ -122,10 +128,10 @@ pub fn load_state_from_storage<T: Transport>(driver: &mut DataRestoreDriver<T>) 
 ///
 /// * `driver` - DataRestore Driver config
 ///
-pub fn update_state<T: Transport>(driver: &mut DataRestoreDriver<T>) {
+pub fn update_state(driver: &mut DataRestoreDriver) {
     driver.run_state_update().expect("Cant update state");
 }
 
-pub fn stop_state_update<T: Transport>(driver: &mut DataRestoreDriver<T>) {
+pub fn stop_state_update(driver: &mut DataRestoreDriver) {
     driver.stop_state_update();
 }

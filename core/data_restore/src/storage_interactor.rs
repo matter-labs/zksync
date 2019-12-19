@@ -10,12 +10,37 @@ use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
 use models::node::block::Block;
-use models::node::{AccountMap, AccountUpdates};
+use models::node::{Account, AccountAddress, AccountUpdate, AccountMap, AccountUpdates};
 use models::{Action, EncodedProof, Operation};
 use storage::{
     ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
     StoredRollupOpsBlock,
 };
+use crate::tree_state::TreeState;
+use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
+
+pub fn save_genesis_tree_state(
+    connection_pool: ConnectionPool,
+    genesis_acc_update: AccountUpdate
+) -> Result<(), failure::Error> {
+    let storage = connection_pool.access_storage().map_err(|e| {
+        format_err!(
+            "Db connection failed for data restore save tree state: {}",
+            e.to_string()
+        )
+    })?;
+    let (_last_committed, mut _accounts) = storage.load_committed_state(None).expect("db failed");
+    assert!(
+        _last_committed == 0 && _accounts.is_empty(),
+        "db should be empty"
+    );
+    storage
+        .commit_state_update(0, &[(0, genesis_acc_update)])
+        .map_err(|e| format_err!("Cant commit state update: {}", e.to_string()))?;
+    storage.apply_state_update(0)
+        .map_err(|e| format_err!("Cant apply state update: {}", e.to_string()))?;
+    Ok(())
+}
 
 /// Updates stored tree state
 ///
@@ -36,6 +61,7 @@ pub fn update_tree_state(
             e.to_string()
         )
     })?;
+    info!("!!!!!!!!accs: {:?}", &accounts_updated);
     storage
         .commit_state_update(block.block_number, accounts_updated.as_slice())
         .map_err(|e| format_err!("Cant commit state update: {}", e.to_string()))?;
@@ -446,12 +472,12 @@ pub fn get_tree_state(
 
     let (last_block, account_map) = storage
         .load_verified_state()
-        .map_err(|e| format_err!("get_tree_state: db must work: {}", e.to_string()))?;
+        .map_err(|e| format_err!("get_tree_state: cant get last verified state: {}", e.to_string()))?;
 
     let block = storage
         .get_block(last_block)
-        .map_err(|e| format_err!("get_tree_state: db must work: {}", e.to_string()))?
-        .ok_or_else(|| format_err!("get_tree_state: db must work"))?;
+        .map_err(|e| format_err!("get_tree_state: cant get last block: {}", e.to_string()))?
+        .ok_or_else(|| format_err!("get_tree_state: no last block"))?;
 
     let unprocessed_prior_ops = block.processed_priority_ops.1;
 
