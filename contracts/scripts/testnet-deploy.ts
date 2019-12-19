@@ -41,6 +41,7 @@ async function main() {
     let franklinAddress      = process.env.CONTRACT_ADDR;
 
     let governanceConstructorArgs    = [ wallet.address ];
+    let priorityQueueConstructorArgs = [ governanceAddress ];
     let verifierConstructorArgs      = [];
     let franklinConstructorArgs      = [
         governanceAddress,
@@ -54,7 +55,7 @@ async function main() {
         const governance = await deployGovernance(wallet, governanceContractCode, governanceConstructorArgs);
         governanceAddress = governance.address;
         
-        const priorityQueue = await deployPriorityQueue(wallet, priorityQueueContractCode, [governance.address]);
+        const priorityQueue = await deployPriorityQueue(wallet, priorityQueueContractCode, priorityQueueConstructorArgs);
         priorityQueueAddress = priorityQueue.address;
         
         const verifier = await deployVerifier(wallet, verifierContractCode, verifierConstructorArgs);
@@ -83,7 +84,7 @@ async function main() {
                 await postContractToTesseracts(franklinContractCode,      "Franklin",      franklinAddress);
             } else {
                 await publishSourceCodeToEtherscan('Governance',    governanceAddress,    governanceContractSourceCode,    governanceContractCode,    governanceConstructorArgs);
-                await publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, [governanceAddress]);
+                await publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, priorityQueueConstructorArgs);
                 await publishSourceCodeToEtherscan('Verifier',      verifierAddress,      verifierContractSourceCode,      verifierContractCode,      verifierConstructorArgs);
                 await publishSourceCodeToEtherscan('Franklin',      franklinAddress,      franklinContractSourceCode,      franklinContractCode,      franklinConstructorArgs);
             }
