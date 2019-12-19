@@ -19,6 +19,9 @@
             width="100" 
             height="100">
         </div>
+        <div v-else-if="transactionExists == false">
+            <h5 class="mt-3">Can't find transaction <code> {{ tx_hash }} </code></h5>
+        </div>
         <div v-else>
             <b-breadcrumb :items="breadcrumbs"></b-breadcrumb>
             <h5 class="mt-3">Transaction data</h5>
@@ -53,6 +56,7 @@ export default {
         status: '',
         intervalHandle: null,
         loading: true,
+        transactionExists: true,
     }),
     async created() {
         await this.update();
@@ -67,6 +71,11 @@ export default {
     methods: {
         async update() {
             let tx_data = await this.fraProvider.getTransactionByHash(this.tx_hash);
+            if (tx_data == null) {
+                this.transactionExists = false;
+                return;
+            }
+
             tx_data.tokenName = (await this.tokensPromise)[tx_data.token].symbol;
             let block = await client.getBlock(tx_data.block_number);
             tx_data.status = block.verified_at ? `Verified`
