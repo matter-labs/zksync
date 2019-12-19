@@ -2,13 +2,10 @@ import {Contract, utils} from 'ethers';
 import { readableEther, sleep, isReadablyPrintable } from './utils';
 import timeConstants from './timeConstants';
 import config from './env-config';
-import Axios from 'axios';
 const zksync = require('zksync');
 const ethers = require('ethers');
 window.ethers = ethers;
-import priority_queue_abi from '../../../contracts/build/PriorityQueue.json'
 import franklin_abi from '../../../contracts/build/Franklin.json'
-import { BlockExplorerClient } from './BlockExplorerClient';
 
 const NUMERIC_LIMITS_UINT_256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
 
@@ -94,7 +91,7 @@ export class WalletDecorator {
     // #region everything
     constructor () {
         this.address = window.syncWallet.address();
-        this.blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
+        this.blockExplorerClient = new zksync.BlockExplorerClient(config.API_SERVER);
     }
 
     static async new(wallet) {

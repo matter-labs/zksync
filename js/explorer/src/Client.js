@@ -1,58 +1,146 @@
-import { FranklinProvider } from 'franklin_lib';
 import config from './env-config';
-import Axios from 'axios';
+import constants from './constants';
 import { readableEther } from './utils';
+const zksync = require('zksync');   
+const ethers = require('ethers');
+import axios from 'axios';
 
-export class WalletDecorator {
-    constructor(address, fraProvider) {
-        this.address = address;
-        this.fraProvider = fraProvider || new FranklinProvider(
-            config.API_SERVER,
-            config.CONTRACT_ADDR
-        );
-        this.tokensPromise = this.fraProvider.getTokens();
+async function fetch(req) {
+    let r = await axios(req).catch(_ => ({}));
+    if (r.status == 200) {
+        return r.data;
+    } else {
+        return null;
     }
-    async getAccount() {
-        return await Axios.get(`${config.API_SERVER}/api/v0.1/account/${this.address}`).then(r => r.data);
+}
+
+function baseUrl() {
+    return config.API_SERVER + '/api/v0.1';
+}
+export class Client {
+    constructor(props) {
+        Object.assign(this, props);
     }
-    async getCommitedBalances() {
-        let account = await this.getAccount();
-        let tokensNamesList = (await this.tokensPromise).map(token => token.symbol || `erc20_${token.tokenId}`);
+
+    static async new() {
+        const net = config.ETH_NETWORK == 'localhost' 
+            ? 'localhost'
+            : 'testnet';
+        const syncProvider = await zksync.getDefaultProvider(net);
+        
+        const tokensPromise = syncProvider.getTokens()
+            .then(tokens => {
+                return Object.values(tokens)
+                    .map(token => ({
+                        ...token,
+                        symbol: token.symbol || `${token.id.toString().padStart(3, '0')}`,
+                    }))
+                    .sort((a, b) => a.id - b.id);
+            });
+        
+        const blockExplorerClient = new zksync.BlockExplorerClient(config.API_SERVER);
+
+        const props = {
+            blockExplorerClient,
+            tokensPromise,
+        };
+
+        return new Client(props);
+    }
+
+    async status() {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/status`,
+        });
+    }
+
+    async loadBlocks(max_block) {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/blocks?max_block=${max_block}&limit=${constants.PAGE_SIZE}`,
+        });
+    }
+
+    async getBlock(blockNumber) {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/blocks/${blockNumber}`,
+        });
+    }
+
+    async getBlockTransactions(blockNumber) {
+        let txs = await fetch({
+            method:     'get',
+            url:        `${baseUrl()}/blocks/${blockNumber}/transactions`,
+        });
+        
+        return txs.map(tx => {
+            let res = tx.op;
+            res.tx_hash = tx.tx_hash;
+            return res;
+        });
+    }
+
+    searchBlock(query) {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/search?query=${query}`,
+        });
+    }
+
+    searchAccount(address) {
+        return fetch({
+            method: 'get',
+            url: `${baseUrl()}/account/${address}`,
+        });
+    }
+    
+    searchTx(txHash) {
+        return fetch({
+            method: 'get',
+            url: `${baseUrl()}/transactions_all/${txHash}`,
+        });
+    }
+
+    getAccount(address) {
+        return fetch({
+            method: 'get',
+            url: `${config.API_SERVER}/api/v0.1/account/${address}`,
+        });
+    }
+
+    async getCommitedBalances(address) {
+        const account = await this.getAccount(address);
+        const tokensInfoList = await this.tokensPromise;
+
         return Object.entries(account.commited.balances)
             .map(([tokenId, balance]) => {
                 return { 
                     tokenId,
                     balance: readableEther(balance),
-                    tokenName: tokensNamesList[tokenId],
+                    tokenName: tokensInfoList[tokenId].symbol,
                 };
             });
     }
     async tokenNameFromId(tokenId) {
-        let token = (await this.tokensPromise)[tokenId];
-        let res = token.symbol;
-        if (res) return res;
-        return `erc20_${tokenId}`;
-    }
-
-    async tokenFromName(tokenName) {
-        let first = (await this.tokensPromise).filter(token => token.symbol == tokenName);
-        if (first.length) return first[0];
-        let tokenId = tokenName.slice('erc20_'.length);
-        let second = this.wallet.supportedTokens.filter(token => {
-            return token.id == tokenId;
-        });
-        return second[0];
+        return (await this.tokensPromise)[tokenId].symbol;
     }
 
     async transactionsAsRenderableList(address, offset, limit) {
-        let transactions = await this.fraProvider.getTransactionsHistory(address, offset, limit);
+        if (!address) {
+            console.log(address);
+            return [];
+        }
+        let transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
         let res = transactions.map(async (tx, index) => {
             let elem_id      = `history_${index}`;
             let type         = tx.tx.type || '';
             let hash         = tx.hash;
             let direction    = 
-                (type == 'Deposit') || (type == 'Transfer' && tx.tx.to == this.address)
-                ? 'incoming' : 'outcoming';
+                (type == 'Deposit') || (type == 'Transfer' && tx.tx.to == address)
+                ? 'incoming' 
+                : 'outcoming';
 
             // pub hash: Option<String>,
             // pub tx: Value,
@@ -73,37 +161,13 @@ export class WalletDecorator {
                 = tx.verified     ? `<span style="color: green">Verified</span>`
                 : tx.commited     ? `<span style="color: grey">Committed</span>`
                 : tx.fail_reason  ? `<span style="color: red">Failed with ${tx.fail_reason}</span>`
-                : `<span style="color: red">(Unknown status)</span>`;
-
-            let status_tooltip = await (async () => {
-                if (tx.commited == false) return 'Nothing';
-                if (hash == null) return 'hash_null';
-
-                let receipt = await this.fraProvider.getTxReceipt(hash);
-                /**
-                pub struct ProverRun {
-                    pub id: i32,
-                    pub block_number: i64,
-                    pub worker: Option<String>,
-                    pub created_at: NaiveDateTime,
-                    pub updated_at: NaiveDateTime,
-                }
-                */
-                
-                if (receipt == null || receipt.prover_run == null) {
-                    return 'Waiting for prover..';
-                }
-
-                let prover_name = receipt.prover_run.worker;
-                let started_time = receipt.prover_run.created;
-                return `Is being proved since ${started_time}`;
-            })();
+                : `<span style="color: red">(Unknown status)</span>`
 
             // here is common data to all tx types
             let data = {
                 elem_id,
                 type, direction,
-                status, status_tooltip, row_status,
+                status, row_status,
             };
 
             switch (true) {
@@ -117,12 +181,11 @@ export class WalletDecorator {
                             { key: 'pq_id',       label: 'Priority op' },
                         ],
                         data: Object.assign(data, {
-                            token, 
-                            amount,
-                            pq_id: tx.pq_id,
                             from: tx.tx.priority_op.sender,
                             to: tx.tx.priority_op.account,
-                            hash: tx.hash,
+                            pq_id: tx.pq_id,
+                            token, amount,
+                            hash,
                         }),
                     };
                 }
@@ -137,13 +200,12 @@ export class WalletDecorator {
                             { key: 'hash',        label: 'Tx hash' },
                         ],
                         data: Object.assign(data, {
-                            token,
-                            amount,
                             from: tx.tx.from,
                             to: tx.tx.to,
+                            token, amount,
                             hash: tx.hash,
-                        }),
-                    };
+                        }),                    
+                    }
                 }
                 case type == 'Transfer' && direction == 'outcoming': {
                     let token = await this.tokenNameFromId(tx.tx.token);
@@ -156,17 +218,16 @@ export class WalletDecorator {
                             { key: 'hash',        label: 'Tx hash' },
                         ],
                         data: Object.assign(data, {
-                            token, 
-                            amount,
-                            from: this.address,
+                            from: tx.tx.from,
                             to: tx.tx.to,
+                            token, amount,
                             hash: tx.hash,
                         }),
-                    };
+                    }
                 }
                 case type == 'Withdraw': {
                     let token = await this.tokenNameFromId(tx.tx.token);
-                    let amount = readableEther(tx.tx.amount);
+                    let amount = readableEther(tx.tx.amount);   
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -175,18 +236,17 @@ export class WalletDecorator {
                         ],
                         data: Object.assign(data, {
                             from: tx.tx.account,
+                            to: tx.tx.ethAddress,
                             token, amount,
                             hash: tx.hash,
-                            to: tx.tx.ethAddress,
                         }),
-                    };
+                    }
                 }
             }
         });
 
         return await Promise.all(res);
     }
-    async getTransactions(offset, limit) {
-        return await this.transactionsAsRenderableList(this.address.slice(2), offset, limit);
-    }
 };
+
+export const clientPromise = Client.new();
