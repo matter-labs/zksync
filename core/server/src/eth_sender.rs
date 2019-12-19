@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 use bigdecimal::BigDecimal;
 use failure::ensure;
 use ff::{PrimeField, PrimeFieldRepr};
-use futures::{sync::mpsc as fmpsc, Future};
+use futures::{channel::mpsc as fmpsc, compat::Future01CompatExt, executor::block_on};
 use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H256, U256};
@@ -153,23 +153,17 @@ impl<T: Transport> ETHSender<T> {
     }
 
     fn block_number(&self) -> Result<u64, failure::Error> {
-        Ok(self
-            .eth_client
-            .web3
-            .eth()
-            .block_number()
-            .wait()
-            .map(|n| n.as_u64())?)
+        Ok(block_on(self.eth_client.web3.eth().block_number().compat()).map(|n| n.as_u64())?)
     }
 
     fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error> {
-        match self
-            .eth_client
-            .web3
-            .eth()
-            .transaction_receipt(*hash)
-            .wait()?
-        {
+        match block_on(
+            self.eth_client
+                .web3
+                .eth()
+                .transaction_receipt(*hash)
+                .compat(),
+        )? {
             Some(TransactionReceipt {
                 block_number: Some(tx_block_number),
                 status: Some(status),
@@ -283,7 +277,7 @@ impl<T: Transport> ETHSender<T> {
     }
 
     fn send_tx(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
-        let hash = self.eth_client.send_raw_tx(tx.signed_tx.raw_tx.clone())?;
+        let hash = block_on(self.eth_client.send_raw_tx(tx.signed_tx.raw_tx.clone()))?;
         ensure!(
             hash == tx.signed_tx.hash,
             "Hash from signer and Ethereum node mismatch"
@@ -302,13 +296,13 @@ impl<T: Transport> ETHSender<T> {
             let old_tx_gas_price =
                 U256::from_dec_str(&stuck_tx.signed_tx.gas_price.to_string()).unwrap();
             let new_gas_price = {
-                let network_price = self.eth_client.get_gas_price()?;
+                let network_price = block_on(self.eth_client.get_gas_price())?;
                 // replacement price should be at least 10% higher, we make it 15% higher.
                 let replacement_price = (old_tx_gas_price * U256::from(115)) / U256::from(100);
                 std::cmp::max(network_price, replacement_price)
             };
 
-            let new_nonce = self.eth_client.current_nonce().wait()?;
+            let new_nonce = block_on(self.eth_client.current_nonce())?;
 
             info!(
                 "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, old_nonce: {}, new_nonce: {}",
@@ -383,7 +377,7 @@ impl<T: Transport> ETHSender<T> {
                 );
 
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
-                self.eth_client.sign_call_tx(
+                block_on(self.eth_client.sign_call_tx(
                     "commitBlock",
                     (
                         u64::from(op.block.block_number),
@@ -392,15 +386,15 @@ impl<T: Transport> ETHSender<T> {
                         public_data,
                     ),
                     tx_options,
-                )
+                ))
             }
             Action::Verify { proof } => {
                 // function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof) external {
-                self.eth_client.sign_call_tx(
+                block_on(self.eth_client.sign_call_tx(
                     "verifyBlock",
                     (u64::from(op.block.block_number), *proof.clone()),
                     tx_options,
-                )
+                ))
             }
         }
     }

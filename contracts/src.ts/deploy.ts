@@ -195,6 +195,14 @@ export async function addTestERC20Token(wallet, governance) {
     }
 }
 
+export async function mintTestERC20Token(wallet, erc20) {
+    try {
+        await erc20.mint(wallet.address, parseEther("3000000000"));
+    } catch (err) {
+        console.log("Mint token error:" + err);
+    }
+}
+
 export async function addTestNotApprovedERC20Token(wallet) {
     try {
         let erc20 = await deployContract(wallet, ERC20MintableContract, []);

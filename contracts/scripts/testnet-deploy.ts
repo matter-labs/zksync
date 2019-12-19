@@ -2,6 +2,7 @@ import { ethers } from "ethers";
 import { ArgumentParser } from "argparse";
 import {
     addTestERC20Token,
+    mintTestERC20Token,
     deployFranklin,
     publishSourceCodeToEtherscan,
     franklinContractSourceCode,
@@ -72,7 +73,16 @@ async function main() {
         franklinAddress = franklin.address;
 
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
-        await addTestERC20Token(wallet, governance);
+        const erc20 = await addTestERC20Token(wallet, governance);
+
+        // Setup test wallet
+        const path = "m/44'/60'/0'/0/0";
+        const testWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, path).connect(provider);
+        await wallet.sendTransaction({
+            to: testWallet.address,
+            value: ethers.utils.parseEther("10.0"),
+        });
+        await mintTestERC20Token(testWallet, erc20);
     }
 
     if (args.publish) {
