@@ -887,7 +887,7 @@ impl StorageProcessor {
                         .as_str()
                         .unwrap_or("unknown from")
                         .to_string(),
-                    operation["tx"]["eth_address"]
+                    operation["tx"]["ethAddress"]
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
@@ -991,7 +991,7 @@ impl StorageProcessor {
         let query = format!(
             "
             select
-                encode(hash, 'hex') as hash,
+                concat('0x', encode(hash, 'hex')) as hash,
                 pq_id,
                 tx,
                 success,

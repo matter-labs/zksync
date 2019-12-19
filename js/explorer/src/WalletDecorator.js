@@ -122,7 +122,7 @@ export class WalletDecorator {
                             pq_id: tx.pq_id,
                             from: tx.tx.priority_op.sender,
                             to: tx.tx.priority_op.account,
-                            hash: '0x' + tx.hash,
+                            hash: tx.hash,
                         }),
                     };
                 }
@@ -141,7 +141,7 @@ export class WalletDecorator {
                             amount,
                             from: tx.tx.from,
                             to: tx.tx.to,
-                            hash: '0x' + tx.hash,
+                            hash: tx.hash,
                         }),
                     };
                 }
@@ -160,7 +160,7 @@ export class WalletDecorator {
                             amount,
                             from: this.address,
                             to: tx.tx.to,
-                            hash: '0x' + tx.hash,
+                            hash: tx.hash,
                         }),
                     };
                 }
@@ -176,8 +176,8 @@ export class WalletDecorator {
                         data: Object.assign(data, {
                             from: tx.tx.account,
                             token, amount,
-                            hash: '0x' + tx.hash,
-                            to: tx.tx.eth_address,
+                            hash: tx.hash,
+                            to: tx.tx.ethAddress,
                         }),
                     };
                 }

@@ -25,3 +25,11 @@ export function readableEther(wei) {
         return formatted.match(/0\.0*[^0]{0,3}/)[0];
     }
 }
+
+export function shortenHash(str, fallback) {
+    try {
+        return `${str.slice(0, 8)}..${str.slice(-8)}`;
+    } catch (e) {
+        return fallback || 'unknown';
+    }
+}
