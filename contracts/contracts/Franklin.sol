@@ -104,7 +104,7 @@ contract Franklin {
         uint16 tokenId,
         uint128 amount,
         uint256 fee,
-        address franklinAddress
+        bytes franklinAddress
     );
 
     /// @notice Event emitted when blocks are reverted
@@ -248,7 +248,7 @@ contract Franklin {
         }
     }
 
-    // fnunction scheduleMigration(address _migrateTo, uint32 _migrateByBlock) external {
+    // function scheduleMigration(address _migrateTo, uint32 _migrateByBlock) external {
     //     requireGovernor();
     //     require(migrateByBlock == 0, "migration in progress");
     //     migrateTo = _migrateTo;
@@ -256,14 +256,14 @@ contract Franklin {
     // }
 
     // // Anybody MUST be able to call this function
-    // fnunction sealMigration() external {
+    // function sealMigration() external {
     //     require(migrateByBlock > 0, "no migration scheduled");
     //     migrationSealed = true;
     //     exodusMode = true;
     // }
 
     // // Anybody MUST be able to call this function
-    // fnunction migrateToken(uint32 _tokenId, uint128 /*_amount*/, bytes calldata /*_proof*/) external {
+    // function migrateToken(uint32 _tokenId, uint128 /*_amount*/, bytes calldata /*_proof*/) external {
     //     require(migrationSealed, "migration not sealed");
     //     requireValidToken(_tokenId);
     //     require(tokenMigrated[_tokenId]==false, "token already migrated");
@@ -277,7 +277,7 @@ contract Franklin {
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
     /// @param _amount Amount to deposit (if user specified msg.value more than this amount + fee - she will recieve difference)
     /// @param _franklinAddr The receiver Layer 2 address
-    function depositETH(uint128 _amount, address _franklinAddr) external payable {
+    function depositETH(uint128 _amount, bytes calldata _franklinAddr) external payable {
         requireActive();
 
         uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
@@ -312,7 +312,7 @@ contract Franklin {
     function depositERC20(
         address _token,
         uint128 _amount,
-        address _franklinAddr
+        bytes calldata _franklinAddr
     ) external payable {
         requireActive();
 
@@ -413,13 +413,18 @@ contract Franklin {
         uint16 _token,
         uint128 _amount,
         uint256 _fee,
-        address _franklinAddr
+        bytes memory _franklinAddr
     ) internal {
+        require(
+            _franklinAddr.length == ADDR_BYTES,
+            "fnrd11"
+        ); // fnrd11 - wrong franklin address hash
+        
         // Priority Queue request
         bytes memory pubData = Bytes.toBytesFromAddress(msg.sender); // sender
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token)); // token id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(_franklinAddr)); // franklin address
+        pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
 
         priorityQueue.addPriorityRequest(uint8(OpType.Deposit), _fee, pubData);
 
