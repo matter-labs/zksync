@@ -27,16 +27,20 @@ Vue.use(BootstrapVue);
 Vue.use(Clipboard);
 
 const routes = [
-    { path: '/', component: Home },
+    { path: '/',                    component: Home  },
     { path: '/blocks/:blockNumber', component: Block },
-    { path: '/transactions/:id', component: Transaction },
-    { path: '/accounts/:address', component: Account }
+    { path: '/transactions/:id',    component: Transaction },
+    { path: '/accounts/:address',   component: Account, props: true },
 ];
+
+function getRouterBase() {
+    return process.env.NODE_ENV === 'production' ? '/explorer/' : '/';
+}
 
 const router = new Router({
     routes, // short for `routes: routes`
     mode: 'history',
-    base:   process.env.NODE_ENV === 'production' ? '/explorer/' : '/',
+    base: getRouterBase(),
 });
 
 let fraProvider = new FranklinProvider(config.API_SERVER, config.CONTRACT_ADDR);
@@ -47,6 +51,7 @@ Vue.mixin({
         store,
         fraProvider,
         tokensPromise,
+        routerBase: getRouterBase(),
     }),
     methods: {
         formatFranklin(value) {
