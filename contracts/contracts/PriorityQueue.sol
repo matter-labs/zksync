@@ -1,16 +1,17 @@
 pragma solidity 0.5.10;
 
 import "./Bytes.sol";
+import "./Governance.sol";
 
 /// @title Priority Queue Contract
 /// @author Matter Labs
 contract PriorityQueue {
 
     /// @notice Rollup contract address
-    address internal franklinAddress;
+    address internal rollupAddress;
 
-    /// @notice PriorityQueue contract owner address
-    address internal ownerAddress;
+    /// @notice Governance contract
+    Governance internal governance;
     
     /// @notice Deposit operation number
     uint8 constant DEPOSIT_OP = 1;
@@ -33,7 +34,7 @@ contract PriorityQueue {
     /// @notice Rollup nonce bytes length
     uint8 constant NONCE_BYTES = 4;
 
-    /// @notice Franklin chain address length
+    /// @notice Rollup chain address length
     uint8 constant PUBKEY_HASH_BYTES = 20;
 
     /// @notice Signature (for example full exit signature) length
@@ -82,21 +83,23 @@ contract PriorityQueue {
     uint64 public totalCommittedPriorityRequests;
 
     /// @notice Constructs PriorityQueue contract
-    /// @param _ownerAddress Governance contract address
-    constructor(address _ownerAddress) public {
-        ownerAddress = _ownerAddress;
+    /// @param _governanceAddress Governance contract address
+    constructor(address _governanceAddress) public {
+        governance = Governance(_governanceAddress);
     }
 
-    /// @notice Set rollup address if it has not been set before
-    /// @param _franklinAddress Address of the Rollup contract
-    function changeFranklinAddress(address _franklinAddress) external {
-        // Its possible to set franklin contract address only if it has not been setted before
+    /// @notice Sets rollup address if it has not been set before
+    /// @param _rollupAddress Address of the Rollup contract
+    function setRollupAddress(address _rollupAddress) external {
+        // Its possible to set rollup contract address only if it has not been setted before
         require(
-            franklinAddress == address(0),
+            rollupAddress == address(0),
             "pcs11"
-        ); // pcs11 - frankin address is already setted
-        requireOwner();
-        franklinAddress = _franklinAddress;
+        ); // pcs11 - rollup address is already setted
+        // Check for governor
+        governance.requireGovernor(msg.sender);
+        // Set rollup address
+        rollupAddress = _rollupAddress;
     }
 
     /// @notice Saves priority request in storage
@@ -109,7 +112,7 @@ contract PriorityQueue {
         uint256 _fee,
         bytes calldata _pubData
     ) external {
-        requireFranklin();
+        requireRollup();
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
@@ -135,7 +138,7 @@ contract PriorityQueue {
     /// @param _number The number of requests to process
     /// @return validators fee
     function collectValidatorsFeeAndDeleteRequests(uint64 _number) external returns (uint256) {
-        requireFranklin();
+        requireRollup();
         require(
             _number <= totalOpenPriorityRequests,
             "pcs21"
@@ -197,14 +200,14 @@ contract PriorityQueue {
     /// @notice Increases committed requests count by provided number
     /// @param _number Number of requests
     function increaseCommittedRequestsNumber(uint64 _number) external {
-        requireFranklin();
+        requireRollup();
         totalCommittedPriorityRequests += _number;
     }
 
     /// @notice Decreases committed requests count by provided number
     /// @param _number Number of requests
     function decreaseCommittedRequestsNumber(uint64 _number) external {
-        requireFranklin();
+        requireRollup();
         totalCommittedPriorityRequests -= _number;
     }
 
@@ -218,18 +221,10 @@ contract PriorityQueue {
     }
 
     /// @notice Check if the sender is rollup contract
-    function requireFranklin() internal view {
+    function requireRollup() internal view {
         require(
-            msg.sender == franklinAddress,
+            msg.sender == rollupAddress,
             "prn11"
-        ); // prn11 - only by franklin
-    }
-
-    /// @notice Check if the sender is owner
-    function requireOwner() internal view {
-        require(
-            msg.sender == ownerAddress,
-            "prr11"
-        ); // prr11 - only by owner
+        ); // prn11 - only by rollup
     }
 }

@@ -42,7 +42,7 @@ async function main() {
     let franklinAddress      = process.env.CONTRACT_ADDR;
 
     let governanceConstructorArgs    = [ wallet.address ];
-    let priorityQueueConstructorArgs = [ wallet.address ];
+    let priorityQueueConstructorArgs = [ governanceAddress ];
     let verifierConstructorArgs      = [];
     let franklinConstructorArgs      = [
         governanceAddress,
