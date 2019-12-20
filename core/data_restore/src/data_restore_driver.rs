@@ -152,8 +152,9 @@ impl DataRestoreDriver {
 
         let current_block = 0;
         let current_unprocessed_priority_op = 0;
+        let fee_acc_num = 0;
 
-        let tree_state = TreeState::load(current_block, account_map, current_unprocessed_priority_op, 0);
+        let tree_state = TreeState::load(current_block, account_map, current_unprocessed_priority_op, fee_acc_num);
 
         info!("Genesis block number: {:?}", tree_state.state.block_number);
         info!("Genesis tree root hash: {:?}", tree_state.root_hash());
@@ -289,11 +290,11 @@ impl DataRestoreDriver {
             info!("New block number: {:?}", &self.tree_state.state.block_number);
             info!("Tree root hash: {:?}", self.tree_state.root_hash());
             info!("Accounts: {:?}", self.tree_state.get_accounts());
-            storage_interactor::update_tree_state(
-                self.connection_pool.clone(),
-                block,
-                acc_updates,
-            )?;
+            // storage_interactor::update_tree_state(
+            //     self.connection_pool.clone(),
+            //     block,
+            //     acc_updates,
+            // )?;
         }
 
         storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;

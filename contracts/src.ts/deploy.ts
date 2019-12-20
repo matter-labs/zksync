@@ -157,6 +157,7 @@ export async function deployFranklin(
             {
                 gasLimit: 6600000,
             });
+        console.log(`CONTRACT_GENESIS_TX_HASH=${contract.deployTransaction.hash}`);
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
         const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);

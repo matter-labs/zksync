@@ -15,6 +15,7 @@ cd contracts;
 yarn deploy | tee ../deploy.log;
 cd ..;
 
+CONTRACT_GENESIS_TX_HASH_NEW_VALUE=`grep "CONTRACT_GENESIS_TX_HASH" deploy.log`
 CONTRACT_ADDR_NEW_VALUE=`grep "CONTRACT_ADDR" deploy.log`
 ERC20_ADDR_NEW_VALUE=`grep "TEST_ERC20" deploy.log`
 GOVERNANCE_ADDR_NEW_VALUE=`grep "GOVERNANCE_ADDR" deploy.log`
@@ -27,6 +28,7 @@ then
     cp ./$ENV_FILE logs/$LABEL/$ZKSYNC_ENV.bak
     cp deploy.log logs/$LABEL/
     echo $CONTRACT_ADDR_NEW_VALUE
+    python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_GENESIS_TX_HASH_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $ERC20_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_ADDR_NEW_VALUE

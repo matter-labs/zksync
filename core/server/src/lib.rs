@@ -61,7 +61,7 @@ impl ConfigurationOptions {
             contract_eth_addr: get_env("CONTRACT_ADDR")[2..]
                 .parse()
                 .expect("Failed to parse CONTRACT_ADDR as ETH contract address"),
-            contract_genesis_tx_hash: get_env("CONTRACT_GENESIS_TX_HASH")
+            contract_genesis_tx_hash: get_env("CONTRACT_GENESIS_TX_HASH")[2..]
                 .parse()
                 .expect("Failed to parse CONTRACT_GENESIS_TX_HASH"),
             web3_url: get_env("WEB3_URL"),
