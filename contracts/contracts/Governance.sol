@@ -80,7 +80,7 @@ contract Governance {
     /// @param _tokenId Token id
     function requireValidTokenId(uint16 _tokenId) external view {
         require(
-            _tokenId < totalTokens + 1,
+            isValidTokenId(_tokenId),
             "grd11"
         ); // grd11 - unknown token id
     }
