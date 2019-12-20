@@ -1,9 +1,6 @@
 //use tokio::runtime::Runtime;
 #[macro_use]
 extern crate log;
-// Built-in uses
-use std::thread;
-use std::time::Duration;
 // External uses
 use clap::{App, Arg};
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
@@ -15,7 +12,7 @@ use server::committer::run_committer;
 use server::eth_watch::start_eth_watch;
 use server::mempool::run_mempool_task;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
-use server::{eth_sender, ConfigurationOptions, ThreadPanicNotify};
+use server::{eth_sender, ConfigurationOptions};
 use std::cell::RefCell;
 use storage::ConnectionPool;
 use web3::types::H160;
@@ -116,14 +113,15 @@ fn main() {
         connection_pool.clone(),
         &main_runtime,
     );
+    let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     start_api_server(
         zksync_commit_notify_receiver,
         connection_pool.clone(),
         stop_signal_sender.clone(),
+        mempool_request_sender.clone(),
         config_opts.clone(),
     );
 
-    let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     run_mempool_task(
         shared_eth_state,
         connection_pool.clone(),

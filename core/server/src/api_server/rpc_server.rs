@@ -1,6 +1,8 @@
+use crate::mempool::MempoolRequest;
 use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
+use futures::{FutureExt, SinkExt, TryFutureExt};
 use jsonrpc_core::{Error, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
@@ -84,8 +86,11 @@ pub trait Rpc {
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp>;
     #[rpc(name = "tx_info")]
     fn tx_info(&self, hash: TxHash) -> Result<TransactionInfoResp>;
-    #[rpc(name = "tx_submit")]
-    fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash>;
+    #[rpc(name = "tx_submit", returns = "TxHash")]
+    fn tx_submit(
+        &self,
+        tx: FranklinTx,
+    ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
     /// "ETH" | #ERC20_ADDRESS => {Token}
@@ -94,6 +99,7 @@ pub trait Rpc {
 }
 
 pub struct RpcApp {
+    pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub connection_pool: ConnectionPool,
 }
 
@@ -190,25 +196,37 @@ impl Rpc for RpcApp {
         })
     }
 
-    fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash> {
-        let storage = self.access_storage()?;
+    fn tx_submit(
+        &self,
+        tx: FranklinTx,
+    ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send> {
+        let mut mempool_sender = self.mempool_request_sender.clone();
+        // TODO: add timeouts
+        let mempool_resp = async move {
+            let hash = tx.hash();
+            let mempool_resp = oneshot::channel();
+            mempool_sender
+                .send(MempoolRequest::NewTx(Box::new(tx), mempool_resp.0))
+                .await
+                .expect("mempool receiver dropped");
+            let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
 
-        let tx_add_result = storage
-            .mempool_add_tx(&tx)
-            .map_err(|_| Error::internal_error())?;
+            tx_add_result.map(|_| hash).map_err(|e| {
+                let code = match &e {
+                    TxAddError::NonceTooLow => 101,
+                    TxAddError::InvalidSignature => 102,
+                    TxAddError::IncorrectTx => 103,
+                    TxAddError::Other => 104,
+                };
+                Error {
+                    code: code.into(),
+                    message: e.to_string(),
+                    data: None,
+                }
+            })
+        };
 
-        tx_add_result.map(|_| tx.hash()).map_err(|e| {
-            let code = match &e {
-                TxAddError::NonceTooLow => 101,
-                TxAddError::InvalidSignature => 102,
-                TxAddError::IncorrectTx => 103,
-            };
-            Error {
-                code: code.into(),
-                message: e.to_string(),
-                data: None,
-            }
-        })
+        Box::new(mempool_resp.boxed().compat())
     }
 
     fn contract_address(&self) -> Result<ContractAddressResp> {
@@ -240,6 +258,7 @@ impl Rpc for RpcApp {
 pub fn start_rpc_server(
     addr: SocketAddr,
     connection_pool: ConnectionPool,
+    mempool_request_sender: mpsc::Sender<MempoolRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -248,7 +267,10 @@ pub fn start_rpc_server(
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
             let mut io = IoHandler::new();
 
-            let rpc_app = RpcApp { connection_pool };
+            let rpc_app = RpcApp {
+                connection_pool,
+                mempool_request_sender,
+            };
             rpc_app.extend(&mut io);
 
             let server = ServerBuilder::new(io).threads(1).start_http(&addr).unwrap();

@@ -14,12 +14,12 @@
 // Built-in uses
 use std::collections::{HashSet, VecDeque};
 use std::str::FromStr;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 // External uses
 use bigdecimal::BigDecimal;
 use failure::ensure;
 use ff::{PrimeField, PrimeFieldRepr};
-use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on, StreamExt};
+use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on};
 use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H256, U256};
@@ -440,7 +440,7 @@ pub fn start_eth_sender(
             );
 
             let mut runtime = Runtime::new().expect("eth-sender-runtime");
-            let mut eth_sender =
+            let eth_sender =
                 ETHSender::new(pool, eth_client, send_requst_receiver, op_notify_sender);
             runtime.block_on(eth_sender.run());
         })

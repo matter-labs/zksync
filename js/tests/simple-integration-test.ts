@@ -2,7 +2,8 @@ import {
     depositFromETH,
     Wallet,
     Provider,
-    ETHProxy, getDefaultProvider, types
+    ETHProxy, getDefaultProvider, types,
+    getEthereumBalance
 } from "zksync";
 import { ethers, utils } from "ethers";
 
@@ -67,19 +68,22 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
 async function testWithdraw(ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
     const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
     const operatorBeforeWithdraw = await getOperatorBalance(token);
+    const onchainBalanceBeforeWithdraw = await getEthereumBalance(ethWallet, token);
     const withdrawHandle = await syncWallet.withdrawTo({
         ethAddress: ethWallet.address,
         token,
         amount,
         fee
     });
-    await withdrawHandle.awaitReceipt();
+    await withdrawHandle.awaitVerifyReceipt();
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const operatorAfterWithdraw = await getOperatorBalance(token);
+    const onchainBalanceAfterWithdraw = await getEthereumBalance(ethWallet, token);
 
     let withdrawCorrect = true;
     withdrawCorrect = withdrawCorrect && wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee));
     withdrawCorrect = withdrawCorrect && operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee);
+    withdrawCorrect = withdrawCorrect && onchainBalanceAfterWithdraw.sub(onchainBalanceBeforeWithdraw).eq(amount);
 
     if (!withdrawCorrect) {
         throw new Error("Withdraw checks failed");

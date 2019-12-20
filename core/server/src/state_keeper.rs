@@ -1,23 +1,15 @@
-// Built-in uses
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 // External uses
 use futures::channel::{mpsc, oneshot};
-use futures::stream::{FusedStream, Stream, StreamExt};
+use futures::stream::StreamExt;
 use futures::SinkExt;
-use itertools::Itertools;
-use std::sync::{Arc, RwLock};
 use tokio::runtime::Runtime;
-use web3::types::H256;
 // Workspace uses
-use crate::eth_watch::ETHState;
 use crate::mempool::ProposedBlock;
-use crate::ThreadPanicNotify;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::config;
 use models::node::tx::FranklinTx;
-use models::node::{Account, AccountAddress, AccountMap, AccountUpdate, PriorityOp, TransferOp};
+use models::node::{Account, AccountAddress, AccountUpdate, PriorityOp};
 use models::params::block_size_chunks;
-use models::{ActionType, CommitRequest, NetworkStatus};
+use models::{ActionType, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
 use std::collections::HashMap;
 use storage::ConnectionPool;
@@ -122,24 +114,20 @@ impl PlasmaStateKeeper {
     async fn run(mut self) {
         while let Some(req) = self.rx_for_blocks.next().await {
             match req {
-                StateKeeperRequest::GetAccounts(addresses, mut sender) => {
+                StateKeeperRequest::GetAccounts(addresses, sender) => {
                     let accounts = addresses
                         .into_iter()
-                        .filter_map(|addr| {
-                            self.state
-                                .get_account_by_address(&addr)
-                                .map(|(_, acc)| (addr, acc))
-                        })
+                        .filter_map(|addr| self.account(&addr).map(|acc| (addr, acc)))
                         .collect();
                     sender.send(accounts).unwrap_or_default();
                 }
-                StateKeeperRequest::GetLastUnprocessedPriorityOp(mut sender) => {
+                StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
                     sender
                         .send(self.current_unprocessed_priority_op)
                         .unwrap_or_default();
                 }
                 StateKeeperRequest::ExecuteBlock(proposed_block) => {
-                    let commit_request = self.create_new_block(proposed_block);
+                    self.create_new_block(proposed_block).await;
                 }
             }
         }
@@ -278,14 +266,11 @@ impl PlasmaStateKeeper {
         }
     }
 
-    fn account(&self, address: &AccountAddress) -> Account {
-        self.state
-            .get_account_by_address(address)
-            .unwrap_or_default()
-            .1
+    fn account(&self, address: &AccountAddress) -> Option<Account> {
+        self.state.get_account_by_address(address).map(|(_, a)| a)
     }
 }
 
-pub fn start_state_keeper(mut sk: PlasmaStateKeeper, runtime: &Runtime) {
+pub fn start_state_keeper(sk: PlasmaStateKeeper, runtime: &Runtime) {
     runtime.spawn(sk.run());
 }

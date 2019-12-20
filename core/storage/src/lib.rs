@@ -658,6 +658,8 @@ pub enum TxAddError {
     InvalidSignature,
     #[fail(display = "Tx is incorrect")]
     IncorrectTx,
+    #[fail(display = "Internal error")]
+    Other,
 }
 
 #[derive(Debug, Serialize, Deserialize)]

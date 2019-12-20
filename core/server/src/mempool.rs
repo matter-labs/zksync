@@ -10,8 +10,7 @@ use models::node::{
 use models::params::block_size_chunks;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::Instant;
-use storage::ConnectionPool;
+use storage::{ConnectionPool, TxAddError};
 use tokio::runtime::Runtime;
 
 // TODO: temporary limit
@@ -45,7 +44,7 @@ pub struct GetBlockRequest {
 
 pub enum MempoolRequest {
     // TODO: new tx add response
-    NewTx(FranklinTx),
+    NewTx(Box<FranklinTx>, oneshot::Sender<Result<(), TxAddError>>),
     GetBlock(GetBlockRequest),
 }
 
@@ -90,8 +89,11 @@ impl Mempool {
                 .access_storage()
                 .expect("mempool storage access");
             match request {
-                MempoolRequest::NewTx(tx) => {
-                    storage.mempool_add_tx(&tx);
+                MempoolRequest::NewTx(tx, resp) => {
+                    let storage_result = storage
+                        .mempool_add_tx(&tx)
+                        .unwrap_or(Err(TxAddError::Other));
+                    resp.send(storage_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
                     block
@@ -105,7 +107,7 @@ impl Mempool {
 
     async fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
         let (chunks_left, priority_ops) = self.select_priority_ops(current_unprocessed_priority_op);
-        let (chunks_left, txs) = self.prepare_tx_for_block(chunks_left).await;
+        let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left).await;
         trace!("Proposed priority ops for block: {:#?}", priority_ops);
         trace!("Proposed txs for block: {:#?}", txs);
         ProposedBlock { priority_ops, txs }
@@ -180,7 +182,8 @@ impl Mempool {
             let account_map = oneshot::channel();
             self.state_keeper_requests
                 .send(StateKeeperRequest::GetAccounts(accounts, account_map.0))
-                .await;
+                .await
+                .expect("state keeper receiver dropped");
             AccountsForBatch {
                 map: account_map.1.await.expect("state keeper accounts request"),
             }

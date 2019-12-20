@@ -3,8 +3,9 @@
 use super::event_notify::{start_sub_notifier, EventSubscribeRequest};
 use crate::api_server::event_notify::EventNotifierRequest;
 use crate::api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp};
+use crate::mempool::MempoolRequest;
 use crate::ThreadPanicNotify;
-use futures::channel::mpsc as fmpsc;
+use futures::channel::mpsc;
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core::Result;
 use jsonrpc_derive::rpc;
@@ -168,20 +169,22 @@ impl RpcPubSub for RpcSubApp {
 }
 
 struct RpcSubApp {
-    event_sub_sender: fmpsc::Sender<EventNotifierRequest>,
+    event_sub_sender: mpsc::Sender<EventNotifierRequest>,
 }
 
 pub fn start_ws_server(
-    op_recv: fmpsc::Receiver<Operation>,
+    op_recv: mpsc::Receiver<Operation>,
     db_pool: ConnectionPool,
     addr: SocketAddr,
-    panic_notify: fmpsc::Sender<bool>,
+    mempool_request_sender: mpsc::Sender<MempoolRequest>,
+    panic_notify: mpsc::Sender<bool>,
 ) {
-    let (event_sub_sender, event_sub_receiver) = fmpsc::channel(2048);
+    let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
     let mut io = PubSubHandler::new(MetaIoHandler::default());
 
     let req_rpc_app = super::rpc_server::RpcApp {
+        mempool_request_sender,
         connection_pool: db_pool.clone(),
     };
     req_rpc_app.extend(&mut io);

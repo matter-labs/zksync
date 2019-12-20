@@ -1,10 +1,10 @@
 use crate::mempool::{GetBlockRequest, MempoolRequest, ProposedBlock};
 use crate::state_keeper::StateKeeperRequest;
 use futures::channel::{mpsc, oneshot};
-use futures::{SinkExt, StreamExt};
+use futures::SinkExt;
 use models::node::config;
 use models::params::block_size_chunks;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::time;
 
@@ -38,7 +38,10 @@ impl BlockProposer {
         // TODO: normal number
         let (mempool_req, resp) =
             create_mempool_req(self.current_priority_op_number, block_size_chunks());
-        self.mempool_requests.send(mempool_req).await;
+        self.mempool_requests
+            .send(mempool_req)
+            .await
+            .expect("mempool receiver dropped");
 
         // TODO: unwrap
         resp.await.unwrap()
@@ -77,16 +80,18 @@ impl BlockProposer {
         if commit_block {
             debug!("Creating block, tries {}", old_tries);
 
+            self.current_priority_op_number += proposed_block.priority_ops.len() as u64;
             self.statekeeper_requests
                 .send(StateKeeperRequest::ExecuteBlock(proposed_block))
-                .await;
+                .await
+                .expect("state keeper receiver dropped");
         }
     }
 }
 
 // driving engine of the application
 pub fn run_block_proposer_task(
-    mut mempool_requests: mpsc::Sender<MempoolRequest>,
+    mempool_requests: mpsc::Sender<MempoolRequest>,
     mut statekeeper_requests: mpsc::Sender<StateKeeperRequest>,
     runtime: &Runtime,
 ) {
@@ -100,7 +105,8 @@ pub fn run_block_proposer_task(
             .send(StateKeeperRequest::GetLastUnprocessedPriorityOp(
                 last_unprocessed_prior_op_chan.0,
             ))
-            .await;
+            .await
+            .expect("state keeper receiver dropped");
         let current_priority_op_number = last_unprocessed_prior_op_chan
             .1
             .await

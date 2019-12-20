@@ -4,7 +4,6 @@ use std::time::Duration;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 // Workspace uses
-use crate::ThreadPanicNotify;
 use models::{Action, CommitRequest, Operation};
 use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};

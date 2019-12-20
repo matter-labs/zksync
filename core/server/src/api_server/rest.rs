@@ -2,14 +2,17 @@ use actix_cors::Cors;
 use actix_web::{
     middleware,
     web::{self},
-    App, HttpResponse, HttpServer, Result as ActixResult,
+    App, Error as ActixError, HttpResponse, HttpServer, Result as ActixResult,
 };
-use futures::channel::mpsc;
+use futures::channel::{mpsc, oneshot};
 use models::node::{Account, AccountAddress, AccountId, ExecutedOperations, FranklinTx};
 use models::NetworkStatus;
 use storage::{ConnectionPool, StorageProcessor};
 
+use crate::mempool::MempoolRequest;
 use crate::ThreadPanicNotify;
+use futures::{FutureExt, SinkExt, TryFutureExt};
+use futures01::Future as Future01;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -33,6 +36,7 @@ struct AppState {
     connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
     contract_address: String,
+    mempool_request_sender: mpsc::Sender<MempoolRequest>,
 }
 
 impl AppState {
@@ -103,20 +107,31 @@ struct NewTxResponse {
 fn handle_submit_tx(
     data: web::Data<AppState>,
     req: web::Json<FranklinTx>,
-) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
+) -> Box<dyn Future01<Item = HttpResponse, Error = ActixError>> {
+    // TODO: add timeouts
+    let response = async move {
+        let hash = req.hash();
+        let mempool_resp = oneshot::channel();
+        data.mempool_request_sender
+            .clone()
+            .send(MempoolRequest::NewTx(Box::new(req.0), mempool_resp.0))
+            .await
+            .expect("mempool channel dropped");
+        let tx_add_result = mempool_resp
+            .1
+            .await
+            .expect("mempool response channel dropped");
 
-    let tx_add_result = storage
-        .mempool_add_tx(&req)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        if let Err(e) = tx_add_result {
+            Ok(HttpResponse::NotAcceptable().body(e.to_string()))
+        } else {
+            Ok(HttpResponse::Ok().json(NewTxResponse {
+                hash: hash.to_hex(),
+            }))
+        }
+    };
 
-    if let Err(e) = tx_add_result {
-        Err(HttpResponse::NotAcceptable().body(e.to_string()).into())
-    } else {
-        Ok(HttpResponse::Ok().json(NewTxResponse {
-            hash: req.hash().to_hex(),
-        }))
-    }
+    Box::new(response.boxed().compat())
 }
 
 #[derive(Debug, Serialize)]
@@ -451,6 +466,7 @@ pub(super) fn start_server_thread_detached(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,
+    mempool_request_sender: mpsc::Sender<MempoolRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -464,6 +480,7 @@ pub(super) fn start_server_thread_detached(
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{}", contract_address),
+                mempool_request_sender,
             };
             state.spawn_network_status_updater(panic_notify);
 

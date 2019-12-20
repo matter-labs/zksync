@@ -12,7 +12,6 @@ pub mod primitives;
 
 // TODO: refactor, find new home for all this stuff
 
-use crate::node::account::{Account, AccountAddress};
 use crate::node::block::Block;
 use crate::node::AccountUpdates;
 use crate::node::BlockNumber;

@@ -57,3 +57,5 @@ chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 diesel = { version = "1.4.3", features = ["postgres", "serde_json", "r2d2", "chrono"] }
 ctrlc = "3.1"
 failure = "0.1"
+# should be removed after actix is updated
+futures01 = { package = "futures", version = "0.1" }
