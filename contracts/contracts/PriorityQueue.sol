@@ -7,8 +7,8 @@ import "./Governance.sol";
 /// @author Matter Labs
 contract PriorityQueue {
 
-    /// @notice Rollup contract address
-    address internal rollupAddress;
+    /// @notice Franklin contract address
+    address internal franklinAddress;
 
     /// @notice Governance contract
     Governance internal governance;
@@ -28,13 +28,13 @@ contract PriorityQueue {
     /// @notice Ethereum address bytes length
     uint8 constant ETH_ADDR_BYTES = 20;
 
-    /// @notice Rollup account id bytes length
+    /// @notice Franklin account id bytes length
     uint8 constant ACC_NUM_BYTES = 3;
 
-    /// @notice Rollup nonce bytes length
+    /// @notice Franklin nonce bytes length
     uint8 constant NONCE_BYTES = 4;
 
-    /// @notice Rollup chain address length
+    /// @notice Franklin chain address length
     uint8 constant PUBKEY_HASH_BYTES = 20;
 
     /// @notice Signature (for example full exit signature) length
@@ -79,7 +79,7 @@ contract PriorityQueue {
     uint64 public totalOpenPriorityRequests;
 
     /// @notice Total number of committed requests.
-    /// @dev Used in checks: if the request matches the operation on Rollup contract and if provided number of requests is not too big
+    /// @dev Used in checks: if the request matches the operation on Franklin contract and if provided number of requests is not too big
     uint64 public totalCommittedPriorityRequests;
 
     /// @notice Constructs PriorityQueue contract
@@ -88,23 +88,23 @@ contract PriorityQueue {
         governance = Governance(_governanceAddress);
     }
 
-    /// @notice Sets rollup address if it has not been set before
-    /// @param _rollupAddress Address of the Rollup contract
-    function setRollupAddress(address _rollupAddress) external {
-        // Its possible to set rollup contract address only if it has not been setted before
+    /// @notice Sets franklin address if it has not been set before
+    /// @param _franklinAddress Address of the Franklin contract
+    function setFranklinAddress(address _franklinAddress) external {
+        // Its possible to set franklin contract address only if it has not been setted before
         require(
-            rollupAddress == address(0),
+            franklinAddress == address(0),
             "pcs11"
-        ); // pcs11 - rollup address is already setted
+        ); // pcs11 - franklin address is already setted
         // Check for governor
         governance.requireGovernor(msg.sender);
-        // Set rollup address
-        rollupAddress = _rollupAddress;
+        // Set franklin address
+        franklinAddress = _franklinAddress;
     }
 
     /// @notice Saves priority request in storage
     /// @dev Calculates expiration block for request, store this request and emit NewPriorityRequest event
-    /// @param _opType Rollup operation type
+    /// @param _opType Franklin operation type
     /// @param _fee Validators' fee
     /// @param _pubData Operation pubdata
     function addPriorityRequest(
@@ -112,7 +112,7 @@ contract PriorityQueue {
         uint256 _fee,
         bytes calldata _pubData
     ) external {
-        requireRollup();
+        requireFranklin();
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
@@ -138,7 +138,7 @@ contract PriorityQueue {
     /// @param _number The number of requests to process
     /// @return validators fee
     function collectValidatorsFeeAndDeleteRequests(uint64 _number) external returns (uint256) {
-        requireRollup();
+        requireFranklin();
         require(
             _number <= totalOpenPriorityRequests,
             "pcs21"
@@ -166,7 +166,7 @@ contract PriorityQueue {
         }
     }
 
-    /// @notice Compares Rollup operation with corresponding priority requests' operation
+    /// @notice Compares Franklin operation with corresponding priority requests' operation
     /// @param _opType Operation type
     /// @param _pubData Operation pub data
     /// @param _id - Request id
@@ -200,14 +200,14 @@ contract PriorityQueue {
     /// @notice Increases committed requests count by provided number
     /// @param _number Number of requests
     function increaseCommittedRequestsNumber(uint64 _number) external {
-        requireRollup();
+        requireFranklin();
         totalCommittedPriorityRequests += _number;
     }
 
     /// @notice Decreases committed requests count by provided number
     /// @param _number Number of requests
     function decreaseCommittedRequestsNumber(uint64 _number) external {
-        requireRollup();
+        requireFranklin();
         totalCommittedPriorityRequests -= _number;
     }
 
@@ -220,11 +220,11 @@ contract PriorityQueue {
             priorityRequests[firstPriorityRequestId].expirationBlock != 0;
     }
 
-    /// @notice Check if the sender is rollup contract
-    function requireRollup() internal view {
+    /// @notice Check if the sender is franklin contract
+    function requireFranklin() internal view {
         require(
-            msg.sender == rollupAddress,
+            msg.sender == franklinAddress,
             "prn11"
-        ); // prn11 - only by rollup
+        ); // prn11 - only by franklin
     }
 }

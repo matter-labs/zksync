@@ -4,7 +4,7 @@ pragma solidity 0.5.10;
 /// @author Matter Labs
 contract Governance {
 
-    /// @notice Token added to Rollup net
+    /// @notice Token added to Franklin net
     event TokenAdded(
         address token,
         uint16 tokenId
