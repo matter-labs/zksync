@@ -29,7 +29,7 @@ contract Franklin {
     uint8 constant ETH_ADDR_BYTES = 20;
 
     /// @notice Franklin chain address length
-    uint8 constant PUBKEY_HASH_LEN = 20;
+    uint8 constant PUBKEY_HASH_BYTES = 20;
 
     /// @notice Fee bytes lengths
     uint8 constant FEE_BYTES = 2;
@@ -45,9 +45,6 @@ contract Franklin {
 
     /// @notice Public key bytes length
     uint8 constant PUBKEY_BYTES = 32;
-
-    // Franklin chain address length
-    uint8 constant PUBKEY_HASH_LEN = 20;
 
     /// @notice Fee gas price for transactions
     uint256 constant FEE_GAS_PRICE_MULTIPLIER = 2; // 2 Gwei
@@ -248,7 +245,7 @@ contract Franklin {
                 amount[j] = deposit[ETH_ADDR_BYTES + TOKEN_BYTES + j];
             }
             balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
-            i += ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES+PUBKEY_HASH_LEN;
+            i += ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES+PUBKEY_HASH_BYTES;
         }
     }
 
@@ -391,12 +388,12 @@ contract Franklin {
         requireActive();
 
         require(
-            _signature.length == SIGNATURE_LEN,
+            _signature.length == SIGNATURE_BYTES,
             "fft12"
         ); // fft12 - wrong signature length
 
         require(
-            _pubKey.length == PUBKEY_LEN,
+            _pubKey.length == PUBKEY_BYTES,
             "fft13"
         ); // fft13 - wrong pubkey length
 
@@ -427,7 +424,7 @@ contract Franklin {
         bytes memory _franklinAddr
     ) internal {
         require(
-            _franklinAddr.length == PUBKEY_HASH_LEN,
+            _franklinAddr.length == PUBKEY_HASH_BYTES,
             "frd11"
         ); // frd11 - wrong franklin address hash
         
@@ -531,9 +528,8 @@ contract Franklin {
     }
 
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
-    /// @notice Returns onchain operations start id for global onchain operations counter,
-    /// @notice onchain operations number for this block, priority operations number for this block
     /// @param _publicData Operations packed in bytes array
+    /// @return onchain operations start id for global onchain operations counter, nchain operations number for this block, priority operations number for this block
     function collectOnchainOps(bytes memory _publicData)
         internal
         returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint64 priorityCount)
@@ -567,12 +563,12 @@ contract Franklin {
         ); // fcs12 - last chunk exceeds pubdata
     }
 
-    /// @notice Returns operation processed length, and indicators if this operation is
-    /// @notice an onchain operation and it is a priority operation (1 if true)
+    /// @notice On the first byte determines the type of operation, if it is an onchain operation - saves it in storage
     /// @param _opType Operation type
     /// @param _currentPointer Current pointer in pubdata
     /// @param _publicData Operation pubdata
     /// @param _currentOnchainOp Operation identifier in onchain operations mapping
+    /// @return operation processed length, and indicators if this operation is an onchain operation and if it is a priority operation (1 if true)
     function processOp(
         uint8 _opType,
         uint256 _currentPointer,
@@ -581,22 +577,22 @@ contract Franklin {
     ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint64 priorityCount) {
         uint256 opDataPointer = _currentPointer + 1; // operation type byte
 
-        if (_opType == uint8(OpType.Noop)) return (NOOP_LENGTH, 0, 0);
-        if (_opType == uint8(OpType.TransferToNew)) return (TRANSFER_TO_NEW_LENGTH, 0, 0);
-        if (_opType == uint8(OpType.Transfer)) return (TRANSFER_LENGTH, 0, 0);
-        if (_opType == uint8(OpType.CloseAccount)) return (CLOSE_ACCOUNT_LENGTH, 0, 0);
+        if (_opType == uint8(OpType.Noop)) return (NOOP_BYTES, 0, 0);
+        if (_opType == uint8(OpType.TransferToNew)) return (TRANSFER_TO_NEW_BYTES, 0, 0);
+        if (_opType == uint8(OpType.Transfer)) return (TRANSFER_BYTES, 0, 0);
+        if (_opType == uint8(OpType.CloseAccount)) return (CLOSE_ACCOUNT_BYTES, 0, 0);
 
         if (_opType == uint8(OpType.Deposit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_LEN);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES);
             require(
-                pubData.length == TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_LEN,
+                pubData.length == TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES,
                 "fpp11"
             ); // fpp11 - wrong deposit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.Deposit,
                 pubData
             );
-            return (DEPOSIT_LENGTH, 1, 1);
+            return (DEPOSIT_BYTES, 1, 1);
         }
 
         if (_opType == uint8(OpType.PartialExit)) {
@@ -609,31 +605,32 @@ contract Franklin {
                 OpType.PartialExit,
                 pubData
             );
-            return (PARTIAL_EXIT_LENGTH, 1, 0);
+            return (PARTIAL_EXIT_BYTES, 1, 0);
         }
 
         if (_opType == uint8(OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN + AMOUNT_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + AMOUNT_BYTES);
             require(
-                pubData.length == ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN + AMOUNT_BYTES,
+                pubData.length == ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + AMOUNT_BYTES,
                 "fpp13"
             ); // fpp13 - wrong full exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.FullExit,
                 pubData
             );
-            return (FULL_EXIT_LENGTH, 1, 1);
+            return (FULL_EXIT_BYTES, 1, 1);
         }
 
         revert("fpp14"); // fpp14 - unsupported op
     }
     
-    /// @notice Returns block commitment
+    /// @notice Creates block commitment from its data
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
     /// @param _oldRoot Old tree root
     /// @param _newRoot New tree root
     /// @param _publicData Operations pubdata
+    /// @return block commitment
     function createBlockCommitment(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -777,19 +774,19 @@ contract Franklin {
                 // full exit was successful, accrue balance
                 bytes memory tokenBytes = new bytes(TOKEN_BYTES);
                 for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-                    tokenBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + i];
+                    tokenBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + i];
                 }
                 uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
 
                 bytes memory amountBytes = new bytes(AMOUNT_BYTES);
                 for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
-                    amountBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN + i];
+                    amountBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + i];
                 }
                 uint128 amount = Bytes.bytesToUInt128(amountBytes);
 
                 bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_LEN + i];
+                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + i];
                 }
                 payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
             }
@@ -797,7 +794,8 @@ contract Franklin {
         }
     }
 
-    /// @notice Checks that commitment is expired and revert blocks
+    /// @notice Checks that commitment is expired and revert blocks if it really is
+    /// @return bool flag that indicates if blocks has been reverted
     function triggerRevertIfBlockCommitmentExpired() internal returns (bool) {
         if (
             totalBlocksCommitted > totalBlocksVerified &&
@@ -841,9 +839,9 @@ contract Franklin {
     }
 
     /// @notice Checks if Exodus mode must be entered. If true - cancels outstanding deposits and emits ExodusMode event.
-    /// @dev Returns bool flag that is true if the Exodus mode must be entered.
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
+    /// @return bool flag that is true if the Exodus mode must be entered.
     function triggerExodusIfNeeded() internal returns (bool) {
         if (priorityQueue.triggerExodusIfNeeded()) {
             exodusMode = true;
