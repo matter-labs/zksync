@@ -7,7 +7,7 @@ import "./Governance.sol";
 /// @author Matter Labs
 contract PriorityQueue {
 
-    /// @notice Franklin contract address
+    /// @notice Rollup contract address
     address internal franklinAddress;
 
     /// @notice Governance contract
@@ -28,10 +28,10 @@ contract PriorityQueue {
     /// @notice Ethereum address bytes length
     uint8 constant ETH_ADDR_BYTES = 20;
 
-    /// @notice Franklin account id bytes length
+    /// @notice Rollup account id bytes length
     uint8 constant ACC_NUM_BYTES = 3;
 
-    /// @notice Franklin nonce bytes length
+    /// @notice Rollup nonce bytes length
     uint8 constant NONCE_BYTES = 4;
 
     /// @notice Franklin chain address length
@@ -79,7 +79,7 @@ contract PriorityQueue {
     uint64 public totalOpenPriorityRequests;
 
     /// @notice Total number of committed requests.
-    /// @dev Used in checks: if the request matches the operation on Franklin contract and if provided number of requests is not too big
+    /// @dev Used in checks: if the request matches the operation on Rollup contract and if provided number of requests is not too big
     uint64 public totalCommittedPriorityRequests;
 
     /// @notice Constructs PriorityQueue contract
@@ -88,8 +88,8 @@ contract PriorityQueue {
         governance = Governance(_governanceAddress);
     }
 
-    /// @notice Sets franklin address if it has not been set before
-    /// @param _franklinAddress Address of the Franklin contract
+    /// @notice Sets rollup address if it has not been set before
+    /// @param _franklinAddress Address of the Rollup contract
     function setFranklinAddress(address _franklinAddress) external {
         // Its possible to set franklin contract address only if it has not been setted before
         require(
@@ -104,7 +104,7 @@ contract PriorityQueue {
 
     /// @notice Saves priority request in storage
     /// @dev Calculates expiration block for request, store this request and emit NewPriorityRequest event
-    /// @param _opType Franklin operation type
+    /// @param _opType Rollup operation type
     /// @param _fee Validators' fee
     /// @param _pubData Operation pubdata
     function addPriorityRequest(
@@ -166,7 +166,7 @@ contract PriorityQueue {
         }
     }
 
-    /// @notice Compares Franklin operation with corresponding priority requests' operation
+    /// @notice Compares Rollup operation with corresponding priority requests' operation
     /// @param _opType Operation type
     /// @param _pubData Operation pub data
     /// @param _id - Request id
@@ -220,7 +220,7 @@ contract PriorityQueue {
             priorityRequests[firstPriorityRequestId].expirationBlock != 0;
     }
 
-    /// @notice Check if the sender is franklin contract
+    /// @notice Check if the sender is rollup contract
     function requireFranklin() internal view {
         require(
             msg.sender == franklinAddress,
