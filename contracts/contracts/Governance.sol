@@ -54,7 +54,7 @@ contract Governance {
     }
 
     /// @notice Change validator status (active or not active)
-    /// @param _address Validator address
+    /// @param _validator Validator address
     /// @param _active Active flag
     function setValidator(address _validator, bool _active) external {
         requireGovernor();
@@ -70,7 +70,7 @@ contract Governance {
     }
 
     /// @notice Return validator status (active or not)
-    /// @param _address Validator address
+    /// @param _sender Validator address
     /// @return bool flag that indicates validator status
     function isValidator(address _sender) external view returns (bool) {
         return validators[_sender];

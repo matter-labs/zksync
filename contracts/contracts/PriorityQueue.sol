@@ -82,13 +82,13 @@ contract PriorityQueue {
     uint64 public totalCommittedPriorityRequests;
 
     /// @notice Constructs PriorityQueue contract
-    /// @param _governanceAddress Governance contract address
+    /// @param _ownerAddress Governance contract address
     constructor(address _ownerAddress) public {
         ownerAddress = _ownerAddress;
     }
 
     /// @notice Set rollup address if it has not been set before
-    /// @param _rollupAddress Address of the Rollup contract
+    /// @param _franklinAddress Address of the Rollup contract
     function changeFranklinAddress(address _franklinAddress) external {
         // Its possible to set franklin contract address only if it has not been setted before
         require(
@@ -176,8 +176,8 @@ contract PriorityQueue {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, PUBKEY_HASH_BYTES + AMOUNT_BYTES + TOKEN_BYTES);
             onchainPubData = _pubData;
         } else if (_opType == FULL_EXIT_OP && priorityRequests[_priorityRequestId].opType == FULL_EXIT_OP) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN);
-            onchainPubData = Bytes.slice(_pubData, 0, ACC_NUM_BYTES + PUBKEY_LEN + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_LEN);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES);
+            onchainPubData = Bytes.slice(_pubData, 0, ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES);
         } else {
             revert("pid11"); // pid11 - wrong operation
         }
