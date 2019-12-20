@@ -1,48 +1,46 @@
 pragma solidity 0.5.10;
 
+/// @title Governance Contract
+/// @author Matter Labs
 contract Governance {
 
-    // Token added to Franklin net
-    // Structure:
-    // - token - added token address
-    // - tokenId - added token id
+    /// @notice Token added to Franklin net
     event TokenAdded(
         address token,
         uint16 tokenId
     );
 
-    // Address which will excercise governance over the network
-    // i.e. add tokens, change validator set, conduct upgrades
+    /// @notice Address which will excercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
 
-    // Total number of ERC20 tokens registered in the network
-    // (excluding ETH, which is hardcoded as tokenId = 0)
+    /// @notice Total number of ERC20 tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
     uint16 public totalTokens;
 
-    // List of registered tokens by tokenId
+    /// @notice List of registered tokens by tokenId
     mapping(uint16 => address) public tokenAddresses;
 
-    // List of registered tokens by address
+    /// @notice List of registered tokens by address
     mapping(address => uint16) public tokenIds;
 
-    // List of permitted validators
+    /// @notice List of permitted validators
     mapping(address => bool) public validators;
 
+    /// @notice Construct Governance contract
+    /// @param _networkGovernor The address of network governor
     constructor(address _networkGovernor) public {
         networkGovernor = _networkGovernor;
         validators[_networkGovernor] = true;
     }
 
-    // Change current governor
-    // _newGovernor - address of the new governor
+    /// @notice Change current governor
+    /// @param _newGovernor Address of the new governor
     function changeGovernor(address _newGovernor) external {
         requireGovernor();
         networkGovernor = _newGovernor;
     }
 
-    // Add token to the list of possible tokens
-    // Params:
-    // - _token - token address
+    /// @notice Add token to the list of networks tokens
+    /// @param _token Token address
     function addToken(address _token) external {
         requireGovernor();
         require(
@@ -55,16 +53,15 @@ contract Governance {
         emit TokenAdded(_token, totalTokens);
     }
 
-    // Set validator status
-    // Params:
-    // - _validator - validator address
-    // - _active - bool value (true if validator is active)
+    /// @notice Change validator status (active or not active)
+    /// @param _validator Validator address
+    /// @param _active Active flag
     function setValidator(address _validator, bool _active) external {
         requireGovernor();
         validators[_validator] = _active;
     }
 
-    // Check if the sender is governor
+    /// @notice Check if the sender is governor
     function requireGovernor() internal view {
         require(
             msg.sender == networkGovernor,
@@ -72,12 +69,15 @@ contract Governance {
         ); // grr11 - only by governor
     }
 
-    // Check if sender is validator
+    /// @notice Return validator status (active or not)
+    /// @param _sender Validator address
+    /// @return bool flag that indicates validator status
     function isValidator(address _sender) external view returns (bool) {
         return validators[_sender];
     }
 
-    // Fail if token is unknown
+    /// @notice Validate token id (must be less than total tokens amount)
+    /// @param _tokenId Token id
     function requireValidTokenId(uint16 _tokenId) external view {
         require(
             isValidTokenId(_tokenId),
@@ -85,12 +85,16 @@ contract Governance {
         ); // grd11 - unknown token id
     }
 
-    // Check if token is known
+    /// @notice Validate token id (must be less than total tokens amount)
+    /// @param _tokenId Token id
+    /// @return bool flag that indicates if token id is less than total tokens amount
     function isValidTokenId(uint16 _tokenId) public view returns (bool) {
         return _tokenId < totalTokens + 1;
     }
 
-    // Validate token address
+    /// @notice Validate token address
+    /// @param _tokenAddr Token address
+    /// @return tokens id
     function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
         uint16 tokenId = tokenIds[_tokenAddr];
         require(
