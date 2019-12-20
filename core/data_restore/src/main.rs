@@ -44,6 +44,9 @@ fn main() {
     let mut driver = if cli.is_present("genesis") {
         create_data_restore_driver_with_genesis_acc(
             connection_pool,
+            // String::from("https://rinkeby.infura.io/v3/4406c3acf862426c83991f1752c46dd8"),
+            // H160::from_str("d4047737804c4b9c6ceb7e8e051b42b249fafbf9").unwrap(),
+            // H256::from_str("b99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e").unwrap(),
             config_opts.web3_url.clone(),
             config_opts.contract_eth_addr.clone(),
             config_opts.contract_genesis_tx_hash.clone(),
@@ -58,6 +61,7 @@ fn main() {
             // H256::from_str("b99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e").unwrap(),
             config_opts.web3_url.clone(),
             config_opts.contract_eth_addr.clone(),
+            config_opts.contract_genesis_tx_hash.clone(),
             ETH_BLOCKS_STEP,
             END_ETH_BLOCKS_OFFSET,
         )
