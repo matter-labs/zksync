@@ -15,8 +15,6 @@ import * as types from "./types";
 import * as utils from "./utils";
 import * as crypto from "./crypto";
 
-import { BlockExplorerClient } from "./BlockExplorerClient";
-
 export {
     Wallet,
     Signer,
@@ -31,5 +29,4 @@ export {
     types,
     utils,
     crypto,
-    BlockExplorerClient,
 };

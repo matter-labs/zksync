@@ -27,6 +27,7 @@ export class Wallet {
     connect(provider: Provider, ethProxy: ETHProxy) {
         this.provider = provider;
         this.ethProxy = ethProxy;
+        return this;
     }
 
     async syncTransfer(transfer: {
