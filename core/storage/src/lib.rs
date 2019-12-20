@@ -2274,9 +2274,9 @@ impl StorageProcessor {
             .filter(executed_transactions::tx_hash.is_null())
             .left_join(accounts::table.on(accounts::address.eq(mempool::primary_account_address)))
             .filter(
-                accounts::nonce
-                    .is_null()
-                    .or(mempool::nonce.ge(accounts::nonce)),
+                mempool::nonce
+                    .eq(accounts::nonce)
+                    .or(accounts::nonce.is_null().and(mempool::nonce.eq(0))),
             )
             .order(mempool::created_at.asc())
             .limit(max_size as i64);
