@@ -14,4 +14,4 @@
 /core/prover/   @dvush
 
 # notify BaldyAsh and dvush about contracts changes
-/contracts/     @dvush @BaldyAsh
+/contracts/     @dvush @BaldyAsh @gluk64
