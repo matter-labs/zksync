@@ -72,7 +72,7 @@ contract Governance {
 
     /// @notice Checks if validator is active
     /// @param _address Validator address
-    function requireActiveValidator(address _address) public view {
+    function requireActiveValidator(address _address) external view {
         require(
             validators[_address],
             "grr21"
@@ -82,7 +82,7 @@ contract Governance {
     /// @notice Validate token id (must be less than total tokens amount)
     /// @param _tokenId Token id
     /// @return bool flag that indicates if token id is less than total tokens amount
-    function isValidTokenId(uint16 _tokenId) public view returns (bool) {
+    function isValidTokenId(uint16 _tokenId) external view returns (bool) {
         return _tokenId < totalTokens + 1;
     }
 
