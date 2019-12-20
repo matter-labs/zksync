@@ -82,7 +82,7 @@ contract PriorityQueue {
     uint64 public totalCommittedPriorityRequests;
 
     /// @notice Constructs PriorityQueue contract
-    /// @param _ownerAddress Governance contract address
+    /// @param _ownerAddress Owner address
     constructor(address _ownerAddress) public {
         ownerAddress = _ownerAddress;
     }
