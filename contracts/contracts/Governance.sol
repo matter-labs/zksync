@@ -80,13 +80,13 @@ contract Governance {
     // Fail if token is unknown
     function requireValidTokenId(uint16 _tokenId) external view {
         require(
-            _tokenId < totalTokens + 1,
+            isValidTokenId(_tokenId),
             "grd11"
         ); // grd11 - unknown token id
     }
 
     // Check if token is known
-    function isValidTokenId(uint16 _tokenId) external view returns (bool) {
+    function isValidTokenId(uint16 _tokenId) public view returns (bool) {
         return _tokenId < totalTokens + 1;
     }
 
