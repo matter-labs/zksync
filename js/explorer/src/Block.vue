@@ -148,7 +148,7 @@ export default {
                     case "Deposit":
                         from               = shortenHash(tx.priority_op.data.sender, 'unknown sender');
                         to                 = shortenHash(tx.priority_op.data.account, 'unknown account');
-                        from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.account}`;
+                        from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.sender}`;
                         to_explorer_link   = `${this.routerBase}accounts/${tx.priority_op.data.account}`;
                         from_onchain_icon  = `<span class="onchain_icon">onchain</span>`;
                         to_onchain_icon    = '';
@@ -166,7 +166,7 @@ export default {
                         to_onchain_icon    = '';
                         token              = tx.tx.token;
                         token              = tokens[token].symbol;
-                        amount             =  `${formatToken(tx.tx.amount, token)} ${token}`;
+                        amount             = `${formatToken(tx.tx.amount, token)} ${token}`;
                         fee                = `${formatToken(tx.tx.fee, token)} ${token}`;
                         break;
                     case "Withdraw":

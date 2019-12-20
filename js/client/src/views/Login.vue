@@ -22,7 +22,7 @@
 import Alert from '../components/Alert.vue'
 
 const components = {
-    Alert
+    Alert,
 };
 
 const ethers = require('ethers');

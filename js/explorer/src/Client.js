@@ -1,6 +1,7 @@
 import config from './env-config';
 import constants from './constants';
 import { readableEther } from './utils';
+import { BlockExplorerClient } from './BlockExplorerClient';
 const zksync = require('zksync');   
 const ethers = require('ethers');
 import axios from 'axios';
@@ -38,7 +39,7 @@ export class Client {
                     .sort((a, b) => a.id - b.id);
             });
         
-        const blockExplorerClient = new zksync.BlockExplorerClient(config.API_SERVER);
+        const blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
 
         const props = {
             blockExplorerClient,
@@ -161,7 +162,7 @@ export class Client {
                 = tx.verified     ? `<span style="color: green">Verified</span>`
                 : tx.commited     ? `<span style="color: grey">Committed</span>`
                 : tx.fail_reason  ? `<span style="color: red">Failed with ${tx.fail_reason}</span>`
-                : `<span style="color: red">(Unknown status)</span>`
+                : `<span style="color: red">(Unknown status)</span>`;
 
             // here is common data to all tx types
             let data = {
@@ -205,7 +206,7 @@ export class Client {
                             token, amount,
                             hash: tx.hash,
                         }),                    
-                    }
+                    };
                 }
                 case type == 'Transfer' && direction == 'outcoming': {
                     let token = await this.tokenNameFromId(tx.tx.token);
@@ -223,7 +224,7 @@ export class Client {
                             token, amount,
                             hash: tx.hash,
                         }),
-                    }
+                    };
                 }
                 case type == 'Withdraw': {
                     let token = await this.tokenNameFromId(tx.tx.token);
@@ -240,7 +241,7 @@ export class Client {
                             token, amount,
                             hash: tx.hash,
                         }),
-                    }
+                    };
                 }
             }
         });
