@@ -71,6 +71,7 @@ contract Governance {
 
     /// @notice Return validator status (active or not)
     /// @param _address Validator address
+    /// @return bool flag that indicates validator status
     function isValidator(address _sender) external view returns (bool) {
         return validators[_sender];
     }
@@ -86,12 +87,14 @@ contract Governance {
 
     /// @notice Validate token id (must be less than total tokens amount)
     /// @param _tokenId Token id
+    /// @return bool flag that indicates if token id is less than total tokens amount
     function isValidTokenId(uint16 _tokenId) external view returns (bool) {
         return _tokenId < totalTokens + 1;
     }
 
-    /// @notice Validate token address and returns its id
+    /// @notice Validate token address
     /// @param _tokenAddr Token address
+    /// @return tokens id
     function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
         uint16 tokenId = tokenIds[_tokenAddr];
         require(
