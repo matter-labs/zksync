@@ -1,6 +1,6 @@
 // Built-in deps
 use std::str::FromStr;
-use std::{fmt, thread, time};
+use std::{thread, time};
 // External deps
 use bellman::groth16;
 // Workspace deps
@@ -23,17 +23,6 @@ pub struct ApiClient {
     publish_url: String,
     stopped_url: String,
     worker: String,
-}
-
-#[derive(Debug)]
-pub enum Error {
-    Default,
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{} error", "default")
-    }
 }
 
 impl ApiClient {
@@ -74,9 +63,7 @@ impl ApiClient {
         };
         match i32::from_str(&text) {
             Ok(v) => Ok(v),
-            Err(e) => {
-                return Err(format!("failed to parse register prover id: {}", e));
-            }
+            Err(e) => Err(format!("failed to parse register prover id: {}", e)),
         }
     }
 

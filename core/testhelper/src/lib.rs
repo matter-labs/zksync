@@ -4,7 +4,7 @@ use rand::Rng;
 pub struct TestAccount {
     pub private_key: franklin_crypto::eddsa::PrivateKey<pairing::bn256::Bn256>,
     pub public_key: franklin_crypto::eddsa::PublicKey<pairing::bn256::Bn256>,
-    pub address: models::node::account::AccountAddress
+    pub address: models::node::account::AccountAddress,
 }
 
 // TODO: move to helper crate
@@ -25,10 +25,16 @@ impl TestAccount {
             p_g,
             jubjub_params,
         );
-        TestAccount{
+        TestAccount {
             private_key,
             public_key,
             address,
         }
+    }
+}
+
+impl Default for TestAccount {
+    fn default() -> Self {
+        TestAccount::new()
     }
 }

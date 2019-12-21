@@ -68,7 +68,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         done_rx.recv_timeout(timeout).unwrap();
     });
     stop_signal.store(true, Ordering::SeqCst);
-    jh.join();
+    jh.join().unwrap();
 }
 
 #[test]
@@ -328,7 +328,7 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
         _timeout: time::Duration,
     ) -> Result<prover::prover_data::ProverData, String> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
-        if let Some(_) = *block_to_prove {
+        if (*block_to_prove).is_some() {
             let v = (self.prover_data_fn)();
             if let Some(pd) = v {
                 return Ok(pd);
