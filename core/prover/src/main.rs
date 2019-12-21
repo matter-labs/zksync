@@ -30,7 +30,7 @@ fn main() {
     info!("creating prover, worker name: {}", worker_name);
 
     // Create client
-    let api_url = env::var("WITNESS_GENERATOR_API_URL").unwrap();
+    let api_url = env::var("PROVER_SERVER_URL").unwrap();
     let api_client = client::ApiClient::new(&api_url, &worker_name);
     // Create prover
     let jubjub_params = AltJubjubBn256::new();
@@ -46,7 +46,7 @@ fn main() {
         stop_signal,
     );
     // Register prover
-    let prover_id = client::ApiClient::new(&api_url, "")
+    let prover_id = client::ApiClient::new(&api_url, &worker_name)
         .register_prover()
         .expect("failed to register prover");
     // Start prover
@@ -58,6 +58,7 @@ fn main() {
     // Handle termination requests.
     let prover_id_copy = prover_id;
     let api_url_copy = api_url.clone();
+    let worker_name_copy = worker_name.clone();
     thread::spawn(move || {
         let signals = Signals::new(&[
             signal_hook::SIGTERM,
@@ -69,7 +70,7 @@ fn main() {
             info!(
                 "Termination signal received. Prover will finish the job and shut down gracefully"
             );
-            client::ApiClient::new(&api_url_copy, "")
+            client::ApiClient::new(&api_url_copy, &worker_name_copy)
                 .prover_stopped(prover_id_copy)
                 .unwrap();
         }
@@ -78,7 +79,7 @@ fn main() {
     // Handle prover exit errors.
     let err = exit_err_rx.recv();
     error!("prover exited with error: {:?}", err);
-    client::ApiClient::new(&api_url, "")
+    client::ApiClient::new(&api_url, &worker_name)
         .prover_stopped(prover_id)
         .unwrap();
 }

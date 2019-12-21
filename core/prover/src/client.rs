@@ -122,7 +122,6 @@ impl crate::ApiClient for ApiClient {
             }
         };
         let res: server::BlockToProveRes = serde_json::from_str(&text).unwrap();
-        println!("response: {:?}", res);
         if res.block != 0 {
             return Ok(Some((res.block, res.prover_run_id)));
         }

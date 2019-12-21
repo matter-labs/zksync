@@ -9,7 +9,9 @@ use std::time::Duration;
 use clap::{App, Arg};
 use futures::channel::mpsc as fmpsc;
 // Workspace deps
+use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL};
 use models::StateKeeperRequest;
+use prover::server::start_server as start_prover_server;
 use server::api_server::start_api_server;
 use server::committer::start_committer;
 use server::eth_watch::start_eth_watch;
@@ -116,6 +118,13 @@ fn main() {
         stop_signal_sender.clone(),
         config_opts.clone(),
     );
+    thread::spawn(move || {
+        start_prover_server(
+            &config_opts.prover_server_address,
+            Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
+            Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
+        );
+    });
 
     // Simple timer, pings every 100 ms
     thread::Builder::new()
