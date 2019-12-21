@@ -1301,7 +1301,6 @@ impl StorageProcessor {
             };
 
             debug!("Sorted account update list: {:?}", account_updates);
-            println!("Sorted account update list: {:?}", account_updates);
 
             for acc_update in account_updates.into_iter() {
                 match acc_update {

@@ -40,6 +40,7 @@ pub struct ConfigurationOptions {
     pub chain_id: u8,
     pub gas_price_factor: usize,
     pub tx_batch_size: usize,
+    pub prover_server_address: SocketAddr,
 }
 
 impl ConfigurationOptions {
@@ -82,6 +83,9 @@ impl ConfigurationOptions {
             tx_batch_size: get_env("TX_BATCH_SIZE")
                 .parse()
                 .expect("TX_BATCH_SIZE invalid value"),
+            prover_server_address: get_env("PROVER_SERVER_BIND")
+                .parse()
+                .expect("Failed to parse PROVER_SERVER_BIND bind address"),
         }
     }
 }

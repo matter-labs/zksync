@@ -57,8 +57,8 @@ fn block_to_prove(
     };
     match storage.next_unverified_commit(&r.name, data.prover_timeout) {
         Ok(ret) => {
-            println!("next unverified commit: {:?}", ret);
             if let Some(prover_run) = ret {
+                debug!("next unverified commit: {:?}", ret);
                 return Ok(HttpResponse::Ok().json(BlockToProveRes {
                     prover_run_id: prover_run.id,
                     block: prover_run.block_number,

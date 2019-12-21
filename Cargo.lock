@@ -2788,6 +2788,7 @@ dependencies = [
  "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "plasma 0.1.1",
  "priority-queue 0.5.4 (registry+https://github.com/rust-lang/crates.io-index)",
+ "prover 0.0.1",
  "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rayon 1.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
