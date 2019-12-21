@@ -56,7 +56,7 @@ impl fmt::Display for BabyProverError {
     }
 }
 
-pub fn start<'a, C: 'static + Sync + Send + ApiClient>(
+pub fn start<C: 'static + Sync + Send + ApiClient>(
     prover: BabyProver<C>,
     exit_err_tx: mpsc::Sender<BabyProverError>,
 ) {

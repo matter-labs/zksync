@@ -27,13 +27,13 @@ pub struct ProverData {
 }
 
 pub fn vec_operations_ser<S: Serializer>(
-    operations: &Vec<Operation<Bn256>>,
+    operations: &[Operation<Bn256>],
     ser: S,
 ) -> Result<S::Ok, S::Error> {
     #[derive(Serialize)]
     struct Wrapper(#[serde(with = "OperationDef")] Operation<Bn256>);
 
-    let v = operations.into_iter().map(|a| Wrapper(a.clone())).collect();
+    let v = operations.iter().map(|a| Wrapper(a.clone())).collect();
     Vec::serialize(&v, ser)
 }
 

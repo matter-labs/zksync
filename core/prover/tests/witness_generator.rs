@@ -133,8 +133,7 @@ pub fn test_operation_and_wanted_prover_data(
 
     let mut state = plasma::state::PlasmaState::new(accounts, 1);
     println!(
-        "acc_number {}, acc {:?}",
-        0,
+        "acc_number 0, acc {:?}",
         models::circuit::account::CircuitAccount::from(validator_account.clone()).pub_key_hash,
     );
     circuit_tree.insert(

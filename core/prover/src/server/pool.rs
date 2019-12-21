@@ -89,7 +89,7 @@ fn take_next_commits(
     };
     drop(d);
 
-    if ops.len() > 0 {
+    if !ops.is_empty() {
         let mut d = data.write().expect("failed to acquire a lock");
         for op in ops.into_iter() {
             let block = op.block.block_number as i64;
@@ -113,8 +113,8 @@ fn prepare_next(
     params: &AltJubjubBn256,
 ) -> Result<(), String> {
     let mut d = data.write().expect("failed to acquire a lock");
-    let mut current = (*d).last_prepared + 1;
-    let op = d.operations.remove(&mut current).unwrap();
+    let current = (*d).last_prepared + 1;
+    let op = d.operations.remove(&current).unwrap();
     drop(d);
     let pd = build_prover_data(&storage, &op, phasher, params)?;
     let mut d = data.write().expect("failed to acquire a lock");
@@ -402,9 +402,7 @@ fn build_prover_data(
 
     let validator_acc = match accounts_tree.get(commit_operation.block.fee_account as u32) {
         Some(v) => v,
-        None => {
-            return Err(format!("validator account is absent in the tree"));
-        }
+        None => return Err("validator account is absent in the tree".to_owned()),
     };
     let mut validator_balances = vec![];
     for i in 0..1 << models::params::BALANCE_TREE_DEPTH {
@@ -465,11 +463,13 @@ fn build_prover_data(
     })
 }
 
+type SigData = (Fr, Fr, Fr, SignatureData, Vec<Option<bool>>);
+
 pub fn prepare_sig_data(
     sig_bytes: &[u8],
     tx_bytes: &[u8],
     pub_key: &PackedPublicKey,
-) -> Result<(Fr, Fr, Fr, SignatureData, Vec<Option<bool>>), String> {
+) -> Result<SigData, String> {
     let (r_bytes, s_bytes) = sig_bytes.split_at(32);
     let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(&r_bytes)
         .iter()
