@@ -60,15 +60,15 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         .expect("heartbeat request is not received");
 
     // Send stop signal.
-    println!("sending stop signal.");
     let jh = thread::spawn(move || {
-        heartbeat_rx.recv_timeout(timeout).unwrap();
+        println!("waiting for first hearbeat");
         heartbeat_rx.recv_timeout(timeout).unwrap();
         // BabyProver must be stopped.
         done_rx.recv_timeout(timeout).unwrap();
     });
+    println!("sending stop signal.");
     stop_signal.store(true, Ordering::SeqCst);
-    jh.join().unwrap();
+    jh.join().expect("did not exit properly");
 }
 
 #[test]
@@ -292,6 +292,7 @@ fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engin
         key_file_path.push(models::params::KEY_FILENAME);
         key_file_path
     };
+    println!("key file path is {:?}", key_file_path);
     let f = fs::File::open(&key_file_path).expect("Unable to open file");
     let mut r = io::BufReader::new(f);
     bellman::groth16::Parameters::<models::node::Engine>::read(&mut r, true)

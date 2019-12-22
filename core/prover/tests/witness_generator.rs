@@ -31,6 +31,7 @@ fn client_with_empty_worker_name_panics() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
     let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
@@ -47,6 +48,7 @@ fn api_client_register_start_and_stop_of_prover() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_simple_simulation() {
     let prover_timeout = time::Duration::from_secs(1);
     let rounds_interval = time::Duration::from_secs(10);
@@ -293,6 +295,7 @@ pub fn test_operation_and_wanted_prover_data(
 }
 
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_server_publish_dummy() {
     let prover_timeout = time::Duration::from_secs(1);
     let rounds_interval = time::Duration::from_secs(10);
