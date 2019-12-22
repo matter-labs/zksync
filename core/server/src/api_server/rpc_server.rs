@@ -1,5 +1,6 @@
 use crate::mempool::MempoolRequest;
 use crate::mempool::TxAddError;
+use crate::state_keeper::StateKeeperRequest;
 use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
 use futures::channel::{mpsc, oneshot};
@@ -81,8 +82,11 @@ pub struct ContractAddressResp {
 
 #[rpc]
 pub trait Rpc {
-    #[rpc(name = "account_info")]
-    fn account_info(&self, addr: AccountAddress) -> Result<AccountInfoResp>;
+    #[rpc(name = "account_info", returns = "AccountInfoResp")]
+    fn account_info(
+        &self,
+        addr: AccountAddress,
+    ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send>;
     #[rpc(name = "ethop_info")]
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp>;
     #[rpc(name = "tx_info")]
@@ -101,6 +105,7 @@ pub trait Rpc {
 
 pub struct RpcApp {
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
+    pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub connection_pool: ConnectionPool,
 }
 
@@ -119,33 +124,62 @@ impl RpcApp {
 }
 
 impl Rpc for RpcApp {
-    fn account_info(&self, address: AccountAddress) -> Result<AccountInfoResp> {
-        let storage = self.access_storage()?;
-        let account = storage
-            .account_state_by_address(&address)
-            .map_err(|_| Error::internal_error())?;
-        let tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
+    fn account_info(
+        &self,
+        address: AccountAddress,
+    ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send> {
+        let (account, tokens) = if let Ok((account, tokens)) = (|| -> Result<_> {
+            let storage = self.access_storage()?;
+            let account = storage
+                .account_state_by_address(&address)
+                .map_err(|_| Error::internal_error())?;
+            let tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
+            Ok((account, tokens))
+        })() {
+            (account, tokens)
+        } else {
+            return Box::new(futures01::done(Err(Error::internal_error())));
+        };
 
         let id = account.committed.as_ref().map(|(id, _)| *id);
 
-        let commited = if let Some((_, account)) = account.committed {
-            ResponseAccountState::try_to_restore(account, &tokens)?
-        } else {
-            ResponseAccountState::default()
+        let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
+        let account_state_resp = async move {
+            // TODO: add timeout
+            let state_keeper_response = oneshot::channel();
+            state_keeper_request_sender
+                .send(StateKeeperRequest::GetAccount(
+                    address.clone(),
+                    state_keeper_response.0,
+                ))
+                .await
+                .expect("state keeper receiver dropped");
+            let committed_account_state = state_keeper_response
+                .1
+                .await
+                .expect("State keeper response dropped"); // TODO: remove this unwrap
+
+            let committed = if let Some(account) = committed_account_state {
+                ResponseAccountState::try_to_restore(account, &tokens)?
+            } else {
+                ResponseAccountState::default()
+            };
+
+            let verified = if let Some((_, account)) = account.verified {
+                ResponseAccountState::try_to_restore(account, &tokens)?
+            } else {
+                ResponseAccountState::default()
+            };
+
+            Ok(AccountInfoResp {
+                address,
+                id,
+                committed,
+                verified,
+            })
         };
 
-        let verified = if let Some((_, account)) = account.verified {
-            ResponseAccountState::try_to_restore(account, &tokens)?
-        } else {
-            ResponseAccountState::default()
-        };
-
-        Ok(AccountInfoResp {
-            address,
-            id,
-            committed: commited,
-            verified,
-        })
+        Box::new(account_state_resp.boxed().compat())
     }
 
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
@@ -260,6 +294,7 @@ pub fn start_rpc_server(
     addr: SocketAddr,
     connection_pool: ConnectionPool,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
+    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -271,6 +306,7 @@ pub fn start_rpc_server(
             let rpc_app = RpcApp {
                 connection_pool,
                 mempool_request_sender,
+                state_keeper_request_sender,
             };
             rpc_app.extend(&mut io);
 

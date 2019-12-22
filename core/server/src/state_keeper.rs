@@ -7,23 +7,27 @@ use tokio::runtime::Runtime;
 use crate::mempool::ProposedBlock;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::FranklinTx;
-use models::node::{Account, AccountAddress, AccountId, AccountUpdate, AccountUpdates, PriorityOp};
+use models::node::{
+    Account, AccountAddress, AccountId, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+};
 use models::params::block_size_chunks;
 use models::{ActionType, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 use storage::ConnectionPool;
 
 pub enum StateKeeperRequest {
-    GetAccounts(
-        Vec<AccountAddress>,
-        oneshot::Sender<HashMap<AccountAddress, Account>>,
-    ),
+    GetAccount(AccountAddress, oneshot::Sender<Option<Account>>),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
 }
 
-const MAX_PENDING_BLOCK_ITERATIONS: usize = 10;
+pub struct ExecutedOpsNotify {
+    pub operations: Vec<ExecutedOperations>,
+    pub block_number: BlockNumber,
+}
+
+const MAX_PENDING_BLOCK_ITERATIONS: usize = 5 * 10;
 
 #[derive(Debug)]
 struct PendingBlock {
@@ -62,6 +66,7 @@ pub struct PlasmaStateKeeper {
 
     rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
+    executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
 }
 
 impl PlasmaStateKeeper {
@@ -70,6 +75,7 @@ impl PlasmaStateKeeper {
         fee_account_address: AccountAddress,
         rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
+        executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
     ) -> Self {
         info!("constructing state keeper instance");
         let storage = pool
@@ -108,6 +114,7 @@ impl PlasmaStateKeeper {
             rx_for_blocks,
             tx_for_commitments,
             pending_block: PendingBlock::new(current_unprocessed_priority_op),
+            executed_tx_notify_sender,
         };
 
         let root = keeper.state.root_hash();
@@ -147,12 +154,8 @@ impl PlasmaStateKeeper {
     async fn run(mut self) {
         while let Some(req) = self.rx_for_blocks.next().await {
             match req {
-                StateKeeperRequest::GetAccounts(addresses, sender) => {
-                    let accounts = addresses
-                        .into_iter()
-                        .filter_map(|addr| self.account(&addr).map(|acc| (addr, acc)))
-                        .collect();
-                    sender.send(accounts).unwrap_or_default();
+                StateKeeperRequest::GetAccount(addr, sender) => {
+                    sender.send(self.account(&addr)).unwrap_or_default();
                 }
                 StateKeeperRequest::GetLastUnprocessedPriorityOp(sender) => {
                     sender
@@ -164,6 +167,19 @@ impl PlasmaStateKeeper {
                 }
             }
         }
+    }
+
+    async fn notify_executed_ops(&self, executed_ops: &mut Vec<ExecutedOperations>) {
+        self.executed_tx_notify_sender
+            .clone()
+            .send(ExecutedOpsNotify {
+                operations: executed_ops.clone(),
+                block_number: self.state.block_number,
+            })
+            .await
+            .map_err(|e| warn!("Failed to send executed tx notify batch: {}", e))
+            .unwrap_or_default();
+        executed_ops.clear();
     }
 
     async fn execute_tx_batch(&mut self, proposed_block: ProposedBlock) {
@@ -179,11 +195,8 @@ impl PlasmaStateKeeper {
                     executed_ops.push(exec_op);
                 }
                 Err(priority_op) => {
-                    let commit_request = self.seal_pending_block();
-                    self.tx_for_commitments
-                        .send(commit_request)
-                        .await
-                        .expect("Commit request send");
+                    self.notify_executed_ops(&mut executed_ops).await;
+                    self.seal_pending_block().await;
 
                     priority_op_queue.push_front(priority_op);
                 }
@@ -197,11 +210,8 @@ impl PlasmaStateKeeper {
                     executed_ops.push(exec_op);
                 }
                 Err(tx) => {
-                    let commit_request = self.seal_pending_block();
-                    self.tx_for_commitments
-                        .send(commit_request)
-                        .await
-                        .expect("Commit request send");
+                    self.notify_executed_ops(&mut executed_ops).await;
+                    self.seal_pending_block().await;
 
                     tx_queue.push_front(tx);
                 }
@@ -211,13 +221,12 @@ impl PlasmaStateKeeper {
         if !self.pending_block.success_operations.is_empty() {
             self.pending_block.pending_block_iteration += 1;
             if self.pending_block.pending_block_iteration > MAX_PENDING_BLOCK_ITERATIONS {
-                let commit_request = self.seal_pending_block();
-                self.tx_for_commitments
-                    .send(commit_request)
-                    .await
-                    .expect("Commit request send");
+                self.notify_executed_ops(&mut executed_ops).await;
+                self.seal_pending_block().await;
             }
         }
+
+        self.notify_executed_ops(&mut executed_ops).await;
     }
 
     // None if there is no space in current block
@@ -313,7 +322,7 @@ impl PlasmaStateKeeper {
         Ok(exec_result)
     }
 
-    fn seal_pending_block(&mut self) -> CommitRequest {
+    async fn seal_pending_block(&mut self) {
         let pending_block = std::mem::replace(
             &mut self.pending_block,
             PendingBlock::new(self.current_unprocessed_priority_op),
@@ -341,7 +350,18 @@ impl PlasmaStateKeeper {
             accounts_updated: pending_block.account_updates,
         };
         self.state.block_number += 1;
-        commit_request
+
+        info!(
+            "Creating full block: {}, operations: {}, chunks_left: {}, miniblock iterations: {}",
+            commit_request.block.block_number,
+            commit_request.block.block_transactions.len(),
+            pending_block.chunks_left,
+            pending_block.pending_block_iteration
+        );
+        self.tx_for_commitments
+            .send(commit_request)
+            .await
+            .expect("committer receiver dropped");
     }
 
     fn account(&self, address: &AccountAddress) -> Option<Account> {

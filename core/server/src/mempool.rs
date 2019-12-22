@@ -50,6 +50,7 @@ pub enum MempoolRequest {
 
 struct MempoolState {
     // account and last committed nonce
+    // TODO: update this mapping
     account_nonces: HashMap<AccountAddress, Nonce>,
     ready_txs: VecDeque<FranklinTx>,
 }

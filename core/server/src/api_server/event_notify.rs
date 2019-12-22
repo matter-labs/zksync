@@ -1,5 +1,6 @@
 use super::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
 use crate::api_server::rpc_server::{BlockInfo, ResponseAccountState};
+use crate::state_keeper::ExecutedOpsNotify;
 use crate::ThreadPanicNotify;
 use failure::{bail, format_err};
 use futures::task::LocalSpawnExt;
@@ -11,6 +12,7 @@ use jsonrpc_pubsub::{
     SubscriptionId,
 };
 use models::node::tx::TxHash;
+use models::node::BlockNumber;
 use models::{
     node::block::ExecutedOperations,
     node::{AccountAddress, AccountId},
@@ -334,11 +336,13 @@ impl OperationNotifier {
         Ok(())
     }
 
-    fn handle_new_block(&mut self, op: Operation) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        let action = op.action.get_type();
-
-        for tx in op.block.block_transactions {
+    fn handle_executed_operations(
+        &mut self,
+        ops: Vec<ExecutedOperations>,
+        action: ActionType,
+        block_number: BlockNumber,
+    ) -> Result<(), failure::Error> {
+        for tx in ops {
             match tx {
                 ExecutedOperations::Tx(tx) => {
                     let hash = tx.tx.hash();
@@ -348,7 +352,7 @@ impl OperationNotifier {
                             success: Some(tx.success),
                             fail_reason: tx.fail_reason,
                             block: Some(BlockInfo {
-                                block_number: i64::from(op.block.block_number),
+                                block_number: i64::from(block_number),
                                 committed: true,
                                 verified: action == ActionType::VERIFY,
                             }),
@@ -364,7 +368,7 @@ impl OperationNotifier {
                         let rec = ETHOpInfoResp {
                             executed: true,
                             block: Some(BlockInfo {
-                                block_number: i64::from(op.block.block_number),
+                                block_number: i64::from(block_number),
                                 committed: true,
                                 verified: action == ActionType::VERIFY,
                             }),
@@ -376,6 +380,29 @@ impl OperationNotifier {
                 }
             }
         }
+        Ok(())
+    }
+
+    fn handle_new_executed_batch(
+        &mut self,
+        exec_batch: ExecutedOpsNotify,
+    ) -> Result<(), failure::Error> {
+        self.handle_executed_operations(
+            exec_batch.operations,
+            ActionType::COMMIT,
+            exec_batch.block_number,
+        )
+    }
+
+    fn handle_new_block(&mut self, op: Operation) -> Result<(), failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+        let action = op.action.get_type();
+
+        self.handle_executed_operations(
+            op.block.block_transactions,
+            action,
+            op.block.block_number,
+        )?;
 
         let updated_accounts = op.accounts_updated.iter().map(|(id, _)| *id);
         let tokens = storage.load_tokens()?;
@@ -419,6 +446,7 @@ pub fn start_sub_notifier(
     db_pool: ConnectionPool,
     mut new_block_stream: mpsc::Receiver<Operation>,
     mut subscription_stream: mpsc::Receiver<EventNotifierRequest>,
+    mut executed_tx_stream: mpsc::Receiver<ExecutedOpsNotify>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -442,6 +470,13 @@ pub fn start_sub_notifier(
                             if let Some(new_block) = new_block {
                                 notifier.handle_new_block(new_block)
                                     .map_err(|e| warn!("Failed to handle new block: {}",e))
+                                    .unwrap_or_default();
+                            }
+                        },
+                        new_exec_batch = executed_tx_stream.next() => {
+                            if let Some(new_exec_batch) = new_exec_batch {
+                                notifier.handle_new_executed_batch(new_exec_batch)
+                                    .map_err(|e| warn!("Failed to handle new exec batch: {}",e))
                                     .unwrap_or_default();
                             }
                         },

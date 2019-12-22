@@ -10,6 +10,7 @@ mod rpc_server;
 mod rpc_subscriptions;
 
 use crate::mempool::MempoolRequest;
+use crate::state_keeper::{ExecutedOpsNotify, StateKeeperRequest};
 use crate::ConfigurationOptions;
 use futures::channel::mpsc;
 use models::Operation;
@@ -20,6 +21,8 @@ pub fn start_api_server(
     connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
+    executed_tx_receiver: mpsc::Receiver<ExecutedOpsNotify>,
+    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     config_options: ConfigurationOptions,
 ) {
     rest::start_server_thread_detached(
@@ -34,6 +37,8 @@ pub fn start_api_server(
         connection_pool.clone(),
         config_options.json_rpc_ws_server_address,
         mempool_request_sender.clone(),
+        executed_tx_receiver,
+        state_keeper_request_sender.clone(),
         panic_notify.clone(),
     );
 
@@ -41,6 +46,7 @@ pub fn start_api_server(
         config_options.json_rpc_http_server_address,
         connection_pool.clone(),
         mempool_request_sender.clone(),
+        state_keeper_request_sender,
         panic_notify.clone(),
     );
 }

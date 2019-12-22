@@ -7,7 +7,7 @@ use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::time;
 
-const TX_MINIBATCH_CREATE_TIME: Duration = Duration::from_millis(5000);
+const TX_MINIBATCH_CREATE_TIME: Duration = Duration::from_millis(200);
 
 fn create_mempool_req(
     last_priority_op_number: u64,

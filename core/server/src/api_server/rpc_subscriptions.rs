@@ -4,6 +4,7 @@ use super::event_notify::{start_sub_notifier, EventSubscribeRequest};
 use crate::api_server::event_notify::EventNotifierRequest;
 use crate::api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp};
 use crate::mempool::MempoolRequest;
+use crate::state_keeper::{ExecutedOpsNotify, StateKeeperRequest};
 use crate::ThreadPanicNotify;
 use futures::channel::mpsc;
 use jsonrpc_core::MetaIoHandler;
@@ -177,6 +178,8 @@ pub fn start_ws_server(
     db_pool: ConnectionPool,
     addr: SocketAddr,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
+    executed_tx_receiver: mpsc::Receiver<ExecutedOpsNotify>,
+    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
@@ -185,6 +188,7 @@ pub fn start_ws_server(
 
     let req_rpc_app = super::rpc_server::RpcApp {
         mempool_request_sender,
+        state_keeper_request_sender,
         connection_pool: db_pool.clone(),
     };
     req_rpc_app.extend(&mut io);
@@ -193,7 +197,13 @@ pub fn start_ws_server(
 
     io.extend_with(rpc_sub_app.to_delegate());
 
-    start_sub_notifier(db_pool, op_recv, event_sub_receiver, panic_notify.clone());
+    start_sub_notifier(
+        db_pool,
+        op_recv,
+        event_sub_receiver,
+        executed_tx_receiver,
+        panic_notify.clone(),
+    );
 
     std::thread::Builder::new()
         .name("json_rpc_ws".to_string())

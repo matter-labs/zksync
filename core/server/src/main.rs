@@ -88,11 +88,13 @@ fn main() {
 
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
+    let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
     let state_keeper = PlasmaStateKeeper::new(
         connection_pool.clone(),
         config_opts.operator_franklin_addr.clone(),
         state_keeper_req_receiver,
         proposed_blocks_sender,
+        executed_tx_notify_sender,
     );
     start_state_keeper(state_keeper, &main_runtime);
 
@@ -119,6 +121,8 @@ fn main() {
         connection_pool.clone(),
         stop_signal_sender.clone(),
         mempool_request_sender.clone(),
+        executed_tx_notify_receiver,
+        state_keeper_req_sender.clone(),
         config_opts.clone(),
     );
 

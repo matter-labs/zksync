@@ -797,6 +797,7 @@ impl StorageProcessor {
                             nonce: tx.tx.nonce() as i64,
                             tx: serde_json::to_value(&tx.tx).unwrap_or_default(),
                         })
+                        .on_conflict_do_nothing()
                         .execute(self.conn())?;
                     diesel::insert_into(executed_transactions::table)
                         .values(&stored_tx)
