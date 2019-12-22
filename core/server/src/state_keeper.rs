@@ -7,11 +7,11 @@ use tokio::runtime::Runtime;
 use crate::mempool::ProposedBlock;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::FranklinTx;
-use models::node::{Account, AccountAddress, AccountUpdate, PriorityOp};
+use models::node::{Account, AccountAddress, AccountId, AccountUpdate, AccountUpdates, PriorityOp};
 use models::params::block_size_chunks;
 use models::{ActionType, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use storage::ConnectionPool;
 
 pub enum StateKeeperRequest {
@@ -20,7 +20,34 @@ pub enum StateKeeperRequest {
         oneshot::Sender<HashMap<AccountAddress, Account>>,
     ),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
-    ExecuteBlock(ProposedBlock),
+    ExecuteMiniBlock(ProposedBlock),
+}
+
+const MAX_PENDING_BLOCK_ITERATIONS: usize = 10;
+
+#[derive(Debug)]
+struct PendingBlock {
+    success_operations: Vec<ExecutedOperations>,
+    failed_txs: Vec<ExecutedTx>,
+    account_updates: AccountUpdates,
+    chunks_left: usize,
+    pending_op_block_index: u32,
+    unprocessed_priority_op_before: u64,
+    pending_block_iteration: usize,
+}
+
+impl PendingBlock {
+    fn new(unprocessed_priority_op_before: u64) -> Self {
+        Self {
+            success_operations: Vec::new(),
+            failed_txs: Vec::new(),
+            account_updates: Vec::new(),
+            chunks_left: block_size_chunks(),
+            pending_op_block_index: 0,
+            unprocessed_priority_op_before,
+            pending_block_iteration: 0,
+        }
+    }
 }
 
 /// Coordinator of tx processing and generation of proofs
@@ -28,8 +55,10 @@ pub struct PlasmaStateKeeper {
     /// Current plasma state
     state: PlasmaState,
 
-    fee_account_address: AccountAddress,
+    fee_account_id: AccountId,
     current_unprocessed_priority_op: u64,
+
+    pending_block: PendingBlock,
 
     rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
@@ -67,14 +96,18 @@ impl PlasmaStateKeeper {
             last_committed, last_verified
         );
 
+        let (fee_account_id, _) = state
+            .get_account_by_address(&fee_account_address)
+            .expect("Fee account should be present in the account tree");
         // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state,
             // TODO: load pk from config.
-            fee_account_address,
+            fee_account_id,
             current_unprocessed_priority_op,
             rx_for_blocks,
             tx_for_commitments,
+            pending_block: PendingBlock::new(current_unprocessed_priority_op),
         };
 
         let root = keeper.state.root_hash();
@@ -126,144 +159,189 @@ impl PlasmaStateKeeper {
                         .send(self.current_unprocessed_priority_op)
                         .unwrap_or_default();
                 }
-                StateKeeperRequest::ExecuteBlock(proposed_block) => {
-                    self.create_new_block(proposed_block).await;
+                StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
+                    self.execute_tx_batch(proposed_block).await;
                 }
             }
         }
     }
 
-    async fn create_new_block(&mut self, proposed_block: ProposedBlock) {
-        let commit_request = self.apply_txs(proposed_block.priority_ops, proposed_block.txs);
+    async fn execute_tx_batch(&mut self, proposed_block: ProposedBlock) {
+        let mut executed_ops = Vec::new();
 
-        let priority_ops_executed = {
-            let (prior_ops_before, prior_ops_after) = commit_request.block.processed_priority_ops;
-            prior_ops_after != prior_ops_before
-        };
+        let mut priority_op_queue = proposed_block
+            .priority_ops
+            .into_iter()
+            .collect::<VecDeque<_>>();
+        while let Some(priority_op) = priority_op_queue.pop_front() {
+            match self.apply_priority_op(priority_op) {
+                Ok(exec_op) => {
+                    executed_ops.push(exec_op);
+                }
+                Err(priority_op) => {
+                    let commit_request = self.seal_pending_block();
+                    self.tx_for_commitments
+                        .send(commit_request)
+                        .await
+                        .expect("Commit request send");
 
-        let block_not_empty = !commit_request.accounts_updated.is_empty() || priority_ops_executed;
-
-        if block_not_empty {
-            self.state.block_number += 1; // bump current block number as we've made one
+                    priority_op_queue.push_front(priority_op);
+                }
+            }
         }
 
-        self.tx_for_commitments
-            .send(commit_request)
-            .await
-            .expect("Commit request send");
+        let mut tx_queue = proposed_block.txs.into_iter().collect::<VecDeque<_>>();
+        while let Some(tx) = tx_queue.pop_front() {
+            match self.apply_tx(tx) {
+                Ok(exec_op) => {
+                    executed_ops.push(exec_op);
+                }
+                Err(tx) => {
+                    let commit_request = self.seal_pending_block();
+                    self.tx_for_commitments
+                        .send(commit_request)
+                        .await
+                        .expect("Commit request send");
+
+                    tx_queue.push_front(tx);
+                }
+            }
+        }
+
+        if !self.pending_block.success_operations.is_empty() {
+            self.pending_block.pending_block_iteration += 1;
+            if self.pending_block.pending_block_iteration > MAX_PENDING_BLOCK_ITERATIONS {
+                let commit_request = self.seal_pending_block();
+                self.tx_for_commitments
+                    .send(commit_request)
+                    .await
+                    .expect("Commit request send");
+            }
+        }
     }
 
-    fn apply_txs(
+    // None if there is no space in current block
+    fn apply_priority_op(
         &mut self,
-        priority_ops: Vec<PriorityOp>,
-        transactions: Vec<FranklinTx>,
-    ) -> CommitRequest {
-        info!(
-            "Creating block, txs: {}, priority_ops: {}",
-            transactions.len(),
-            priority_ops.len()
-        );
-        // collect updated state
-        let mut accounts_updated = Vec::new();
-        let mut fees = Vec::new();
-        let mut ops = Vec::new();
-        let mut chunks_left = block_size_chunks();
-        let mut current_op_block_index = 0u32;
-        let last_unprocessed_prior_op = self.current_unprocessed_priority_op;
+        priority_op: PriorityOp,
+    ) -> Result<ExecutedOperations, PriorityOp> {
+        let chunks_needed = priority_op.data.chunks();
+        if self.pending_block.chunks_left < chunks_needed {
+            return Err(priority_op);
+        }
 
-        for priority_op in priority_ops.into_iter() {
-            let chunks_needed = priority_op.data.chunks();
-            if chunks_left < chunks_needed {
-                break;
-            }
+        let OpSuccess {
+            fee,
+            mut updates,
+            executed_op,
+        } = self.state.execute_priority_op(priority_op.data.clone());
 
-            let OpSuccess {
+        self.pending_block.chunks_left -= chunks_needed;
+        self.pending_block.account_updates.append(&mut updates);
+        if let Some(fee) = fee {
+            let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
+            self.pending_block
+                .account_updates
+                .extend(fee_updates.into_iter());
+        }
+        let block_index = self.pending_block.pending_op_block_index;
+        self.pending_block.pending_op_block_index += 1;
+
+        let exec_result = ExecutedOperations::PriorityOp(Box::new(ExecutedPriorityOp {
+            op: executed_op,
+            priority_op,
+            block_index,
+        }));
+        self.pending_block
+            .success_operations
+            .push(exec_result.clone());
+        self.current_unprocessed_priority_op += 1;
+        Ok(exec_result)
+    }
+
+    fn apply_tx(&mut self, tx: FranklinTx) -> Result<ExecutedOperations, FranklinTx> {
+        let chunks_needed = self.state.chunks_for_tx(&tx);
+        if self.pending_block.chunks_left < chunks_needed {
+            return Err(tx);
+        }
+
+        let tx_updates = self.state.execute_tx(tx.clone());
+
+        let exec_result = match tx_updates {
+            Ok(OpSuccess {
                 fee,
                 mut updates,
                 executed_op,
-            } = self.state.execute_priority_op(priority_op.data.clone());
-
-            assert_eq!(chunks_needed, executed_op.chunks());
-            chunks_left -= chunks_needed;
-            accounts_updated.append(&mut updates);
-            if let Some(fee) = fee {
-                fees.push(fee);
-            }
-            let block_index = current_op_block_index;
-            current_op_block_index += 1;
-            let exec_result = ExecutedPriorityOp {
-                op: executed_op,
-                priority_op,
-                block_index,
-            };
-            ops.push(ExecutedOperations::PriorityOp(Box::new(exec_result)));
-            self.current_unprocessed_priority_op += 1;
-        }
-
-        for tx in transactions.into_iter() {
-            let chunks_needed = self.state.chunks_for_tx(&tx);
-            if chunks_left < chunks_needed {
-                break;
-            }
-
-            let tx_updates = self.state.execute_tx(tx.clone());
-
-            match tx_updates {
-                Ok(OpSuccess {
-                    fee,
-                    mut updates,
-                    executed_op,
-                }) => {
-                    assert!(chunks_needed == executed_op.chunks());
-                    chunks_left -= chunks_needed;
-                    accounts_updated.append(&mut updates);
-                    if let Some(fee) = fee {
-                        fees.push(fee);
-                    }
-                    let block_index = current_op_block_index;
-                    current_op_block_index += 1;
-                    let exec_result = ExecutedTx {
-                        tx,
-                        success: true,
-                        op: Some(executed_op),
-                        fail_reason: None,
-                        block_index: Some(block_index),
-                    };
-                    ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
+            }) => {
+                self.pending_block.chunks_left -= chunks_needed;
+                self.pending_block.account_updates.append(&mut updates);
+                if let Some(fee) = fee {
+                    let fee_updates = self.state.collect_fee(&[fee], self.fee_account_id);
+                    self.pending_block
+                        .account_updates
+                        .extend(fee_updates.into_iter());
                 }
-                Err(e) => {
-                    error!("Failed to execute transaction: {:?}, {}", tx, e);
-                    let exec_result = ExecutedTx {
-                        tx,
-                        success: false,
-                        op: None,
-                        fail_reason: Some(e.to_string()),
-                        block_index: None,
-                    };
-                    ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
-                }
-            };
-        }
+                let block_index = self.pending_block.pending_op_block_index;
+                self.pending_block.pending_op_block_index += 1;
 
-        let (fee_account_id, fee_updates) =
-            self.state.collect_fee(&fees, &self.fee_account_address);
-        accounts_updated.extend(fee_updates.into_iter());
-
-        let block = Block {
-            block_number: self.state.block_number,
-            new_root_hash: self.state.root_hash(),
-            fee_account: fee_account_id,
-            block_transactions: ops,
-            processed_priority_ops: (
-                last_unprocessed_prior_op,
-                self.current_unprocessed_priority_op,
-            ),
+                let exec_result = ExecutedOperations::Tx(Box::new(ExecutedTx {
+                    tx,
+                    success: true,
+                    op: Some(executed_op),
+                    fail_reason: None,
+                    block_index: Some(block_index),
+                }));
+                self.pending_block
+                    .success_operations
+                    .push(exec_result.clone());
+                exec_result
+            }
+            Err(e) => {
+                warn!("Failed to execute transaction: {:?}, {}", tx, e);
+                let failed_tx = ExecutedTx {
+                    tx,
+                    success: false,
+                    op: None,
+                    fail_reason: Some(e.to_string()),
+                    block_index: None,
+                };
+                self.pending_block.failed_txs.push(failed_tx.clone());
+                ExecutedOperations::Tx(Box::new(failed_tx))
+            }
         };
 
-        CommitRequest {
-            block,
-            accounts_updated,
-        }
+        Ok(exec_result)
+    }
+
+    fn seal_pending_block(&mut self) -> CommitRequest {
+        let pending_block = std::mem::replace(
+            &mut self.pending_block,
+            PendingBlock::new(self.current_unprocessed_priority_op),
+        );
+
+        let mut block_transactions = pending_block.success_operations;
+        block_transactions.extend(
+            pending_block
+                .failed_txs
+                .into_iter()
+                .map(|tx| ExecutedOperations::Tx(Box::new(tx))),
+        );
+
+        let commit_request = CommitRequest {
+            block: Block {
+                block_number: self.state.block_number,
+                new_root_hash: self.state.root_hash(),
+                fee_account: self.fee_account_id,
+                block_transactions,
+                processed_priority_ops: (
+                    pending_block.unprocessed_priority_op_before,
+                    self.current_unprocessed_priority_op,
+                ),
+            },
+            accounts_updated: pending_block.account_updates,
+        };
+        self.state.block_number += 1;
+        commit_request
     }
 
     fn account(&self, address: &AccountAddress) -> Option<Account> {

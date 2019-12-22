@@ -1,20 +1,28 @@
 use crate::eth_watch::ETHState;
-use crate::state_keeper::StateKeeperRequest;
+use failure::Fail;
 use futures::channel::{mpsc, oneshot};
-use futures::SinkExt;
 use futures::StreamExt;
-use itertools::Itertools;
-use models::node::{
-    Account, AccountAddress, FranklinTx, Nonce, PriorityOp, TransferOp, TransferToNewOp,
-};
+use models::node::{AccountAddress, FranklinTx, Nonce, PriorityOp, TransferOp, TransferToNewOp};
 use models::params::block_size_chunks;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
-use storage::{ConnectionPool, TxAddError};
+use storage::ConnectionPool;
 use tokio::runtime::Runtime;
 
 // TODO: temporary limit
 const MAX_NUMBER_OF_WITHDRAWS: usize = 4;
+
+#[derive(Debug, Serialize, Deserialize, Fail)]
+pub enum TxAddError {
+    #[fail(display = "Tx nonce is too low.")]
+    NonceMismatch,
+    #[fail(display = "Tx signature is incorrect.")]
+    InvalidSignature,
+    #[fail(display = "Tx is incorrect")]
+    IncorrectTx,
+    #[fail(display = "Internal error")]
+    Other,
+}
 
 #[derive(Debug)]
 pub struct ProposedBlock {
@@ -23,16 +31,8 @@ pub struct ProposedBlock {
 }
 
 impl ProposedBlock {
-    /// when executed number of chunks will be >= min_chunks()
-    pub fn min_chunks(&self) -> usize {
-        let mut total = 0;
-        for tx in &self.txs {
-            total += tx.min_chunks();
-        }
-        for op in &self.priority_ops {
-            total += op.data.chunks();
-        }
-        total
+    pub fn is_empty(&self) -> bool {
+        self.priority_ops.is_empty() && self.txs.is_empty()
     }
 }
 
@@ -48,22 +48,17 @@ pub enum MempoolRequest {
     GetBlock(GetBlockRequest),
 }
 
-struct AccountsForBatch {
-    map: HashMap<AccountAddress, Account>,
+struct MempoolState {
+    // account and last committed nonce
+    account_nonces: HashMap<AccountAddress, Nonce>,
+    ready_txs: VecDeque<FranklinTx>,
 }
 
-impl AccountsForBatch {
-    fn nonce(&self, address: &AccountAddress) -> Nonce {
-        self.map
-            .get(address)
-            .map(|acc| acc.nonce)
-            .unwrap_or_default()
-    }
-
+impl MempoolState {
     fn chunks_for_tx(&self, tx: &FranklinTx) -> usize {
         match tx {
             FranklinTx::Transfer(tx) => {
-                if self.map.get(&tx.to).is_some() {
+                if self.account_nonces.contains_key(&tx.to) {
                     TransferOp::CHUNKS
                 } else {
                     TransferToNewOp::CHUNKS
@@ -72,42 +67,71 @@ impl AccountsForBatch {
             _ => tx.min_chunks(),
         }
     }
+
+    fn restore_from_db(db_pool: &ConnectionPool) -> Self {
+        let storage = db_pool.access_storage().expect("mempool db restore");
+        let (_, accounts) = storage
+            .load_committed_state(None)
+            .expect("mempool account state load");
+        let account_nonces = accounts
+            .into_iter()
+            .map(|(_, acc)| (acc.address, acc.nonce))
+            .collect();
+        Self {
+            account_nonces,
+            ready_txs: VecDeque::new(),
+        }
+    }
+
+    fn nonce(&self, address: &AccountAddress) -> Nonce {
+        *self.account_nonces.get(address).unwrap_or(&0)
+    }
+
+    fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+        if !tx.check_signature() {
+            return Err(TxAddError::InvalidSignature);
+        }
+
+        if !tx.check_correctness() {
+            return Err(TxAddError::IncorrectTx);
+        }
+
+        if tx.nonce() >= self.nonce(&tx.account()) {
+            self.ready_txs.push_back(tx);
+            Ok(())
+        } else {
+            Err(TxAddError::NonceMismatch)
+        }
+    }
 }
 
 struct Mempool {
+    mempool_state: MempoolState,
     eth_state: Arc<RwLock<ETHState>>,
-    db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
-    state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
 }
 
 impl Mempool {
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
-            let storage = self
-                .db_pool
-                .access_storage()
-                .expect("mempool storage access");
             match request {
                 MempoolRequest::NewTx(tx, resp) => {
-                    let storage_result = storage
-                        .mempool_add_tx(&tx)
-                        .unwrap_or(Err(TxAddError::Other));
-                    resp.send(storage_result).unwrap_or_default();
+                    let tx_add_result = self.mempool_state.add_tx(*tx);
+                    resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
                     block
                         .response_sender
-                        .send(self.propose_new_block(block.last_priority_op_number).await)
+                        .send(self.propose_new_block(block.last_priority_op_number))
                         .expect("mempool response send");
                 }
             }
         }
     }
 
-    async fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
+    fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
         let (chunks_left, priority_ops) = self.select_priority_ops(current_unprocessed_priority_op);
-        let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left).await;
+        let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left);
         trace!("Proposed priority ops for block: {:#?}", priority_ops);
         trace!("Proposed txs for block: {:#?}", txs);
         ProposedBlock { priority_ops, txs }
@@ -138,102 +162,34 @@ impl Mempool {
         (chunks_left, selected_ops)
     }
 
-    async fn prepare_tx_for_block(&mut self, chunks_left: usize) -> (usize, Vec<FranklinTx>) {
-        let txs = self
-            .db_pool
-            .access_storage()
-            .map(|m| {
-                m.mempool_get_txs((block_size_chunks() / TransferOp::CHUNKS) * 2)
-                    .expect("Failed to get tx from db")
-            })
-            .expect("Failed to get txs from mempool");
+    fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<FranklinTx>) {
+        let mut withdrawals = 0;
+        let mut txs_for_commit = Vec::new();
+        let mut txs_for_reinsert = VecDeque::new();
 
-        let (chunks_left, filtered_txs) = self.filter_invalid_txs(chunks_left, txs).await;
-
-        (chunks_left, filtered_txs)
-    }
-
-    async fn filter_invalid_txs(
-        &mut self,
-        mut chunks_left: usize,
-        mut transfer_txs: Vec<FranklinTx>,
-    ) -> (usize, Vec<FranklinTx>) {
-        // TODO: temporary measure - limit number of withdrawals in one block
-        let mut withdraws = 0;
-        transfer_txs.retain(|tx| {
-            if let FranklinTx::Withdraw(..) = tx {
-                if withdraws >= MAX_NUMBER_OF_WITHDRAWS {
-                    false
+        while let Some(tx) = self.mempool_state.ready_txs.pop_front() {
+            if let FranklinTx::Withdraw(_) = &tx {
+                if withdrawals >= MAX_NUMBER_OF_WITHDRAWS {
+                    txs_for_reinsert.push_back(tx);
+                    continue;
                 } else {
-                    withdraws += 1;
-                    true
+                    withdrawals += 1;
                 }
+            }
+
+            let chunks_for_tx = self.mempool_state.chunks_for_tx(&tx);
+            if chunks_left >= chunks_for_tx {
+                txs_for_commit.push(tx);
+                chunks_left -= chunks_for_tx;
             } else {
-                true
+                txs_for_reinsert.push_back(tx);
+                break;
             }
-        });
+        }
 
-        let accounts_for_batch = {
-            let mut accounts = Vec::with_capacity(transfer_txs.len());
-            for tx in &transfer_txs {
-                accounts.push(tx.account());
-            }
+        self.mempool_state.ready_txs.append(&mut txs_for_reinsert);
 
-            let account_map = oneshot::channel();
-            self.state_keeper_requests
-                .send(StateKeeperRequest::GetAccounts(accounts, account_map.0))
-                .await
-                .expect("state keeper receiver dropped");
-            AccountsForBatch {
-                map: account_map.1.await.expect("state keeper accounts request"),
-            }
-        };
-
-        let mut filtered_txs = Vec::new();
-        transfer_txs.sort_by_key(|tx| tx.account());
-        let txs_with_correct_nonce = transfer_txs
-            .into_iter()
-            .group_by(|tx| tx.account())
-            .into_iter()
-            .map(|(from, txs)| {
-                let mut txs = txs.collect::<Vec<_>>();
-                txs.sort_by_key(|tx| tx.nonce());
-
-                let mut valid_txs = Vec::new();
-                let mut current_nonce = accounts_for_batch.nonce(&from);
-
-                for tx in txs {
-                    if tx.nonce() < current_nonce {
-                        continue;
-                    } else if tx.nonce() == current_nonce {
-                        valid_txs.push(tx);
-                        current_nonce += 1;
-                    } else {
-                        break;
-                    }
-                }
-                valid_txs
-            })
-            .fold(Vec::new(), |mut all_txs, mut next_tx_batch| {
-                all_txs.append(&mut next_tx_batch);
-                all_txs
-            });
-
-        filtered_txs.extend(txs_with_correct_nonce.into_iter());
-
-        let filtered_txs = filtered_txs
-            .into_iter()
-            .take_while(|tx| {
-                let tx_chunks = accounts_for_batch.chunks_for_tx(&tx);
-                if chunks_left < tx_chunks {
-                    false
-                } else {
-                    chunks_left -= tx_chunks;
-                    true
-                }
-            })
-            .collect();
-        (chunks_left, filtered_txs)
+        (chunks_left, txs_for_commit)
     }
 }
 
@@ -241,14 +197,13 @@ pub fn run_mempool_task(
     eth_state: Arc<RwLock<ETHState>>,
     db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
-    state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     runtime: &Runtime,
 ) {
+    let mempool_state = MempoolState::restore_from_db(&db_pool);
     let mempool = Mempool {
+        mempool_state,
         eth_state,
-        db_pool,
         requests,
-        state_keeper_requests,
     };
     runtime.spawn(mempool.run());
 }

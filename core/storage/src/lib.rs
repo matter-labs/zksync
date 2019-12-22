@@ -16,7 +16,7 @@ extern crate log;
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use failure::{bail, Fail};
+use failure::bail;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
@@ -650,18 +650,6 @@ struct ReadTx {
     created_at: NaiveDateTime,
 }
 
-#[derive(Debug, Serialize, Deserialize, Fail)]
-pub enum TxAddError {
-    #[fail(display = "Tx nonce is too low.")]
-    NonceTooLow,
-    #[fail(display = "Tx signature is incorrect.")]
-    InvalidSignature,
-    #[fail(display = "Tx is incorrect")]
-    IncorrectTx,
-    #[fail(display = "Internal error")]
-    Other,
-}
-
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccountTransaction {
     tx: Value,
@@ -802,6 +790,14 @@ impl StorageProcessor {
                 ExecutedOperations::Tx(tx) => {
                     let stored_tx =
                         NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
+                    diesel::insert_into(mempool::table)
+                        .values(&InsertTx {
+                            hash: tx.tx.hash().as_ref().to_vec(),
+                            primary_account_address: tx.tx.account().data.to_vec(),
+                            nonce: tx.tx.nonce() as i64,
+                            tx: serde_json::to_value(&tx.tx).unwrap_or_default(),
+                        })
+                        .execute(self.conn())?;
                     diesel::insert_into(executed_transactions::table)
                         .values(&stored_tx)
                         .execute(self.conn())?;
@@ -2186,111 +2182,6 @@ impl StorageProcessor {
             .order(tokens::id.asc())
             .load::<Token>(self.conn())?;
         Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
-    }
-
-    pub fn mempool_get_size(&self) -> QueryResult<usize> {
-        mempool::table
-            .select(count(mempool::primary_account_address))
-            .execute(self.conn())
-    }
-
-    pub fn mempool_add_tx(&self, tx: &FranklinTx) -> QueryResult<Result<(), TxAddError>> {
-        if !tx.check_signature() {
-            return Ok(Err(TxAddError::InvalidSignature));
-        }
-
-        if !tx.check_correctness() {
-            return Ok(Err(TxAddError::IncorrectTx));
-        }
-
-        let StoredAccountState {
-            committed: commited_state,
-            ..
-        } = self.account_state_by_address(&tx.account())?;
-        let lowest_possible_nonce = commited_state
-            .map(|(_, a)| a.nonce as u32)
-            .unwrap_or_default();
-        if tx.nonce() < lowest_possible_nonce {
-            return Ok(Err(TxAddError::NonceTooLow));
-        }
-
-        let tx_failed = executed_transactions::table
-            .filter(executed_transactions::tx_hash.eq(tx.hash().as_ref().to_vec()))
-            .filter(executed_transactions::success.eq(false))
-            .first::<StoredExecutedTransaction>(self.conn())
-            .optional()?;
-        // Remove executed tx from db
-        if let Some(tx_failed) = tx_failed {
-            diesel::delete(
-                executed_transactions::table.filter(executed_transactions::id.eq(tx_failed.id)),
-            )
-            .execute(self.conn())?;
-        } else {
-            // TODO Check tx and add only txs with valid nonce.
-            insert_into(mempool::table)
-                .values(&InsertTx {
-                    hash: tx.hash().as_ref().to_vec(),
-                    primary_account_address: tx.account().data.to_vec(),
-                    nonce: i64::from(tx.nonce()),
-                    tx: serde_json::to_value(tx).unwrap(),
-                })
-                .execute(self.conn())
-                .map(drop)?;
-        }
-
-        Ok(Ok(()))
-    }
-
-    pub fn get_pending_txs(&self, address: &AccountAddress) -> QueryResult<Vec<FranklinTx>> {
-        let StoredAccountState {
-            committed: commited_state,
-            ..
-        } = self.account_state_by_address(address)?;
-        let commited_nonce = commited_state
-            .map(|(_, a)| i64::from(a.nonce))
-            .unwrap_or_default();
-
-        let pending_txs: Vec<_> = mempool::table
-            .filter(mempool::primary_account_address.eq(address.data.to_vec()))
-            .filter(mempool::nonce.ge(commited_nonce))
-            .left_join(
-                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
-            )
-            .filter(executed_transactions::tx_hash.is_null())
-            .load::<(ReadTx, Option<StoredExecutedTransaction>)>(self.conn())?;
-
-        Ok(pending_txs
-            .into_iter()
-            .map(|(stored_tx, _)| serde_json::from_value(stored_tx.tx).unwrap())
-            .collect())
-    }
-
-    pub fn mempool_get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
-        //TODO use "gaps and islands" sql solution for this.
-        let query = mempool::table
-            .left_join(
-                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
-            )
-            .filter(executed_transactions::tx_hash.is_null())
-            .left_join(accounts::table.on(accounts::address.eq(mempool::primary_account_address)))
-            .filter(
-                mempool::nonce
-                    .eq(accounts::nonce)
-                    .or(accounts::nonce.is_null().and(mempool::nonce.eq(0))),
-            )
-            .order(mempool::created_at.asc())
-            .limit(max_size as i64);
-
-        let stored_txs: Vec<_> = query.load::<(
-            ReadTx,
-            Option<StoredExecutedTransaction>,
-            Option<StorageAccount>,
-        )>(self.conn())?;
-
-        Ok(stored_txs
-            .into_iter()
-            .map(|stored_tx| serde_json::from_value(stored_tx.0.tx).unwrap())
-            .collect())
     }
 }
 

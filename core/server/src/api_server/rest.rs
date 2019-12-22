@@ -173,9 +173,8 @@ fn handle_get_account_state(
         (id, verified, committed)
     };
 
-    let pending_txs = storage
-        .get_pending_txs(&account_address)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    // TODO: ask mempool about pending txs
+    let pending_txs = Vec::new();
 
     let res = AccountStateResponse {
         id,

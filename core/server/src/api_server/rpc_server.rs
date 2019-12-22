@@ -1,4 +1,5 @@
 use crate::mempool::MempoolRequest;
+use crate::mempool::TxAddError;
 use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
 use futures::channel::{mpsc, oneshot};
@@ -11,7 +12,7 @@ use models::node::tx::TxHash;
 use models::node::{Account, AccountAddress, AccountId, FranklinTx, Nonce, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use storage::{ConnectionPool, StorageProcessor, Token, TxAddError};
+use storage::{ConnectionPool, StorageProcessor, Token};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ResponseAccountState {
@@ -213,7 +214,7 @@ impl Rpc for RpcApp {
 
             tx_add_result.map(|_| hash).map_err(|e| {
                 let code = match &e {
-                    TxAddError::NonceTooLow => 101,
+                    TxAddError::NonceMismatch => 101,
                     TxAddError::InvalidSignature => 102,
                     TxAddError::IncorrectTx => 103,
                     TxAddError::Other => 104,

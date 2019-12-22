@@ -126,7 +126,6 @@ fn main() {
         shared_eth_state,
         connection_pool.clone(),
         mempool_request_receiver,
-        state_keeper_req_sender.clone(),
         &main_runtime,
     );
     run_block_proposer_task(

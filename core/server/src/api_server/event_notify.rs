@@ -4,11 +4,7 @@ use crate::ThreadPanicNotify;
 use failure::{bail, format_err};
 use futures::task::LocalSpawnExt;
 use futures::{
-    channel::mpsc,
-    compat::Future01CompatExt,
-    executor, select,
-    stream::{FusedStream, Stream, StreamExt},
-    FutureExt,
+    channel::mpsc, compat::Future01CompatExt, executor, select, stream::StreamExt, FutureExt,
 };
 use jsonrpc_pubsub::{
     typed::{Sink, Subscriber},
@@ -419,15 +415,12 @@ impl OperationNotifier {
     }
 }
 
-pub fn start_sub_notifier<BStream, SStream>(
+pub fn start_sub_notifier(
     db_pool: ConnectionPool,
-    mut new_block_stream: BStream,
-    mut subscription_stream: SStream,
+    mut new_block_stream: mpsc::Receiver<Operation>,
+    mut subscription_stream: mpsc::Receiver<EventNotifierRequest>,
     panic_notify: mpsc::Sender<bool>,
-) where
-    BStream: Stream<Item = Operation> + FusedStream + Unpin + Send + 'static,
-    SStream: Stream<Item = EventNotifierRequest> + FusedStream + Unpin + Send + 'static,
-{
+) {
     std::thread::Builder::new()
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
