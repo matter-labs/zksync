@@ -9,6 +9,7 @@ use prover;
 use testhelper::TestAccount;
 
 #[test]
+#[cfg_attr(not(feature = "keys-required"), ignore)]
 fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // Testing [black box] that:
     // - BabyProver sends `working_on` requests (heartbeat) over api client
@@ -72,6 +73,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "keys-required"), ignore)]
 fn prover_proves_a_block_and_publishes_result() {
     // Testing [black box] the actual proof calculation by mocking genesis and +1 block.
     let circuit_params = read_circuit_parameters();
