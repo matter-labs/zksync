@@ -1,9 +1,8 @@
 use crate::events::EventData;
 use crate::helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
-use failure::{ensure, format_err};
+use failure::format_err;
 use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
-use web3::{Transport, Web3};
 
 use models::params::{
     INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH, INPUT_DATA_EMPTY_BYTES_WIDTH,

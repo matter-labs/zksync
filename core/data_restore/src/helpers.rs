@@ -3,7 +3,6 @@ use failure::{ensure, format_err};
 use web3::futures::Future;
 use web3::types::H256;
 use web3::types::{Transaction, TransactionId};
-use web3::{Transport, Web3};
 
 pub const FUNC_NAME_HASH_LENGTH: usize = 4;
 

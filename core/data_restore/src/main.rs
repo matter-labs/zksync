@@ -16,7 +16,6 @@ use clap::{App, Arg};
 use server::ConfigurationOptions;
 use storage::ConnectionPool;
 use web3::types::{H160, H256};
-use web3::Transport;
 
 const ETH_BLOCKS_STEP: u64 = 1000;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;

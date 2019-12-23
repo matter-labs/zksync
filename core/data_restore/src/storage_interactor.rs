@@ -6,18 +6,16 @@ use failure::format_err;
 use web3::types::H256;
 // Workspace uses
 use crate::data_restore_driver::StorageUpdateState;
+use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
-use models::node::block::Block;
-use models::node::{Account, AccountAddress, AccountUpdate, AccountMap, AccountUpdates};
+use models::node::{AccountUpdate, AccountMap, AccountUpdates};
 use models::{Action, EncodedProof, Operation};
 use storage::{
     ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
     StoredRollupOpsBlock,
 };
-use crate::tree_state::TreeState;
-use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 
 pub fn save_genesis_tree_state(
     connection_pool: ConnectionPool,
@@ -42,6 +40,24 @@ pub fn save_genesis_tree_state(
     Ok(())
 }
 
+pub fn save_token(
+    connection_pool: ConnectionPool,
+    id: u16,
+    address: &str,
+    symbol: Option<&str>
+) -> Result<(), failure::Error> {
+    let storage = connection_pool.access_storage().map_err(|e| {
+        format_err!(
+            "Db connection failed for saving token: {}",
+            e.to_string()
+        )
+    })?;
+    storage.store_token(id, address, symbol)
+        .map_err(|e| format_err!("Cant store token: {}", e.to_string()))?;
+    info!("{:?}", storage.load_tokens());
+    Ok(())
+}
+
 /// Updates stored tree state
 ///
 /// # Arguments
@@ -61,13 +77,14 @@ pub fn update_tree_state(
             e.to_string()
         )
     })?;
-    info!("!!!!!!!!accs: {:?}", &accounts_updated);
-    storage
-        .commit_state_update(block.block_number, accounts_updated.as_slice())
-        .map_err(|e| format_err!("Cant commit state update: {}", e.to_string()))?;
-    storage
-        .apply_state_update(block.block_number)
-        .map_err(|e| format_err!("Cant apply state update: {}", e.to_string()))?;
+
+    for transaction in block.block_transactions.clone() {
+        if let ExecutedOperations::Tx(tx) = transaction {
+            storage
+            .mempool_add_tx_unsafe(&tx.tx)
+            .map_err(|e| format_err!("Cant save txs in mempool: {}", e.to_string()))?;
+        }
+    }
 
     if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
         info!(
@@ -77,30 +94,30 @@ pub fn update_tree_state(
         storage
             .save_block_transactions(&block)
             .map_err(|e| format_err!("Cant save block transactions: {}", e.to_string()))?;
+        return Ok(())
     }
-
+    
     let commit_op = Operation {
         action: Action::Commit,
         block: block.clone(),
-        accounts_updated,
+        accounts_updated: accounts_updated.clone(),
         id: None,
     };
     storage
-        .execute_operation(&commit_op)
-        .map_err(|e| format_err!("Cant execute commit operations: {}", e.to_string()))?;
+        .execute_operation_data_restore(&commit_op)
+        .map_err(|e| format_err!("Cant execute commit operation: {}", e.to_string()))?;
 
-    // Cant get proof at this point
     let verify_op = Operation {
         action: Action::Verify {
             proof: Box::new(EncodedProof::default()),
         },
-        block: block.clone(),
+        block: block,
         accounts_updated: Vec::new(),
         id: None,
     };
     storage
-        .execute_operation(&verify_op)
-        .map_err(|e| format_err!("Cant execute verify operations: {}", e.to_string()))?;
+        .execute_operation_data_restore(&verify_op)
+        .map_err(|e| format_err!("Cant execute verify operation: {}", e.to_string()))?;
 
     Ok(())
 }

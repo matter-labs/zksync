@@ -1,19 +1,17 @@
 use crate::events_state::EventsState;
-use crate::genesis_state::get_genesis_account;
+use crate::genesis_state::{get_genesis_account, get_tokens};
 use crate::helpers::get_ethereum_transaction;
 use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor;
 use crate::tree_state::TreeState;
 use ethabi;
 use failure::format_err;
-use models::node::block::Block;
 use models::node::{AccountMap, AccountUpdate};
 use std::str::FromStr;
 use storage::ConnectionPool;
 use web3::contract::Contract;
 use web3::types::H160;
 use web3::types::H256;
-use web3::{Transport, Web3};
 
 /// Storage state update
 pub enum StorageUpdateState {
@@ -64,6 +62,17 @@ impl DataRestoreDriver {
                 Contract::new(web3.eth(), contract_eth_addr, abi.clone()),
             )
         };
+        
+        // TODO: -fix it
+        let tokens = get_tokens().unwrap();
+        for token in tokens {
+            storage_interactor::save_token(
+                connection_pool.clone(),
+                token.0,
+                token.1.as_str(),
+                None
+            );
+        }
 
         let mut events_state = EventsState::new();
 
@@ -125,6 +134,17 @@ impl DataRestoreDriver {
                 Contract::new(web3.eth(), contract_eth_addr, abi.clone()),
             )
         };
+        
+        // TODO: -fix it
+        let tokens = get_tokens().unwrap();
+        for token in tokens {
+            storage_interactor::save_token(
+                connection_pool.clone(),
+                token.0,
+                token.1.as_str(),
+                None
+            );
+        }
 
         let mut events_state = EventsState::new();
 
@@ -158,7 +178,7 @@ impl DataRestoreDriver {
 
         info!("Genesis block number: {:?}", tree_state.state.block_number);
         info!("Genesis tree root hash: {:?}", tree_state.root_hash());
-        info!("Genesis accounts: {:?}", tree_state.get_accounts());;
+        info!("Genesis accounts: {:?}", tree_state.get_accounts());
 
         storage_interactor::save_genesis_tree_state(
             connection_pool.clone(),
@@ -289,12 +309,11 @@ impl DataRestoreDriver {
                 .update_tree_states_from_ops_block(&op_block)?;
             info!("New block number: {:?}", &self.tree_state.state.block_number);
             info!("Tree root hash: {:?}", self.tree_state.root_hash());
-            info!("Accounts: {:?}", self.tree_state.get_accounts());
-            // storage_interactor::update_tree_state(
-            //     self.connection_pool.clone(),
-            //     block,
-            //     acc_updates,
-            // )?;
+            storage_interactor::update_tree_state(
+                self.connection_pool.clone(),
+                block,
+                acc_updates,
+            )?;
         }
 
         storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;
@@ -303,7 +322,7 @@ impl DataRestoreDriver {
             StorageUpdateState::None,
         )?;
 
-        info!("Updated accounts state");
+        info!("Updated accounts state\n");
 
         Ok(())
     }

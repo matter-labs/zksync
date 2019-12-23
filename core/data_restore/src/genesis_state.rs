@@ -18,3 +18,7 @@ pub fn get_genesis_account(
     acc.address = genesis_operator_address;
     Ok(acc)
 }
+
+pub fn get_tokens() -> Result<Vec<(u16, String, Option<String>)>, failure::Error> {
+    return Ok(vec![(1, "0x54FCb2405EE4f574C4F09333d25c401E68aD3408".to_string(), None)])
+}
