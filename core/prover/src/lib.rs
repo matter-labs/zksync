@@ -23,19 +23,19 @@ pub struct BabyProver<C: ApiClient> {
 }
 
 pub trait ApiClient {
-    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, String>;
-    fn working_on(&self, job_id: i32) -> Result<(), String>;
+    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error>;
+    fn working_on(&self, job_id: i32) -> Result<(), failure::Error>;
     fn prover_data(
         &self,
         block: i64,
         timeout: time::Duration,
-    ) -> Result<prover_data::ProverData, String>;
+    ) -> Result<prover_data::ProverData, failure::Error>;
     fn publish(
         &self,
         block: i64,
         p: groth16::Proof<models::node::Engine>,
         public_data_commitment: models::node::Fr,
-    ) -> Result<(), String>;
+    ) -> Result<(), failure::Error>;
 }
 
 #[derive(Debug)]
@@ -125,14 +125,10 @@ impl<C: ApiClient> BabyProver<C> {
         rng: &mut rand::OsRng,
         start_heartbeats_tx: &mpsc::Sender<(i32, bool)>,
     ) -> Result<(), BabyProverError> {
-        let block_to_prove = self.api_client.block_to_prove();
-        let block_to_prove = match block_to_prove {
-            Ok(b) => b,
-            Err(e) => {
-                let e = format!("failed to get block to prove {}", e);
-                return Err(BabyProverError::Api(e));
-            }
-        };
+        let block_to_prove = self.api_client.block_to_prove().map_err(|e| {
+            let e = format!("failed to get block to prove {}", e);
+            return BabyProverError::Api(e);
+        })?;
 
         let (block, job_id) = match block_to_prove {
             Some(b) => b,
@@ -148,19 +144,15 @@ impl<C: ApiClient> BabyProver<C> {
         if job_id == 0 {
             return Ok(());
         }
-        let prover_data = match self
+        let prover_data = self
             .api_client
             .prover_data(block, self.get_prover_data_timeout)
-        {
-            Ok(v) => v,
-            Err(err) => {
-                return Err(BabyProverError::Api(format!(
+            .map_err(|err| {
+                BabyProverError::Api(format!(
                     "could not get prover data for block {}: {}",
                     block, err
-                )));
-            }
-        };
-
+                ))
+            })?;
         info!("starting to compute proof for block {}", block);
 
         let instance = circuit::circuit::FranklinCircuit {
