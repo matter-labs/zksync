@@ -17,11 +17,18 @@ import {
 import { serializePointPacked } from "./crypto";
 
 export class Wallet {
+    public provider: Provider;
+    public ethProxy: ETHProxy;
+
     constructor(
         public signer: Signer,
-        public provider: Provider,
-        public ethProxy: ETHProxy
     ) {}
+
+    connect(provider: Provider, ethProxy: ETHProxy) {
+        this.provider = provider;
+        this.ethProxy = ethProxy;
+        return this;
+    }
 
     async syncTransfer(transfer: {
         to: Address;
@@ -120,13 +127,17 @@ export class Wallet {
 
     static async fromEthSigner(
         ethWallet: ethers.Signer,
-        provider: Provider,
-        ethProxy: ETHProxy
+        provider?: Provider,
+        ethProxy?: ETHProxy
     ): Promise<Wallet> {
         const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
         const seed = Buffer.from(seedHex, "hex");
         const signer = Signer.fromSeed(seed);
-        return new Wallet(signer, provider, ethProxy);
+        const wallet = new Wallet(signer);
+        if (provider && ethProxy) {
+            wallet.connect(provider, ethProxy);
+        }
+        return wallet;
     }
 
     async getAccountState(): Promise<AccountState> {
@@ -158,14 +169,17 @@ export async function depositFromETH(deposit: {
     amount: utils.BigNumberish;
     maxFeeInETHToken?: utils.BigNumberish;
 }): Promise<ETHOperation> {
-    let maxFeeInETHToken;
+    const gasPrice = await deposit.depositFrom.provider.getGasPrice();
+    
+    let maxFeeInETHToken;    
     if (deposit.maxFeeInETHToken != null) {
         maxFeeInETHToken = deposit.maxFeeInETHToken;
     } else {
         const baseFee = await deposit.depositTo.ethProxy.estimateDepositFeeInETHToken(
-            deposit.token
+            deposit.token,
+            gasPrice
         );
-        maxFeeInETHToken = baseFee.mul(115).div(100); // 15% higher that base fee.
+        maxFeeInETHToken = baseFee;
     }
     const mainZkSyncContract = new Contract(
         deposit.depositTo.provider.contractAddress.mainContract,
@@ -178,10 +192,11 @@ export async function depositFromETH(deposit: {
     if (deposit.token == "ETH") {
         ethTransaction = await mainZkSyncContract.depositETH(
             deposit.amount,
-            deposit.depositTo.address(),
+            deposit.depositTo.address().replace('sync:', '0x'),
             {
                 value: utils.bigNumberify(deposit.amount).add(maxFeeInETHToken),
-                gasLimit: utils.bigNumberify("200000")
+                gasLimit: utils.bigNumberify("200000"),
+                gasPrice,
             }
         );
     } else {
@@ -198,11 +213,12 @@ export async function depositFromETH(deposit: {
         ethTransaction = await mainZkSyncContract.depositERC20(
             deposit.token,
             deposit.amount,
-            deposit.depositTo.address(),
+            deposit.depositTo.address().replace('sync:', '0x'),
             {
                 gasLimit: utils.bigNumberify("250000"),
                 value: maxFeeInETHToken,
-                nonce: approveTx.nonce + 1
+                nonce: approveTx.nonce + 1,
+                gasPrice,
             }
         );
     }
@@ -218,12 +234,16 @@ export async function emergencyWithdraw(withdraw: {
     accountId?: number;
     nonce?: Nonce;
 }): Promise<ETHOperation> {
+    const gasPrice = await withdraw.withdrawTo.provider.getGasPrice();
+
     let maxFeeInETHToken;
     if (withdraw.maxFeeInETHToken != null) {
         maxFeeInETHToken = withdraw.maxFeeInETHToken;
     } else {
-        const baseFee = await withdraw.withdrawFrom.ethProxy.estimateEmergencyWithdrawFeeInETHToken();
-        maxFeeInETHToken = baseFee.mul(115).div(100); // 15% higher
+        const baseFee = await withdraw.withdrawFrom.ethProxy
+            .estimateEmergencyWithdrawFeeInETHToken(gasPrice);
+
+        maxFeeInETHToken = baseFee;
     }
 
     let accountId;
@@ -271,7 +291,8 @@ export async function emergencyWithdraw(withdraw: {
         nonce,
         {
             gasLimit: utils.bigNumberify("500000"),
-            value: maxFeeInETHToken
+            value: maxFeeInETHToken,
+            gasPrice,
         }
     );
 

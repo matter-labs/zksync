@@ -62,7 +62,7 @@ export class Provider {
         return provider;
     }
 
-    // return transaction hash (e.g. 0xdead..beef)
+    // return transaction hash (e.g. sync-tx:dead..beef)
     async submitTx(tx: any): Promise<string> {
         return await this.transport.request("tx_submit", [tx]);
     }
@@ -192,14 +192,14 @@ export class ETHProxy {
         }
     }
 
-    async estimateDepositFeeInETHToken(token: Token): Promise<utils.BigNumber> {
-        const gasPrice = await this.ethersProvider.getGasPrice();
+    async estimateDepositFeeInETHToken(token: Token, gasPrice?: utils.BigNumber): Promise<utils.BigNumber> {
+        gasPrice = gasPrice || await this.ethersProvider.getGasPrice();
         const multiplier = token == "ETH" ? 179000 : 214000;
         return gasPrice.mul(2 * multiplier);
     }
 
-    async estimateEmergencyWithdrawFeeInETHToken(): Promise<utils.BigNumber> {
-        const gasPrice = await this.ethersProvider.getGasPrice();
+    async estimateEmergencyWithdrawFeeInETHToken(gasPrice?: utils.BigNumber): Promise<utils.BigNumber> {
+        gasPrice = gasPrice || await this.ethersProvider.getGasPrice();
         return gasPrice.mul(2 * 170000);
     }
 }
