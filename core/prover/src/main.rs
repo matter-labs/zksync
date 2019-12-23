@@ -25,7 +25,7 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal))
         .expect("Error setting SIGQUIT handler");
 
-    let worker_name = env::var("POD_NAME").unwrap_or_else(|_| "default".to_string());
+    let worker_name = env::var("POD_NAME").expect("POD_NAME is missing");
     let key_dir = env::var("KEY_DIR").expect("KEY_DIR not set");
     info!("creating prover, worker name: {}", worker_name);
 
