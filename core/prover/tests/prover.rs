@@ -309,16 +309,16 @@ struct MockApiClient<F: Fn() -> Option<prover::prover_data::ProverData>> {
 }
 
 impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for MockApiClient<F> {
-    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, String> {
+    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         Ok(*block_to_prove)
     }
 
-    fn working_on(&self, job: i32) -> Result<(), String> {
+    fn working_on(&self, job: i32) -> Result<(), failure::Error> {
         let stored = self.block_to_prove.lock().unwrap();
         if let Some((_, stored)) = *stored {
             if stored != job {
-                return Err("unexpected job id".to_owned());
+                return Err(failure::format_err!("unexpected job id"));
             }
             let _ = self.heartbeats_tx.lock().unwrap().send(());
         }
@@ -329,7 +329,7 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
         &self,
         _block: i64,
         _timeout: time::Duration,
-    ) -> Result<prover::prover_data::ProverData, String> {
+    ) -> Result<prover::prover_data::ProverData, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if (*block_to_prove).is_some() {
             let v = (self.prover_data_fn)();
@@ -337,7 +337,7 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
                 return Ok(pd);
             }
         }
-        Err("mock not configured".to_string())
+        Err(failure::format_err!("mock not configured"))
     }
 
     fn publish(
@@ -345,7 +345,7 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
         _block: i64,
         p: bellman::groth16::Proof<models::node::Engine>,
         _public_data_commitment: models::node::Fr,
-    ) -> Result<(), String> {
+    ) -> Result<(), failure::Error> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();
         *block_to_prove = None;

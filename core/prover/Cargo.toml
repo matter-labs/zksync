@@ -36,6 +36,7 @@ env_logger = "0.6"
 num-traits = "0.2"
 actix-web = "1.0"
 reqwest = "0.9.22"
+failure = "0.1"
 
 [dev-dependencies]
 testhelper = { path = "../testhelper", version = "0.1.0"}

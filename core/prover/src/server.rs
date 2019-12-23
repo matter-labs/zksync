@@ -96,19 +96,16 @@ fn working_on(data: web::Data<AppState>, r: web::Json<WorkingOnReq>) -> actix_we
         "working on request for prover_run with id: {}",
         r.prover_run_id
     );
-    let storage = match data.connection_pool.access_storage() {
-        Ok(s) => s,
-        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
-    };
-    match storage.record_prover_is_working(r.prover_run_id) {
-        Ok(_) => Ok(()),
-        Err(e) => {
+    let storage = data
+        .connection_pool
+        .access_storage()
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    storage
+        .record_prover_is_working(r.prover_run_id)
+        .map_err(|e| {
             error!("failed to record prover work in progress request: {}", e);
-            Err(actix_web::error::ErrorInternalServerError(
-                "storage layer error",
-            ))
-        }
-    }
+            actix_web::error::ErrorInternalServerError("storage layer error")
+        })
 }
 
 #[derive(Serialize, Deserialize)]
@@ -119,10 +116,10 @@ pub struct PublishReq {
 
 fn publish(data: web::Data<AppState>, r: web::Json<PublishReq>) -> actix_web::Result<()> {
     info!("publish of a proof for block: {}", r.block);
-    let storage = match data.connection_pool.access_storage() {
-        Ok(s) => s,
-        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
-    };
+    let storage = data
+        .connection_pool
+        .access_storage()
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
     match storage.store_proof(r.block, &r.proof) {
         Ok(_) => {
             let mut data_pool = data.preparing_data_pool.write().unwrap();
@@ -143,19 +140,14 @@ fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::R
         "prover sent stopped request with prover_run id: {}",
         prover_id
     );
-    let storage = match data.connection_pool.access_storage() {
-        Ok(s) => s,
-        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
-    };
-    match storage.record_prover_stop(*prover_id) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            error!("failed to record prover stop: {}", e);
-            Err(actix_web::error::ErrorInternalServerError(
-                "storage layer error",
-            ))
-        }
-    }
+    let storage = data
+        .connection_pool
+        .access_storage()
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e))?;
+    storage.record_prover_stop(*prover_id).map_err(|e| {
+        error!("failed to record prover stop: {}", e);
+        actix_web::error::ErrorInternalServerError("storage layer error")
+    })
 }
 
 pub fn start_server(
