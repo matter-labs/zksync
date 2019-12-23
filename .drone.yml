@@ -58,6 +58,7 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - export KEY_DIR=`pwd`/keys/
   - f gen-keys
   - f cargo test
   depends_on:
