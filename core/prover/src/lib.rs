@@ -127,7 +127,7 @@ impl<C: ApiClient> BabyProver<C> {
     ) -> Result<(), BabyProverError> {
         let block_to_prove = self.api_client.block_to_prove().map_err(|e| {
             let e = format!("failed to get block to prove {}", e);
-            return BabyProverError::Api(e);
+            BabyProverError::Api(e)
         })?;
 
         let (block, job_id) = match block_to_prove {
