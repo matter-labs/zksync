@@ -8,6 +8,10 @@ edition = "2018"
 server = { path = "../server", version = "0.0.1" }
 models = { path = "../models", version = "0.0.1" }
 storage = { path = "../storage", version = "0.0.1" }
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
 
 tokio = { version = "0.2", features = ["full"] }
 futures = "0.3"
+log = "0.4"
+bigdecimal = { version = "0.1.0", features = ["serde"]}
+rand = "0.4"

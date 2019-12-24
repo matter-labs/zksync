@@ -22,6 +22,7 @@ pub enum StateKeeperRequest {
     GetAccount(AccountAddress, oneshot::Sender<Option<Account>>),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
+    SealBlock,
 }
 
 pub struct ExecutedOpsNotify {
@@ -186,6 +187,9 @@ impl PlasmaStateKeeper {
                 }
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
                     self.execute_tx_batch(proposed_block).await;
+                }
+                StateKeeperRequest::SealBlock => {
+                    self.seal_pending_block().await;
                 }
             }
         }
