@@ -91,7 +91,7 @@ impl EventsState {
         let mut events_to_return: Vec<BlockEvent> = self.committed_events.clone();
         events_to_return.extend(self.verified_events.clone());
 
-        Ok((events_to_return, token_events, to_block_number))
+        Ok((events_to_return, token_events, self.last_watched_eth_block_number))
     }
 
     /// Return last watched ethereum block number

@@ -14,6 +14,7 @@ use web3::types::H160;
 use web3::types::H256;
 
 /// Storage state update
+#[derive(Debug)]
 pub enum StorageUpdateState {
     None,
     Events,
@@ -83,19 +84,6 @@ impl DataRestoreDriver {
 
         let mut events_state = EventsState::new();
 
-        let genesis_governance_transaction =
-            get_ethereum_transaction(&web3_url, &governance_contract_genesis_tx_hash)?;
-
-        let genesis_eth_block_number =
-            events_state.set_genesis_block_number(&genesis_governance_transaction)?;
-        info!("Genesis eth block number: {:?}", &genesis_eth_block_number);
-
-        storage_interactor::save_block_events_state(
-            connection_pool.clone(),
-            &vec![],
-            genesis_eth_block_number,
-        )?;
-
         let tree_state = TreeState::new();
 
         Ok(Self {
@@ -159,17 +147,6 @@ impl DataRestoreDriver {
                 Contract::new(web3.eth(), franklin_contract_eth_addr, abi.clone()),
             )
         };
-
-        // TODO: -fix it
-        // let tokens = get_tokens(&web3_url, &governance_contract, &governance_contract_genesis_tx_hash).unwrap();
-        // for token in tokens {
-        //     storage_interactor::save_token(
-        //         connection_pool.clone(),
-        //         token.0,
-        //         token.1.as_str(),
-        //         None
-        //     );
-        // }
 
         let mut events_state = EventsState::new();
 
@@ -238,7 +215,11 @@ impl DataRestoreDriver {
     }
 
     pub fn load_state_from_storage(&mut self) -> Result<(), failure::Error> {
+        info!("Loading state from storage");
         let state = storage_interactor::get_storage_state(self.connection_pool.clone())?;
+        self.events_state = storage_interactor::get_block_events_state_from_storage(
+            self.connection_pool.clone(),
+        )?;
         let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;
         self.tree_state = TreeState::load(
             tree_state.0, // current block
@@ -248,18 +229,12 @@ impl DataRestoreDriver {
         );
         match state {
             StorageUpdateState::Events => {
-                self.events_state = storage_interactor::get_block_events_state_from_storage(
-                    self.connection_pool.clone(),
-                )?;
                 // Update operations
                 let new_ops_blocks = self.update_operations_state()?;
                 // Update tree
                 self.update_tree_state(new_ops_blocks)?;
             }
             StorageUpdateState::Operations => {
-                self.events_state = storage_interactor::get_block_events_state_from_storage(
-                    self.connection_pool.clone(),
-                )?;
                 // Update operations
                 let new_ops_blocks =
                     storage_interactor::get_ops_blocks_from_storage(self.connection_pool.clone())?;
@@ -268,6 +243,7 @@ impl DataRestoreDriver {
             }
             StorageUpdateState::None => {}
         }
+        info!("State has been loaded");
         Ok(())
     }
 
@@ -311,7 +287,7 @@ impl DataRestoreDriver {
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
             )?;
-        info!("Got new events");
+        info!("Got new events until block: {:?}", &last_watched_eth_block_number);
 
         // Store block events
         storage_interactor::delete_block_events_state(self.connection_pool.clone())?;
@@ -338,19 +314,27 @@ impl DataRestoreDriver {
         &mut self,
         new_ops_blocks: Vec<RollupOpsBlock>,
     ) -> Result<(), failure::Error> {
+        let mut blocks = vec![];
+        let mut updates = vec![];
+        let mut count = 0;
         for op_block in new_ops_blocks {
             let (block, acc_updates) = self
                 .tree_state
                 .update_tree_states_from_ops_block(&op_block)?;
+            blocks.push(block);
+            updates.push(acc_updates);
+            count += 1;
             info!(
                 "New block number: {:?}",
                 &self.tree_state.state.block_number
             );
             info!("Tree root hash: {:?}", self.tree_state.root_hash());
+        }
+        for i in 0..count {
             storage_interactor::update_tree_state(
                 self.connection_pool.clone(),
-                block,
-                acc_updates,
+                blocks[i].clone(),
+                updates[i].clone(),
             )?;
         }
 
@@ -360,7 +344,7 @@ impl DataRestoreDriver {
             StorageUpdateState::None,
         )?;
 
-        info!("Updated accounts state\n");
+        info!("Updated state\n");
 
         Ok(())
     }

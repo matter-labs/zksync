@@ -71,6 +71,7 @@ pub fn update_tree_state(
     block: Block,
     accounts_updated: AccountUpdates,
 ) -> Result<(), failure::Error> {
+
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
             "Db connection failed for data restore save tree state: {}",
@@ -150,9 +151,14 @@ pub fn save_block_events_state(
     storage
         .save_events_state(new_events.as_slice())
         .map_err(|e| format_err!("Cant save events state: {}", e.to_string()))?;
+
+    storage
+        .delete_last_watched_block_number()
+        .map_err(|e| format_err!("No last watched block number to delete: {}", e.to_string()))?;
     storage
         .save_last_watched_block_number(&block_number)
         .map_err(|e| format_err!("Cant save last watched block number: {}", e.to_string()))?;
+
     Ok(())
 }
 
@@ -497,7 +503,7 @@ pub fn get_tree_state(
     let block = storage
         .get_block(last_block)
         .map_err(|e| format_err!("get_tree_state: cant get last block: {}", e.to_string()))?
-        .ok_or_else(|| format_err!("get_tree_state: no last block"))?;
+        .ok_or_else(|| format_err!("get_tree_state: no last block - need to restart"))?;
 
     let unprocessed_prior_ops = block.processed_priority_ops.1;
 

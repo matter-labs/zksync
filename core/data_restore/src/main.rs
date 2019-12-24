@@ -16,6 +16,7 @@ use clap::{App, Arg};
 use server::ConfigurationOptions;
 use storage::ConnectionPool;
 use web3::types::{H160, H256};
+use std::str::FromStr;
 
 const ETH_BLOCKS_STEP: u64 = 1000;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
@@ -44,6 +45,8 @@ fn main() {
         create_data_restore_driver_with_genesis_acc(
             connection_pool,
             // String::from("https://rinkeby.infura.io/v3/4406c3acf862426c83991f1752c46dd8"),
+            // H160::from_str("7f5692db445a06673a031414e7d30551351c9d5a").unwrap(),
+            // H256::from_str("717e4085a779222e8def2c0a85a843bb74071bc33f84fc182f36dc2bfb36e92b").unwrap(),
             // H160::from_str("d4047737804c4b9c6ceb7e8e051b42b249fafbf9").unwrap(),
             // H256::from_str("b99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e").unwrap(),
             config_opts.web3_url.clone(),
@@ -58,8 +61,9 @@ fn main() {
         create_data_restore_driver_empty(
             connection_pool,
             // String::from("https://rinkeby.infura.io/v3/4406c3acf862426c83991f1752c46dd8"),
+            // H160::from_str("7f5692db445a06673a031414e7d30551351c9d5a").unwrap(),
+            // H256::from_str("717e4085a779222e8def2c0a85a843bb74071bc33f84fc182f36dc2bfb36e92b").unwrap(),
             // H160::from_str("d4047737804c4b9c6ceb7e8e051b42b249fafbf9").unwrap(),
-            // H256::from_str("b99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e").unwrap(),
             config_opts.web3_url.clone(),
             config_opts.governance_eth_addr.clone(),
             config_opts.governance_genesis_tx_hash.clone(),
