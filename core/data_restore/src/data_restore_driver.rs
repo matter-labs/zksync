@@ -46,7 +46,6 @@ impl DataRestoreDriver {
         connection_pool: ConnectionPool,
         web3_url: String,
         governance_contract_eth_addr: H160,
-        governance_contract_genesis_tx_hash: H256,
         franklin_contract_eth_addr: H160,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,

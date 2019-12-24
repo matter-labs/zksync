@@ -44,11 +44,6 @@ fn main() {
     let mut driver = if cli.is_present("genesis") {
         create_data_restore_driver_with_genesis_acc(
             connection_pool,
-            // String::from("https://rinkeby.infura.io/v3/4406c3acf862426c83991f1752c46dd8"),
-            // H160::from_str("7f5692db445a06673a031414e7d30551351c9d5a").unwrap(),
-            // H256::from_str("717e4085a779222e8def2c0a85a843bb74071bc33f84fc182f36dc2bfb36e92b").unwrap(),
-            // H160::from_str("d4047737804c4b9c6ceb7e8e051b42b249fafbf9").unwrap(),
-            // H256::from_str("b99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e").unwrap(),
             config_opts.web3_url.clone(),
             config_opts.governance_eth_addr.clone(),
             config_opts.governance_genesis_tx_hash.clone(),
@@ -60,13 +55,8 @@ fn main() {
     } else {
         create_data_restore_driver_empty(
             connection_pool,
-            // String::from("https://rinkeby.infura.io/v3/4406c3acf862426c83991f1752c46dd8"),
-            // H160::from_str("7f5692db445a06673a031414e7d30551351c9d5a").unwrap(),
-            // H256::from_str("717e4085a779222e8def2c0a85a843bb74071bc33f84fc182f36dc2bfb36e92b").unwrap(),
-            // H160::from_str("d4047737804c4b9c6ceb7e8e051b42b249fafbf9").unwrap(),
             config_opts.web3_url.clone(),
             config_opts.governance_eth_addr.clone(),
-            config_opts.governance_genesis_tx_hash.clone(),
             config_opts.contract_eth_addr.clone(),
             ETH_BLOCKS_STEP,
             END_ETH_BLOCKS_OFFSET,
@@ -85,18 +75,14 @@ pub fn create_data_restore_driver_empty(
     connection_pool: ConnectionPool,
     web3_url: String,
     governance_eth_addr: H160,
-    governance_genesis_tx_hash: H256,
     contract_eth_addr: H160,
     eth_blocks_step: u64,
     end_eth_blocks_offset: u64,
 ) -> Result<DataRestoreDriver, failure::Error> {
-    // let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
-    // let web3 = web3::Web3::new(transport);
     DataRestoreDriver::new_empty(
         connection_pool,
         web3_url,
         governance_eth_addr,
-        governance_genesis_tx_hash,
         contract_eth_addr,
         eth_blocks_step,
         end_eth_blocks_offset,
@@ -119,8 +105,6 @@ pub fn create_data_restore_driver_with_genesis_acc(
     eth_blocks_step: u64,
     end_eth_blocks_offset: u64,
 ) -> Result<DataRestoreDriver, failure::Error> {
-    // let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
-    // let web3 = web3::Web3::new(transport);
     DataRestoreDriver::new_with_genesis_acc(
         connection_pool,
         web3_url,

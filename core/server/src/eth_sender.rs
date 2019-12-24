@@ -30,7 +30,7 @@ use crate::{ConfigurationOptions, ThreadPanicNotify};
 use eth_client::{ETHClient, SignedCallResult};
 use models::abi::FRANKLIN_CONTRACT;
 use models::{Action, ActionType, Operation};
-use storage::{ConnectionPool, StorageETHOperation};
+use storage::{ConnectionPool, StorageETHOperation, StorageProcessor};
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
@@ -86,14 +86,17 @@ impl<T: Transport> ETHSender<T> {
         let mut sender = Self {
             eth_client,
             unconfirmed_ops: VecDeque::new(),
-            db_pool,
+            db_pool: db_pool.clone(),
         };
-        sender.restore_state().expect("Eth sender state restore");
+        let storage = db_pool.access_storage()
+            .expect("Failed to access storage");
+        if let Err(_) = sender.restore_state(storage) {
+            info!("No unconfirmed operations");
+        }
         sender
     }
 
-    fn restore_state(&mut self) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
+    fn restore_state(&mut self, storage: StorageProcessor) -> Result<(), failure::Error> {
         self.unconfirmed_ops = storage
             .load_unconfirmed_operations()?
             .into_iter()
