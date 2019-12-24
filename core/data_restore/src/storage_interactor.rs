@@ -6,12 +6,13 @@ use failure::format_err;
 use web3::types::H256;
 // Workspace uses
 use crate::data_restore_driver::StorageUpdateState;
-use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use crate::events::{EventData, EventType};
+use crate::events::{BlockEvent, EventType};
 use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
-use models::node::{AccountUpdate, AccountMap, AccountUpdates};
+use models::node::block::{Block, ExecutedOperations};
+use models::node::{AccountMap, AccountUpdate, AccountUpdates};
 use models::{Action, EncodedProof, Operation};
+use server::eth_watch::TokenAddedEvent;
 use storage::{
     ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
     StoredRollupOpsBlock,
@@ -19,7 +20,7 @@ use storage::{
 
 pub fn save_genesis_tree_state(
     connection_pool: ConnectionPool,
-    genesis_acc_update: AccountUpdate
+    genesis_acc_update: AccountUpdate,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -35,26 +36,25 @@ pub fn save_genesis_tree_state(
     storage
         .commit_state_update(0, &[(0, genesis_acc_update)])
         .map_err(|e| format_err!("Cant commit state update: {}", e.to_string()))?;
-    storage.apply_state_update(0)
+    storage
+        .apply_state_update(0)
         .map_err(|e| format_err!("Cant apply state update: {}", e.to_string()))?;
     Ok(())
 }
 
-pub fn save_token(
+pub fn save_tokens(
     connection_pool: ConnectionPool,
-    id: u16,
-    address: &str,
-    symbol: Option<&str>
+    tokens: Vec<TokenAddedEvent>,
 ) -> Result<(), failure::Error> {
-    let storage = connection_pool.access_storage().map_err(|e| {
-        format_err!(
-            "Db connection failed for saving token: {}",
-            e.to_string()
-        )
-    })?;
-    storage.store_token(id, address, symbol)
-        .map_err(|e| format_err!("Cant store token: {}", e.to_string()))?;
-    info!("{:?}", storage.load_tokens());
+    let storage = connection_pool
+        .access_storage()
+        .map_err(|e| format_err!("Db connection failed for saving token: {}", e.to_string()))?;
+    for token in tokens {
+        storage
+            .store_token(token.id as u16, &format!("0x{:x}", token.address), None)
+            .map_err(|e| format_err!("Cant store token: {}", e.to_string()))?;
+    }
+    // info!("{:?}", storage.load_tokens());
     Ok(())
 }
 
@@ -81,8 +81,8 @@ pub fn update_tree_state(
     for transaction in block.block_transactions.clone() {
         if let ExecutedOperations::Tx(tx) = transaction {
             storage
-            .mempool_add_tx_unsafe(&tx.tx)
-            .map_err(|e| format_err!("Cant save txs in mempool: {}", e.to_string()))?;
+                .mempool_add_tx_unsafe(&tx.tx)
+                .map_err(|e| format_err!("Cant save txs in mempool: {}", e.to_string()))?;
         }
     }
 
@@ -94,9 +94,9 @@ pub fn update_tree_state(
         storage
             .save_block_transactions(&block)
             .map_err(|e| format_err!("Cant save block transactions: {}", e.to_string()))?;
-        return Ok(())
+        return Ok(());
     }
-    
+
     let commit_op = Operation {
         action: Action::Commit,
         block: block.clone(),
@@ -129,9 +129,9 @@ pub fn update_tree_state(
 /// * `events` - Franklin Contract events descriptions
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn save_events_state(
+pub fn save_block_events_state(
     connection_pool: ConnectionPool,
-    events: &[EventData],
+    events: &[BlockEvent],
     last_watched_eth_block_number: u64,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
@@ -162,7 +162,7 @@ pub fn save_events_state(
 ///
 /// * `evnet` - Franklin Contract event description
 ///
-pub fn block_event_into_stored_block_event(event: &EventData) -> NewBlockEvent {
+pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent {
     NewBlockEvent {
         block_type: match event.block_type {
             EventType::Committed => "Committed".to_string(),
@@ -235,7 +235,7 @@ pub fn save_rollup_ops(
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn delete_events_state(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
+pub fn delete_block_events_state(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
             "Db connection failed for data restore remove events state: {}",
@@ -414,7 +414,7 @@ pub fn get_last_watched_block_number_from_storage(
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-pub fn get_events_state_from_storage(
+pub fn get_block_events_state_from_storage(
     connection_pool: ConnectionPool,
 ) -> Result<EventsState, failure::Error> {
     let last_watched_eth_block_number =
@@ -431,7 +431,7 @@ pub fn get_events_state_from_storage(
         .load_committed_events_state()
         .map_err(|e| format_err!("Load committed state failed: {}", e.to_string()))?;
 
-    let mut committed_events: Vec<EventData> = vec![];
+    let mut committed_events: Vec<BlockEvent> = vec![];
     for event in committed {
         let block_event = stored_block_event_into_block_event(event.clone())?;
         committed_events.push(block_event);
@@ -440,7 +440,7 @@ pub fn get_events_state_from_storage(
     let verified = storage
         .load_verified_events_state()
         .map_err(|e| format_err!("Db connection failed for past events: {}", e.to_string()))?;
-    let mut verified_events: Vec<EventData> = vec![];
+    let mut verified_events: Vec<BlockEvent> = vec![];
     for event in verified {
         let block_event = stored_block_event_into_block_event(event.clone())?;
         verified_events.push(block_event);
@@ -461,8 +461,8 @@ pub fn get_events_state_from_storage(
 ///
 pub fn stored_block_event_into_block_event(
     block: StoredBlockEvent,
-) -> Result<EventData, failure::Error> {
-    Ok(EventData {
+) -> Result<BlockEvent, failure::Error> {
+    Ok(BlockEvent {
         block_num: u32::try_from(block.block_num)?,
         transaction_hash: H256::from_slice(block.transaction_hash.as_slice()),
         block_type: match &block.block_type {
@@ -487,9 +487,12 @@ pub fn get_tree_state(
         .access_storage()
         .map_err(|e| format_err!("Db connection failed for tree state: {}", e.to_string()))?;
 
-    let (last_block, account_map) = storage
-        .load_verified_state()
-        .map_err(|e| format_err!("get_tree_state: cant get last verified state: {}", e.to_string()))?;
+    let (last_block, account_map) = storage.load_verified_state().map_err(|e| {
+        format_err!(
+            "get_tree_state: cant get last verified state: {}",
+            e.to_string()
+        )
+    })?;
 
     let block = storage
         .get_block(last_block)

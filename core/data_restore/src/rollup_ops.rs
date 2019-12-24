@@ -1,4 +1,4 @@
-use crate::events::EventData;
+use crate::events::BlockEvent;
 use crate::helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use failure::format_err;
 use models::node::operations::FranklinOp;
@@ -6,7 +6,8 @@ use models::primitives::bytes_slice_to_uint32;
 
 use models::params::{
     INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH, INPUT_DATA_EMPTY_BYTES_WIDTH,
-    INPUT_DATA_FEE_ACC_BYTES_WIDTH, INPUT_DATA_ROOT_BYTES_WIDTH, INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
+    INPUT_DATA_FEE_ACC_BYTES_WIDTH, INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET,
+    INPUT_DATA_ROOT_BYTES_WIDTH,
 };
 
 /// Description of a Franklin operations block
@@ -29,7 +30,7 @@ impl RollupOpsBlock {
     ///
     pub fn get_rollup_ops_block(
         web3_url: &String,
-        event_data: &EventData,
+        event_data: &BlockEvent,
     ) -> Result<Self, failure::Error> {
         let transaction = get_ethereum_transaction(web3_url, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
@@ -89,8 +90,11 @@ impl RollupOpsBlock {
         //     "No fee account data in tx"
         // );
         Ok(bytes_slice_to_uint32(
-            &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET - INPUT_DATA_FEE_ACC_BYTES_WIDTH
-                ..INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET],
+            &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
+                + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
+                - INPUT_DATA_FEE_ACC_BYTES_WIDTH
+                ..INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
+                    + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET],
         )
         .ok_or_else(|| format_err!("Cant convert bytes to fee account number"))?)
     }

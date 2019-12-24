@@ -14,7 +14,7 @@ pub enum EventType {
 
 /// Franklin Contract event description
 #[derive(Debug, Copy, Clone, Eq)]
-pub struct EventData {
+pub struct BlockEvent {
     /// Franklin block number
     pub block_num: u32,
     /// Ethereum transaction type
@@ -23,20 +23,20 @@ pub struct EventData {
     pub block_type: EventType,
 }
 
-impl PartialOrd for EventData {
-    fn partial_cmp(&self, other: &EventData) -> Option<Ordering> {
+impl PartialOrd for BlockEvent {
+    fn partial_cmp(&self, other: &BlockEvent) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for EventData {
-    fn cmp(&self, other: &EventData) -> Ordering {
+impl Ord for BlockEvent {
+    fn cmp(&self, other: &BlockEvent) -> Ordering {
         self.block_num.cmp(&other.block_num)
     }
 }
 
-impl PartialEq for EventData {
-    fn eq(&self, other: &EventData) -> bool {
+impl PartialEq for BlockEvent {
+    fn eq(&self, other: &BlockEvent) -> bool {
         self.block_num == other.block_num
     }
 }

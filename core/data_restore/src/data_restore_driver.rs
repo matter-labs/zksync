@@ -1,5 +1,5 @@
 use crate::events_state::EventsState;
-use crate::genesis_state::{get_genesis_account, get_tokens};
+use crate::genesis_state::get_genesis_account;
 use crate::helpers::get_ethereum_transaction;
 use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor;
@@ -27,6 +27,8 @@ pub struct DataRestoreDriver {
     /// Web3 endpoint
     pub web3_url: String,
     /// Provides Ethereum Franklin contract unterface
+    pub governance_contract: (ethabi::Contract, Contract<web3::transports::http::Http>),
+    /// Provides Ethereum Franklin contract unterface
     pub franklin_contract: (ethabi::Contract, Contract<web3::transports::http::Http>),
     /// Flag that indicates that state updates are running
     pub run_update: bool,
@@ -42,13 +44,29 @@ impl DataRestoreDriver {
     pub fn new_empty(
         connection_pool: ConnectionPool,
         web3_url: String,
-        contract_eth_addr: H160,
-        contract_genesis_tx_hash: H256,
+        governance_contract_eth_addr: H160,
+        governance_contract_genesis_tx_hash: H256,
+        franklin_contract_eth_addr: H160,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<Self, failure::Error> {
         let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
         let web3 = web3::Web3::new(transport);
+
+        let governance_contract = {
+            let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
+                .map_err(|e| format_err!("No governance contract abi: {}", e.to_string()))?
+                .get("abi")
+                .ok_or_else(|| format_err!("No governance contract abi"))?
+                .to_string();
+            let abi = ethabi::Contract::load(abi_string.as_bytes())
+                .map_err(|e| format_err!("No governance contract abi: {}", e.to_string()))?;
+            (
+                abi.clone(),
+                Contract::new(web3.eth(), governance_contract_eth_addr, abi.clone()),
+            )
+        };
+
         let franklin_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
                 .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?
@@ -59,30 +77,20 @@ impl DataRestoreDriver {
                 .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?;
             (
                 abi.clone(),
-                Contract::new(web3.eth(), contract_eth_addr, abi.clone()),
+                Contract::new(web3.eth(), franklin_contract_eth_addr, abi.clone()),
             )
         };
-        
-        // TODO: -fix it
-        let tokens = get_tokens().unwrap();
-        for token in tokens {
-            storage_interactor::save_token(
-                connection_pool.clone(),
-                token.0,
-                token.1.as_str(),
-                None
-            );
-        }
 
         let mut events_state = EventsState::new();
 
-        let genesis_transaction = get_ethereum_transaction(&web3_url, &contract_genesis_tx_hash)?;
+        let genesis_governance_transaction =
+            get_ethereum_transaction(&web3_url, &governance_contract_genesis_tx_hash)?;
 
         let genesis_eth_block_number =
-            events_state.set_genesis_block_number(&genesis_transaction)?;
+            events_state.set_genesis_block_number(&genesis_governance_transaction)?;
         info!("Genesis eth block number: {:?}", &genesis_eth_block_number);
 
-        storage_interactor::save_events_state(
+        storage_interactor::save_block_events_state(
             connection_pool.clone(),
             &vec![],
             genesis_eth_block_number,
@@ -93,6 +101,7 @@ impl DataRestoreDriver {
         Ok(Self {
             connection_pool,
             web3_url,
+            governance_contract,
             franklin_contract,
             run_update: false,
             events_state,
@@ -113,13 +122,29 @@ impl DataRestoreDriver {
     pub fn new_with_genesis_acc(
         connection_pool: ConnectionPool,
         web3_url: String,
-        contract_eth_addr: H160,
-        contract_genesis_tx_hash: H256,
+        governance_contract_eth_addr: H160,
+        governance_contract_genesis_tx_hash: H256,
+        franklin_contract_eth_addr: H160,
+        franklin_contract_genesis_tx_hash: H256,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<Self, failure::Error> {
         let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
         let web3 = web3::Web3::new(transport);
+
+        let governance_contract = {
+            let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
+                .map_err(|e| format_err!("No governance contract abi: {}", e.to_string()))?
+                .get("abi")
+                .ok_or_else(|| format_err!("No governance contract abi"))?
+                .to_string();
+            let abi = ethabi::Contract::load(abi_string.as_bytes())
+                .map_err(|e| format_err!("No governance contract abi: {}", e.to_string()))?;
+            (
+                abi.clone(),
+                Contract::new(web3.eth(), governance_contract_eth_addr, abi.clone()),
+            )
+        };
 
         let franklin_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
@@ -131,36 +156,39 @@ impl DataRestoreDriver {
                 .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?;
             (
                 abi.clone(),
-                Contract::new(web3.eth(), contract_eth_addr, abi.clone()),
+                Contract::new(web3.eth(), franklin_contract_eth_addr, abi.clone()),
             )
         };
-        
+
         // TODO: -fix it
-        let tokens = get_tokens().unwrap();
-        for token in tokens {
-            storage_interactor::save_token(
-                connection_pool.clone(),
-                token.0,
-                token.1.as_str(),
-                None
-            );
-        }
+        // let tokens = get_tokens(&web3_url, &governance_contract, &governance_contract_genesis_tx_hash).unwrap();
+        // for token in tokens {
+        //     storage_interactor::save_token(
+        //         connection_pool.clone(),
+        //         token.0,
+        //         token.1.as_str(),
+        //         None
+        //     );
+        // }
 
         let mut events_state = EventsState::new();
 
-        let genesis_transaction = get_ethereum_transaction(&web3_url, &contract_genesis_tx_hash)?;
+        let genesis_franklin_transaction =
+            get_ethereum_transaction(&web3_url, &franklin_contract_genesis_tx_hash)?;
+        let genesis_governance_transaction =
+            get_ethereum_transaction(&web3_url, &governance_contract_genesis_tx_hash)?;
 
         let genesis_eth_block_number =
-            events_state.set_genesis_block_number(&genesis_transaction)?;
+            events_state.set_genesis_block_number(&genesis_governance_transaction)?;
         info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
-        storage_interactor::save_events_state(
+        storage_interactor::save_block_events_state(
             connection_pool.clone(),
             &vec![],
             genesis_eth_block_number,
         )?;
 
-        let genesis_account = get_genesis_account(&genesis_transaction)?;
+        let genesis_account = get_genesis_account(&genesis_franklin_transaction)?;
 
         let account_update = AccountUpdate::Create {
             address: genesis_account.address.clone(),
@@ -174,16 +202,18 @@ impl DataRestoreDriver {
         let current_unprocessed_priority_op = 0;
         let fee_acc_num = 0;
 
-        let tree_state = TreeState::load(current_block, account_map, current_unprocessed_priority_op, fee_acc_num);
+        let tree_state = TreeState::load(
+            current_block,
+            account_map,
+            current_unprocessed_priority_op,
+            fee_acc_num,
+        );
 
         info!("Genesis block number: {:?}", tree_state.state.block_number);
         info!("Genesis tree root hash: {:?}", tree_state.root_hash());
         info!("Genesis accounts: {:?}", tree_state.get_accounts());
 
-        storage_interactor::save_genesis_tree_state(
-            connection_pool.clone(),
-            account_update
-        )?;
+        storage_interactor::save_genesis_tree_state(connection_pool.clone(), account_update)?;
 
         println!("Saved genesis tree state");
 
@@ -192,6 +222,7 @@ impl DataRestoreDriver {
         Ok(Self {
             connection_pool,
             web3_url,
+            governance_contract,
             franklin_contract,
             run_update: false,
             events_state,
@@ -217,7 +248,7 @@ impl DataRestoreDriver {
         );
         match state {
             StorageUpdateState::Events => {
-                self.events_state = storage_interactor::get_events_state_from_storage(
+                self.events_state = storage_interactor::get_block_events_state_from_storage(
                     self.connection_pool.clone(),
                 )?;
                 // Update operations
@@ -226,7 +257,7 @@ impl DataRestoreDriver {
                 self.update_tree_state(new_ops_blocks)?;
             }
             StorageUpdateState::Operations => {
-                self.events_state = storage_interactor::get_events_state_from_storage(
+                self.events_state = storage_interactor::get_block_events_state_from_storage(
                     self.connection_pool.clone(),
                 )?;
                 // Update operations
@@ -272,21 +303,25 @@ impl DataRestoreDriver {
     }
 
     fn update_events_state(&mut self) -> Result<(), failure::Error> {
-        let (events, last_watched_eth_block_number) = self.events_state.update_events_state(
-            &self.web3_url,
-            &self.franklin_contract,
-            self.eth_blocks_step,
-            self.end_eth_blocks_offset,
-        )?;
+        let (block_events, token_events, last_watched_eth_block_number) =
+            self.events_state.update_events_state(
+                &self.web3_url,
+                &self.franklin_contract,
+                &self.governance_contract,
+                self.eth_blocks_step,
+                self.end_eth_blocks_offset,
+            )?;
         info!("Got new events");
 
-        // Store events
-        storage_interactor::delete_events_state(self.connection_pool.clone())?;
-        storage_interactor::save_events_state(
+        // Store block events
+        storage_interactor::delete_block_events_state(self.connection_pool.clone())?;
+        storage_interactor::save_block_events_state(
             self.connection_pool.clone(),
-            &events,
+            &block_events,
             last_watched_eth_block_number,
         )?;
+        // Store tokens
+        storage_interactor::save_tokens(self.connection_pool.clone(), token_events)?;
 
         storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
@@ -307,7 +342,10 @@ impl DataRestoreDriver {
             let (block, acc_updates) = self
                 .tree_state
                 .update_tree_states_from_ops_block(&op_block)?;
-            info!("New block number: {:?}", &self.tree_state.state.block_number);
+            info!(
+                "New block number: {:?}",
+                &self.tree_state.state.block_number
+            );
             info!("Tree root hash: {:?}", self.tree_state.root_hash());
             storage_interactor::update_tree_state(
                 self.connection_pool.clone(),

@@ -47,6 +47,8 @@ fn main() {
             // H160::from_str("d4047737804c4b9c6ceb7e8e051b42b249fafbf9").unwrap(),
             // H256::from_str("b99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e").unwrap(),
             config_opts.web3_url.clone(),
+            config_opts.governance_eth_addr.clone(),
+            config_opts.governance_genesis_tx_hash.clone(),
             config_opts.contract_eth_addr.clone(),
             config_opts.contract_genesis_tx_hash.clone(),
             ETH_BLOCKS_STEP,
@@ -59,8 +61,9 @@ fn main() {
             // H160::from_str("d4047737804c4b9c6ceb7e8e051b42b249fafbf9").unwrap(),
             // H256::from_str("b99ebfea46cbe05a21cd80fe5597d97b204befc52a16303f579c607dc1ac2e2e").unwrap(),
             config_opts.web3_url.clone(),
+            config_opts.governance_eth_addr.clone(),
+            config_opts.governance_genesis_tx_hash.clone(),
             config_opts.contract_eth_addr.clone(),
-            config_opts.contract_genesis_tx_hash.clone(),
             ETH_BLOCKS_STEP,
             END_ETH_BLOCKS_OFFSET,
         )
@@ -77,8 +80,9 @@ fn main() {
 pub fn create_data_restore_driver_empty(
     connection_pool: ConnectionPool,
     web3_url: String,
+    governance_eth_addr: H160,
+    governance_genesis_tx_hash: H256,
     contract_eth_addr: H160,
-    contract_genesis_tx_hash: H256,
     eth_blocks_step: u64,
     end_eth_blocks_offset: u64,
 ) -> Result<DataRestoreDriver, failure::Error> {
@@ -87,8 +91,9 @@ pub fn create_data_restore_driver_empty(
     DataRestoreDriver::new_empty(
         connection_pool,
         web3_url,
+        governance_eth_addr,
+        governance_genesis_tx_hash,
         contract_eth_addr,
-        contract_genesis_tx_hash,
         eth_blocks_step,
         end_eth_blocks_offset,
     )
@@ -103,6 +108,8 @@ pub fn create_data_restore_driver_empty(
 pub fn create_data_restore_driver_with_genesis_acc(
     connection_pool: ConnectionPool,
     web3_url: String,
+    governance_eth_addr: H160,
+    governance_genesis_tx_hash: H256,
     contract_eth_addr: H160,
     contract_genesis_tx_hash: H256,
     eth_blocks_step: u64,
@@ -113,6 +120,8 @@ pub fn create_data_restore_driver_with_genesis_acc(
     DataRestoreDriver::new_with_genesis_acc(
         connection_pool,
         web3_url,
+        governance_eth_addr,
+        governance_genesis_tx_hash,
         contract_eth_addr,
         contract_genesis_tx_hash,
         eth_blocks_step,

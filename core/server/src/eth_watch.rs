@@ -40,9 +40,9 @@ impl ETHState {
 }
 
 #[derive(Debug)]
-struct TokenAddedEvent {
-    address: Address,
-    id: u32,
+pub struct TokenAddedEvent {
+    pub address: Address,
+    pub id: u32,
 }
 
 impl TryFrom<Log> for TokenAddedEvent {

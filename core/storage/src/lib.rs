@@ -2035,11 +2035,10 @@ impl StorageProcessor {
             Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
         };
 
-        diesel::insert_into(operations::table)
-            .values(&NewOperation {
-                block_number: i64::from(op.block.block_number),
-                action_type: op.action.to_string(),
-            });
+        diesel::insert_into(operations::table).values(&NewOperation {
+            block_number: i64::from(op.block.block_number),
+            action_type: op.action.to_string(),
+        });
         Ok(())
     }
 

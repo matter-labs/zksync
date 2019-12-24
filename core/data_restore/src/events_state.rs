@@ -1,22 +1,25 @@
-use crate::events::{EventData, EventType};
+use crate::events::{BlockEvent, EventType};
 use crate::helpers::get_block_number_from_ethereum_transaction;
 use ethabi;
 use failure::{ensure, format_err};
+use futures::{compat::Future01CompatExt, executor::block_on};
+use server::eth_watch::TokenAddedEvent;
+use std::convert::TryFrom;
 use web3::contract::Contract;
 use web3::futures::Future;
 use web3::types::Transaction;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 
-type CommittedAndVerifiedEvents = (Vec<EventData>, Vec<EventData>);
+type CommittedAndVerifiedEvents = (Vec<BlockEvent>, Vec<BlockEvent>);
 // type BlockNumber256 = U256;
 
 /// Franklin contract events states description
 #[derive(Debug, Clone)]
 pub struct EventsState {
     /// Committed operations blocks events
-    pub committed_events: Vec<EventData>,
+    pub committed_events: Vec<BlockEvent>,
     /// Verified operations blocks events
-    pub verified_events: Vec<EventData>,
+    pub verified_events: Vec<BlockEvent>,
     /// Last watched ethereum block number
     pub last_watched_eth_block_number: u64,
 }
@@ -59,38 +62,43 @@ impl EventsState {
     pub fn update_events_state(
         &mut self,
         web3_url: &String,
-        contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
+        franklin_contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
+        governance_contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-    ) -> Result<(Vec<EventData>, u64), failure::Error> {
+    ) -> Result<(Vec<BlockEvent>, Vec<TokenAddedEvent>, u64), failure::Error> {
         self.remove_verified_events();
 
-        let (events, to_block_number): (CommittedAndVerifiedEvents, u64) =
-            EventsState::update_events_and_last_watched_block(
-                web3_url,
-                contract,
-                self.last_watched_eth_block_number,
-                eth_blocks_step,
-                end_eth_blocks_offset,
-            )?;
-        
+        let (block_events, token_events, to_block_number): (
+            CommittedAndVerifiedEvents,
+            Vec<TokenAddedEvent>,
+            u64,
+        ) = EventsState::update_events_and_last_watched_block(
+            web3_url,
+            franklin_contract,
+            governance_contract,
+            self.last_watched_eth_block_number,
+            eth_blocks_step,
+            end_eth_blocks_offset,
+        )?;
+
         self.last_watched_eth_block_number = to_block_number;
 
-        self.committed_events.extend(events.0);
+        self.committed_events.extend(block_events.0);
 
-        self.verified_events.extend(events.1);
+        self.verified_events.extend(block_events.1);
 
-        let mut events_to_return: Vec<EventData> = self.committed_events.clone();
+        let mut events_to_return: Vec<BlockEvent> = self.committed_events.clone();
         events_to_return.extend(self.verified_events.clone());
 
-        Ok((events_to_return, to_block_number))
+        Ok((events_to_return, token_events, to_block_number))
     }
 
     /// Return last watched ethereum block number
     pub fn get_last_block_number(web3_url: &String) -> Result<u64, failure::Error> {
         let (_eloop, transport) = web3::transports::Http::new(web3_url).unwrap();
         let web3 = web3::Web3::new(transport);
-        
+
         Ok(web3.eth().block_number().wait().map(|n| n.as_u64())?)
     }
 
@@ -104,16 +112,17 @@ impl EventsState {
     ///
     fn update_events_and_last_watched_block(
         web3_url: &String,
-        contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
+        franklin_contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
+        governance_contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
         last_watched_block_number: u64,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-    ) -> Result<(CommittedAndVerifiedEvents, u64), failure::Error> {
+    ) -> Result<(CommittedAndVerifiedEvents, Vec<TokenAddedEvent>, u64), failure::Error> {
         let latest_eth_block_minus_delta =
             EventsState::get_last_block_number(web3_url)? - end_eth_blocks_offset;
 
         if latest_eth_block_minus_delta == last_watched_block_number {
-            return Ok(((vec![], vec![]), last_watched_block_number)); // No new eth blocks
+            return Ok(((vec![], vec![]), vec![], last_watched_block_number)); // No new eth blocks
         }
 
         let from_block_number_u64 = last_watched_block_number + 1;
@@ -130,10 +139,53 @@ impl EventsState {
 
         let from_block_number = BlockNumber::Number(from_block_number_u64);
 
-        let logs = EventsState::get_logs(web3_url, contract, from_block_number, to_block_number)?;
-        let sorted_logs = EventsState::sort_logs(&contract.0, &logs)?;
+        let block_logs = EventsState::get_block_logs(
+            web3_url,
+            franklin_contract,
+            from_block_number,
+            to_block_number,
+        )?;
+        let block_sorted_logs = EventsState::sort_block_logs(&franklin_contract.0, &block_logs)?;
 
-        Ok((sorted_logs, to_block_number_u64))
+        let token_logs = EventsState::get_token_added_logs(
+            web3_url,
+            governance_contract,
+            from_block_number,
+            to_block_number,
+        )?;
+
+        Ok((block_sorted_logs, token_logs, to_block_number_u64))
+    }
+
+    fn get_token_added_logs(
+        web3_url: &String,
+        contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
+        from: BlockNumber,
+        to: BlockNumber,
+    ) -> Result<Vec<TokenAddedEvent>, failure::Error> {
+        let new_token_event_topic = contract
+            .0
+            .event("TokenAdded")
+            .map_err(|e| format_err!("Governance contract abi error: {}", e.to_string()))?
+            .signature();
+        let filter = FilterBuilder::default()
+            .address(vec![contract.1.address()])
+            .from_block(from)
+            .to_block(to)
+            .topics(Some(vec![new_token_event_topic]), None, None, None)
+            .build();
+
+        let (_eloop, transport) = web3::transports::Http::new(web3_url).unwrap();
+        let web3 = web3::Web3::new(transport);
+
+        block_on(web3.eth().logs(filter).compat())?
+            .into_iter()
+            .map(|event| {
+                TokenAddedEvent::try_from(event).map_err(|e| {
+                    format_err!("Failed to parse TokenAdded event log from ETH: {}", e)
+                })
+            })
+            .collect()
     }
 
     /// Return logs
@@ -143,7 +195,7 @@ impl EventsState {
     /// * `from_block_number` - Start ethereum block number
     /// * `to_block_number` - End ethereum block number
     ///
-    fn get_logs(
+    fn get_block_logs(
         web3_url: &String,
         contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
         from_block_number: BlockNumber,
@@ -187,15 +239,15 @@ impl EventsState {
     ///
     /// * `logs` - Logs slice
     ///
-    fn sort_logs(
+    fn sort_block_logs(
         contract: &ethabi::Contract,
         logs: &[Log],
     ) -> Result<CommittedAndVerifiedEvents, failure::Error> {
         if logs.is_empty() {
             return Ok((vec![], vec![]));
         }
-        let mut committed_events: Vec<EventData> = vec![];
-        let mut verified_events: Vec<EventData> = vec![];
+        let mut committed_events: Vec<BlockEvent> = vec![];
+        let mut verified_events: Vec<BlockEvent> = vec![];
 
         let block_verified_topic = contract
             .event("BlockVerified")
@@ -207,7 +259,7 @@ impl EventsState {
             .signature();
 
         for log in logs {
-            let mut block: EventData = EventData {
+            let mut block: BlockEvent = BlockEvent {
                 block_num: 0,
                 transaction_hash: H256::zero(),
                 block_type: EventType::Committed,
@@ -248,7 +300,7 @@ impl EventsState {
     }
 
     /// Return only verified committed blocks from verified
-    pub fn get_only_verified_committed_events(&self) -> Vec<EventData> {
+    pub fn get_only_verified_committed_events(&self) -> Vec<BlockEvent> {
         let count_to_get = self.verified_events.len();
         self.committed_events[0..count_to_get].to_vec()
     }

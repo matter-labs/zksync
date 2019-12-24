@@ -94,6 +94,7 @@ export async function deployGovernance(
         let governance = await deployContract(wallet, governanceCode, constructorArgs, {
             gasLimit: 3000000,
         });
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${governance.deployTransaction.hash}`);
         console.log(`GOVERNANCE_ADDR=${governance.address}`);
 
         return governance;
