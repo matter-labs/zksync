@@ -1,0 +1,13 @@
+[package]
+name = "test-kit"
+version = "0.1.0"
+authors = ["Vitaly Drogan <vd@matterlabs.dev>"]
+edition = "2018"
+
+[dependencies]
+server = { path = "../server", version = "0.0.1" }
+models = { path = "../models", version = "0.0.1" }
+storage = { path = "../storage", version = "0.0.1" }
+
+tokio = { version = "0.2", features = ["full"] }
+futures = "0.3"

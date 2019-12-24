@@ -198,7 +198,7 @@ impl<T: Transport> EthWatch<T> {
             eth_state.add_new_token(token.id as TokenId, token.address)
         }
 
-        debug!("ETH state: {:#?}", *eth_state);
+        trace!("ETH state: {:#?}", *eth_state);
     }
 
     fn process_new_blocks(&mut self, last_block: u64) -> Result<(), failure::Error> {
