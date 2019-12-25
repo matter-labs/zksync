@@ -22,7 +22,6 @@ fnv = "1.0.3"
 ethabi = "8.0.0"
 web3 = "0.8.0"
 rustc-hex = "2.0.1"
-futures = "0.1.28"
 hyper = "0.12.16"
 serde = "1.0.90"
 serde_derive = "1.0.90"
@@ -46,7 +45,8 @@ num-traits = "0.2"
 
 rayon = "1.0.3"
 
-tokio = "0.1.18"
+tokio = { version = "0.2", features = ["full"] }
+futures = { version = "0.3", features = ["compat"] }
 actix-rt = "0.2.5"
 actix-cors = "0.1.0"
 actix = "0.8.3"

@@ -160,7 +160,7 @@ export async function deployFranklin(
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
         const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);
-        await (await priorityQueueContract.changeFranklinAddress(contract.address)).wait();
+        await (await priorityQueueContract.setFranklinAddress(contract.address)).wait();
         return contract;
     } catch (err) {
         console.log("Franklin deploy error:" + err);
@@ -192,6 +192,14 @@ export async function addTestERC20Token(wallet, governance) {
         return erc20
     } catch (err) {
         console.log("Add token error:" + err);
+    }
+}
+
+export async function mintTestERC20Token(wallet, erc20) {
+    try {
+        await erc20.mint(wallet.address, parseEther("3000000000"));
+    } catch (err) {
+        console.log("Mint token error:" + err);
     }
 }
 

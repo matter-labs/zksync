@@ -7,7 +7,7 @@ use std::thread;
 use std::time::Duration;
 // External uses
 use clap::{App, Arg};
-use futures::sync::mpsc as fmpsc;
+use futures::channel::mpsc as fmpsc;
 // Workspace uses
 use models::StateKeeperRequest;
 use server::api_server::start_api_server;
