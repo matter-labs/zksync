@@ -2,7 +2,7 @@ export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:latest
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:latest
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(ZKSYNC_ENV)
-export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
+export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
 # Getting started

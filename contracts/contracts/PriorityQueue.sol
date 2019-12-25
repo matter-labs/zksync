@@ -1,6 +1,7 @@
 pragma solidity 0.5.10;
 
 import "./Bytes.sol";
+import "./Governance.sol";
 
 /// @title Priority Queue Contract
 /// @author Matter Labs
@@ -9,8 +10,8 @@ contract PriorityQueue {
     /// @notice Rollup contract address
     address internal franklinAddress;
 
-    /// @notice PriorityQueue contract owner address
-    address internal ownerAddress;
+    /// @notice Governance contract
+    Governance internal governance;
     
     /// @notice Deposit operation number
     uint8 constant DEPOSIT_OP = 1;
@@ -82,20 +83,22 @@ contract PriorityQueue {
     uint64 public totalCommittedPriorityRequests;
 
     /// @notice Constructs PriorityQueue contract
-    /// @param _ownerAddress Owner address
-    constructor(address _ownerAddress) public {
-        ownerAddress = _ownerAddress;
+    /// @param _governanceAddress Governance contract address
+    constructor(address _governanceAddress) public {
+        governance = Governance(_governanceAddress);
     }
 
-    /// @notice Set rollup address if it has not been set before
+    /// @notice Sets rollup address if it has not been set before
     /// @param _franklinAddress Address of the Rollup contract
-    function changeFranklinAddress(address _franklinAddress) external {
+    function setFranklinAddress(address _franklinAddress) external {
         // Its possible to set franklin contract address only if it has not been setted before
         require(
             franklinAddress == address(0),
             "pcs11"
-        ); // pcs11 - frankin address is already setted
-        requireOwner();
+        ); // pcs11 - franklin address is already setted
+        // Check for governor
+        governance.requireGovernor(msg.sender);
+        // Set franklin address
         franklinAddress = _franklinAddress;
     }
 
@@ -223,13 +226,5 @@ contract PriorityQueue {
             msg.sender == franklinAddress,
             "prn11"
         ); // prn11 - only by franklin
-    }
-
-    /// @notice Check if the sender is owner
-    function requireOwner() internal view {
-        require(
-            msg.sender == ownerAddress,
-            "prr11"
-        ); // prr11 - only by owner
     }
 }
