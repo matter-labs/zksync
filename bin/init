@@ -8,7 +8,7 @@ zksync dev-up
 zksync env
 zksync yarn || true # It can fail.
 zksync db-wait
-zksync db-setup
+zksync db-reset
 zksync build-contracts
 zksync genesis
 zksync redeploy

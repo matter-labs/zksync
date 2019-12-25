@@ -1,6 +1,6 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
-export SERVER_DOCKER_IMAGE ?=matterlabs/server:latest
-export PROVER_DOCKER_IMAGE ?=matterlabs/prover:latest
+export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(ZKSYNC_ENV)
+export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(ZKSYNC_ENV)
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(ZKSYNC_ENV)
 export GETH_DOCKER_IMAGE ?= gluk64/franklin:geth
 export CI_DOCKER_IMAGE ?= matterlabs/ci
@@ -62,7 +62,7 @@ db-drop: confirm_action
 db-wait:
 	@bin/db-wait
 
-genesis: confirm_action db-reset
+genesis: confirm_action
 	@bin/genesis.sh
 
 # Frontend clients

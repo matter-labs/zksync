@@ -3,13 +3,14 @@
 DIR=$KEY_DIR$BLOCK_SIZE_CHUNKS
 echo "Checking keys in $DIR"
 mkdir -p $DIR
-#cd $KEY_DIR
 
+SPACE_LINK=$KEYS_SPACE_URL/$BLOCK_SIZE_CHUNKS
+
+KEY_FILES="franklin_pk.key"
 for i in $KEY_FILES; do
     if ! [ -f $DIR/$i ]; then
-        echo "Downloading file $SPACE_URL/$i"
-        axel -o $DIR/$i -a $SPACE_URL/$i 2>&1
-        echo axel -o $DIR/$i -a $SPACE_URL/$i 2>&1
-        #curl -o $KEY_DIR/$i $SPACE_URL/$i 2>&1
+        echo "Downloading file $SPACE_LINK/$i"
+        axel -o $DIR/$i -a $SPACE_LINK/$i 2>&1
+        echo axel -o $DIR/$i -a $SPACE_LINK/$i 2>&1
     fi
 done

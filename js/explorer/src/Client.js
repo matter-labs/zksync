@@ -24,10 +24,7 @@ export class Client {
     }
 
     static async new() {
-        const net = config.ETH_NETWORK == 'localhost' 
-            ? 'localhost'
-            : 'testnet';
-        const syncProvider = await zksync.getDefaultProvider(net);
+        const syncProvider = await zksync.Provider.newWebsocketProvider(config.WS_API_ADDR);
         
         const tokensPromise = syncProvider.getTokens()
             .then(tokens => {

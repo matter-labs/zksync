@@ -27,6 +27,7 @@ const components = {
 
 const ethers = require('ethers');
 const zksync = require('zksync');
+import config from '../env-config';
 
 import { WalletDecorator } from '../WalletDecorator'
 
@@ -38,11 +39,7 @@ export default {
     methods: {
         async login() {
             try {
-                const net = this.currentLocationNetworkName == 'localhost' 
-                    ? 'localhost'
-                    : 'testnet';
-                const syncProvider = await zksync.getDefaultProvider(net);
-                
+                const syncProvider = await zksync.Provider.newWebsocketProvider(config.WS_API_ADDR);
                 const tokensList = await syncProvider.getTokens()
                 window.tokensList = Object.values(tokensList)
                     .map(token => ({
