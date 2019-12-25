@@ -1,4 +1,4 @@
-use crate::helpers::get_input_data_from_ethereum_transaction;
+use crate::eth_tx_helpers::get_input_data_from_ethereum_transaction;
 use failure::format_err;
 use models::node::account::{Account, AccountAddress};
 use models::params::{FR_ADDRESS_LEN, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};

@@ -1,5 +1,5 @@
 use crate::events::BlockEvent;
-use crate::helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
+use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use failure::format_err;
 use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;

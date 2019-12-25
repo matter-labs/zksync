@@ -1,5 +1,5 @@
 use crate::events::{BlockEvent, EventType};
-use crate::helpers::get_block_number_from_ethereum_transaction;
+use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
 use ethabi;
 use failure::{ensure, format_err};
 use futures::{compat::Future01CompatExt, executor::block_on};

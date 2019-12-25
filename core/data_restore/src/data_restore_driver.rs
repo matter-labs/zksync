@@ -1,6 +1,6 @@
 use crate::events_state::EventsState;
 use crate::genesis_state::get_genesis_account;
-use crate::helpers::get_ethereum_transaction;
+use crate::eth_tx_helpers::get_ethereum_transaction;
 use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor;
 use crate::tree_state::TreeState;

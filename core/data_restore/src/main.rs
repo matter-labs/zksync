@@ -5,7 +5,7 @@ pub mod data_restore_driver;
 pub mod events;
 pub mod events_state;
 pub mod genesis_state;
-pub mod helpers;
+pub mod eth_tx_helpers;
 pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
