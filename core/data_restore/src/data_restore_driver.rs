@@ -182,6 +182,9 @@ impl DataRestoreDriver {
         storage_interactor::save_block_events_state(
             connection_pool.clone(),
             &vec![],
+        )?;
+        storage_interactor::save_last_wached_block_number(
+            connection_pool.clone(),
             genesis_eth_block_number,
         )?;
 
@@ -315,16 +318,18 @@ impl DataRestoreDriver {
         );
 
         // Store block events
-        storage_interactor::delete_block_events_state(self.connection_pool.clone())?;
         storage_interactor::save_block_events_state(
             self.connection_pool.clone(),
             &block_events,
+        )?;
+        // Store block number
+        storage_interactor::save_last_wached_block_number(
+            self.connection_pool.clone(),
             last_watched_eth_block_number,
         )?;
         // Store tokens
         storage_interactor::save_tokens(self.connection_pool.clone(), token_events)?;
 
-        storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
             self.connection_pool.clone(),
             StorageUpdateState::Events,
@@ -369,7 +374,6 @@ impl DataRestoreDriver {
             )?;
         }
 
-        storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
             self.connection_pool.clone(),
             StorageUpdateState::None,
@@ -386,10 +390,8 @@ impl DataRestoreDriver {
         let new_blocks = self.get_new_operation_blocks_from_events()?;
         info!("Parsed events to operation blocks");
 
-        storage_interactor::delete_rollup_ops(self.connection_pool.clone())?;
         storage_interactor::save_rollup_ops(self.connection_pool.clone(), &new_blocks)?;
 
-        storage_interactor::delete_storage_state_status(self.connection_pool.clone())?;
         storage_interactor::save_storage_state(
             self.connection_pool.clone(),
             StorageUpdateState::Operations,

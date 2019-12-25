@@ -142,12 +142,10 @@ pub fn update_tree_state(
 ///
 /// * `connection_pool` - Database Connection Pool
 /// * `events` - Rollup contract events descriptions
-/// * `last_watched_eth_block_number` - Last watched ethereum block
 ///
 pub fn save_block_events_state(
     connection_pool: ConnectionPool,
     events: &[BlockEvent],
-    last_watched_eth_block_number: u64,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -159,13 +157,37 @@ pub fn save_block_events_state(
     for event in events {
         new_events.push(block_event_into_stored_block_event(event));
     }
-    let block_number = NewLastWatchedEthBlockNumber {
-        block_number: last_watched_eth_block_number.to_string(),
-    };
+    storage
+        .delete_events_state()
+        .map_err(|e| format_err!("No events state to delete: {}", e.to_string()))?;
     storage
         .save_events_state(new_events.as_slice())
         .map_err(|e| format_err!("Cant save events state: {}", e.to_string()))?;
 
+    Ok(())
+}
+
+/// Saves last watched ethereum block number in storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database Connection Pool
+/// * `last_watched_eth_block_number` - Last watched ethereum block
+///
+pub fn save_last_wached_block_number(
+    connection_pool: ConnectionPool,
+    last_watched_eth_block_number: u64,
+) -> Result<(), failure::Error> {
+    let storage = connection_pool.access_storage().map_err(|e| {
+        format_err!(
+            "Db connection failed for data restore save events: {}",
+            e.to_string()
+        )
+    })?;
+
+    let block_number = NewLastWatchedEthBlockNumber {
+        block_number: last_watched_eth_block_number.to_string(),
+    };
     storage
         .delete_last_watched_block_number()
         .map_err(|e| format_err!("No last watched block number to delete: {}", e.to_string()))?;
@@ -219,6 +241,9 @@ pub fn save_storage_state(
         )
     })?;
     storage
+        .delete_data_restore_storage_state_status()
+        .map_err(|e| format_err!("No storage state status to delete: {}", e.to_string()))?;
+    storage
         .save_storage_state(&storage_state)
         .map_err(|e| format_err!("Cant save storage state: {}", e.to_string()))?;
     Ok(())
@@ -241,89 +266,14 @@ pub fn save_rollup_ops(
             e.to_string()
         )
     })?;
+    storage
+        .delete_rollup_ops()
+        .map_err(|e| format_err!("No franklin ops to delete: {}", e.to_string()))?;
     for block in blocks {
         storage
             .save_rollup_ops(block.ops.as_slice(), block.block_num, block.fee_account)
             .map_err(|e| format_err!("Cant save franklin transaction: {}", e.to_string()))?;
     }
-    Ok(())
-}
-
-/// Removes events state from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub fn delete_block_events_state(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
-    let storage = connection_pool.access_storage().map_err(|e| {
-        format_err!(
-            "Db connection failed for data restore remove events state: {}",
-            e.to_string()
-        )
-    })?;
-    storage
-        .delete_events_state()
-        .map_err(|e| format_err!("No events state to delete: {}", e.to_string()))?;
-    Ok(())
-}
-
-/// Removes rollup operations from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub fn delete_rollup_ops(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
-    let storage = connection_pool.access_storage().map_err(|e| {
-        format_err!(
-            "Db connection failed for data restore remove franklin ops: {}",
-            e.to_string()
-        )
-    })?;
-    storage
-        .delete_rollup_ops()
-        .map_err(|e| format_err!("No franklin ops to delete: {}", e.to_string()))?;
-    Ok(())
-}
-
-/// Removes last watched ethereum block number from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub fn delete_last_watched_block_number(
-    connection_pool: ConnectionPool,
-) -> Result<(), failure::Error> {
-    let storage = connection_pool.access_storage().map_err(|e| {
-        format_err!(
-            "Db connection failed for data restore remove last watched block number: {}",
-            e.to_string()
-        )
-    })?;
-    storage
-        .delete_last_watched_block_number()
-        .map_err(|e| format_err!("No last watched block number to delete: {}", e.to_string()))?;
-    Ok(())
-}
-
-/// Removes last recovery state update step from storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-///
-pub fn delete_storage_state_status(connection_pool: ConnectionPool) -> Result<(), failure::Error> {
-    let storage = connection_pool.access_storage().map_err(|e| {
-        format_err!(
-            "Db connection failed for data restore remove storage state status: {}",
-            e.to_string()
-        )
-    })?;
-    storage
-        .delete_data_restore_storage_state_status()
-        .map_err(|e| format_err!("No storage state status to delete: {}", e.to_string()))?;
     Ok(())
 }
 
