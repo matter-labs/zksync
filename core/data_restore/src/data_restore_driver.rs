@@ -8,6 +8,7 @@ use ethabi;
 use failure::format_err;
 use models::node::{AccountMap, AccountUpdate};
 use std::str::FromStr;
+use std::time::Duration;
 use storage::ConnectionPool;
 use web3::contract::Contract;
 use web3::types::H160;
@@ -285,22 +286,23 @@ impl DataRestoreDriver {
             );
 
             // Update events
-            self.update_events_state()?;
+            let got_new_events = self.update_events_state()?;
 
-            // Update operations
-            let new_ops_blocks = self.update_operations_state()?;
-
-            // info!("new_ops_blocks: {:?}", &new_ops_blocks);
-
-            // Update tree
-            self.update_tree_state(new_ops_blocks)?;
+            if got_new_events {
+                // Update operations
+                let new_ops_blocks = self.update_operations_state()?;
+    
+                // Update tree
+                self.update_tree_state(new_ops_blocks)?;
+            }
         }
         info!("Stopped state updates");
         Ok(())
     }
 
     /// Updates events state, saves new blocks, tokens events and the last watched eth block number in storage
-    fn update_events_state(&mut self) -> Result<(), failure::Error> {
+    /// Returns bool flag, true if there are new block events
+    fn update_events_state(&mut self) -> Result<bool, failure::Error> {
         let (block_events, token_events, last_watched_eth_block_number) =
             self.events_state.update_events_state(
                 &self.web3_url,
@@ -309,10 +311,21 @@ impl DataRestoreDriver {
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
             )?;
-        info!(
-            "Got new events until block: {:?}",
-            &last_watched_eth_block_number
-        );
+
+        let result = if block_events.is_empty() {
+            info!(
+                "Got no new events until block: {:?}",
+                &last_watched_eth_block_number
+            );
+            false
+        } else {
+            info!(
+                "Got {:?} new events until block: {:?}",
+                &block_events.len(),
+                &last_watched_eth_block_number
+            );
+            true
+        };
 
         // Store block events
         storage_interactor::save_block_events_state(self.connection_pool.clone(), &block_events)?;
@@ -331,7 +344,7 @@ impl DataRestoreDriver {
 
         info!("Updated events storage");
 
-        Ok(())
+        Ok(result)
     }
 
     /// Updates tree state from the new Rollup operations blocks, saves it in storage
