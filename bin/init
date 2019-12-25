@@ -4,12 +4,13 @@ set -e
 
 check-environment.sh
 
-zksync dev-up
+zksync dev-up || true
 zksync env
 zksync yarn || true # It can fail.
 zksync db-wait
-zksync db-reset
+zksync db-setup
 zksync build-contracts
+zksync db-reset
 zksync genesis
 zksync redeploy
 echo done.

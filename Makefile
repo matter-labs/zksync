@@ -15,7 +15,6 @@ init:
 	@bin/init
 
 yarn:
-	@cd js/franklin_lib && yarn
 	@cd js/client && yarn
 	@cd js/explorer && yarn
 	@cd contracts && yarn
@@ -44,10 +43,7 @@ db-setup:
 db-insert-contract:
 	@bin/db-insert-contract.sh
 
-update-frontend-contract:
-	@bin/update-frontend-contract.sh
-
-db-reset: confirm_action db-wait db-drop db-setup db-insert-contract update-frontend-contract
+db-reset: confirm_action db-wait db-drop db-setup db-insert-contract
 	@echo database is ready
 
 db-migrate: confirm_action
