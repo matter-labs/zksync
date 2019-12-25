@@ -97,7 +97,7 @@ impl DataRestoreDriver {
             )
         };
 
-        let mut events_state = EventsState::new();
+        let events_state = EventsState::new();
 
         let tree_state = TreeState::new();
 

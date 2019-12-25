@@ -48,7 +48,7 @@ async function main() {
         governanceAddress,
         verifierAddress,
         priorityQueueAddress,
-        wallet.address,
+        process.env.OPERATOR_FRANKLIN_ADDRESS,
         process.env.GENESIS_ROOT || ethers.constants.HashZero,
     ];
 
@@ -66,7 +66,7 @@ async function main() {
             governanceAddress,
             verifierAddress,
             priorityQueueAddress,
-            wallet.address,
+            process.env.OPERATOR_FRANKLIN_ADDRESS,
             process.env.GENESIS_ROOT || ethers.constants.HashZero,
         ];
         const franklin = await deployFranklin(wallet, franklinContractCode, franklinConstructorArgs);

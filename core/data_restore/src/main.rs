@@ -13,7 +13,6 @@ pub mod tree_state;
 use crate::data_restore_driver::DataRestoreDriver;
 use clap::{App, Arg};
 use server::ConfigurationOptions;
-use std::str::FromStr;
 use storage::ConnectionPool;
 use web3::types::{H160, H256};
 
