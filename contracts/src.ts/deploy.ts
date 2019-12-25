@@ -42,10 +42,13 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
             .filter(i => i.type === 'constructor');
             
         if (constructorInputs.length > 0) {
-            constructorArguments = ethers.utils.defaultAbiCoder.encode(
-                constructorInputs[0].inputs,
-                constructorParams
-            );
+            constructorArguments = 
+                ethers.utils.defaultAbiCoder
+                .encode(
+                    constructorInputs[0].inputs,
+                    constructorParams
+                )
+                .slice(2);
         }
     }
 
@@ -59,7 +62,7 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
         compilerversion:    'v0.5.10+commit.5a6ea5b1',      // see http://etherscan.io/solcversions for list of support versions
         optimizationUsed:   0,                              // 0 = No Optimization, 1 = Optimization used
         runs:               200,                            // set to 200 as default unless otherwise         
-        constructorArguments                                // if applicable
+        constructorArguements: constructorArguments         // if applicable. How nice, they have a typo in their api
     };
     
     let r = await Axios.post(etherscanApiUrl, qs.stringify(data));
