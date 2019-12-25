@@ -82,7 +82,10 @@ fn prover_data(
     block: web::Json<i64>,
 ) -> actix_web::Result<HttpResponse> {
     info!("requesting prover_data for block {}", *block);
-    let data_pool = data.preparing_data_pool.read().unwrap();
+    let data_pool = data
+        .preparing_data_pool
+        .read()
+        .expect("failed to get read lock on data");
     Ok(HttpResponse::Ok().json(data_pool.get(*block)))
 }
 
@@ -122,7 +125,10 @@ fn publish(data: web::Data<AppState>, r: web::Json<PublishReq>) -> actix_web::Re
         .map_err(actix_web::error::ErrorInternalServerError)?;
     match storage.store_proof(r.block, &r.proof) {
         Ok(_) => {
-            let mut data_pool = data.preparing_data_pool.write().unwrap();
+            let mut data_pool = data
+                .preparing_data_pool
+                .write()
+                .expect("failed to get write lock on data");
             data_pool.clean_up(r.block as i64);
             Ok(())
         }
@@ -179,7 +185,7 @@ pub fn start_server(
             .route("/stopped", web::post().to(stopped))
     })
     .bind(bind_to)
-    .unwrap()
+    .expect("failed to bind")
     .run()
-    .unwrap();
+    .expect("failed to run server");
 }

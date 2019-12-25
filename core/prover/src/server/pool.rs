@@ -61,12 +61,13 @@ pub fn maintain(
     let storage = conn_pool.access_storage().expect("failed to connect to db");
     loop {
         if has_capacity(&data) {
-            take_next_commits(&storage, &data).unwrap();
+            take_next_commits(&storage, &data).expect("failed to get next commit operations");
         }
         if all_prepared(&data) {
             thread::sleep(rounds_interval);
         } else {
-            prepare_next(&storage, &data, &phasher, &params).unwrap();
+            prepare_next(&storage, &data, &phasher, &params)
+                .expect("failed to prepare prover data");
         }
     }
 }
@@ -114,7 +115,7 @@ fn prepare_next(
 ) -> Result<(), String> {
     let mut d = data.write().expect("failed to acquire a lock");
     let current = (*d).last_prepared + 1;
-    let op = d.operations.remove(&current).unwrap();
+    let op = d.operations.remove(&current).expect("data is inconsistent");
     drop(d);
     let pd = build_prover_data(&storage, &op, phasher, params)?;
     let mut d = data.write().expect("failed to acquire a lock");
@@ -406,7 +407,6 @@ fn build_prover_data(
     };
     let mut validator_balances = vec![];
     for i in 0..1 << models::params::BALANCE_TREE_DEPTH {
-        //    validator_balances.push(Some(validator_acc.subtree.get(i as u32).map(|s| s.clone()).unwrap_or(Balance::default())));
         let balance_value = match validator_acc.subtree.get(i as u32) {
             None => Fr::zero(),
             Some(bal) => bal.value,
@@ -447,15 +447,18 @@ fn build_prover_data(
         &pub_data,
         Some(initial_root),
         Some(root_after_fee),
-        Some(Fr::from_str(&commit_operation.block.fee_account.to_string()).unwrap()),
-        Some(Fr::from_str(&(block_number).to_string()).unwrap()),
+        Some(
+            Fr::from_str(&commit_operation.block.fee_account.to_string()).expect("failed to parse"),
+        ),
+        Some(Fr::from_str(&(block_number).to_string()).expect("failed to parse")),
     );
 
     Ok(ProverData {
         public_data_commitment,
         old_root: initial_root,
         new_root: commit_operation.block.new_root_hash,
-        validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string()).unwrap(),
+        validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string())
+            .expect("failed to parse"),
         operations,
         validator_balances,
         validator_audit_path,

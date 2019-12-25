@@ -30,7 +30,7 @@ fn main() {
     info!("creating prover, worker name: {}", worker_name);
 
     // Create client
-    let api_url = env::var("PROVER_SERVER_URL").unwrap();
+    let api_url = env::var("PROVER_SERVER_URL").expect("PROVER_SERVER_URL is missing");
     let api_client = client::ApiClient::new(&api_url, &worker_name);
     // Create prover
     let jubjub_params = AltJubjubBn256::new();
@@ -72,7 +72,7 @@ fn main() {
             );
             client::ApiClient::new(&api_url_copy, &worker_name_copy)
                 .prover_stopped(prover_id_copy)
-                .unwrap();
+                .expect("failed to send prover stop request");
         }
     });
 
@@ -81,7 +81,7 @@ fn main() {
     error!("prover exited with error: {:?}", err);
     client::ApiClient::new(&api_url, &worker_name)
         .prover_stopped(prover_id)
-        .unwrap();
+        .expect("failed to send prover stop request");
 }
 
 fn read_from_key_dir(key_dir: String) -> groth16::Parameters<bn256::Bn256> {
@@ -92,31 +92,21 @@ fn read_from_key_dir(key_dir: String) -> groth16::Parameters<bn256::Bn256> {
         key_file_path.push(models::params::KEY_FILENAME);
         key_file_path
     };
-    debug!("Reading key from {}", path.to_str().unwrap());
-    let franklin_circuit_params = read_parameters(&path.to_str().unwrap());
-    if franklin_circuit_params.is_err() {
-        panic!("could not read circuit params")
-    }
-    franklin_circuit_params.unwrap()
+    debug!(
+        "Reading key from {}",
+        path.to_str().expect("failed to get keys location")
+    );
+    read_parameters(&path.to_str().expect("failed to get keys location"))
 }
 
-fn read_parameters(file_name: &str) -> Result<groth16::Parameters<bn256::Bn256>, String> {
+fn read_parameters(file_name: &str) -> groth16::Parameters<bn256::Bn256> {
     use std::fs::File;
     use std::io::BufReader;
 
-    let f_r = File::open(file_name);
-    if f_r.is_err() {
-        return Err(format!("could not open file {}", f_r.err().unwrap()));
-    }
-    let mut r = BufReader::new(f_r.unwrap());
-    let circuit_params = groth16::Parameters::<bn256::Bn256>::read(&mut r, true);
+    let f_r = File::open(file_name).expect("failed to open file");
+    let mut r = BufReader::new(f_r);
+    let circuit_params = groth16::Parameters::<bn256::Bn256>::read(&mut r, true)
+        .expect("failed to read circuit params");
 
-    if circuit_params.is_err() {
-        return Err(format!(
-            "could not parse circuit params {}",
-            circuit_params.err().unwrap()
-        ));
-    }
-
-    Ok(circuit_params.unwrap())
+    circuit_params
 }

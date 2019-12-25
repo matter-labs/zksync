@@ -95,7 +95,7 @@ impl<C: ApiClient> BabyProver<C> {
     }
 
     fn run_rounds(&self, start_heartbeats_tx: mpsc::Sender<(i32, bool)>) -> BabyProverError {
-        let mut rng = rand::OsRng::new().unwrap();
+        let mut rng = rand::OsRng::new().expect("failed to create");
         let pause_duration = time::Duration::from_secs(models::node::config::PROVER_CYCLE_WAIT);
 
         info!("Running worker rounds");
@@ -179,7 +179,7 @@ impl<C: ApiClient> BabyProver<C> {
         }
 
         // TODO: handle error.
-        let p = proof.unwrap();
+        let p = proof.expect("failed to make a proof");
 
         let pvk = bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
 
@@ -191,7 +191,7 @@ impl<C: ApiClient> BabyProver<C> {
                 e
             )));
         }
-        if !res.unwrap() {
+        if !res.expect("failed to verify proof") {
             return Err(BabyProverError::Internal(
                 "created proof did not pass verification".to_owned(),
             ));
