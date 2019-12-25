@@ -37,7 +37,6 @@ impl ProversDataPool {
     }
 
     pub fn clean_up(&mut self, block: i64) {
-        self.operations.remove(&block);
         self.prepared.remove(&block);
     }
 
@@ -119,7 +118,7 @@ fn prepare_next(
     drop(d);
     let pd = build_prover_data(&storage, &op, phasher, params)?;
     let mut d = data.write().expect("failed to acquire a lock");
-    (*d).last_prepared += current;
+    (*d).last_prepared = current;
     (*d).prepared.insert(op.block.block_number as i64, pd);
     Ok(())
 }

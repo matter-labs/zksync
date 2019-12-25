@@ -4,8 +4,14 @@
 
 cd $ZKSYNC_HOME
 
-IN_DIR=./contracts/contracts/
+IN_DIR=./contracts/contracts
 OUT_DIR=./contracts/contracts/generated
+
+ls
+
+ls -l $IN_DIR
+
+echo `pwd`
 
 rm -rf $OUT_DIR
 mkdir -p $OUT_DIR

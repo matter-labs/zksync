@@ -35,14 +35,14 @@ contract Governance {
     /// @notice Change current governor
     /// @param _newGovernor Address of the new governor
     function changeGovernor(address _newGovernor) external {
-        requireGovernor();
+        requireGovernor(msg.sender);
         networkGovernor = _newGovernor;
     }
 
     /// @notice Add token to the list of networks tokens
     /// @param _token Token address
     function addToken(address _token) external {
-        requireGovernor();
+        requireGovernor(msg.sender);
         require(
             tokenIds[_token] == 0,
             "gan11"
@@ -57,32 +57,26 @@ contract Governance {
     /// @param _validator Validator address
     /// @param _active Active flag
     function setValidator(address _validator, bool _active) external {
-        requireGovernor();
+        requireGovernor(msg.sender);
         validators[_validator] = _active;
     }
 
-    /// @notice Check if the sender is governor
-    function requireGovernor() internal view {
+    /// @notice Check if specified address is is governor
+    /// @param _address Address to check
+    function requireGovernor(address _address) public view {
         require(
-            msg.sender == networkGovernor,
+            _address == networkGovernor,
             "grr11"
         ); // grr11 - only by governor
     }
 
-    /// @notice Return validator status (active or not)
-    /// @param _sender Validator address
-    /// @return bool flag that indicates validator status
-    function isValidator(address _sender) external view returns (bool) {
-        return validators[_sender];
-    }
-
-    /// @notice Validate token id (must be less than total tokens amount)
-    /// @param _tokenId Token id
-    function requireValidTokenId(uint16 _tokenId) external view {
+    /// @notice Checks if validator is active
+    /// @param _address Validator address
+    function requireActiveValidator(address _address) external view {
         require(
-            isValidTokenId(_tokenId),
-            "grd11"
-        ); // grd11 - unknown token id
+            validators[_address],
+            "grr21"
+        ); // grr21 - validator is not active
     }
 
     /// @notice Validate token id (must be less than total tokens amount)
