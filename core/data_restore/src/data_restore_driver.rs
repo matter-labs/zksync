@@ -179,10 +179,7 @@ impl DataRestoreDriver {
             events_state.set_genesis_block_number(&genesis_governance_transaction)?;
         info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
-        storage_interactor::save_block_events_state(
-            connection_pool.clone(),
-            &vec![],
-        )?;
+        storage_interactor::save_block_events_state(connection_pool.clone(), &vec![])?;
         storage_interactor::save_last_wached_block_number(
             connection_pool.clone(),
             genesis_eth_block_number,
@@ -318,10 +315,7 @@ impl DataRestoreDriver {
         );
 
         // Store block events
-        storage_interactor::save_block_events_state(
-            self.connection_pool.clone(),
-            &block_events,
-        )?;
+        storage_interactor::save_block_events_state(self.connection_pool.clone(), &block_events)?;
         // Store block number
         storage_interactor::save_last_wached_block_number(
             self.connection_pool.clone(),

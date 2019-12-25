@@ -457,30 +457,32 @@ pub fn get_tree_state(
         .access_storage()
         .map_err(|e| format_err!("Db connection failed for tree state: {}", e.to_string()))?;
 
-
     let verified_state_result = storage.load_verified_state();
     let (last_block, account_map) = match verified_state_result {
         Err(err) => {
             warn!("There are no last verified state in storage - will be updated from empty state. Reason: {:?}", err.to_string());
             (0, AccountMap::default())
-        },
-        Ok(res) => {(res.0, res.1)}
+        }
+        Ok(res) => (res.0, res.1),
     };
 
     let block_result = storage.get_block(last_block);
     let block_opt = match block_result {
         Err(err) => {
-            warn!("Cant get last block from storage. Reason: {:?}", err.to_string());
+            warn!(
+                "Cant get last block from storage. Reason: {:?}",
+                err.to_string()
+            );
             None
-        },
-        Ok(res) => {res}
+        }
+        Ok(res) => res,
     };
     let (unprocessed_prior_ops, fee_acc_id) = match block_opt {
         None => {
             warn!("There are no last block in storage");
             (0, 0)
-        },
-        Some(block) => {(block.processed_priority_ops.1, block.fee_account)}
+        }
+        Some(block) => (block.processed_priority_ops.1, block.fee_account),
     };
 
     Ok((last_block, account_map, unprocessed_prior_ops, fee_acc_id))
