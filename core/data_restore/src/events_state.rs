@@ -11,9 +11,8 @@ use web3::types::Transaction;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 
 type CommittedAndVerifiedEvents = (Vec<BlockEvent>, Vec<BlockEvent>);
-// type BlockNumber256 = U256;
 
-/// Franklin contract events states description
+/// Rollup contract events states description
 #[derive(Debug, Clone)]
 pub struct EventsState {
     /// Committed operations blocks events
@@ -24,14 +23,8 @@ pub struct EventsState {
     pub last_watched_eth_block_number: u64,
 }
 
-/// Set new
-/// Get last block
-/// Get blocks till last - delta, set last watching block
-/// Subscribe on new blocks
-/// New blocks -> last watching block ++
-/// Check if txs in last watching block
 impl EventsState {
-    /// Create new franklin contract events state
+    /// Create new Rollup contract events state
     pub fn new() -> Self {
         Self {
             committed_events: Vec::new(),
@@ -40,6 +33,13 @@ impl EventsState {
         }
     }
 
+    /// Saves the genesis block number as the last watched number
+    /// Returns the genesis block number
+    ///
+    /// # Arguments
+    ///
+    /// * `genesis_transaction` - Genesis transaction description
+    ///
     pub fn set_genesis_block_number(
         &mut self,
         genesis_transaction: &Transaction,
@@ -50,12 +50,14 @@ impl EventsState {
         Ok(genesis_block_number)
     }
 
-    /// Update past events state from last watched ethereum block
-    /// with delta between last eth block and last watched block
-    /// and return new verified committed blocks
+    /// Update past events state from last watched ethereum block with delta between last eth block and last watched block.
+    /// Returns new verified committed blocks evens, added tokens events and the last watched eth block number
     ///
     /// # Arguments
     ///
+    /// * `web3_url` - Web3 provider url
+    /// * `franklin_contract` - Rollup contract
+    /// * `governance_contract` - Governance contract
     /// * `eth_blocks_step` - Blocks step for watching
     /// * `end_eth_blocks_offset` - Delta between last eth block and last watched block
     ///
@@ -91,10 +93,19 @@ impl EventsState {
         let mut events_to_return: Vec<BlockEvent> = self.committed_events.clone();
         events_to_return.extend(self.verified_events.clone());
 
-        Ok((events_to_return, token_events, self.last_watched_eth_block_number))
+        Ok((
+            events_to_return,
+            token_events,
+            self.last_watched_eth_block_number,
+        ))
     }
 
-    /// Return last watched ethereum block number
+    /// Returns a last watched ethereum block number
+    ///
+    /// # Arguments
+    ///
+    /// * `web3_url` - Web3 provider url
+    ///
     pub fn get_last_block_number(web3_url: &String) -> Result<u64, failure::Error> {
         let (_eloop, transport) = web3::transports::Http::new(web3_url).unwrap();
         let web3 = web3::Web3::new(transport);
@@ -102,11 +113,14 @@ impl EventsState {
         Ok(web3.eth().block_number().wait().map(|n| n.as_u64())?)
     }
 
-    /// Return tuple (committed blocks logs, verified blocks logs) from last watched block
+    /// Returns a tuple (committed blocks logs, verified blocks logs), added token logs and the new last watched block number
     ///
     /// # Arguments
     ///
-    /// * `last_watched_block_number` - the laste watched eth block
+    /// * `web3_url` - Web3 provider url
+    /// * `franklin_contract` - Rollup contract
+    /// * `governance_contract` - Governance contract
+    /// * `last_watched_block_number` - the current last watched eth block
     /// * `eth_blocks_step` - Ethereum blocks delta step
     /// * `end_eth_blocks_offset` - last block delta
     ///
@@ -157,6 +171,15 @@ impl EventsState {
         Ok((block_sorted_logs, token_logs, to_block_number_u64))
     }
 
+    /// Returns new added token logs
+    ///
+    /// # Arguments
+    ///
+    /// * `web3_url` - Web3 provider url
+    /// * `contract` - Governance contract
+    /// * `from` - From ethereum block number
+    /// * `to` - To ethereum block number
+    ///
     fn get_token_added_logs(
         web3_url: &String,
         contract: &(ethabi::Contract, Contract<web3::transports::http::Http>),
@@ -188,10 +211,12 @@ impl EventsState {
             .collect()
     }
 
-    /// Return logs
+    /// Returns the contract logs that occurred on the specified blocks
     ///
     /// # Arguments
     ///
+    /// * `web3_url` - Web3 provider url
+    /// * `contract` - Specified contract
     /// * `from_block_number` - Start ethereum block number
     /// * `to_block_number` - End ethereum block number
     ///
@@ -233,11 +258,11 @@ impl EventsState {
         Ok(result)
     }
 
-    /// Return tuple (committed blocks logs, verified blocks logs) from concated logs slice
+    /// Returns tuple (committed blocks logs, verified blocks logs) from concated logs slice
     ///
     /// # Arguments
     ///
-    /// * `logs` - Logs slice
+    /// * `logs` - Logs slice of blocks events
     ///
     fn sort_block_logs(
         contract: &ethabi::Contract,
@@ -299,7 +324,7 @@ impl EventsState {
         self.committed_events.drain(0..count_to_remove);
     }
 
-    /// Return only verified committed blocks from verified
+    /// Returns only verified committed blocks from verified
     pub fn get_only_verified_committed_events(&self) -> Vec<BlockEvent> {
         let count_to_get = self.verified_events.len();
         self.committed_events[0..count_to_get].to_vec()

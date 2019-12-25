@@ -6,7 +6,7 @@ use web3::types::{Transaction, TransactionId};
 
 pub const FUNC_NAME_HASH_LENGTH: usize = 4;
 
-/// Return Ethereum transaction input data
+/// Returns Ethereum transaction input data
 ///
 /// # Arguments
 ///
@@ -24,7 +24,7 @@ pub fn get_input_data_from_ethereum_transaction(
     Ok(input_data[FUNC_NAME_HASH_LENGTH..input_data.len()].to_vec())
 }
 
-/// Return Ethereum transaction input data
+/// Returns Ethereum transaction block number
 ///
 /// # Arguments
 ///

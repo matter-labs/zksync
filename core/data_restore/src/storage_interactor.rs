@@ -18,6 +18,13 @@ use storage::{
     StoredRollupOpsBlock,
 };
 
+/// Saves genesis account state in storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database connection pool
+/// * `genesis_acc_update` - Genesis account update
+///
 pub fn save_genesis_tree_state(
     connection_pool: ConnectionPool,
     genesis_acc_update: AccountUpdate,
@@ -42,6 +49,13 @@ pub fn save_genesis_tree_state(
     Ok(())
 }
 
+/// Saves tokens that had been added to system in storage
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database connection pool
+/// * `tokens` - Tokens that had been added to system
+///
 pub fn save_tokens(
     connection_pool: ConnectionPool,
     tokens: Vec<TokenAddedEvent>,
@@ -58,20 +72,19 @@ pub fn save_tokens(
     Ok(())
 }
 
-/// Updates stored tree state
+/// Updates stored tree state: saves block transactions in storage mempool, stores blocks and account updates
 ///
 /// # Arguments
 ///
-/// * `block_number` - current block number
-/// * `account_updates` - accounts updates
 /// * `connection_pool` - Database Connection Pool
+/// * `block` - Rollup block
+/// * `accounts_updated` - accounts updates
 ///
 pub fn update_tree_state(
     connection_pool: ConnectionPool,
     block: Block,
     accounts_updated: AccountUpdates,
 ) -> Result<(), failure::Error> {
-
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
             "Db connection failed for data restore save tree state: {}",
@@ -123,12 +136,13 @@ pub fn update_tree_state(
     Ok(())
 }
 
-/// Saves Franklin Contract events in storage
+/// Saves Rollup contract events in storage
 ///
 /// # Arguments
 ///
-/// * `events` - Franklin Contract events descriptions
 /// * `connection_pool` - Database Connection Pool
+/// * `events` - Rollup contract events descriptions
+/// * `last_watched_eth_block_number` - Last watched ethereum block
 ///
 pub fn save_block_events_state(
     connection_pool: ConnectionPool,
@@ -162,11 +176,11 @@ pub fn save_block_events_state(
     Ok(())
 }
 
-/// Get new stored representation of the Franklin Contract event from itself
+/// Get new stored representation of the Rollup contract event from itself
 ///
 /// # Arguments
 ///
-/// * `evnet` - Franklin Contract event description
+/// * `evnet` - Rollup contract event description
 ///
 pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent {
     NewBlockEvent {
@@ -179,12 +193,12 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
     }
 }
 
-/// Saves update storage state
+/// Saves last recovery state update step
 ///
 /// # Arguments
 ///
-/// * `state` - storage state update
 /// * `connection_pool` - Database Connection Pool
+/// * `state` - last recovery state update step
 ///
 pub fn save_storage_state(
     connection_pool: ConnectionPool,
@@ -210,12 +224,12 @@ pub fn save_storage_state(
     Ok(())
 }
 
-/// Saves franklin operations blocks in storage
+/// Saves Rollup operations blocks in storage
 ///
 /// # Arguments
 ///
-/// * `blocks` - Franklin operations blocks
 /// * `connection_pool` - Database Connection Pool
+/// * `blocks` - Rollup operations blocks
 ///
 pub fn save_rollup_ops(
     connection_pool: ConnectionPool,
@@ -254,7 +268,7 @@ pub fn delete_block_events_state(connection_pool: ConnectionPool) -> Result<(), 
     Ok(())
 }
 
-/// Removes franklin operations from storage
+/// Removes rollup operations from storage
 ///
 /// # Arguments
 ///
@@ -273,7 +287,7 @@ pub fn delete_rollup_ops(connection_pool: ConnectionPool) -> Result<(), failure:
     Ok(())
 }
 
-/// Removes last watched block number from storage
+/// Removes last watched ethereum block number from storage
 ///
 /// # Arguments
 ///
@@ -294,7 +308,7 @@ pub fn delete_last_watched_block_number(
     Ok(())
 }
 
-/// Removes update storage statae from storage
+/// Removes last recovery state update step from storage
 ///
 /// # Arguments
 ///
@@ -313,7 +327,7 @@ pub fn delete_storage_state_status(connection_pool: ConnectionPool) -> Result<()
     Ok(())
 }
 
-/// Get Franklin operations blocks from storage
+/// Returns Rollup operations blocks from storage
 ///
 /// # Arguments
 ///
@@ -338,7 +352,7 @@ pub fn get_ops_blocks_from_storage(
     Ok(blocks)
 }
 
-/// Get Franklin Operations Block from its stored representation
+/// Returns Rollup operations block from its stored representation
 ///
 /// # Arguments
 ///
@@ -352,7 +366,7 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> Rollu
     }
 }
 
-/// Get storage update state from storage
+/// Returns last recovery state update step from storage
 ///
 /// # Arguments
 ///
@@ -383,7 +397,7 @@ pub fn get_storage_state(
     Ok(state)
 }
 
-/// Get last watched ethereum block number from storage
+/// Returns last watched ethereum block number from storage
 ///
 /// # Arguments
 ///
@@ -414,7 +428,7 @@ pub fn get_last_watched_block_number_from_storage(
     )
 }
 
-/// Get Events State from storage
+/// Returns Rollup contract events state from storage
 ///
 /// # Arguments
 ///
@@ -459,7 +473,7 @@ pub fn get_block_events_state_from_storage(
     })
 }
 
-/// Get Optional Franklin Contract event from its stored representation
+/// Returns Rollup contract event from its stored representation
 ///
 /// # Arguments
 ///
@@ -479,7 +493,7 @@ pub fn stored_block_event_into_block_event(
     })
 }
 
-/// Get tree accounts state and last block number from storage
+/// Returns the current Rollup block, tree accounts map, unprocessed priority ops and the last fee acc from storage
 ///
 /// # Arguments
 ///

@@ -88,8 +88,7 @@ impl<T: Transport> ETHSender<T> {
             unconfirmed_ops: VecDeque::new(),
             db_pool: db_pool.clone(),
         };
-        let storage = db_pool.access_storage()
-            .expect("Failed to access storage");
+        let storage = db_pool.access_storage().expect("Failed to access storage");
         if let Err(_) = sender.restore_state(storage) {
             info!("No unconfirmed operations");
         }

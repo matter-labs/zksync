@@ -10,13 +10,12 @@ pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
 
-// use std::str::FromStr;
 use crate::data_restore_driver::DataRestoreDriver;
 use clap::{App, Arg};
 use server::ConfigurationOptions;
+use std::str::FromStr;
 use storage::ConnectionPool;
 use web3::types::{H160, H256};
-use std::str::FromStr;
 
 const ETH_BLOCKS_STEP: u64 = 1000;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
@@ -41,6 +40,7 @@ fn main() {
         )
         .get_matches();
 
+    // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
     let mut driver = if cli.is_present("genesis") {
         create_data_restore_driver_with_genesis_acc(
             connection_pool,
@@ -71,6 +71,17 @@ fn main() {
     update_state(&mut driver);
 }
 
+/// Returns data restore driver with empty events and tree states
+///
+/// # Arguments
+///
+/// * `connection_pool` - Database connection pool
+/// * `web3_url` - Web3 provider url
+/// * `governance_eth_addr` - Governance contract address
+/// * `contract_eth_addr` - Rollup contract address
+/// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
+/// * `end_eth_blocks_offset` - The distance to the last ethereum block
+///
 pub fn create_data_restore_driver_empty(
     connection_pool: ConnectionPool,
     web3_url: String,
@@ -89,11 +100,18 @@ pub fn create_data_restore_driver_empty(
     )
 }
 
-/// Creates data restore driver state
+/// Returns data restore driver state with 'genesis' state - tree with inserted genesis account
 ///
 /// # Arguments
 ///
 /// * `connection_pool` - Database connection pool
+/// * `web3_url` - Web3 provider url
+/// * `governance_eth_addr` - Governance contract address
+/// * `governance_genesis_tx_hash` - Governance contract creation tx hash
+/// * `contract_eth_addr` - Rollup contract address
+/// * `contract_genesis_tx_hash` - Rollup contract creation tx hash
+/// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
+/// * `end_eth_blocks_offset` - The distance to the last ethereum block
 ///
 pub fn create_data_restore_driver_with_genesis_acc(
     connection_pool: ConnectionPool,
@@ -117,21 +135,32 @@ pub fn create_data_restore_driver_with_genesis_acc(
     )
 }
 
-/// Loads states from storage and start update
+/// Loads states for driver from storage
+///
+/// # Arguments
+///
+/// * `driver` - Data restore driver instance
+///
 pub fn load_state_from_storage(driver: &mut DataRestoreDriver) {
     driver.load_state_from_storage().expect("Cant load state");
 }
 
-/// Runs states updates
+/// Runs states updates for driver
 ///
 /// # Arguments
 ///
-/// * `driver` - DataRestore Driver config
+/// * `driver` - Data restore driver instance
 ///
 pub fn update_state(driver: &mut DataRestoreDriver) {
     driver.run_state_update().expect("Cant update state");
 }
 
+/// Stopss states updates for driver
+///
+/// # Arguments
+///
+/// * `driver` - Data restore driver instance
+///
 pub fn stop_state_update(driver: &mut DataRestoreDriver) {
     driver.stop_state_update();
 }

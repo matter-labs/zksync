@@ -10,11 +10,13 @@ use models::node::tx::FranklinTx;
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
 use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 
-/// Franklin Accounts states with data restore configuration
+/// Rollup accounts states
 pub struct TreeState {
     /// Accounts stored in a spase merkle tree
     pub state: PlasmaState,
+    /// Current unprocessed priority op number
     pub current_unprocessed_priority_op: u64,
+    /// The last fee account address
     pub last_fee_account_address: AccountAddress,
 }
 
@@ -25,6 +27,7 @@ impl Default for TreeState {
 }
 
 impl TreeState {
+    /// Returns empty self state
     pub fn new() -> Self {
         Self {
             state: PlasmaState::empty(),
@@ -33,12 +36,14 @@ impl TreeState {
         }
     }
 
-    /// Returns TreeState from accounts map and current block number
+    /// Returns the loaded state
     ///
     /// # Arguments
     ///
-    /// * `current_block` - current block number
-    /// * `accounts` - accounts map
+    /// * `current_block` - The current block number
+    /// * `accounts` - Accounts stored in a spase merkle tree
+    /// * `current_unprocessed_priority_op` - The current unprocessed priority op number
+    /// * `fee_account` - The last fee account address
     ///
     pub fn load(
         current_block: u32,
@@ -55,12 +60,12 @@ impl TreeState {
         }
     }
 
-    /// Updates Franklin Accounts states from Franklin operations block
-    /// Returns updated accounts
+    /// Updates Rollup accounts states from Rollup operations block
+    /// Returns current rollup block and updated accounts
     ///
     /// # Arguments
     ///
-    /// * `block` - Franklin operations blocks
+    /// * `ops_block` - Rollup operations blocks
     ///
     pub fn update_tree_states_from_ops_block(
         &mut self,
@@ -214,6 +219,18 @@ impl TreeState {
         Ok((block, accounts_updated))
     }
 
+    /// Updates the list of accounts that has been updated, aggregates fees, updates blocks operations list from Rollup priority operation
+    /// Returns current operation index
+    ///
+    /// # Arguments
+    ///
+    /// * `priority_op` - Priority operation
+    /// * `op_result` - Rollup priority operation execution result
+    /// * `fees` - Rollup operation fees
+    /// * `accounts_updated` - Updated accounts
+    /// * `current_op_block_index` - Current operation index
+    /// * `ops` - Current block operations list
+    ///
     fn update_from_priority_operation(
         &mut self,
         priority_op: FranklinPriorityOp,
@@ -244,6 +261,18 @@ impl TreeState {
         current_op_block_index + 1
     }
 
+    /// Updates the list of accounts that has been updated, aggregates fees, updates blocks operations list from Rollup transaction
+    /// Returns current operation index
+    ///
+    /// # Arguments
+    ///
+    /// * `tx` - Rollup transaction
+    /// * `op_result` - Rollup transaction execution result
+    /// * `fees` - Rollup operation fees
+    /// * `accounts_updated` - Updated accounts
+    /// * `current_op_block_index` - Current operation index
+    /// * `ops` - Current block operations list
+    ///
     fn update_from_tx(
         &mut self,
         tx: FranklinTx,

@@ -10,23 +10,24 @@ use models::params::{
     INPUT_DATA_ROOT_BYTES_WIDTH,
 };
 
-/// Description of a Franklin operations block
+/// Description of a Rollup operations block
 #[derive(Debug, Clone)]
 pub struct RollupOpsBlock {
-    /// Franklin block number
+    /// Rollup block number
     pub block_num: u32,
-    /// Franklin operations in block
+    /// Rollup operations in block
     pub ops: Vec<FranklinOp>,
     /// Fee account
     pub fee_account: u32,
 }
 
 impl RollupOpsBlock {
-    /// Return Franklin operations block description
+    /// Returns a Rollup operations block description
     ///
     /// # Arguments
     ///
-    /// * `event_data` - Franklin Contract event description
+    /// * `web3_url` - Web3 provider url
+    /// * `event_data` - Rollup contract event description
     ///
     pub fn get_rollup_ops_block(
         web3_url: &String,
@@ -51,7 +52,7 @@ impl RollupOpsBlock {
         Ok(block)
     }
 
-    /// Return Franklin operations vector
+    /// Returns a Rollup operations vector
     ///
     /// # Arguments
     ///
@@ -77,18 +78,13 @@ impl RollupOpsBlock {
         Ok(ops)
     }
 
-    /// Return fee account from Ethereum transaction input data
+    /// Returns fee account from Ethereum transaction input data
     ///
     /// # Arguments
     ///
     /// * `input` - Ethereum transaction input
     ///
     fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, failure::Error> {
-        // ensure!(
-        //     input_data.len()
-        //         == INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH + INPUT_DATA_FEE_ACC_BYTES_WIDTH,
-        //     "No fee account data in tx"
-        // );
         Ok(bytes_slice_to_uint32(
             &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
                 + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET

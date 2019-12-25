@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 // External uses
 use web3::types::H256;
 
-/// Franklin Contract event type describing the state of the corresponding Franklin block
+/// Rollup contract event type describing the state of the corresponding Rollup block
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EventType {
     /// Committed event
@@ -12,14 +12,14 @@ pub enum EventType {
     Verified,
 }
 
-/// Franklin Contract event description
+/// Rollup Contract event description
 #[derive(Debug, Copy, Clone, Eq)]
 pub struct BlockEvent {
-    /// Franklin block number
+    /// Rollup block number
     pub block_num: u32,
     /// Ethereum transaction type
     pub transaction_hash: H256,
-    /// Franklin Block type
+    /// Rollup block type
     pub block_type: EventType,
 }
 

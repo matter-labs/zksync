@@ -13,7 +13,10 @@ use web3::contract::Contract;
 use web3::types::H160;
 use web3::types::H256;
 
-/// Storage state update
+/// Storage state update:
+/// - None - The state is updated completely last time - start from fetching the new events
+/// - Events - The events fetched and saved successfully - now get operations from them and update tree
+/// - Operations - There are operations that are not presented in the tree state - update tree state
 #[derive(Debug)]
 pub enum StorageUpdateState {
     None,
@@ -25,23 +28,36 @@ pub enum StorageUpdateState {
 pub struct DataRestoreDriver {
     /// Database connection pool
     pub connection_pool: ConnectionPool,
-    /// Web3 endpoint
+    /// Web3 provider endpoint
     pub web3_url: String,
-    /// Provides Ethereum Franklin contract unterface
+    /// Provides Ethereum Governance contract unterface
     pub governance_contract: (ethabi::Contract, Contract<web3::transports::http::Http>),
-    /// Provides Ethereum Franklin contract unterface
+    /// Provides Ethereum Rollup contract unterface
     pub franklin_contract: (ethabi::Contract, Contract<web3::transports::http::Http>),
     /// Flag that indicates that state updates are running
     pub run_update: bool,
-    /// Franklin contract events state
+    /// Rollup contract events state
     pub events_state: EventsState,
-    /// Franklin accounts state
+    /// Rollup accounts state
     pub tree_state: TreeState,
+    /// The step distance of viewing events in the ethereum blocks
     pub eth_blocks_step: u64,
+    /// The distance to the last ethereum block
     pub end_eth_blocks_offset: u64,
 }
 
 impl DataRestoreDriver {
+    /// Returns new data restore driver with empty events and tree states
+    ///
+    /// # Arguments
+    ///
+    /// * `connection_pool` - Database connection pool
+    /// * `web3_url` - Web3 provider url
+    /// * `governance_contract_eth_addr` - Governance contract address
+    /// * `franklin_contract_eth_addr` - Rollup contract address
+    /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
+    /// * `end_eth_blocks_offset` - The distance to the last ethereum block
+    ///
     pub fn new_empty(
         connection_pool: ConnectionPool,
         web3_url: String,
@@ -98,13 +114,18 @@ impl DataRestoreDriver {
         })
     }
 
-    /// Create new data restore driver
+    /// Returns the new data restore driver state with 'genesis' state - tree with inserted genesis account
     ///
     /// # Arguments
     ///
     /// * `connection_pool` - Database connection pool
-    /// * `eth_blocks_step` - Step of the considered blocks ethereum block
-    /// * `eth_end_blocks_delta` - Delta between last ethereum block and last watched ethereum block
+    /// * `web3_url` - Web3 provider url
+    /// * `governance_contract_eth_addr` - Governance contract address
+    /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
+    /// * `franklin_contract_eth_addr` - Rollup contract address
+    /// * `franklin_contract_genesis_tx_hash` - Rollup contract creation tx hash
+    /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
+    /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
     pub fn new_with_genesis_acc(
         connection_pool: ConnectionPool,
@@ -208,17 +229,17 @@ impl DataRestoreDriver {
         })
     }
 
-    /// Stop states updates by setting run_update flag to false
+    /// Stops states updates by setting run_update flag to false
     pub fn stop_state_update(&mut self) {
         self.run_update = false
     }
 
+    /// Stops states from storage
     pub fn load_state_from_storage(&mut self) -> Result<(), failure::Error> {
         info!("Loading state from storage");
         let state = storage_interactor::get_storage_state(self.connection_pool.clone())?;
-        self.events_state = storage_interactor::get_block_events_state_from_storage(
-            self.connection_pool.clone(),
-        )?;
+        self.events_state =
+            storage_interactor::get_block_events_state_from_storage(self.connection_pool.clone())?;
         let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;
         self.tree_state = TreeState::load(
             tree_state.0, // current block
@@ -246,6 +267,7 @@ impl DataRestoreDriver {
         Ok(())
     }
 
+    /// Activates states updates
     pub fn run_state_update(&mut self) -> Result<(), failure::Error> {
         self.run_update = true;
         while self.run_update {
@@ -277,6 +299,7 @@ impl DataRestoreDriver {
         Ok(())
     }
 
+    /// Updates events state, saves new blocks, tokens events and the last watched eth block number in storage
     fn update_events_state(&mut self) -> Result<(), failure::Error> {
         let (block_events, token_events, last_watched_eth_block_number) =
             self.events_state.update_events_state(
@@ -286,7 +309,10 @@ impl DataRestoreDriver {
                 self.eth_blocks_step,
                 self.end_eth_blocks_offset,
             )?;
-        info!("Got new events until block: {:?}", &last_watched_eth_block_number);
+        info!(
+            "Got new events until block: {:?}",
+            &last_watched_eth_block_number
+        );
 
         // Store block events
         storage_interactor::delete_block_events_state(self.connection_pool.clone())?;
@@ -309,6 +335,12 @@ impl DataRestoreDriver {
         Ok(())
     }
 
+    /// Updates tree state from the new Rollup operations blocks, saves it in storage
+    ///
+    /// # Arguments
+    ///
+    /// * `new_ops_blocks` - the new Rollup operations blocks
+    ///
     fn update_tree_state(
         &mut self,
         new_ops_blocks: Vec<RollupOpsBlock>,
@@ -348,6 +380,8 @@ impl DataRestoreDriver {
         Ok(())
     }
 
+    /// Gets new operations blocks from events, updates rollup operations stored state.
+    /// Returns new rollup operations blocks
     fn update_operations_state(&mut self) -> Result<Vec<RollupOpsBlock>, failure::Error> {
         let new_blocks = self.get_new_operation_blocks_from_events()?;
         info!("Parsed events to operation blocks");
@@ -366,7 +400,7 @@ impl DataRestoreDriver {
         Ok(new_blocks)
     }
 
-    /// Return verified comitted operations blocks from verified op blocks events
+    /// Returns verified comitted operations blocks from verified op blocks events
     pub fn get_new_operation_blocks_from_events(
         &mut self,
     ) -> Result<Vec<RollupOpsBlock>, failure::Error> {
