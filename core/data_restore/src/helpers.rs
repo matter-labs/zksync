@@ -3,6 +3,7 @@ use failure::{ensure, format_err};
 use web3::futures::Future;
 use web3::types::H256;
 use web3::types::{Transaction, TransactionId};
+use web3::{Transport, Web3};
 
 pub const FUNC_NAME_HASH_LENGTH: usize = 4;
 
@@ -44,14 +45,13 @@ pub fn get_block_number_from_ethereum_transaction(
 ///
 /// # Arguments
 ///
+/// * `web3` - Web3 provider url
 /// * `transaction_hash` - The identifier of the particular Ethereum transaction
 ///
-pub fn get_ethereum_transaction(
-    web3_url: &String,
+pub fn get_ethereum_transaction<T: Transport>(
+    web3: &Web3<T>,
     transaction_hash: &H256,
 ) -> Result<Transaction, failure::Error> {
-    let (_eloop, transport) = web3::transports::Http::new(web3_url).unwrap();
-    let web3 = web3::Web3::new(transport);
     let tx_id = TransactionId::Hash(*transaction_hash);
     let web3_transaction = web3
         .eth()

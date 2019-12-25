@@ -3,6 +3,7 @@ use crate::helpers::{get_ethereum_transaction, get_input_data_from_ethereum_tran
 use failure::format_err;
 use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
+use web3::{Transport, Web3};
 
 use models::params::{
     INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH, INPUT_DATA_EMPTY_BYTES_WIDTH,
@@ -26,14 +27,14 @@ impl RollupOpsBlock {
     ///
     /// # Arguments
     ///
-    /// * `web3_url` - Web3 provider url
+    /// * `web3` - Web3 provider url
     /// * `event_data` - Rollup contract event description
     ///
-    pub fn get_rollup_ops_block(
-        web3_url: &String,
+    pub fn get_rollup_ops_block<T: Transport>(
+        web3: &Web3<T>,
         event_data: &BlockEvent,
     ) -> Result<Self, failure::Error> {
-        let transaction = get_ethereum_transaction(web3_url, &event_data.transaction_hash)?;
+        let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
         // info!("New ops block input_data: {:?}", &input_data);
         let commitment_data = &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH

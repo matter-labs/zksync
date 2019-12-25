@@ -8,11 +8,10 @@ use ethabi;
 use failure::format_err;
 use models::node::{AccountMap, AccountUpdate};
 use std::str::FromStr;
-use std::time::Duration;
 use storage::ConnectionPool;
 use web3::contract::Contract;
-use web3::types::H160;
-use web3::types::H256;
+use web3::types::{H160, H256};
+use web3::{Transport, Web3};
 
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events
@@ -26,15 +25,15 @@ pub enum StorageUpdateState {
 }
 
 /// Description of data restore driver
-pub struct DataRestoreDriver {
+pub struct DataRestoreDriver<T: Transport> {
     /// Database connection pool
     pub connection_pool: ConnectionPool,
     /// Web3 provider endpoint
-    pub web3_url: String,
+    pub web3: Web3<T>,
     /// Provides Ethereum Governance contract unterface
-    pub governance_contract: (ethabi::Contract, Contract<web3::transports::http::Http>),
+    pub governance_contract: (ethabi::Contract, Contract<T>),
     /// Provides Ethereum Rollup contract unterface
-    pub franklin_contract: (ethabi::Contract, Contract<web3::transports::http::Http>),
+    pub franklin_contract: (ethabi::Contract, Contract<T>),
     /// Flag that indicates that state updates are running
     pub run_update: bool,
     /// Rollup contract events state
@@ -47,13 +46,13 @@ pub struct DataRestoreDriver {
     pub end_eth_blocks_offset: u64,
 }
 
-impl DataRestoreDriver {
+impl<T: Transport> DataRestoreDriver<T> {
     /// Returns new data restore driver with empty events and tree states
     ///
     /// # Arguments
     ///
     /// * `connection_pool` - Database connection pool
-    /// * `web3_url` - Web3 provider url
+    /// * `web3_transport` - Web3 provider transport
     /// * `governance_contract_eth_addr` - Governance contract address
     /// * `franklin_contract_eth_addr` - Rollup contract address
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
@@ -61,14 +60,13 @@ impl DataRestoreDriver {
     ///
     pub fn new_empty(
         connection_pool: ConnectionPool,
-        web3_url: String,
+        web3_transport: T,
         governance_contract_eth_addr: H160,
         franklin_contract_eth_addr: H160,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<Self, failure::Error> {
-        let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
-        let web3 = web3::Web3::new(transport);
+        let web3 = Web3::new(web3_transport);
 
         let governance_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
@@ -104,7 +102,7 @@ impl DataRestoreDriver {
 
         Ok(Self {
             connection_pool,
-            web3_url,
+            web3,
             governance_contract,
             franklin_contract,
             run_update: false,
@@ -120,7 +118,7 @@ impl DataRestoreDriver {
     /// # Arguments
     ///
     /// * `connection_pool` - Database connection pool
-    /// * `web3_url` - Web3 provider url
+    /// * `web3_transport` - Web3 provider transport
     /// * `governance_contract_eth_addr` - Governance contract address
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
     /// * `franklin_contract_eth_addr` - Rollup contract address
@@ -130,7 +128,7 @@ impl DataRestoreDriver {
     ///
     pub fn new_with_genesis_acc(
         connection_pool: ConnectionPool,
-        web3_url: String,
+        web3_transport: T,
         governance_contract_eth_addr: H160,
         governance_contract_genesis_tx_hash: H256,
         franklin_contract_eth_addr: H160,
@@ -138,8 +136,7 @@ impl DataRestoreDriver {
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
     ) -> Result<Self, failure::Error> {
-        let (_eloop, transport) = web3::transports::Http::new(&web3_url).unwrap();
-        let web3 = web3::Web3::new(transport);
+        let web3 = Web3::new(web3_transport);
 
         let governance_contract = {
             let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
@@ -172,9 +169,9 @@ impl DataRestoreDriver {
         let mut events_state = EventsState::new();
 
         let genesis_franklin_transaction =
-            get_ethereum_transaction(&web3_url, &franklin_contract_genesis_tx_hash)?;
+            get_ethereum_transaction(&web3, &franklin_contract_genesis_tx_hash)?;
         let genesis_governance_transaction =
-            get_ethereum_transaction(&web3_url, &governance_contract_genesis_tx_hash)?;
+            get_ethereum_transaction(&web3, &governance_contract_genesis_tx_hash)?;
 
         let genesis_eth_block_number =
             events_state.set_genesis_block_number(&genesis_governance_transaction)?;
@@ -219,7 +216,7 @@ impl DataRestoreDriver {
 
         Ok(Self {
             connection_pool,
-            web3_url,
+            web3,
             governance_contract,
             franklin_contract,
             run_update: false,
@@ -291,7 +288,7 @@ impl DataRestoreDriver {
             if got_new_events {
                 // Update operations
                 let new_ops_blocks = self.update_operations_state()?;
-    
+
                 // Update tree
                 self.update_tree_state(new_ops_blocks)?;
             }
@@ -305,7 +302,7 @@ impl DataRestoreDriver {
     fn update_events_state(&mut self) -> Result<bool, failure::Error> {
         let (block_events, token_events, last_watched_eth_block_number) =
             self.events_state.update_events_state(
-                &self.web3_url,
+                &self.web3,
                 &self.franklin_contract,
                 &self.governance_contract,
                 self.eth_blocks_step,
@@ -337,10 +334,7 @@ impl DataRestoreDriver {
         // Store tokens
         storage_interactor::save_tokens(&self.connection_pool, token_events)?;
 
-        storage_interactor::save_storage_state(
-            &self.connection_pool,
-            StorageUpdateState::Events,
-        )?;
+        storage_interactor::save_storage_state(&self.connection_pool, StorageUpdateState::Events)?;
 
         info!("Updated events storage");
 
@@ -381,10 +375,7 @@ impl DataRestoreDriver {
             )?;
         }
 
-        storage_interactor::save_storage_state(
-            &self.connection_pool,
-            StorageUpdateState::None,
-        )?;
+        storage_interactor::save_storage_state(&self.connection_pool, StorageUpdateState::None)?;
 
         info!("Updated state\n");
 
@@ -417,7 +408,7 @@ impl DataRestoreDriver {
         let committed_events = self.events_state.get_only_verified_committed_events();
         let mut blocks: Vec<RollupOpsBlock> = vec![];
         for event in committed_events {
-            let mut _block = RollupOpsBlock::get_rollup_ops_block(&self.web3_url, &event)?;
+            let mut _block = RollupOpsBlock::get_rollup_ops_block(&self.web3, &event)?;
             blocks.push(_block);
         }
         Ok(blocks)
