@@ -26,7 +26,7 @@ use storage::{
 /// * `genesis_acc_update` - Genesis account update
 ///
 pub fn save_genesis_tree_state(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
     genesis_acc_update: AccountUpdate,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
@@ -57,7 +57,7 @@ pub fn save_genesis_tree_state(
 /// * `tokens` - Tokens that had been added to system
 ///
 pub fn save_tokens(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
     tokens: Vec<TokenAddedEvent>,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool
@@ -81,7 +81,7 @@ pub fn save_tokens(
 /// * `accounts_updated` - accounts updates
 ///
 pub fn update_tree_state(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
     block: Block,
     accounts_updated: AccountUpdates,
 ) -> Result<(), failure::Error> {
@@ -144,7 +144,7 @@ pub fn update_tree_state(
 /// * `events` - Rollup contract events descriptions
 ///
 pub fn save_block_events_state(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
     events: &[BlockEvent],
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
@@ -175,7 +175,7 @@ pub fn save_block_events_state(
 /// * `last_watched_eth_block_number` - Last watched ethereum block
 ///
 pub fn save_last_wached_block_number(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
     last_watched_eth_block_number: u64,
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
@@ -223,7 +223,7 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
 /// * `state` - last recovery state update step
 ///
 pub fn save_storage_state(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
     state: StorageUpdateState,
 ) -> Result<(), failure::Error> {
     let string = match state {
@@ -257,7 +257,7 @@ pub fn save_storage_state(
 /// * `blocks` - Rollup operations blocks
 ///
 pub fn save_rollup_ops(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
     blocks: &[RollupOpsBlock],
 ) -> Result<(), failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
@@ -284,7 +284,7 @@ pub fn save_rollup_ops(
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn get_ops_blocks_from_storage(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
 ) -> Result<Vec<RollupOpsBlock>, failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -323,7 +323,7 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> Rollu
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn get_storage_state(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
 ) -> Result<StorageUpdateState, failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -354,7 +354,7 @@ pub fn get_storage_state(
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn get_last_watched_block_number_from_storage(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
 ) -> Result<u64, failure::Error> {
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -385,10 +385,10 @@ pub fn get_last_watched_block_number_from_storage(
 /// * `connection_pool` - Database Connection Pool
 ///
 pub fn get_block_events_state_from_storage(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
 ) -> Result<EventsState, failure::Error> {
     let last_watched_eth_block_number =
-        get_last_watched_block_number_from_storage(connection_pool.clone())?;
+        get_last_watched_block_number_from_storage(&connection_pool)?;
 
     let storage = connection_pool.access_storage().map_err(|e| {
         format_err!(
@@ -449,9 +449,9 @@ pub fn stored_block_event_into_block_event(
 ///
 /// * `connection_pool` - Database Connection Pool
 ///
-/// connection_pool: ConnectionPool,
+/// connection_pool: &ConnectionPool,
 pub fn get_tree_state(
-    connection_pool: ConnectionPool,
+    connection_pool: &ConnectionPool,
 ) -> Result<(u32, AccountMap, u64, u32), failure::Error> {
     let storage = connection_pool
         .access_storage()
