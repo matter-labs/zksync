@@ -107,17 +107,17 @@ export class Provider {
                 );
             });
         } else {
-            let notifyDone = false;
-            while (!notifyDone) {
+            while (true) {
                 const priorOpStatus = await this.getPriorityOpStatus(serialId);
-                if (priorOpStatus.block) {
-                    if (action == "COMMIT") {
-                        notifyDone = priorOpStatus.block.committed;
-                    } else {
-                        notifyDone = priorOpStatus.block.verified;
-                    }
+                const notifyDone
+                    = action == "COMMIT"
+                    ? priorOpStatus.block && priorOpStatus.block.committed
+                    : priorOpStatus.block && priorOpStatus.block.verified;
+                if (notifyDone) {
+                    return priorOpStatus;
+                } else {
+                    await sleep(3000);
                 }
-                await sleep(3000);
             }
         }
     }
@@ -139,17 +139,17 @@ export class Provider {
                 );
             });
         } else {
-            let notifyDone = false;
-            while (!notifyDone) {
+            while (true) {
                 const transactionStatus = await this.getTxReceipt(hash);
-                if (transactionStatus.block) {
-                    if (action == "COMMIT") {
-                        notifyDone = transactionStatus.block.committed;
-                    } else {
-                        notifyDone = transactionStatus.block.verified;
-                    }
+                const notifyDone 
+                    = action == "COMMIT"
+                    ? transactionStatus.block && transactionStatus.block.committed
+                    : transactionStatus.block && transactionStatus.block.verified;
+                if (notifyDone) {
+                    return transactionStatus;
+                } else {
+                    await sleep(3000);
                 }
-                await sleep(3000);
             }
         }
     }
