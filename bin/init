@@ -7,6 +7,7 @@ check-environment.sh
 zksync dev-up || true
 zksync env
 zksync yarn || true # It can fail.
+zksync gen-keys-if-not-present
 zksync db-wait
 zksync db-setup
 zksync build-contracts

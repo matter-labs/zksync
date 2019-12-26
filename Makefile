@@ -150,12 +150,24 @@ define flatten_file
 endef
 
 # Flatten contract source
-flatten:
+flatten: prepare-contracts
 	@mkdir -p contracts/flat
 	$(call flatten_file,Franklin.sol)
 	$(call flatten_file,Governance.sol)
 	$(call flatten_file,PriorityQueue.sol)
 	$(call flatten_file,Verifier.sol)
+
+gen-keys-if-not-present:
+	# TODO: change compile-time contract reads in abi.rs
+	@mkdir -p contracts/build
+	@touch contracts/build/Franklin.json
+	@touch contracts/build/Governance.json
+	@touch contracts/build/PriorityQueue.json
+	
+	test -f keys/${BLOCK_SIZE_CHUNKS}/VerificationKey.sol || gen-keys
+
+prepare-contracts:
+	@cp keys/${BLOCK_SIZE_CHUNKS}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 
