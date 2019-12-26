@@ -103,7 +103,7 @@ impl<T: Transport> ETHClient<T> {
             chain_id: self.chain_id,
             nonce,
             to: Some(self.contract_addr),
-            value: U256::zero(),
+            value: options.value.unwrap_or_default(),
             gas_price,
             gas: options.gas.unwrap_or_else(|| U256::from(3_000_000)),
             data,

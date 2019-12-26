@@ -1,18 +1,40 @@
 use log::*;
 
+use crate::eth_account::{parse_ether, EthereumAccount};
+use crate::zksync_account::ZksyncAccount;
 use bigdecimal::BigDecimal;
+use eth_client::ETHClient;
 use franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
-use futures::{channel::mpsc, SinkExt, StreamExt};
+use futures::{
+    channel::{mpsc, oneshot},
+    compat::Future01CompatExt,
+    executor::block_on,
+    SinkExt, StreamExt, TryFutureExt,
+};
+use models::abi::FRANKLIN_CONTRACT;
 use models::node::tx::TxSignature;
-use models::node::{Account, AccountAddress, AccountMap, Engine, FranklinTx, Transfer};
+use models::node::{
+    Account, AccountAddress, AccountMap, Engine, FranklinTx, PriorityOp, TokenId, Transfer,
+};
 use rand::{Rng, SeedableRng, XorShiftRng};
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
 };
 use server::ConfigurationOptions;
+use std::convert::TryFrom;
+use std::str::FromStr;
+use std::sync::mpsc::channel;
+use std::time::Duration;
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;
+use tokio::spawn;
+use web3::contract::{Contract, Options};
+use web3::transports::{EventLoopHandle, Http};
+use web3::types::{Address, H256, U256};
+
+pub mod eth_account;
+pub mod zksync_account;
 
 struct TestBlock {
     transactions: Vec<FranklinTx>,
@@ -58,8 +80,22 @@ fn dummy_proposed_block() -> ProposedBlock {
     }
 }
 
+async fn sk_get_account(
+    mut sender: mpsc::Sender<StateKeeperRequest>,
+    address: &AccountAddress,
+) -> Account {
+    let resp = oneshot::channel();
+    sender
+        .send(StateKeeperRequest::GetAccount(address.clone(), resp.0))
+        .await
+        .expect("sk request send");
+    resp.1
+        .await
+        .expect("sk account resp recv")
+        .unwrap_or_else(|| Account::default_with_address(address))
+}
+
 pub fn init_and_run_state_keeper() {
-    let mut main_runtime = Runtime::new().expect("main runtime start");
     let connection_pool = ConnectionPool::new();
     let config = ConfigurationOptions::from_env();
 
@@ -74,47 +110,131 @@ pub fn init_and_run_state_keeper() {
         proposed_blocks_sender,
         executed_tx_notify_sender,
     );
-    start_state_keeper(state_keeper, &main_runtime);
 
-    let empty_block = async move {
-        println!("go1");
-        state_keeper_req_sender
-            .clone()
-            .send(StateKeeperRequest::ExecuteMiniBlock(dummy_proposed_block()))
-            .await;
-        println!("go2");
-        state_keeper_req_sender
-            .clone()
-            .send(StateKeeperRequest::SealBlock)
-            .await;
-        println!("go3");
-        println!("go1");
-        state_keeper_req_sender
-            .clone()
-            .send(StateKeeperRequest::ExecuteMiniBlock(dummy_proposed_block()))
-            .await;
-        println!("go2");
-        state_keeper_req_sender
-            .clone()
-            .send(StateKeeperRequest::SealBlock)
-            .await;
-        println!("go3");
-        state_keeper_req_sender
-            .clone()
-            .send(StateKeeperRequest::SealBlock)
-            .await;
-        println!("go3");
-        state_keeper_req_sender
-            .clone()
-            .send(StateKeeperRequest::SealBlock)
-            .await;
-        println!("go3");
+    let (mut stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
+    let sk_thread_handle = std::thread::spawn(move || {
+        let mut main_runtime = Runtime::new().expect("main runtime start");
+        start_state_keeper(state_keeper, &main_runtime);
+        main_runtime.block_on(async move {
+            stop_state_keeper_receiver.await;
+        })
+    });
+
+    //    let state_proxy = StateProxy::new(&config, state_keeper_req_sender.clone());
+    let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
+
+    let eth_account = EthereumAccount::new(
+        config.operator_private_key,
+        config.operator_eth_addr,
+        transport,
+        &config,
+    );
+    let zksync_account = ZksyncAccount::rand();
+
+    let mut eth_acc_balance = block_on(eth_account.eth_balance()).expect("eth balance get");
+
+    let deposit_amount = parse_ether("1").unwrap();
+    eth_acc_balance -= &deposit_amount;
+    let res = block_on(eth_account.deposit_eth(
+        deposit_amount.clone(),
+        BigDecimal::from(0),
+        &zksync_account.address,
+    ))
+    .expect("deposit fail");
+
+    let transfer_amount = parse_ether("0.33").unwrap();
+    let mut zksync_balance = deposit_amount;
+    zksync_balance -= &transfer_amount;
+    let transfer = FranklinTx::Transfer(zksync_account.sign_transfer(
+        0,
+        transfer_amount,
+        BigDecimal::from(0),
+        &AccountAddress::default(),
+        0,
+    ));
+
+    let block = ProposedBlock {
+        priority_ops: vec![res],
+        txs: vec![transfer],
     };
 
-    main_runtime.block_on(async move {
-        empty_block.await;
-        while let Some(op) = proposed_blocks_receiver.next().await {
-            println!("op: {:#?}", op);
+    let empty_block = async {
+        state_keeper_req_sender
+            .clone()
+            .send(StateKeeperRequest::ExecuteMiniBlock(block))
+            .await;
+        state_keeper_req_sender
+            .clone()
+            .send(StateKeeperRequest::SealBlock)
+            .await;
+    };
+
+    block_on(empty_block);
+
+    let mut next_block = || {
+        block_on(async {
+            if let Some(op) = proposed_blocks_receiver.next().await {
+                println!("op: {:#?}", op);
+            }
+        })
+    };
+
+    next_block();
+
+    // check
+    let eth_acc_new_balance = block_on(eth_account.eth_balance()).expect("eth balance get");
+    let zksync_acc_new_balance = block_on(sk_get_account(
+        state_keeper_req_sender.clone(),
+        &zksync_account.address,
+    ))
+    .get_balance(0);
+
+    println!("eth bal: {}", eth_acc_balance - eth_acc_new_balance);
+    println!(
+        "zksync bal: {} - {}",
+        zksync_balance, zksync_acc_new_balance
+    );
+
+    stop_state_keeper_sender.send(());
+
+    sk_thread_handle.join().expect("sk thread join");
+}
+
+struct StateProxy {
+    web3_event_loop: EventLoopHandle,
+    web3_transport: Http,
+    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    //    gov_contract: (ethabi::Contract, Contract<Http>),
+    //    priority_queue_contract: (ethabi::Contract, Contract<Http>),
+    //    main_contract: (ethabi::Contract, Contract<Http>),
+    config: ConfigurationOptions,
+}
+
+impl StateProxy {
+    fn new(
+        config: &ConfigurationOptions,
+        state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    ) -> Self {
+        let (eloop, transport) = Http::new(&config.web3_url).expect("web3 transport");
+        Self {
+            web3_event_loop: eloop,
+            web3_transport: transport,
+            state_keeper_request_sender,
+            config: config.clone(),
         }
-    });
+    }
+
+    fn emergency_withdraw(&self) {
+        unimplemented!()
+    }
+
+    fn get_offhcain_balance(&self, address: &AccountAddress, token: String) -> BigDecimal {
+        // ask state keeper
+        unimplemented!()
+    }
+
+    fn get_onchain_balance(&self, address: &Address, token: String) -> BigDecimal {
+        // ask ethereum
+        unimplemented!()
+    }
 }

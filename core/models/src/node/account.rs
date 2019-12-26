@@ -15,7 +15,10 @@ use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use crate::circuit::account::{Balance, CircuitAccount};
 use crate::circuit::utils::pub_key_hash_bytes;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
+use crate::node::PrivateKey;
+use crate::params::JUBJUB_PARAMS;
 use franklin_crypto::eddsa::PublicKey;
+use franklin_crypto::jubjub::FixedGenerators;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct AccountAddress {
@@ -52,11 +55,20 @@ impl AccountAddress {
         })
     }
 
-    pub fn from_pubkey(public_key: PublicKey<Engine>) -> Self {
+    pub fn from_pubkey(public_key: &PublicKey<Engine>) -> Self {
         let mut pk_hash =
-            pub_key_hash_bytes(&public_key, &params::PEDERSEN_HASHER as &BabyPedersenHasher);
+            pub_key_hash_bytes(public_key, &params::PEDERSEN_HASHER as &BabyPedersenHasher);
         pk_hash.reverse();
         Self::from_bytes(&pk_hash).expect("pk convert error")
+    }
+
+    pub fn from_privkey(private_key: &PrivateKey) -> Self {
+        let pub_key = PublicKey::from_private(
+            private_key,
+            FixedGenerators::SpendingKeyGenerator,
+            &JUBJUB_PARAMS,
+        );
+        Self::from_pubkey(&pub_key)
     }
 }
 
