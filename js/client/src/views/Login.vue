@@ -39,7 +39,7 @@ export default {
     methods: {
         async login() {
             try {
-                const syncProvider = await zksync.Provider.newWebsocketProvider(config.WS_API_ADDR);
+                const syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
                 const tokensList = await syncProvider.getTokens()
                 window.tokensList = Object.values(tokensList)
                     .map(token => ({

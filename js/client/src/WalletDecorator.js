@@ -483,8 +483,6 @@ export class WalletDecorator {
         const tx = await window.ethProvider.getTransaction(tx_hash);
         const code = await window.ethProvider.call(tx, tx.blockNumber);
 
-        console.log({tx, code});
-
         if (code == '0x') {
             return '';
         } else {
@@ -523,9 +521,6 @@ export class WalletDecorator {
             yield * this.verboseGetRevertReason(deposit.ethTx.hash);
             
             yield * this.verboseGetSyncPriorityOpStatus(deposit);
-
-            const receipt = await window.syncProvider.getPriorityOpStatus(deposit.priorityOpId.toNumber());
-            console.log({deposit, receipt});
         } catch (e) {
             yield combineMessages(
                 info(`Onchain deposit failed with "${e.message}"`, { countdown: 7 }),
@@ -539,8 +534,6 @@ export class WalletDecorator {
         const txHashHtml = shortenedTxHash(syncOp.txHash);
     
         const receipt = await syncOp.awaitReceipt();
-        console.log({receipt});
-
         if (receipt.failReason) {
             yield error(`Transaction ${txHashHtml} with <code>${receipt.failReason}</code>`, { countdown: 10 });
             return;

@@ -24,8 +24,7 @@ export class Client {
     }
 
     static async new() {
-        const syncProvider = await zksync.Provider.newWebsocketProvider(config.WS_API_ADDR);
-        
+        const syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
         const tokensPromise = syncProvider.getTokens()
             .then(tokens => {
                 return Object.values(tokens)
