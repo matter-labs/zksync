@@ -3,13 +3,14 @@ use eth_client::ETHClient;
 use failure::{ensure, format_err};
 use futures::compat::Future01CompatExt;
 use models::abi::FRANKLIN_CONTRACT;
+use models::node::block::Block;
 use models::node::{AccountAddress, PriorityOp, TokenId, U128};
 use server::ConfigurationOptions;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
 use web3::contract::Options;
-use web3::types::{Address, H256, U256};
+use web3::types::{Address, TransactionReceipt, H256, U256};
 use web3::Transport;
 
 pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
@@ -126,5 +127,33 @@ impl<T: Transport> EthereumAccount<T> {
                 .compat()
                 .await?,
         ))
+    }
+
+    pub async fn commit_block(&self, block: &Block) -> Result<TransactionReceipt, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "commitBlock",
+                (
+                    u64::from(block.block_number),
+                    u64::from(block.fee_account),
+                    block.get_eth_encoded_root(),
+                    block.get_eth_public_data(),
+                ),
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("Commit block send err: {}", e))?;
+        Ok(self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("Commit block confirm err: {}", e))?)
     }
 }

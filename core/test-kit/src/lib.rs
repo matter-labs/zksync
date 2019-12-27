@@ -16,6 +16,7 @@ use models::node::tx::TxSignature;
 use models::node::{
     Account, AccountAddress, AccountMap, Engine, FranklinTx, PriorityOp, TokenId, Transfer,
 };
+use models::CommitRequest;
 use rand::{Rng, SeedableRng, XorShiftRng};
 use server::mempool::ProposedBlock;
 use server::state_keeper::{
@@ -171,15 +172,24 @@ pub fn init_and_run_state_keeper() {
 
     block_on(empty_block);
 
-    let mut next_block = || {
+    let mut next_block = || -> CommitRequest {
         block_on(async {
             if let Some(op) = proposed_blocks_receiver.next().await {
                 println!("op: {:#?}", op);
+                return op;
+            } else {
+                panic!("State keeper channel closed");
             }
         })
     };
 
-    next_block();
+    let new_block = next_block();
+    // commit block on eth
+    println!("commiting new block to eth");
+    let block_rec = block_on(eth_account.commit_block(&new_block.block));
+    println!("block receipt: {:#?}", block_rec);
+
+    //
 
     // check
     let eth_acc_new_balance = block_on(eth_account.eth_balance()).expect("eth balance get");
