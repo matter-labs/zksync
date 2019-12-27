@@ -128,7 +128,7 @@ pub fn apply_transfer_to_new_tx(
     tree: &mut CircuitAccountTree,
     transfer_to_new: &TransferToNewOp,
 ) -> TransferToNewWitness<Bn256> {
-    let new_pubkey_hash = Fr::from_hex(&transfer_to_new.tx.to.to_hex()).unwrap();
+    let new_pubkey_hash = transfer_to_new.tx.to.to_fr();
 
     let transfer_data = TransferToNewData {
         amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),

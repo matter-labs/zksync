@@ -84,7 +84,7 @@
 
 import store from './store';
 import timeConstants from './timeConstants';
-import { WalletDecorator } from './WalletDecorator';
+import { clientPromise } from './Client';
 import { readableEther, shortenHash } from './utils';
 
 import SearchField from './SearchField.vue';
@@ -110,7 +110,7 @@ export default {
         client: null,
     }),
     async created() {
-        this.client = new WalletDecorator(this.address, this.fraProvider);
+        this.client = await clientPromise;
 
         this.update();  
         this.intervalHandle = setInterval(async () => {
@@ -128,25 +128,24 @@ export default {
             this.$parent.$router.push('/transactions/' + item.hash);
         },
         async update() {
-            let balances = await this.client.getCommitedBalances();
+            const balances = await this.client.getCommitedBalances(this.address);
             this.balances = balances
                 .map(bal => ({ name: bal.tokenName, value: bal.balance }));
 
-            let offset = (this.currentPage - 1) * this.rowsPerPage;
-            let limit = this.rowsPerPage;
+            const offset = (this.currentPage - 1) * this.rowsPerPage;
+            const limit = this.rowsPerPage;
 
             // maybe load the requested page
             if (this.pagesOfTransactions[this.currentPage] == undefined)
                 this.pagesOfTransactions[this.currentPage] 
-                    = await this.client.getTransactions(offset, limit);
-            
+                    = await this.client.transactionsAsRenderableList(this.address, offset, limit);
 
             let nextPageLoaded = false;
             let numNextPageTransactions;
             
             // maybe load the next page
             if (this.pagesOfTransactions[this.currentPage + 1] == undefined) {
-                let txs = await this.client.getTransactions(offset + limit, limit);
+                let txs = await this.client.transactionsAsRenderableList(this.address, offset + limit, limit);
                 numNextPageTransactions = txs.length;
                 nextPageLoaded = true;
 
@@ -204,40 +203,40 @@ export default {
                 .map(tx => {
                     let TxnHash = `<code>
                         <a href="/transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
-                            ${shortenHash(tx.data.hash, 'unknown hash')}
+                            ${shortenHash(tx.data.hash, 'unknown! hash')}
                         </a>
                     </code>`;                    
 
-                    let link_from
+                    const link_from
                         = tx.data.type == 'Deposit' ? `${this.blockchain_explorer_address}/${tx.data.from}`
                         : `${this.routerBase}accounts/${tx.data.from}`;
 
-                    let link_to
+                    const link_to
                         = tx.data.type == 'Withdraw' ? `${this.blockchain_explorer_address}/${tx.data.to}`
                         : `${this.routerBase}accounts/${tx.data.to}`;
 
-                    let target_from
+                    const target_from
                         = tx.data.type == 'Deposit' ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
-                    let target_to
+                    const target_to
                         = tx.data.type == 'Withdraw' ? `target="_blank" rel="noopener noreferrer"`
                         : '';
 
-                    let From = `<code>
+                    const From = `<code>
                         <a href="${link_from}" ${target_from}>
-                            ${shortenHash(tx.data.from, 'unknown from')}
+                            ${shortenHash(tx.data.from, 'unknown! from')}
                         </a>
                     </code>`;
 
-                    let To = `<code>
+                    const To = `<code>
                         <a href="${link_to}" ${target_to}>
-                            ${shortenHash(tx.data.to, 'unknown to')}
+                            ${shortenHash(tx.data.to, 'unknown! to')}
                         </a>
                     </code>`;
 
-                    let Type = `<b>${tx.data.type}</b>`;
-                    let Amount = `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
+                    const Type = `<b>${tx.data.type}</b>`;
+                    const Amount = `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
 
                     return {
                         Type,

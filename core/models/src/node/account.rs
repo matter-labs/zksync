@@ -36,12 +36,12 @@ impl AccountAddress {
     }
 
     pub fn to_hex(&self) -> String {
-        format!("0x{}", hex::encode(&self.data))
+        format!("sync:{}", hex::encode(&self.data))
     }
 
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
-        ensure!(s.starts_with("0x"), "Address should start with 0x");
-        let bytes = hex::decode(&s[2..])?;
+        ensure!(s.starts_with("sync:"), "Address should start with sync:");
+        let bytes = hex::decode(&s[5..])?;
         Self::from_bytes(&bytes)
     }
 
@@ -57,6 +57,10 @@ impl AccountAddress {
             pub_key_hash_bytes(&public_key, &params::PEDERSEN_HASHER as &BabyPedersenHasher);
         pk_hash.reverse();
         Self::from_bytes(&pk_hash).expect("pk convert error")
+    }
+
+    pub fn to_fr(&self) -> Fr {
+        Fr::from_hex(&format!("0x{}", hex::encode(&self.data))).unwrap()
     }
 }
 
@@ -135,7 +139,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
-        circuit_account.pub_key_hash = Fr::from_hex(&acc.address.to_hex()).unwrap();
+        circuit_account.pub_key_hash = acc.address.to_fr();
         circuit_account
     }
 }

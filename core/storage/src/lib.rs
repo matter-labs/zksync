@@ -780,7 +780,7 @@ impl StorageProcessor {
 
             let new_block = StorageBlock {
                 number: i64::from(block.block_number),
-                root_hash: block.new_root_hash.to_hex(),
+                root_hash: format!("sync-bl:{}", &block.new_root_hash.to_hex()),
                 fee_account_id: i64::from(block.fee_account),
                 unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
                 unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
@@ -991,7 +991,7 @@ impl StorageProcessor {
         let query = format!(
             "
             select
-                concat('0x', encode(hash, 'hex')) as hash,
+                hash,
                 pq_id,
                 tx,
                 success,
@@ -1004,7 +1004,7 @@ impl StorageProcessor {
                 from (
                     select
                         tx,
-                        hash,
+                        'sync-tx:' || encode(hash, 'hex') as hash,
                         null as pq_id,
                         success,
                         fail_reason,
@@ -1016,13 +1016,13 @@ impl StorageProcessor {
                     on
                         tx_hash = hash
                     where
-                        encode(primary_account_address, 'hex') = '{address}'
+                        'sync:' || encode(primary_account_address, 'hex') = '{address}'
                         or
-                        tx->>'to' = '0x{address}'
+                        tx->>'to' = '{address}'
                     union all
                     select
                         operation as tx,
-                        eth_hash as hash,
+                        '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
                         null as success,
                         null as fail_reason,
@@ -1030,7 +1030,7 @@ impl StorageProcessor {
                     from 
                         executed_priority_operations
                     where 
-                        operation->'priority_op'->>'account' = '0x{address}') t
+                        operation->'priority_op'->>'account' = '{address}') t
                 order by
                     block_number desc
                 offset 
@@ -1055,7 +1055,7 @@ impl StorageProcessor {
             using 
                 (block_number)
             ",
-            address = hex::encode(address.data),
+            address = address.to_hex(),
             offset = offset,
             limit = limit
         );
@@ -1139,7 +1139,7 @@ impl StorageProcessor {
 
         Ok(Some(Block {
             block_number: block,
-            new_root_hash: Fr::from_hex(&stored_block.root_hash).expect("Unparsable root hash"),
+            new_root_hash: Fr::from_hex(&format!("0x{}", &stored_block.root_hash[8..])).expect("Unparsable root hash"),
             fee_account: stored_block.fee_account_id as AccountId,
             block_transactions,
             processed_priority_ops: (
@@ -1549,7 +1549,7 @@ impl StorageProcessor {
             with eth_ops as (
             	select
             		operations.block_number,
-                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
+                    'sync-tx:' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
             		operations.action_type,
             		operations.created_at
             	from operations

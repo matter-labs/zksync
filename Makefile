@@ -1,6 +1,6 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
-export SERVER_DOCKER_IMAGE ?=matterlabs/server:latest
-export PROVER_DOCKER_IMAGE ?=matterlabs/prover:latest
+export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(ZKSYNC_ENV)
+export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(ZKSYNC_ENV)
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(ZKSYNC_ENV)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
@@ -15,7 +15,6 @@ init:
 	@bin/init
 
 yarn:
-	@cd js/franklin_lib && yarn
 	@cd js/client && yarn
 	@cd js/explorer && yarn
 	@cd contracts && yarn
@@ -44,10 +43,7 @@ db-setup:
 db-insert-contract:
 	@bin/db-insert-contract.sh
 
-update-frontend-contract:
-	@bin/update-frontend-contract.sh
-
-db-reset: confirm_action db-wait db-drop db-setup db-insert-contract update-frontend-contract
+db-reset: confirm_action db-wait db-drop db-setup db-insert-contract
 	@echo database is ready
 
 db-migrate: confirm_action
@@ -62,7 +58,7 @@ db-drop: confirm_action
 db-wait:
 	@bin/db-wait
 
-genesis: confirm_action db-reset
+genesis: confirm_action
 	@bin/genesis.sh
 
 # Frontend clients
@@ -154,12 +150,24 @@ define flatten_file
 endef
 
 # Flatten contract source
-flatten:
+flatten: prepare-contracts
 	@mkdir -p contracts/flat
 	$(call flatten_file,Franklin.sol)
 	$(call flatten_file,Governance.sol)
 	$(call flatten_file,PriorityQueue.sol)
 	$(call flatten_file,Verifier.sol)
+
+gen-keys-if-not-present:
+	# TODO: change compile-time contract reads in abi.rs
+	@mkdir -p contracts/build
+	@touch contracts/build/Franklin.json
+	@touch contracts/build/Governance.json
+	@touch contracts/build/PriorityQueue.json
+	
+	test -f keys/${BLOCK_SIZE_CHUNKS}/VerificationKey.sol || gen-keys
+
+prepare-contracts:
+	@cp keys/${BLOCK_SIZE_CHUNKS}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 

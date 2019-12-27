@@ -25,7 +25,7 @@ export default {
         for await (const progress of this.verboseOp.generator.gencopy()) {
             if (progress.displayMessage) {
                 this.$refs.alert.display(progress.displayMessage);
-                wait = progress.displayMessage.countdown;
+                wait = progress.displayMessage.countdown || progress.displayMessage.timeout;
             }
 
             if (progress.startProgressBar) {
