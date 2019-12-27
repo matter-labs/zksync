@@ -17,7 +17,7 @@ fn main() {
     loop {
         let storage = pool.access_storage().expect("Storage access");
         let job = storage
-            .next_unverified_commit(
+            .prover_run_for_next_commit(
                 worker,
                 time::Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
             )

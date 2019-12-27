@@ -9,6 +9,7 @@ use std::time::Duration;
 use clap::{App, Arg};
 use futures::channel::mpsc as fmpsc;
 // Workspace deps
+use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL};
 use models::StateKeeperRequest;
 use prover::server::start_server as start_prover_server;
 use server::api_server::start_api_server;

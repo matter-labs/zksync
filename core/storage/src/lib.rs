@@ -1964,7 +1964,7 @@ impl StorageProcessor {
     }
 
     // TODO: remove this method
-    pub fn next_unverified_commit(
+    pub fn prover_run_for_next_commit(
         &self,
         worker_: &str,
         prover_timeout: time::Duration,

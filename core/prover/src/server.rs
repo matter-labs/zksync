@@ -55,7 +55,7 @@ fn block_to_prove(
         Ok(s) => s,
         Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
     };
-    match storage.next_unverified_commit(&r.name, data.prover_timeout) {
+    match storage.prover_run_for_next_commit(&r.name, data.prover_timeout) {
         Ok(ret) => {
             if let Some(prover_run) = ret {
                 return Ok(HttpResponse::Ok().json(BlockToProveRes {

@@ -10,11 +10,11 @@ use std::{fmt, thread, time};
 use bellman::groth16;
 use ff::PrimeField;
 use log::{error, info};
-use pairing::bn256;
 // Workspace deps
+use models::node::Engine;
 
 pub struct BabyProver<C: ApiClient> {
-    circuit_params: groth16::Parameters<bn256::Bn256>,
+    circuit_params: groth16::Parameters<Engine>,
     jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
     api_client: C,
     heartbeat_interval: time::Duration,
@@ -77,7 +77,7 @@ pub fn start<C: 'static + Sync + Send + ApiClient>(
 
 impl<C: ApiClient> BabyProver<C> {
     pub fn new(
-        circuit_params: groth16::Parameters<bn256::Bn256>,
+        circuit_params: groth16::Parameters<Engine>,
         jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
         api_client: C,
         heartbeat_interval: time::Duration,

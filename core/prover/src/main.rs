@@ -6,10 +6,10 @@ use std::{env, thread, time};
 use bellman::groth16;
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use log::{debug, error, info};
-use pairing::bn256;
 use signal_hook::iterator::Signals;
 // Workspace deps
 use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_HEARTBEAT_INTERVAL};
+use models::node::Engine;
 use prover::client;
 use prover::{start, BabyProver};
 
@@ -84,7 +84,7 @@ fn main() {
         .expect("failed to send prover stop request");
 }
 
-fn read_from_key_dir(key_dir: String) -> groth16::Parameters<bn256::Bn256> {
+fn read_from_key_dir(key_dir: String) -> groth16::Parameters<Engine> {
     let path = {
         let mut key_file_path = std::path::PathBuf::new();
         key_file_path.push(&key_dir);
@@ -99,14 +99,14 @@ fn read_from_key_dir(key_dir: String) -> groth16::Parameters<bn256::Bn256> {
     read_parameters(&path.to_str().expect("failed to get keys location"))
 }
 
-fn read_parameters(file_name: &str) -> groth16::Parameters<bn256::Bn256> {
+fn read_parameters(file_name: &str) -> groth16::Parameters<Engine> {
     use std::fs::File;
     use std::io::BufReader;
 
     let f_r = File::open(file_name).expect("failed to open file");
     let mut r = BufReader::new(f_r);
-    let circuit_params = groth16::Parameters::<bn256::Bn256>::read(&mut r, true)
-        .expect("failed to read circuit params");
+    let circuit_params =
+        groth16::Parameters::<Engine>::read(&mut r, true).expect("failed to read circuit params");
 
     circuit_params
 }
