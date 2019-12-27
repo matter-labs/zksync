@@ -1752,21 +1752,7 @@ impl StorageProcessor {
     }
 
     pub fn load_unverified_commits(&self) -> QueryResult<Vec<Operation>> {
-        self.conn().transaction(|| {
-            let ops: Vec<StoredOperation> = diesel::sql_query(
-                "
-                SELECT * FROM operations
-                WHERE action_type = 'COMMIT'
-                AND block_number > (
-                    SELECT COALESCE(max(block_number), 0)  
-                    FROM operations 
-                    WHERE action_type = 'VERIFY'
-                )
-            ",
-            )
-            .load(self.conn())?;
-            ops.into_iter().map(|o| o.into_op(self)).collect()
-        })
+        self.load_unverified_commits_after_block(0, 10e9 as i64)
     }
 
     fn get_account_and_last_block(
