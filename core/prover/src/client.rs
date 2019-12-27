@@ -71,7 +71,6 @@ impl ApiClient {
 
 impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
-        // TODO: handle errors
         let client = reqwest::Client::new();
         let mut res = client
             .get(&self.block_to_prove_url)

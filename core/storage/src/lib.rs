@@ -1949,7 +1949,6 @@ impl StorageProcessor {
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
 
-    // TODO: remove this method
     pub fn prover_run_for_next_commit(
         &self,
         worker_: &str,
