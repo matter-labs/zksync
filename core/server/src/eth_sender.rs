@@ -15,6 +15,7 @@
 use std::collections::{HashSet, VecDeque};
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 // External deps
 use bigdecimal::BigDecimal;
@@ -77,12 +78,12 @@ struct ExecutedTxStatus {
 struct ETHSender<T: Transport> {
     // unconfirmed operations queue
     unconfirmed_ops: VecDeque<OperationETHState>,
-    db_pool: ConnectionPool,
+    db_pool: Arc<ConnectionPool>,
     eth_client: ETHClient<T>,
 }
 
 impl<T: Transport> ETHSender<T> {
-    fn new(db_pool: ConnectionPool, eth_client: ETHClient<T>) -> Self {
+    fn new(db_pool: Arc<ConnectionPool>, eth_client: ETHClient<T>) -> Self {
         let mut sender = Self {
             eth_client,
             unconfirmed_ops: VecDeque::new(),
@@ -401,7 +402,7 @@ impl<T: Transport> ETHSender<T> {
 }
 
 pub fn start_eth_sender(
-    pool: ConnectionPool,
+    pool: Arc<ConnectionPool>,
     panic_notify: Sender<bool>,
     op_notify_sender: fmpsc::Sender<Operation>,
     config_options: ConfigurationOptions,

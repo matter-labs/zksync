@@ -3,6 +3,7 @@
 extern crate log;
 // Built-in deps
 use std::sync::mpsc::channel;
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 // External deps
@@ -34,12 +35,12 @@ fn main() {
         )
         .get_matches();
 
-    let connection_pool = ConnectionPool::new();
+    let connection_pool = Arc::new(ConnectionPool::new());
 
     if cli.is_present("genesis") {
         info!("Generating genesis block.");
         PlasmaStateKeeper::create_genesis_block(
-            connection_pool.clone(),
+            Arc::clone(&connection_pool),
             &config_opts.operator_franklin_addr,
         );
         return;
@@ -57,23 +58,24 @@ fn main() {
         .expect("Error setting Ctrl-C handler");
     }
 
-    let storage = connection_pool
-        .access_storage()
-        .expect("db connection failed for committer");
-    let contract_addr: H160 = storage
-        .load_config()
-        .expect("can not load server_config")
-        .contract_addr
-        .expect("contract_addr empty in server_config")[2..]
-        .parse()
-        .expect("contract_addr in db wrong");
+    let contract_addr: H160 = {
+        let storage = connection_pool
+            .access_storage()
+            .expect("failed to connect to db");
+        storage
+            .load_config()
+            .expect("failed to load server config")
+            .contract_addr
+            .expect("contract_address is empty in server_config")[2..]
+            .parse()
+            .expect("failed to parse contract_addr")
+    };
     if contract_addr != config_opts.contract_eth_addr {
         panic!(
             "Contract addresses mismatch! From DB = {}, from env = {}",
             contract_addr, config_opts.contract_eth_addr
         );
     }
-    drop(storage);
 
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
@@ -81,13 +83,13 @@ fn main() {
     info!("starting actors");
 
     let shared_eth_state = start_eth_watch(
-        connection_pool.clone(),
+        Arc::clone(&connection_pool),
         stop_signal_sender.clone(),
         config_opts.clone(),
     );
     let (tx_for_ops, rx_for_ops) = channel();
     let state_keeper = PlasmaStateKeeper::new(
-        connection_pool.clone(),
+        Arc::clone(&connection_pool),
         shared_eth_state,
         config_opts.operator_franklin_addr.clone(),
     );
@@ -100,7 +102,7 @@ fn main() {
     );
     let (op_notify_sender, op_notify_receiver) = fmpsc::channel(256);
     let tx_for_eth = eth_sender::start_eth_sender(
-        connection_pool.clone(),
+        Arc::clone(&connection_pool),
         stop_signal_sender.clone(),
         op_notify_sender.clone(),
         config_opts.clone(),
@@ -109,17 +111,18 @@ fn main() {
         rx_for_ops,
         tx_for_eth,
         op_notify_sender,
-        connection_pool.clone(),
+        Arc::clone(&connection_pool),
         stop_signal_sender.clone(),
     );
     start_api_server(
         op_notify_receiver,
-        connection_pool.clone(),
+        Arc::clone(&connection_pool),
         stop_signal_sender.clone(),
         config_opts.clone(),
     );
     thread::spawn(move || {
         start_prover_server(
+            connection_pool,
             &config_opts.prover_server_address,
             Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
             Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),

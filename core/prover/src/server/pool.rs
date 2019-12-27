@@ -50,22 +50,21 @@ impl ProversDataPool {
 }
 
 pub fn maintain(
-    conn_pool: storage::ConnectionPool,
+    conn_pool: Arc<storage::ConnectionPool>,
     data: Arc<RwLock<ProversDataPool>>,
     rounds_interval: time::Duration,
 ) {
     info!("preparing prover data routine started");
     let phasher = PedersenHasher::<Engine>::default();
     let params = AltJubjubBn256::new();
-    let storage = conn_pool.access_storage().expect("failed to connect to db");
     loop {
         if has_capacity(&data) {
-            take_next_commits(&storage, &data).expect("failed to get next commit operations");
+            take_next_commits(&conn_pool, &data).expect("failed to get next commit operations");
         }
         if all_prepared(&data) {
             thread::sleep(rounds_interval);
         } else {
-            prepare_next(&storage, &data, &phasher, &params)
+            prepare_next(&conn_pool, &data, &phasher, &params)
                 .expect("failed to prepare prover data");
         }
     }
@@ -77,10 +76,11 @@ fn has_capacity(data: &Arc<RwLock<ProversDataPool>>) -> bool {
 }
 
 fn take_next_commits(
-    storage: &storage::StorageProcessor,
+    conn_pool: &Arc<storage::ConnectionPool>,
     data: &Arc<RwLock<ProversDataPool>>,
 ) -> Result<(), String> {
     let d = data.write().expect("failed to acquire a lock");
+    let storage = conn_pool.access_storage().expect("failed to connect to db");
     let ops = match storage.load_unverified_commits_after_block(d.last_loaded, d.limit) {
         Ok(v) => v,
         Err(e) => {
@@ -107,13 +107,14 @@ fn all_prepared(data: &Arc<RwLock<ProversDataPool>>) -> bool {
 }
 
 fn prepare_next(
-    storage: &storage::StorageProcessor,
+    conn_pool: &Arc<storage::ConnectionPool>,
     data: &Arc<RwLock<ProversDataPool>>,
     phasher: &PedersenHasher<Engine>,
     params: &AltJubjubBn256,
 ) -> Result<(), String> {
     let mut d = data.write().expect("failed to acquire a lock");
     let current = (*d).last_prepared + 1;
+    let storage = conn_pool.access_storage().expect("failed to connect to db");
     let op = d.operations.remove(&current).expect("data is inconsistent");
     drop(d);
     let pd = build_prover_data(&storage, &op, phasher, params)?;

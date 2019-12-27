@@ -1,5 +1,6 @@
 // Built-in deps
 use std::sync::mpsc::{Receiver, Sender};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 // External deps
@@ -13,7 +14,7 @@ pub fn start_committer(
     rx_for_ops: Receiver<CommitRequest>,
     tx_for_eth: Sender<Operation>,
     op_notify_sender: fmpsc::Sender<Operation>,
-    pool: ConnectionPool,
+    pool: Arc<ConnectionPool>,
     panic_notify: Sender<bool>,
 ) {
     thread::Builder::new()
@@ -29,7 +30,7 @@ fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
     tx_for_eth: Sender<Operation>,
     mut op_notify_sender: fmpsc::Sender<Operation>,
-    pool: ConnectionPool,
+    pool: Arc<ConnectionPool>,
 ) {
     info!("committer started");
     let storage = pool

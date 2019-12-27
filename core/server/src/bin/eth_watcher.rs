@@ -1,4 +1,5 @@
 use server::eth_watch::EthWatch;
+use std::sync::Arc;
 use storage::ConnectionPool;
 
 fn main() {
@@ -17,7 +18,7 @@ fn main() {
 
     let watcher = EthWatch::new(
         web3,
-        ConnectionPool::new(),
+        Arc::new(ConnectionPool::new()),
         governance_addr,
         priority_queue_address,
     );

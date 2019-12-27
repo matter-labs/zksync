@@ -157,6 +157,7 @@ fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::R
 }
 
 pub fn start_server(
+    connection_pool: Arc<storage::ConnectionPool>,
     bind_to: &net::SocketAddr,
     prover_timeout: time::Duration,
     rounds_interval: time::Duration,
@@ -165,14 +166,12 @@ pub fn start_server(
     // TODO: graceful thread exit?
     let data_pool_copy = Arc::clone(&data_pool);
     thread::spawn(move || {
-        let conn_pool = storage::ConnectionPool::new();
-        pool::maintain(conn_pool, data_pool_copy, rounds_interval);
+        pool::maintain(connection_pool, data_pool_copy, rounds_interval);
     });
     HttpServer::new(move || {
         App::new()
             .wrap(actix_web::middleware::Logger::default())
             .data(AppState {
-                // TODO: receive conn pool?
                 connection_pool: storage::ConnectionPool::new(),
                 preparing_data_pool: Arc::clone(&data_pool),
                 prover_timeout,

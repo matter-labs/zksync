@@ -29,7 +29,7 @@ pub struct PlasmaStateKeeper {
     next_block_try_timer: Instant,
     block_tries: usize,
 
-    db_conn_pool: ConnectionPool,
+    db_conn_pool: Arc<ConnectionPool>,
 
     fee_account_address: AccountAddress,
 
@@ -44,7 +44,7 @@ type UpdatedAccounts = AccountMap;
 
 impl PlasmaStateKeeper {
     pub fn new(
-        pool: ConnectionPool,
+        pool: Arc<ConnectionPool>,
         eth_state: Arc<RwLock<ETHState>>,
         fee_account_address: AccountAddress,
     ) -> Self {
@@ -91,7 +91,7 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &AccountAddress) {
+    pub fn create_genesis_block(pool: Arc<ConnectionPool>, fee_account_address: &AccountAddress) {
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");

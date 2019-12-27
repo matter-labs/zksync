@@ -6,12 +6,11 @@ use actix_web::{
 };
 use models::node::{Account, AccountAddress, AccountId, ExecutedOperations, FranklinTx};
 use models::NetworkStatus;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, RwLock};
 use storage::{ConnectionPool, StorageProcessor};
 
 use crate::ThreadPanicNotify;
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
@@ -29,7 +28,7 @@ impl SharedNetworkStatus {
 /// AppState is a collection of records cloned by each thread to shara data between them
 #[derive(Clone)]
 struct AppState {
-    connection_pool: ConnectionPool,
+    connection_pool: Arc<ConnectionPool>,
     network_status: SharedNetworkStatus,
     contract_address: String,
 }
@@ -447,7 +446,7 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
 
 /// Start HTTP REST API
 pub(super) fn start_server_thread_detached(
-    connection_pool: ConnectionPool,
+    connection_pool: Arc<ConnectionPool>,
     listen_addr: SocketAddr,
     contract_address: H160,
     panic_notify: mpsc::Sender<bool>,

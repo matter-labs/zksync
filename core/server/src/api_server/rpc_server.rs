@@ -8,7 +8,7 @@ use models::node::tx::TxHash;
 use models::node::{Account, AccountAddress, AccountId, FranklinTx, Nonce, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use storage::{ConnectionPool, StorageProcessor, Token, TxAddError};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -94,7 +94,7 @@ pub trait Rpc {
 }
 
 pub struct RpcApp {
-    pub connection_pool: ConnectionPool,
+    pub connection_pool: Arc<ConnectionPool>,
 }
 
 impl RpcApp {
@@ -239,7 +239,7 @@ impl Rpc for RpcApp {
 
 pub fn start_rpc_server(
     addr: SocketAddr,
-    connection_pool: ConnectionPool,
+    connection_pool: Arc<ConnectionPool>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
