@@ -28,7 +28,7 @@ impl SharedNetworkStatus {
 /// AppState is a collection of records cloned by each thread to shara data between them
 #[derive(Clone)]
 struct AppState {
-    connection_pool: Arc<ConnectionPool>,
+    connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
     contract_address: String,
 }
@@ -446,7 +446,7 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
 
 /// Start HTTP REST API
 pub(super) fn start_server_thread_detached(
-    connection_pool: Arc<ConnectionPool>,
+    connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,
     panic_notify: mpsc::Sender<bool>,

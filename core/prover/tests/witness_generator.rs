@@ -11,7 +11,7 @@ use testhelper::TestAccount;
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
     // TODO: make single server spawn for all tests
     let bind_to = "127.0.0.1:8088";
-    let conn_pool = Arc::new(storage::ConnectionPool::new());
+    let conn_pool = storage::ConnectionPool::new();
     let addr = net::SocketAddr::from_str(bind_to).unwrap();
     thread::spawn(move || {
         server::start_server(conn_pool, &addr, prover_timeout, rounds_interval);

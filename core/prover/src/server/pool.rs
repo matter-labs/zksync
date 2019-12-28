@@ -50,7 +50,7 @@ impl ProversDataPool {
 }
 
 pub fn maintain(
-    conn_pool: Arc<storage::ConnectionPool>,
+    conn_pool: storage::ConnectionPool,
     data: Arc<RwLock<ProversDataPool>>,
     rounds_interval: time::Duration,
 ) {
@@ -76,7 +76,7 @@ fn has_capacity(data: &Arc<RwLock<ProversDataPool>>) -> bool {
 }
 
 fn take_next_commits(
-    conn_pool: &Arc<storage::ConnectionPool>,
+    conn_pool: &storage::ConnectionPool,
     data: &Arc<RwLock<ProversDataPool>>,
 ) -> Result<(), String> {
     let d = data.write().expect("failed to acquire a lock");
@@ -107,7 +107,7 @@ fn all_prepared(data: &Arc<RwLock<ProversDataPool>>) -> bool {
 }
 
 fn prepare_next(
-    conn_pool: &Arc<storage::ConnectionPool>,
+    conn_pool: &storage::ConnectionPool,
     data: &Arc<RwLock<ProversDataPool>>,
     phasher: &PedersenHasher<Engine>,
     params: &AltJubjubBn256,

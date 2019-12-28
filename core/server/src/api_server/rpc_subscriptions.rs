@@ -173,7 +173,7 @@ struct RpcSubApp {
 
 pub fn start_ws_server(
     op_recv: fmpsc::Receiver<Operation>,
-    db_pool: Arc<ConnectionPool>,
+    db_pool: ConnectionPool,
     addr: SocketAddr,
     panic_notify: mpsc::Sender<bool>,
 ) {

@@ -11,33 +11,33 @@ mod rpc_subscriptions;
 
 use crate::ConfigurationOptions;
 use models::Operation;
-use std::sync::{mpsc, Arc};
+use std::sync::mpsc;
 use storage::ConnectionPool;
 
 use futures::channel::mpsc as fmpsc;
 
 pub fn start_api_server(
     op_notify_receiver: fmpsc::Receiver<Operation>,
-    connection_pool: Arc<ConnectionPool>,
+    connection_pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     config_options: ConfigurationOptions,
 ) {
     rest::start_server_thread_detached(
-        Arc::clone(&connection_pool),
+        connection_pool.clone(),
         config_options.rest_api_server_address,
         config_options.contract_eth_addr,
         panic_notify.clone(),
     );
     rpc_subscriptions::start_ws_server(
         op_notify_receiver,
-        Arc::clone(&connection_pool),
+        connection_pool.clone(),
         config_options.json_rpc_ws_server_address,
         panic_notify.clone(),
     );
 
     rpc_server::start_rpc_server(
         config_options.json_rpc_http_server_address,
-        Arc::clone(&connection_pool),
+        connection_pool.clone(),
         panic_notify.clone(),
     );
 }

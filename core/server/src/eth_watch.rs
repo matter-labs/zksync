@@ -24,7 +24,7 @@ pub struct EthWatch<T: Transport> {
     processed_block: u64,
     eth_state: Arc<RwLock<ETHState>>,
     web3: Web3<T>,
-    db_pool: Arc<ConnectionPool>,
+    db_pool: ConnectionPool,
 }
 
 #[derive(Debug)]
@@ -66,7 +66,7 @@ impl TryFrom<Log> for TokenAddedEvent {
 impl<T: Transport> EthWatch<T> {
     pub fn new(
         web3: Web3<T>,
-        db_pool: Arc<ConnectionPool>,
+        db_pool: ConnectionPool,
         governance_addr: H160,
         priority_queue_address: H160,
     ) -> Self {
@@ -275,7 +275,7 @@ impl<T: Transport> EthWatch<T> {
 }
 
 pub fn start_eth_watch(
-    pool: Arc<ConnectionPool>,
+    pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     config_options: ConfigurationOptions,
 ) -> Arc<RwLock<ETHState>> {

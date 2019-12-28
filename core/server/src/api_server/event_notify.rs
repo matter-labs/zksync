@@ -20,7 +20,6 @@ use models::{
     ActionType, Operation,
 };
 use std::collections::BTreeMap;
-use std::sync::Arc;
 use storage::ConnectionPool;
 
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
@@ -57,7 +56,7 @@ struct SubscriptionSender<T> {
 }
 
 struct OperationNotifier {
-    db_pool: Arc<ConnectionPool>,
+    db_pool: ConnectionPool,
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
     prior_op_subs: BTreeMap<(u64, ActionType), Vec<SubscriptionSender<ETHOpInfoResp>>>,
     account_subs: BTreeMap<(AccountId, ActionType), Vec<SubscriptionSender<ResponseAccountState>>>,
@@ -420,7 +419,7 @@ impl OperationNotifier {
 }
 
 pub fn start_sub_notifier<BStream, SStream>(
-    db_pool: Arc<ConnectionPool>,
+    db_pool: ConnectionPool,
     mut new_block_stream: BStream,
     mut subscription_stream: SStream,
     panic_notify: std::sync::mpsc::Sender<bool>,

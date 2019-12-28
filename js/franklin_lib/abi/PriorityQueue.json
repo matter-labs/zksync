@@ -127,20 +127,6 @@
       "constant": false,
       "inputs": [
         {
-          "name": "_franklinAddress",
-          "type": "address"
-        }
-      ],
-      "name": "changeFranklinAddress",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
           "name": "_number",
           "type": "uint64"
         }
@@ -212,6 +198,20 @@
       "type": "function"
     },
     {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_franklinAddress",
+          "type": "address"
+        }
+      ],
+      "name": "setFranklinAddress",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "constant": true,
       "inputs": [
         {
@@ -228,7 +228,7 @@
     {
       "inputs": [
         {
-          "name": "_ownerAddress",
+          "name": "_governanceAddress",
           "type": "address"
         }
       ],

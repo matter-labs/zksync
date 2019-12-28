@@ -3,7 +3,6 @@
 extern crate log;
 // Built-in deps
 use std::sync::mpsc::channel;
-use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 // External deps
@@ -35,12 +34,12 @@ fn main() {
         )
         .get_matches();
 
-    let connection_pool = Arc::new(ConnectionPool::new());
+    let connection_pool = ConnectionPool::new();
 
     if cli.is_present("genesis") {
         info!("Generating genesis block.");
         PlasmaStateKeeper::create_genesis_block(
-            Arc::clone(&connection_pool),
+            connection_pool.clone(),
             &config_opts.operator_franklin_addr,
         );
         return;
@@ -83,13 +82,13 @@ fn main() {
     info!("starting actors");
 
     let shared_eth_state = start_eth_watch(
-        Arc::clone(&connection_pool),
+        connection_pool.clone(),
         stop_signal_sender.clone(),
         config_opts.clone(),
     );
     let (tx_for_ops, rx_for_ops) = channel();
     let state_keeper = PlasmaStateKeeper::new(
-        Arc::clone(&connection_pool),
+        connection_pool.clone(),
         shared_eth_state,
         config_opts.operator_franklin_addr.clone(),
     );
@@ -102,7 +101,7 @@ fn main() {
     );
     let (op_notify_sender, op_notify_receiver) = fmpsc::channel(256);
     let tx_for_eth = eth_sender::start_eth_sender(
-        Arc::clone(&connection_pool),
+        connection_pool.clone(),
         stop_signal_sender.clone(),
         op_notify_sender.clone(),
         config_opts.clone(),
@@ -111,12 +110,12 @@ fn main() {
         rx_for_ops,
         tx_for_eth,
         op_notify_sender,
-        Arc::clone(&connection_pool),
+        connection_pool.clone(),
         stop_signal_sender.clone(),
     );
     start_api_server(
         op_notify_receiver,
-        Arc::clone(&connection_pool),
+        connection_pool.clone(),
         stop_signal_sender.clone(),
         config_opts.clone(),
     );
