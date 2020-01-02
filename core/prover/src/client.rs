@@ -114,9 +114,8 @@ impl crate::ApiClient for ApiClient {
         timeout: time::Duration,
     ) -> Result<ProverData, failure::Error> {
         let client = reqwest::Client::new();
-        // TODO: whats the idiomatic way of cancallation by timeout.
-        let now = time::SystemTime::now();
-        while now.elapsed().expect("failed to get elapsed time") < timeout {
+        let now = time::Instant::now();
+        while now.elapsed() < timeout {
             let mut res = client
                 .get(&self.prover_data_url)
                 .json(&block)
