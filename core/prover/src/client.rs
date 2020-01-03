@@ -100,10 +100,7 @@ impl crate::ApiClient for ApiClient {
             .send()
             .map_err(|e| format_err!("failed to send working on request: {}", e))?;
         if res.status() != reqwest::StatusCode::OK {
-            return Err(format_err!(
-                "working on request failed with status: {}",
-                res.status()
-            ));
+            failure::bail!("working on request failed with status: {}", res.status())
         }
         Ok(())
     }
@@ -132,7 +129,7 @@ impl crate::ApiClient for ApiClient {
             thread::sleep(time::Duration::from_secs(10));
         }
 
-        Err(format_err!("timeout"))
+        failure::bail!("timeout")
     }
 
     fn publish(
@@ -159,10 +156,7 @@ impl crate::ApiClient for ApiClient {
             .send()
             .map_err(|e| format_err!("failed to send publish request: {}", e))?;
         if res.status() != reqwest::StatusCode::OK {
-            return Err(format_err!(
-                "publish request failed with status: {}",
-                res.status()
-            ));
+            failure::bail!("publish request failed with status: {}", res.status())
         }
 
         Ok(())

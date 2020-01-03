@@ -16,6 +16,14 @@ struct AppState {
     prover_timeout: time::Duration,
 }
 
+impl AppState {
+    fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor> {
+        self.connection_pool
+            .access_storage()
+            .map_err(actix_web::error::ErrorInternalServerError)
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {
     pub name: String,
@@ -26,14 +34,10 @@ fn register(data: web::Data<AppState>, r: web::Json<ProverReq>) -> actix_web::Re
     if r.name == "" {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
-    let storage = match data.connection_pool.access_storage() {
-        Ok(s) => s,
-        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
-    };
-    let id = match storage.register_prover(&r.name) {
-        Ok(id) => id,
-        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
-    };
+    let storage = data.access_storage()?;
+    let id = storage
+        .register_prover(&r.name)
+        .map_err(actix_web::error::ErrorInternalServerError)?;
     Ok(id.to_string())
 }
 
@@ -51,29 +55,23 @@ fn block_to_prove(
     if r.name == "" {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
-    let storage = match data.connection_pool.access_storage() {
-        Ok(s) => s,
-        Err(e) => return Err(actix_web::error::ErrorInternalServerError(e)),
-    };
-    match storage.prover_run_for_next_commit(&r.name, data.prover_timeout) {
-        Ok(ret) => {
-            if let Some(prover_run) = ret {
-                return Ok(HttpResponse::Ok().json(BlockToProveRes {
-                    prover_run_id: prover_run.id,
-                    block: prover_run.block_number,
-                }));
-            }
-            Ok(HttpResponse::Ok().json(BlockToProveRes {
-                prover_run_id: 0,
-                block: 0,
-            }))
-        }
-        Err(e) => {
+    let storage = data.access_storage()?;
+    let ret = storage
+        .prover_run_for_next_commit(&r.name, data.prover_timeout)
+        .map_err(|e| {
             error!("could not get next unverified commit operation: {}", e);
-            Err(actix_web::error::ErrorInternalServerError(
-                "storage layer error",
-            ))
-        }
+            actix_web::error::ErrorInternalServerError("storage layer error")
+        })?;
+    if let Some(prover_run) = ret {
+        Ok(HttpResponse::Ok().json(BlockToProveRes {
+            prover_run_id: prover_run.id,
+            block: prover_run.block_number,
+        }))
+    } else {
+        Ok(HttpResponse::Ok().json(BlockToProveRes {
+            prover_run_id: 0,
+            block: 0,
+        }))
     }
 }
 
@@ -161,19 +159,23 @@ pub fn start_server(
     bind_to: &net::SocketAddr,
     prover_timeout: time::Duration,
     rounds_interval: time::Duration,
+    // panic_notify: mpsc::Sender<bool>,
 ) {
     let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new()));
     // TODO: graceful thread exit?
     let data_pool_copy = Arc::clone(&data_pool);
     let conn_pool_clone = connection_pool.clone();
-    thread::spawn(move || {
-        pool::maintain(conn_pool_clone, data_pool_copy, rounds_interval);
-    });
+    thread::Builder::new()
+        .name("provers_data_pool".to_string())
+        .spawn(move || {
+            pool::maintain(conn_pool_clone, data_pool_copy, rounds_interval);
+        })
+        .expect("failed to start provers server");
     HttpServer::new(move || {
         App::new()
             .wrap(actix_web::middleware::Logger::default())
             .data(AppState {
-                connection_pool,
+                connection_pool: connection_pool.clone(),
                 preparing_data_pool: Arc::clone(&data_pool),
                 prover_timeout,
             })

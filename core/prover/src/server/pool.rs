@@ -79,15 +79,13 @@ fn take_next_commits(
     conn_pool: &storage::ConnectionPool,
     data: &Arc<RwLock<ProversDataPool>>,
 ) -> Result<(), String> {
-    let d = data.write().expect("failed to acquire a lock");
-    let storage = conn_pool.access_storage().expect("failed to connect to db");
-    let ops = match storage.load_unverified_commits_after_block(d.last_loaded, d.limit) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(format!("failed to read commit operations: {}", e));
-        }
+    let ops = {
+        let d = data.write().expect("failed to acquire a lock");
+        let storage = conn_pool.access_storage().expect("failed to connect to db");
+        storage
+            .load_unverified_commits_after_block(d.last_loaded, d.limit)
+            .map_err(|e| format!("failed to read commit operations: {}", e))?
     };
-    drop(d);
 
     if !ops.is_empty() {
         let mut d = data.write().expect("failed to acquire a lock");
@@ -112,14 +110,15 @@ fn prepare_next(
     phasher: &PedersenHasher<Engine>,
     params: &AltJubjubBn256,
 ) -> Result<(), String> {
-    let mut d = data.write().expect("failed to acquire a lock");
-    let current = (*d).last_prepared + 1;
+    let op = {
+        let mut d = data.write().expect("failed to acquire a lock");
+        let current = (*d).last_prepared + 1;
+        d.operations.remove(&current).expect("data is inconsistent")
+    };
     let storage = conn_pool.access_storage().expect("failed to connect to db");
-    let op = d.operations.remove(&current).expect("data is inconsistent");
-    drop(d);
     let pd = build_prover_data(&storage, &op, phasher, params)?;
     let mut d = data.write().expect("failed to acquire a lock");
-    (*d).last_prepared = current;
+    (*d).last_prepared += 1;
     (*d).prepared.insert(op.block.block_number as i64, pd);
     Ok(())
 }
@@ -137,12 +136,9 @@ fn build_prover_data(
 
     let block_number = commit_operation.block.block_number;
 
-    let (_, accounts) = match storage.load_committed_state(Some(block_number - 1)) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(format!("failed to load commited state: {}", e));
-        }
-    };
+    let (_, accounts) = storage
+        .load_committed_state(Some(block_number - 1))
+        .map_err(|e| format!("failed to load commited state: {}", e))?;
     let mut accounts_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
     for acc in accounts {
@@ -151,13 +147,9 @@ fn build_prover_data(
         accounts_tree.insert(acc_number, leaf_copy);
     }
     let initial_root = accounts_tree.root_hash();
-    let ops = match storage.get_block_operations(block_number) {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(format!("failed to get block operations {}", e));
-        }
-    };
-    // TODO: use conn pool
+    let ops = storage
+        .get_block_operations(block_number)
+        .map_err(|e| format!("failed to get block operations {}", e))?;
 
     circuit::witness::utils::apply_fee(
         &mut accounts_tree,

@@ -169,43 +169,25 @@ impl<C: ApiClient> BabyProver<C> {
             validator_account: prover_data.validator_account,
         };
 
-        let proof = bellman::groth16::create_random_proof(instance, &self.circuit_params, rng);
-
-        if let Err(e) = proof {
-            return Err(BabyProverError::Internal(format!(
-                "failed to create a proof: {}",
-                e
-            )));
-        }
-
-        // TODO: handle error.
-        let p = proof.expect("failed to make a proof");
+        let p = bellman::groth16::create_random_proof(instance, &self.circuit_params, rng)
+            .map_err(|e| BabyProverError::Internal(format!("failed to create a proof: {}", e)))?;
 
         let pvk = bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
 
-        let res =
-            bellman::groth16::verify_proof(&pvk, &p.clone(), &[prover_data.public_data_commitment]);
-        if let Err(e) = res {
-            return Err(BabyProverError::Internal(format!(
-                "failed to verify created proof: {}",
-                e
-            )));
-        }
-        if !res.expect("failed to verify proof") {
+        let proof_verified =
+            bellman::groth16::verify_proof(&pvk, &p.clone(), &[prover_data.public_data_commitment])
+                .map_err(|e| {
+                    BabyProverError::Internal(format!("failed to verify created proof: {}", e))
+                })?;
+        if !proof_verified {
             return Err(BabyProverError::Internal(
                 "created proof did not pass verification".to_owned(),
             ));
         }
 
-        let ret = self
-            .api_client
-            .publish(block, p, prover_data.public_data_commitment);
-        if let Err(e) = ret {
-            return Err(BabyProverError::Api(format!(
-                "failed to publish proof: {}",
-                e
-            )));
-        }
+        self.api_client
+            .publish(block, p, prover_data.public_data_commitment)
+            .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
 
         info!("finished and published proof for block {}", block);
 
