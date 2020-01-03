@@ -173,7 +173,7 @@ pub fn start_server(
         App::new()
             .wrap(actix_web::middleware::Logger::default())
             .data(AppState {
-                connection_pool: storage::ConnectionPool::new(),
+                connection_pool,
                 preparing_data_pool: Arc::clone(&data_pool),
                 prover_timeout,
             })
