@@ -1,11 +1,13 @@
 // Built-in deps
 use std::str::FromStr;
+use std::sync::mpsc;
 use std::{net, thread, time};
 // External deps
 use ff::{Field, PrimeField};
 // Workspace deps
+use prover::client;
 use prover::ApiClient;
-use prover::{client, server};
+use server::prover_server;
 use testhelper::TestAccount;
 
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
@@ -13,8 +15,9 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
     let bind_to = "127.0.0.1:8088";
     let conn_pool = storage::ConnectionPool::new();
     let addr = net::SocketAddr::from_str(bind_to).unwrap();
+    let (tx, _rx) = mpsc::channel();
     thread::spawn(move || {
-        server::start_server(conn_pool, &addr, prover_timeout, rounds_interval);
+        prover_server::start_prover_server(conn_pool, addr, prover_timeout, rounds_interval, tx);
     });
     bind_to.to_string()
 }
@@ -305,7 +308,7 @@ fn api_server_publish_dummy() {
     let client = reqwest::Client::new();
     let res = client
         .post(&format!("http://{}/publish", &addr))
-        .json(&server::PublishReq {
+        .json(&client::PublishReq {
             block: 1,
             proof: models::EncodedProof::default(),
         })

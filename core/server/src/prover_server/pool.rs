@@ -7,11 +7,11 @@ use ff::{Field, PrimeField};
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use log::info;
 // Workspace deps
-use crate::prover_data::ProverData;
 use circuit::operation::SignatureData;
 use models::merkle_tree::PedersenHasher;
 use models::node::tx::PackedPublicKey;
 use models::node::{Engine, Fr};
+use prover::prover_data::ProverData;
 
 pub struct ProversDataPool {
     last_prepared: i64,

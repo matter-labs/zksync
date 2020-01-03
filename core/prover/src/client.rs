@@ -4,9 +4,32 @@ use std::{thread, time};
 // External deps
 use bellman::groth16;
 use failure::format_err;
+use serde::{Deserialize, Serialize};
 // Workspace deps
+use crate::client;
 use crate::prover_data::ProverData;
-use crate::server;
+
+#[derive(Serialize, Deserialize)]
+pub struct ProverReq {
+    pub name: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BlockToProveRes {
+    pub prover_run_id: i32,
+    pub block: i64,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct WorkingOnReq {
+    pub prover_run_id: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct PublishReq {
+    pub block: u32,
+    pub proof: models::EncodedProof,
+}
 
 #[derive(Debug)]
 pub struct FullBabyProof {
@@ -46,7 +69,7 @@ impl ApiClient {
         let client = reqwest::Client::new();
         let res = client
             .post(&self.register_url)
-            .json(&server::ProverReq {
+            .json(&client::ProverReq {
                 name: self.worker.clone(),
             })
             .send();
@@ -74,7 +97,7 @@ impl crate::ApiClient for ApiClient {
         let client = reqwest::Client::new();
         let mut res = client
             .get(&self.block_to_prove_url)
-            .json(&server::ProverReq {
+            .json(&client::ProverReq {
                 name: self.worker.clone(),
             })
             .send()
@@ -82,7 +105,7 @@ impl crate::ApiClient for ApiClient {
         let text = res
             .text()
             .map_err(|e| format_err!("failed to read block to prove response: {}", e))?;
-        let res: server::BlockToProveRes = serde_json::from_str(&text)
+        let res: client::BlockToProveRes = serde_json::from_str(&text)
             .map_err(|e| format_err!("failed to parse block to prove response: {}", e))?;
         if res.block != 0 {
             return Ok(Some((res.block, res.prover_run_id)));
@@ -94,7 +117,7 @@ impl crate::ApiClient for ApiClient {
         let client = reqwest::Client::new();
         let res = client
             .post(&self.working_on_url)
-            .json(&server::WorkingOnReq {
+            .json(&client::WorkingOnReq {
                 prover_run_id: job_id,
             })
             .send()
@@ -149,7 +172,7 @@ impl crate::ApiClient for ApiClient {
         let client = reqwest::Client::new();
         let res = client
             .post(&self.publish_url)
-            .json(&server::PublishReq {
+            .json(&client::PublishReq {
                 block: block as u32,
                 proof: encoded,
             })

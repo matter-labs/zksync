@@ -11,10 +11,10 @@ use futures::channel::mpsc as fmpsc;
 // Workspace deps
 use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL};
 use models::StateKeeperRequest;
-use prover::server::start_server as start_prover_server;
 use server::api_server::start_api_server;
 use server::committer::start_committer;
 use server::eth_watch::start_eth_watch;
+use server::prover_server::start_prover_server;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 use server::{eth_sender, ConfigurationOptions, ThreadPanicNotify};
 use storage::ConnectionPool;
@@ -119,14 +119,13 @@ fn main() {
         stop_signal_sender.clone(),
         config_opts.clone(),
     );
-    thread::spawn(move || {
-        start_prover_server(
-            connection_pool,
-            &config_opts.prover_server_address,
-            Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
-            Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
-        );
-    });
+    start_prover_server(
+        connection_pool,
+        config_opts.prover_server_address.clone(),
+        Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
+        Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
+        stop_signal_sender.clone(),
+    );
 
     // Simple timer, pings every 100 ms
     thread::Builder::new()

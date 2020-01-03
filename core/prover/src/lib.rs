@@ -1,6 +1,5 @@
 pub mod client;
 pub mod prover_data;
-pub mod server;
 
 // Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
