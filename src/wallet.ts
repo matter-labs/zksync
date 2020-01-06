@@ -72,7 +72,7 @@ export class Wallet {
     }): Promise<Transaction> {
         const tokenId = await this.ethProxy.resolveTokenId(withdraw.token);
         const nonce =
-            withdraw.nonce == null
+            withdraw.nonce != null
                 ? await this.getNonce(withdraw.nonce)
                 : await this.getNonce();
         const transactionData = {
