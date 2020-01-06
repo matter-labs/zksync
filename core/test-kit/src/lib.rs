@@ -27,7 +27,7 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;
 use tokio::spawn;
@@ -36,6 +36,7 @@ use web3::transports::{EventLoopHandle, Http};
 use web3::types::{Address, H256, U256};
 use web3::Transport;
 
+pub mod deploy_contracts;
 pub mod eth_account;
 pub mod zksync_account;
 
@@ -161,6 +162,15 @@ pub fn init_and_run_state_keeper() {
     let connection_pool = ConnectionPool::new();
     let config = ConfigurationOptions::from_env();
 
+    let deploy_timer = Instant::now();
+    println!("deploying contracts");
+    let contracts = deploy_contracts::deploy_contracts();
+    println!(
+        "contracts deployed {:#?}, {} secs",
+        contracts,
+        deploy_timer.elapsed().as_secs()
+    );
+
     let (proposed_blocks_sender, mut proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
     let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
@@ -189,6 +199,7 @@ pub fn init_and_run_state_keeper() {
         config.operator_private_key.clone(),
         config.operator_eth_addr.clone(),
         transport.clone(),
+        contracts.contract.clone(),
         &config,
     );
 
@@ -196,6 +207,7 @@ pub fn init_and_run_state_keeper() {
         config.operator_private_key,
         config.operator_eth_addr,
         transport,
+        contracts.contract.clone(),
         &config,
     );
     let zksync_account1 = ZksyncAccount::rand();

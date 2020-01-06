@@ -57,6 +57,7 @@ impl<T: Transport> EthereumAccount<T> {
         private_key: H256,
         address: Address,
         transport: T,
+        contract_address: Address,
         config: &ConfigurationOptions,
     ) -> Self {
         let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
@@ -69,7 +70,7 @@ impl<T: Transport> EthereumAccount<T> {
             abi_string,
             address.clone(),
             private_key.clone(),
-            config.contract_eth_addr.clone(),
+            contract_address,
             config.chain_id,
             config.gas_price_factor,
         );
