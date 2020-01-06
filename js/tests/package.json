@@ -3,16 +3,17 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
-  "dependencies": {
-    "ethers": "^4.0.40",
-    "zksync": "^0.3.7"
-  },
   "devDependencies": {
-    "@types/node": "^12.12.14"
+    "@types/node": "^12.12.14",
+    "ethers": "^4.0.40",
+    "ts-node": "^8.5.4",
+    "typescript": "^3.7.4",
+    "zksync": "../../../zksync.js"
   },
   "scripts": {
     "simple": "f ts-node simple-integration-test.ts",
     "full-exit": "f ts-node full-exit-inegration-test.ts",
-    "loadtest": "f ts-node loadtest.ts"
+    "loadtest": "f ts-node loadtest.ts",
+    "update_zksync.js": "cd ../../../zksync.js && yarn build && cd ../zksync/js/tests && yarn upgrade zksync"
   }
 }
