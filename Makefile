@@ -94,7 +94,7 @@ push-image-ci:
 	docker push "${CI_DOCKER_IMAGE}"
 
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
-docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
+docker-options = --rm -v $(shell pwd):/home/rust/src -v /Users/oleg/.cargo/git:/home/rust/.cargo/git -v /Users/oleg/.cargo/registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
 rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 
@@ -164,10 +164,10 @@ gen-keys-if-not-present:
 	@touch contracts/build/Governance.json
 	@touch contracts/build/PriorityQueue.json
 	
-	test -f keys/${BLOCK_SIZE_CHUNKS}/VerificationKey.sol || gen-keys
+	test -f keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/franklin_pk.key || gen-keys
 
 prepare-contracts:
-	@cp keys/${BLOCK_SIZE_CHUNKS}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 
@@ -301,13 +301,11 @@ nodes:
 # Dev environment
 
 dev-up:
-	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
-	@docker-compose up -d postgres geth
-	@docker-compose up -d tesseracts
+	# @{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
+	@docker-compose up -d postgres geth tesseracts
 
 dev-down:
-	@docker-compose stop postgres geth
-	@docker-compose stop tesseracts
+	@docker-compose stop postgres geth tesseracts
 
 geth-up: geth
 	@docker-compose up geth
