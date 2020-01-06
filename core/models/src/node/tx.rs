@@ -249,6 +249,13 @@ impl FranklinTx {
             FranklinTx::Close(tx) => tx.get_bytes(),
         }
     }
+
+    pub fn is_withdraw(&self) -> bool {
+        match &*self {
+            &FranklinTx::Withdraw(_) => true,
+            &_ => false,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]

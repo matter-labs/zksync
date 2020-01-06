@@ -2264,31 +2264,80 @@ impl StorageProcessor {
     }
 
     pub fn mempool_get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
-        //TODO use "gaps and islands" sql solution for this.
-        let query = mempool::table
-            .left_join(
-                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
-            )
-            .filter(executed_transactions::tx_hash.is_null())
-            .left_join(accounts::table.on(accounts::address.eq(mempool::primary_account_address)))
-            .filter(
-                mempool::nonce
-                    .eq(accounts::nonce)
-                    .or(accounts::nonce.is_null().and(mempool::nonce.eq(0))),
-            )
-            .order(mempool::created_at.asc())
-            .limit(max_size as i64);
+        let query = format!(
+            "
+            with good_accounts as (
+                select distinct
+                    address,
+                    accounts.nonce as acc_nonce
+                from 
+                    accounts 
+                join 
+                    mempool
+                on 
+                    accounts.address = mempool.primary_account_address
+                    and accounts.nonce = mempool.nonce
+            ), txs_with_diffs as (
+                select 
+                    coalesce(nonce - lag(nonce, 1) over (partition by primary_account_address order by nonce, created_at desc), 1) as noncediff,
+                    hash,
+                    primary_account_address,
+                    nonce,
+                    tx,
+                    created_at
+                from 
+                    mempool
+                join
+                    good_accounts
+                on 
+                    mempool.primary_account_address = good_accounts.address
+                    and mempool.nonce >= good_accounts.acc_nonce
+                left join 
+                    executed_transactions
+                on
+                    mempool.hash = executed_transactions.tx_hash
+                where 
+                    executed_transactions.tx_hash is null
+            ), txs_with_maxdiffs as (
+                select 
+                    *,
+                    max(noncediff) over (partition by primary_account_address order by nonce) as maxdiff
+                from 
+                    txs_with_diffs
+            ) 
+            select 
+                *
+            from 
+                txs_with_maxdiffs
+            where
+                maxdiff = 1
+            limit 
+                {max_size}
+            ",
+            max_size = max_size
+        );
 
-        let stored_txs: Vec<_> = query.load::<(
-            ReadTx,
-            Option<StoredExecutedTransaction>,
-            Option<StorageAccount>,
-        )>(self.conn())?;
+        #[derive(QueryableByName)]
+        struct StoredTxValue {
+            #[sql_type = "Jsonb"]
+            pub tx: Value,
+        }
 
+        let stored_txs: Vec<_> = diesel::sql_query(query).load::<StoredTxValue>(self.conn())?;
         Ok(stored_txs
             .into_iter()
-            .map(|stored_tx| serde_json::from_value(stored_tx.0.tx).unwrap())
+            .map(|stored_tx| serde_json::from_value(stored_tx.tx).unwrap())
             .collect())
+
+        // let query = mempool::table
+        //     .left_join(
+        //         executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
+        //     )
+        //     .filter(executed_transactions::tx_hash.is_null())
+        //     .left_join(accounts::table.on(accounts::address.eq(mempool::primary_account_address)))
+        //     .filter(mempool::nonce.ge(coalesce(accounts::nonce, 0)))
+        //     .order(mempool::nonce - coalesce(accounts::nonce, 0))
+        //     .limit(max_size as i64);
     }
 }
 

@@ -18,7 +18,7 @@ use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 
 // TODO: temporary limit
-const MAX_NUMBER_OF_WITHDRAWS: usize = 4;
+const MAX_NUMBER_OF_WITHDRAWS: usize = 20;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {
@@ -288,22 +288,20 @@ impl PlasmaStateKeeper {
     fn filter_invalid_txs(
         &self,
         mut chunks_left: usize,
-        mut transfer_txs: Vec<FranklinTx>,
+        transfer_txs: Vec<FranklinTx>,
     ) -> (usize, Vec<FranklinTx>) {
         // TODO: temporary measure - limit number of withdrawals in one block
-        let mut withdraws = 0;
-        transfer_txs.retain(|tx| {
-            if let FranklinTx::Withdraw(..) = tx {
-                if withdraws >= MAX_NUMBER_OF_WITHDRAWS {
-                    false
-                } else {
-                    withdraws += 1;
-                    true
-                }
-            } else {
-                true
-            }
-        });
+        let mut transfer_txs = {
+            let (mut withdraws_txs, non_withdraw_txs): (Vec<FranklinTx>, Vec<FranklinTx>) =
+                transfer_txs.into_iter().partition(|tx| tx.is_withdraw());
+
+            withdraws_txs.sort_by_key(|tx| tx.nonce());
+            withdraws_txs.truncate(MAX_NUMBER_OF_WITHDRAWS);
+
+            let mut transfer_txs = withdraws_txs;
+            transfer_txs.extend(non_withdraw_txs);
+            transfer_txs
+        };
 
         let mut filtered_txs = Vec::new();
 
