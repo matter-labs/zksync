@@ -11,9 +11,7 @@
 
 echo "redeploying for the db $DATABASE_URL"
 zksync flatten;
-cd contracts;
-yarn deploy | tee ../deploy.log;
-cd ..;
+execute-deploy.sh
 
 CONTRACT_ADDR_NEW_VALUE=`grep "CONTRACT_ADDR" deploy.log`
 ERC20_ADDR_NEW_VALUE=`grep "TEST_ERC20" deploy.log`

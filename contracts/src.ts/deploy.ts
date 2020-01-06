@@ -189,7 +189,7 @@ export async function addTestERC20Token(wallet, governance) {
         await erc20.mint(wallet.address, parseEther("3000000000"));
         console.log("TEST_ERC20=" + erc20.address);
         await (await governance.addToken(erc20.address)).wait();
-        return erc20
+        return erc20;
     } catch (err) {
         console.log("Add token error:" + err);
     }

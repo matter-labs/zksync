@@ -34,6 +34,10 @@ async function main() {
     }
 
     const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+    if (process.env.ETH_NETWORK == "localhost") {
+        // small polling interval for localhost network
+        provider.pollingInterval = 200;
+    }
     const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 
     let governanceAddress    = process.env.GOVERNANCE_ADDR;
@@ -53,13 +57,19 @@ async function main() {
     ];
 
     if (args.deploy) {
+        let timer = new Date().getTime();
         const governance = await deployGovernance(wallet, governanceContractCode, governanceConstructorArgs);
+        console.log(`Governance contract deployed, time: ${(new Date().getTime() - timer)/1000} secs`);
         governanceAddress = governance.address;
-        
+
+        timer = new Date().getTime();
         const priorityQueue = await deployPriorityQueue(wallet, priorityQueueContractCode, priorityQueueConstructorArgs);
+        console.log(`Priority queue contract deployed, time: ${(new Date().getTime() - timer)/1000} secs`);
         priorityQueueAddress = priorityQueue.address;
-        
+
+        timer = new Date().getTime();
         const verifier = await deployVerifier(wallet, verifierContractCode, verifierConstructorArgs);
+        console.log(`Verifier contract deployed, time: ${(new Date().getTime() - timer)/1000} secs`);
         verifierAddress = verifier.address;
         
         franklinConstructorArgs = [
@@ -69,7 +79,9 @@ async function main() {
             wallet.address,
             process.env.GENESIS_ROOT || ethers.constants.HashZero,
         ];
+        timer = new Date().getTime();
         const franklin = await deployFranklin(wallet, franklinContractCode, franklinConstructorArgs);
+        console.log(`Main contract deployed, time: ${(new Date().getTime() - timer)/1000} secs`);
         franklinAddress = franklin.address;
 
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
