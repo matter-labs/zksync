@@ -248,7 +248,7 @@ fn handle_get_tx_by_hash(
         } else {
             return Err(HttpResponse::BadRequest().finish().into());
         };
-        
+
         hash.map_err(|_| HttpResponse::BadRequest().finish())?
     };
 
@@ -361,7 +361,9 @@ fn handle_get_block_transactions(
         .map(|op| {
             let tx_hash = match &op {
                 ExecutedOperations::Tx(tx) => tx.tx.hash().to_str(),
-                ExecutedOperations::PriorityOp(tx) => format!("0x{}", hex::encode(&tx.priority_op.eth_hash)),
+                ExecutedOperations::PriorityOp(tx) => {
+                    format!("0x{}", hex::encode(&tx.priority_op.eth_hash))
+                }
             };
 
             ExecutedOperationWithHash { op, tx_hash }

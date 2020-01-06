@@ -38,7 +38,10 @@ impl TxHash {
     }
 
     pub fn from_str(s: &str) -> Result<Self, failure::Error> {
-        ensure!(s.starts_with("sync-tx:"), "TxHash should start with sync-tx:");
+        ensure!(
+            s.starts_with("sync-tx:"),
+            "TxHash should start with sync-tx:"
+        );
         let bytes = hex::decode(&s[8..])?;
         ensure!(bytes.len() == 32, "Size mismatch");
         Ok(TxHash {

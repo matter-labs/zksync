@@ -1139,7 +1139,8 @@ impl StorageProcessor {
 
         Ok(Some(Block {
             block_number: block,
-            new_root_hash: Fr::from_hex(&format!("0x{}", &stored_block.root_hash[8..])).expect("Unparsable root hash"),
+            new_root_hash: Fr::from_hex(&format!("0x{}", &stored_block.root_hash[8..]))
+                .expect("Unparsable root hash"),
             fee_account: stored_block.fee_account_id as AccountId,
             block_transactions,
             processed_priority_ops: (
