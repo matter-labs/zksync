@@ -1,9 +1,10 @@
 use bigdecimal::BigDecimal;
 use models::node::tx::TxSignature;
 use models::node::{
-    priv_key_from_fs, AccountAddress, Nonce, PrivateKey, PublicKey, TokenId, Transfer,
+    priv_key_from_fs, AccountAddress, Nonce, PrivateKey, PublicKey, TokenId, Transfer, Withdraw,
 };
 use rand::{thread_rng, Rng};
+use web3::types::Address;
 
 pub struct ZksyncAccount {
     pub private_key: PrivateKey,
@@ -44,5 +45,27 @@ impl ZksyncAccount {
         transfer.signature =
             TxSignature::sign_musig_pedersen(&self.private_key, &transfer.get_bytes());
         transfer
+    }
+
+    pub fn sign_withdraw(
+        &self,
+        token_id: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        eth_address: &Address,
+        nonce: Nonce,
+    ) -> Withdraw {
+        let mut withdraw = Withdraw {
+            account: self.address.clone(),
+            eth_address: eth_address.clone(),
+            token: token_id,
+            amount,
+            fee,
+            nonce,
+            signature: TxSignature::default(),
+        };
+        withdraw.signature =
+            TxSignature::sign_musig_pedersen(&self.private_key, &withdraw.get_bytes());
+        withdraw
     }
 }

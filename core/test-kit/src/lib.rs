@@ -14,7 +14,7 @@ use futures::{
 use models::abi::FRANKLIN_CONTRACT;
 use models::node::tx::TxSignature;
 use models::node::{
-    Account, AccountAddress, AccountMap, Engine, FranklinTx, PriorityOp, TokenId, Transfer,
+    Account, AccountAddress, AccountMap, Engine, FranklinTx, Nonce, PriorityOp, TokenId, Transfer,
 };
 use models::CommitRequest;
 use rand::{Rng, SeedableRng, XorShiftRng};
@@ -23,6 +23,7 @@ use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
 };
 use server::ConfigurationOptions;
+use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::sync::mpsc::channel;
@@ -33,9 +34,69 @@ use tokio::spawn;
 use web3::contract::{Contract, Options};
 use web3::transports::{EventLoopHandle, Http};
 use web3::types::{Address, H256, U256};
+use web3::Transport;
 
 pub mod eth_account;
 pub mod zksync_account;
+
+struct AccountSet<T: Transport> {
+    eth_accounts: Vec<EthereumAccount<T>>,
+    zksync_accounts: Vec<ZksyncAccount>,
+}
+
+type ETHAccountSetId = usize;
+type ZKSyncAccountSetId = usize;
+
+enum AccountSetId {
+    ETHAccount(ETHAccountSetId),
+    ZKSync(ZKSyncAccountSetId),
+}
+
+impl<T: Transport> AccountSet<T> {
+    fn deposit(
+        &self,
+        from: ETHAccountSetId,
+        to: ZKSyncAccountSetId,
+        token_id: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+    ) -> PriorityOp {
+        let from = &self.eth_accounts[from];
+        let to = &self.zksync_accounts[to];
+
+        block_on(from.deposit_eth(amount, fee, &to.address)).expect("deposit should not fail")
+    }
+
+    fn transfer(
+        &self,
+        from: ZKSyncAccountSetId,
+        to: ZKSyncAccountSetId,
+        token_id: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+    ) -> FranklinTx {
+        let from = &self.zksync_accounts[from];
+        let to = &self.zksync_accounts[to];
+
+        FranklinTx::Transfer(from.sign_transfer(token_id, amount, fee, &to.address, nonce))
+    }
+
+    fn withdraw(
+        &self,
+        from: ZKSyncAccountSetId,
+        to: ETHAccountSetId,
+        token_id: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+    ) -> FranklinTx {
+        let from = &self.zksync_accounts[from];
+        let to = &self.eth_accounts[to];
+
+        FranklinTx::Withdraw(from.sign_withdraw(token_id, amount, fee, &to.address, nonce))
+    }
+}
 
 struct TestBlock {
     transactions: Vec<FranklinTx>,
@@ -124,39 +185,72 @@ pub fn init_and_run_state_keeper() {
     //    let state_proxy = StateProxy::new(&config, state_keeper_req_sender.clone());
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
 
+    let commit_account = EthereumAccount::new(
+        config.operator_private_key.clone(),
+        config.operator_eth_addr.clone(),
+        transport.clone(),
+        &config,
+    );
+
     let eth_account = EthereumAccount::new(
         config.operator_private_key,
         config.operator_eth_addr,
         transport,
         &config,
     );
-    let zksync_account = ZksyncAccount::rand();
+    let zksync_account1 = ZksyncAccount::rand();
+    let zksync_account2 = ZksyncAccount::rand();
 
-    let mut eth_acc_balance = block_on(eth_account.eth_balance()).expect("eth balance get");
+    let accounts = AccountSet {
+        eth_accounts: vec![eth_account],
+        zksync_accounts: vec![zksync_account1, zksync_account2],
+    };
 
-    let deposit_amount = parse_ether("1").unwrap();
-    eth_acc_balance -= &deposit_amount;
-    let res = block_on(eth_account.deposit_eth(
-        deposit_amount.clone(),
-        BigDecimal::from(0),
-        &zksync_account.address,
-    ))
-    .expect("deposit fail");
+    //    let mut expected_balances = HashMap::new();
 
-    let transfer_amount = parse_ether("0.33").unwrap();
-    let mut zksync_balance = deposit_amount;
-    zksync_balance -= &transfer_amount;
-    let transfer = FranklinTx::Transfer(zksync_account.sign_transfer(
+    let deposit = accounts.deposit(
         0,
-        transfer_amount,
-        BigDecimal::from(0),
-        &AccountAddress::default(),
         0,
-    ));
+        0,
+        parse_ether("1.0").unwrap(),
+        parse_ether("0.1").unwrap(),
+    );
+    let transfer1 = accounts.transfer(
+        0,
+        1,
+        0,
+        parse_ether("0.25").unwrap(),
+        BigDecimal::from(0),
+        0,
+    );
+    //    let transfer2 = accounts.transfer(0, 1, 0, parse_ether("0.25").unwrap(), BigDecimal::from(0), 1);
+    let withdraw = accounts.withdraw(0, 0, 0, parse_ether("0.5").unwrap(), BigDecimal::from(0), 1);
+
+    //    let mut eth_acc_balance = block_on(eth_account.eth_balance()).expect("eth balance get");
+    //
+    //    let deposit_amount = parse_ether("1").unwrap();
+    //    eth_acc_balance -= &deposit_amount;
+    //    let res = block_on(eth_account.deposit_eth(
+    //        deposit_amount.clone(),
+    //        BigDecimal::from(0),
+    //        &zksync_account.address,
+    //    ))
+    //    .expect("deposit fail");
+
+    //    let transfer_amount = parse_ether("0.33").unwrap();
+    //    let mut zksync_balance = deposit_amount;
+    //    zksync_balance -= &transfer_amount;
+    //    let transfer = FranklinTx::Transfer(zksync_account.sign_transfer(
+    //        0,
+    //        transfer_amount,
+    //        BigDecimal::from(0),
+    //        &AccountAddress::default(),
+    //        0,
+    //    ));
 
     let block = ProposedBlock {
-        priority_ops: vec![res],
-        txs: vec![transfer],
+        priority_ops: vec![deposit],
+        txs: vec![transfer1, withdraw],
     };
 
     let empty_block = async {
@@ -186,24 +280,29 @@ pub fn init_and_run_state_keeper() {
     let new_block = next_block();
     // commit block on eth
     println!("commiting new block to eth");
-    let block_rec = block_on(eth_account.commit_block(&new_block.block));
+    let block_rec = block_on(commit_account.commit_block(&new_block.block));
+    //    println!("block receipt: {:#?}", block_rec);
+    let before_ver = block_on(accounts.eth_accounts[0].eth_balance()).expect("eth balance get");
+    let block_rec = block_on(commit_account.verify_block(&new_block.block));
+    let after_ver = block_on(accounts.eth_accounts[0].eth_balance()).expect("eth balance get");
+    println!("diff {}", after_ver - before_ver);
     println!("block receipt: {:#?}", block_rec);
 
     //
 
-    // check
-    let eth_acc_new_balance = block_on(eth_account.eth_balance()).expect("eth balance get");
-    let zksync_acc_new_balance = block_on(sk_get_account(
-        state_keeper_req_sender.clone(),
-        &zksync_account.address,
-    ))
-    .get_balance(0);
-
-    println!("eth bal: {}", eth_acc_balance - eth_acc_new_balance);
-    println!(
-        "zksync bal: {} - {}",
-        zksync_balance, zksync_acc_new_balance
-    );
+    //    // check
+    //    let eth_acc_new_balance = block_on(eth_account.eth_balance()).expect("eth balance get");
+    //    let zksync_acc_new_balance = block_on(sk_get_account(
+    //        state_keeper_req_sender.clone(),
+    //        &zksync_account.address,
+    //    ))
+    //    .get_balance(0);
+    //
+    //    println!("eth bal: {}", eth_acc_balance - eth_acc_new_balance);
+    //    println!(
+    //        "zksync bal: {} - {}",
+    //        zksync_balance, zksync_acc_new_balance
+    //    );
 
     stop_state_keeper_sender.send(());
 

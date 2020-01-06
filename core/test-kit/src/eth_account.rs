@@ -39,9 +39,9 @@ fn priority_op_fee() -> BigDecimal {
 }
 
 pub struct EthereumAccount<T: Transport> {
-    private_key: H256,
-    address: Address,
-    main_contract_eth_client: ETHClient<T>,
+    pub private_key: H256,
+    pub address: Address,
+    pub main_contract_eth_client: ETHClient<T>,
 }
 
 fn big_dec_to_u256(bd: BigDecimal) -> U256 {
@@ -155,5 +155,28 @@ impl<T: Transport> EthereumAccount<T> {
             .compat()
             .await
             .map_err(|e| format_err!("Commit block confirm err: {}", e))?)
+    }
+
+    pub async fn verify_block(&self, block: &Block) -> Result<TransactionReceipt, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "verifyBlock",
+                (u64::from(block.block_number), [U256::default(); 8]),
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("Verify block send err: {}", e))?;
+        Ok(self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("Verify block confirm err: {}", e))?)
     }
 }
