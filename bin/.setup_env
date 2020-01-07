@@ -28,10 +28,5 @@ then
     eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
     set +o allexport
 
-    if [ "dev" != "$ZKSYNC_ENV" ]
-    then
-        export KUBECONFIG=etc/kube/clusters/kubeconfig-main.yaml
-    fi
-
     popd > /dev/null
 fi

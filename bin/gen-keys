@@ -3,7 +3,8 @@
 . .setup_env
 
 
-mkdir -p $KEY_DIR/$BLOCK_SIZE_CHUNKS
+
+mkdir -p $ZKSYNC_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH
 cargo run --bin key_generator --release
 
-cp $KEY_DIR/$BLOCK_SIZE_CHUNKS/VerificationKey.sol $ZKSYNC_HOME/contracts/contracts
+cp $ZKSYNC_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH/VerificationKey.sol $ZKSYNC_HOME/contracts/contracts

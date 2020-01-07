@@ -22,12 +22,13 @@
 import Alert from '../components/Alert.vue'
 
 const components = {
-    Alert
+    Alert,
 };
 
-import Eth from 'ethjs'
-import { ethers } from 'ethers'
-import { Wallet, FranklinProvider } from 'franklin_lib'
+const ethers = require('ethers');
+const zksync = require('zksync');
+import config from '../env-config';
+
 import { WalletDecorator } from '../WalletDecorator'
 
 export default {
@@ -38,13 +39,29 @@ export default {
     methods: {
         async login() {
             try {
+                const syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
+                const tokensList = await syncProvider.getTokens()
+                window.tokensList = Object.values(tokensList)
+                    .map(token => ({
+                        ...token,
+                        symbol: token.symbol || `${token.id.toString().padStart(3, '0')}`,
+                    }))
+                    .sort((a, b) => a.id - b.id);
+
                 await window.ethereum.enable();
-                window.eth = new Eth(window.ethereum);
-                window.ethersProvider = new ethers.providers.Web3Provider(window.ethereum);
-                let franklinProvider = new FranklinProvider(this.config.API_SERVER, this.config.CONTRACT_ADDR);
-                let signer = window.ethersProvider.getSigner();
-                window.wallet = await Wallet.fromEthWallet(signer, franklinProvider);
-                window.walletDecorator = await WalletDecorator.new(window.wallet);
+                const ethersProvider = new ethers.providers.Web3Provider(window.ethereum);
+                const ethProxy = new zksync.ETHProxy(ethersProvider, syncProvider.contractAddress);
+                
+                const signer = ethersProvider.getSigner();
+                const syncWallet = await zksync.Wallet.fromEthSigner(signer, syncProvider, ethProxy);
+
+                window.ethProvider = ethersProvider;
+                window.ethSigner = signer;
+                window.syncWallet = syncWallet;
+                window.syncProvider = syncProvider;
+                window.ethProxy = ethProxy;
+
+                window.walletDecorator = await WalletDecorator.new();
 
                 this.$parent.$router.push('/main')
             } catch (e) {
@@ -56,7 +73,7 @@ export default {
             }
         }
     },
-    components
+    components,
 }
 </script>
 

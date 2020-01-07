@@ -1,0 +1,6 @@
+{
+    "compilerOptions": {
+        "types" : ["node", "ethers", "zksync"],
+        "downlevelIteration": true,
+    },
+}

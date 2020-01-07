@@ -89,6 +89,7 @@ fn read_from_key_dir(key_dir: String) -> groth16::Parameters<Engine> {
         let mut key_file_path = std::path::PathBuf::new();
         key_file_path.push(&key_dir);
         key_file_path.push(&format!("{}", models::params::block_size_chunks()));
+        key_file_path.push(&format!("{}", models::params::account_tree_depth()));
         key_file_path.push(models::params::KEY_FILENAME);
         key_file_path
     };

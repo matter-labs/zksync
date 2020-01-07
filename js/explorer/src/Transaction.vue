@@ -40,7 +40,7 @@
 
 import store from './store';
 import { readableEther } from './utils';
-import client from './client';
+import { clientPromise } from './Client';
 import timeConstants from './timeConstants';
 
 import SearchField from './SearchField.vue';
@@ -52,7 +52,7 @@ const components = {
 export default {
     name: 'transaction',
     data: () => ({
-        tx_data: {},
+        txData: {},
         status: '',
         intervalHandle: null,
         loading: true,
@@ -70,18 +70,22 @@ export default {
     },
     methods: {
         async update() {
-            let tx_data = await this.fraProvider.getTransactionByHash(this.tx_hash);
-            if (tx_data == null) {
+            const client = await clientPromise;
+            const tokens = await client.tokensPromise;
+
+            const txData = await client.searchTx(this.tx_hash);
+            if (txData == null) {
                 this.transactionExists = false;
                 return;
             }
 
-            tx_data.tokenName = (await this.tokensPromise)[tx_data.token].symbol;
-            let block = await client.getBlock(tx_data.block_number);
-            tx_data.status = block.verified_at ? `Verified`
+            txData.tokenName = tokens[txData.token].symbol;
+            
+            const block = await client.getBlock(txData.block_number);
+            txData.status = block.verified_at ? `Verified`
                            : block.committed_at ? `Committed`
                            : `unknown`;
-            this.tx_data = tx_data;
+            this.txData = txData;
         },
     },
     computed: {
@@ -95,8 +99,8 @@ export default {
                     to: '/'
                 },
                 {
-                    text: 'Block ' + this.tx_data.block_number,
-                    to: '/blocks/' + this.tx_data.block_number,
+                    text: 'Block ' + this.txData.block_number,
+                    to: '/blocks/' + this.txData.block_number,
                 },                
                 {
                     text: 'Transaction ' + this.tx_hash,
@@ -105,47 +109,45 @@ export default {
             ];
         },
         props() {
-            if (Object.keys(this.tx_data).length == 0) 
+            if (Object.keys(this.txData).length == 0) 
                 return [];
 
-            let link_from 
-                = this.tx_data.tx_type == 'Deposit' ? `${this.blockchain_explorer_address}/${this.tx_data.from}`
-                : `/accounts/${this.tx_data.from}`;
+            const link_from 
+                = this.txData.tx_type == 'Deposit' ? `${this.blockchain_explorer_address}/${this.txData.from}`
+                : `/accounts/${this.txData.from}`;
 
-            let link_to 
-                = this.tx_data.tx_type == 'Withdraw' ? `${this.blockchain_explorer_address}/${this.tx_data.to}`
-                : `/accounts/${this.tx_data.to}`;
+            const link_to 
+                = this.txData.tx_type == 'Withdraw' ? `${this.blockchain_explorer_address}/${this.txData.to}`
+                : `/accounts/${this.txData.to}`;
 
-            let onchain_from
-                = this.tx_data.tx_type == 'Deposit' ? `<span class="onchain_icon">onchain</span>`
+            const onchain_from
+                = this.txData.tx_type == 'Deposit' ? `<span class="onchain_icon">onchain</span>`
                 : '';
 
-            // <i class="fas fa-external-link-alt" />
-            let onchain_to
-                = this.tx_data.tx_type == 'Withdraw' ? `<span class="onchain_icon">onchain</span>`
+            const onchain_to
+                = this.txData.tx_type == 'Withdraw' ? `<span class="onchain_icon">onchain</span>`
                 : '';
 
-            let target_from
-                = this.tx_data.tx_type == 'Deposit' ? `target="_blank" rel="noopener noreferrer"`
+            const target_from
+                = this.txData.tx_type == 'Deposit' ? `target="_blank" rel="noopener noreferrer"`
                 : '';
 
-            // <i class="fas fa-external-link-alt" />
-            let target_to
-                = this.tx_data.tx_type == 'Withdraw' ? `target="_blank" rel="noopener noreferrer"`
+            const target_to
+                = this.txData.tx_type == 'Withdraw' ? `target="_blank" rel="noopener noreferrer"`
                 : '';
 
-            let rows = [
+            const rows = [
                 { name: 'Tx hash',        value: `<code>${this.tx_hash}</code>`},
-                { name: "Type",           value: `<b>${this.tx_data.tx_type}</b>`   },
-                { name: "Status",         value: `<b>${this.tx_data.status}</b>` },
-                { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.tx_data.from} ${onchain_from}</a></code>`      },
-                { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.tx_data.to} ${onchain_to}</a></code>`      },
-                { name: "Amount",         value: `<b>${this.tx_data.tokenName}</b> ${readableEther(this.tx_data.amount)}`    },
+                { name: "Type",           value: `<b>${this.txData.tx_type}</b>`   },
+                { name: "Status",         value: `<b>${this.txData.status}</b>` },
+                { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
+                { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
+                { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${readableEther(this.txData.amount)}`    },
             ];
 
-            if (this.tx_data.fee) 
+            if (this.txData.fee) 
                 rows.push(
-                { name: "fee",            value: this.tx_data.fee       });
+                    { name: "fee",            value: this.txData.fee       });
 
             return rows;
         },
