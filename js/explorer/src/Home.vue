@@ -53,8 +53,132 @@
 </div>
 </template>
 
-<style>
+<script>
+import config from './env-config';
+import constants from './constants';
+import store from './store';
+import { Client, clientPromise } from './Client';
+import ClosableJumbotron from './ClosableJumbotron.vue';
+import SearchField from './SearchField.vue';
+const components = { 
+    ClosableJumbotron,
+    SearchField,
+};
 
+function formatTime(timeStr) {
+    return timeStr 
+        ? timeStr.toString().split('T')[0] + " " + timeStr.toString().split('T')[1].split('.')[0]
+        : null;
+}
+
+export default {
+    name: 'home',
+    created() {
+        this.update();
+    },
+    timers: {
+        ticker: { time: 1000, autostart: true, repeat: true }
+    },
+    data() { 
+        return {
+            lastCommitted:      0,
+            lastVerified:       0,
+            totalTransactions:  0,
+            currentPage:        this.$route.query.page || 1,
+            
+            txPerBlock:         config.TX_BATCH_SIZE,
+            blocks:             [],
+            ready:              false,
+
+            loading:            true,
+
+            breadcrumbs: [
+                {
+                    text: 'Blocks',
+                    active: true
+                },
+            ],
+        };
+    },
+    computed: {
+        page() {
+            return this.$route.query.page || 1;
+        },
+        items() {
+            return this.blocks;
+        },
+        perPage() {
+            return constants.PAGE_SIZE;
+        },
+        rows() {
+            return this.lastCommitted || 9999;
+        },
+    },
+    methods: {
+        ticker() {
+            this.update(true);
+        },
+        onRowClicked(item) {
+            this.$router.push('/blocks/' + item.block_number);
+        },
+        onPageChanged(page) {
+            this.$router.push(`${this.$route.path}?page=${page}`);
+        },
+        async update(silent) {
+            if (!silent) {
+                this.loading = true;
+            }
+
+            const client = await clientPromise;
+
+            const status = await client.status();
+            
+            let newBlocks = false;
+            if (status) {
+                newBlocks = this.lastCommitted !== status.last_committed || this.lastVerified !== status.last_verified;
+                this.lastCommitted = status.last_committed;
+                this.lastVerified = status.last_verified;
+                this.totalTransactions = status.total_transactions;
+            }
+
+            if (newBlocks) {
+                await this.updateBlocks();
+            } 
+
+            this.loading = false;
+        },
+        async updateBlocks() {
+            const client = await clientPromise;
+
+            const max_block = this.lastCommitted - (constants.PAGE_SIZE * (this.currentPage-1));
+            if (max_block < 0) return;
+
+            const blocks = await client.loadBlocks(max_block);
+            if (blocks) {
+                this.blocks = blocks.map( b => ({
+                    block_number:   b.block_number,
+                    status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
+                    new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
+                    committed_at:   formatTime(b.committed_at),
+                    verified_at:    formatTime(b.verified_at),
+                }));
+                this.currentPage = this.page;
+                this.ready = true;
+            }
+            this.loading = false;
+        },
+    },
+    watch: {
+        '$route' (to, from) {
+            this.currentPage = this.page;
+            this.updateBlocks();
+        },
+    },
+    components,
+};
+</script>
+
+<style>
 .capitalize:first-letter {
     text-transform: capitalize;
 }
@@ -80,15 +204,15 @@
 }
 
 @media (max-width: 720px) {
-.hide-sm {
-    display: none
-}
+    .hide-sm {
+        display: none
+    }
 }
 
 @media (max-width: 992px) {
-.hide-lg {
-    display: none
-}
+    .hide-lg {
+        display: none
+    }
 }
 
 h1, h2, h3, h4 {
@@ -102,118 +226,4 @@ body {
 .btn {
     font-size: 0.8rem;
 }
-
 </style>
-
-<script>
-
-import store from './store';
-import client from './client';
-
-import ClosableJumbotron from './ClosableJumbotron.vue';
-import SearchField from './SearchField.vue';
-const components = { 
-    ClosableJumbotron,
-    SearchField,
-};
-
-export default {
-    name: 'home',
-    created() {
-        this.update();
-    },
-    timers: {
-        ticker: { time: 1000, autostart: true, repeat: true }
-    },
-    methods: {
-        ticker() {
-            this.update(true);
-        },
-        onRowClicked(item) {
-            this.$router.push('/blocks/' + item.block_number);
-        },
-        async onPageChanged(page) {
-            this.$router.push(`${this.$route.path}?page=${page}`);
-            //this.updateBlocks()
-        },
-        async update(silent) {
-            if (!silent) {
-                this.loading = true;
-            }
-            const status = await client.status();
-            let newBlocks = false;
-            if (status) {
-                newBlocks = this.lastCommitted !== status.last_committed || this.lastVerified !== status.last_verified;
-                this.lastCommitted = status.last_committed;
-                this.lastVerified = status.last_verified;
-                this.totalTransactions = status.total_transactions;
-            }
-            if (newBlocks) {
-                this.updateBlocks();
-            } else {
-                this.loading = false;
-            }
-        },
-        async updateBlocks() {
-            let max = this.lastCommitted - (client.PAGE_SIZE * (this.currentPage-1));
-            if (max < 0) return;
-
-            let blocks = await client.loadBlocks(max);
-            if (blocks) {
-                this.blocks = blocks.map( b => ({
-                    block_number:   b.block_number,
-                    status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
-                    new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
-                    committed_at:   b.committed_at.toString().split('T')[0] + " " + b.committed_at.toString().split('T')[1].split('.')[0],
-                    verified_at:    b.verified_at ? (b.verified_at.toString().split('T')[0] + " " + b.verified_at.toString().split('T')[1].split('.')[0]) : null,
-                }));
-                this.currentPage = this.page;
-                this.ready = true;
-            }
-            this.loading = false;
-        },
-    },
-    watch: {
-        '$route' (to, from) {
-            this.currentPage = this.page;
-            this.updateBlocks();
-        },
-    },
-    computed: {
-        page() {
-            return this.$route.query.page || 1;
-        },
-        items() {
-            return this.blocks;
-        },
-        perPage() {
-            return client.PAGE_SIZE;
-        },
-        rows() {
-            return this.lastCommitted || 9999;
-        },
-    },
-    data() {
-        return {
-            lastCommitted:      0,
-            lastVerified:       0,
-            totalTransactions:  0,
-            currentPage:        this.$route.query.page || 1,
-            
-            txPerBlock:         client.TX_PER_BLOCK(),
-            blocks:             [],
-            ready:              false,
-
-            loading:            true,
-
-            breadcrumbs: [
-                {
-                    text: 'Blocks',
-                    active: true
-                },
-            ],
-        };
-    },
-    components,
-};
-</script>

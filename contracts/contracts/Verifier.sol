@@ -1,15 +1,19 @@
-// from https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
 pragma solidity 0.5.10;
 
 import "./VerificationKey.sol";
 
+/// @title Verifier Contract
+/// @notice Based on https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
+/// @dev TODO: - remove DUMMY_VERIFIER variable for production
+/// @author Matter Labs
 contract Verifier is VerificationKey {
+    /// @notice If this flag is true - dummy verification is used instead of full verifier
     bool constant DUMMY_VERIFIER = false;
 
-    // Proof verification
-    // Params:
-    // - _proof - block number
-    // - _commitment - block commitment
+    /// @notice Rollup block proof verification
+    /// @param _proof Block proof
+    /// @param _commitment Block commitment
+    /// @return bool flag that indicates if block proof is valid
     function verifyBlockProof(
         uint256[8] calldata _proof,
         bytes32 _commitment
@@ -23,6 +27,12 @@ contract Verifier is VerificationKey {
         return Verify(vk, gammaABC, _proof, inputs);
     }
 
+    /// @notice Verifies exit proof
+    /// @param _tokenId Token id
+    /// @param _owner Token owner (user)
+    /// @param _amount Token amount
+    /// @param _proof Proof that user committed
+    /// @return bool flag that indicates if exit proof is valid
     function verifyExitProof(
         uint16 _tokenId,
         address _owner,
@@ -43,11 +53,20 @@ contract Verifier is VerificationKey {
         return Verify(vk, gammaABC, _proof, inputs);
     }
 
+    /// @notice Negates Y value
+    /// @param Y Y value
+    /// @return negated Y value
     function NegateY(uint256 Y) internal pure returns (uint256) {
         uint256 q = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
         return q - (Y % q);
     }
 
+    /// @notice Verifies exit proof
+    /// @param in_vk Verification key inputs
+    /// @param vk_gammaABC Verification key gamma
+    /// @param in_proof Proof input (Block proof)
+    /// @param proof_inputs Public inputs (commitment & mask)
+    /// @return bool flag that indicates if proof is valid
     function Verify(
         uint256[14] memory in_vk,
         uint256[] memory vk_gammaABC,

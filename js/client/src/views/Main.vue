@@ -92,15 +92,13 @@ export default {
             try {
                 await window.walletDecorator.updateState();
 
-                let onchainBalances = window.walletDecorator.onchainBalancesAsRenderableList();
-                let contractBalances = window.walletDecorator.contractBalancesAsRenderableList();
-                let franklinBalances = window.walletDecorator.franklinBalancesAsRenderableList();
-                let franklinBalancesWithInfo = window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
-                let pendingOps = await window.walletDecorator.pendingOperationsAsRenderableList();
+                let onchainBalances          =       window.walletDecorator.onchainBalancesAsRenderableList();
+                let franklinBalances         =       window.walletDecorator.franklinBalancesAsRenderableList();
+                let franklinBalancesWithInfo =       window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
+                let pendingOps               = await window.walletDecorator.pendingOperationsAsRenderableList();
 
                 this.walletInfo = {
                     onchainBalances,
-                    contractBalances,
                     franklinBalances,
                     franklinBalancesWithInfo,
                     pendingOps,

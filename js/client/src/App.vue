@@ -16,3 +16,7 @@ input::placeholder {
 }
 @import "../../client/scss/common.scss";
 </style>
+
+<style lang="scss">
+@import "../scss/common.scss";
+</style>

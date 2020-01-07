@@ -181,6 +181,7 @@ impl BabyProver {
             let mut key_file_path = std::path::PathBuf::new();
             key_file_path.push(&key_dir);
             key_file_path.push(&format!("{}", franklin_constants::block_size_chunks()));
+            key_file_path.push(&format!("{}", franklin_constants::account_tree_depth()));
             key_file_path.push(franklin_constants::KEY_FILENAME);
             key_file_path
         };

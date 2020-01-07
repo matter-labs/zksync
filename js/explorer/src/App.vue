@@ -10,6 +10,7 @@ export default {
 </script>
 
 <style lang="scss">
+@import "../../client/scss/common.scss";
 input::placeholder {
     color: lightgrey !important;
     font-style: italic !important;
@@ -17,5 +18,4 @@ input::placeholder {
 table {
     font-size: 1.1em;
 }
-@import "../../client/scss/common.scss";
 </style>

@@ -2,7 +2,6 @@ use crate::accounts_state::FranklinAccountsState;
 use crate::events_state::EventsState;
 use crate::franklin_ops::FranklinOpsBlock;
 use crate::genesis_state::get_genesis_state;
-use crate::helpers::DataRestoreError;
 use crate::storage_interactor;
 use storage::ConnectionPool;
 
@@ -58,7 +57,7 @@ impl DataRestoreDriver {
         self.run_updates = false
     }
 
-    pub fn load_state_from_storage(&mut self) -> Result<(), DataRestoreError> {
+    pub fn load_state_from_storage(&mut self) -> Result<(), failure::Error> {
         let state = storage_interactor::get_storage_state(self.connection_pool.clone());
         if let Ok(state) = state {
             let tree_state = storage_interactor::get_tree_state(self.connection_pool.clone())?;
@@ -95,7 +94,7 @@ impl DataRestoreDriver {
         }
     }
 
-    pub fn run_state_updates(&mut self) -> Result<(), DataRestoreError> {
+    pub fn run_state_updates(&mut self) -> Result<(), failure::Error> {
         self.run_updates = true;
         while self.run_updates {
             info!(
@@ -124,7 +123,7 @@ impl DataRestoreDriver {
         Ok(())
     }
 
-    fn update_events_state(&mut self) -> Result<(), DataRestoreError> {
+    fn update_events_state(&mut self) -> Result<(), failure::Error> {
         let events = self
             .events_state
             .update_events_state(self.eth_blocks_delta, self.end_eth_blocks_delta)?;
@@ -148,7 +147,7 @@ impl DataRestoreDriver {
     fn update_tree_state(
         &mut self,
         new_ops_blocks: Vec<FranklinOpsBlock>,
-    ) -> Result<(), DataRestoreError> {
+    ) -> Result<(), failure::Error> {
         for block in new_ops_blocks {
             let state = self
                 .accounts_state
@@ -171,7 +170,7 @@ impl DataRestoreDriver {
         Ok(())
     }
 
-    fn update_operations_state(&mut self) -> Result<Vec<FranklinOpsBlock>, DataRestoreError> {
+    fn update_operations_state(&mut self) -> Result<Vec<FranklinOpsBlock>, failure::Error> {
         let new_blocks = self.get_new_operation_blocks_from_events()?;
         info!("Parsed events to operation blocks");
 
@@ -192,7 +191,7 @@ impl DataRestoreDriver {
     /// Return verified comitted operations blocks from verified op blocks events
     pub fn get_new_operation_blocks_from_events(
         &mut self,
-    ) -> Result<Vec<FranklinOpsBlock>, DataRestoreError> {
+    ) -> Result<Vec<FranklinOpsBlock>, failure::Error> {
         info!("Loading new verified op_blocks");
         let committed_events = self.events_state.get_only_verified_committed_events();
         let mut blocks: Vec<FranklinOpsBlock> = vec![];

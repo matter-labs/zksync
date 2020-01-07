@@ -1748,7 +1748,7 @@ bootstrap-vue@^2.0.0:
     portal-vue "^2.1.6"
     vue-functional-data-merge "^3.1.0"
 
-"bootstrap@>=4.3.1 <5.0.0", bootstrap@^4.3.1:
+"bootstrap@>=4.3.1 <5.0.0":
   version "4.3.1"
   resolved "https://registry.yarnpkg.com/bootstrap/-/bootstrap-4.3.1.tgz#280ca8f610504d99d7b6b4bfc4b68cec601704ac"
   integrity sha512-rXqOmH1VilAt2DyPzluTi2blhk17bO7ef+zLLPlWvG494pDxcM234pJ8wTc/6R40UWizAIIMgxjvxZg5kmsbag==
@@ -2116,6 +2116,11 @@ check-types@^8.0.3:
   version "8.0.3"
   resolved "https://registry.yarnpkg.com/check-types/-/check-types-8.0.3.tgz#3356cca19c889544f2d7a95ed49ce508a0ecf552"
   integrity sha512-YpeKZngUmG65rLudJ4taU7VLkOCTMhNl/u4ctNC56LQS/zJTyNH0Lrtwm1tfTsbLlwvlfsA2d1c8vCf/Kh2KwQ==
+
+chnl@^0.5.0:
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/chnl/-/chnl-0.5.0.tgz#ed7aea426043fce5685e547f7297193b6d2bef8c"
+  integrity sha512-0dl4ZJfAZdLn9mDnWejs5nasZKVnDTwdXV+dkxodYbb//GJDtXNhPlqCCYUb1xF0NQpIB5zlHRDrU1RCB4BRog==
 
 chokidar@^2.0.2, chokidar@^2.1.8:
   version "2.1.8"
@@ -3287,6 +3292,22 @@ es-abstract@^1.12.0, es-abstract@^1.4.3, es-abstract@^1.5.1:
     string.prototype.trimleft "^2.1.0"
     string.prototype.trimright "^2.1.0"
 
+es-abstract@^1.13.0:
+  version "1.16.2"
+  resolved "https://registry.yarnpkg.com/es-abstract/-/es-abstract-1.16.2.tgz#4e874331645e9925edef141e74fc4bd144669d34"
+  integrity sha512-jYo/J8XU2emLXl3OLwfwtuFfuF2w6DYPs+xy9ZfVyPkDcrauu6LYrw/q2TyCtrbc/KUdCiC5e9UajRhgNkVopA==
+  dependencies:
+    es-to-primitive "^1.2.1"
+    function-bind "^1.1.1"
+    has "^1.0.3"
+    has-symbols "^1.0.1"
+    is-callable "^1.1.4"
+    is-regex "^1.0.4"
+    object-inspect "^1.7.0"
+    object-keys "^1.1.1"
+    string.prototype.trimleft "^2.1.0"
+    string.prototype.trimright "^2.1.0"
+
 es-to-primitive@^1.2.1:
   version "1.2.1"
   resolved "https://registry.yarnpkg.com/es-to-primitive/-/es-to-primitive-1.2.1.tgz#e55cd4c9cdc188bcefb03b366c736323fc5c898a"
@@ -4051,6 +4072,11 @@ flat-cache@^2.0.1:
     rimraf "2.6.3"
     write "1.0.3"
 
+flat-options@^0.1.3:
+  version "0.1.3"
+  resolved "https://registry.yarnpkg.com/flat-options/-/flat-options-0.1.3.tgz#56f644aaa095e5f984ecdd329f119e8a196c8aa3"
+  integrity sha512-z1vH9mb4ly55dWUZZFUeLNqhFWhwSQNngHpK8RQOhFuNw/sWcNDZhkHl3GS1YTHiYxB5qvcbSRbH7X6ThzX9UA==
+
 flatted@^2.0.0:
   version "2.0.1"
   resolved "https://registry.yarnpkg.com/flatted/-/flatted-2.0.1.tgz#69e57caa8f0eacbc281d2e2cb458d46fdb449e08"
@@ -4108,17 +4134,6 @@ fragment-cache@^0.2.1:
   integrity sha1-QpD60n8T6Jvn8zeZxrxaCr//DRk=
   dependencies:
     map-cache "^0.2.2"
-
-franklin_lib@../franklin_lib:
-  version "1.0.0"
-  dependencies:
-    axios "^0.19.0"
-    blake2b "^2.1.3"
-    bn.js "^5.0.0"
-    crypto-js "^3.1.9-1"
-    elliptic "^6.5.0"
-    ethers "^4.0.33"
-    js-sha256 "^0.9.0"
 
 fresh@0.5.2:
   version "0.5.2"
@@ -5212,7 +5227,7 @@ is-symbol@^1.0.2:
   dependencies:
     has-symbols "^1.0.1"
 
-is-typedarray@~1.0.0:
+is-typedarray@^1.0.0, is-typedarray@~1.0.0:
   version "1.0.0"
   resolved "https://registry.yarnpkg.com/is-typedarray/-/is-typedarray-1.0.0.tgz#e479c80858df0c1b11ddda6940f96011fcda4a9a"
   integrity sha1-5HnICFjfDBsR3dppQPlgEfzaSpo=
@@ -5999,7 +6014,7 @@ mz@^2.4.0:
     object-assign "^4.0.1"
     thenify-all "^1.0.0"
 
-nan@^2.12.1, nan@^2.13.2:
+nan@^2.12.1, nan@^2.13.2, nan@^2.14.0:
   version "2.14.0"
   resolved "https://registry.yarnpkg.com/nan/-/nan-2.14.0.tgz#7818f722027b2459a86f0295d434d1fc2336c52c"
   integrity sha512-INOFj37C7k3AfaNTtX8RhsTw7qRy7eLET14cROi9+5HAVbbHuIWUHEauBv5qT4Av2tWasiTY1Jw6puUNqRJXQg==
@@ -7300,6 +7315,11 @@ progress@^2.0.0:
   resolved "https://registry.yarnpkg.com/progress/-/progress-2.0.3.tgz#7e8cf8d8f5b8f239c1bc68beb4eb78567d572ef8"
   integrity sha512-7PiHtLll5LdnKIMw100I+8xJXR5gW2QwWYkT6iJva0bXitZKa/XMrSbdmg3r2Xnaidz9Qumd0VPaMrZlF9V9sA==
 
+promise-controller@^0.5.2:
+  version "0.5.2"
+  resolved "https://registry.yarnpkg.com/promise-controller/-/promise-controller-0.5.2.tgz#f32d2156dc1f8e62703bf9fb0b8158335660c212"
+  integrity sha512-ymVCGfCxN+A+6TqESLnGZhGfQdQJ08SpIMyft4xQPUDrOgoqzKcQnLIYaqQk7/rPyg4wpKpxBKefeGkvumWgUg==
+
 promise-inflight@^1.0.1:
   version "1.0.1"
   resolved "https://registry.yarnpkg.com/promise-inflight/-/promise-inflight-1.0.1.tgz#98472870bf228132fcbdd868129bad12c3c029e3"
@@ -7312,6 +7332,15 @@ promise-to-callback@^1.0.0:
   dependencies:
     is-fn "^1.0.0"
     set-immediate-shim "^1.0.1"
+
+promise.prototype.finally@^3.1.0:
+  version "3.1.1"
+  resolved "https://registry.yarnpkg.com/promise.prototype.finally/-/promise.prototype.finally-3.1.1.tgz#cb279d3a5020ca6403b3d92357f8e22d50ed92aa"
+  integrity sha512-gnt8tThx0heJoI3Ms8a/JdkYBVhYP/wv+T7yQimR+kdOEJL21xTFbiJhMRqnSPcr54UVvMbsscDk2w+ivyaLPw==
+  dependencies:
+    define-properties "^1.1.3"
+    es-abstract "^1.13.0"
+    function-bind "^1.1.1"
 
 proxy-addr@~2.0.5:
   version "2.0.5"
@@ -8923,6 +8952,13 @@ type-is@~1.6.17, type-is@~1.6.18:
     media-typer "0.3.0"
     mime-types "~2.1.24"
 
+typedarray-to-buffer@^3.1.5:
+  version "3.1.5"
+  resolved "https://registry.yarnpkg.com/typedarray-to-buffer/-/typedarray-to-buffer-3.1.5.tgz#a97ee7a9ff42691b9f783ff1bc5112fe3fca9080"
+  integrity sha512-zdu8XMNEDepKKR+XYOXAVPtWui0ly0NtohUscw+UmaHiAWT8hrV1rr//H6V+0DvJ3OQ19S979M0laLfX8rm82Q==
+  dependencies:
+    is-typedarray "^1.0.0"
+
 typedarray@^0.0.6:
   version "0.0.6"
   resolved "https://registry.yarnpkg.com/typedarray/-/typedarray-0.0.6.tgz#867ac74e3864187b1d3d47d996a78ec5c8830777"
@@ -9390,6 +9426,16 @@ webpack@^4.0.0:
     watchpack "^1.6.0"
     webpack-sources "^1.4.1"
 
+websocket-as-promised@^0.10.1:
+  version "0.10.1"
+  resolved "https://registry.yarnpkg.com/websocket-as-promised/-/websocket-as-promised-0.10.1.tgz#30aef1529fc7e797b8270875a408d83264e52958"
+  integrity sha512-hKAZPSIGaao4WPoporPkDQpKl9jz0I0Hh9x/Dn05k6u//e44+0rAhMam4/gvBlYZl02wJYELD561bAenyxwJJQ==
+  dependencies:
+    chnl "^0.5.0"
+    flat-options "^0.1.3"
+    promise-controller "^0.5.2"
+    promise.prototype.finally "^3.1.0"
+
 websocket-driver@>=0.5.1:
   version "0.7.3"
   resolved "https://registry.yarnpkg.com/websocket-driver/-/websocket-driver-0.7.3.tgz#a2d4e0d4f4f116f1e6297eba58b05d430100e9f9"
@@ -9403,6 +9449,16 @@ websocket-extensions@>=0.1.1:
   version "0.1.3"
   resolved "https://registry.yarnpkg.com/websocket-extensions/-/websocket-extensions-0.1.3.tgz#5d2ff22977003ec687a4b87073dfbbac146ccf29"
   integrity sha512-nqHUnMXmBzT0w570r2JpJxfiSD1IzoI+HGVdd3aZ0yNi3ngvQ4jv1dtHt5VGxfI2yj5yqImPhOK4vmIh2xMbGg==
+
+websocket@^1.0.30:
+  version "1.0.30"
+  resolved "https://registry.yarnpkg.com/websocket/-/websocket-1.0.30.tgz#91d3bd00c3d43e916f0cf962f8f8c451bb0b2373"
+  integrity sha512-aO6klgaTdSMkhfl5VVJzD5fm+Srhh5jLYbS15+OiI1sN6h/RU/XW6WN9J1uVIpUKNmsTvT3Hs35XAFjn9NMfOw==
+  dependencies:
+    debug "^2.2.0"
+    nan "^2.14.0"
+    typedarray-to-buffer "^3.1.5"
+    yaeti "^0.0.6"
 
 which-module@^1.0.0:
   version "1.0.0"
@@ -9529,6 +9585,11 @@ y18n@^3.2.1:
   resolved "https://registry.yarnpkg.com/y18n/-/y18n-4.0.0.tgz#95ef94f85ecc81d007c264e190a120f0a3c8566b"
   integrity sha512-r9S/ZyXu/Xu9q1tYlpsLIsa3EeLXXk0VwlxqTcFRfg9EhMW+17kbt9G0NrgCmhGb5vT2hyhJZLfDGx+7+5Uj/w==
 
+yaeti@^0.0.6:
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/yaeti/-/yaeti-0.0.6.tgz#f26f484d72684cf42bedfb76970aa1608fbf9577"
+  integrity sha1-8m9ITXJoTPQr7ft2lwqhYI+/lXc=
+
 yallist@^2.1.2:
   version "2.1.2"
   resolved "https://registry.yarnpkg.com/yallist/-/yallist-2.1.2.tgz#1c11f9218f076089a47dd512f93c6699a6a81d52"
@@ -9625,3 +9686,18 @@ yorkie@^2.0.0:
     is-ci "^1.0.10"
     normalize-path "^1.0.0"
     strip-indent "^2.0.0"
+
+zksync@^0.3.9:
+  version "0.3.9"
+  resolved "https://registry.yarnpkg.com/zksync/-/zksync-0.3.9.tgz#c329c978b539a933b32078d99a94a009019c867f"
+  integrity sha512-xDS587brKb2QKdKO3w4V46ty7apAjlOg1VAsOHA43hCwNKSIAaJL7X/VrzAZbF2WnW3emuKUKN79LncGs9t/MA==
+  dependencies:
+    axios "^0.19.0"
+    blake2b "^2.1.3"
+    bn.js "^5.0.0"
+    crypto-js "^3.1.9-1"
+    elliptic "^6.5.0"
+    ethers "^4.0.33"
+    js-sha256 "^0.9.0"
+    websocket "^1.0.30"
+    websocket-as-promised "^0.10.1"

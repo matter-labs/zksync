@@ -10,11 +10,10 @@ use std::sync::mpsc;
 use storage::{ConnectionPool, StorageProcessor};
 
 use crate::ThreadPanicNotify;
-use futures::{Future, Stream};
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
-use tokio::timer::Interval;
+use std::time::Duration;
+use tokio::{runtime::Runtime, time};
 use web3::types::H160;
 
 #[derive(Default, Clone)]
@@ -43,32 +42,41 @@ impl AppState {
     }
 
     // Spawns future updating SharedNetworkStatus in the current `actix::System`
-    fn spawn_network_status_updater(&self) {
-        let state_checker = Interval::new(Instant::now(), Duration::from_millis(1000))
-            .fold(self.clone(), |state, _instant| {
-                let pool = state.connection_pool.clone();
-                let storage = pool.access_storage().expect("db failed");
+    fn spawn_network_status_updater(&self, panic_notify: mpsc::Sender<bool>) {
+        let state = self.clone();
 
-                let last_verified = storage.get_last_verified_block().unwrap_or(0);
-                let status = NetworkStatus {
-                    next_block_at_max: None,
-                    last_committed: storage.get_last_committed_block().unwrap_or(0),
-                    last_verified,
-                    total_transactions: storage.count_total_transactions().unwrap_or(0),
-                    outstanding_txs: storage.count_outstanding_proofs(last_verified).unwrap_or(0),
+        std::thread::Builder::new()
+            .name("rest-state-updater".to_string())
+            .spawn(move || {
+                let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
+
+                let mut runtime = Runtime::new().expect("tokio runtime creation");
+
+                let state_update_task = async move {
+                    let mut timer = time::interval(Duration::from_millis(1000));
+                    loop {
+                        timer.tick().await;
+
+                        let storage = state.connection_pool.access_storage().expect("db failed");
+
+                        let last_verified = storage.get_last_verified_block().unwrap_or(0);
+                        let status = NetworkStatus {
+                            next_block_at_max: None,
+                            last_committed: storage.get_last_committed_block().unwrap_or(0),
+                            last_verified,
+                            total_transactions: storage.count_total_transactions().unwrap_or(0),
+                            outstanding_txs: storage
+                                .count_outstanding_proofs(last_verified)
+                                .unwrap_or(0),
+                        };
+
+                        // save status to state
+                        *state.network_status.0.as_ref().write().unwrap() = status;
+                    }
                 };
-
-                // save status to state
-                *state.network_status.0.as_ref().write().unwrap() = status;
-
-                Ok(state)
+                runtime.block_on(state_update_task);
             })
-            .map(|_| ())
-            .map_err(|e| panic!("interval errored; err={:?}", e));
-
-        actix::System::with_current(|_| {
-            actix::spawn(state_checker);
-        });
+            .expect("State update thread");
     }
 }
 #[derive(Debug, Serialize)]
@@ -105,7 +113,7 @@ fn handle_submit_tx(
         Err(HttpResponse::NotAcceptable().body(e.to_string()).into())
     } else {
         Ok(HttpResponse::Ok().json(NewTxResponse {
-            hash: req.hash().to_hex(),
+            hash: req.hash().to_str(),
         }))
     }
 }
@@ -226,13 +234,23 @@ fn handle_get_executed_transaction_by_hash(
 
 fn handle_get_tx_by_hash(
     data: web::Data<AppState>,
-    hash_hex_with_0x: web::Path<String>,
+    hash_hex_with_prefix: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
-    if hash_hex_with_0x.len() < 2 {
+    if hash_hex_with_prefix.len() < 2 {
         return Err(HttpResponse::BadRequest().finish().into());
     }
-    let hash = hex::decode(&hash_hex_with_0x.into_inner()[2..])
-        .map_err(|_| HttpResponse::BadRequest().finish())?;
+
+    let hash = {
+        let hash = if hash_hex_with_prefix.starts_with("0x") {
+            hex::decode(&hash_hex_with_prefix.into_inner()[2..])
+        } else if hash_hex_with_prefix.starts_with("sync-tx:") {
+            hex::decode(&hash_hex_with_prefix.into_inner()[8..])
+        } else {
+            return Err(HttpResponse::BadRequest().finish().into());
+        };
+
+        hash.map_err(|_| HttpResponse::BadRequest().finish())?
+    };
 
     let storage = data.access_storage()?;
 
@@ -342,11 +360,11 @@ fn handle_get_block_transactions(
         .into_iter()
         .map(|op| {
             let tx_hash = match &op {
-                ExecutedOperations::Tx(tx) => tx.tx.hash().as_ref().to_vec(),
-                ExecutedOperations::PriorityOp(tx) => tx.priority_op.eth_hash.clone(),
+                ExecutedOperations::Tx(tx) => tx.tx.hash().to_str(),
+                ExecutedOperations::PriorityOp(tx) => {
+                    format!("0x{}", hex::encode(&tx.priority_op.eth_hash))
+                }
             };
-
-            let tx_hash = format!("0x{}", hex::encode(&tx_hash));
 
             ExecutedOperationWithHash { op, tx_hash }
         })
@@ -447,7 +465,7 @@ pub(super) fn start_server_thread_detached(
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
             let runtime = actix_rt::System::new("api-server");
 
@@ -456,7 +474,7 @@ pub(super) fn start_server_thread_detached(
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{}", contract_address),
             };
-            state.spawn_network_status_updater();
+            state.spawn_network_status_updater(panic_notify);
 
             start_server(state, listen_addr);
             runtime.run().unwrap_or_default();
