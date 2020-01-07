@@ -4,7 +4,7 @@ set -e
 
 check-environment.sh
 
-zksync dev-up || true
+zksync dev-up
 zksync env
 zksync yarn || true # It can fail.
 zksync gen-keys-if-not-present

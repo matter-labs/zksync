@@ -164,10 +164,10 @@ gen-keys-if-not-present:
 	@touch contracts/build/Governance.json
 	@touch contracts/build/PriorityQueue.json
 	
-	test -f keys/${BLOCK_SIZE_CHUNKS}/VerificationKey.sol || gen-keys
+	test -f keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/franklin_pk.key || gen-keys
 
 prepare-contracts:
-	@cp keys/${BLOCK_SIZE_CHUNKS}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 
@@ -301,13 +301,13 @@ nodes:
 # Dev environment
 
 dev-up:
-	@{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
 	@docker-compose up -d postgres geth
 	@docker-compose up -d tesseracts
 
+
 dev-down:
-	@docker-compose stop postgres geth
 	@docker-compose stop tesseracts
+	@docker-compose stop postgres geth
 
 geth-up: geth
 	@docker-compose up geth

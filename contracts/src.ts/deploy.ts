@@ -80,9 +80,15 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
         }
     } else {
         let status;
-        do {
+        let retriesLeft = 10;
+        while (retriesLeft --> 0) {
             status = await Axios.get(`http://api.etherscan.io/api?module=contract&&action=checkverifystatus&&guid=${r.data.result}`).then(r => r.data);
-        } while (status.result.includes('Pending in queue'));
+            
+            if (status.result.includes('Pending in queue') == false) 
+                break;
+            
+            await sleep(5000);
+        }
 
         console.log(`Published ${contractname} sources on https://${network}.etherscan.io/address/${contractaddress} with status`, status);
     }

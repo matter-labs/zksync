@@ -38,7 +38,10 @@ impl TxHash {
     }
 
     pub fn from_str(s: &str) -> Result<Self, failure::Error> {
-        ensure!(s.starts_with("sync-tx:"), "TxHash should start with sync-tx:");
+        ensure!(
+            s.starts_with("sync-tx:"),
+            "TxHash should start with sync-tx:"
+        );
         let bytes = hex::decode(&s[8..])?;
         ensure!(bytes.len() == 32, "Size mismatch");
         Ok(TxHash {
@@ -247,6 +250,13 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
+        }
+    }
+
+    pub fn is_withdraw(&self) -> bool {
+        match self {
+            FranklinTx::Withdraw(_) => true,
+            _ => false,
         }
     }
 }
