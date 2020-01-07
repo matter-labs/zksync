@@ -2,7 +2,7 @@
 
 # Generates a json config file with current env var configuration for production
 
-JS_CONFIG="API_SERVER TX_BATCH_SIZE SENDER_ACCOUNT CONTRACT_ADDR ETH_NETWORK"
+JS_CONFIG="API_SERVER TX_BATCH_SIZE SENDER_ACCOUNT CONTRACT_ADDR ETH_NETWORK WS_API_ADDR HTTP_RPC_API_ADDR"
 
 echo "export default {" 
 
@@ -10,5 +10,4 @@ for VAR in $JS_CONFIG; do
     echo "  \"$VAR\":\"${!VAR}\","
 done
 
-echo "  \"trailing\": null"
 echo "}"

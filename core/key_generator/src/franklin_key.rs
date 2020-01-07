@@ -21,7 +21,8 @@ pub fn make_franklin_key() {
     let out_dir = {
         let mut out_dir = PathBuf::new();
         out_dir.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
-        out_dir.push(&format!("{}", models::params::block_size_chunks()));
+        out_dir.push(&format!("{}", franklin_constants::block_size_chunks()));
+        out_dir.push(&format!("{}", franklin_constants::account_tree_depth()));
         out_dir
     };
     let key_file_path = {
