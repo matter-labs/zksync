@@ -288,7 +288,7 @@ pub fn apply_fee(
     let fee_fe = Fr::from_str(&fee.to_string()).unwrap();
     let mut validator_leaf = tree
         .remove(validator_address)
-        .expect("validator_leaf not empty");
+        .expect("validator_leaf is empty");
     let validator_account_witness = AccountWitness {
         nonce: Some(validator_leaf.nonce),
         pub_key_hash: Some(validator_leaf.pub_key_hash),

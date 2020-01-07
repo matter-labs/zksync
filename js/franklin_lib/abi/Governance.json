@@ -39,6 +39,20 @@
     },
     {
       "constant": true,
+      "inputs": [
+        {
+          "name": "_address",
+          "type": "address"
+        }
+      ],
+      "name": "requireActiveValidator",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
       "inputs": [],
       "name": "totalTokens",
       "outputs": [
@@ -47,20 +61,6 @@
           "type": "uint16"
         }
       ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [
-        {
-          "name": "_tokenId",
-          "type": "uint16"
-        }
-      ],
-      "name": "requireValidTokenId",
-      "outputs": [],
       "payable": false,
       "stateMutability": "view",
       "type": "function"
@@ -149,17 +149,12 @@
       "constant": true,
       "inputs": [
         {
-          "name": "",
+          "name": "_address",
           "type": "address"
         }
       ],
-      "name": "validators",
-      "outputs": [
-        {
-          "name": "",
-          "type": "bool"
-        }
-      ],
+      "name": "requireGovernor",
+      "outputs": [],
       "payable": false,
       "stateMutability": "view",
       "type": "function"
@@ -168,11 +163,11 @@
       "constant": true,
       "inputs": [
         {
-          "name": "_sender",
+          "name": "",
           "type": "address"
         }
       ],
-      "name": "isValidator",
+      "name": "validators",
       "outputs": [
         {
           "name": "",

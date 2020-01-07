@@ -167,10 +167,10 @@ loadtest: confirm_action
 	@bin/loadtest.sh
 
 integration-simple:
-	@cd js/tests && yarn simple
+	@cd js/tests && yarn && yarn simple
 
 integration-full-exit:
-	@cd js/tests && yarn full-exit
+	@cd js/tests && yarn && yarn full-exit
 
 price:
 	@node contracts/scripts/check-price.js
@@ -332,4 +332,3 @@ data-restore-restart: confirm_action data-restore-db-prepare
 
 data-restore-continue:
 	@./target/release/data_restore
-	

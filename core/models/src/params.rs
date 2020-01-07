@@ -1,10 +1,10 @@
-// Built-in uses
+// Built-in deps
 use std::env;
 use std::str::FromStr;
-// External uses
+// External deps
 use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
-// Workspace uses
+// Workspace deps
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::node::TokenId;
 

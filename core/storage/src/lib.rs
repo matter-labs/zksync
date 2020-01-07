@@ -26,6 +26,7 @@ use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::convert::TryInto;
+use std::time;
 use web3::types::H256;
 
 mod schema;
@@ -1725,22 +1726,33 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
+    pub fn load_unverified_commits_after_block(
+        &self,
+        block: i64,
+        limit: i64,
+    ) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
-            let ops: Vec<StoredOperation> = diesel::sql_query(
+            let ops: Vec<StoredOperation> = diesel::sql_query(format!(
                 "
                 SELECT * FROM operations
-                WHERE action_type = 'COMMIT'
-                AND block_number > (
-                    SELECT COALESCE(max(block_number), 0)  
-                    FROM operations 
-                    WHERE action_type = 'VERIFY'
-                )
+                  WHERE action_type = 'COMMIT'
+                   AND block_number > (
+                     SELECT COALESCE(max(block_number), 0)
+                       FROM operations
+                       WHERE action_type = 'VERIFY'
+                   )
+                   AND block_number > {}
+                  LIMIT {}
             ",
-            )
+                block, limit
+            ))
             .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
+    }
+
+    pub fn load_unverified_commits(&self) -> QueryResult<Vec<Operation>> {
+        self.load_unverified_commits_after_block(0, 10e9 as i64)
     }
 
     fn get_account_and_last_block(
@@ -1937,10 +1949,10 @@ impl StorageProcessor {
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
 
-    pub fn fetch_prover_job(
+    pub fn prover_run_for_next_commit(
         &self,
         worker_: &str,
-        timeout_seconds: usize,
+        prover_timeout: time::Duration,
     ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
@@ -1954,14 +1966,10 @@ impl StorageProcessor {
                     AND NOT EXISTS
                         (SELECT * FROM prover_runs 
                             WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
-                ", timeout_seconds))
+                ", prover_timeout.as_secs()))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             if let Some(block_number_) = job {
-                // let to_store = NewProverRun{
-                //     block_number: i64::from(block_number),
-                //     worker: worker.to_string(),
-                // };
                 use crate::schema::prover_runs::dsl::*;
                 let inserted: ProverRun = insert_into(prover_runs)
                     .values(&vec![(
@@ -1976,7 +1984,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn update_prover_job(&self, job_id: i32) -> QueryResult<()> {
+    pub fn record_prover_is_working(&self, job_id: i32) -> QueryResult<()> {
         use crate::schema::prover_runs::dsl::*;
 
         let target = prover_runs.filter(id.eq(job_id));
@@ -1992,6 +2000,15 @@ impl StorageProcessor {
             .values(&vec![(worker.eq(worker_.to_string()))])
             .get_result(self.conn())?;
         Ok(inserted.id)
+    }
+
+    pub fn prover_by_id(&self, prover_id: i32) -> QueryResult<ActiveProver> {
+        use crate::schema::active_provers::dsl::*;
+
+        let ret: ActiveProver = active_provers
+            .filter(id.eq(prover_id))
+            .get_result(self.conn())?;
+        Ok(ret)
     }
 
     pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
@@ -2446,7 +2463,7 @@ mod test {
         conn.execute_operation(&dummy_op(Action::Commit, 1))
             .unwrap();
 
-        let pending = conn.load_unverified_commitments().unwrap();
+        let pending = conn.load_unverified_commits().unwrap();
         assert_eq!(pending.len(), 1);
 
         conn.execute_operation(&dummy_op(
@@ -2457,7 +2474,7 @@ mod test {
         ))
         .unwrap();
 
-        let pending = conn.load_unverified_commitments().unwrap();
+        let pending = conn.load_unverified_commits().unwrap();
         assert_eq!(pending.len(), 0);
     }
 

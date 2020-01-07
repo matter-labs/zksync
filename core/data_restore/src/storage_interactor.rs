@@ -1,10 +1,10 @@
-// Built-in uses
+// Built-in deps
 use std::convert::TryFrom;
 use std::str::FromStr;
-// External uses
+// External deps
 use failure::format_err;
 use web3::types::H256;
-// Workspace uses
+// Workspace deps
 use crate::data_restore_driver::StorageUpdateState;
 use crate::events::{EventData, EventType};
 use crate::events_state::EventsState;

@@ -1,11 +1,11 @@
-// Built-in uses
+// Built-in deps
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
-// External uses
+// External deps
 use itertools::Itertools;
 use web3::types::H256;
-// Workspace uses
+// Workspace deps
 use crate::eth_watch::ETHState;
 use crate::ThreadPanicNotify;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -487,28 +487,4 @@ pub fn start_state_keeper(
             sk.run(rx_for_blocks, tx_for_commitments)
         })
         .expect("State keeper thread");
-}
-
-#[test]
-fn test_read_private_key() {
-    //    let pk_bytes =
-    //        hex::decode("8ea0225bbf7f3689eb8ba6f8d7bef3d8ae2541573d71711a28d5149807b40805").unwrap();
-    //    let private_key: PrivateKey<Bn256> =
-    //        PrivateKey::read(BufReader::new(pk_bytes.as_slice())).unwrap();
-    //
-    //    let padding_account_id = 2;
-    //
-    //    let nonce = 0;
-    //    let _tx = TransferTx::create_signed_tx(
-    //        padding_account_id, // from
-    //        0,                  // to
-    //        BigDecimal::zero(), // amount
-    //        BigDecimal::zero(), // fee
-    //        nonce,              // nonce
-    //        2_147_483_647,      // good until max_block
-    //        &private_key,
-    //    );
-
-    //let pub_key = PublicKey::from_private(private_key, FixedGenerators::SpendingKeyGenerator, &params::JUBJUB_PARAMS as &franklin_crypto::alt_babyjubjub::AltJubjubBn256);
-    //assert!( tx.verify_sig(&pub_key) );
 }

@@ -6,12 +6,11 @@ use actix_web::{
 };
 use models::node::{Account, AccountAddress, AccountId, ExecutedOperations, FranklinTx};
 use models::NetworkStatus;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, RwLock};
 use storage::{ConnectionPool, StorageProcessor};
 
 use crate::ThreadPanicNotify;
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
