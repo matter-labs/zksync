@@ -18,7 +18,7 @@ use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 
 // TODO: temporary limit
-const MAX_NUMBER_OF_WITHDRAWS: usize = 20;
+const MAX_NUMBER_OF_WITHDRAWS: usize = 4;
 
 /// Coordinator of tx processing and generation of proofs
 pub struct PlasmaStateKeeper {

@@ -2329,16 +2329,6 @@ impl StorageProcessor {
             .into_iter()
             .map(|stored_tx| serde_json::from_value(stored_tx.tx).unwrap())
             .collect())
-
-        // let query = mempool::table
-        //     .left_join(
-        //         executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
-        //     )
-        //     .filter(executed_transactions::tx_hash.is_null())
-        //     .left_join(accounts::table.on(accounts::address.eq(mempool::primary_account_address)))
-        //     .filter(mempool::nonce.ge(coalesce(accounts::nonce, 0)))
-        //     .order(mempool::nonce - coalesce(accounts::nonce, 0))
-        //     .limit(max_size as i64);
     }
 }
 

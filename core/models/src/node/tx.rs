@@ -254,9 +254,9 @@ impl FranklinTx {
     }
 
     pub fn is_withdraw(&self) -> bool {
-        match &*self {
-            &FranklinTx::Withdraw(_) => true,
-            &_ => false,
+        match self {
+            FranklinTx::Withdraw(_) => true,
+            _ => false,
         }
     }
 }

@@ -94,7 +94,7 @@ push-image-ci:
 	docker push "${CI_DOCKER_IMAGE}"
 
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
-docker-options = --rm -v $(shell pwd):/home/rust/src -v /Users/oleg/.cargo/git:/home/rust/.cargo/git -v /Users/oleg/.cargo/registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
+docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
 rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 
@@ -301,11 +301,13 @@ nodes:
 # Dev environment
 
 dev-up:
-	# @{ docker ps | grep -q "$(GETH_DOCKER_IMAGE)" && echo "Dev env already running" && exit 1; } || echo -n
-	@docker-compose up -d postgres geth tesseracts
+	@docker-compose up -d postgres geth
+	@docker-compose up -d tesseracts
+
 
 dev-down:
-	@docker-compose stop postgres geth tesseracts
+	@docker-compose stop tesseracts
+	@docker-compose stop postgres geth
 
 geth-up: geth
 	@docker-compose up geth

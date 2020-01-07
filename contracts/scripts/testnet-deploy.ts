@@ -33,8 +33,9 @@ async function main() {
         return;
     }
 
-    const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-    const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+    const provider   = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+    const wallet     = ethers.Wallet.fromMnemonic(process.env.MNEMONIC,      "m/44'/60'/0'/0/1").connect(provider);
+    const testWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
 
     let governanceAddress    = process.env.GOVERNANCE_ADDR;
     let priorityQueueAddress = process.env.PRIORITY_QUEUE_ADDR;
@@ -73,30 +74,33 @@ async function main() {
         franklinAddress = franklin.address;
 
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
+
         const erc20 = await addTestERC20Token(wallet, governance);
 
-        // Setup test wallet
-        const path = "m/44'/60'/0'/0/0";
-        const testWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, path).connect(provider);
         await wallet.sendTransaction({
             to: testWallet.address,
             value: ethers.utils.parseEther("10.0"),
-        });
+        })
+        .catch(e => console.log('Failed to send ether:', e.message));
         await mintTestERC20Token(testWallet, erc20);
     }
 
     if (args.publish) {
         try {
             if (process.env.ETH_NETWORK === 'localhost') {
-                await postContractToTesseracts(governanceContractCode,    "Governance",    governanceAddress);
-                await postContractToTesseracts(priorityQueueContractCode, "PriorityQueue", priorityQueueAddress);
-                await postContractToTesseracts(verifierContractCode,      "Verifier",      verifierAddress);
-                await postContractToTesseracts(franklinContractCode,      "Franklin",      franklinAddress);
+                await Promise.all([
+                    postContractToTesseracts(governanceContractCode,    "Governance",    governanceAddress),
+                    postContractToTesseracts(priorityQueueContractCode, "PriorityQueue", priorityQueueAddress),
+                    postContractToTesseracts(verifierContractCode,      "Verifier",      verifierAddress),
+                    postContractToTesseracts(franklinContractCode,      "Franklin",      franklinAddress),
+                ]);
             } else {
-                await publishSourceCodeToEtherscan('Governance',    governanceAddress,    governanceContractSourceCode,    governanceContractCode,    governanceConstructorArgs);
-                await publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, priorityQueueConstructorArgs);
-                await publishSourceCodeToEtherscan('Verifier',      verifierAddress,      verifierContractSourceCode,      verifierContractCode,      verifierConstructorArgs);
-                await publishSourceCodeToEtherscan('Franklin',      franklinAddress,      franklinContractSourceCode,      franklinContractCode,      franklinConstructorArgs);
+                await Promise.all([
+                    publishSourceCodeToEtherscan('Governance',    governanceAddress,    governanceContractSourceCode,    governanceContractCode,    governanceConstructorArgs),
+                    publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, priorityQueueConstructorArgs),
+                    publishSourceCodeToEtherscan('Verifier',      verifierAddress,      verifierContractSourceCode,      verifierContractCode,      verifierConstructorArgs),
+                    publishSourceCodeToEtherscan('Franklin',      franklinAddress,      franklinContractSourceCode,      franklinContractCode,      franklinConstructorArgs),
+                ]);
             }
         } catch (e) {
             console.error("Failed to post contract code: ", e.toString());

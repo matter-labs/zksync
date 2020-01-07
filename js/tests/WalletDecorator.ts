@@ -12,7 +12,7 @@ export let syncProvider;
 export let tokens;
 
 const syncProviderPromise = (async () => {
-    syncProvider = await zksync.Provider.newWebsocketProvider(process.env.WS_API_ADDR);
+    syncProvider = await zksync.Provider.newHttpProvider(process.env.HTTP_RPC_API_ADDR);
     tokens = await syncProvider.getTokens().then(Object.keys);
 })();
 
