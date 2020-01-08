@@ -13,7 +13,6 @@
   "scripts": {
     "simple": "f ts-node simple-integration-test.ts",
     "full-exit": "f ts-node full-exit-inegration-test.ts",
-    "loadtest": "f ts-node loadtest.ts",
-    "update_zksync.js": "cd ../../../zksync.js && yarn build && cd ../zksync/js/tests && yarn upgrade zksync"
+    "loadtest": "f ts-node loadtest.ts"
   }
 }
