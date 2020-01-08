@@ -3,10 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "serve": "yarn gen_config && yarn update_zksync.js && vue-cli-service serve --port=7000",
-    "build": "yarn gen_config && yarn update_zksync.js && vue-cli-service build",
+    "serve": "yarn gen_config && vue-cli-service serve --port=7000",
+    "build": "yarn gen_config && vue-cli-service build",
     "gen_config": "f ../../bin/.gen_js_config > src/env-config.js",
-    "update_zksync.js": "cd ../../../zksync.js && yarn build && cd ../zksync/js/explorer && yarn upgrade zksync.js",
     "lint": "vue-cli-service lint"
   },
   "dependencies": {
