@@ -18,6 +18,7 @@ yarn:
 	@cd js/client && yarn
 	@cd js/explorer && yarn
 	@cd contracts && yarn
+	@cd js/tests && yarn
 
 
 # Helpers
