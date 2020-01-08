@@ -470,9 +470,9 @@ yn@^3.0.0:
   resolved "https://registry.yarnpkg.com/yn/-/yn-3.1.1.tgz#1e87401a09d767c1d5eab26a6e4c185182d2eb50"
   integrity sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==
 
-"zksync@ssh://git@github.com:matter-labs/zksync.js.git":
+"zksync@https://github.com/matter-labs/zksync.js.git":
   version "0.3.8"
-  resolved "ssh://git@github.com:matter-labs/zksync.js.git#825395ef277ca0a7b21fe6259501e905f7983df6"
+  resolved "https://github.com/matter-labs/zksync.js.git#825395ef277ca0a7b21fe6259501e905f7983df6"
   dependencies:
     axios "^0.19.0"
     blake2b "^2.1.3"
