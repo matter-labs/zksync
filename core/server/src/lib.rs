@@ -17,6 +17,7 @@ pub mod committer;
 pub mod eth_sender;
 pub mod eth_watch;
 pub mod mempool;
+pub mod prover_server;
 pub mod state_keeper;
 
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
@@ -45,6 +46,7 @@ pub struct ConfigurationOptions {
     pub chain_id: u8,
     pub gas_price_factor: usize,
     pub tx_batch_size: usize,
+    pub prover_server_address: SocketAddr,
 }
 
 impl ConfigurationOptions {
@@ -87,6 +89,9 @@ impl ConfigurationOptions {
             tx_batch_size: get_env("TX_BATCH_SIZE")
                 .parse()
                 .expect("TX_BATCH_SIZE invalid value"),
+            prover_server_address: get_env("PROVER_SERVER_BIND")
+                .parse()
+                .expect("Failed to parse PROVER_SERVER_BIND bind address"),
         }
     }
 }

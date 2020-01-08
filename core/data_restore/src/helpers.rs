@@ -1,7 +1,7 @@
-// Built-in uses
+// Built-in deps
 use std::env;
 use std::str::FromStr;
-// External uses
+// External deps
 use ethabi::Contract;
 use failure::format_err;
 use lazy_static::lazy_static;
@@ -9,7 +9,7 @@ use serde_json;
 use web3::futures::Future;
 use web3::types::{Address, H256};
 use web3::types::{Transaction, TransactionId};
-// Workspace uses
+// Workspace deps
 use models::abi::FRANKLIN_CONTRACT;
 
 pub const FUNC_NAME_HASH_LENGTH: usize = 4;

@@ -14,12 +14,10 @@ const store = {
 };
 
 Vue.mixin({
-	data: () => {
-		return {
-			isDev: process.env.NODE_ENV !== 'production',
-            config
-		}
-    },
+	data: () => ({
+        isDev: process.env.NODE_ENV !== 'production',
+        config,
+    }),
 	computed: {
         store() {
             return store;
@@ -28,7 +26,7 @@ Vue.mixin({
             return window.walletDecorator.ethAddress;
         },
         franklinAddress() {
-            return window.walletDecorator.address;
+            return window.syncWallet.address();
         },
         baseUrl() {
             return this.apiServer + '/api/v0.1'

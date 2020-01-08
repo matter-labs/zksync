@@ -126,7 +126,7 @@ fn handle_submit_tx(
             Ok(HttpResponse::NotAcceptable().body(e.to_string()))
         } else {
             Ok(HttpResponse::Ok().json(NewTxResponse {
-                hash: hash.to_hex(),
+                hash: hash.to_string(),
             }))
         }
     };
@@ -249,13 +249,23 @@ fn handle_get_executed_transaction_by_hash(
 
 fn handle_get_tx_by_hash(
     data: web::Data<AppState>,
-    hash_hex_with_0x: web::Path<String>,
+    hash_hex_with_prefix: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
-    if hash_hex_with_0x.len() < 2 {
+    if hash_hex_with_prefix.len() < 2 {
         return Err(HttpResponse::BadRequest().finish().into());
     }
-    let hash = hex::decode(&hash_hex_with_0x.into_inner()[2..])
-        .map_err(|_| HttpResponse::BadRequest().finish())?;
+
+    let hash = {
+        let hash = if hash_hex_with_prefix.starts_with("0x") {
+            hex::decode(&hash_hex_with_prefix.into_inner()[2..])
+        } else if hash_hex_with_prefix.starts_with("sync-tx:") {
+            hex::decode(&hash_hex_with_prefix.into_inner()[8..])
+        } else {
+            return Err(HttpResponse::BadRequest().finish().into());
+        };
+
+        hash.map_err(|_| HttpResponse::BadRequest().finish())?
+    };
 
     let storage = data.access_storage()?;
 
@@ -365,11 +375,11 @@ fn handle_get_block_transactions(
         .into_iter()
         .map(|op| {
             let tx_hash = match &op {
-                ExecutedOperations::Tx(tx) => tx.tx.hash().as_ref().to_vec(),
-                ExecutedOperations::PriorityOp(tx) => tx.priority_op.eth_hash.clone(),
+                ExecutedOperations::Tx(tx) => tx.tx.hash().to_string(),
+                ExecutedOperations::PriorityOp(tx) => {
+                    format!("0x{}", hex::encode(&tx.priority_op.eth_hash))
+                }
             };
-
-            let tx_hash = format!("0x{}", hex::encode(&tx_hash));
 
             ExecutedOperationWithHash { op, tx_hash }
         })

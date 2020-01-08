@@ -12,12 +12,8 @@ import Block from './Block.vue';
 import Transaction from './Transaction.vue';
 import Account from './Account.vue';
 
-import axios from 'axios';
-import url from 'url';
 import config from './env-config';
 import VueTimers from 'vue-timers';
-import { WalletDecorator } from './WalletDecorator';
-import { FranklinProvider } from 'franklin_lib';
 
 const ethers = require('ethers');
 
@@ -43,23 +39,15 @@ const router = new Router({
     base: getRouterBase(),
 });
 
-let fraProvider = new FranklinProvider(config.API_SERVER, config.CONTRACT_ADDR);
-let tokensPromise = fraProvider.getTokens();
-
 Vue.mixin({
     data: () => ({
         store,
-        fraProvider,
-        tokensPromise,
         routerBase: getRouterBase(),
     }),
     methods: {
         formatFranklin(value) {
             return ethers.utils.formatEther(ethers.utils.bigNumberify(value).mul(1000000000000));
         },
-        // parseFranklin(value) {
-        //     return ethers.utils.parseEther(value).div(1)
-        // },
     },
     computed: {
         blockchain_explorer_tx() {

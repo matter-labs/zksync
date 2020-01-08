@@ -31,21 +31,15 @@
 </div>
 </template>
 
-<style>
-.hidden_header {
-  display: none;
-}
-</style>
-
 <script>
 
 import store from './store';
-import client from './client';
 import { ethers } from 'ethers';
 import { readableEther, shortenHash } from './utils';
 
 import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
+import { clientPromise } from './Client';
 
 const components = {
     TransactionList,
@@ -54,10 +48,6 @@ const components = {
 
 function formatToken(amount, token) {
     return readableEther(amount);
-    // if (token == "ETH") {
-    //     return ethers.utils.formatEther(amount);
-    // }
-    // return amount;
 }
 
 function defaultTokenSymbol(tokenId) {
@@ -70,99 +60,20 @@ function formatDate(date) {
 }
 
 export default {
-    name: 'block',
+    name: 'Block',
     created() {
         this.update();
     },
-    methods: {
-        async update() {
-            const block = await client.getBlock(this.blockNumber);
-            if (!block) return;
-
-            // this.type            = block.type
-            this.new_state_root  = block.new_state_root;
-            this.commit_tx_hash  = block.commit_tx_hash || '';
-            this.verify_tx_hash  = block.verify_tx_hash || '';
-            this.committed_at    = block.committed_at;
-            this.verified_at     = block.verified_at;
-            this.status          = block.verified_at ? 'Verified' : 'Committed';
-
-            let txs = await client.getBlockTransactions(this.blockNumber);
-            let tokens = await client.getTokens();
-            this.transactions = txs.map((tx, index) => {
-                let type = "";
-                if (tx.type == "PriorityOp") {
-                    type = tx.priority_op.data.type;
-                } else if (tx.type == "Tx") {
-                    type = tx.tx.type;
-                }
-
-                let from = "";
-                let to = "";
-                let token = "";
-                let amount = "";
-                let fee = "";
-                let from_explorer_link = "";
-                let to_explorer_link = "";
-                let from_onchain_icon = "";
-                let to_onchain_icon = "";
-
-                if (type == "Deposit") {
-                    from = shortenHash(tx.priority_op.data.sender, 'unknown sender');
-                    to = shortenHash(tx.priority_op.data.account, 'unknown account');
-                    from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.account}`;
-                    to_explorer_link = `${this.routerBase}accounts/${tx.priority_op.data.account}`;
-                    from_onchain_icon = `<span class="onchain_icon">onchain</span>`;
-                    to_onchain_icon = '';
-                    token = tx.priority_op.data.token;
-                    token = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
-                    amount =  `${formatToken(tx.priority_op.data.amount, token)} ${token}`;
-                    fee = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
-                } else if (type == "Transfer") {
-                    from = shortenHash(tx.tx.from, 'unknown from');
-                    to = shortenHash(tx.tx.to, 'unknown to');
-                    from_explorer_link = `${this.routerBase}accounts/${tx.tx.from}`;
-                    to_explorer_link = `${this.routerBase}accounts/${tx.tx.to}`;
-                    from_onchain_icon = '';
-                    to_onchain_icon = '';
-                    token = tx.tx.token;
-                    token = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
-                    amount =  `${formatToken(tx.tx.amount, token)} ${token}`;
-                    fee = `${formatToken(tx.tx.fee, token)} ${token}`;
-                } else if (type == "Withdraw") {
-                    from = shortenHash(tx.tx.account, 'unknown account');
-                    to = shortenHash(tx.tx.ethAddress, 'unknown ethAddress');
-                    from_explorer_link = `${this.routerBase}accounts/${tx.tx.account}`;
-                    to_explorer_link = `${this.blockchain_explorer_address}/${tx.tx.ethAddress}`;
-                    from_onchain_icon = '';
-                    to_onchain_icon = `<span class="onchain_icon">onchain</span>`;
-                    token = tx.tx.token;
-                    token = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
-                    amount =  `${formatToken(tx.tx.amount, token)} ${token}`;
-                    fee = `${formatToken(tx.tx.fee, token)} ${token}`;
-                }
-
-                let from_target = from_explorer_link.startsWith('/')
-                    ? ''
-                    : `_target="_blank" rel="noopener noreferrer"`;
-
-                let to_target = to_explorer_link.startsWith('/')
-                    ? ''
-                    : `_target="_blank" rel="noopener noreferrer"`;
-
-                this.loading = false;
-
-                return {
-                    type: `<b>${type}</b>`,
-                    from: `<code><a href="${from_explorer_link}" ${from_target}>${from} ${from_onchain_icon}</a></code>`,
-                    to: `<code><a href="${to_explorer_link}" ${to_target}>${to} ${to_onchain_icon}</a></code>`,
-                    amount,
-                    fee,
-                    tx_hash: tx.tx_hash,
-                };
-            });
-        },
-    },
+    data: () => ({
+        new_state_root: null,
+        commit_tx_hash: null,
+        verify_tx_hash: null,
+        committed_at:   null,
+        verified_at:    null,
+        status:         null,
+        transactions:   [  ],
+        loading:        true,
+    }),
     computed: {
         isBusy: () => false,
         blockNumber() {
@@ -200,19 +111,107 @@ export default {
             ];
         },
     },
-    data() {
-        return {
-            new_state_root: null,
-            // type:           null,
-            commit_tx_hash: null,
-            verify_tx_hash: null,
-            committed_at:   null,
-            verified_at:    null,
-            status:         null,
-            transactions:   [  ],
-            loading:        true,
-        };
+    methods: {
+        async update() {
+            const client = await clientPromise;
+            
+            const block = await client.getBlock(this.blockNumber);
+            if (!block) return;
+
+            this.new_state_root  = block.new_state_root;
+            this.commit_tx_hash  = block.commit_tx_hash || '';
+            this.verify_tx_hash  = block.verify_tx_hash || '';
+            this.committed_at    = block.committed_at;
+            this.verified_at     = block.verified_at;
+            this.status          = block.verified_at ? 'Verified' : 'Committed';
+
+            const txs = await client.getBlockTransactions(this.blockNumber);
+            const tokens = await client.tokensPromise;
+
+            this.transactions = txs.map(tx => {
+                const type 
+                    = tx.type == "PriorityOp" ? tx.priority_op.data.type
+                    : tx.type == "Tx"         ? tx.tx.type 
+                    : null;
+
+                let from = "";
+                let to = "";
+                let token = "";
+                let amount = "";
+                let fee = "";
+                let from_explorer_link = "";
+                let to_explorer_link = "";
+                let from_onchain_icon = "";
+                let to_onchain_icon = "";
+
+                switch (type) {
+                    case "Deposit":
+                        from               = shortenHash(tx.priority_op.data.sender, 'unknown sender');
+                        to                 = shortenHash(tx.priority_op.data.account, 'unknown account');
+                        from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.sender}`;
+                        to_explorer_link   = `${this.routerBase}accounts/${tx.priority_op.data.account}`;
+                        from_onchain_icon  = `<span class="onchain_icon">onchain</span>`;
+                        to_onchain_icon    = '';
+                        token              = tx.priority_op.data.token;
+                        token              = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
+                        amount             = `${formatToken(tx.priority_op.data.amount, token)} ${token}`;
+                        fee                = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
+                        break;
+                    case "Transfer":
+                        from               = shortenHash(tx.tx.from, 'unknown from');
+                        to                 = shortenHash(tx.tx.to, 'unknown to');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.tx.from}`;
+                        to_explorer_link   = `${this.routerBase}accounts/${tx.tx.to}`;
+                        from_onchain_icon  = '';
+                        to_onchain_icon    = '';
+                        token              = tx.tx.token;
+                        token              = tokens[token].symbol;
+                        amount             = `${formatToken(tx.tx.amount, token)} ${token}`;
+                        fee                = `${formatToken(tx.tx.fee, token)} ${token}`;
+                        break;
+                    case "Withdraw":
+                        from               = shortenHash(tx.tx.account, 'unknown account');
+                        to                 = shortenHash(tx.tx.ethAddress, 'unknown ethAddress');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.tx.account}`;
+                        to_explorer_link   = `${this.blockchain_explorer_address}/${tx.tx.ethAddress}`;
+                        from_onchain_icon  = '';
+                        to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
+                        token              = tx.tx.token;
+                        token              = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
+                        amount             = `${formatToken(tx.tx.amount, token)} ${token}`;
+                        fee                = `${formatToken(tx.tx.fee, token)} ${token}`;
+                        break;
+                    default: 
+                        throw new Error('switch reached default');
+                }
+
+                const from_target = from_explorer_link.startsWith('/')
+                    ? ''
+                    : `_target="_blank" rel="noopener noreferrer"`;
+
+                const to_target = to_explorer_link.startsWith('/')
+                    ? ''
+                    : `_target="_blank" rel="noopener noreferrer"`;
+
+                return {
+                    type: `<b>${type}</b>`,
+                    from: `<code><a href="${from_explorer_link}" ${from_target}>${from} ${from_onchain_icon}</a></code>`,
+                    to: `<code><a href="${to_explorer_link}" ${to_target}>${to} ${to_onchain_icon}</a></code>`,
+                    amount,
+                    fee,
+                    tx_hash: tx.tx_hash,
+                };
+            });
+
+            this.loading = false;
+        },
     },
     components,
 };
 </script>
+
+<style>
+.hidden_header {
+    display: none;
+}
+</style>

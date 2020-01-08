@@ -19,6 +19,7 @@ rand = "0.4"
 rust-crypto = "0.2"
 rustc-hex = "2.0.1"
 
+web3 = "0.8.0"
 signal-hook = "0.1.8"
 tokio = "0.1.18"
 futures = "0.1.28"
@@ -33,3 +34,9 @@ chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 log = "0.4"
 env_logger = "0.6"
 num-traits = "0.2"
+actix-web = "1.0"
+reqwest = "0.9.22"
+failure = "0.1"
+
+[dev-dependencies]
+testhelper = { path = "../testhelper", version = "0.1.0"}

@@ -6,14 +6,17 @@ use clap::{App, Arg};
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use tokio::runtime::Runtime;
 // Workspace uses
+use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL};
 use server::api_server::start_api_server;
 use server::block_proposer::run_block_proposer_task;
 use server::committer::run_committer;
 use server::eth_watch::start_eth_watch;
 use server::mempool::run_mempool_task;
+use server::prover_server::start_prover_server;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 use server::{eth_sender, ConfigurationOptions};
 use std::cell::RefCell;
+use std::time::Duration;
 use storage::ConnectionPool;
 use web3::types::H160;
 
@@ -60,7 +63,6 @@ fn main() {
             contract_addr, config_opts.contract_eth_addr
         );
     }
-    drop(storage);
 
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
@@ -124,6 +126,13 @@ fn main() {
         executed_tx_notify_receiver,
         state_keeper_req_sender.clone(),
         config_opts.clone(),
+    );
+    start_prover_server(
+        connection_pool.clone(),
+        config_opts.prover_server_address,
+        Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
+        Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
+        stop_signal_sender.clone(),
     );
 
     run_mempool_task(
