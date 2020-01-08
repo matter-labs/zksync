@@ -106,8 +106,5 @@ fn read_parameters(file_name: &str) -> groth16::Parameters<Engine> {
 
     let f_r = File::open(file_name).expect("failed to open file");
     let mut r = BufReader::new(f_r);
-    let circuit_params =
-        groth16::Parameters::<Engine>::read(&mut r, true).expect("failed to read circuit params");
-
-    circuit_params
+    groth16::Parameters::<Engine>::read(&mut r, true).expect("failed to read circuit params")
 }

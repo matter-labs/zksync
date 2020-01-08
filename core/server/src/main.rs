@@ -121,7 +121,7 @@ fn main() {
     );
     start_prover_server(
         connection_pool,
-        config_opts.prover_server_address.clone(),
+        config_opts.prover_server_address,
         Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
         Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
         stop_signal_sender.clone(),

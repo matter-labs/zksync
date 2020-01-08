@@ -112,7 +112,7 @@ fn handle_submit_tx(
         Err(HttpResponse::NotAcceptable().body(e.to_string()).into())
     } else {
         Ok(HttpResponse::Ok().json(NewTxResponse {
-            hash: req.hash().to_str(),
+            hash: req.hash().to_string(),
         }))
     }
 }
@@ -359,7 +359,7 @@ fn handle_get_block_transactions(
         .into_iter()
         .map(|op| {
             let tx_hash = match &op {
-                ExecutedOperations::Tx(tx) => tx.tx.hash().to_str(),
+                ExecutedOperations::Tx(tx) => tx.tx.hash().to_string(),
                 ExecutedOperations::PriorityOp(tx) => {
                     format!("0x{}", hex::encode(&tx.priority_op.eth_hash))
                 }
