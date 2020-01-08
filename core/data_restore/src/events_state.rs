@@ -11,8 +11,6 @@ use web3::types::Transaction;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 use web3::{Transport, Web3};
 
-type CommittedAndVerifiedEvents = (Vec<BlockEvent>, Vec<BlockEvent>);
-
 /// Rollup contract events states description
 #[derive(Debug, Clone)]
 pub struct EventsState {
@@ -73,10 +71,10 @@ impl EventsState {
         self.remove_verified_events();
 
         let (block_events, token_events, to_block_number): (
-            CommittedAndVerifiedEvents,
+            Vec<Log>,
             Vec<TokenAddedEvent>,
             u64,
-        ) = EventsState::update_events_and_last_watched_block(
+        ) = EventsState::get_new_events_and_last_watched_block(
             web3,
             franklin_contract,
             governance_contract,
@@ -87,9 +85,7 @@ impl EventsState {
 
         self.last_watched_eth_block_number = to_block_number;
 
-        self.committed_events.extend(block_events.0);
-
-        self.verified_events.extend(block_events.1);
+        self.update_blocks_state(franklin_contract, &block_events)?;
 
         let mut events_to_return: Vec<BlockEvent> = self.committed_events.clone();
         events_to_return.extend(self.verified_events.clone());
@@ -111,7 +107,7 @@ impl EventsState {
         Ok(web3.eth().block_number().wait().map(|n| n.as_u64())?)
     }
 
-    /// Returns a tuple (committed blocks logs, verified blocks logs), added token logs and the new last watched block number
+    /// Returns blocks logs, added token logs and the new last watched block number
     ///
     /// # Arguments
     ///
@@ -122,19 +118,19 @@ impl EventsState {
     /// * `eth_blocks_step` - Ethereum blocks delta step
     /// * `end_eth_blocks_offset` - last block delta
     ///
-    fn update_events_and_last_watched_block<T: Transport>(
+    fn get_new_events_and_last_watched_block<T: Transport>(
         web3: &Web3<T>,
         franklin_contract: &(ethabi::Contract, Contract<T>),
         governance_contract: &(ethabi::Contract, Contract<T>),
         last_watched_block_number: u64,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-    ) -> Result<(CommittedAndVerifiedEvents, Vec<TokenAddedEvent>, u64), failure::Error> {
+    ) -> Result<(Vec<Log>, Vec<TokenAddedEvent>, u64), failure::Error> {
         let latest_eth_block_minus_delta =
             EventsState::get_last_block_number(web3)? - end_eth_blocks_offset;
 
         if latest_eth_block_minus_delta == last_watched_block_number {
-            return Ok(((vec![], vec![]), vec![], last_watched_block_number)); // No new eth blocks
+            return Ok((vec![], vec![], last_watched_block_number)); // No new eth blocks
         }
 
         let from_block_number_u64 = last_watched_block_number + 1;
@@ -157,7 +153,6 @@ impl EventsState {
             from_block_number,
             to_block_number,
         )?;
-        let block_sorted_logs = EventsState::sort_block_logs(&franklin_contract.0, &block_logs)?;
 
         let token_logs = EventsState::get_token_added_logs(
             web3,
@@ -166,7 +161,7 @@ impl EventsState {
             to_block_number,
         )?;
 
-        Ok((block_sorted_logs, token_logs, to_block_number_u64))
+        Ok((block_logs, token_logs, to_block_number_u64))
     }
 
     /// Returns new added token logs
@@ -233,7 +228,13 @@ impl EventsState {
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
 
-        let topics_vec: Vec<H256> = vec![block_verified_topic, block_comitted_topic];
+        let reverted_topic = contract
+            .0
+            .event("BlocksReverted")
+            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
+            .signature();
+
+        let topics_vec: Vec<H256> = vec![block_verified_topic, block_comitted_topic, reverted_topic];
 
         let filter = FilterBuilder::default()
             .address(vec![contract.1.address()])
@@ -250,41 +251,60 @@ impl EventsState {
         Ok(result)
     }
 
-    /// Returns tuple (committed blocks logs, verified blocks logs) from concated logs slice
+    /// Updates committed and verified blocks state by extending their arrays
     ///
     /// # Arguments
     ///
-    /// * `logs` - Logs slice of blocks events
+    /// * `contract` - Specified contract
+    /// * `logs` - Block events with their info
     ///
-    fn sort_block_logs(
-        contract: &ethabi::Contract,
+    fn update_blocks_state<T: Transport>(
+        &mut self,
+        contract: &(ethabi::Contract, Contract<T>),
         logs: &[Log],
-    ) -> Result<CommittedAndVerifiedEvents, failure::Error> {
+    ) -> Result<(), failure::Error> {
         if logs.is_empty() {
-            return Ok((vec![], vec![]));
+            return Ok(());
         }
-        let mut committed_events: Vec<BlockEvent> = vec![];
-        let mut verified_events: Vec<BlockEvent> = vec![];
 
-        let block_verified_topic = contract
+        let block_verified_topic = contract.0
             .event("BlockVerified")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
-        let block_comitted_topic = contract
+        let block_comitted_topic = contract.0
             .event("BlockCommitted")
+            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
+            .signature();
+        let reverted_topic = contract.0
+            .event("BlocksReverted")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
 
         for log in logs {
+            let topic = log.topics[0];
+            ensure!(log.topics.len() >= 2, "Cant get enouth topics from event");
+
+            // Remove reverted committed blocks first
+            if topic == reverted_topic {
+                ensure!(log.topics.len() == 3, "Cant get enouth topics from reverted event");
+                let committed_total = U256::from(log.topics[2].as_bytes()).as_u32();
+                let mut i = 0;
+                while i != self.committed_events.len() {
+                    if self.committed_events[i].block_num > committed_total {
+                        self.committed_events.remove(i);
+                    } else {
+                        i += 1;
+                    }
+                }
+            }
+
+            // Go into new blocks
             let mut block: BlockEvent = BlockEvent {
                 block_num: 0,
                 transaction_hash: H256::zero(),
                 block_type: EventType::Committed,
             };
             let tx_hash = log.transaction_hash;
-
-            ensure!(log.topics.len() >= 2, "Cant get enouth topics from event");
-            let topic = log.topics[0];
             let block_num = log.topics[1];
 
             match tx_hash {
@@ -294,9 +314,9 @@ impl EventsState {
 
                     if topic == block_verified_topic {
                         block.block_type = EventType::Verified;
-                        verified_events.push(block);
+                        self.verified_events.push(block);
                     } else if topic == block_comitted_topic {
-                        committed_events.push(block);
+                        self.committed_events.push(block);
                     }
                 }
                 None => {
@@ -304,9 +324,7 @@ impl EventsState {
                 }
             };
         }
-        committed_events.sort_by_key(|x| x.block_num);
-        verified_events.sort_by_key(|x| x.block_num);
-        Ok((committed_events, verified_events))
+        Ok(())
     }
 
     /// Removes verified committed blocks events and all verified
