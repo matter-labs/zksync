@@ -261,18 +261,19 @@ impl PlasmaState {
         })
     }
 
-    fn apply_close(&mut self, tx: Close) -> Result<OpSuccess, Error> {
-        let (account_id, _) = self
-            .get_account_by_address(&tx.account)
-            .ok_or_else(|| format_err!("Account does not exist"))?;
-        let close_op = CloseOp { tx, account_id };
+    fn apply_close(&mut self, _tx: Close) -> Result<OpSuccess, Error> {
+        bail!("Account closing is disabled");
+        // let (account_id, _) = self
+        //     .get_account_by_address(&tx.account)
+        //     .ok_or_else(|| format_err!("Account does not exist"))?;
+        // let close_op = CloseOp { tx, account_id };
 
-        let (fee, updates) = self.apply_close_op(&close_op)?;
-        Ok(OpSuccess {
-            fee: Some(fee),
-            updates,
-            executed_op: FranklinOp::Close(Box::new(close_op)),
-        })
+        // let (fee, updates) = self.apply_close_op(&close_op)?;
+        // Ok(OpSuccess {
+        //     fee: Some(fee),
+        //     updates,
+        //     executed_op: FranklinOp::Close(Box::new(close_op)),
+        // })
     }
 
     pub fn collect_fee(
@@ -332,6 +333,7 @@ impl PlasmaState {
         self.balance_tree.insert(id, account);
     }
 
+    #[allow(dead_code)]
     fn remove_account(&mut self, id: AccountId) {
         if let Some(account) = self.get_account(id) {
             self.account_id_by_address.remove(&account.address);
@@ -471,6 +473,7 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
+    #[allow(dead_code)]
     fn apply_close_op(&mut self, op: &CloseOp) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
         let account = self.get_account(op.account_id).unwrap();
