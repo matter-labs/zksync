@@ -1,9 +1,9 @@
-use crate::events::{BlockEvent, EventType};
 use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
+use crate::events::{BlockEvent, EventType};
 use ethabi;
 use failure::{ensure, format_err};
 use futures::{compat::Future01CompatExt, executor::block_on};
-use server::eth_watch::TokenAddedEvent;
+use models::TokenAddedEvent;
 use std::convert::TryFrom;
 use web3::contract::Contract;
 use web3::futures::Future;
@@ -70,18 +70,15 @@ impl EventsState {
     ) -> Result<(Vec<BlockEvent>, Vec<TokenAddedEvent>, u64), failure::Error> {
         self.remove_verified_events();
 
-        let (block_events, token_events, to_block_number): (
-            Vec<Log>,
-            Vec<TokenAddedEvent>,
-            u64,
-        ) = EventsState::get_new_events_and_last_watched_block(
-            web3,
-            franklin_contract,
-            governance_contract,
-            self.last_watched_eth_block_number,
-            eth_blocks_step,
-            end_eth_blocks_offset,
-        )?;
+        let (block_events, token_events, to_block_number): (Vec<Log>, Vec<TokenAddedEvent>, u64) =
+            EventsState::get_new_events_and_last_watched_block(
+                web3,
+                franklin_contract,
+                governance_contract,
+                self.last_watched_eth_block_number,
+                eth_blocks_step,
+                end_eth_blocks_offset,
+            )?;
 
         self.last_watched_eth_block_number = to_block_number;
 
@@ -234,7 +231,8 @@ impl EventsState {
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
 
-        let topics_vec: Vec<H256> = vec![block_verified_topic, block_comitted_topic, reverted_topic];
+        let topics_vec: Vec<H256> =
+            vec![block_verified_topic, block_comitted_topic, reverted_topic];
 
         let filter = FilterBuilder::default()
             .address(vec![contract.1.address()])
@@ -267,15 +265,18 @@ impl EventsState {
             return Ok(());
         }
 
-        let block_verified_topic = contract.0
+        let block_verified_topic = contract
+            .0
             .event("BlockVerified")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
-        let block_comitted_topic = contract.0
+        let block_comitted_topic = contract
+            .0
             .event("BlockCommitted")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
-        let reverted_topic = contract.0
+        let reverted_topic = contract
+            .0
             .event("BlocksReverted")
             .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
             .signature();
@@ -286,7 +287,10 @@ impl EventsState {
 
             // Remove reverted committed blocks first
             if topic == reverted_topic {
-                ensure!(log.topics.len() == 3, "Cant get enouth topics from reverted event");
+                ensure!(
+                    log.topics.len() == 3,
+                    "Cant get enouth topics from reverted event"
+                );
                 let committed_total = U256::from(log.topics[2].as_bytes()).as_u32();
                 let mut i = 0;
                 while i != self.committed_events.len() {

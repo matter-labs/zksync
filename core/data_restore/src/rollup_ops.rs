@@ -1,5 +1,5 @@
-use crate::events::BlockEvent;
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
+use crate::events::BlockEvent;
 use failure::format_err;
 use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
@@ -36,13 +36,11 @@ impl RollupOpsBlock {
     ) -> Result<Self, failure::Error> {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
-        // info!("New ops block input_data: {:?}", &input_data);
         let commitment_data = &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
             + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
             + INPUT_DATA_ROOT_BYTES_WIDTH
             + INPUT_DATA_EMPTY_BYTES_WIDTH
             ..input_data.len()];
-        // info!("New ops block commitment_data: {:?}", &commitment_data);
         let fee_account = RollupOpsBlock::get_fee_account_from_tx_input(&input_data)?;
         let ops = RollupOpsBlock::get_rollup_ops_from_data(commitment_data)?;
         let block = RollupOpsBlock {
@@ -71,7 +69,6 @@ impl RollupOpsBlock {
             let post = pre + pub_data_size;
 
             let op = FranklinOp::from_public_data(&data[pre..post])?;
-            // info!("New op: {:?}", &op);
 
             ops.push(op);
             current_pointer += pub_data_size;

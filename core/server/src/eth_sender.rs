@@ -26,9 +26,9 @@ use web3::transports::Http;
 use web3::types::{TransactionReceipt, H256, U256};
 use web3::Transport;
 // Workspace uses
-use crate::{ConfigurationOptions, ThreadPanicNotify};
 use eth_client::{ETHClient, SignedCallResult};
 use models::abi::FRANKLIN_CONTRACT;
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::{Action, ActionType, Operation};
 use storage::{ConnectionPool, StorageETHOperation, StorageProcessor};
 

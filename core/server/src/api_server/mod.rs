@@ -9,7 +9,7 @@ mod rest;
 mod rpc_server;
 mod rpc_subscriptions;
 
-use crate::ConfigurationOptions;
+use models::config_options::ConfigurationOptions;
 use models::Operation;
 use std::sync::mpsc;
 use storage::ConnectionPool;

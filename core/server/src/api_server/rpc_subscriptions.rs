@@ -3,13 +3,13 @@
 use super::event_notify::{start_sub_notifier, EventSubscribeRequest};
 use crate::api_server::event_notify::EventNotifierRequest;
 use crate::api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp};
-use crate::ThreadPanicNotify;
 use futures::channel::mpsc as fmpsc;
 use jsonrpc_core::MetaIoHandler;
 use jsonrpc_core::Result;
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
+use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::AccountAddress;
 use models::{ActionType, Operation};

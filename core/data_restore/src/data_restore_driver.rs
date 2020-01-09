@@ -1,6 +1,6 @@
+use crate::eth_tx_helpers::get_ethereum_transaction;
 use crate::events_state::EventsState;
 use crate::genesis_state::get_genesis_account;
-use crate::eth_tx_helpers::get_ethereum_transaction;
 use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor;
 use crate::tree_state::TreeState;
@@ -206,13 +206,11 @@ impl<T: Transport> DataRestoreDriver<T> {
 
         info!("Genesis block number: {:?}", tree_state.state.block_number);
         info!("Genesis tree root hash: {:?}", tree_state.root_hash());
-        info!("Genesis accounts: {:?}", tree_state.get_accounts());
+        debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
         storage_interactor::save_genesis_tree_state(&connection_pool, account_update)?;
 
-        println!("Saved genesis tree state");
-
-        // println!("current storage tree: {:?}", storage_interactor::get_tree_state(&connection_pool));
+        info!("Saved genesis tree state");
 
         Ok(Self {
             connection_pool,
@@ -261,26 +259,19 @@ impl<T: Transport> DataRestoreDriver<T> {
             }
             StorageUpdateState::None => {}
         }
-        info!("State has been loaded: {:?}", self.tree_state.root_hash());
+        info!(
+            "State has been loaded, root hash: {:?}",
+            self.tree_state.root_hash()
+        );
         Ok(())
     }
 
     /// Activates states updates
     pub fn run_state_update(&mut self) -> Result<(), failure::Error> {
         self.run_update = true;
+        let mut last_wached_block: u64 = self.events_state.last_watched_eth_block_number;
         while self.run_update {
-            info!(
-                "Last watched ethereum block: {:?}",
-                &self.events_state.last_watched_eth_block_number
-            );
-            info!(
-                "Committed franklin events count: {:?}",
-                &self.events_state.committed_events.len()
-            );
-            info!(
-                "Verified franklin events count: {:?}",
-                &self.events_state.verified_events.len()
-            );
+            info!("Last watched ethereum block: {:?}", last_wached_block);
 
             // Update events
             let got_new_events = self.update_events_state()?;
@@ -291,6 +282,12 @@ impl<T: Transport> DataRestoreDriver<T> {
 
                 // Update tree
                 self.update_tree_state(new_ops_blocks)?;
+            }
+
+            if last_wached_block == self.events_state.last_watched_eth_block_number {
+                std::thread::sleep(std::time::Duration::from_secs(5));
+            } else {
+                last_wached_block = self.events_state.last_watched_eth_block_number;
             }
         }
         info!("Stopped state updates");
@@ -309,21 +306,6 @@ impl<T: Transport> DataRestoreDriver<T> {
                 self.end_eth_blocks_offset,
             )?;
 
-        let result = if block_events.is_empty() {
-            info!(
-                "Got no new events until block: {:?}",
-                &last_watched_eth_block_number
-            );
-            false
-        } else {
-            info!(
-                "Got {:?} new events until block: {:?}",
-                &block_events.len(),
-                &last_watched_eth_block_number
-            );
-            true
-        };
-
         // Store block events
         storage_interactor::save_block_events_state(&self.connection_pool, &block_events)?;
         // Store block number
@@ -336,9 +318,9 @@ impl<T: Transport> DataRestoreDriver<T> {
 
         storage_interactor::save_storage_state(&self.connection_pool, StorageUpdateState::Events)?;
 
-        info!("Updated events storage");
+        debug!("Updated events storage");
 
-        Ok(result)
+        Ok(!block_events.is_empty())
     }
 
     /// Updates tree state from the new Rollup operations blocks, saves it in storage
@@ -386,7 +368,6 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// Returns new rollup operations blocks
     fn update_operations_state(&mut self) -> Result<Vec<RollupOpsBlock>, failure::Error> {
         let new_blocks = self.get_new_operation_blocks_from_events()?;
-        info!("Parsed events to operation blocks");
 
         storage_interactor::save_rollup_ops(&self.connection_pool, &new_blocks)?;
 
@@ -395,7 +376,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             StorageUpdateState::Operations,
         )?;
 
-        info!("Updated operations storage");
+        debug!("Updated operations storage");
 
         Ok(new_blocks)
     }
@@ -404,7 +385,6 @@ impl<T: Transport> DataRestoreDriver<T> {
     pub fn get_new_operation_blocks_from_events(
         &mut self,
     ) -> Result<Vec<RollupOpsBlock>, failure::Error> {
-        info!("Loading new verified op_blocks");
         let committed_events = self.events_state.get_only_verified_committed_events();
         let mut blocks: Vec<RollupOpsBlock> = vec![];
         for event in committed_events {

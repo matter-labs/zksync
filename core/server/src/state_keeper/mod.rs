@@ -7,7 +7,7 @@ use itertools::Itertools;
 use web3::types::H256;
 // Workspace uses
 use crate::eth_watch::ETHState;
-use crate::ThreadPanicNotify;
+use models::config_options::ThreadPanicNotify;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::config;
 use models::node::tx::FranklinTx;

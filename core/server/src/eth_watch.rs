@@ -6,16 +6,16 @@ use std::sync::mpsc::{self, sync_channel};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 // External uses
-use ethabi::{decode, ParamType};
 use failure::format_err;
 use futures::{compat::Future01CompatExt, executor::block_on};
 use web3::contract::Contract;
-use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
+use web3::types::{Address, BlockNumber, Filter, FilterBuilder, H160};
 use web3::{Transport, Web3};
 // Workspace uses
-use crate::{ConfigurationOptions, ThreadPanicNotify};
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::{PriorityOp, TokenId};
 use models::params::PRIORITY_EXPIRATION;
+use models::TokenAddedEvent;
 use storage::ConnectionPool;
 
 pub struct EthWatch<T: Transport> {
@@ -36,30 +36,6 @@ pub struct ETHState {
 impl ETHState {
     fn add_new_token(&mut self, id: TokenId, address: Address) {
         self.tokens.insert(id, address);
-    }
-}
-
-#[derive(Debug)]
-pub struct TokenAddedEvent {
-    pub address: Address,
-    pub id: u32,
-}
-
-impl TryFrom<Log> for TokenAddedEvent {
-    type Error = failure::Error;
-
-    fn try_from(event: Log) -> Result<TokenAddedEvent, failure::Error> {
-        let mut dec_ev = decode(&[ParamType::Address, ParamType::Uint(32)], &event.data.0)
-            .map_err(|e| format_err!("Event data decode: {:?}", e))?;
-        Ok(TokenAddedEvent {
-            address: dec_ev.remove(0).to_address().unwrap(),
-            id: dec_ev
-                .remove(0)
-                .to_uint()
-                .as_ref()
-                .map(U256::as_u32)
-                .unwrap(),
-        })
     }
 }
 

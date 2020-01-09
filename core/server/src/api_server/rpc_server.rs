@@ -1,9 +1,9 @@
-use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
 use jsonrpc_core::{Error, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
+use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::{Account, AccountAddress, AccountId, FranklinTx, Nonce, TokenId};
 use std::collections::HashMap;

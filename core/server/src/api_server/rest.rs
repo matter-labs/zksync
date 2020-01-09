@@ -9,7 +9,7 @@ use models::NetworkStatus;
 use std::sync::mpsc;
 use storage::{ConnectionPool, StorageProcessor};
 
-use crate::ThreadPanicNotify;
+use models::config_options::ThreadPanicNotify;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;

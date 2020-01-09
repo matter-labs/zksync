@@ -2,17 +2,17 @@
 extern crate log;
 
 pub mod data_restore_driver;
+pub mod eth_tx_helpers;
 pub mod events;
 pub mod events_state;
 pub mod genesis_state;
-pub mod eth_tx_helpers;
 pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
 
 use crate::data_restore_driver::DataRestoreDriver;
 use clap::{App, Arg};
-use server::ConfigurationOptions;
+use models::config_options::ConfigurationOptions;
 use storage::ConnectionPool;
 use web3::transports::Http;
 use web3::Transport;
@@ -21,7 +21,7 @@ const ETH_BLOCKS_STEP: u64 = 1000;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
 fn main() {
-    info!("Building Franklin accounts state");
+    info!("Restoring ZK Sync state from the contract");
     env_logger::init();
     let connection_pool = ConnectionPool::new();
     let config_opts = ConfigurationOptions::from_env();

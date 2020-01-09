@@ -9,12 +9,13 @@ use std::time::Duration;
 use clap::{App, Arg};
 use futures::channel::mpsc as fmpsc;
 // Workspace uses
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::StateKeeperRequest;
 use server::api_server::start_api_server;
 use server::committer::start_committer;
+use server::eth_sender;
 use server::eth_watch::start_eth_watch;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
-use server::{eth_sender, ConfigurationOptions, ThreadPanicNotify};
 use storage::ConnectionPool;
 use web3::types::H160;
 

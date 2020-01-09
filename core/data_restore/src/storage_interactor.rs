@@ -11,8 +11,8 @@ use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
 use models::node::block::{Block, ExecutedOperations};
 use models::node::{AccountMap, AccountUpdate, AccountUpdates};
+use models::TokenAddedEvent;
 use models::{Action, EncodedProof, Operation};
-use server::eth_watch::TokenAddedEvent;
 use storage::{
     ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
     StoredRollupOpsBlock,
@@ -68,7 +68,6 @@ pub fn save_tokens(
             .store_token(token.id as u16, &format!("0x{:x}", token.address), None)
             .map_err(|e| format_err!("Cant store token: {}", e.to_string()))?;
     }
-    // info!("{:?}", storage.load_tokens());
     Ok(())
 }
 
@@ -101,10 +100,6 @@ pub fn update_tree_state(
     }
 
     if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
-        info!(
-            "Failed transactions commited block: #{}",
-            block.block_number
-        );
         storage
             .save_block_transactions(&block)
             .map_err(|e| format_err!("Cant save block transactions: {}", e.to_string()))?;

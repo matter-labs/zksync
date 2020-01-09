@@ -5,7 +5,7 @@ use std::time::Duration;
 // External uses
 use futures::channel::mpsc as fmpsc;
 // Workspace uses
-use crate::ThreadPanicNotify;
+use models::config_options::ThreadPanicNotify;
 use models::{Action, CommitRequest, Operation};
 use storage::ConnectionPool;
 

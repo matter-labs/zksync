@@ -2027,21 +2027,23 @@ impl StorageProcessor {
     }
 
     pub fn execute_operation_data_restore(&self, op: &Operation) -> QueryResult<()> {
-        match &op.action {
-            Action::Commit => {
-                self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
-                self.save_block(&op.block)?;
-            }
-            Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
-        };
+        self.conn().transaction(|| {
+            match &op.action {
+                Action::Commit => {
+                    self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
+                    self.save_block(&op.block)?;
+                }
+                Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
+            };
 
-        let _stored: StoredOperation = diesel::insert_into(operations::table)
-            .values(&NewOperation {
-                block_number: i64::from(op.block.block_number),
-                action_type: op.action.to_string(),
-            })
-            .get_result(self.conn())?;
-        Ok(())
+            let _stored: StoredOperation = diesel::insert_into(operations::table)
+                .values(&NewOperation {
+                    block_number: i64::from(op.block.block_number),
+                    action_type: op.action.to_string(),
+                })
+                .get_result(self.conn())?;
+            Ok(())
+        })
     }
 
     pub fn save_events_state(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
@@ -2236,29 +2238,15 @@ impl StorageProcessor {
     }
 
     pub fn mempool_add_tx_unsafe(&self, tx: &FranklinTx) -> QueryResult<()> {
-        let tx_failed = executed_transactions::table
-            .filter(executed_transactions::tx_hash.eq(tx.hash().as_ref().to_vec()))
-            .filter(executed_transactions::success.eq(false))
-            .first::<StoredExecutedTransaction>(self.conn())
-            .optional()?;
-        // Remove executed tx from db
-        if let Some(tx_failed) = tx_failed {
-            diesel::delete(
-                executed_transactions::table.filter(executed_transactions::id.eq(tx_failed.id)),
-            )
-            .execute(self.conn())?;
-        } else {
-            // TODO Check tx and add only txs with valid nonce.
-            insert_into(mempool::table)
-                .values(&InsertTx {
-                    hash: tx.hash().as_ref().to_vec(),
-                    primary_account_address: tx.account().data.to_vec(),
-                    nonce: i64::from(tx.nonce()),
-                    tx: serde_json::to_value(tx).unwrap(),
-                })
-                .execute(self.conn())
-                .map(drop)?;
-        }
+        insert_into(mempool::table)
+            .values(&InsertTx {
+                hash: tx.hash().as_ref().to_vec(),
+                primary_account_address: tx.account().data.to_vec(),
+                nonce: i64::from(tx.nonce()),
+                tx: serde_json::to_value(tx).unwrap(),
+            })
+            .execute(self.conn())
+            .map(drop)?;
 
         Ok(())
     }

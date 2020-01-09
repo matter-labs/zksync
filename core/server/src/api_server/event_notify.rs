@@ -1,6 +1,5 @@
 use super::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
 use crate::api_server::rpc_server::{BlockInfo, ResponseAccountState};
-use crate::ThreadPanicNotify;
 use failure::{bail, format_err};
 use futures::task::LocalSpawnExt;
 use futures::{
@@ -13,6 +12,7 @@ use jsonrpc_pubsub::{
     typed::{Sink, Subscriber},
     SubscriptionId,
 };
+use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::{
     node::block::ExecutedOperations,
