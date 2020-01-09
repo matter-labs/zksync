@@ -169,7 +169,7 @@ pub fn save_block_events_state(
 /// * `connection_pool` - Database Connection Pool
 /// * `last_watched_eth_block_number` - Last watched ethereum block
 ///
-pub fn save_last_wached_block_number(
+pub fn save_last_watched_block_number(
     connection_pool: &ConnectionPool,
     last_watched_eth_block_number: u64,
 ) -> Result<(), failure::Error> {

@@ -24,7 +24,17 @@ pub enum StorageUpdateState {
     Operations,
 }
 
-/// Description of data restore driver
+/// Data restore driver is a high level interface for all restoring components.
+/// It is actually a finite state machine, that has following states:
+/// - Empty - The state is new
+/// - None - The state is completely updated last time, driver will load state from storage and fetch new events
+/// - Events - The events has been fetched and saved successfully and firstly driver will load state from storage and get new operation for last saved events
+/// - Operations - The operations and events has been fetched and saved successfully and firstly driver will load state from storage and update merkle tree by last saved operations
+/// Driver can interact with other restoring components for their updating:
+/// - Events
+/// - Operations
+/// - Tree
+/// - Storage
 pub struct DataRestoreDriver<T: Transport> {
     /// Database connection pool
     pub connection_pool: ConnectionPool,
@@ -47,7 +57,9 @@ pub struct DataRestoreDriver<T: Transport> {
 }
 
 impl<T: Transport> DataRestoreDriver<T> {
-    /// Returns new data restore driver with empty events and tree states
+    /// Returns new data restore driver with empty events and tree states.
+    /// Used when restore driver is started with non-empty storage and there is need to continue previous restore session.
+    /// States will be restored from storage.
     ///
     /// # Arguments
     ///
@@ -113,7 +125,9 @@ impl<T: Transport> DataRestoreDriver<T> {
         })
     }
 
-    /// Returns the new data restore driver state with 'genesis' state - tree with inserted genesis account
+    /// Returns the new data restore driver state with 'genesis' state.
+    /// Tree with inserted genesis account will be created.
+    /// Used when restore driver is restarted.
     ///
     /// # Arguments
     ///
@@ -178,7 +192,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
         storage_interactor::save_block_events_state(&connection_pool, &vec![])?;
-        storage_interactor::save_last_wached_block_number(
+        storage_interactor::save_last_watched_block_number(
             &connection_pool,
             genesis_eth_block_number,
         )?;
@@ -309,7 +323,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         // Store block events
         storage_interactor::save_block_events_state(&self.connection_pool, &block_events)?;
         // Store block number
-        storage_interactor::save_last_wached_block_number(
+        storage_interactor::save_last_watched_block_number(
             &self.connection_pool,
             last_watched_eth_block_number,
         )?;
