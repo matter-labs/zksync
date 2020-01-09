@@ -19,6 +19,7 @@ steps:
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
       - ./target/cargo
+      - ./keys
 
 - name: init
   image: matterlabs/ci
@@ -100,6 +101,7 @@ steps:
       - ./js/explorer/node_modules
       - ./js/franklin_lib/node_modules
       - ./target/cargo
+      - ./keys
   depends_on:
      - init
      - rust-checks
