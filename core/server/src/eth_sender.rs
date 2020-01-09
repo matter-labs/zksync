@@ -11,7 +11,7 @@
 //! Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 //! that state is always recoverable.
 
-// Built-in uses
+// Built-in deps
 use std::collections::{HashSet, VecDeque};
 use std::str::FromStr;
 use std::time::Duration;
@@ -23,7 +23,7 @@ use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H256, U256};
 use web3::Transport;
-// Workspace uses
+// Workspace deps
 use crate::{ConfigurationOptions, ThreadPanicNotify};
 use eth_client::{ETHClient, SignedCallResult};
 use models::abi::FRANKLIN_CONTRACT;

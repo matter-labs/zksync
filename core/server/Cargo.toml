@@ -8,6 +8,8 @@ eth_client = { path = "../eth_client", version = "0.1.0"  }
 plasma = { path = "../plasma", version = "0.1.1" }
 models = { path = "../models", version = "0.0.1" }
 storage = { path = "../storage", version = "0.0.1" }
+prover = { path = "../prover", version = "0.0.1" }
+circuit = { path = "../circuit", version = "0.1.1"}
 
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 pairing = { package = "pairing_ce", version = "0.17.0" }
@@ -44,3 +46,7 @@ ctrlc = "3.1"
 failure = "0.1"
 # should be removed after json rpc deps are updated is updated
 futures01 = { package = "futures", version = "0.1" }
+reqwest = "0.9.22"
+
+[dev-dependencies]
+testhelper = { path = "../testhelper", version = "0.1.0"}

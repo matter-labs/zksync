@@ -62,7 +62,7 @@ export default {
         tokensForTokenSelector: null,
     }),
     async created() {
-        this.depositFee = await window.walletDecorator.getDepositFee();
+        this.depositFee = await window.walletDecorator.getDepositFeeReadable();
         this.createDisplayableBalancesDict();
     },
     watch: {

@@ -5,7 +5,7 @@ export const sleep = async ms => await new Promise(resolve => setTimeout(resolve
 const readablyPrintableTokens = ['ETH', 'FAU'];
 
 export function isReadablyPrintable(tokenName) {
-    return readablyPrintableTokens.includes(tokenName);
+    return true;
 }
 
 /**

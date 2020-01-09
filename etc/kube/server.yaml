@@ -4,7 +4,7 @@ metadata:
   name: api-ingress
 spec:
   rules:
-  - host: testnet.matter-labs.io
+  - host: ${SERVER_API_HOST}
     http:
       paths:
       - path: /
@@ -35,6 +35,30 @@ spec:
     name: http
   selector:
     app: ${ZKSYNC_ENV}-nginx
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ${ZKSYNC_ENV}-server
+  labels:
+    app: ${ZKSYNC_ENV}-server
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: ${ZKSYNC_ENV}-server-rest
+  - port: 3030
+    targetPort: 3030
+    protocol: TCP
+    name: ${ZKSYNC_ENV}-server-jsrpc
+  - port: 3031
+    targetPort: 3031
+    protocol: TCP
+    name: ${ZKSYNC_ENV}-server-jsrpc-ws
+  selector:
+    app: ${ZKSYNC_ENV}-server
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -79,7 +103,7 @@ spec:
     spec:
       containers:
         - name: server
-          image: matterlabs/server:latest
+          image: matterlabs/server:${ZKSYNC_ENV}
           imagePullPolicy: Always
           ports:
             - containerPort: 3000

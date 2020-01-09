@@ -21,7 +21,7 @@
 </template>
 
 <script>
-import client from './client';
+import { clientPromise } from './Client';
 
 export default {
     name: 'SearchField',
@@ -35,6 +35,8 @@ export default {
     methods: {
         async search() {
             if (this.query == null) return;
+
+            const client = await clientPromise;
 
             this.notFound = false;
             this.searching = true;

@@ -26,6 +26,7 @@ use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::convert::TryInto;
+use std::time;
 use web3::types::H256;
 
 mod schema;
@@ -770,7 +771,7 @@ impl StorageProcessor {
 
             let new_block = StorageBlock {
                 number: i64::from(block.block_number),
-                root_hash: block.new_root_hash.to_hex(),
+                root_hash: format!("sync-bl:{}", &block.new_root_hash.to_hex()),
                 fee_account_id: i64::from(block.fee_account),
                 unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
                 unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
@@ -990,7 +991,7 @@ impl StorageProcessor {
         let query = format!(
             "
             select
-                concat('0x', encode(hash, 'hex')) as hash,
+                hash,
                 pq_id,
                 tx,
                 success,
@@ -1003,7 +1004,7 @@ impl StorageProcessor {
                 from (
                     select
                         tx,
-                        hash,
+                        'sync-tx:' || encode(hash, 'hex') as hash,
                         null as pq_id,
                         success,
                         fail_reason,
@@ -1015,13 +1016,13 @@ impl StorageProcessor {
                     on
                         tx_hash = hash
                     where
-                        encode(primary_account_address, 'hex') = '{address}'
+                        'sync:' || encode(primary_account_address, 'hex') = '{address}'
                         or
-                        tx->>'to' = '0x{address}'
+                        tx->>'to' = '{address}'
                     union all
                     select
                         operation as tx,
-                        eth_hash as hash,
+                        '0x' || encode(eth_hash, 'hex') as hash,
                         priority_op_serialid as pq_id,
                         null as success,
                         null as fail_reason,
@@ -1029,7 +1030,7 @@ impl StorageProcessor {
                     from 
                         executed_priority_operations
                     where 
-                        operation->'priority_op'->>'account' = '0x{address}') t
+                        operation->'priority_op'->>'account' = '{address}') t
                 order by
                     block_number desc
                 offset 
@@ -1054,7 +1055,7 @@ impl StorageProcessor {
             using 
                 (block_number)
             ",
-            address = hex::encode(address.data),
+            address = address.to_hex(),
             offset = offset,
             limit = limit
         );
@@ -1138,7 +1139,8 @@ impl StorageProcessor {
 
         Ok(Some(Block {
             block_number: block,
-            new_root_hash: Fr::from_hex(&stored_block.root_hash).expect("Unparsable root hash"),
+            new_root_hash: Fr::from_hex(&format!("0x{}", &stored_block.root_hash[8..]))
+                .expect("Unparsable root hash"),
             fee_account: stored_block.fee_account_id as AccountId,
             block_transactions,
             processed_priority_ops: (
@@ -1548,7 +1550,7 @@ impl StorageProcessor {
             with eth_ops as (
             	select
             		operations.block_number,
-                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
+                    'sync-tx:' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
             		operations.action_type,
             		operations.created_at
             	from operations
@@ -1724,22 +1726,33 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
+    pub fn load_unverified_commits_after_block(
+        &self,
+        block: i64,
+        limit: i64,
+    ) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
-            let ops: Vec<StoredOperation> = diesel::sql_query(
+            let ops: Vec<StoredOperation> = diesel::sql_query(format!(
                 "
                 SELECT * FROM operations
-                WHERE action_type = 'COMMIT'
-                AND block_number > (
-                    SELECT COALESCE(max(block_number), 0)  
-                    FROM operations 
-                    WHERE action_type = 'VERIFY'
-                )
+                  WHERE action_type = 'COMMIT'
+                   AND block_number > (
+                     SELECT COALESCE(max(block_number), 0)
+                       FROM operations
+                       WHERE action_type = 'VERIFY'
+                   )
+                   AND block_number > {}
+                  LIMIT {}
             ",
-            )
+                block, limit
+            ))
             .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
+    }
+
+    pub fn load_unverified_commits(&self) -> QueryResult<Vec<Operation>> {
+        self.load_unverified_commits_after_block(0, 10e9 as i64)
     }
 
     fn get_account_and_last_block(
@@ -1936,10 +1949,10 @@ impl StorageProcessor {
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
 
-    pub fn fetch_prover_job(
+    pub fn prover_run_for_next_commit(
         &self,
         worker_: &str,
-        timeout_seconds: usize,
+        prover_timeout: time::Duration,
     ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
@@ -1953,14 +1966,10 @@ impl StorageProcessor {
                     AND NOT EXISTS
                         (SELECT * FROM prover_runs 
                             WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
-                ", timeout_seconds))
+                ", prover_timeout.as_secs()))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             if let Some(block_number_) = job {
-                // let to_store = NewProverRun{
-                //     block_number: i64::from(block_number),
-                //     worker: worker.to_string(),
-                // };
                 use crate::schema::prover_runs::dsl::*;
                 let inserted: ProverRun = insert_into(prover_runs)
                     .values(&vec![(
@@ -1975,7 +1984,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn update_prover_job(&self, job_id: i32) -> QueryResult<()> {
+    pub fn record_prover_is_working(&self, job_id: i32) -> QueryResult<()> {
         use crate::schema::prover_runs::dsl::*;
 
         let target = prover_runs.filter(id.eq(job_id));
@@ -1991,6 +2000,15 @@ impl StorageProcessor {
             .values(&vec![(worker.eq(worker_.to_string()))])
             .get_result(self.conn())?;
         Ok(inserted.id)
+    }
+
+    pub fn prover_by_id(&self, prover_id: i32) -> QueryResult<ActiveProver> {
+        use crate::schema::active_provers::dsl::*;
+
+        let ret: ActiveProver = active_provers
+            .filter(id.eq(prover_id))
+            .get_result(self.conn())?;
+        Ok(ret)
     }
 
     pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
@@ -2340,7 +2358,7 @@ mod test {
         conn.execute_operation(&dummy_op(Action::Commit, 1))
             .unwrap();
 
-        let pending = conn.load_unverified_commitments().unwrap();
+        let pending = conn.load_unverified_commits().unwrap();
         assert_eq!(pending.len(), 1);
 
         conn.execute_operation(&dummy_op(
@@ -2351,7 +2369,7 @@ mod test {
         ))
         .unwrap();
 
-        let pending = conn.load_unverified_commitments().unwrap();
+        let pending = conn.load_unverified_commits().unwrap();
         assert_eq!(pending.len(), 0);
     }
 

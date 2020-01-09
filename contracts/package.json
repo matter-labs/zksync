@@ -22,7 +22,8 @@
     "solhint-plugin-prettier": "^0.0.3",
     "ts-node": "^8.3.0",
     "tslint": "^5.18.0",
-    "typescript": "^3.5.3"
+    "typescript": "^3.5.3",
+    "zksync": "^0.3.9"
   },
   "scripts": {
     "build": "waffle config.json && waffle config_flat.json",
