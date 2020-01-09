@@ -191,8 +191,15 @@ impl Rpc for RpcApp {
     }
 
     fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash> {
-        let storage = self.access_storage()?;
+        if tx.is_close() {
+            return Err(Error {
+                code: 110.into(),
+                message: "Account close tx is disabled.".to_string(),
+                data: None,
+            });
+        }
 
+        let storage = self.access_storage()?;
         let tx_add_result = storage
             .mempool_add_tx(&tx)
             .map_err(|_| Error::internal_error())?;

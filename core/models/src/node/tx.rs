@@ -264,6 +264,13 @@ impl FranklinTx {
             _ => false,
         }
     }
+
+    pub fn is_close(&self) -> bool {
+        match self {
+            FranklinTx::Close(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
