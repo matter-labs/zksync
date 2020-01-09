@@ -120,7 +120,7 @@ pub fn update_tree_state(
         action: Action::Verify {
             proof: Box::new(EncodedProof::default()),
         },
-        block: block,
+        block,
         accounts_updated: Vec::new(),
         id: None,
     };
