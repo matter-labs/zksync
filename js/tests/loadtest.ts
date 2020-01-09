@@ -126,7 +126,9 @@ async function createRandomZKSyncWallet(ethWallet: ethers.Wallet, provider: Prov
     const seedHex = (await ethWallet.signMessage(random)).substr(2);
     const seed = Buffer.from(seedHex, "hex");
     const signer = Signer.fromSeed(seed);
-    return new Wallet(signer, provider, ethProxy);
+    const wallet = new Wallet(signer);
+    wallet.connect(provider, ethProxy);
+    return wallet;
 }
 
 async function deposit(ethWallet: ethers.Wallet, syncWallet: Wallet, tokens: types.Token[], amount: utils.BigNumber) {

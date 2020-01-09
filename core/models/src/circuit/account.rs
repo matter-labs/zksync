@@ -35,6 +35,7 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         leaf_content
     }
 }
+
 impl<E: JubjubEngine> CircuitAccount<E> {
     //we temporary pass it as repr. TODO: return Fr, when we could provide proper trait bound
     pub fn empty_balances_root_hash() -> Vec<u8> {

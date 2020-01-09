@@ -85,7 +85,7 @@ export default {
     watch: {
         info() {
             this.updateInfo();
-        }
+        },
     },
     methods: {
         updateInfo() {
@@ -115,6 +115,6 @@ export default {
             });
         },
     },
-    components
+    components,
 }
 </script>

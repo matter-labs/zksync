@@ -42,10 +42,13 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
             .filter(i => i.type === 'constructor');
             
         if (constructorInputs.length > 0) {
-            constructorArguments = ethers.utils.defaultAbiCoder.encode(
-                constructorInputs[0].inputs,
-                constructorParams
-            );
+            constructorArguments = 
+                ethers.utils.defaultAbiCoder
+                .encode(
+                    constructorInputs[0].inputs,
+                    constructorParams
+                )
+                .slice(2);
         }
     }
 
@@ -59,7 +62,7 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
         compilerversion:    'v0.5.10+commit.5a6ea5b1',      // see http://etherscan.io/solcversions for list of support versions
         optimizationUsed:   0,                              // 0 = No Optimization, 1 = Optimization used
         runs:               200,                            // set to 200 as default unless otherwise         
-        constructorArguments                                // if applicable
+        constructorArguements: constructorArguments         // if applicable. How nice, they have a typo in their api
     };
     
     let r = await Axios.post(etherscanApiUrl, qs.stringify(data));
@@ -77,9 +80,15 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
         }
     } else {
         let status;
-        do {
+        let retriesLeft = 10;
+        while (retriesLeft --> 0) {
             status = await Axios.get(`http://api.etherscan.io/api?module=contract&&action=checkverifystatus&&guid=${r.data.result}`).then(r => r.data);
-        } while (status.result.includes('Pending in queue'));
+            
+            if (status.result.includes('Pending in queue') == false) 
+                break;
+            
+            await sleep(5000);
+        }
 
         console.log(`Published ${contractname} sources on https://${network}.etherscan.io/address/${contractaddress} with status`, status);
     }
@@ -162,7 +171,7 @@ export async function deployFranklin(
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
         const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);
-        await (await priorityQueueContract.changeFranklinAddress(contract.address)).wait();
+        await (await priorityQueueContract.setFranklinAddress(contract.address)).wait();
         return contract;
     } catch (err) {
         console.log("Franklin deploy error:" + err);

@@ -1,8 +1,8 @@
-// Built-in uses
+// Built-in deps
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 use std::time::Duration;
-// External uses
+// External deps
 use futures::channel::mpsc as fmpsc;
 // Workspace uses
 use models::config_options::ThreadPanicNotify;

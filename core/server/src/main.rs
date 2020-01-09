@@ -1,20 +1,22 @@
 //use tokio::runtime::Runtime;
 #[macro_use]
 extern crate log;
-// Built-in uses
+// Built-in deps
 use std::sync::mpsc::channel;
 use std::thread;
 use std::time::Duration;
-// External uses
+// External deps
 use clap::{App, Arg};
 use futures::channel::mpsc as fmpsc;
 // Workspace uses
 use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
+use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL};
 use models::StateKeeperRequest;
 use server::api_server::start_api_server;
 use server::committer::start_committer;
 use server::eth_sender;
 use server::eth_watch::start_eth_watch;
+use server::prover_server::start_prover_server;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 use storage::ConnectionPool;
 use web3::types::H160;
@@ -56,23 +58,24 @@ fn main() {
         .expect("Error setting Ctrl-C handler");
     }
 
-    let storage = connection_pool
-        .access_storage()
-        .expect("db connection failed for committer");
-    let contract_addr: H160 = storage
-        .load_config()
-        .expect("can not load server_config")
-        .contract_addr
-        .expect("contract_addr empty in server_config")[2..]
-        .parse()
-        .expect("contract_addr in db wrong");
+    let contract_addr: H160 = {
+        let storage = connection_pool
+            .access_storage()
+            .expect("failed to connect to db");
+        storage
+            .load_config()
+            .expect("failed to load server config")
+            .contract_addr
+            .expect("contract_address is empty in server_config")[2..]
+            .parse()
+            .expect("failed to parse contract_addr")
+    };
     if contract_addr != config_opts.contract_eth_addr {
         panic!(
             "Contract addresses mismatch! From DB = {}, from env = {}",
             contract_addr, config_opts.contract_eth_addr
         );
     }
-    drop(storage);
 
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
@@ -116,6 +119,13 @@ fn main() {
         connection_pool.clone(),
         stop_signal_sender.clone(),
         config_opts.clone(),
+    );
+    start_prover_server(
+        connection_pool,
+        config_opts.prover_server_address,
+        Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
+        Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
+        stop_signal_sender.clone(),
     );
 
     // Simple timer, pings every 100 ms

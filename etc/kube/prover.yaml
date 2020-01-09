@@ -2,6 +2,8 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ${ZKSYNC_ENV}-prover
+  labels:
+    app: ${ZKSYNC_ENV}-prover
 spec:
   selector:
     matchLabels:
@@ -11,27 +13,45 @@ spec:
       labels:
         app: ${ZKSYNC_ENV}-prover
     spec:
+      volumes:
+      - name: keys-dir
+        hostPath:
+          path: /home/docker
       containers:
-        - name: ${ZKSYNC_ENV}-prover
-          image: matterlabs/prover:latest
-          imagePullPolicy: Always
-          resources:
-            requests:
-              memory: "2Gi"
-          envFrom:
-          - secretRef:
-              name: ${ZKSYNC_ENV}-secret
-          env:
-          - name: ZKSYNC_ENV
-            value: "${ZKSYNC_ENV}"
-          - name: NODE_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.nodeName
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
+      - name: ${ZKSYNC_ENV}-prover
+        image: matterlabs/prover:${ZKSYNC_ENV}
+        imagePullPolicy: Always
+        volumeMounts:
+        - name: keys-dir
+          mountPath: /keys
+          readOnly: false
+        env:
+        - name: RUST_BACKTRACE
+          value: "${RUST_BACKTRACE}"
+        - name: CONTRACT_ADDR
+          value: "${CONTRACT_ADDR}"
+        - name: KEY_DIR
+          value: "${KEY_DIR}"
+        - name: TX_BATCH_SIZE
+          value: "${TX_BATCH_SIZE}"
+        - name: MAX_OUTSTANDING_TXS
+          value: "${MAX_OUTSTANDING_TXS}"
+        - name: PROVER_DATABASE_URL
+          value: "${PROVER_DATABASE_URL}"
+        - name: DB_POOL_SIZE
+          value: "${DB_POOL_SIZE}"
+        - name: ACCOUNT_TREE_DEPTH
+          value: "${ACCOUNT_TREE_DEPTH}"
+        - name: BLOCK_SIZE_CHUNKS
+          value: "${BLOCK_SIZE_CHUNKS}"
+        - name: KEYS_SPACE_URL
+          value: "${KEYS_SPACE_URL}"
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
       terminationGracePeriodSeconds: 20
-      nodeSelector:
-        doks.digitalocean.com/node-pool: prover

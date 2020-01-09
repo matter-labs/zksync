@@ -4,7 +4,7 @@
 
 cd $ZKSYNC_HOME
 
-IN_DIR=./contracts/contracts/
+IN_DIR=./contracts/contracts
 OUT_DIR=./contracts/contracts/generated
 
 rm -rf $OUT_DIR

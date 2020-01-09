@@ -1,5 +1,4 @@
-use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
-use crate::events::{BlockEvent, EventType};
+// External deps
 use ethabi;
 use failure::{ensure, format_err};
 use futures::{compat::Future01CompatExt, executor::block_on};
@@ -10,6 +9,9 @@ use web3::futures::Future;
 use web3::types::Transaction;
 use web3::types::{BlockNumber, FilterBuilder, Log, H256, U256};
 use web3::{Transport, Web3};
+// Workspace deps
+use crate::eth_tx_helpers::get_block_number_from_ethereum_transaction;
+use crate::events::{BlockEvent, EventType};
 
 /// Rollup contract events states description
 #[derive(Debug, Clone)]

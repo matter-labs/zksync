@@ -3,12 +3,12 @@
   "version": "1.0.0",
   "main": "index.js",
   "license": "MIT",
-  "dependencies": {
-    "ethers": "^4.0.40",
-    "zksync": "^0.3.7"
-  },
   "devDependencies": {
-    "@types/node": "^12.12.14"
+    "@types/node": "^12.12.14",
+    "ethers": "^4.0.33",
+    "ts-node": "^8.5.4",
+    "typescript": "^3.7.4",
+    "zksync": "https://github.com/matter-labs/zksync.js.git"
   },
   "scripts": {
     "simple": "f ts-node simple-integration-test.ts",

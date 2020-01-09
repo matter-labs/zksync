@@ -11,12 +11,12 @@
 //! Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 //! that state is always recoverable.
 
-// Built-in uses
+// Built-in deps
 use std::collections::{HashSet, VecDeque};
 use std::str::FromStr;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
-// External uses
+// External deps
 use bigdecimal::BigDecimal;
 use failure::ensure;
 use ff::{PrimeField, PrimeFieldRepr};

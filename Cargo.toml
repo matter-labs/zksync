@@ -11,4 +11,5 @@ members = [
     "core/prover",
     "core/key_generator",
     "core/spec_test",
+    "core/testhelper",
 ]

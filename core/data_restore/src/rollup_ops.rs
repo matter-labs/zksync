@@ -113,7 +113,7 @@ mod test {
             sender: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(10),
-            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
                 .unwrap(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
@@ -132,7 +132,7 @@ mod test {
     #[test]
     fn test_part_exit() {
         let tx = Withdraw {
-            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
                 .unwrap(),
             eth_address: [9u8; 20].into(),
             token: 1,
@@ -208,8 +208,9 @@ mod test {
     #[test]
     fn test_transfer_to_new() {
         let tx = Transfer {
-            from: AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap(),
-            to: AccountAddress::from_hex("0x8888888888888888888888888888888888888888").unwrap(),
+            from: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
+                .unwrap(),
+            to: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(10),
@@ -233,8 +234,9 @@ mod test {
     #[test]
     fn test_transfer() {
         let tx = Transfer {
-            from: AccountAddress::from_hex("0x7777777777777777777777777777777777777777").unwrap(),
-            to: AccountAddress::from_hex("0x8888888888888888888888888888888888888888").unwrap(),
+            from: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
+                .unwrap(),
+            to: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(10),
@@ -258,7 +260,7 @@ mod test {
     #[test]
     fn test_close() {
         let tx = Close {
-            account: AccountAddress::from_hex("0x7777777777777777777777777777777777777777")
+            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
                 .unwrap(),
             nonce: 3,
             signature: TxSignature::default(),
