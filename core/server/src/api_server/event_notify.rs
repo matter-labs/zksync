@@ -20,6 +20,7 @@ use models::{
     ActionType, Operation,
 };
 use std::collections::BTreeMap;
+use std::str::FromStr;
 use storage::ConnectionPool;
 
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
@@ -237,7 +238,7 @@ impl OperationNotifier {
         let id = SubscriptionId::String(format!(
             "{}/{}/{}/{}",
             TX_SUB_PREFIX,
-            hash.to_str(),
+            hash.to_string(),
             action.to_string(),
             rand::random::<u64>()
         ));
@@ -279,7 +280,7 @@ impl OperationNotifier {
                 .assign_id(id.clone())
                 .map_err(|_| format_err!("SubIdAssign"))?;
             subs.push(SubscriptionSender { id, sink });
-            trace!("tx sub added: {}", hash.to_str());
+            trace!("tx sub added: {}", hash.to_string());
         }
         self.tx_subs.insert((hash, action), subs);
         Ok(())

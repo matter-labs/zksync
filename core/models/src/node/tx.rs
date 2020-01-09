@@ -19,6 +19,7 @@ use franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
+use std::str::FromStr;
 use web3::types::Address;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
@@ -32,12 +33,16 @@ impl AsRef<[u8]> for TxHash {
     }
 }
 
-impl TxHash {
-    pub fn to_str(&self) -> String {
+impl ToString for TxHash {
+    fn to_string(&self) -> String {
         format!("sync-tx:{}", hex::encode(&self.data))
     }
+}
 
-    pub fn from_str(s: &str) -> Result<Self, failure::Error> {
+impl FromStr for TxHash {
+    type Err = failure::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         ensure!(
             s.starts_with("sync-tx:"),
             "TxHash should start with sync-tx:"
@@ -55,7 +60,7 @@ impl Serialize for TxHash {
     where
         S: Serializer,
     {
-        serializer.serialize_str(&self.to_str())
+        serializer.serialize_str(&self.to_string())
     }
 }
 
