@@ -70,7 +70,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
-    pub fn new_empty(
+    pub fn new_empty_to_load_from_storage(
         connection_pool: ConnectionPool,
         web3_transport: T,
         governance_contract_eth_addr: H160,

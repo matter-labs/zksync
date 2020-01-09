@@ -60,7 +60,7 @@ fn main() {
             END_ETH_BLOCKS_OFFSET,
         )
     } else {
-        DataRestoreDriver::new_empty(
+        DataRestoreDriver::new_empty_to_load_from_storage(
             connection_pool,
             transport,
             governance_addr,
