@@ -114,7 +114,7 @@ pub fn block_size_chunks() -> usize {
 pub const PRIORITY_EXPIRATION: u64 = 250;
 pub const FR_ADDRESS_LEN: usize = 20;
 
-pub const KEY_FILENAME: &str = "franklin_pk.key";
+pub const KEY_FILENAME: &str = "zksync_pk.key";
 
 pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 
