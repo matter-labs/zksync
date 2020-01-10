@@ -6,7 +6,7 @@ mkdir -p $DIR
 
 SPACE_LINK=$KEYS_SPACE_URL/$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH
 
-KEY_FILES="franklin_pk.key"
+KEY_FILES="zksync_pk.key"
 for i in $KEY_FILES; do
     if ! [ -f $DIR/$i ]; then
         echo "Downloading file $SPACE_LINK/$i"

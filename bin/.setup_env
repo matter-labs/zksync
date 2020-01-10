@@ -19,7 +19,7 @@ then
     fi
 
     if [ ! -f $ENV_FILE ]; then
-        echo "Franklin config file not found: $ENV_FILE"
+        echo "ZKSync config file not found: $ENV_FILE"
         #exit
     fi
 
