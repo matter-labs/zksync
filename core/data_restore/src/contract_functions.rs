@@ -2,7 +2,10 @@ use crate::eth_tx_helpers::get_input_data_from_ethereum_transaction;
 use failure::format_err;
 use models::node::account::{Account, AccountAddress};
 use models::params::{FR_ADDRESS_LEN, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
-use web3::types::Transaction;
+use web3::contract::{Contract, Options};
+use web3::futures::Future;
+use web3::types::{Address, BlockNumber, Transaction, U256};
+use web3::Transport;
 
 /// Returns Rollup genesis (fees) account from the input of the Rollup contract creation transaction
 ///
@@ -22,18 +25,26 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
     Ok(acc)
 }
 
-// /// Returns total number of verified blocks on Rollup contract
-// ///
-// /// # Arguments
-// ///
-// /// * `web3` - Web3 provider url
-// /// * `franklin_contract` - Rollup contract
-// ///
-// pub fn get_total_verified_blocks<T: Transport>(
-//     web3: &Web3<T>,
-//     franklin_contract: &(ethabi::Contract, Contract<T>)
-// ) -> u32 {
-//     let result = franklin_contract.1.query("totalBlocksVerified", (), None, Options::default(), None);
-//     let blocks: U256 = result.wait().unwrap();
-//     32
-// }
+/// Returns total number of verified blocks on Rollup contract
+///
+/// # Arguments
+///
+/// * `web3` - Web3 provider url
+/// * `franklin_contract` - Rollup contract
+///
+pub fn get_total_verified_blocks<T: Transport>(
+    franklin_contract: &(ethabi::Contract, Contract<T>),
+) -> u32 {
+    franklin_contract
+        .1
+        .query::<U256, Option<Address>, Option<BlockNumber>, ()>(
+            "totalBlocksVerified",
+            (),
+            None,
+            Options::default(),
+            None,
+        )
+        .wait()
+        .unwrap()
+        .as_u32()
+}

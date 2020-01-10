@@ -1,4 +1,4 @@
-use crate::contract_functions::get_genesis_account;
+use crate::contract_functions::{get_genesis_account, get_total_verified_blocks};
 use crate::eth_tx_helpers::get_ethereum_transaction;
 use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
@@ -135,7 +135,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     pub fn set_genesis_state(
         &mut self,
         governance_contract_genesis_tx_hash: H256,
-        franklin_contract_genesis_tx_hash: H256
+        franklin_contract_genesis_tx_hash: H256,
     ) -> Result<(), failure::Error> {
         let genesis_franklin_transaction =
             get_ethereum_transaction(&self.web3, &franklin_contract_genesis_tx_hash)?;
@@ -143,8 +143,9 @@ impl<T: Transport> DataRestoreDriver<T> {
             get_ethereum_transaction(&self.web3, &governance_contract_genesis_tx_hash)?;
 
         // Setting genesis block number for events state
-        let genesis_eth_block_number =
-            self.events_state.set_genesis_block_number(&genesis_governance_transaction)?;
+        let genesis_eth_block_number = self
+            .events_state
+            .set_genesis_block_number(&genesis_governance_transaction)?;
         info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
         storage_interactor::save_block_events_state(&self.connection_pool, &[])?;
@@ -174,13 +175,12 @@ impl<T: Transport> DataRestoreDriver<T> {
             fee_acc_num,
         );
 
-        info!("Genesis block number: {:?}", tree_state.state.block_number);
         info!("Genesis tree root hash: {:?}", tree_state.root_hash());
         debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
         storage_interactor::save_genesis_tree_state(&self.connection_pool, account_update)?;
 
-        info!("Saved genesis tree state");
+        info!("Saved genesis tree state\n");
 
         self.tree_state = tree_state;
 
@@ -221,8 +221,12 @@ impl<T: Transport> DataRestoreDriver<T> {
             }
             StorageUpdateState::None => {}
         }
+        let total_verified_blocks = get_total_verified_blocks(&self.franklin_contract);
+        let last_verified_block = self.tree_state.state.block_number;
         info!(
-            "State has been loaded, root hash: {:?}",
+            "State has been loaded\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
+            last_verified_block,
+            total_verified_blocks,
             self.tree_state.root_hash()
         );
         Ok(())
@@ -233,17 +237,26 @@ impl<T: Transport> DataRestoreDriver<T> {
         self.run_update = true;
         let mut last_wached_block: u64 = self.events_state.last_watched_eth_block_number;
         while self.run_update {
-            info!("Last watched ethereum block: {:?}", last_wached_block);
+            debug!("Last watched ethereum block: {:?}", last_wached_block);
 
             // Update events
-            let got_new_events = self.update_events_state()?;
-
-            if got_new_events {
+            if self.update_events_state()? {
                 // Update operations
                 let new_ops_blocks = self.update_operations_state()?;
 
-                // Update tree
-                self.update_tree_state(new_ops_blocks)?;
+                if !new_ops_blocks.is_empty() {
+                    // Update tree
+                    self.update_tree_state(new_ops_blocks)?;
+
+                    let total_verified_blocks = get_total_verified_blocks(&self.franklin_contract);
+                    let last_verified_block = self.tree_state.state.block_number;
+                    info!(
+                        "State updated\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
+                        last_verified_block,
+                        total_verified_blocks,
+                        self.tree_state.root_hash()
+                    );
+                }
             }
 
             if last_wached_block == self.events_state.last_watched_eth_block_number {
@@ -305,11 +318,6 @@ impl<T: Transport> DataRestoreDriver<T> {
             blocks.push(block);
             updates.push(acc_updates);
             count += 1;
-            info!(
-                "New block number: {:?}",
-                &self.tree_state.state.block_number
-            );
-            info!("Tree root hash: {:?}", self.tree_state.root_hash());
         }
         for i in 0..count {
             storage_interactor::update_tree_state(
@@ -321,7 +329,7 @@ impl<T: Transport> DataRestoreDriver<T> {
 
         storage_interactor::save_storage_state(&self.connection_pool, StorageUpdateState::None)?;
 
-        info!("Updated state\n");
+        debug!("Updated state");
 
         Ok(())
     }

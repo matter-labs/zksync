@@ -36,7 +36,6 @@ impl std::default::Default for EventsState {
 }
 
 impl EventsState {
-
     /// Saves the genesis block number as the last watched number
     /// Returns the genesis block number
     ///
@@ -87,7 +86,9 @@ impl EventsState {
 
         self.last_watched_eth_block_number = to_block_number;
 
-        self.update_blocks_state(franklin_contract, &block_events)?;
+        if !self.update_blocks_state(franklin_contract, &block_events)? {
+            return Ok((vec![], token_events, self.last_watched_eth_block_number));
+        }
 
         let mut events_to_return: Vec<BlockEvent> = self.committed_events.clone();
         events_to_return.extend(self.verified_events.clone());
@@ -255,6 +256,7 @@ impl EventsState {
     }
 
     /// Updates committed and verified blocks state by extending their arrays
+    /// Returns flag that indicates if there are any logs
     ///
     /// # Arguments
     ///
@@ -265,9 +267,9 @@ impl EventsState {
         &mut self,
         contract: &(ethabi::Contract, Contract<T>),
         logs: &[Log],
-    ) -> Result<(), failure::Error> {
+    ) -> Result<bool, failure::Error> {
         if logs.is_empty() {
-            return Ok(());
+            return Ok(false);
         }
 
         let block_verified_topic = contract
@@ -333,7 +335,7 @@ impl EventsState {
                 }
             };
         }
-        Ok(())
+        Ok(true)
     }
 
     /// Removes verified committed blocks events and all verified

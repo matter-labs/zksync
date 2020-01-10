@@ -17,7 +17,7 @@ use storage::ConnectionPool;
 use web3::transports::Http;
 use web3::Transport;
 
-const ETH_BLOCKS_STEP: u64 = 1000;
+const ETH_BLOCKS_STEP: u64 = 1;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
 fn main() {
@@ -54,14 +54,14 @@ fn main() {
         contract_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-    ).expect("Cant create state");
+    )
+    .expect("Cant create state");
 
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
     if cli.is_present("genesis") {
-        driver.set_genesis_state(
-            governance_genesis_tx_hash,
-            contract_genesis_tx_hash
-        ).expect("Cant set genesis state");
+        driver
+            .set_genesis_state(governance_genesis_tx_hash, contract_genesis_tx_hash)
+            .expect("Cant set genesis state");
     }
 
     if cli.is_present("continue") {
