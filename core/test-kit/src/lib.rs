@@ -1,4 +1,4 @@
-use log::*;
+//use log::*;
 
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::zksync_account::ZksyncAccount;
@@ -23,6 +23,7 @@ use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
 };
 use server::ConfigurationOptions;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -224,22 +225,58 @@ pub fn init_and_run_state_keeper() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    // approximate because eth is also spent on the tx fee
-    let mut eth0_bal = block_on(accounts.eth_accounts[0].eth_balance()).expect("eth balance get");
-    let mut zksync0_bal = zksync_acc_balance(&accounts.zksync_accounts[0].address);
-    let mut zksync1_bal = zksync_acc_balance(&accounts.zksync_accounts[1].address);
+    let eth_accounts_balances = RefCell::new(HashMap::<usize, (BigDecimal, BigDecimal)>::new());
+    let zksync_accounts_balances = RefCell::new(HashMap::<usize, BigDecimal>::new());
 
-    eth0_bal -= &deposit_amount;
-    zksync0_bal += &deposit_amount;
-    let deposit = accounts.deposit(0, 0, 0, deposit_amount, parse_ether("0.1").unwrap());
+    let get_expected_eth_account_balance = |id| -> (BigDecimal, BigDecimal) {
+        eth_accounts_balances
+            .borrow()
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| {
+                (
+                    block_on(accounts.eth_accounts[id].eth_balance()).expect("eth balance get"),
+                    BigDecimal::from(0),
+                )
+            })
+    };
+    let get_expected_zksync_account_balance = |id| -> BigDecimal {
+        zksync_accounts_balances
+            .borrow()
+            .get(&id)
+            .cloned()
+            .unwrap_or_else(|| zksync_acc_balance(&accounts.zksync_accounts[id].address))
+    };
+
+    // approximate because eth is also spent on the tx fee
+    let mut eth0_old = get_expected_eth_account_balance(0);
+    eth0_old.0 -= &deposit_amount;
+    eth0_old.1 += parse_ether("0.015").unwrap(); // max fee payed
+    eth_accounts_balances.borrow_mut().insert(0, eth0_old);
+    let mut zksync0_old = get_expected_zksync_account_balance(0);
+    zksync0_old += &deposit_amount;
+    zksync_accounts_balances.borrow_mut().insert(0, zksync0_old);
+
+    let deposit = accounts.deposit(0, 0, 0, deposit_amount, parse_ether("0.0").unwrap());
 
     let transfer_amount = parse_ether("0.25").unwrap();
-    zksync0_bal -= &transfer_amount;
-    zksync1_bal += &transfer_amount;
+    let mut zksync0_old = get_expected_zksync_account_balance(0);
+    zksync0_old -= &transfer_amount;
+    zksync_accounts_balances.borrow_mut().insert(0, zksync0_old);
+    let mut zksync1_old = get_expected_zksync_account_balance(1);
+    zksync1_old += &transfer_amount;
+    zksync_accounts_balances.borrow_mut().insert(1, zksync1_old);
     let transfer1 = accounts.transfer(0, 1, 0, transfer_amount, BigDecimal::from(0), 0);
+
     let withdraw_amount = parse_ether("0.5").unwrap();
-    zksync0_bal -= &withdraw_amount;
-    eth0_bal += &withdraw_amount;
+
+    let mut zksync0_old = get_expected_zksync_account_balance(0);
+    zksync0_old -= &withdraw_amount;
+    zksync_accounts_balances.borrow_mut().insert(0, zksync0_old);
+    let mut eth0_old = get_expected_eth_account_balance(0);
+    eth0_old.0 += &withdraw_amount;
+    eth_accounts_balances.borrow_mut().insert(0, eth0_old);
+
     let withdraw = accounts.withdraw(0, 0, 0, withdraw_amount, BigDecimal::from(0), 1);
 
     let block = ProposedBlock {
@@ -263,7 +300,7 @@ pub fn init_and_run_state_keeper() {
     let mut next_block = || -> CommitRequest {
         block_on(async {
             if let Some(op) = proposed_blocks_receiver.next().await {
-                println!("op: {:#?}", op);
+                //                println!("op: {:#?}", op);
                 return op;
             } else {
                 panic!("State keeper channel closed");
@@ -271,32 +308,35 @@ pub fn init_and_run_state_keeper() {
         })
     };
 
+    let timer = Instant::now();
     let new_block = next_block();
-    let block_rec = block_on(commit_account.commit_block(&new_block.block));
-    let block_rec = block_on(commit_account.verify_block(&new_block.block));
+    println!("block created, {}", timer.elapsed().as_secs());
 
-    let eth0_bal_after = block_on(accounts.eth_accounts[0].eth_balance()).expect("eth balance get");
-    let zksync0_bal_after = zksync_acc_balance(&accounts.zksync_accounts[0].address);
-    let zksync1_bal_after = zksync_acc_balance(&accounts.zksync_accounts[1].address);
+    let block_rec =
+        block_on(commit_account.commit_block(&new_block.block)).expect("block commit fail");
+    println!(
+        "commit: {:?}, status: {:?}",
+        block_rec.transaction_hash, block_rec.status
+    );
+    let block_rec =
+        block_on(commit_account.verify_block(&new_block.block)).expect("block verify fail");
+    println!(
+        "verify: {:?}, status: {:?}",
+        block_rec.transaction_hash, block_rec.status
+    );
 
-    println!("eth0 delta: {}", eth0_bal_after - eth0_bal);
-    println!("zks0 delta: {}", zksync0_bal_after - zksync0_bal);
-    println!("zks1 delta: {}", zksync1_bal_after - zksync1_bal);
-    //
+    for (eth_acc, balance) in eth_accounts_balances.into_inner() {
+        let real_balance =
+            block_on(accounts.eth_accounts[eth_acc].eth_balance()).expect("eth balance get");
+        let diff = balance.0 - real_balance;
+        let is_diff_valid = diff > BigDecimal::from(0) && diff < balance.1;
+        println!("eth acc diff: {}, within bounds: {}", diff, is_diff_valid);
+    }
 
-    //    // check
-    //    let eth_acc_new_balance = block_on(eth_account.eth_balance()).expect("eth balance get");
-    //    let zksync_acc_new_balance = block_on(sk_get_account(
-    //        state_keeper_req_sender.clone(),
-    //        &zksync_account.address,
-    //    ))
-    //    .get_balance(0);
-    //
-    //    println!("eth bal: {}", eth_acc_balance - eth_acc_new_balance);
-    //    println!(
-    //        "zksync bal: {} - {}",
-    //        zksync_balance, zksync_acc_new_balance
-    //    );
+    for (zksync_acc, balance) in zksync_accounts_balances.into_inner() {
+        let real = zksync_acc_balance(&accounts.zksync_accounts[zksync_acc].address);
+        println!("zksync acc {} diff {}", zksync_acc, real - balance);
+    }
 
     stop_state_keeper_sender.send(());
 
@@ -307,9 +347,6 @@ struct StateProxy {
     web3_event_loop: EventLoopHandle,
     web3_transport: Http,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
-    //    gov_contract: (ethabi::Contract, Contract<Http>),
-    //    priority_queue_contract: (ethabi::Contract, Contract<Http>),
-    //    main_contract: (ethabi::Contract, Contract<Http>),
     config: ConfigurationOptions,
 }
 
