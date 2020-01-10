@@ -201,24 +201,9 @@ deposit: confirm_action
 # Devops: main
 
 # (Re)deploy contracts and database
-ifeq (dev,$(ZKSYNC_ENV))
-redeploy: confirm_action stop deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
-else
 redeploy: confirm_action stop deploy-contracts db-insert-contract
-endif
 
-ifeq (dev,$(ZKSYNC_ENV))
-init-deploy: confirm_action deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
-else
 init-deploy: confirm_action deploy-contracts db-insert-contract
-endif
-
-start-local:
-	@kubectl apply -f ./etc/kube/minikube/server.yaml
-	@kubectl apply -f ./etc/kube/minikube/prover.yaml
-	./bin/kube-update-server-vars
-	@kubectl apply -f ./etc/kube/minikube/postgres.yaml
-	@kubectl apply -f ./etc/kube/minikube/geth.yaml
 
 dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
@@ -244,15 +229,7 @@ start: apply-kubeconfig start-prover start-server start-nginx
 endif
 
 ifeq (dev,$(ZKSYNC_ENV))
-stop: confirm_action
-	@echo TODO: fix minikube local dev
-#	@kubectl delete deployments --selector=app=dev-server
-#	@kubectl delete deployments --selector=app=dev-prover
-#	@kubectl delete deployments --selector=app=dev-nginx
-#	@kubectl delete svc --selector=app=dev-server
-#	@kubectl delete svc --selector=app=dev-nginx
-#	@kubectl delete -f ./etc/kube/minikube/postgres.yaml
-#	@kubectl delete -f ./etc/kube/minikube/geth.yaml
+stop:
 else ifeq (ci,$(ZKSYNC_ENV))
 stop:
 else
