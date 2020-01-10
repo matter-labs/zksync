@@ -89,7 +89,7 @@ impl<T: Transport> ETHSender<T> {
             db_pool: db_pool.clone(),
         };
         let storage = db_pool.access_storage().expect("Failed to access storage");
-        if let Err(_) = sender.restore_state(storage) {
+        if sender.restore_state(storage).is_err() {
             info!("No unconfirmed operations");
         }
         sender

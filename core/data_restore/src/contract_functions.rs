@@ -21,3 +21,19 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
     acc.address = genesis_operator_address;
     Ok(acc)
 }
+
+// /// Returns total number of verified blocks on Rollup contract
+// ///
+// /// # Arguments
+// ///
+// /// * `web3` - Web3 provider url
+// /// * `franklin_contract` - Rollup contract
+// ///
+// pub fn get_total_verified_blocks<T: Transport>(
+//     web3: &Web3<T>,
+//     franklin_contract: &(ethabi::Contract, Contract<T>)
+// ) -> u32 {
+//     let result = franklin_contract.1.query("totalBlocksVerified", (), None, Options::default(), None);
+//     let blocks: U256 = result.wait().unwrap();
+//     32
+// }

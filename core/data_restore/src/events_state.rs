@@ -24,15 +24,18 @@ pub struct EventsState {
     pub last_watched_eth_block_number: u64,
 }
 
-impl EventsState {
-    /// Create new Rollup contract events state
-    pub fn new() -> Self {
+impl std::default::Default for EventsState {
+    /// Create default Rollup contract events state
+    fn default() -> Self {
         Self {
             committed_events: Vec::new(),
             verified_events: Vec::new(),
             last_watched_eth_block_number: 0,
         }
     }
+}
+
+impl EventsState {
 
     /// Saves the genesis block number as the last watched number
     /// Returns the genesis block number

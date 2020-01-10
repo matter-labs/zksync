@@ -1,6 +1,6 @@
+use crate::contract_functions::get_genesis_account;
 use crate::eth_tx_helpers::get_ethereum_transaction;
 use crate::events_state::EventsState;
-use crate::genesis_state::get_genesis_account;
 use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor;
 use crate::tree_state::TreeState;
@@ -58,8 +58,6 @@ pub struct DataRestoreDriver<T: Transport> {
 
 impl<T: Transport> DataRestoreDriver<T> {
     /// Returns new data restore driver with empty events and tree states.
-    /// Used when restore driver is started with non-empty storage and there is need to continue previous restore session.
-    /// States will be restored from storage.
     ///
     /// # Arguments
     ///
@@ -70,7 +68,7 @@ impl<T: Transport> DataRestoreDriver<T> {
     /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
     /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
-    pub fn new_empty_to_load_from_storage(
+    pub fn new(
         connection_pool: ConnectionPool,
         web3_transport: T,
         governance_contract_eth_addr: H160,
@@ -108,7 +106,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             )
         };
 
-        let events_state = EventsState::new();
+        let events_state = EventsState::default();
 
         let tree_state = TreeState::new();
 
@@ -125,75 +123,33 @@ impl<T: Transport> DataRestoreDriver<T> {
         })
     }
 
-    /// Returns the new data restore driver state with 'genesis' state.
+    /// Sets the 'genesis' state.
     /// Tree with inserted genesis account will be created.
     /// Used when restore driver is restarted.
     ///
     /// # Arguments
     ///
-    /// * `connection_pool` - Database connection pool
-    /// * `web3_transport` - Web3 provider transport
-    /// * `governance_contract_eth_addr` - Governance contract address
     /// * `governance_contract_genesis_tx_hash` - Governance contract creation tx hash
-    /// * `franklin_contract_eth_addr` - Rollup contract address
     /// * `franklin_contract_genesis_tx_hash` - Rollup contract creation tx hash
-    /// * `eth_blocks_step` - The step distance of viewing events in the ethereum blocks
-    /// * `end_eth_blocks_offset` - The distance to the last ethereum block
     ///
-    pub fn new_with_genesis_acc(
-        connection_pool: ConnectionPool,
-        web3_transport: T,
-        governance_contract_eth_addr: H160,
+    pub fn set_genesis_state(
+        &mut self,
         governance_contract_genesis_tx_hash: H256,
-        franklin_contract_eth_addr: H160,
-        franklin_contract_genesis_tx_hash: H256,
-        eth_blocks_step: u64,
-        end_eth_blocks_offset: u64,
-    ) -> Result<Self, failure::Error> {
-        let web3 = Web3::new(web3_transport);
-
-        let governance_contract = {
-            let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
-                .map_err(|e| format_err!("No governance contract abi: {}", e.to_string()))?
-                .get("abi")
-                .ok_or_else(|| format_err!("No governance contract abi"))?
-                .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes())
-                .map_err(|e| format_err!("No governance contract abi: {}", e.to_string()))?;
-            (
-                abi.clone(),
-                Contract::new(web3.eth(), governance_contract_eth_addr, abi.clone()),
-            )
-        };
-
-        let franklin_contract = {
-            let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
-                .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?
-                .get("abi")
-                .ok_or_else(|| format_err!("No franklin contract abi"))?
-                .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes())
-                .map_err(|e| format_err!("No franklin contract abi: {}", e.to_string()))?;
-            (
-                abi.clone(),
-                Contract::new(web3.eth(), franklin_contract_eth_addr, abi.clone()),
-            )
-        };
-
-        let mut events_state = EventsState::new();
-
+        franklin_contract_genesis_tx_hash: H256
+    ) -> Result<(), failure::Error> {
         let genesis_franklin_transaction =
-            get_ethereum_transaction(&web3, &franklin_contract_genesis_tx_hash)?;
+            get_ethereum_transaction(&self.web3, &franklin_contract_genesis_tx_hash)?;
         let genesis_governance_transaction =
-            get_ethereum_transaction(&web3, &governance_contract_genesis_tx_hash)?;
+            get_ethereum_transaction(&self.web3, &governance_contract_genesis_tx_hash)?;
 
+        // Setting genesis block number for events state
         let genesis_eth_block_number =
-            events_state.set_genesis_block_number(&genesis_governance_transaction)?;
+            self.events_state.set_genesis_block_number(&genesis_governance_transaction)?;
         info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
-        storage_interactor::save_block_events_state(&connection_pool, &vec![])?;
+        storage_interactor::save_block_events_state(&self.connection_pool, &[])?;
         storage_interactor::save_last_watched_block_number(
-            &connection_pool,
+            &self.connection_pool,
             genesis_eth_block_number,
         )?;
 
@@ -201,7 +157,7 @@ impl<T: Transport> DataRestoreDriver<T> {
 
         let account_update = AccountUpdate::Create {
             address: genesis_account.address.clone(),
-            nonce: genesis_account.nonce.clone(),
+            nonce: genesis_account.nonce,
         };
 
         let mut account_map = AccountMap::default();
@@ -222,21 +178,13 @@ impl<T: Transport> DataRestoreDriver<T> {
         info!("Genesis tree root hash: {:?}", tree_state.root_hash());
         debug!("Genesis accounts: {:?}", tree_state.get_accounts());
 
-        storage_interactor::save_genesis_tree_state(&connection_pool, account_update)?;
+        storage_interactor::save_genesis_tree_state(&self.connection_pool, account_update)?;
 
         info!("Saved genesis tree state");
 
-        Ok(Self {
-            connection_pool,
-            web3,
-            governance_contract,
-            franklin_contract,
-            run_update: false,
-            events_state,
-            tree_state,
-            eth_blocks_step,
-            end_eth_blocks_offset,
-        })
+        self.tree_state = tree_state;
+
+        Ok(())
     }
 
     /// Stops states updates by setting run_update flag to false

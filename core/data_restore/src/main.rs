@@ -1,11 +1,11 @@
 #[macro_use]
 extern crate log;
 
+pub mod contract_functions;
 pub mod data_restore_driver;
 pub mod eth_tx_helpers;
 pub mod events;
 pub mod events_state;
-pub mod genesis_state;
 pub mod rollup_ops;
 pub mod storage_interactor;
 pub mod tree_state;
@@ -42,37 +42,30 @@ fn main() {
 
     let (_event_loop, transport) =
         Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
-    let governance_addr = config_opts.governance_eth_addr.clone();
-    let governance_genesis_tx_hash = config_opts.governance_genesis_tx_hash.clone();
-    let contract_addr = config_opts.contract_eth_addr.clone();
-    let contract_genesis_tx_hash = config_opts.contract_genesis_tx_hash.clone();
+    let governance_addr = config_opts.governance_eth_addr;
+    let governance_genesis_tx_hash = config_opts.governance_genesis_tx_hash;
+    let contract_addr = config_opts.contract_eth_addr;
+    let contract_genesis_tx_hash = config_opts.contract_genesis_tx_hash;
+
+    let mut driver = DataRestoreDriver::new(
+        connection_pool,
+        transport,
+        governance_addr,
+        contract_addr,
+        ETH_BLOCKS_STEP,
+        END_ETH_BLOCKS_OFFSET,
+    ).expect("Cant create state");
 
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
-    let mut driver = if cli.is_present("genesis") {
-        DataRestoreDriver::new_with_genesis_acc(
-            connection_pool,
-            transport,
-            governance_addr,
+    if cli.is_present("genesis") {
+        driver.set_genesis_state(
             governance_genesis_tx_hash,
-            contract_addr,
-            contract_genesis_tx_hash,
-            ETH_BLOCKS_STEP,
-            END_ETH_BLOCKS_OFFSET,
-        )
-    } else {
-        DataRestoreDriver::new_empty_to_load_from_storage(
-            connection_pool,
-            transport,
-            governance_addr,
-            contract_addr,
-            ETH_BLOCKS_STEP,
-            END_ETH_BLOCKS_OFFSET,
-        )
+            contract_genesis_tx_hash
+        ).expect("Cant set genesis state");
     }
-    .expect("Cant load state");
 
     if cli.is_present("continue") {
-        load_state_from_storage(&mut driver)
+        load_state_from_storage(&mut driver);
     }
 
     update_state(&mut driver);
