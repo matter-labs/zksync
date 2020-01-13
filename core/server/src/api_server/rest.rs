@@ -2,17 +2,15 @@ use actix_cors::Cors;
 use actix_web::{
     middleware,
     web::{self},
-    App, Error as ActixError, HttpResponse, HttpServer, Result as ActixResult,
+    App, HttpResponse, HttpServer, Result as ActixResult,
 };
-use futures::channel::{mpsc, oneshot};
-use models::node::{Account, AccountAddress, AccountId, ExecutedOperations, FranklinTx};
+use futures::channel::mpsc;
+use models::node::{Account, AccountAddress, AccountId, ExecutedOperations};
 use models::NetworkStatus;
 use storage::{ConnectionPool, StorageProcessor};
 
 use crate::mempool::MempoolRequest;
 use crate::ThreadPanicNotify;
-use futures::{FutureExt, SinkExt, TryFutureExt};
-use futures01::Future as Future01;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -99,48 +97,12 @@ fn handle_get_network_status(data: web::Data<AppState>) -> ActixResult<HttpRespo
     Ok(HttpResponse::Ok().json(network_status))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct NewTxResponse {
-    hash: String,
-}
-
-fn handle_submit_tx(
-    data: web::Data<AppState>,
-    req: web::Json<FranklinTx>,
-) -> Box<dyn Future01<Item = HttpResponse, Error = ActixError>> {
-    // TODO: add timeouts
-    let response = async move {
-        let hash = req.hash();
-        let mempool_resp = oneshot::channel();
-        data.mempool_request_sender
-            .clone()
-            .send(MempoolRequest::NewTx(Box::new(req.0), mempool_resp.0))
-            .await
-            .expect("mempool channel dropped");
-        let tx_add_result = mempool_resp
-            .1
-            .await
-            .expect("mempool response channel dropped");
-
-        if let Err(e) = tx_add_result {
-            Ok(HttpResponse::NotAcceptable().body(e.to_string()))
-        } else {
-            Ok(HttpResponse::Ok().json(NewTxResponse {
-                hash: hash.to_string(),
-            }))
-        }
-    };
-
-    Box::new(response.boxed().compat())
-}
-
 #[derive(Debug, Serialize)]
 struct AccountStateResponse {
     // None if account is not created yet.
     id: Option<AccountId>,
     commited: Account,
     verified: Account,
-    pending_txs: Vec<FranklinTx>,
 }
 
 fn handle_get_account_state(
@@ -173,14 +135,10 @@ fn handle_get_account_state(
         (id, verified, committed)
     };
 
-    // TODO: ask mempool about pending txs
-    let pending_txs = Vec::new();
-
     let res = AccountStateResponse {
         id,
         commited,
         verified,
-        pending_txs,
     };
 
     Ok(HttpResponse::Ok().json(res))
@@ -420,7 +378,6 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                     )
                     .route("/testnet_config", web::get().to(handle_get_testnet_config))
                     .route("/status", web::get().to(handle_get_network_status))
-                    .route("/submit_tx", web::post().to(handle_submit_tx))
                     .route(
                         "/account/{address}",
                         web::get().to(handle_get_account_state),

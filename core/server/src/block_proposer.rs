@@ -2,12 +2,10 @@ use crate::mempool::{GetBlockRequest, MempoolRequest, ProposedBlock};
 use crate::state_keeper::StateKeeperRequest;
 use futures::channel::{mpsc, oneshot};
 use futures::SinkExt;
+use models::node::config::TX_MINIBATCH_CREATE_TIME;
 use models::params::block_size_chunks;
-use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::time;
-
-const TX_MINIBATCH_CREATE_TIME: Duration = Duration::from_millis(200);
 
 fn create_mempool_req(
     last_priority_op_number: u64,
@@ -34,7 +32,6 @@ struct BlockProposer {
 
 impl BlockProposer {
     async fn propose_new_block(&mut self) -> ProposedBlock {
-        // TODO: normal number
         let (mempool_req, resp) =
             create_mempool_req(self.current_priority_op_number, block_size_chunks());
         self.mempool_requests
@@ -42,8 +39,7 @@ impl BlockProposer {
             .await
             .expect("mempool receiver dropped");
 
-        // TODO: unwrap
-        resp.await.unwrap()
+        resp.await.expect("Mempool new block request failed")
     }
 
     async fn commit_new_tx_mini_batch(&mut self) {
@@ -63,8 +59,6 @@ pub fn run_block_proposer_task(
     mut statekeeper_requests: mpsc::Sender<StateKeeperRequest>,
     runtime: &Runtime,
 ) {
-    // TODO: proper const
-
     runtime.spawn(async move {
         let mut timer = time::interval(TX_MINIBATCH_CREATE_TIME);
 
