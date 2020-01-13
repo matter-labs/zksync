@@ -2,7 +2,10 @@ use crate::eth_watch::ETHState;
 use failure::Fail;
 use futures::channel::{mpsc, oneshot};
 use futures::StreamExt;
-use models::node::{AccountAddress, FranklinTx, Nonce, PriorityOp, TransferOp, TransferToNewOp};
+use models::node::{
+    AccountAddress, AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp,
+    TransferOp, TransferToNewOp,
+};
 use models::params::block_size_chunks;
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
@@ -43,15 +46,15 @@ pub struct GetBlockRequest {
 }
 
 pub enum MempoolRequest {
-    // TODO: new tx add response
     NewTx(Box<FranklinTx>, oneshot::Sender<Result<(), TxAddError>>),
+    UpdateNonces(AccountUpdates),
     GetBlock(GetBlockRequest),
 }
 
 struct MempoolState {
     // account and last committed nonce
-    // TODO: update this mapping
     account_nonces: HashMap<AccountAddress, Nonce>,
+    account_ids: HashMap<AccountId, AccountAddress>,
     ready_txs: VecDeque<FranklinTx>,
 }
 
@@ -74,12 +77,18 @@ impl MempoolState {
         let (_, accounts) = storage
             .load_committed_state(None)
             .expect("mempool account state load");
-        let account_nonces = accounts
-            .into_iter()
-            .map(|(_, acc)| (acc.address, acc.nonce))
-            .collect();
+
+        let mut account_ids = HashMap::new();
+        let mut account_nonces = HashMap::new();
+
+        for (id, account) in accounts {
+            account_ids.insert(id, account.address.clone());
+            account_nonces.insert(account.address, account.nonce);
+        }
+
         Self {
             account_nonces,
+            account_ids,
             ready_txs: VecDeque::new(),
         }
     }
@@ -125,6 +134,29 @@ impl Mempool {
                         .response_sender
                         .send(self.propose_new_block(block.last_priority_op_number))
                         .expect("mempool response send");
+                }
+                MempoolRequest::UpdateNonces(updates) => {
+                    for (id, update) in updates {
+                        match update {
+                            AccountUpdate::Create { address, nonce } => {
+                                self.mempool_state.account_ids.insert(id, address.clone());
+                                self.mempool_state.account_nonces.insert(address, nonce);
+                            }
+                            AccountUpdate::Delete { address, .. } => {
+                                self.mempool_state.account_ids.remove(&id);
+                                self.mempool_state.account_nonces.remove(&address);
+                            }
+                            AccountUpdate::UpdateBalance { new_nonce, .. } => {
+                                if let Some(address) = self.mempool_state.account_ids.get(&id) {
+                                    if let Some(nonce) =
+                                        self.mempool_state.account_nonces.get_mut(address)
+                                    {
+                                        *nonce = new_nonce;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
