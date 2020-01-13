@@ -227,7 +227,11 @@ contract Franklin {
 
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
     /// @dev WARNING: Only for Exodus mode
-    function cancelOutstandingDepositsForExodusMode() internal {
+    function cancelOutstandingDepositsForExodusMode() external {
+        require(
+            exodusMode,
+            "frс11"
+        ); // frс11 - exodus mode is not activated
         bytes memory depositsPubData = priorityQueue.getOutstandingDeposits();
         uint64 i = 0;
         while (i < depositsPubData.length) {
@@ -839,7 +843,6 @@ contract Franklin {
     function triggerExodusIfNeeded() internal returns (bool) {
         if (priorityQueue.triggerExodusIfNeeded()) {
             exodusMode = true;
-            cancelOutstandingDepositsForExodusMode();
             emit ExodusMode();
             return true;
         } else {

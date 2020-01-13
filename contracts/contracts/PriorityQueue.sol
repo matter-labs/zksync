@@ -46,6 +46,9 @@ contract PriorityQueue {
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 4 * 60 * 24; // One day
 
+    /// @notice Maximum number of outstanding deposits to be canceled in one call
+    uint64 constant MAX_OUTSTANDING_DEPOSITS_TO_CANCEL_IN_ONE_CALL = 70;
+
     /// @notice New priority request event. Emitted when a request is placed into mapping
     event NewPriorityRequest(
         uint64 serialId,
@@ -156,14 +159,27 @@ contract PriorityQueue {
         return totalFee;
     }
 
-    /// @notice Concates open (outstanding) deposit requests public data
+    /// @notice Concates open (outstanding) deposit requests public data up to defined deposits number
+    /// @dev Deletes processed requests
     /// @return concated deposits public data
-    function getOutstandingDeposits() external view returns (bytes memory depositsPubData) {
-        for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + totalOpenPriorityRequests; i++) {
+    function getOutstandingDeposits() external returns (bytes memory depositsPubData) {
+        requireFranklin();
+        require(
+            totalOpenPriorityRequests > 0,
+            "pgs11"
+        ); // pgs11 - no one priority request left
+        uint64 k = 0; // Number of outstanding deposits
+        uint64 i = firstPriorityRequestId;
+        while(k < MAX_OUTSTANDING_DEPOSITS_TO_CANCEL_IN_ONE_CALL && i < firstPriorityRequestId + totalOpenPriorityRequests) {
             if (priorityRequests[i].opType == DEPOSIT_OP) {
                 depositsPubData = Bytes.concat(depositsPubData, priorityRequests[i].pubData);
+                k++;
             }
+            delete priorityRequests[i];
+            i++;
         }
+        firstPriorityRequestId += i - firstPriorityRequestId;
+        totalOpenPriorityRequests -= i - firstPriorityRequestId;
     }
 
     /// @notice Compares Rollup operation with corresponding priority requests' operation
