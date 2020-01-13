@@ -17,7 +17,6 @@ steps:
       - ./contracts/node_modules
       - ./js/client/node_modules
       - ./js/explorer/node_modules
-      - ./js/franklin_lib/node_modules
       - ./target/cargo
       - ./keys
 
@@ -99,7 +98,6 @@ steps:
       - ./contracts/node_modules
       - ./js/client/node_modules
       - ./js/explorer/node_modules
-      - ./js/franklin_lib/node_modules
       - ./target/cargo
       - ./keys
   depends_on:
