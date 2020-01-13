@@ -6,7 +6,7 @@ use tokio::runtime::Runtime;
 // Workspace uses
 use crate::mempool::ProposedBlock;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::tx::FranklinTx;
+use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
     Account, AccountAddress, AccountId, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
 };
@@ -16,10 +16,16 @@ use plasma::state::{OpSuccess, PlasmaState};
 use std::collections::VecDeque;
 use storage::ConnectionPool;
 
+pub enum ExecutedOpId {
+    Transaction(TxHash),
+    PriorityOp(u64),
+}
+
 pub enum StateKeeperRequest {
     GetAccount(AccountAddress, oneshot::Sender<Option<Account>>),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
+    GetExecutedInPendingBlock(ExecutedOpId, oneshot::Sender<Option<(BlockNumber, bool)>>),
 }
 
 pub struct ExecutedOpsNotify {
@@ -164,6 +170,10 @@ impl PlasmaStateKeeper {
                 }
                 StateKeeperRequest::ExecuteMiniBlock(proposed_block) => {
                     self.execute_tx_batch(proposed_block).await;
+                }
+                StateKeeperRequest::GetExecutedInPendingBlock(op_id, sender) => {
+                    let result = self.check_executed_in_pending_block(op_id);
+                    sender.send(result).unwrap_or_default();
                 }
             }
         }
@@ -362,6 +372,37 @@ impl PlasmaStateKeeper {
             .send(commit_request)
             .await
             .expect("committer receiver dropped");
+    }
+
+    fn check_executed_in_pending_block(&self, op_id: ExecutedOpId) -> Option<(BlockNumber, bool)> {
+        let current_block_number = self.state.block_number;
+        match op_id {
+            ExecutedOpId::Transaction(hash) => {
+                for op in &self.pending_block.success_operations {
+                    if let ExecutedOperations::Tx(exec_tx) = op {
+                        if exec_tx.tx.hash() == hash {
+                            return Some((current_block_number, true));
+                        }
+                    }
+                }
+
+                for failed_tx in &self.pending_block.failed_txs {
+                    if failed_tx.tx.hash() == hash {
+                        return Some((current_block_number, false));
+                    }
+                }
+            }
+            ExecutedOpId::PriorityOp(serial_id) => {
+                for op in &self.pending_block.success_operations {
+                    if let ExecutedOperations::PriorityOp(exec_op) = op {
+                        if exec_op.priority_op.serial_id == serial_id {
+                            return Some((current_block_number, true));
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 
     fn account(&self, address: &AccountAddress) -> Option<Account> {

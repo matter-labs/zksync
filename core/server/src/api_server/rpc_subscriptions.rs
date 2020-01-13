@@ -188,7 +188,7 @@ pub fn start_ws_server(
 
     let req_rpc_app = super::rpc_server::RpcApp {
         mempool_request_sender,
-        state_keeper_request_sender,
+        state_keeper_request_sender: state_keeper_request_sender.clone(),
         connection_pool: db_pool.clone(),
     };
     req_rpc_app.extend(&mut io);
@@ -202,6 +202,7 @@ pub fn start_ws_server(
         op_recv,
         event_sub_receiver,
         executed_tx_receiver,
+        state_keeper_request_sender.clone(),
         panic_notify.clone(),
     );
 
