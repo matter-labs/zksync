@@ -58,9 +58,6 @@ contract Franklin {
     /// @notice Base gas for full exit transaction
     uint256 constant BASE_FULL_EXIT_GAS = 170000;
 
-    /// @notice Max amount of any token must fit into uint128
-    uint256 constant MAX_VALUE = 2 ** 112 - 1;
-
     /// @notice ETH blocks verification expectation
     uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
 
@@ -293,11 +290,6 @@ contract Franklin {
             msg.value >= fee + _amount,
             "fdh11"
         ); // fdh11 - Not enough ETH provided
-        
-        require(
-            _amount <= MAX_VALUE,
-            "fdh12"
-        ); // fdh12 - deposit amount value is heigher than Franklin is able to process
 
         if (msg.value != fee + _amount) {
             msg.sender.transfer(msg.value-(fee + _amount));
