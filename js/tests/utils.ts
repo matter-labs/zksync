@@ -1,4 +1,4 @@
-import ethers = require('ethers');
+const ethers = require('ethers');
 const zksync = require('zksync');
 
 export function isPowerOfTwo(n: number): boolean {
