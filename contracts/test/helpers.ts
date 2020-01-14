@@ -66,10 +66,10 @@ export function createWithdrawPublicData(tokenId, hexAmount: string, ethAddress:
     return Buffer.concat([txId, accountId, tokenBytes, pad1Bytes, amountBytes, feeBytes, addressBytes, pad2Bytes]);
 }
 
-export function createFullExitPublicData(ethAddress: string, tokenId, hexAmount: string): Buffer {
+export function createFullExitPublicData(accId, ethAddress: string, tokenId, hexAmount: string): Buffer {
     const txId = Buffer.from("06", "hex");
     const accountId = Buffer.alloc(3, 0);
-    accountId.writeUIntBE(2, 0, 3);
+    accountId.writeUIntBE(accId, 0, 3);
     const pubkeyBytes = Buffer.alloc(32, 0);
     if (ethAddress.charAt(0) === "0" && ethAddress.charAt(1) === "x") {
         ethAddress = ethAddress.substr(2);

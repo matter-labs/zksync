@@ -60,7 +60,7 @@ describe("PLANNED FAILS", function() {
                 priorityQueueDeployedContract.address,
                 wallet.address,
                 ethers.constants.HashZero,
-            ]
+            ],
         );
         await governanceDeployedContract.setValidator(wallet.address, true);
         erc20DeployedToken1 = await addTestERC20Token(wallet, governanceDeployedContract);
