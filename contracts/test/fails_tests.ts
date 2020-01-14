@@ -637,7 +637,7 @@ describe("PLANNED FAILS", function() {
         const code1 = await provider.call(prTx2, prTx2.blockNumber);
         const reason1 = hex_to_ascii(code1.substr(138));
         
-        expect(reason1.substring(0, 5)).equal("pcs21");
+        expect(reason1.substring(0, 5)).equal("pcs11");
         console.log(" + Set franklin address twice will not work passed");
     });
 });
