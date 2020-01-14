@@ -334,30 +334,46 @@ describe("PLANNED FAILS", function() {
         const verifyReceipt = await verifyTx.wait();
         expect(verifyReceipt.events.pop().args.blockNumber).equal(1);
 
-        // Getting exodus mode revert code
-        const exodusTx = await franklinDeployedContract.commitBlock(2, 22,
+        // Get commit exodus mode revert code
+        const exodusCommitTx = await franklinDeployedContract.commitBlock(2, 22,
             Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
             noopBlockPublicData,
             {
                 gasLimit: bigNumberify("500000"),
             },
         );
-        const exodusReceipt = await exodusTx.wait()
+        const exodusCommitReceipt = await exodusCommitTx.wait()
         .catch(() => {});
 
-        const code = await provider.call(exodusTx, exodusTx.blockNumber);
-        const reason = hex_to_ascii(code.substr(138));
+        const codeCommitExodus = await provider.call(exodusCommitTx, exodusCommitTx.blockNumber);
+        const reasonCommitExodus = hex_to_ascii(codeCommitExodus.substr(138));
 
-        expect(reason.substring(0, 5)).equal("fre11");
+        expect(reasonCommitExodus.substring(0, 5)).equal("fre11");
 
-        console.log("Got exodus mode tx revert code");
+        console.log("Got exodus mode commit tx revert code");
 
-        // Get exodus event
-        const events = exodusReceipt.events;
-        const exodusEvent = events[0];
-        expect(exodusEvent.event).equal("ExodusMode");
+        // Get commit exodus event
+        const eventsCommitExodus = exodusCommitReceipt.events;
+        const exodusCommitEvent = eventsCommitExodus[0];
+        expect(exodusCommitEvent.event).equal("ExodusMode");
 
-        console.log("Got exodus event");
+        console.log("Got commit exodus event");
+
+        // Get deposit
+        const exodusDepositTx = await franklinDeployedContract.depositETH(
+            depositExodusAmount,
+            franklinAddressBinary,
+            {value: depositExodusValue, gasLimit: bigNumberify("8000000")},
+        );
+        const exodusDepositReceipt = await exodusDepositTx.wait()
+        .catch(() => {});
+
+        const codeDepositExodus = await provider.call(exodusDepositTx, exodusDepositTx.blockNumber);
+        const reasonDepositExodus = hex_to_ascii(codeDepositExodus.substr(138));
+
+        expect(reasonDepositExodus.substring(0, 5)).equal("fre11");
+
+        console.log("Got exodus mode deposit tx revert code");
 
         // Check balance to be nill
         let balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
