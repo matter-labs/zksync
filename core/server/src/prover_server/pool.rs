@@ -47,6 +47,31 @@ impl ProversDataPool {
     fn all_prepared(&self) -> bool {
         self.last_loaded == self.last_prepared
     }
+
+    fn store_to_prove(&mut self, op: models::Operation) {
+        let block = op.block.block_number as i64;
+        self.last_loaded = block;
+        self.operations.insert(block, op);
+    }
+
+    fn take_next_to_prove(&mut self) -> Result<models::Operation, String> {
+        if self.last_prepared == 0 {
+            // Pool restart or first ever take.
+            // Handling restart case by setting proper value for `last_prepared`.
+            let mut first_from_loaded = 0;
+            for key in self.operations.keys() {
+                if first_from_loaded == 0 || *key < first_from_loaded {
+                    first_from_loaded = *key;
+                }
+            }
+            self.last_prepared = first_from_loaded - 1
+        }
+        let next = self.last_prepared + 1;
+        match self.operations.remove(&next) {
+            Some(v) => Ok(v),
+            None => Err("data is inconsistent".to_owned()),
+        }
+    }
 }
 
 pub fn maintain(
@@ -90,9 +115,7 @@ fn take_next_commits(
     if !ops.is_empty() {
         let mut d = data.write().expect("failed to acquire a lock");
         for op in ops.into_iter() {
-            let block = op.block.block_number as i64;
-            (*d).operations.insert(block, op);
-            (*d).last_loaded = block;
+            (*d).store_to_prove(op)
         }
     }
 
@@ -112,8 +135,7 @@ fn prepare_next(
 ) -> Result<(), String> {
     let op = {
         let mut d = data.write().expect("failed to acquire a lock");
-        let current = (*d).last_prepared + 1;
-        d.operations.remove(&current).expect("data is inconsistent")
+        d.take_next_to_prove()?
     };
     let storage = conn_pool.access_storage().expect("failed to connect to db");
     let pd = build_prover_data(&storage, &op, phasher, params)?;
