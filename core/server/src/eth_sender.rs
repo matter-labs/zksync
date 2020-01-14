@@ -26,7 +26,7 @@ use web3::Transport;
 // Workspace deps
 use crate::{ConfigurationOptions, ThreadPanicNotify};
 use eth_client::{ETHClient, SignedCallResult};
-use models::abi::FRANKLIN_CONTRACT;
+use models::abi::zksync_contract;
 use models::{Action, ActionType, Operation};
 use storage::{ConnectionPool, StorageETHOperation};
 use tokio::runtime::Runtime;
@@ -416,14 +416,9 @@ pub fn start_eth_sender(
             let (_event_loop, transport) =
                 Http::new(&config_options.web3_url).expect("failed to start web3 transport");
 
-            let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
             let eth_client = ETHClient::new(
                 transport,
-                abi_string,
+                zksync_contract(),
                 config_options.operator_eth_addr,
                 config_options.operator_private_key,
                 config_options.contract_eth_addr,

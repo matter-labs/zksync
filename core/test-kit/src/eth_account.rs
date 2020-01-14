@@ -2,15 +2,15 @@ use bigdecimal::BigDecimal;
 use eth_client::ETHClient;
 use failure::{ensure, format_err};
 use futures::compat::Future01CompatExt;
-use models::abi::FRANKLIN_CONTRACT;
+use models::abi::{erc20_contract, zksync_contract};
 use models::node::block::Block;
 use models::node::{AccountAddress, PriorityOp, TokenId, U128};
 use server::ConfigurationOptions;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
-use web3::contract::Options;
-use web3::types::{Address, TransactionReceipt, H256, U256};
+use web3::contract::{Contract, Options};
+use web3::types::{Address, CallRequest, TransactionReceipt, H256, U256, U64};
 use web3::Transport;
 
 pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
@@ -60,14 +60,9 @@ impl<T: Transport> EthereumAccount<T> {
         contract_address: Address,
         config: &ConfigurationOptions,
     ) -> Self {
-        let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
-            .unwrap()
-            .get("abi")
-            .unwrap()
-            .to_string();
         let main_contract_eth_client = ETHClient::new(
             transport,
-            abi_string,
+            zksync_contract(),
             address.clone(),
             private_key.clone(),
             contract_address,
@@ -85,7 +80,6 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn deposit_eth(
         &self,
         amount: BigDecimal,
-        fee: BigDecimal,
         to: &AccountAddress,
     ) -> Result<PriorityOp, failure::Error> {
         let signed_tx = self
@@ -98,7 +92,7 @@ impl<T: Transport> EthereumAccount<T> {
                 }),
             )
             .await
-            .map_err(|e| format_err!("Deposit send err: {}", e))?;
+            .map_err(|e| format_err!("Deposit eth send err: {}", e))?;
         let receipt = self
             .main_contract_eth_client
             .web3
@@ -109,7 +103,8 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .compat()
             .await
-            .map_err(|e| format_err!("Deposit wait confirm err: {}", e))?;
+            .map_err(|e| format_err!("Deposit eth wait confirm err: {}", e))?;
+        ensure!(receipt.status == Some(U64::from(1)), "eth deposit fail");
         Ok(receipt
             .logs
             .into_iter()
@@ -128,6 +123,108 @@ impl<T: Transport> EthereumAccount<T> {
                 .compat()
                 .await?,
         ))
+    }
+
+    pub async fn erc20_balance(
+        &self,
+        token_contract: &Address,
+    ) -> Result<BigDecimal, failure::Error> {
+        let contract = Contract::new(
+            self.main_contract_eth_client.web3.eth(),
+            token_contract.clone(),
+            erc20_contract(),
+        );
+        contract
+            .query("balanceOf", (self.address), None, Options::default(), None)
+            .compat()
+            .await
+            .map(u256_to_big_dec)
+            .map_err(|e| format_err!("Contract query fail: {}", e))
+    }
+
+    pub async fn approve_erc20(
+        &self,
+        token_contract: Address,
+        amount: BigDecimal,
+    ) -> Result<(), failure::Error> {
+        let erc20_client = ETHClient::new(
+            self.main_contract_eth_client.web3.transport().clone(),
+            erc20_contract(),
+            self.address.clone(),
+            self.private_key.clone(),
+            token_contract,
+            self.main_contract_eth_client.chain_id,
+            self.main_contract_eth_client.gas_price_factor,
+        );
+
+        let signed_tx = erc20_client
+            .sign_call_tx(
+                "approve",
+                (
+                    self.main_contract_eth_client.contract_addr,
+                    big_dec_to_u256(amount.clone()),
+                ),
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("Approve send err: {}", e))?;
+        let receipt = self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("Approve wait confirm err: {}", e))?;
+
+        ensure!(receipt.status == Some(U64::from(1)), "erc20 approve fail");
+
+        Ok(())
+    }
+
+    pub async fn deposit_erc20(
+        &self,
+        token_contract: Address,
+        amount: BigDecimal,
+        to: &AccountAddress,
+    ) -> Result<PriorityOp, failure::Error> {
+        self.approve_erc20(token_contract, amount.clone()).await?;
+
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "depositERC20",
+                (
+                    token_contract,
+                    big_dec_to_u256(amount.clone()),
+                    to.data.to_vec(),
+                ),
+                Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
+            )
+            .await
+            .map_err(|e| format_err!("Deposit erc20 send err: {}", e))?;
+        let receipt = self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("Deposit erc20 wait confirm err: {}", e))?;
+        ensure!(receipt.status == Some(U64::from(1)), "erc20 deposit fail");
+        Ok(receipt
+            .logs
+            .into_iter()
+            .map(PriorityOp::try_from)
+            .filter_map(|op| op.ok())
+            .next()
+            .expect("no priority op log in deposit"))
     }
 
     pub async fn commit_block(&self, block: &Block) -> Result<TransactionReceipt, failure::Error> {

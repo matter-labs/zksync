@@ -4,11 +4,13 @@ use models::node::{
     priv_key_from_fs, AccountAddress, Nonce, PrivateKey, PublicKey, TokenId, Transfer, Withdraw,
 };
 use rand::{thread_rng, Rng};
+use std::cell::RefCell;
 use web3::types::Address;
 
 pub struct ZksyncAccount {
     pub private_key: PrivateKey,
     pub address: AccountAddress,
+    nonce: RefCell<Nonce>,
 }
 
 impl ZksyncAccount {
@@ -16,13 +18,14 @@ impl ZksyncAccount {
         let mut rng = &mut thread_rng();
 
         let pk = priv_key_from_fs(rng.gen());
-        Self::new(pk)
+        Self::new(pk, 0)
     }
 
-    pub fn new(private_key: PrivateKey) -> Self {
+    pub fn new(private_key: PrivateKey, nonce: Nonce) -> Self {
         Self {
             address: AccountAddress::from_privkey(&private_key),
             private_key,
+            nonce: RefCell::new(nonce),
         }
     }
     pub fn sign_transfer(
@@ -31,7 +34,6 @@ impl ZksyncAccount {
         amount: BigDecimal,
         fee: BigDecimal,
         to: &AccountAddress,
-        nonce: Nonce,
     ) -> Transfer {
         let mut transfer = Transfer {
             from: self.address.clone(),
@@ -39,11 +41,13 @@ impl ZksyncAccount {
             token: token_id,
             amount,
             fee,
-            nonce,
+            nonce: *self.nonce.borrow(),
             signature: TxSignature::default(),
         };
         transfer.signature =
             TxSignature::sign_musig_pedersen(&self.private_key, &transfer.get_bytes());
+
+        *self.nonce.borrow_mut() += 1;
         transfer
     }
 
@@ -53,7 +57,6 @@ impl ZksyncAccount {
         amount: BigDecimal,
         fee: BigDecimal,
         eth_address: &Address,
-        nonce: Nonce,
     ) -> Withdraw {
         let mut withdraw = Withdraw {
             account: self.address.clone(),
@@ -61,11 +64,13 @@ impl ZksyncAccount {
             token: token_id,
             amount,
             fee,
-            nonce,
+            nonce: *self.nonce.borrow(),
             signature: TxSignature::default(),
         };
         withdraw.signature =
             TxSignature::sign_musig_pedersen(&self.private_key, &withdraw.get_bytes());
+
+        *self.nonce.borrow_mut() += 1;
         withdraw
     }
 }

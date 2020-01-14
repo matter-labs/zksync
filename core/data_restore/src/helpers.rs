@@ -5,12 +5,11 @@ use std::str::FromStr;
 use ethabi::Contract;
 use failure::format_err;
 use lazy_static::lazy_static;
-use serde_json;
+use models::abi::zksync_contract;
 use web3::futures::Future;
 use web3::types::{Address, H256};
 use web3::types::{Transaction, TransactionId};
 // Workspace deps
-use models::abi::FRANKLIN_CONTRACT;
 
 pub const FUNC_NAME_HASH_LENGTH: usize = 4;
 
@@ -36,15 +35,9 @@ pub struct DataRestoreConfig {
 impl DataRestoreConfig {
     /// Return the configuration for setted Infura web3 endpoint
     pub fn from_env() -> Self {
-        let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
-            .expect("Cant get plasma contract")
-            .get("abi")
-            .expect("Cant get plasma contract abi")
-            .to_string();
         Self {
             web3_endpoint: env::var("WEB3_URL").expect("WEB3_URL env missing"), //"https://rinkeby.infura.io/".to_string(),
-            franklin_contract: ethabi::Contract::load(abi_string.as_bytes())
-                .expect("Cant get plasma contract in data restore config"),
+            franklin_contract: zksync_contract(),
             franklin_contract_address: env::var("CONTRACT_ADDR")
                 .expect("CONTRACT_ADDR env missing")
                 .as_str()

@@ -88,12 +88,6 @@ async function main() {
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
 
         const erc20 = await addTestERC20Token(wallet, governance);
-
-        await wallet.sendTransaction({
-            to: testWallet.address,
-            value: ethers.utils.parseEther("10.0"),
-        })
-        .catch(e => console.log('Failed to send ether:', e.message));
         await mintTestERC20Token(testWallet, erc20);
     }
 
