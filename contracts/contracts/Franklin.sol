@@ -224,6 +224,8 @@ contract Franklin {
 
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
     /// @dev WARNING: Only for Exodus mode
+    /// @dev Canceling may take several separate transactions to be completed
+    /// @dev getOutstandingDeposits returns only limited number of deposits so as not to go beyond the block gas limit
     function cancelOutstandingDepositsForExodusMode() external {
         require(
             exodusMode,

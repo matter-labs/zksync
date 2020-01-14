@@ -160,8 +160,8 @@ contract PriorityQueue {
     }
 
     /// @notice Concates open (outstanding) deposit requests public data up to defined deposits number
-    /// @dev Deletes processed requests
-    /// @return concated deposits public data
+    /// @dev Deletes processed requests. Number of request is determined in MAX_OUTSTANDING_DEPOSITS_TO_CANCEL_IN_ONE_CALL
+    /// @return concated deposits public data for limited number of deposits so as not to go beyond the block gas limit in the caller function
     function getOutstandingDeposits() external returns (bytes memory depositsPubData) {
         requireFranklin();
         require(
