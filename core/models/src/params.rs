@@ -50,6 +50,7 @@ pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
 pub const BALANCE_BIT_WIDTH: usize = 128;
 
 pub const NEW_PUBKEY_HASH_WIDTH: usize = FR_ADDRESS_LEN * 8;
+pub const ADDRESS_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //

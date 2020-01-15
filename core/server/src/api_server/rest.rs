@@ -5,7 +5,7 @@ use actix_web::{
     App, HttpResponse, HttpServer, Result as ActixResult,
 };
 use futures::channel::mpsc;
-use models::node::{Account, AccountAddress, AccountId, ExecutedOperations};
+use models::node::{Account, AccountId, ExecutedOperations, PubKeyHash};
 use models::NetworkStatus;
 use storage::{ConnectionPool, StorageProcessor};
 
@@ -15,7 +15,7 @@ use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::{runtime::Runtime, time};
-use web3::types::H160;
+use web3::types::{Address, H160};
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
@@ -106,7 +106,7 @@ struct AccountStateResponse {
 
 fn handle_get_account_state(
     data: web::Data<AppState>,
-    account_address: web::Path<AccountAddress>,
+    account_address: web::Path<Address>,
 ) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
 
@@ -115,7 +115,7 @@ fn handle_get_account_state(
             .account_state_by_address(&account_address)
             .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-        let empty_state = |address: &AccountAddress| {
+        let empty_state = |address: &Address| {
             let mut acc = Account::default();
             acc.address = address.clone();
             acc
@@ -157,7 +157,7 @@ fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
 
 fn handle_get_account_transactions(
     data: web::Data<AppState>,
-    address: web::Path<AccountAddress>,
+    address: web::Path<PubKeyHash>,
 ) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
     let txs = storage
@@ -168,7 +168,7 @@ fn handle_get_account_transactions(
 
 fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
-    request_path: web::Path<(AccountAddress, i64, i64)>,
+    request_path: web::Path<(PubKeyHash, i64, i64)>,
 ) -> ActixResult<HttpResponse> {
     let (address, offset, limit) = request_path.into_inner();
 

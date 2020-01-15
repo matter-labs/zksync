@@ -343,55 +343,56 @@ fn build_prover_data(
                 pub_data.extend(close_account_witness.get_pubdata());
             }
             models::node::FranklinOp::FullExit(full_exit) => {
-                let is_full_exit_success = full_exit.withdraw_amount.is_some();
-                let full_exit_witness = circuit::witness::full_exit::apply_full_exit_tx(
-                    &mut accounts_tree,
-                    &full_exit,
-                    is_full_exit_success,
-                );
-
-                let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(
-                    full_exit.priority_op.signature_r.as_ref(),
-                )
-                .iter()
-                .map(|x| Some(*x))
-                .collect();
-                let s_bits: Vec<_> = models::primitives::bytes_into_be_bits(
-                    full_exit.priority_op.signature_s.as_ref(),
-                )
-                .iter()
-                .map(|x| Some(*x))
-                .collect();
-                let signature = SignatureData {
-                    r_packed: r_bits,
-                    s: s_bits,
-                };
-                let sig_bits: Vec<bool> =
-                    models::primitives::bytes_into_be_bits(&full_exit.priority_op.get_bytes());
-
-                let (first_sig_msg, second_sig_msg, third_sig_msg) =
-                    circuit::witness::utils::generate_sig_witness(&sig_bits, &phasher, &params);
-                let signer_packed_key_bytes = full_exit.priority_op.packed_pubkey.to_vec();
-                let signer_packed_key_bits: Vec<_> =
-                    models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
-                        .iter()
-                        .map(|x| Some(*x))
-                        .collect();
-
-                let full_exit_operations =
-                    circuit::witness::full_exit::calculate_full_exit_operations_from_witness(
-                        &full_exit_witness,
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature,
-                        &signer_packed_key_bits,
-                    );
-                operations.extend(full_exit_operations);
-                pub_data.extend(full_exit_witness.get_pubdata(
-                    &signature,
-                    &models::primitives::bytes_into_be_bits(&signer_packed_key_bytes),
-                ));
+                unimplemented!()
+                //                let is_full_exit_success = full_exit.withdraw_amount.is_some();
+                //                let full_exit_witness = circuit::witness::full_exit::apply_full_exit_tx(
+                //                    &mut accounts_tree,
+                //                    &full_exit,
+                //                    is_full_exit_success,
+                //                );
+                //
+                //                let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(
+                //                    full_exit.priority_op.signature_r.as_ref(),
+                //                )
+                //                .iter()
+                //                .map(|x| Some(*x))
+                //                .collect();
+                //                let s_bits: Vec<_> = models::primitives::bytes_into_be_bits(
+                //                    full_exit.priority_op.signature_s.as_ref(),
+                //                )
+                //                .iter()
+                //                .map(|x| Some(*x))
+                //                .collect();
+                //                let signature = SignatureData {
+                //                    r_packed: r_bits,
+                //                    s: s_bits,
+                //                };
+                //                let sig_bits: Vec<bool> =
+                //                    models::primitives::bytes_into_be_bits(&full_exit.priority_op.get_bytes());
+                //
+                //                let (first_sig_msg, second_sig_msg, third_sig_msg) =
+                //                    circuit::witness::utils::generate_sig_witness(&sig_bits, &phasher, &params);
+                //                let signer_packed_key_bytes = full_exit.priority_op.packed_pubkey.to_vec();
+                //                let signer_packed_key_bits: Vec<_> =
+                //                    models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
+                //                        .iter()
+                //                        .map(|x| Some(*x))
+                //                        .collect();
+                //
+                //                let full_exit_operations =
+                //                    circuit::witness::full_exit::calculate_full_exit_operations_from_witness(
+                //                        &full_exit_witness,
+                //                        &first_sig_msg,
+                //                        &second_sig_msg,
+                //                        &third_sig_msg,
+                //                        &signature,
+                //                        &signer_packed_key_bits,
+                //                    );
+                //                operations.extend(full_exit_operations);
+                //                pub_data.extend(full_exit_witness.get_pubdata(
+                //                    &signature,
+                //                    &models::primitives::bytes_into_be_bits(&signer_packed_key_bytes),
+                //                ));
             }
             _ => {}
         }

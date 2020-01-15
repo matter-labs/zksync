@@ -413,6 +413,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
+            address: unimplemented!(),
         };
 
         let mut validator_balances = vec![];
@@ -482,6 +483,7 @@ mod test {
             subtree: from_balance_tree,
             nonce: Fr::zero(),
             pub_key_hash: from_pub_key_hash,
+            address: unimplemented!(),
         };
 
         to_balance_tree.insert(
@@ -494,6 +496,7 @@ mod test {
             subtree: to_balance_tree,
             nonce: Fr::zero(),
             pub_key_hash: to_pub_key_hash,
+            address: unimplemented!(),
         };
         tree.insert(from_leaf_number, from_leaf_initial);
         tree.insert(to_leaf_number, to_leaf_initial);

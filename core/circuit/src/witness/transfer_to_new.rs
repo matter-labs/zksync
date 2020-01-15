@@ -128,7 +128,7 @@ pub fn apply_transfer_to_new_tx(
     tree: &mut CircuitAccountTree,
     transfer_to_new: &TransferToNewOp,
 ) -> TransferToNewWitness<Bn256> {
-    let new_pubkey_hash = transfer_to_new.tx.to.to_fr();
+    let new_pubkey_hash = unimplemented!();
 
     let transfer_data = TransferToNewData {
         amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),
@@ -528,6 +528,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
+            address: unimplemented!(),
         };
 
         let mut validator_balances = vec![];
@@ -567,6 +568,7 @@ mod test {
             subtree: from_balance_tree,
             nonce: Fr::zero(),
             pub_key_hash: from_pub_key_hash,
+            address: unimplemented!(),
         };
 
         tree.insert(from_leaf_number, from_leaf_initial);

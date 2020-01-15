@@ -43,8 +43,9 @@ use std::env;
 use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
 
 use itertools::Itertools;
-use models::node::AccountAddress;
+use models::node::PubKeyHash;
 use std::collections::HashMap;
+use web3::types::Address;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
@@ -345,18 +346,14 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
                 upd.account_id as u32,
                 AccountUpdate::Create {
                     nonce: upd.nonce as u32,
-                    address: AccountAddress {
-                        data: upd.address.as_slice().try_into().unwrap(),
-                    },
+                    address: Address::from_slice(&upd.address.as_slice()),
                 },
             ),
             StorageAccountDiff::Delete(upd) => (
                 upd.account_id as u32,
                 AccountUpdate::Delete {
                     nonce: upd.nonce as u32,
-                    address: AccountAddress {
-                        data: upd.address.as_slice().try_into().unwrap(),
-                    },
+                    address: Address::from_slice(&upd.address.as_slice()),
                 },
             ),
         }
@@ -704,7 +701,7 @@ fn restore_account(
         account.set_balance(b.coin_id as TokenId, b.balance);
     }
     account.nonce = stored_account.nonce as u32;
-    account.address = AccountAddress {
+    account.pub_key_hash = PubKeyHash {
         data: stored_account.address.as_slice().try_into().unwrap(),
     };
     (stored_account.id as u32, account)
@@ -794,7 +791,7 @@ impl StorageProcessor {
                     diesel::insert_into(mempool::table)
                         .values(&InsertTx {
                             hash: tx.tx.hash().as_ref().to_vec(),
-                            primary_account_address: tx.tx.account().data.to_vec(),
+                            primary_account_address: tx.tx.account().as_bytes().to_vec(),
                             nonce: tx.tx.nonce() as i64,
                             tx: serde_json::to_value(&tx.tx).unwrap_or_default(),
                         })
@@ -983,7 +980,7 @@ impl StorageProcessor {
 
     pub fn get_account_transactions_history(
         &self,
-        address: &AccountAddress,
+        address: &PubKeyHash,
         offset: i64,
         limit: i64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
@@ -1065,7 +1062,7 @@ impl StorageProcessor {
 
     pub fn get_account_transactions(
         &self,
-        address: &AccountAddress,
+        address: &PubKeyHash,
     ) -> QueryResult<Vec<AccountTransaction>> {
         let all_txs: Vec<_> = mempool::table
             .filter(mempool::primary_account_address.eq(address.data.to_vec()))
@@ -1234,7 +1231,7 @@ impl StorageProcessor {
                                 account_id: i64::from(*id),
                                 is_create: true,
                                 block_number: i64::from(block_number),
-                                address: address.data.to_vec(),
+                                address: address.as_bytes().to_vec(),
                                 nonce: i64::from(nonce),
                             })
                             .execute(self.conn())?;
@@ -1245,7 +1242,7 @@ impl StorageProcessor {
                                 account_id: i64::from(*id),
                                 is_create: false,
                                 block_number: i64::from(block_number),
-                                address: address.data.to_vec(),
+                                address: address.as_bytes().to_vec(),
                                 nonce: i64::from(nonce),
                             })
                             .execute(self.conn())?;
@@ -1266,6 +1263,9 @@ impl StorageProcessor {
                                 new_nonce: i64::from(new_nonce),
                             })
                             .execute(self.conn())?;
+                    }
+                    AccountUpdate::ChangePubKeyHash { .. } => {
+                        unimplemented!("Change pub key hash tx implement");
                     }
                 }
             }
@@ -1778,12 +1778,9 @@ impl StorageProcessor {
     }
 
     // Verified, commited states.
-    pub fn account_state_by_address(
-        &self,
-        address: &AccountAddress,
-    ) -> QueryResult<StoredAccountState> {
+    pub fn account_state_by_address(&self, address: &Address) -> QueryResult<StoredAccountState> {
         let account_create_record = account_creates::table
-            .filter(account_creates::address.eq(address.data.to_vec()))
+            .filter(account_creates::address.eq(address.as_bytes().to_vec()))
             .filter(account_creates::is_create.eq(true))
             .order(account_creates::block_number.desc())
             .first::<StorageAccountCreation>(self.conn())

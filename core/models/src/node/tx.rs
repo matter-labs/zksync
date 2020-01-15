@@ -7,7 +7,7 @@ use crate::node::{
 use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
 
-use super::account::AccountAddress;
+use super::account::PubKeyHash;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
@@ -89,8 +89,8 @@ pub enum TxType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transfer {
-    pub from: AccountAddress,
-    pub to: AccountAddress,
+    pub from: Address,
+    pub to: Address,
     pub token: TokenId,
     pub amount: BigDecimal,
     pub fee: BigDecimal,
@@ -104,8 +104,8 @@ impl Transfer {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.from.data);
-        out.extend_from_slice(&self.to.data);
+        out.extend_from_slice(&self.from.as_bytes());
+        out.extend_from_slice(&self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -119,11 +119,11 @@ impl Transfer {
             && is_fee_amount_packable(&self.fee)
     }
 
-    pub fn verify_signature(&self) -> bool {
+    pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
-            AccountAddress::from_pubkey(pub_key) == self.from
+            Some(PubKeyHash::from_pubkey(pub_key))
         } else {
-            false
+            None
         }
     }
 }
@@ -131,8 +131,8 @@ impl Transfer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Withdraw {
-    pub account: AccountAddress,
-    pub eth_address: Address,
+    pub from: Address,
+    pub to: Address,
     pub token: TokenId,
     pub amount: BigDecimal,
     pub fee: BigDecimal,
@@ -146,8 +146,8 @@ impl Withdraw {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account.data);
-        out.extend_from_slice(self.eth_address.as_bytes());
+        out.extend_from_slice(&self.from.as_bytes());
+        out.extend_from_slice(self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&big_decimal_to_u128(&self.amount).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -159,11 +159,11 @@ impl Withdraw {
         is_fee_amount_packable(&self.fee) && self.amount <= u128_to_bigdecimal(u128::max_value())
     }
 
-    pub fn verify_signature(&self) -> bool {
+    pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
-            AccountAddress::from_pubkey(pub_key) == self.account
+            Some(PubKeyHash::from_pubkey(pub_key))
         } else {
-            false
+            None
         }
     }
 }
@@ -171,7 +171,7 @@ impl Withdraw {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Close {
-    pub account: AccountAddress,
+    pub account: Address,
     pub nonce: Nonce,
     pub signature: TxSignature,
 }
@@ -182,16 +182,16 @@ impl Close {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account.data);
+        out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
 
-    pub fn verify_signature(&self) -> bool {
+    pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
-            AccountAddress::from_pubkey(pub_key) == self.account
+            Some(PubKeyHash::from_pubkey(pub_key))
         } else {
-            false
+            None
         }
     }
 }
@@ -219,10 +219,10 @@ impl FranklinTx {
         TxHash { data: out }
     }
 
-    pub fn account(&self) -> AccountAddress {
+    pub fn account(&self) -> Address {
         match self {
             FranklinTx::Transfer(tx) => tx.from.clone(),
-            FranklinTx::Withdraw(tx) => tx.account.clone(),
+            FranklinTx::Withdraw(tx) => tx.from.clone(),
             FranklinTx::Close(tx) => tx.account.clone(),
         }
     }
@@ -243,7 +243,7 @@ impl FranklinTx {
         }
     }
 
-    pub fn check_signature(&self) -> bool {
+    pub fn check_signature(&self) -> Option<PubKeyHash> {
         match self {
             FranklinTx::Transfer(tx) => tx.verify_signature(),
             FranklinTx::Withdraw(tx) => tx.verify_signature(),

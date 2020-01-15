@@ -93,7 +93,7 @@ pub fn apply_deposit_tx(
     tree: &mut CircuitAccountTree,
     deposit: &DepositOp,
 ) -> DepositWitness<Bn256> {
-    let alt_new_pubkey_hash = deposit.priority_op.account.to_fr();
+    let alt_new_pubkey_hash = unimplemented!();
     let deposit_data = DepositData {
         amount: deposit.priority_op.amount.to_string().parse().unwrap(),
         token: u32::from(deposit.priority_op.token),
@@ -342,6 +342,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: sender_pub_key_hash,
+            address: unimplemented!(),
         };
         println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
@@ -354,6 +355,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
+            address: unimplemented!(),
         };
         println!(
             "validator_leaf_len {:?}",
@@ -465,6 +467,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: sender_pub_key_hash,
+            address: unimplemented!(),
         };
         println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
 
@@ -477,6 +480,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
+            address: unimplemented!(),
         };
 
         let mut validator_balances = vec![];

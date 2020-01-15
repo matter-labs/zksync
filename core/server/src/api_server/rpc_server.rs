@@ -10,10 +10,11 @@ use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::node::tx::TxHash;
-use models::node::{Account, AccountAddress, AccountId, FranklinTx, Nonce, TokenId};
+use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use storage::{ConnectionPool, StorageProcessor, Token};
+use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ResponseAccountState {
@@ -43,7 +44,7 @@ impl ResponseAccountState {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfoResp {
-    address: AccountAddress,
+    address: Address,
     id: Option<AccountId>,
     committed: ResponseAccountState,
     verified: ResponseAccountState,
@@ -85,7 +86,7 @@ pub trait Rpc {
     #[rpc(name = "account_info", returns = "AccountInfoResp")]
     fn account_info(
         &self,
-        addr: AccountAddress,
+        addr: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send>;
     #[rpc(name = "ethop_info")]
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp>;
@@ -126,7 +127,7 @@ impl RpcApp {
 impl Rpc for RpcApp {
     fn account_info(
         &self,
-        address: AccountAddress,
+        address: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send> {
         let (account, tokens) = if let Ok((account, tokens)) = (|| -> Result<_> {
             let storage = self.access_storage()?;

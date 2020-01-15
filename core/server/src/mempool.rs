@@ -19,7 +19,7 @@ use failure::Fail;
 use futures::channel::{mpsc, oneshot};
 use futures::StreamExt;
 use models::node::{
-    AccountAddress, AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp,
+    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, PubKeyHash,
     TransferOp, TransferToNewOp,
 };
 use models::params::block_size_chunks;
@@ -27,6 +27,7 @@ use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;
+use web3::types::Address;
 
 // TODO: temporary limit
 const MAX_NUMBER_OF_WITHDRAWS: usize = 4;
@@ -73,8 +74,8 @@ pub enum MempoolRequest {
 
 struct MempoolState {
     // account and last committed nonce
-    account_nonces: HashMap<AccountAddress, Nonce>,
-    account_ids: HashMap<AccountId, AccountAddress>,
+    account_nonces: HashMap<Address, Nonce>,
+    account_ids: HashMap<AccountId, Address>,
     ready_txs: VecDeque<FranklinTx>,
 }
 
@@ -113,12 +114,12 @@ impl MempoolState {
         }
     }
 
-    fn nonce(&self, address: &AccountAddress) -> Nonce {
+    fn nonce(&self, address: &Address) -> Nonce {
         *self.account_nonces.get(address).unwrap_or(&0)
     }
 
     fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
-        if !tx.check_signature() {
+        if tx.check_signature().is_none() {
             return Err(TxAddError::InvalidSignature);
         }
 
@@ -174,6 +175,9 @@ impl Mempool {
                                         *nonce = new_nonce;
                                     }
                                 }
+                            }
+                            AccountUpdate::ChangePubKeyHash { .. } => {
+                                unimplemented!("change pubkey tx")
                             }
                         }
                     }

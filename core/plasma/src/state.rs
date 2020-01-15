@@ -4,13 +4,14 @@ use log::trace;
 use models::node::operations::{
     CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
-use models::node::{Account, AccountAddress, AccountTree, FranklinPriorityOp};
+use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
 };
 use models::node::{Close, Deposit, FranklinTx, FullExit, Transfer, Withdraw};
 use models::params;
 use std::collections::HashMap;
+use web3::types::Address;
 
 #[derive(Debug)]
 pub struct OpSuccess {
@@ -23,7 +24,7 @@ pub struct PlasmaState {
     /// Accounts stored in a sparse Merkle tree
     balance_tree: AccountTree,
 
-    account_id_by_address: HashMap<AccountAddress, AccountId>,
+    account_id_by_address: HashMap<Address, AccountId>,
 
     /// Current block number
     pub block_number: BlockNumber,
@@ -107,12 +108,12 @@ impl PlasmaState {
     }
 
     fn apply_deposit(&mut self, priority_op: Deposit) -> OpSuccess {
-        let account_id =
-            if let Some((account_id, _)) = self.get_account_by_address(&priority_op.account) {
-                account_id
-            } else {
-                self.get_free_account_id()
-            };
+        let account_id = if let Some((account_id, _)) = self.get_account_by_address(&priority_op.to)
+        {
+            account_id
+        } else {
+            self.get_free_account_id()
+        };
         let deposit_op = DepositOp {
             priority_op,
             account_id,
@@ -127,30 +128,18 @@ impl PlasmaState {
     }
 
     fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
+        // NOTE: Authroization of the FullExit is verified on the contract.
         assert!(
             priority_op.token < params::TOTAL_TOKENS as TokenId,
             "Full exit token is out of range, this should be enforced by contract"
         );
         trace!("Processing {:?}", priority_op);
-        let account_balance = priority_op
-            // Check that operation was signed
-            .verify_signature()
-            .and_then(|signed_by| {
-                trace!("Signature correct, by: {}", signed_by.to_hex());
-                // Check if account exists and withdraw was authorized by this account
-                self.get_account(priority_op.account_id).filter(|tree_acc| {
-                    let withdraw_authorized = tree_acc.address == signed_by;
-                    let nonce_correct = tree_acc.nonce == priority_op.nonce;
-                    trace!(
-                        "authorized: {}, nonce ok: {}",
-                        withdraw_authorized,
-                        nonce_correct
-                    );
-                    withdraw_authorized && nonce_correct
-                })
-            })
-            .map(|account| account.get_balance(priority_op.token))
+        let account_balance = self
+            .get_account(priority_op.account_id)
+            .filter(|account| account.address == priority_op.eth_address)
+            .map(|acccount| acccount.get_balance(priority_op.token))
             .filter(|balance| balance != &BigDecimal::from(0));
+
         assert_ne!(
             account_balance,
             Some(BigDecimal::from(0)),
@@ -187,10 +176,8 @@ impl PlasmaState {
         let old_balance = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;
 
-        // Nonce should be verified before.
-        assert_eq!(old_nonce, op.priority_op.nonce, "Full exit nonce mismatch");
         account.sub_balance(op.priority_op.token, &amount);
-        account.nonce += 1;
+
         let new_balance = account.get_balance(op.priority_op.token);
         assert_eq!(
             new_balance,
@@ -217,9 +204,14 @@ impl PlasmaState {
             tx.token < (params::TOTAL_TOKENS as TokenId),
             "Token id is not supported"
         );
-        let (from, _) = self
+        let (from, from_account) = self
             .get_account_by_address(&tx.from)
             .ok_or_else(|| format_err!("From account does not exist"))?;
+
+        ensure!(
+            tx.verify_signature() == Some(from_account.pub_key_hash),
+            "transfer signature is incorrect"
+        );
 
         if let Some((to, _)) = self.get_account_by_address(&tx.to) {
             let transfer_op = TransferOp { tx, from, to };
@@ -249,7 +241,7 @@ impl PlasmaState {
             "Token id is not supported"
         );
         let (account_id, _) = self
-            .get_account_by_address(&tx.account)
+            .get_account_by_address(&tx.from)
             .ok_or_else(|| format_err!("Account does not exist"))?;
         let withdraw_op = WithdrawOp { tx, account_id };
 
@@ -310,7 +302,7 @@ impl PlasmaState {
         updates
     }
 
-    pub fn get_account_by_address(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
+    pub fn get_account_by_address(&self, address: &Address) -> Option<(AccountId, Account)> {
         let account_id = *self.account_id_by_address.get(address)?;
         Some((
             account_id,
@@ -336,8 +328,7 @@ impl PlasmaState {
         let mut updates = Vec::new();
 
         let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
-            let (account, upd) =
-                Account::create_account(op.account_id, op.priority_op.account.clone());
+            let (account, upd) = Account::create_account(op.account_id, op.priority_op.to.clone());
             updates.extend(upd.into_iter());
             account
         });

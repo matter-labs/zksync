@@ -11,6 +11,7 @@ use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
 use models::circuit::utils::le_bit_vector_into_field_element;
+use models::node::Fr;
 use models::params as franklin_constants;
 use models::primitives::*;
 

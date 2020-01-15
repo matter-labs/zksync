@@ -1,11 +1,12 @@
 use crate::franklin_ops::FranklinOpsBlock;
 use failure::format_err;
-use models::node::account::{Account, AccountAddress};
+use models::node::account::{Account, PubKeyHash};
 use models::node::operations::FranklinOp;
 use models::node::priority_ops::FranklinPriorityOp;
 use models::node::tx::FranklinTx;
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
 use plasma::state::{OpSuccess, PlasmaState};
+use web3::types::Address;
 
 /// Franklin Accounts states with data restore configuration
 pub struct FranklinAccountsState {
@@ -92,7 +93,7 @@ impl FranklinAccountsState {
                         .state
                         .get_account(op.account_id)
                         .ok_or_else(|| format_err!("Nonexistent account"))?;
-                    op.tx.account = account.address;
+                    op.tx.from = account.address;
                     op.tx.nonce = account.nonce;
                     if let Ok(OpSuccess {
                         fee, mut updates, ..
@@ -145,7 +146,6 @@ impl FranklinAccountsState {
                     }
                 }
                 FranklinOp::FullExit(mut op) => {
-                    op.priority_op.nonce -= 1;
                     let OpSuccess {
                         fee, mut updates, ..
                     } = self
@@ -176,7 +176,7 @@ impl FranklinAccountsState {
     }
 
     /// Returns Franklin Account id and description by its address
-    pub fn get_account_by_address(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
+    pub fn get_account_by_address(&self, address: &Address) -> Option<(AccountId, Account)> {
         self.state.get_account_by_address(address)
     }
 
@@ -193,17 +193,18 @@ mod test {
     use bigdecimal::BigDecimal;
     use models::node::tx::TxSignature;
     use models::node::{
-        AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp, Transfer, TransferOp,
+        Close, CloseOp, Deposit, DepositOp, FranklinOp, PubKeyHash, Transfer, TransferOp,
         TransferToNewOp, Withdraw, WithdrawOp,
     };
 
     #[test]
     fn test_update_tree_with_one_tx_per_block() {
         let tx1 = Deposit {
-            sender: [9u8; 20].into(),
+            from: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(1000),
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
+            to: "0x7777777777777777777777777777777777777777"
+                .parse()
                 .unwrap(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
@@ -220,9 +221,10 @@ mod test {
         };
 
         let tx2 = Withdraw {
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
+            from: "0x7777777777777777777777777777777777777777"
+                .parse()
                 .unwrap(),
-            eth_address: [9u8; 20].into(),
+            to: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(1),
@@ -243,9 +245,12 @@ mod test {
         };
 
         let tx3 = Transfer {
-            from: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
+            from: "0x7777777777777777777777777777777777777777"
+                .parse()
                 .unwrap(),
-            to: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
+            to: "0x8888888888888888888888888888888888888888"
+                .parse()
+                .unwrap(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(1),
@@ -267,9 +272,12 @@ mod test {
         };
 
         let tx4 = Transfer {
-            from: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
+            from: "0x8888888888888888888888888888888888888888"
+                .parse()
                 .unwrap(),
-            to: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777").unwrap(),
+            to: "0x7777777777777777777777777777777777777777"
+                .parse()
+                .unwrap(),
             token: 1,
             amount: BigDecimal::from(19),
             fee: BigDecimal::from(1),
@@ -291,7 +299,8 @@ mod test {
         };
 
         let tx5 = Close {
-            account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
+            account: "0x8888888888888888888888888888888888888888"
+                .parse()
                 .unwrap(),
             nonce: 2,
             signature: TxSignature::default(),
@@ -326,14 +335,18 @@ mod test {
         let zero_acc = tree.get_account(0).expect("Cant get 0 account");
         assert_eq!(
             zero_acc.address,
-            AccountAddress::from_hex("sync:7777777777777777777777777777777777777777").unwrap()
+            "0x7777777777777777777777777777777777777777"
+                .parse()
+                .unwrap()
         );
         assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
 
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(
             first_acc.address,
-            AccountAddress::from_hex("sync:0000000000000000000000000000000000000000").unwrap()
+            "0x0000000000000000000000000000000000000000"
+                .parse()
+                .unwrap()
         );
         assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }
@@ -341,10 +354,11 @@ mod test {
     #[test]
     fn test_update_tree_with_multiple_txs_per_block() {
         let tx1 = Deposit {
-            sender: [9u8; 20].into(),
+            from: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(1000),
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
+            to: "0x7777777777777777777777777777777777777777"
+                .parse()
                 .unwrap(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
@@ -354,9 +368,10 @@ mod test {
         let pub_data1 = op1.public_data();
 
         let tx2 = Withdraw {
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
+            from: "0x7777777777777777777777777777777777777777"
+                .parse()
                 .unwrap(),
-            eth_address: [9u8; 20].into(),
+            to: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(1),
@@ -370,9 +385,12 @@ mod test {
         let pub_data2 = op2.public_data();
 
         let tx3 = Transfer {
-            from: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
+            from: "0x7777777777777777777777777777777777777777"
+                .parse()
                 .unwrap(),
-            to: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
+            to: "0x8888888888888888888888888888888888888888"
+                .parse()
+                .unwrap(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(1),
@@ -387,9 +405,12 @@ mod test {
         let pub_data3 = op3.public_data();
 
         let tx4 = Transfer {
-            from: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
+            from: "0x8888888888888888888888888888888888888888"
+                .parse()
                 .unwrap(),
-            to: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777").unwrap(),
+            to: "0x7777777777777777777777777777777777777777"
+                .parse()
+                .unwrap(),
             token: 1,
             amount: BigDecimal::from(19),
             fee: BigDecimal::from(1),
@@ -404,7 +425,8 @@ mod test {
         let pub_data4 = op4.public_data();
 
         let tx5 = Close {
-            account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
+            account: "0x8888888888888888888888888888888888888888"
+                .parse()
                 .unwrap(),
             nonce: 2,
             signature: TxSignature::default(),
@@ -439,14 +461,18 @@ mod test {
         let zero_acc = tree.get_account(0).expect("Cant get 0 account");
         assert_eq!(
             zero_acc.address,
-            AccountAddress::from_hex("sync:7777777777777777777777777777777777777777").unwrap()
+            "0x7777777777777777777777777777777777777777"
+                .parse()
+                .unwrap()
         );
         assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
 
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(
             first_acc.address,
-            AccountAddress::from_hex("sync:0000000000000000000000000000000000000000").unwrap()
+            "0x0000000000000000000000000000000000000000"
+                .parse()
+                .unwrap()
         );
         assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }

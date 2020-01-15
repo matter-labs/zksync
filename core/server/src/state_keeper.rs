@@ -9,12 +9,13 @@ use crate::mempool::ProposedBlock;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
-    Account, AccountAddress, AccountId, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+    Account, AccountId, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp, PubKeyHash,
 };
 use models::params::block_size_chunks;
 use models::{ActionType, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
+use web3::types::Address;
 
 pub enum ExecutedOpId {
     Transaction(TxHash),
@@ -22,7 +23,7 @@ pub enum ExecutedOpId {
 }
 
 pub enum StateKeeperRequest {
-    GetAccount(AccountAddress, oneshot::Sender<Option<Account>>),
+    GetAccount(Address, oneshot::Sender<Option<Account>>),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
     GetExecutedInPendingBlock(ExecutedOpId, oneshot::Sender<Option<(BlockNumber, bool)>>),
@@ -78,7 +79,7 @@ pub struct PlasmaStateKeeper {
 impl PlasmaStateKeeper {
     pub fn new(
         pool: ConnectionPool,
-        fee_account_address: AccountAddress,
+        fee_account_address: Address,
         rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
@@ -128,7 +129,7 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &AccountAddress) {
+    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");
@@ -404,7 +405,7 @@ impl PlasmaStateKeeper {
         None
     }
 
-    fn account(&self, address: &AccountAddress) -> Option<Account> {
+    fn account(&self, address: &Address) -> Option<Account> {
         self.state.get_account_by_address(address).map(|(_, a)| a)
     }
 }

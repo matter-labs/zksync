@@ -8,7 +8,9 @@ use crate::operation::SignatureData;
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
+use models::circuit::utils::{
+    append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
+};
 
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
@@ -118,7 +120,7 @@ pub fn apply_withdraw_tx(
         fee: big_decimal_to_u128(&withdraw.tx.fee),
         token: u32::from(withdraw.tx.token),
         account_address: withdraw.account_id,
-        ethereum_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.eth_address)).unwrap(),
+        ethereum_key: eth_address_to_fr(&withdraw.tx.to),
     };
     // le_bit_vector_into_field_element()
     apply_withdraw(tree, &withdraw_data)
@@ -386,6 +388,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
+            address: unimplemented!(),
         };
 
         let mut validator_balances = vec![];
@@ -419,6 +422,7 @@ mod test {
             subtree: sender_balance_tree,
             nonce: Fr::zero(),
             pub_key_hash: sender_pub_key_hash,
+            address: unimplemented!(),
         };
 
         tree.insert(account_address, sender_leaf_initial);

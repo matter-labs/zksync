@@ -216,6 +216,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: sender_pub_key_hash,
+            address: unimplemented!(),
         };
         let mut sender_leaf_number: u32 = rng.gen();
         sender_leaf_number %= capacity;
@@ -232,6 +233,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
+            address: unimplemented!(),
         };
 
         let mut validator_balances = vec![];

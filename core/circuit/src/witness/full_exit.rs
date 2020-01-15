@@ -124,7 +124,7 @@ pub fn apply_full_exit_tx(
         token: u32::from(full_exit.priority_op.token),
         account_address: full_exit.priority_op.account_id,
         ethereum_key: Fr::from_hex(&format!("{:x}", &full_exit.priority_op.eth_address)).unwrap(),
-        pub_nonce: Fr::from_str(&full_exit.priority_op.nonce.to_string()).unwrap(),
+        pub_nonce: unimplemented!(),
     };
     // le_bit_vector_into_field_element()
     apply_full_exit(tree, &full_exit, is_success)
@@ -339,6 +339,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
+            address: unimplemented!(),
         };
 
         let mut validator_balances = vec![];
@@ -371,6 +372,7 @@ mod test {
             subtree: sender_balance_tree,
             nonce: Fr::zero(),
             pub_key_hash: sender_pub_key_hash,
+            address: unimplemented!(),
         };
 
         let packed_public_key = PackedPublicKey(sender_pk.clone());
@@ -532,6 +534,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
+            address: unimplemented!(),
         };
 
         let mut validator_balances = vec![];
@@ -564,6 +567,7 @@ mod test {
             subtree: sender_balance_tree,
             nonce: Fr::zero(),
             pub_key_hash: sender_pub_key_hash,
+            address: unimplemented!(),
         };
 
         let packed_public_key = PackedPublicKey(sender_pk.clone());
