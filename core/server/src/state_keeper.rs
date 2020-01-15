@@ -19,7 +19,10 @@ use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 
 pub enum StateKeeperRequest {
-    GetAccount(AccountAddress, oneshot::Sender<Option<Account>>),
+    GetAccount(
+        AccountAddress,
+        oneshot::Sender<Option<(AccountId, Account)>>,
+    ),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
     SealBlock,
@@ -390,8 +393,8 @@ impl PlasmaStateKeeper {
             .expect("committer receiver dropped");
     }
 
-    fn account(&self, address: &AccountAddress) -> Option<Account> {
-        self.state.get_account_by_address(address).map(|(_, a)| a)
+    fn account(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
+        self.state.get_account_by_address(address)
     }
 }
 

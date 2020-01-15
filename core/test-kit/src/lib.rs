@@ -16,7 +16,8 @@ use futures::{
 };
 use models::node::tx::TxSignature;
 use models::node::{
-    Account, AccountAddress, AccountMap, Engine, FranklinTx, Nonce, PriorityOp, TokenId, Transfer,
+    Account, AccountAddress, AccountId, AccountMap, Engine, FranklinTx, Nonce, PriorityOp, TokenId,
+    Transfer,
 };
 use models::CommitRequest;
 use rand::{Rng, SeedableRng, XorShiftRng};
@@ -104,6 +105,31 @@ impl<T: Transport> AccountSet<T> {
 
         FranklinTx::Withdraw(from.sign_withdraw(token_id, amount, fee, &to.address))
     }
+
+    fn full_exit(
+        &self,
+        post_by: ETHAccountSetId,
+        from: ZKSyncAccountSetId,
+        token: TokenId,
+        token_address: Address,
+        account_id: AccountId,
+    ) -> PriorityOp {
+        let eth_address = self.eth_accounts[post_by].address.clone();
+        let signed_full_exit =
+            self.zksync_accounts[from].sign_full_exit(account_id, eth_address, token);
+
+        let mut sign = Vec::new();
+        sign.extend_from_slice(signed_full_exit.signature_r.as_ref());
+        sign.extend_from_slice(signed_full_exit.signature_s.as_ref());
+        block_on(self.eth_accounts[post_by].full_exit(
+            account_id,
+            signed_full_exit.packed_pubkey.as_ref(),
+            token_address,
+            &sign,
+            signed_full_exit.nonce,
+        ))
+        .expect("FullExit eth call failed")
+    }
 }
 
 fn gen_pk() -> PrivateKey<Engine> {
@@ -149,16 +175,13 @@ fn dummy_proposed_block() -> ProposedBlock {
 async fn sk_get_account(
     mut sender: mpsc::Sender<StateKeeperRequest>,
     address: &AccountAddress,
-) -> Account {
+) -> Option<(AccountId, Account)> {
     let resp = oneshot::channel();
     sender
         .send(StateKeeperRequest::GetAccount(address.clone(), resp.0))
         .await
         .expect("sk request send");
-    resp.1
-        .await
-        .expect("sk account resp recv")
-        .unwrap_or_else(|| Account::default_with_address(address))
+    resp.1.await.expect("sk account resp recv")
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -262,6 +285,8 @@ pub fn init_and_run_state_keeper() {
 
     test_setup.start_block();
     test_setup.deposit(0, 1, 0, deposit_amount.clone());
+    test_setup.full_exit(0, 1, 0);
+    test_setup.deposit(0, 1, 0, deposit_amount.clone());
     test_setup.transfer(
         1,
         0,
@@ -275,22 +300,6 @@ pub fn init_and_run_state_keeper() {
         0,
         &deposit_amount / &BigDecimal::from(2),
         BigDecimal::from(0),
-    );
-    test_setup.execute_commit_and_verify_block();
-
-    test_setup.start_block();
-    test_setup.deposit(0, 1, 0, deposit_amount.clone());
-    test_setup.withdraw(1, 0, 0, deposit_amount.clone(), BigDecimal::from(0));
-    test_setup.execute_commit_and_verify_block();
-
-    test_setup.start_block();
-    test_setup.deposit(0, 1, 0, deposit_amount.clone());
-    test_setup.withdraw(
-        1,
-        0,
-        0,
-        deposit_amount.clone() / BigDecimal::from(2),
-        deposit_amount.clone() / BigDecimal::from(2),
     );
     test_setup.execute_commit_and_verify_block();
 
@@ -383,13 +392,25 @@ impl TestSetup {
     ) {
         let mut from_eth_balance = self.get_expected_eth_account_balance(from, token);
         from_eth_balance.0 -= &amount;
-        if token == 0 {
-            from_eth_balance.1 += parse_ether("0.015").unwrap(); // max fee payed
-        }
+
         self.block
             .expected_state
             .eth_accounts_state
             .insert((from, token), from_eth_balance);
+
+        if let Some(mut eth_balance) = self
+            .block
+            .expected_state
+            .eth_accounts_state
+            .remove(&(from, 0))
+        {
+            eth_balance.1 += parse_ether("0.015").unwrap(); // max fee payed;
+            self.block
+                .expected_state
+                .eth_accounts_state
+                .insert((from, 0), eth_balance);
+        }
+
         let mut zksync0_old = self.get_expected_zksync_account_balance(to, token);
         zksync0_old += &amount;
         self.block
@@ -410,6 +431,65 @@ impl TestSetup {
         let deposit = self.accounts.deposit(from, to, token_address, amount);
 
         self.block.txs.priority_ops.push(deposit);
+        self.execute_current_txs();
+    }
+
+    fn execute_current_txs(&mut self) {
+        let block_sender = async {
+            self.state_keeper_request_sender
+                .clone()
+                .send(StateKeeperRequest::ExecuteMiniBlock(self.block.txs.clone()))
+                .await;
+        };
+        block_on(block_sender);
+        self.block.txs = ProposedBlock::default();
+    }
+
+    fn full_exit(&mut self, post_by: ETHAccountSetId, from: ZKSyncAccountSetId, token: TokenId) {
+        let account_id = self
+            .get_zksync_account_committed_state(from)
+            .map(|(id, _)| id)
+            .expect("Account should be in the map");
+        let token_address = if token == 0 {
+            Address::zero()
+        } else {
+            self.tokens
+                .get(&token)
+                .expect("Token does not exist")
+                .clone()
+        };
+
+        let mut zksync0_old = self.get_expected_zksync_account_balance(from, token);
+        self.block
+            .expected_state
+            .sync_accounts_state
+            .insert((from, token), BigDecimal::from(0));
+
+        let mut post_by_eth_balance = self.get_expected_eth_account_balance(post_by, token);
+        post_by_eth_balance.0 += zksync0_old;
+        self.block
+            .expected_state
+            .eth_accounts_state
+            .insert((post_by, token), post_by_eth_balance);
+
+        if let Some(mut eth_balance) = self
+            .block
+            .expected_state
+            .eth_accounts_state
+            .remove(&(post_by, 0))
+        {
+            eth_balance.1 += parse_ether("0.015").unwrap(); // max fee payed;
+            self.block
+                .expected_state
+                .eth_accounts_state
+                .insert((post_by, 0), eth_balance);
+        }
+
+        let op = self
+            .accounts
+            .full_exit(post_by, from, token, token_address, account_id);
+        self.block.txs.priority_ops.push(op);
+        self.execute_current_txs();
     }
 
     fn transfer(
@@ -446,6 +526,7 @@ impl TestSetup {
         let transfer1 = self.accounts.transfer(from, to, token, amount, fee);
 
         self.block.txs.txs.push(transfer1);
+        self.execute_current_txs();
     }
 
     fn withdraw(
@@ -482,6 +563,7 @@ impl TestSetup {
         let withdraw = self.accounts.withdraw(from, to, token, amount, fee);
 
         self.block.txs.txs.push(withdraw);
+        self.execute_current_txs();
     }
 
     fn execute_commit_and_verify_block(&mut self) {
@@ -532,21 +614,30 @@ impl TestSetup {
 
         for ((zksync_account, token), balance) in &self.block.expected_state.sync_accounts_state {
             let real = self.get_zksync_balance(*zksync_account, *token);
-            println!("zksync acc {} diff {}", zksync_account, real - balance);
+            println!(
+                "zksync acc {} diff {}, real: {}",
+                zksync_account,
+                real.clone() - balance,
+                real.clone()
+            );
         }
     }
 
-    fn emergency_withdraw(&self) {
-        unimplemented!()
-    }
-
-    fn get_zksync_balance(&self, zksync_id: ZKSyncAccountSetId, token: TokenId) -> BigDecimal {
+    fn get_zksync_account_committed_state(
+        &self,
+        zksync_id: ZKSyncAccountSetId,
+    ) -> Option<(AccountId, Account)> {
         let address = &self.accounts.zksync_accounts[zksync_id].address;
         block_on(sk_get_account(
             self.state_keeper_request_sender.clone(),
             address,
         ))
-        .get_balance(token)
+    }
+
+    fn get_zksync_balance(&self, zksync_id: ZKSyncAccountSetId, token: TokenId) -> BigDecimal {
+        self.get_zksync_account_committed_state(zksync_id)
+            .map(|(_, acc)| acc.get_balance(token))
+            .unwrap_or_default()
     }
 
     fn get_eth_balance(&self, eth_account_id: ETHAccountSetId, token: TokenId) -> BigDecimal {
