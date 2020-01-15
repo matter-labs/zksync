@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 // External uses
 use futures::channel::{mpsc, oneshot};
 use futures::stream::StreamExt;
@@ -13,7 +14,6 @@ use models::node::{
 use models::params::block_size_chunks;
 use models::{ActionType, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
-use std::collections::VecDeque;
 use storage::ConnectionPool;
 
 pub enum ExecutedOpId {
@@ -60,7 +60,7 @@ impl PendingBlock {
     }
 }
 
-/// Coordinator of tx processing and generation of proofs
+/// Responsible for tx processing and block forming.
 pub struct PlasmaStateKeeper {
     /// Current plasma state
     state: PlasmaState,
@@ -114,7 +114,6 @@ impl PlasmaStateKeeper {
         // Keeper starts with the NEXT block
         let keeper = PlasmaStateKeeper {
             state,
-            // TODO: load pk from config.
             fee_account_id,
             current_unprocessed_priority_op,
             rx_for_blocks,

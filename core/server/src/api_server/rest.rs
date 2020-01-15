@@ -17,7 +17,6 @@ use std::time::Duration;
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
 
-// todo future aware lock
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 

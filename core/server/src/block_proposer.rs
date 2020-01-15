@@ -1,3 +1,10 @@
+//! Block proposer is main driver of the application, it polls transactions from mempool
+//! and sends them to `StateKeeper`
+//!
+//! It does it in small batches, called here `miniblocks`, which are smaller that full blocks.
+//!
+//! Right now logic of this actor is simple, but in future consensus will replace it using the same API.
+
 use crate::mempool::{GetBlockRequest, MempoolRequest, ProposedBlock};
 use crate::state_keeper::StateKeeperRequest;
 use futures::channel::{mpsc, oneshot};

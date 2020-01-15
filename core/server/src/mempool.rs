@@ -1,3 +1,19 @@
+//! Mempool is simple in memory buffer for transactions.
+//!
+//! Its role is to:
+//! 1) Accept transactions from api, check signatures and basic nonce correctness(nonce not too small).
+//! To do nonce correctness check mempool stores mapping `AccountAddress -> Nonce`, this mapping is updated
+//! when new block is committed.
+//! 2) When polled return vector of the transactions in the queue.
+//!
+//! Mempool is not persisted on disc, all transactions will be lost on node shutdown.
+//!
+//! Communication channel with other actors:
+//! Mempool does not push information to other actors, only accepts requests. (see `MempoolRequest`)
+//!
+//! Communication with db:
+//! on restart mempool restores nonces of the accounts that are stored in the account tree.
+
 use crate::eth_watch::ETHState;
 use failure::Fail;
 use futures::channel::{mpsc, oneshot};
@@ -46,8 +62,12 @@ pub struct GetBlockRequest {
 }
 
 pub enum MempoolRequest {
+    /// Add new transaction to mempool, check signature and correctness
+    /// oneshot is used to receive tx add result.
     NewTx(Box<FranklinTx>, oneshot::Sender<Result<(), TxAddError>>),
+    /// When block is committed, nonces of the account tree should be updated too.
     UpdateNonces(AccountUpdates),
+    /// Get transactions from the mempool.
     GetBlock(GetBlockRequest),
 }
 
@@ -133,7 +153,7 @@ impl Mempool {
                     block
                         .response_sender
                         .send(self.propose_new_block(block.last_priority_op_number))
-                        .expect("mempool response send");
+                        .expect("mempool proposed block response send failed");
                 }
                 MempoolRequest::UpdateNonces(updates) => {
                     for (id, update) in updates {
