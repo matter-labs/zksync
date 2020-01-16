@@ -4,6 +4,7 @@ use crate::deploy_contracts::{get_test_accounts, Contracts};
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::zksync_account::ZksyncAccount;
 use bigdecimal::BigDecimal;
+use failure::{bail, ensure};
 use futures::{
     channel::{mpsc, oneshot},
     executor::block_on,
@@ -210,7 +211,7 @@ fn spawn_state_keeper(
     )
 }
 
-pub fn init_and_run_state_keeper() {
+pub fn perform_basic_tests() {
     let config = ConfigurationOptions::from_env();
 
     let fee_account = ZksyncAccount::rand();
@@ -219,7 +220,7 @@ pub fn init_and_run_state_keeper() {
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
-    let contracts = deploy_contracts::deploy_contracts();
+    let contracts = deploy_contracts::deploy_test_contracts();
     println!(
         "contracts deployed {:#?}, {} secs",
         contracts,
@@ -258,63 +259,68 @@ pub fn init_and_run_state_keeper() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    // test two deposits
-    test_setup.start_block();
-    test_setup.deposit(
-        ETHAccountId(0),
-        ZKSyncAccountId(1),
-        Token(0),
-        deposit_amount.clone(),
-    );
-    test_setup.deposit(
-        ETHAccountId(0),
-        ZKSyncAccountId(1),
-        Token(0),
-        deposit_amount.clone(),
-    );
-    test_setup.execute_commit_and_verify_block();
+    for token in 0..1 {
+        // test two deposits
+        test_setup.start_block();
+        test_setup.deposit(
+            ETHAccountId(0),
+            ZKSyncAccountId(1),
+            Token(token),
+            deposit_amount.clone(),
+        );
+        test_setup.deposit(
+            ETHAccountId(0),
+            ZKSyncAccountId(1),
+            Token(token),
+            deposit_amount.clone(),
+        );
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
 
-    // test transfers
-    test_setup.start_block();
+        // test transfers
+        test_setup.start_block();
+        //should be executed as a transfer
+        test_setup.transfer(
+            ZKSyncAccountId(1),
+            ZKSyncAccountId(2),
+            Token(token),
+            &deposit_amount / &BigDecimal::from(4),
+            &deposit_amount / &BigDecimal::from(4),
+        );
 
-    //should be executed as a transfer
-    test_setup.transfer(
-        ZKSyncAccountId(1),
-        ZKSyncAccountId(2),
-        Token(0),
-        &deposit_amount / &BigDecimal::from(4),
-        &deposit_amount / &BigDecimal::from(4),
-    );
+        let nonce = test_setup.accounts.zksync_accounts[1].nonce();
+        let incorrect_nonce_transfer = test_setup.accounts.transfer(
+            ZKSyncAccountId(1),
+            ZKSyncAccountId(0),
+            Token(token),
+            deposit_amount.clone(),
+            BigDecimal::from(0),
+            Some(nonce + 1),
+            false,
+        );
+        test_setup.execute_incorrect_tx(incorrect_nonce_transfer);
 
-    let nonce = test_setup.accounts.zksync_accounts[1].nonce();
-    let incorrect_nonce_transfer = test_setup.accounts.transfer(
-        ZKSyncAccountId(1),
-        ZKSyncAccountId(0),
-        Token(0),
-        deposit_amount.clone(),
-        BigDecimal::from(0),
-        Some(nonce + 1),
-        false,
-    );
-    test_setup.execute_incorrect_tx(incorrect_nonce_transfer);
+        //should be executed as a transfer to new
+        test_setup.transfer(
+            ZKSyncAccountId(1),
+            ZKSyncAccountId(2),
+            Token(token),
+            &deposit_amount / &BigDecimal::from(4),
+            &deposit_amount / &BigDecimal::from(4),
+        );
 
-    //should be executed as a transfer to new
-    test_setup.transfer(
-        ZKSyncAccountId(1),
-        ZKSyncAccountId(2),
-        Token(0),
-        &deposit_amount / &BigDecimal::from(4),
-        &deposit_amount / &BigDecimal::from(4),
-    );
-
-    test_setup.withdraw(
-        ZKSyncAccountId(2),
-        ETHAccountId(0),
-        Token(0),
-        &deposit_amount / &BigDecimal::from(4),
-        &deposit_amount / &BigDecimal::from(4),
-    );
-    test_setup.execute_commit_and_verify_block();
+        test_setup.withdraw(
+            ZKSyncAccountId(2),
+            ETHAccountId(0),
+            Token(token),
+            &deposit_amount / &BigDecimal::from(4),
+            &deposit_amount / &BigDecimal::from(4),
+        );
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+    }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
     sk_thread_handle.join().expect("sk thread join");
@@ -590,7 +596,7 @@ impl TestSetup {
         self.execute_current_txs();
     }
 
-    pub fn execute_commit_and_verify_block(&mut self) {
+    pub fn execute_commit_and_verify_block(&mut self) -> Result<(), failure::Error> {
         let block_sender = async {
             self.state_keeper_request_sender
                 .clone()
@@ -614,17 +620,17 @@ impl TestSetup {
 
         let block_rec = block_on(self.commit_account.commit_block(&new_block.block))
             .expect("block commit fail");
-        println!(
-            "commit: {:?}, success: {}",
-            block_rec.transaction_hash,
-            block_rec.status == Some(U64::from(1))
+        ensure!(
+            block_rec.status == Some(U64::from(1)),
+            "Block commit failed: {:?}",
+            block_rec.transaction_hash
         );
         let block_rec = block_on(self.commit_account.verify_block(&new_block.block))
             .expect("block verify fail");
-        println!(
-            "verify: {:?}, status: {}",
-            block_rec.transaction_hash,
-            block_rec.status == Some(U64::from(1))
+        ensure!(
+            block_rec.status == Some(U64::from(1)),
+            "Block verify failed: {:?}",
+            block_rec.transaction_hash
         );
 
         let mut block_checks_failed = false;
@@ -664,7 +670,10 @@ impl TestSetup {
                 "Failed block exec_operations: {:#?}",
                 new_block.block.block_transactions
             );
+            bail!("Block checks failed")
         }
+
+        Ok(())
     }
 
     fn get_zksync_account_committed_state(

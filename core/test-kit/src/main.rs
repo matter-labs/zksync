@@ -1,4 +1,4 @@
-use test_kit::init_and_run_state_keeper;
+use test_kit::perform_basic_tests;
 fn main() {
-    init_and_run_state_keeper();
+    perform_basic_tests();
 }

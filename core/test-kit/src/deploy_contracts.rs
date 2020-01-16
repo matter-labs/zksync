@@ -50,7 +50,7 @@ fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
     }
 }
 
-pub fn deploy_contracts() -> Contracts {
+pub fn deploy_test_contracts() -> Contracts {
     let result = Command::new("sh")
         .arg("execute-deploy-test.sh")
         .output()
