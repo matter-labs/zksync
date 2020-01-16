@@ -275,22 +275,15 @@ impl PlasmaState {
         })
     }
 
-    pub fn collect_fee(
-        &mut self,
-        fees: &[CollectedFee],
-        fee_account: &AccountAddress,
-    ) -> (AccountId, AccountUpdates) {
+    pub fn collect_fee(&mut self, fees: &[CollectedFee], fee_account: AccountId) -> AccountUpdates {
         let mut updates = Vec::new();
 
-        let (id, mut account) =
-            if let Some((id, account)) = self.get_account_by_address(fee_account) {
-                (id, account)
-            } else {
-                panic!(
-                    "Fee account should be present in the account tree: {}",
-                    fee_account.to_hex()
-                );
-            };
+        let mut account = self.get_account(fee_account).unwrap_or_else(|| {
+            panic!(
+                "Fee account should be present in the account tree: {}",
+                fee_account
+            )
+        });
 
         for fee in fees {
             if fee.amount == BigDecimal::from(0) {
@@ -303,7 +296,7 @@ impl PlasmaState {
             let new_amount = account.get_balance(fee.token).clone();
 
             updates.push((
-                id,
+                fee_account,
                 AccountUpdate::UpdateBalance {
                     balance_update: (fee.token, old_amount, new_amount),
                     old_nonce: nonce,
@@ -312,9 +305,9 @@ impl PlasmaState {
             ));
         }
 
-        self.insert_account(id, account);
+        self.insert_account(fee_account, account);
 
-        (id, updates)
+        updates
     }
 
     pub fn get_account_by_address(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {

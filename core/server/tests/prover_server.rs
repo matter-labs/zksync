@@ -1,9 +1,9 @@
 // Built-in deps
 use std::str::FromStr;
-use std::sync::mpsc;
 use std::{net, thread, time};
 // External deps
 use ff::{Field, PrimeField};
+use futures::channel::mpsc;
 // Workspace deps
 use prover::client;
 use prover::ApiClient;
@@ -15,7 +15,7 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
     let bind_to = "127.0.0.1:8088";
     let conn_pool = storage::ConnectionPool::new();
     let addr = net::SocketAddr::from_str(bind_to).unwrap();
-    let (tx, _rx) = mpsc::channel();
+    let (tx, _rx) = mpsc::channel(1);
     thread::spawn(move || {
         prover_server::start_prover_server(conn_pool, addr, prover_timeout, rounds_interval, tx);
     });
@@ -192,13 +192,13 @@ pub fn test_operation_and_wanted_prover_data(
         },
     )));
 
-    let (fee_account_id, fee_updates) = state.collect_fee(&fees, &validator_test_account.address);
+    let fee_updates = state.collect_fee(&fees, validator_account_id);
     accounts_updated.extend(fee_updates.into_iter());
 
     let block = models::node::block::Block {
         block_number: state.block_number,
         new_root_hash: state.root_hash(),
-        fee_account: fee_account_id,
+        fee_account: validator_account_id,
         block_transactions: ops,
         processed_priority_ops: (0, 1),
     };
