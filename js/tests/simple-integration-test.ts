@@ -2,7 +2,8 @@ import {
     depositFromETH,
     Wallet,
     Provider,
-    ETHProxy, getDefaultProvider, types
+    ETHProxy, getDefaultProvider, types,
+    getEthereumBalance
 } from "zksync";
 import { ethers, utils } from "ethers";
 
@@ -25,6 +26,8 @@ async function getOperatorBalance(token: types.Token, type: "committed" | "verif
 
 async function testDeposit(ethWallet: ethers.Signer, syncWallet: Wallet, token: types.Token, amount: utils.BigNumberish) {
     const balanceBeforeDep = await syncWallet.getBalance(token);
+
+    const startTime = new Date().getTime();
     const depositHandle = await depositFromETH(
     {
         depositFrom: ethWallet,
@@ -32,7 +35,9 @@ async function testDeposit(ethWallet: ethers.Signer, syncWallet: Wallet, token: 
         token: token,
         amount,
     });
+    console.log(`Deposit posted: ${(new Date().getTime()) - startTime} ms`);
     await depositHandle.awaitReceipt();
+    console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
     const balanceAfterDep = await syncWallet.getBalance(token);
 
     if (!balanceAfterDep.sub(balanceBeforeDep).eq(amount)) {
@@ -44,13 +49,16 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
     const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
     const operatorBeforeTransfer = await getOperatorBalance(token);
+    const startTime = new Date().getTime();
     const transferToNewHandle = await syncWallet1.syncTransfer({
         to: syncWallet2.address(),
         token,
         amount,
         fee
     });
+    console.log(`Transfer posted: ${(new Date().getTime()) - startTime} ms`);
     await transferToNewHandle.awaitReceipt();
+    console.log(`Transfer committed: ${(new Date().getTime()) - startTime} ms`);
     const wallet1AfterTransfer = await syncWallet1.getBalance(token);
     const wallet2AfterTransfer = await syncWallet2.getBalance(token);
     const operatorAfterTransfer = await getOperatorBalance(token);
@@ -67,19 +75,25 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
 async function testWithdraw(ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
     const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
     const operatorBeforeWithdraw = await getOperatorBalance(token);
+    const onchainBalanceBeforeWithdraw = await getEthereumBalance(ethWallet, token);
+    const startTime = new Date().getTime();
     const withdrawHandle = await syncWallet.withdrawTo({
         ethAddress: ethWallet.address,
         token,
         amount,
         fee
     });
-    await withdrawHandle.awaitReceipt();
+    console.log(`Withdraw posted: ${(new Date().getTime()) - startTime} ms`);
+    await withdrawHandle.awaitVerifyReceipt();
+    console.log(`Withdraw verified: ${(new Date().getTime()) - startTime} ms`);
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const operatorAfterWithdraw = await getOperatorBalance(token);
+    const onchainBalanceAfterWithdraw = await getEthereumBalance(ethWallet, token);
 
     let withdrawCorrect = true;
     withdrawCorrect = withdrawCorrect && wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee));
     withdrawCorrect = withdrawCorrect && operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee);
+    withdrawCorrect = withdrawCorrect && onchainBalanceAfterWithdraw.sub(onchainBalanceBeforeWithdraw).eq(amount);
 
     if (!withdrawCorrect) {
         throw new Error("Withdraw checks failed");

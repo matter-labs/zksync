@@ -159,11 +159,7 @@ impl FranklinAccountsState {
                 _ => {}
             }
         }
-        let fee_account_address = self
-            .get_account(block.fee_account)
-            .ok_or_else(|| format_err!("Nonexistent account"))?
-            .address;
-        let (_, fee_updates) = self.state.collect_fee(&fees, &fee_account_address);
+        let fee_updates = self.state.collect_fee(&fees, block.fee_account);
         accounts_updated.extend(fee_updates.into_iter());
 
         Ok(accounts_updated)

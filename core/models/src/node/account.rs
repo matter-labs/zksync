@@ -281,8 +281,7 @@ impl Account {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::node::{apply_updates, reverse_updates, AccountMap};
-    use crate::{AccountAddress, AccountUpdates};
+    use crate::node::{apply_updates, reverse_updates, AccountAddress, AccountMap, AccountUpdates};
 
     #[test]
     fn test_default_account() {
