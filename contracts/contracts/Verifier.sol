@@ -8,7 +8,7 @@ import "./VerificationKey.sol";
 /// @author Matter Labs
 contract Verifier is VerificationKey {
     /// @notice If this flag is true - dummy verification is used instead of full verifier
-    bool constant DUMMY_VERIFIER = true;
+    bool constant DUMMY_VERIFIER = false;
 
     /// @notice Rollup block proof verification
     /// @param _proof Block proof

@@ -8,4 +8,4 @@ fi
 . .setup_env
 
 cd contracts;
-yarn deploy-no-build | tee ../deploy.log;
+yarn deploy-test-no-build | tee ../deploy.log;

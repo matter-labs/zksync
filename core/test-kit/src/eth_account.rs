@@ -4,17 +4,17 @@ use failure::{ensure, format_err};
 use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
 use models::node::block::Block;
-use models::node::{AccountAddress, AccountId, Nonce, PriorityOp, TokenId, U128};
+use models::node::{AccountAddress, AccountId, Nonce, PriorityOp};
 use server::ConfigurationOptions;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
 use web3::contract::{Contract, Options};
-use web3::types::{Address, CallRequest, TransactionReceipt, H256, U256, U64};
+use web3::types::{Address, TransactionReceipt, H256, U256, U64};
 use web3::Transport;
 
 pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
-    let split = eth_value.split(".").collect::<Vec<&str>>();
+    let split = eth_value.split('.').collect::<Vec<&str>>();
     ensure!(split.len() == 1 || split.len() == 2, "Wrong eth value");
     let string_wei_value = if split.len() == 1 {
         format!("{}000000000000000000", split[0])
@@ -63,8 +63,8 @@ impl<T: Transport> EthereumAccount<T> {
         let main_contract_eth_client = ETHClient::new(
             transport,
             zksync_contract(),
-            address.clone(),
-            private_key.clone(),
+            address,
+            private_key,
             contract_address,
             config.chain_id,
             config.gas_price_factor,
@@ -178,11 +178,11 @@ impl<T: Transport> EthereumAccount<T> {
     ) -> Result<BigDecimal, failure::Error> {
         let contract = Contract::new(
             self.main_contract_eth_client.web3.eth(),
-            token_contract.clone(),
+            *token_contract,
             erc20_contract(),
         );
         contract
-            .query("balanceOf", (self.address), None, Options::default(), None)
+            .query("balanceOf", self.address, None, Options::default(), None)
             .compat()
             .await
             .map(u256_to_big_dec)
@@ -197,8 +197,8 @@ impl<T: Transport> EthereumAccount<T> {
         let erc20_client = ETHClient::new(
             self.main_contract_eth_client.web3.transport().clone(),
             erc20_contract(),
-            self.address.clone(),
-            self.private_key.clone(),
+            self.address,
+            self.private_key,
             token_contract,
             self.main_contract_eth_client.chain_id,
             self.main_contract_eth_client.gas_price_factor,

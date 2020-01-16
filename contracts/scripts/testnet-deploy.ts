@@ -11,12 +11,16 @@ import {
     governanceContractSourceCode,
     governanceContractCode,
     postContractToTesseracts,
-    deployPriorityQueue, 
+    deployPriorityQueue,
     priorityQueueContractSourceCode,
-    priorityQueueContractCode, 
-    deployVerifier, 
+    priorityQueueContractCode,
+    deployVerifier,
     verifierContractSourceCode,
-    verifierContractCode
+    verifierContractCode,
+    governanceTestContractCode,
+    priorityQueueTestContractCode,
+    verifierTestContractCode,
+    franklinTestContractCode
 } from "../src.ts/deploy";
 
 async function main() {
@@ -27,13 +31,18 @@ async function main() {
     });
     parser.addArgument('--deploy',  { action: 'storeTrue' });
     parser.addArgument('--publish', { action: 'storeTrue' });
+    parser.addArgument('--test', { action: 'storeTrue' });
     const args = parser.parseArgs(process.argv.slice(2));
     if (args.deploy == false && args.publish == false) {
         parser.printHelp();
         return;
     }
+    if (process.env.ETH_NETWORK !== 'localhost' && args.test) {
+        console.log("Deploying test contracts not on localhost is not allowed");
+        return;
+    }
 
-    const provider   = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+        const provider   = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     if (process.env.ETH_NETWORK == "localhost") {
         // small polling interval for localhost network
         provider.pollingInterval = 200;
@@ -59,20 +68,23 @@ async function main() {
 
     if (args.deploy) {
         let timer = new Date().getTime();
-        const governance = await deployGovernance(wallet, governanceContractCode, governanceConstructorArgs);
-        console.log(`Governance contract deployed, time: ${(new Date().getTime() - timer)/1000} secs`);
+        const governanceCode = args.test ? governanceTestContractCode : governanceContractCode;
+        const governance = await deployGovernance(wallet, governanceCode, governanceConstructorArgs);
+        console.log(`Governance contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         governanceAddress = governance.address;
 
         timer = new Date().getTime();
-        const priorityQueue = await deployPriorityQueue(wallet, priorityQueueContractCode, priorityQueueConstructorArgs);
-        console.log(`Priority queue contract deployed, time: ${(new Date().getTime() - timer)/1000} secs`);
+        const priorityQueueCode = args.test ? priorityQueueTestContractCode : priorityQueueContractCode;
+        const priorityQueue = await deployPriorityQueue(wallet, priorityQueueCode, priorityQueueConstructorArgs);
+        console.log(`Priority queue contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         priorityQueueAddress = priorityQueue.address;
 
         timer = new Date().getTime();
-        const verifier = await deployVerifier(wallet, verifierContractCode, verifierConstructorArgs);
-        console.log(`Verifier contract deployed, time: ${(new Date().getTime() - timer)/1000} secs`);
+        const verifierCode = args.test ? verifierTestContractCode : verifierContractCode;
+        const verifier = await deployVerifier(wallet, verifierCode, verifierConstructorArgs);
+        console.log(`Verifier contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         verifierAddress = verifier.address;
-        
+
         franklinConstructorArgs = [
             governanceAddress,
             verifierAddress,
@@ -81,36 +93,38 @@ async function main() {
             process.env.GENESIS_ROOT || ethers.constants.HashZero,
         ];
         timer = new Date().getTime();
-        const franklin = await deployFranklin(wallet, franklinContractCode, franklinConstructorArgs);
-        console.log(`Main contract deployed, time: ${(new Date().getTime() - timer)/1000} secs`);
+        const franklinCode = args.test ? franklinTestContractCode : franklinContractCode;
+        const franklin = await deployFranklin(wallet, franklinCode, franklinConstructorArgs);
+        console.log(`Main contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         franklinAddress = franklin.address;
 
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
 
         const erc20 = await addTestERC20Token(wallet, governance);
         await mintTestERC20Token(testWallet, erc20);
-    }
 
-    if (args.publish) {
-        try {
-            if (process.env.ETH_NETWORK === 'localhost') {
-                await Promise.all([
-                    postContractToTesseracts(governanceContractCode,    "Governance",    governanceAddress),
-                    postContractToTesseracts(priorityQueueContractCode, "PriorityQueue", priorityQueueAddress),
-                    postContractToTesseracts(verifierContractCode,      "Verifier",      verifierAddress),
-                    postContractToTesseracts(franklinContractCode,      "Franklin",      franklinAddress),
-                ]);
-            } else {
-                await Promise.all([
-                    publishSourceCodeToEtherscan('Governance',    governanceAddress,    governanceContractSourceCode,    governanceContractCode,    governanceConstructorArgs),
-                    publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, priorityQueueConstructorArgs),
-                    publishSourceCodeToEtherscan('Verifier',      verifierAddress,      verifierContractSourceCode,      verifierContractCode,      verifierConstructorArgs),
-                    publishSourceCodeToEtherscan('Franklin',      franklinAddress,      franklinContractSourceCode,      franklinContractCode,      franklinConstructorArgs),
-                ]);
+        if (args.publish) {
+            try {
+                if (process.env.ETH_NETWORK === 'localhost') {
+                    await Promise.all([
+                        postContractToTesseracts(governanceCode, "Governance", governanceAddress),
+                        postContractToTesseracts(priorityQueueCode, "PriorityQueue", priorityQueueAddress),
+                        postContractToTesseracts(verifierCode, "Verifier", verifierAddress),
+                        postContractToTesseracts(franklinCode, "Franklin", franklinAddress),
+                    ]);
+                } else {
+                    await Promise.all([
+                        publishSourceCodeToEtherscan('Governance', governanceAddress, governanceContractSourceCode, governanceContractCode, governanceConstructorArgs),
+                        publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, priorityQueueConstructorArgs),
+                        publishSourceCodeToEtherscan('Verifier', verifierAddress, verifierContractSourceCode, verifierContractCode, verifierConstructorArgs),
+                        publishSourceCodeToEtherscan('Franklin', franklinAddress, franklinContractSourceCode, franklinContractCode, franklinConstructorArgs),
+                    ]);
+                }
+            } catch (e) {
+                console.error("Failed to post contract code: ", e.toString());
             }
-        } catch (e) {
-            console.error("Failed to post contract code: ", e.toString());
         }
+
     }
 }
 
