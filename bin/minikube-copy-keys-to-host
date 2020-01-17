@@ -1,5 +1,0 @@
-#!/bin/bash
-
-# When mounting a volume as a `hostPath` minikube containers has access to minikube host filesystem only,
-# thus it is required to copy container files into it.
-scp  -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -r -i $(minikube ssh-key) ./keys/* docker@$(minikube ip):/home/docker

@@ -160,7 +160,7 @@ export default {
             this.transferPending = true;
             setTimeout(() => {
                 this.transferPending = false;
-            }, timeConstants.transferPending);
+            }, timeConstants.transferButtonDisableTime);
 
             this.$emit('buttonClicked', {
                 address: this.address,
