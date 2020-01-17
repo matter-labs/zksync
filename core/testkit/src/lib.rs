@@ -31,12 +31,6 @@ pub mod eth_account;
 pub mod external_commands;
 pub mod zksync_account;
 
-struct AccountSet<T: Transport> {
-    eth_accounts: Vec<EthereumAccount<T>>,
-    zksync_accounts: Vec<ZksyncAccount>,
-    fee_account_id: ZKSyncAccountId,
-}
-
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ETHAccountId(usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -44,8 +38,17 @@ pub struct ZKSyncAccountId(usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Token(TokenId);
 
+/// Account set is used to create transactions using stored account
+/// in a covenient way
+pub struct AccountSet<T: Transport> {
+    eth_accounts: Vec<EthereumAccount<T>>,
+    zksync_accounts: Vec<ZksyncAccount>,
+    fee_account_id: ZKSyncAccountId,
+}
+
 impl<T: Transport> AccountSet<T> {
-    fn deposit(
+    /// Create deposit from eth account to zksync account
+    pub fn deposit(
         &self,
         from: ETHAccountId,
         to: ZKSyncAccountId,
@@ -63,6 +66,9 @@ impl<T: Transport> AccountSet<T> {
         }
     }
 
+    /// Create signed transfer between zksync accounts
+    /// `nonce` optional nonce override
+    /// `increment_nonce` - flag for `from` account nonce increment
     #[allow(clippy::too_many_arguments)]
     fn transfer(
         &self,
@@ -87,6 +93,9 @@ impl<T: Transport> AccountSet<T> {
         ))
     }
 
+    /// Create withdraw from zksync account to eth account
+    /// `nonce` optional nonce override
+    /// `increment_nonce` - flag for `from` account nonce increment
     #[allow(clippy::too_many_arguments)]
     fn withdraw(
         &self,
@@ -111,6 +120,9 @@ impl<T: Transport> AccountSet<T> {
         ))
     }
 
+    /// Create full exit from zksync account to eth account
+    /// `nonce` optional nonce override
+    /// `increment_nonce` - flag for `from` account nonce increment
     #[allow(clippy::too_many_arguments)]
     fn full_exit(
         &self,
@@ -145,6 +157,7 @@ impl<T: Transport> AccountSet<T> {
     }
 }
 
+/// Initialize plasma state with one account - fee account.
 fn genesis_state(fee_account_address: &AccountAddress) -> PlasmaStateInitParams {
     let mut accounts = AccountMap::default();
     let operator_account = Account::default_with_address(fee_account_address);
@@ -157,7 +170,7 @@ fn genesis_state(fee_account_address: &AccountAddress) -> PlasmaStateInitParams 
     }
 }
 
-async fn sk_get_account(
+async fn state_keeper_get_account(
     mut sender: mpsc::Sender<StateKeeperRequest>,
     address: &AccountAddress,
 ) -> Option<(AccountId, Account)> {
@@ -340,6 +353,7 @@ pub fn perform_basic_tests() {
     sk_thread_handle.join().expect("sk thread join");
 }
 
+// Struct used to keep expected balance changes after transactions execution.
 #[derive(Default)]
 struct ExpectedAccountState {
     // First number is balance, second one is allowed error in balance(used for ETH because eth is used for transaction fees).
@@ -347,12 +361,14 @@ struct ExpectedAccountState {
     sync_accounts_state: HashMap<(ZKSyncAccountId, TokenId), BigDecimal>,
 }
 
-#[derive(Default)]
-struct TestBlock {
-    txs: ProposedBlock,
-    expected_state: ExpectedAccountState,
-}
-
+/// Used to create transactions between accounts and check for their validity.
+/// Every new block should start with `.start_block()`
+/// and end with `execute_commit_and_verify_block()`
+/// with desired transactions in between.
+///
+/// Transactions balance side effects are checked,
+/// in order to execute unusual/failed transactions one should create it separately and commit to block
+/// using `execute_incorrect_tx`
 pub struct TestSetup {
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     proposed_blocks_receiver: mpsc::Receiver<CommitRequest>,
@@ -360,7 +376,7 @@ pub struct TestSetup {
     accounts: AccountSet<Http>,
     tokens: HashMap<TokenId, Address>,
 
-    block: TestBlock,
+    expected_changes_for_current_block: ExpectedAccountState,
 
     commit_account: EthereumAccount<Http>,
 }
@@ -379,7 +395,7 @@ impl TestSetup {
             proposed_blocks_receiver: sk_channels.new_blocks,
             accounts,
             tokens,
-            block: TestBlock::default(),
+            expected_changes_for_current_block: ExpectedAccountState::default(),
             commit_account,
         }
     }
@@ -389,8 +405,7 @@ impl TestSetup {
         account: ETHAccountId,
         token: TokenId,
     ) -> (BigDecimal, BigDecimal) {
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .eth_accounts_state
             .get(&(account, token))
             .cloned()
@@ -402,8 +417,7 @@ impl TestSetup {
         account: ZKSyncAccountId,
         token: TokenId,
     ) -> BigDecimal {
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .sync_accounts_state
             .get(&(account, token))
             .cloned()
@@ -411,12 +425,11 @@ impl TestSetup {
     }
 
     fn start_block(&mut self) {
-        self.block = TestBlock::default();
+        self.expected_changes_for_current_block = ExpectedAccountState::default();
     }
 
     pub fn execute_incorrect_tx(&mut self, tx: FranklinTx) {
-        self.block.txs.txs.push(tx);
-        self.execute_current_txs();
+        self.execute_tx(tx);
     }
 
     pub fn deposit(
@@ -429,28 +442,24 @@ impl TestSetup {
         let mut from_eth_balance = self.get_expected_eth_account_balance(from, token.0);
         from_eth_balance.0 -= &amount;
 
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .eth_accounts_state
             .insert((from, token.0), from_eth_balance);
 
         if let Some(mut eth_balance) = self
-            .block
-            .expected_state
+            .expected_changes_for_current_block
             .eth_accounts_state
             .remove(&(from, 0))
         {
             eth_balance.1 += parse_ether("0.015").unwrap(); // max fee payed;
-            self.block
-                .expected_state
+            self.expected_changes_for_current_block
                 .eth_accounts_state
                 .insert((from, 0), eth_balance);
         }
 
         let mut zksync0_old = self.get_expected_zksync_account_balance(to, token.0);
         zksync0_old += &amount;
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((to, token.0), zksync0_old);
 
@@ -466,20 +475,37 @@ impl TestSetup {
         };
         let deposit = self.accounts.deposit(from, to, token_address, amount);
 
-        self.block.txs.priority_ops.push(deposit);
-        self.execute_current_txs();
+        self.execute_priority_op(deposit);
     }
 
-    pub fn execute_current_txs(&mut self) {
+    fn execute_tx(&self, tx: FranklinTx) {
+        let block = ProposedBlock {
+            priority_ops: Vec::new(),
+            txs: vec![tx],
+        };
         let block_sender = async {
             self.state_keeper_request_sender
                 .clone()
-                .send(StateKeeperRequest::ExecuteMiniBlock(self.block.txs.clone()))
+                .send(StateKeeperRequest::ExecuteMiniBlock(block))
                 .await
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        self.block.txs = ProposedBlock::default();
+    }
+
+    fn execute_priority_op(&self, op: PriorityOp) {
+        let block = ProposedBlock {
+            priority_ops: vec![op],
+            txs: Vec::new(),
+        };
+        let block_sender = async {
+            self.state_keeper_request_sender
+                .clone()
+                .send(StateKeeperRequest::ExecuteMiniBlock(block))
+                .await
+                .expect("sk receiver dropped");
+        };
+        block_on(block_sender);
     }
 
     pub fn full_exit(&mut self, post_by: ETHAccountId, from: ZKSyncAccountId, token: Token) {
@@ -494,32 +520,28 @@ impl TestSetup {
         };
 
         let zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((from, token.0), BigDecimal::from(0));
 
         let mut post_by_eth_balance = self.get_expected_eth_account_balance(post_by, token.0);
         post_by_eth_balance.0 += zksync0_old;
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .eth_accounts_state
             .insert((post_by, token.0), post_by_eth_balance);
 
         if let Some(mut eth_balance) = self
-            .block
-            .expected_state
+            .expected_changes_for_current_block
             .eth_accounts_state
             .remove(&(post_by, 0))
         {
             eth_balance.1 += parse_ether("0.015").unwrap(); // max fee payed;
-            self.block
-                .expected_state
+            self.expected_changes_for_current_block
                 .eth_accounts_state
                 .insert((post_by, 0), eth_balance);
         }
 
-        let op = self.accounts.full_exit(
+        let full_exit = self.accounts.full_exit(
             post_by,
             from,
             token.0,
@@ -528,8 +550,7 @@ impl TestSetup {
             None,
             true,
         );
-        self.block.txs.priority_ops.push(op);
-        self.execute_current_txs();
+        self.execute_priority_op(full_exit);
     }
 
     pub fn transfer(
@@ -543,32 +564,28 @@ impl TestSetup {
         let mut zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
         zksync0_old -= &amount;
         zksync0_old -= &fee;
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((from, token.0), zksync0_old);
 
         let mut zksync0_old = self.get_expected_zksync_account_balance(to, token.0);
         zksync0_old += &amount;
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((to, token.0), zksync0_old);
 
         let mut zksync0_old =
             self.get_expected_zksync_account_balance(self.accounts.fee_account_id, token.0);
         zksync0_old += &fee;
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
-        let transfer1 = self
+        let transfer = self
             .accounts
             .transfer(from, to, token, amount, fee, None, true);
 
-        self.block.txs.txs.push(transfer1);
-        self.execute_current_txs();
+        self.execute_tx(transfer)
     }
 
     pub fn withdraw(
@@ -582,23 +599,20 @@ impl TestSetup {
         let mut zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
         zksync0_old -= &amount;
         zksync0_old -= &fee;
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((from, token.0), zksync0_old);
 
         let mut to_eth_balance = self.get_expected_eth_account_balance(to, token.0);
         to_eth_balance.0 += &amount;
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .eth_accounts_state
             .insert((to, token.0), to_eth_balance);
 
         let mut zksync0_old =
             self.get_expected_zksync_account_balance(self.accounts.fee_account_id, token.0);
         zksync0_old += &fee;
-        self.block
-            .expected_state
+        self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((self.accounts.fee_account_id, token.0), zksync0_old);
 
@@ -606,17 +620,11 @@ impl TestSetup {
             .accounts
             .withdraw(from, to, token, amount, fee, None, true);
 
-        self.block.txs.txs.push(withdraw);
-        self.execute_current_txs();
+        self.execute_tx(withdraw);
     }
 
     pub fn execute_commit_and_verify_block(&mut self) -> Result<(), failure::Error> {
         let block_sender = async {
-            self.state_keeper_request_sender
-                .clone()
-                .send(StateKeeperRequest::ExecuteMiniBlock(self.block.txs.clone()))
-                .await
-                .expect("sk receiver dropped");
             self.state_keeper_request_sender
                 .clone()
                 .send(StateKeeperRequest::SealBlock)
@@ -649,7 +657,7 @@ impl TestSetup {
 
         let mut block_checks_failed = false;
         for ((eth_account, token), (balance, allowed_margin)) in
-            &self.block.expected_state.eth_accounts_state
+            &self.expected_changes_for_current_block.eth_accounts_state
         {
             let real_balance = self.get_eth_balance(*eth_account, *token);
             let diff = balance - &real_balance;
@@ -665,7 +673,9 @@ impl TestSetup {
             }
         }
 
-        for ((zksync_account, token), balance) in &self.block.expected_state.sync_accounts_state {
+        for ((zksync_account, token), balance) in
+            &self.expected_changes_for_current_block.sync_accounts_state
+        {
             let real = self.get_zksync_balance(*zksync_account, *token);
             let is_diff_valid = real.clone() - balance == BigDecimal::from(0);
             if !is_diff_valid {
@@ -695,7 +705,7 @@ impl TestSetup {
         zksync_id: ZKSyncAccountId,
     ) -> Option<(AccountId, Account)> {
         let address = &self.accounts.zksync_accounts[zksync_id.0].address;
-        block_on(sk_get_account(
+        block_on(state_keeper_get_account(
             self.state_keeper_request_sender.clone(),
             address,
         ))

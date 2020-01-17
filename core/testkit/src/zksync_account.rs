@@ -11,6 +11,7 @@ use std::cell::RefCell;
 use std::convert::TryInto;
 use web3::types::Address;
 
+/// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZksyncAccount {
     pub private_key: PrivateKey,
     pub address: AccountAddress,
