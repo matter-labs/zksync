@@ -70,6 +70,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync genesis
   - zksync redeploy
+  - zksync integration-testkit
   depends_on:
   - rust-tests
 

@@ -2912,7 +2912,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "test-kit"
+name = "testhelper"
+version = "0.1.0"
+dependencies = [
+ "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto)",
+ "models 0.0.1",
+ "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "testkit"
 version = "0.1.0"
 dependencies = [
  "bigdecimal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2931,16 +2941,6 @@ dependencies = [
  "storage 0.0.1",
  "tokio 0.2.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "web3 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "testhelper"
-version = "0.1.0"
-dependencies = [
- "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto)",
- "models 0.0.1",
- "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

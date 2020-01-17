@@ -175,6 +175,9 @@ prepare-contracts:
 loadtest: confirm_action
 	@bin/loadtest.sh
 
+integration-testkit: build-contracts
+	cargo run --bin testkit --release
+
 integration-simple:
 	@cd js/tests && yarn && yarn simple
 

@@ -1,5 +1,5 @@
 [package]
-name = "test-kit"
+name = "testkit"
 version = "0.1.0"
 authors = ["Vitaly Drogan <vd@matterlabs.dev>"]
 edition = "2018"
