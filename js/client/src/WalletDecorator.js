@@ -401,6 +401,8 @@ export class WalletDecorator {
         const address = options.address;
 
         try {
+            yield info(`Sending transfer...`);
+
             const transferTransaction = await window.syncWallet.syncTransfer({
                 to: address,
                 token,
@@ -411,6 +413,8 @@ export class WalletDecorator {
             yield info(`Sent transfer to Matter server`);
     
             yield * this.verboseGetSyncOpStatus(transferTransaction);
+
+            yield info(`Transfer succeeded!`);
             return;
         } catch (e) {
             console.log(e);
@@ -435,9 +439,11 @@ export class WalletDecorator {
                 fee,
             });
 
+            yield info(`Sent withdraw to Matter server`);
+
             yield * this.verboseGetSyncOpStatus(withdrawTransaction);
 
-            yield info(`Offchain withdraw succeeded!`);
+            yield info(`Withdraw succeeded!`);
         } catch (e) {
             console.log('error in verboseWithdrawOffchain', e);
             yield combineMessages(
@@ -505,6 +511,7 @@ export class WalletDecorator {
         const amount = utils.bigNumberify(options.amount);
         try {
             yield info(`Sending deposit...`);
+
             const maxFeeInETHToken = await this.getDepositFee(token);
             const deposit = await zksync.depositFromETH({
                 depositFrom: window.ethSigner,
@@ -523,6 +530,8 @@ export class WalletDecorator {
             yield * this.verboseGetRevertReason(deposit.ethTx.hash);
             
             yield * this.verboseGetSyncPriorityOpStatus(deposit);
+
+            yield info(`Deposit succeeded!`);
         } catch (e) {
             yield combineMessages(
                 info(`Onchain deposit failed with "${e.message}"`, { countdown: 7 }),
@@ -533,6 +542,8 @@ export class WalletDecorator {
     }
 
     async * verboseGetSyncOpStatus(syncOp) {
+        this.emit("receiptCommittedOrVerified");
+
         const txHashHtml = shortenedTxHash(syncOp.txHash);
     
         const receipt = await syncOp.awaitReceipt();
@@ -579,6 +590,8 @@ export class WalletDecorator {
     }
 
     async * verboseGetSyncPriorityOpStatus(syncOp) {
+        this.emit("receiptCommittedOrVerified");
+
         let txHashHtml = shortenedTxHash(syncOp.ethTx.hash);
 
         await syncOp.awaitEthereumTxCommit();

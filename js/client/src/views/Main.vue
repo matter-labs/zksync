@@ -77,7 +77,10 @@ export default {
     async created() {
         window.walletDecorator.on(
             "receiptCommittedOrVerified", 
-            this.updateAccountInfo.bind(this)
+            () => {
+                console.log('receiptCommittedOrVerified');
+                this.updateAccountInfo();
+            }
         );
 
         const timeOut = async () => {
