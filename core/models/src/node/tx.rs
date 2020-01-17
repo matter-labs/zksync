@@ -11,6 +11,7 @@ use super::account::PubKeyHash;
 use super::Engine;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
+use ethsign::Signature as ETHSignature;
 use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
@@ -474,6 +475,74 @@ impl<'de> Deserialize<'de> for PackedSignature {
     }
 }
 
+/// Struct used for working with ethereym signatures created using eth_sign
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PackedEthSignature(pub ETHSignature);
+
+impl PackedEthSignature {
+    pub fn serialize_packed(&self) -> [u8; 65] {
+        let mut result = [0u8; 65];
+        result[0..32].copy_from_slice(&self.0.r);
+        result[32..64].copy_from_slice(&self.0.s);
+        result[64] = self.0.v;
+        result
+    }
+
+    pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, failure::Error> {
+        ensure!(bytes.len() == 65, "eth signature length should be 65 bytes");
+        Ok(PackedEthSignature(ETHSignature {
+            r: bytes[0..32].try_into().unwrap(),
+            s: bytes[32..64].try_into().unwrap(),
+            v: bytes[64],
+        }))
+    }
+
+    pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, failure::Error> {
+        let mut signature = self.0.clone();
+        signature.v = signature
+            .v
+            .checked_sub(27)
+            .ok_or_else(|| format_err!("signature v should be 27 + recovery_id"))?;
+
+        let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(prefix.as_bytes());
+        bytes.extend_from_slice(msg);
+        let final_message = tiny_keccak::keccak256(&bytes);
+
+        let pk = signature.recover(&final_message)?;
+        Ok(Address::from_slice(pk.address()))
+    }
+}
+
+impl Serialize for PackedEthSignature {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        use serde::ser::Error;
+
+        let packed_signature = self.serialize_packed();
+        serializer.serialize_str(&format!("0x{}", &hex::encode(&packed_signature[..])))
+    }
+}
+
+impl<'de> Deserialize<'de> for PackedEthSignature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        String::deserialize(deserializer).and_then(|string| {
+            if !string.starts_with("0x") {
+                return Err(Error::custom("Packed eth signature should start with 0x"));
+            }
+            let bytes = hex::decode(&string[2..]).map_err(|e| Error::custom(e.to_string()))?;
+            PackedEthSignature::deserialize_packed(&bytes).map_err(|e| Error::custom(e.to_string()))
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -536,6 +605,65 @@ mod test {
             } else {
                 panic!("Signature is incorrect, msg: {}", hex::encode(&msg));
             }
+        }
+    }
+
+    #[test]
+    fn test_ethereum_signature_with_serialization() {
+        let address: Address = "52312AD6f01657413b2eaE9287f6B9ADaD93D5FE".parse().unwrap();
+        let message = "hello world";
+
+        #[derive(Debug, Serialize, Deserialize, PartialEq)]
+        struct TestSignatureSerialize {
+            signature: PackedEthSignature,
+        }
+
+        // signature calculated using ethers.js signer
+        let test_signature_serialize = "{ \"signature\": \"0x111ea2824732851dd0893eaa5873597ba38ed08b69f6d8a0d7f5da810335566403d05281b1f56d12ca653e32eb7d67b76814b0cc8b0da2d7ad2c862d575329951b\"}";
+
+        // test serialization
+        let deserialized_signature: TestSignatureSerialize =
+            serde_json::from_str(test_signature_serialize).expect("signature deserialize");
+        let signature_after_roundtrip: TestSignatureSerialize = serde_json::from_str(
+            &serde_json::to_string(&deserialized_signature).expect("signature serialize roundtrip"),
+        )
+        .expect("signature deserialize roundtrip");
+        assert_eq!(
+            deserialized_signature, signature_after_roundtrip,
+            "signature serialize-deserialize roundtrip"
+        );
+
+        let recovered_address = deserialized_signature
+            .signature
+            .signature_recover_signer(message.as_bytes())
+            .expect("signature verification");
+
+        assert_eq!(address, recovered_address, "recovered address mismatch");
+    }
+
+    #[test]
+    fn test_ethereum_signature_examples() {
+        // signatures created using geth
+        // e.g. in geth console: eth.sign(eth.accounts[0], "0x")
+        let examples = vec![
+            ("0x8a91dc2d28b689474298d91899f0c1baf62cb85b", "0xdead", "0x13c34c76ffb42d97da67ddc5d275e92d758d1b48b5ee4b3bacd800cbeec3baff043a5ee63fea55485e1ee5d6f8b088daabd095f2ebbdc80a33806528b44bfccc1c"),
+            // empty message
+            ("0x8a91dc2d28b689474298d91899f0c1baf62cb85b", "0x", "0xd98f51c2ee0fd589e421348002dffec5d1b38e5bef9a41a699030456dc39298d12698158dc2a814b5f9ac6d433009dec87484a4579107be3f8f33907e92938291b"),
+            // this example has v = 28, unlike others
+            ("0x8a91dc2d28b689474298d91899f0c1baf62cb85b", "0x14", "0xd288b623af654c9d805e132812edf09ce244040376ca49112e91d437ecceed7c518690d4ae14149cd533f1ca4f081e6d2252c980fccc63de4d6bb818f1b668921c"),
+            ];
+
+        for (address, msg, signature) in examples {
+            println!("addr: {}, msg: {}, sign: {}", address, msg, signature);
+            let address = address[2..].parse::<Address>().unwrap();
+            let msg = hex::decode(&msg[2..]).unwrap();
+            let signature =
+                PackedEthSignature::deserialize_packed(&hex::decode(&signature[2..]).unwrap())
+                    .expect("signature deserialize");
+            let signer_address = signature
+                .signature_recover_signer(&msg)
+                .expect("signature verification");
+            assert_eq!(address, signer_address, "signer address mismatch");
         }
     }
 }
