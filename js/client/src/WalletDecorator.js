@@ -542,12 +542,13 @@ export class WalletDecorator {
     }
 
     async * verboseGetSyncOpStatus(syncOp) {
-        this.emit("receiptCommittedOrVerified");
+        // this.emit("receiptCommittedOrVerified");
 
         const txHashHtml = shortenedTxHash(syncOp.txHash);
     
         const receipt = await syncOp.awaitReceipt();
-        this.emit("receiptCommittedOrVerified");
+        this.emit("receiptCommittedOrVerified"); 
+        console.log('awaitReceipt');
 
         if (receipt.failReason) {
             yield error(`Transaction ${txHashHtml} with <code>${receipt.failReason}</code>`, { countdown: 10 });
@@ -563,6 +564,7 @@ export class WalletDecorator {
         syncOp.awaitVerifyReceipt()
             .then(verifyReceipt => {
                 this.emit("receiptCommittedOrVerified");
+                console.log('verifyReceipt');
                 verified = true;
             });
 
@@ -590,7 +592,7 @@ export class WalletDecorator {
     }
 
     async * verboseGetSyncPriorityOpStatus(syncOp) {
-        this.emit("receiptCommittedOrVerified");
+        // this.emit("receiptCommittedOrVerified");
 
         let txHashHtml = shortenedTxHash(syncOp.ethTx.hash);
 
@@ -598,6 +600,7 @@ export class WalletDecorator {
 
         const receipt = await syncOp.awaitReceipt();
         this.emit("receiptCommittedOrVerified");
+        console.log('awaitReceipt')
         
         yield combineMessages(
             info(`Transaction ${txHashHtml} got included in block <code>${receipt.block.blockNumber}</code>, waiting for prover...`),
@@ -608,6 +611,7 @@ export class WalletDecorator {
         syncOp.awaitVerifyReceipt()
             .then(verifyReceipt => {
                 this.emit("receiptCommittedOrVerified");
+                console.log('verifyReceipt');
                 verified = true;
             });
 

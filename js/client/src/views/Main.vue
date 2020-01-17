@@ -78,7 +78,7 @@ export default {
         window.walletDecorator.on(
             "receiptCommittedOrVerified", 
             () => {
-                console.log('receiptCommittedOrVerified');
+                // console.log('receiptCommittedOrVerified');
                 this.updateAccountInfo();
             }
         );
