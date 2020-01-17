@@ -162,6 +162,7 @@ gen-keys-if-not-present:
 	@touch contracts/build/Franklin.json
 	@touch contracts/build/Governance.json
 	@touch contracts/build/PriorityQueue.json
+	@touch contracts/build/IERC20.json
 	
 	test -f keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
 
