@@ -1,7 +1,7 @@
 //use log::*;
 
-use crate::deploy_contracts::{get_test_accounts, Contracts};
 use crate::eth_account::{parse_ether, EthereumAccount};
+use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
 use bigdecimal::BigDecimal;
 use failure::{bail, ensure};
@@ -27,8 +27,8 @@ use web3::transports::Http;
 use web3::types::{Address, U64};
 use web3::Transport;
 
-pub mod deploy_contracts;
 pub mod eth_account;
+pub mod external_commands;
 pub mod zksync_account;
 
 struct AccountSet<T: Transport> {
@@ -220,7 +220,7 @@ pub fn perform_basic_tests() {
 
     let deploy_timer = Instant::now();
     println!("deploying contracts");
-    let contracts = deploy_contracts::deploy_test_contracts();
+    let contracts = deploy_test_contracts();
     println!(
         "contracts deployed {:#?}, {} secs",
         contracts,
@@ -251,7 +251,12 @@ pub fn perform_basic_tests() {
 
     let accounts = AccountSet {
         eth_accounts,
-        zksync_accounts: vec![fee_account, ZksyncAccount::rand(), ZksyncAccount::rand()],
+        zksync_accounts: vec![
+            fee_account,
+            ZksyncAccount::rand(),
+            ZksyncAccount::rand(),
+            ZksyncAccount::rand(),
+        ],
         fee_account_id: ZKSyncAccountId(0),
     };
 
@@ -259,7 +264,7 @@ pub fn perform_basic_tests() {
 
     let deposit_amount = parse_ether("1.0").unwrap();
 
-    for token in 0..1 {
+    for token in 0..=1 {
         // test two deposits
         test_setup.start_block();
         test_setup.deposit(
@@ -277,6 +282,7 @@ pub fn perform_basic_tests() {
         test_setup
             .execute_commit_and_verify_block()
             .expect("Block execution failed");
+        println!("Deposit test success, token_id: {}", token);
 
         // test transfers
         test_setup.start_block();
@@ -320,6 +326,14 @@ pub fn perform_basic_tests() {
         test_setup
             .execute_commit_and_verify_block()
             .expect("Block execution failed");
+        println!("Transfer test success, token_id: {}", token);
+
+        test_setup.start_block();
+        test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(0), Token(token));
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Full exit test success, token_id: {}", token);
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
