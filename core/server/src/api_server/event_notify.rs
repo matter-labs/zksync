@@ -1,11 +1,15 @@
 use super::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
 use crate::api_server::rpc_server::{BlockInfo, ResponseAccountState};
-use crate::state_keeper::ExecutedOpsNotify;
+use crate::state_keeper::{ExecutedOpId, ExecutedOpsNotify, StateKeeperRequest};
 use crate::ThreadPanicNotify;
 use failure::{bail, format_err};
 use futures::task::LocalSpawnExt;
 use futures::{
-    channel::mpsc, compat::Future01CompatExt, executor, select, stream::StreamExt, FutureExt,
+    channel::{mpsc, oneshot},
+    compat::Future01CompatExt,
+    executor, select,
+    stream::StreamExt,
+    FutureExt, SinkExt,
 };
 use jsonrpc_pubsub::{
     typed::{Sink, Subscriber},
@@ -57,6 +61,7 @@ struct SubscriptionSender<T> {
 
 struct OperationNotifier {
     db_pool: ConnectionPool,
+    state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
     prior_op_subs: BTreeMap<(u64, ActionType), Vec<SubscriptionSender<ETHOpInfoResp>>>,
     account_subs: BTreeMap<(AccountId, ActionType), Vec<SubscriptionSender<ResponseAccountState>>>,
@@ -69,6 +74,21 @@ impl OperationNotifier {
         self.spawner
             .spawn_local(sink.notify(Ok(val)).compat().map(drop))
             .expect("future local_spawn");
+    }
+
+    async fn check_op_executed_current_block(
+        &self,
+        op_id: ExecutedOpId,
+    ) -> Result<Option<(BlockNumber, bool)>, failure::Error> {
+        let response = oneshot::channel();
+        self.state_keeper_requests
+            .clone()
+            .send(StateKeeperRequest::GetExecutedInPendingBlock(
+                op_id, response.0,
+            ))
+            .await?;
+        let state_keeper_resp = response.1.await;
+        Ok(state_keeper_resp?)
     }
 
     fn handle_unsub(&mut self, sub_id: SubscriptionId) -> Result<(), failure::Error> {
@@ -117,19 +137,25 @@ impl OperationNotifier {
         Ok(())
     }
 
-    fn handle_notify_req(&mut self, new_sub: EventNotifierRequest) -> Result<(), failure::Error> {
+    async fn handle_notify_req(
+        &mut self,
+        new_sub: EventNotifierRequest,
+    ) -> Result<(), failure::Error> {
         match new_sub {
             EventNotifierRequest::Sub(event_sub) => match event_sub {
                 EventSubscribeRequest::Transaction {
                     hash,
                     action,
                     subscriber,
-                } => self.handle_transaction_sub(hash, action, subscriber),
+                } => self.handle_transaction_sub(hash, action, subscriber).await,
                 EventSubscribeRequest::PriorityOp {
                     serial_id,
                     action,
                     subscriber,
-                } => self.handle_priority_op_sub(serial_id, action, subscriber),
+                } => {
+                    self.handle_priority_op_sub(serial_id, action, subscriber)
+                        .await
+                }
                 EventSubscribeRequest::Account {
                     address,
                     action,
@@ -143,7 +169,7 @@ impl OperationNotifier {
         }
     }
 
-    fn handle_priority_op_sub(
+    async fn handle_priority_op_sub(
         &mut self,
         serial_id: u64,
         action: ActionType,
@@ -158,6 +184,29 @@ impl OperationNotifier {
         ));
 
         // Maybe it was executed already
+        if action == ActionType::COMMIT {
+            if let Some((block_number, _)) = self
+                .check_op_executed_current_block(ExecutedOpId::PriorityOp(serial_id))
+                .await?
+            {
+                let sink = sub
+                    .assign_id(sub_id)
+                    .map_err(|_| format_err!("SubIdAssign"))?;
+                self.send_once(
+                    &sink,
+                    ETHOpInfoResp {
+                        executed: true,
+                        block: Some(BlockInfo {
+                            block_number: i64::from(block_number),
+                            committed: true,
+                            verified: false,
+                        }),
+                    },
+                );
+                return Ok(());
+            }
+        }
+
         let storage = self.db_pool.access_storage()?;
         let executed_op = storage.get_executed_priority_op(serial_id as u32)?;
         if let Some(executed_op) = executed_op {
@@ -228,7 +277,7 @@ impl OperationNotifier {
         Ok(())
     }
 
-    fn handle_transaction_sub(
+    async fn handle_transaction_sub(
         &mut self,
         hash: TxHash,
         action: ActionType,
@@ -243,6 +292,29 @@ impl OperationNotifier {
         ));
 
         // Maybe tx was executed already.
+        if action == ActionType::COMMIT {
+            if let Some((block_number, success)) = self
+                .check_op_executed_current_block(ExecutedOpId::Transaction(hash.clone()))
+                .await?
+            {
+                let sink = sub.assign_id(id).map_err(|_| format_err!("SubIdAssign"))?;
+                self.send_once(
+                    &sink,
+                    TransactionInfoResp {
+                        executed: true,
+                        success: Some(success),
+                        fail_reason: None,
+                        block: Some(BlockInfo {
+                            block_number: i64::from(block_number),
+                            committed: true,
+                            verified: false,
+                        }),
+                    },
+                );
+                return Ok(());
+            }
+        }
+
         if let Some(receipt) = self.db_pool.access_storage()?.tx_receipt(hash.as_ref())? {
             let tx_info_resp = TransactionInfoResp {
                 executed: true,
@@ -448,6 +520,7 @@ pub fn start_sub_notifier(
     mut new_block_stream: mpsc::Receiver<Operation>,
     mut subscription_stream: mpsc::Receiver<EventNotifierRequest>,
     mut executed_tx_stream: mpsc::Receiver<ExecutedOpsNotify>,
+    state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -458,6 +531,7 @@ pub fn start_sub_notifier(
 
             let mut notifier = OperationNotifier {
                 db_pool,
+                state_keeper_requests,
                 tx_subs: BTreeMap::new(),
                 prior_op_subs: BTreeMap::new(),
                 account_subs: BTreeMap::new(),
@@ -483,7 +557,7 @@ pub fn start_sub_notifier(
                         },
                         new_sub = subscription_stream.next() => {
                             if let Some(new_sub) = new_sub {
-                                notifier.handle_notify_req(new_sub)
+                                notifier.handle_notify_req(new_sub).await
                                     .map_err(|e| warn!("Failed to handle notify request: {}",e))
                                     .unwrap_or_default();
                             }

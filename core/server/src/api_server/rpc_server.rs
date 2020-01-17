@@ -145,7 +145,6 @@ impl Rpc for RpcApp {
 
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
         let account_state_resp = async move {
-            // TODO: add timeout
             let state_keeper_response = oneshot::channel();
             state_keeper_request_sender
                 .send(StateKeeperRequest::GetAccount(
@@ -157,7 +156,7 @@ impl Rpc for RpcApp {
             let committed_account_state = state_keeper_response
                 .1
                 .await
-                .expect("State keeper response dropped"); // TODO: remove this unwrap
+                .map_err(|_| Error::internal_error())?;
 
             let committed = if let Some((_, account)) = committed_account_state {
                 ResponseAccountState::try_to_restore(account, &tokens)?
@@ -236,7 +235,6 @@ impl Rpc for RpcApp {
         tx: FranklinTx,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send> {
         let mut mempool_sender = self.mempool_request_sender.clone();
-        // TODO: add timeouts
         let mempool_resp = async move {
             let hash = tx.hash();
             let mempool_resp = oneshot::channel();

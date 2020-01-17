@@ -4,6 +4,7 @@ use std::time::Duration;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 // Workspace uses
+use crate::mempool::MempoolRequest;
 use models::{Action, CommitRequest, Operation};
 use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
@@ -14,6 +15,7 @@ async fn handle_new_commit_task(
     mut rx_for_ops: Receiver<CommitRequest>,
     mut tx_for_eth: Sender<Operation>,
     mut op_notify_sender: Sender<Operation>,
+    mut mempool_req_sender: Sender<MempoolRequest>,
     pool: ConnectionPool,
 ) {
     while let Some(CommitRequest {
@@ -55,9 +57,15 @@ async fn handle_new_commit_task(
 
         // we notify about commit operation as soon as it is executed, we don't wait for eth confirmations
         op_notify_sender
-            .send(op)
+            .send(op.clone())
             .await
             .map_err(|e| warn!("Failed notify about commit op confirmation: {}", e))
+            .unwrap_or_default();
+
+        mempool_req_sender
+            .send(MempoolRequest::UpdateNonces(op.accounts_updated))
+            .await
+            .map_err(|e| warn!("Failed notify mempool about account updates: {}", e))
             .unwrap_or_default();
     }
 }
@@ -113,6 +121,7 @@ pub fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
     tx_for_eth: Sender<Operation>,
     op_notify_sender: Sender<Operation>,
+    mempool_req_sender: Sender<MempoolRequest>,
     pool: ConnectionPool,
     runtime: &Runtime,
 ) {
@@ -120,6 +129,7 @@ pub fn run_committer(
         rx_for_ops,
         tx_for_eth.clone(),
         op_notify_sender,
+        mempool_req_sender,
         pool.clone(),
     ));
     runtime.spawn(poll_for_new_proofs_task(tx_for_eth, pool));

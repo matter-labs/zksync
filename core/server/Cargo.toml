@@ -44,7 +44,7 @@ chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 diesel = { version = "1.4.3", features = ["postgres", "serde_json", "r2d2", "chrono"] }
 ctrlc = "3.1"
 failure = "0.1"
-# should be removed after json rpc deps are updated is updated
+# TODO: should be removed after json rpc deps are updated is updated, current version (14.0)
 futures01 = { package = "futures", version = "0.1" }
 reqwest = "0.9.22"
 

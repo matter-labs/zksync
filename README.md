@@ -33,11 +33,6 @@ To completely reset the dev environment:
 
 - Stop services:
 ```zksync dev-down```
-- Remove containers data:
-```
-ssh minikube
-rm -r /data/*
-```
 - Repeat the setup procedure above
 
 # (Re)deploy db and contraсts:
@@ -94,20 +89,6 @@ zksync client
 Client UI will be available at http://localhost:8080.
 Make sure you have environment variables set right, you can check it by running:
 ```zksync env```. You should see `* dev` in output.
-
-## Start server and prover in minikube (this setup is closest to prod):
-
-- Prerequisite: ```zksync dev-up; zksync init```
-
-- Start:
-```zksync start```
-
-- Watch logs:
-Server: ```zksync log-server```
-Prover: ```zksync log-prover```
-
-- Stop:
-```zksync stop```
 
 ## Build and push images to dockerhub:
 

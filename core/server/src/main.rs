@@ -91,6 +91,7 @@ fn main() {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
     let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
+    let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     let state_keeper = PlasmaStateKeeper::new(
         PlasmaStateInitParams::restore_from_db(connection_pool.clone()),
         config_opts.operator_franklin_addr.clone(),
@@ -114,10 +115,10 @@ fn main() {
         proposed_blocks_receiver,
         eth_send_request_sender,
         zksync_commit_notify_sender, // commiter sends only commit block notifications
+        mempool_request_sender.clone(),
         connection_pool.clone(),
         &main_runtime,
     );
-    let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     start_api_server(
         zksync_commit_notify_receiver,
         connection_pool.clone(),

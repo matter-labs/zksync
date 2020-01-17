@@ -2,6 +2,9 @@ kind: pipeline
 type: docker
 name: default
 
+clone:
+    depth: 10
+
 steps:
 - name: restore-cache
   image: drillster/drone-volume-cache
@@ -14,8 +17,8 @@ steps:
       - ./contracts/node_modules
       - ./js/client/node_modules
       - ./js/explorer/node_modules
-      - ./js/franklin_lib/node_modules
       - ./target/cargo
+      - ./keys
 
 - name: init
   image: matterlabs/ci
@@ -96,8 +99,8 @@ steps:
       - ./contracts/node_modules
       - ./js/client/node_modules
       - ./js/explorer/node_modules
-      - ./js/franklin_lib/node_modules
       - ./target/cargo
+      - ./keys
   depends_on:
      - init
      - rust-checks

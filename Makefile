@@ -69,11 +69,9 @@ dist-config:
 	bin/.gen_js_config > js/explorer/src/env-config.js
 
 client:
-	@cd js/client && yarn update_franklin_lib
 	@cd js/client && yarn serve
 
 explorer: dist-config
-	@cd js/explorer && yarn update_franklin_lib
 	@cd js/explorer && yarn serve
 
 dist-client:
@@ -165,7 +163,7 @@ gen-keys-if-not-present:
 	@touch contracts/build/Governance.json
 	@touch contracts/build/PriorityQueue.json
 	
-	test -f keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/franklin_pk.key || gen-keys
+	test -f keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
 
 prepare-contracts:
 	@cp keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
@@ -204,24 +202,9 @@ deposit: confirm_action
 # Devops: main
 
 # (Re)deploy contracts and database
-ifeq (dev,$(ZKSYNC_ENV))
-redeploy: confirm_action stop deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
-else
 redeploy: confirm_action stop deploy-contracts db-insert-contract
-endif
 
-ifeq (dev,$(ZKSYNC_ENV))
-init-deploy: confirm_action deploy-contracts db-insert-contract bin/minikube-copy-keys-to-host
-else
 init-deploy: confirm_action deploy-contracts db-insert-contract
-endif
-
-start-local:
-	@kubectl apply -f ./etc/kube/minikube/server.yaml
-	@kubectl apply -f ./etc/kube/minikube/prover.yaml
-	./bin/kube-update-server-vars
-	@kubectl apply -f ./etc/kube/minikube/postgres.yaml
-	@kubectl apply -f ./etc/kube/minikube/geth.yaml
 
 dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
@@ -247,15 +230,7 @@ start: apply-kubeconfig start-prover start-server start-nginx
 endif
 
 ifeq (dev,$(ZKSYNC_ENV))
-stop: confirm_action
-	@echo TODO: fix minikube local dev
-#	@kubectl delete deployments --selector=app=dev-server
-#	@kubectl delete deployments --selector=app=dev-prover
-#	@kubectl delete deployments --selector=app=dev-nginx
-#	@kubectl delete svc --selector=app=dev-server
-#	@kubectl delete svc --selector=app=dev-nginx
-#	@kubectl delete -f ./etc/kube/minikube/postgres.yaml
-#	@kubectl delete -f ./etc/kube/minikube/geth.yaml
+stop:
 else ifeq (ci,$(ZKSYNC_ENV))
 stop:
 else
