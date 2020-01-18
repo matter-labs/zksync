@@ -1,4 +1,9 @@
+use crate::mempool::MempoolRequest;
+use crate::mempool::TxAddError;
+use crate::state_keeper::StateKeeperRequest;
 use bigdecimal::BigDecimal;
+use futures::channel::{mpsc, oneshot};
+use futures::{FutureExt, SinkExt, TryFutureExt};
 use jsonrpc_core::{Error, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
@@ -8,8 +13,7 @@ use models::node::tx::TxHash;
 use models::node::{Account, AccountAddress, AccountId, FranklinTx, Nonce, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::sync::mpsc;
-use storage::{ConnectionPool, StorageProcessor, Token, TxAddError};
+use storage::{ConnectionPool, StorageProcessor, Token};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ResponseAccountState {
@@ -78,14 +82,20 @@ pub struct ContractAddressResp {
 
 #[rpc]
 pub trait Rpc {
-    #[rpc(name = "account_info")]
-    fn account_info(&self, addr: AccountAddress) -> Result<AccountInfoResp>;
+    #[rpc(name = "account_info", returns = "AccountInfoResp")]
+    fn account_info(
+        &self,
+        addr: AccountAddress,
+    ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send>;
     #[rpc(name = "ethop_info")]
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp>;
     #[rpc(name = "tx_info")]
     fn tx_info(&self, hash: TxHash) -> Result<TransactionInfoResp>;
-    #[rpc(name = "tx_submit")]
-    fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash>;
+    #[rpc(name = "tx_submit", returns = "TxHash")]
+    fn tx_submit(
+        &self,
+        tx: FranklinTx,
+    ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
     /// "ETH" | #ERC20_ADDRESS => {Token}
@@ -94,6 +104,8 @@ pub trait Rpc {
 }
 
 pub struct RpcApp {
+    pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
+    pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub connection_pool: ConnectionPool,
 }
 
@@ -112,33 +124,61 @@ impl RpcApp {
 }
 
 impl Rpc for RpcApp {
-    fn account_info(&self, address: AccountAddress) -> Result<AccountInfoResp> {
-        let storage = self.access_storage()?;
-        let account = storage
-            .account_state_by_address(&address)
-            .map_err(|_| Error::internal_error())?;
-        let tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
+    fn account_info(
+        &self,
+        address: AccountAddress,
+    ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send> {
+        let (account, tokens) = if let Ok((account, tokens)) = (|| -> Result<_> {
+            let storage = self.access_storage()?;
+            let account = storage
+                .account_state_by_address(&address)
+                .map_err(|_| Error::internal_error())?;
+            let tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
+            Ok((account, tokens))
+        })() {
+            (account, tokens)
+        } else {
+            return Box::new(futures01::done(Err(Error::internal_error())));
+        };
 
         let id = account.committed.as_ref().map(|(id, _)| *id);
 
-        let commited = if let Some((_, account)) = account.committed {
-            ResponseAccountState::try_to_restore(account, &tokens)?
-        } else {
-            ResponseAccountState::default()
+        let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
+        let account_state_resp = async move {
+            let state_keeper_response = oneshot::channel();
+            state_keeper_request_sender
+                .send(StateKeeperRequest::GetAccount(
+                    address.clone(),
+                    state_keeper_response.0,
+                ))
+                .await
+                .expect("state keeper receiver dropped");
+            let committed_account_state = state_keeper_response
+                .1
+                .await
+                .map_err(|_| Error::internal_error())?;
+
+            let committed = if let Some(account) = committed_account_state {
+                ResponseAccountState::try_to_restore(account, &tokens)?
+            } else {
+                ResponseAccountState::default()
+            };
+
+            let verified = if let Some((_, account)) = account.verified {
+                ResponseAccountState::try_to_restore(account, &tokens)?
+            } else {
+                ResponseAccountState::default()
+            };
+
+            Ok(AccountInfoResp {
+                address,
+                id,
+                committed,
+                verified,
+            })
         };
 
-        let verified = if let Some((_, account)) = account.verified {
-            ResponseAccountState::try_to_restore(account, &tokens)?
-        } else {
-            ResponseAccountState::default()
-        };
-
-        Ok(AccountInfoResp {
-            address,
-            id,
-            committed: commited,
-            verified,
-        })
+        Box::new(account_state_resp.boxed().compat())
     }
 
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
@@ -190,25 +230,36 @@ impl Rpc for RpcApp {
         })
     }
 
-    fn tx_submit(&self, tx: FranklinTx) -> Result<TxHash> {
-        let storage = self.access_storage()?;
+    fn tx_submit(
+        &self,
+        tx: FranklinTx,
+    ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send> {
+        let mut mempool_sender = self.mempool_request_sender.clone();
+        let mempool_resp = async move {
+            let hash = tx.hash();
+            let mempool_resp = oneshot::channel();
+            mempool_sender
+                .send(MempoolRequest::NewTx(Box::new(tx), mempool_resp.0))
+                .await
+                .expect("mempool receiver dropped");
+            let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
 
-        let tx_add_result = storage
-            .mempool_add_tx(&tx)
-            .map_err(|_| Error::internal_error())?;
+            tx_add_result.map(|_| hash).map_err(|e| {
+                let code = match &e {
+                    TxAddError::NonceMismatch => 101,
+                    TxAddError::InvalidSignature => 102,
+                    TxAddError::IncorrectTx => 103,
+                    TxAddError::Other => 104,
+                };
+                Error {
+                    code: code.into(),
+                    message: e.to_string(),
+                    data: None,
+                }
+            })
+        };
 
-        tx_add_result.map(|_| tx.hash()).map_err(|e| {
-            let code = match &e {
-                TxAddError::NonceTooLow => 101,
-                TxAddError::InvalidSignature => 102,
-                TxAddError::IncorrectTx => 103,
-            };
-            Error {
-                code: code.into(),
-                message: e.to_string(),
-                data: None,
-            }
-        })
+        Box::new(mempool_resp.boxed().compat())
     }
 
     fn contract_address(&self) -> Result<ContractAddressResp> {
@@ -240,6 +291,8 @@ impl Rpc for RpcApp {
 pub fn start_rpc_server(
     addr: SocketAddr,
     connection_pool: ConnectionPool,
+    mempool_request_sender: mpsc::Sender<MempoolRequest>,
+    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -248,7 +301,11 @@ pub fn start_rpc_server(
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
             let mut io = IoHandler::new();
 
-            let rpc_app = RpcApp { connection_pool };
+            let rpc_app = RpcApp {
+                connection_pool,
+                mempool_request_sender,
+                state_keeper_request_sender,
+            };
             rpc_app.extend(&mut io);
 
             let server = ServerBuilder::new(io).threads(1).start_http(&addr).unwrap();

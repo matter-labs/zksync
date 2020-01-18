@@ -13,7 +13,6 @@ pub mod primitives;
 
 // TODO: refactor, find new home for all this stuff
 
-use crate::node::account::{Account, AccountAddress};
 use crate::node::block::Block;
 use crate::node::AccountUpdates;
 use crate::node::BlockNumber;
@@ -21,7 +20,6 @@ use ethabi::{decode, ParamType};
 use failure::format_err;
 use serde_bytes;
 use std::convert::TryFrom;
-use std::sync::mpsc::Sender;
 use web3::types::{Address, Log, U256};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,12 +82,6 @@ pub struct Operation {
     pub action: Action,
     pub block: Block,
     pub accounts_updated: AccountUpdates,
-}
-
-pub enum StateKeeperRequest {
-    GetAccount(AccountAddress, Sender<Option<Account>>),
-    GetNetworkStatus(Sender<NetworkStatus>),
-    TimerTick,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

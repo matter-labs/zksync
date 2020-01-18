@@ -8,7 +8,7 @@ use std::{fmt, thread, time};
 // External deps
 use bellman::groth16;
 use ff::PrimeField;
-use log::{error, info};
+use log::{error, info, trace};
 // Workspace deps
 use models::node::Engine;
 
@@ -100,7 +100,7 @@ impl<C: ApiClient> BabyProver<C> {
         info!("Running worker rounds");
 
         while !self.stop_signal.load(Ordering::SeqCst) {
-            info!("Starting a next round");
+            trace!("Starting a next round");
             let ret = self.next_round(&mut rng, &start_heartbeats_tx);
             if let Err(err) = ret {
                 match err {
@@ -113,7 +113,7 @@ impl<C: ApiClient> BabyProver<C> {
                     _ => {}
                 };
             }
-            info!("round completed.");
+            trace!("round completed.");
             thread::sleep(pause_duration);
         }
         BabyProverError::Stop
@@ -132,7 +132,7 @@ impl<C: ApiClient> BabyProver<C> {
         let (block, job_id) = match block_to_prove {
             Some(b) => b,
             _ => {
-                info!("no block to prove from the server");
+                trace!("no block to prove from the server");
                 (0, 0)
             }
         };
@@ -209,7 +209,7 @@ impl<C: ApiClient> BabyProver<C> {
             }
             job_id = j;
             if job_id != 0 {
-                info!("sending working_on request for job_id: {}", job_id);
+                trace!("sending working_on request for job_id: {}", job_id);
                 let ret = self.api_client.working_on(job_id);
                 if let Err(e) = ret {
                     error!("working_on request errored: {}", e);

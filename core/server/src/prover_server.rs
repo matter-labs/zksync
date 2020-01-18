@@ -1,12 +1,13 @@
 mod pool;
 
 // Built-in
-use std::sync::{mpsc, Arc, RwLock};
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::{net, time};
 // External
 use actix_web::{web, App, HttpResponse, HttpServer};
-use log::{error, info};
+use futures::channel::mpsc;
+use log::{error, info, trace};
 // Workspace deps
 use models::config_options::ThreadPanicNotify;
 use prover::client;
@@ -44,7 +45,7 @@ fn block_to_prove(
     data: web::Data<AppState>,
     r: web::Json<client::ProverReq>,
 ) -> actix_web::Result<HttpResponse> {
-    info!("request block to prove from worker: {}", r.name);
+    trace!("request block to prove from worker: {}", r.name);
     if r.name == "" {
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
@@ -84,7 +85,7 @@ fn working_on(
     data: web::Data<AppState>,
     r: web::Json<client::WorkingOnReq>,
 ) -> actix_web::Result<()> {
-    info!(
+    trace!(
         "working on request for prover_run with id: {}",
         r.prover_run_id
     );
