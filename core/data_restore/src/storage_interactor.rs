@@ -9,11 +9,11 @@ use crate::events::{BlockEvent, EventType};
 use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
 use models::node::block::Block;
-use models::node::{AccountMap, AccountUpdate, AccountUpdates};
+use models::node::{AccountMap, FranklinOp, AccountUpdate, AccountUpdates};
 use models::TokenAddedEvent;
 use models::{Action, EncodedProof, Operation};
 use storage::{
-    ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
+    ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, StoredBlockEvent,
     StoredRollupOpsBlock,
 };
 
@@ -37,27 +37,8 @@ pub fn save_genesis_tree_state(
         "db should be empty"
     );
     storage
-        .commit_state_update(0, &[(0, genesis_acc_update)])
-        .expect("Cant commit tree state update");
-    storage
-        .apply_state_update(0)
-        .expect("Cant apply tree state update");
-}
-
-/// Saves tokens that had been added to system in storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database connection pool
-/// * `tokens` - Tokens that had been added to system
-///
-pub fn save_tokens(connection_pool: &ConnectionPool, tokens: Vec<TokenAddedEvent>) {
-    let storage = connection_pool.access_storage().expect("db failed");
-    for token in tokens {
-        storage
-            .store_token(token.id as u16, &format!("0x{:x}", token.address), None)
-            .expect("Cant store token");
-    }
+        .save_genesis_state(genesis_acc_update)
+        .expect("Cant update genesis state");
 }
 
 /// Updates stored tree state: saves block transactions in storage mempool, stores blocks and account updates
@@ -77,7 +58,7 @@ pub fn update_tree_state(
 
     if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
         storage
-            .save_block_transactions(&block)
+            .save_block_transactions_with_data_restore_state(&block)
             .expect("Cant save block transactions");
     } else {
         let commit_op = Operation {
@@ -86,9 +67,6 @@ pub fn update_tree_state(
             accounts_updated: accounts_updated.clone(),
             id: None,
         };
-        storage
-            .execute_operation_data_restore(&commit_op)
-            .expect("Cant execute commit operation");
 
         let verify_op = Operation {
             action: Action::Verify {
@@ -98,49 +76,46 @@ pub fn update_tree_state(
             accounts_updated: Vec::new(),
             id: None,
         };
+
         storage
-            .execute_operation_data_restore(&verify_op)
+            .save_block_operations_with_data_restore_state(&commit_op, &verify_op)
             .expect("Cant execute verify operation");
     }
 }
 
-/// Saves Rollup contract events in storage
+/// Saves Rollup contract events in storage (includes block events, new tokens and last watched eth block number)
 ///
 /// # Arguments
 ///
 /// * `connection_pool` - Database Connection Pool
-/// * `events` - Rollup contract events descriptions
-///
-pub fn save_block_events_state(connection_pool: &ConnectionPool, events: &[BlockEvent]) {
-    let storage = connection_pool.access_storage().expect("db failed");
-    let mut new_events: Vec<NewBlockEvent> = vec![];
-    for event in events {
-        new_events.push(block_event_into_stored_block_event(event));
-    }
-    storage
-        .update_events_state(new_events.as_slice())
-        .expect("Cant update events state");
-}
-
-/// Saves last watched ethereum block number in storage
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
+/// * `eveblock_eventsnts` - Rollup contract block events descriptions
+/// * `tokens` - Tokens that had been added to system
 /// * `last_watched_eth_block_number` - Last watched ethereum block
 ///
-pub fn save_last_watched_block_number(
+pub fn save_events_state(
     connection_pool: &ConnectionPool,
+    block_events: &[BlockEvent],
+    tokens: &[TokenAddedEvent],
     last_watched_eth_block_number: u64,
 ) {
     let storage = connection_pool.access_storage().expect("db failed");
 
+    let mut new_events: Vec<NewBlockEvent> = vec![];
+    for event in block_events {
+        new_events.push(block_event_into_stored_block_event(event));
+    }
+
     let block_number = NewLastWatchedEthBlockNumber {
         block_number: last_watched_eth_block_number.to_string(),
     };
+
     storage
-        .update_last_watched_block_number(&block_number)
-        .expect("Cant update last watched block number");
+        .save_events_state_with_data_restore_state(
+            new_events.as_slice(),
+            tokens,
+            &block_number,
+        )
+        .expect("Cant update events state");
 }
 
 /// Get new stored representation of the Rollup contract event from itself
@@ -160,28 +135,6 @@ pub fn block_event_into_stored_block_event(event: &BlockEvent) -> NewBlockEvent 
     }
 }
 
-/// Saves last recovery state update step
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database Connection Pool
-/// * `state` - last recovery state update step
-///
-pub fn save_storage_state(connection_pool: &ConnectionPool, state: StorageUpdateState) {
-    let string = match state {
-        StorageUpdateState::None => "None".to_string(),
-        StorageUpdateState::Events => "Events".to_string(),
-        StorageUpdateState::Operations => "Operations".to_string(),
-    };
-    let storage_state = NewStorageState {
-        storage_state: string,
-    };
-    let storage = connection_pool.access_storage().expect("db failed");
-    storage
-        .update_storage_state(&storage_state)
-        .expect("Cant update storage state status");
-}
-
 /// Saves Rollup operations blocks in storage
 ///
 /// # Arguments
@@ -191,12 +144,17 @@ pub fn save_storage_state(connection_pool: &ConnectionPool, state: StorageUpdate
 ///
 pub fn save_rollup_ops(connection_pool: &ConnectionPool, blocks: &[RollupOpsBlock]) {
     let storage = connection_pool.access_storage().expect("db failed");
-    storage.delete_rollup_ops().expect("Cant delete operations");
+    let mut ops: Vec<(u32, &FranklinOp, u32)> = vec![];
+
     for block in blocks {
-        storage
-            .save_rollup_ops(block.ops.as_slice(), block.block_num, block.fee_account)
-            .expect("Cant save operations");
+        for op in &block.ops {
+            ops.push((block.block_num, op, block.fee_account));
+        }
     }
+
+    storage
+        .save_rollup_ops_with_data_restore_state(ops.as_slice())
+        .expect("Cant update rollup operations");
 }
 
 /// Returns Rollup operations blocks from storage

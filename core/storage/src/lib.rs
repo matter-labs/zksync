@@ -22,7 +22,9 @@ use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
     AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
 };
-use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_VERIFY};
+use models::{
+    Action, ActionType, EncodedProof, Operation, TokenAddedEvent, ACTION_COMMIT, ACTION_VERIFY,
+};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::convert::TryInto;
@@ -2043,7 +2045,32 @@ impl StorageProcessor {
         Ok(serde_json::from_value(stored.proof).unwrap())
     }
 
-    pub fn execute_operation_data_restore(&self, op: &Operation) -> QueryResult<()> {
+    pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
+        let new_token = Token {
+            id: i32::from(id),
+            address: address.to_string(),
+            symbol: symbol.map(String::from),
+        };
+        diesel::insert_into(tokens::table)
+            .values(&new_token)
+            .on_conflict(tokens::id)
+            .do_update()
+            // update token address but not symbol -- so we can update it externally
+            .set(tokens::address.eq(new_token.address.clone()))
+            .execute(self.conn())
+            .map(drop)
+    }
+
+    pub fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
+        let tokens = tokens::table
+            .order(tokens::id.asc())
+            .load::<Token>(self.conn())?;
+        Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
+    }
+
+    // Data restore part
+
+    fn save_operation(&self, op: &Operation) -> QueryResult<()> {
         self.conn().transaction(|| {
             match &op.action {
                 Action::Commit => {
@@ -2063,7 +2090,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn update_events_state(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
+    fn update_block_events(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
         self.conn().transaction(|| {
             diesel::delete(events_state::table).execute(self.conn())?;
             for event in events.iter() {
@@ -2071,6 +2098,111 @@ impl StorageProcessor {
                     .values(event)
                     .execute(self.conn())?;
             }
+            Ok(())
+        })
+    }
+
+    fn update_last_watched_block_number(
+        &self,
+        number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
+            diesel::insert_into(data_restore_last_watched_eth_block::table)
+                .values(number)
+                .execute(self.conn())?;
+            Ok(())
+        })
+    }
+
+    fn update_storage_state(&self, state: NewStorageState) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(storage_state_update::table).execute(self.conn())?;
+            diesel::insert_into(storage_state_update::table)
+                .values(state)
+                .execute(self.conn())?;
+            Ok(())
+        })
+    }
+
+    pub fn save_genesis_state(&self, genesis_acc_update: AccountUpdate) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.commit_state_update(0, &[(0, genesis_acc_update)])?;
+            self.apply_state_update(0)?;
+            Ok(())
+        })
+    }
+
+    pub fn save_block_transactions_with_data_restore_state(
+        &self,
+        block: &Block,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.save_block_transactions(block)?;
+            let state = NewStorageState {
+                storage_state: "None".to_string(),
+            };
+            self.update_storage_state(state)?;
+            Ok(())
+        })
+    }
+
+    pub fn save_block_operations_with_data_restore_state(
+        &self,
+        commit_op: &Operation,
+        verify_op: &Operation,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.save_operation(commit_op)?;
+            self.save_operation(verify_op)?;
+            let state = NewStorageState {
+                storage_state: "None".to_string(),
+            };
+            self.update_storage_state(state)?;
+            Ok(())
+        })
+    }
+
+    pub fn save_events_state_with_data_restore_state(
+        &self,
+        block_events: &[NewBlockEvent],
+        token_events: &[TokenAddedEvent],
+        last_watched_eth_number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.update_block_events(block_events)?;
+
+            for token in token_events.iter() {
+                self.store_token(token.id as u16, &format!("0x{:x}", token.address), None)?;
+            }
+
+            self.update_last_watched_block_number(last_watched_eth_number)?;
+
+            let state = NewStorageState {
+                storage_state: "Events".to_string(),
+            };
+            self.update_storage_state(state)?;
+
+            Ok(())
+        })
+    }
+
+    pub fn save_rollup_ops_with_data_restore_state(
+        &self,
+        ops: &[(BlockNumber, &FranklinOp, AccountId)],
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(rollup_ops::table).execute(self.conn())?;
+            for op in ops.iter() {
+                let stored_op = NewFranklinOp::prepare_stored_op(&op.1, op.0, op.2);
+                diesel::insert_into(rollup_ops::table)
+                    .values(&stored_op)
+                    .execute(self.conn())?;
+            }
+            let state = NewStorageState {
+                storage_state: "Operations".to_string(),
+            };
+            self.update_storage_state(state)?;
             Ok(())
         })
     }
@@ -2091,55 +2223,12 @@ impl StorageProcessor {
         Ok(events)
     }
 
-    pub fn update_storage_state(&self, state: &NewStorageState) -> QueryResult<()> {
-        self.conn().transaction(|| {
-            diesel::delete(storage_state_update::table).execute(self.conn())?;
-            diesel::insert_into(storage_state_update::table)
-                .values(state)
-                .execute(self.conn())?;
-            Ok(())
-        })
-    }
-
     pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
         storage_state_update::table.first(self.conn())
     }
 
-    pub fn update_last_watched_block_number(
-        &self,
-        number: &NewLastWatchedEthBlockNumber,
-    ) -> QueryResult<()> {
-        self.conn().transaction(|| {
-            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
-            diesel::insert_into(data_restore_last_watched_eth_block::table)
-                .values(number)
-                .execute(self.conn())?;
-                Ok(())
-        })
-    }
-
     pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
         data_restore_last_watched_eth_block::table.first(self.conn())
-    }
-
-    pub fn save_rollup_ops(
-        &self,
-        ops: &[FranklinOp],
-        block_num: BlockNumber,
-        fee_account: AccountId,
-    ) -> QueryResult<()> {
-        for op in ops.iter() {
-            let stored_op = NewFranklinOp::prepare_stored_op(&op, block_num, fee_account);
-            diesel::insert_into(rollup_ops::table)
-                .values(&stored_op)
-                .execute(self.conn())?;
-        }
-        Ok(())
-    }
-
-    pub fn delete_rollup_ops(&self) -> QueryResult<()> {
-        diesel::delete(rollup_ops::table).execute(self.conn())?;
-        Ok(())
     }
 
     pub fn load_rollup_ops_blocks(&self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
@@ -2170,29 +2259,6 @@ impl StorageProcessor {
             })
             .collect();
         Ok(ops_blocks)
-    }
-
-    pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
-        let new_token = Token {
-            id: i32::from(id),
-            address: address.to_string(),
-            symbol: symbol.map(String::from),
-        };
-        diesel::insert_into(tokens::table)
-            .values(&new_token)
-            .on_conflict(tokens::id)
-            .do_update()
-            // update token address but not symbol -- so we can update it externally
-            .set(tokens::address.eq(new_token.address.clone()))
-            .execute(self.conn())
-            .map(drop)
-    }
-
-    pub fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
-        let tokens = tokens::table
-            .order(tokens::id.asc())
-            .load::<Token>(self.conn())?;
-        Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
     }
 }
 

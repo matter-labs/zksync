@@ -147,9 +147,10 @@ impl<T: Transport> DataRestoreDriver<T> {
             .expect("Cant set genesis block number for events state");
         info!("genesis_eth_block_number: {:?}", &genesis_eth_block_number);
 
-        storage_interactor::save_block_events_state(&self.connection_pool, &[]);
-        storage_interactor::save_last_watched_block_number(
+        storage_interactor::save_events_state(
             &self.connection_pool,
+            &[],
+            &[],
             genesis_eth_block_number,
         );
 
@@ -272,17 +273,12 @@ impl<T: Transport> DataRestoreDriver<T> {
             )
             .expect("Updating events state: cant update events state");
 
-        // Store block events
-        storage_interactor::save_block_events_state(&self.connection_pool, &block_events);
-        // Store block number
-        storage_interactor::save_last_watched_block_number(
+        storage_interactor::save_events_state(
             &self.connection_pool,
+            &block_events,
+            token_events.as_slice(),
             last_watched_eth_block_number,
         );
-        // Store tokens
-        storage_interactor::save_tokens(&self.connection_pool, token_events);
-
-        storage_interactor::save_storage_state(&self.connection_pool, StorageUpdateState::Events);
 
         debug!("Updated events storage");
 
@@ -316,8 +312,6 @@ impl<T: Transport> DataRestoreDriver<T> {
             );
         }
 
-        storage_interactor::save_storage_state(&self.connection_pool, StorageUpdateState::None);
-
         debug!("Updated state");
     }
 
@@ -327,11 +321,6 @@ impl<T: Transport> DataRestoreDriver<T> {
         let new_blocks = self.get_new_operation_blocks_from_events();
 
         storage_interactor::save_rollup_ops(&self.connection_pool, &new_blocks);
-
-        storage_interactor::save_storage_state(
-            &self.connection_pool,
-            StorageUpdateState::Operations,
-        );
 
         debug!("Updated operations storage");
 
