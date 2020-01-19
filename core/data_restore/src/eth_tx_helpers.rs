@@ -17,12 +17,11 @@ pub fn get_input_data_from_ethereum_transaction(
     transaction: &Transaction,
 ) -> Result<Vec<u8>, failure::Error> {
     let input_data = transaction.clone().input.0;
-    // info!("Start input: {:?}", &input_data);
     ensure!(
         input_data.len() > FUNC_NAME_HASH_LENGTH,
         format_err!("No commitment data in tx")
     );
-    Ok(input_data[FUNC_NAME_HASH_LENGTH..input_data.len()].to_vec())
+    Ok(input_data[FUNC_NAME_HASH_LENGTH..].to_vec())
 }
 
 /// Returns Ethereum transaction block number
@@ -57,7 +56,7 @@ pub fn get_ethereum_transaction<T: Transport>(
         .eth()
         .transaction(tx_id)
         .wait()
-        .map_err(|e| format_err!("No response from web3: {}", e.to_string()))?
+        .map_err(|e| format_err!("No response from web3: {}", e))?
         .ok_or_else(|| format_err!("No tx with this hash"))?;
     Ok(web3_transaction)
 }

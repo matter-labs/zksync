@@ -1,6 +1,6 @@
 // External deps
 use ethabi;
-use failure::{ensure, format_err};
+use failure::format_err;
 use futures::{compat::Future01CompatExt, executor::block_on};
 use models::TokenAddedEvent;
 use std::convert::TryFrom;
@@ -86,7 +86,7 @@ impl EventsState {
 
         self.last_watched_eth_block_number = to_block_number;
 
-        if !self.update_blocks_state(franklin_contract, &block_events)? {
+        if !self.update_blocks_state(franklin_contract, &block_events) {
             return Ok((vec![], token_events, self.last_watched_eth_block_number));
         }
 
@@ -185,7 +185,7 @@ impl EventsState {
         let new_token_event_topic = contract
             .0
             .event("TokenAdded")
-            .map_err(|e| format_err!("Governance contract abi error: {}", e.to_string()))?
+            .expect("Governance contract abi error")
             .signature();
         let filter = FilterBuilder::default()
             .address(vec![contract.1.address()])
@@ -222,19 +222,19 @@ impl EventsState {
         let block_verified_topic = contract
             .0
             .event("BlockVerified")
-            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
+            .expect("Main contract abi error")
             .signature();
 
         let block_comitted_topic = contract
             .0
             .event("BlockCommitted")
-            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
+            .expect("Main contract abi error")
             .signature();
 
         let reverted_topic = contract
             .0
             .event("BlocksReverted")
-            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
+            .expect("Main contract abi error")
             .signature();
 
         let topics_vec: Vec<H256> =
@@ -251,7 +251,7 @@ impl EventsState {
             .eth()
             .logs(filter)
             .wait()
-            .map_err(|e| format_err!("No new logs: {}", e.to_string()))?;
+            .map_err(|e| format_err!("No new logs: {}", e))?;
         Ok(result)
     }
 
@@ -267,35 +267,36 @@ impl EventsState {
         &mut self,
         contract: &(ethabi::Contract, Contract<T>),
         logs: &[Log],
-    ) -> Result<bool, failure::Error> {
+    ) -> bool {
         if logs.is_empty() {
-            return Ok(false);
+            return false;
         }
 
         let block_verified_topic = contract
             .0
             .event("BlockVerified")
-            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
+            .expect("Main contract abi error")
             .signature();
         let block_comitted_topic = contract
             .0
             .event("BlockCommitted")
-            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
+            .expect("Main contract abi error")
             .signature();
         let reverted_topic = contract
             .0
             .event("BlocksReverted")
-            .map_err(|e| format_err!("Main contract abi error: {}", e.to_string()))?
+            .expect("Main contract abi error")
             .signature();
 
         for log in logs {
             let topic = log.topics[0];
-            ensure!(log.topics.len() >= 2, "Cant get enouth topics from event");
+            assert!(log.topics.len() >= 2, "Cant get enouth topics from event");
 
             // Remove reverted committed blocks first
             if topic == reverted_topic {
-                ensure!(
-                    log.topics.len() == 3,
+                assert_eq!(
+                    log.topics.len(),
+                    3,
                     "Cant get enouth topics from reverted event"
                 );
                 let committed_total = U256::from(log.topics[2].as_bytes()).as_u32();
@@ -315,27 +316,23 @@ impl EventsState {
                 transaction_hash: H256::zero(),
                 block_type: EventType::Committed,
             };
-            let tx_hash = log.transaction_hash;
+
+            let tx_hash = log
+                .transaction_hash
+                .expect("There are no tx hash in block event");
             let block_num = log.topics[1];
 
-            match tx_hash {
-                Some(hash) => {
-                    block.block_num = U256::from(block_num.as_bytes()).as_u32();
-                    block.transaction_hash = hash;
+            block.block_num = U256::from(block_num.as_bytes()).as_u32();
+            block.transaction_hash = tx_hash;
 
-                    if topic == block_verified_topic {
-                        block.block_type = EventType::Verified;
-                        self.verified_events.push(block);
-                    } else if topic == block_comitted_topic {
-                        self.committed_events.push(block);
-                    }
-                }
-                None => {
-                    return Err(format_err!("No tx hash in block event"));
-                }
-            };
+            if topic == block_verified_topic {
+                block.block_type = EventType::Verified;
+                self.verified_events.push(block);
+            } else if topic == block_comitted_topic {
+                self.committed_events.push(block);
+            }
         }
-        Ok(true)
+        true
     }
 
     /// Removes verified committed blocks events and all verified

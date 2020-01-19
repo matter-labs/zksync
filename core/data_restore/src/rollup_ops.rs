@@ -39,8 +39,7 @@ impl RollupOpsBlock {
         let commitment_data = &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
             + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
             + INPUT_DATA_ROOT_BYTES_WIDTH
-            + INPUT_DATA_EMPTY_BYTES_WIDTH
-            ..input_data.len()];
+            + INPUT_DATA_EMPTY_BYTES_WIDTH..];
         let fee_account = RollupOpsBlock::get_fee_account_from_tx_input(&input_data)?;
         let ops = RollupOpsBlock::get_rollup_ops_from_data(commitment_data)?;
         let block = RollupOpsBlock {

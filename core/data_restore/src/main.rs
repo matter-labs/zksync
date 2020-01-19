@@ -15,7 +15,6 @@ use clap::{App, Arg};
 use models::config_options::ConfigurationOptions;
 use storage::ConnectionPool;
 use web3::transports::Http;
-use web3::Transport;
 
 const ETH_BLOCKS_STEP: u64 = 1;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
@@ -54,49 +53,16 @@ fn main() {
         contract_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
-    )
-    .expect("Cant create state");
+    );
 
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
     if cli.is_present("genesis") {
-        driver
-            .set_genesis_state(governance_genesis_tx_hash, contract_genesis_tx_hash)
-            .expect("Cant set genesis state");
+        driver.set_genesis_state(governance_genesis_tx_hash, contract_genesis_tx_hash);
     }
 
     if cli.is_present("continue") {
-        load_state_from_storage(&mut driver);
+        driver.load_state_from_storage();
     }
 
-    update_state(&mut driver);
-}
-
-/// Loads states for driver from storage
-///
-/// # Arguments
-///
-/// * `driver` - Data restore driver instance
-///
-pub fn load_state_from_storage<T: Transport>(driver: &mut DataRestoreDriver<T>) {
-    driver.load_state_from_storage().expect("Cant load state");
-}
-
-/// Runs states updates for driver
-///
-/// # Arguments
-///
-/// * `driver` - Data restore driver instance
-///
-pub fn update_state<T: Transport>(driver: &mut DataRestoreDriver<T>) {
-    driver.run_state_update().expect("Cant update state");
-}
-
-/// Stopss states updates for driver
-///
-/// # Arguments
-///
-/// * `driver` - Data restore driver instance
-///
-pub fn stop_state_update<T: Transport>(driver: &mut DataRestoreDriver<T>) {
-    driver.stop_state_update();
+    driver.run_state_update();
 }

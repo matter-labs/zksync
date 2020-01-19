@@ -52,7 +52,10 @@ impl TreeState {
         fee_account: AccountId,
     ) -> Self {
         let state = PlasmaState::new(accounts, current_block);
-        let last_fee_account_address = state.get_account(fee_account).unwrap().address;
+        let last_fee_account_address = state
+            .get_account(fee_account)
+            .expect("Cant get fee account from tree state")
+            .address;
         Self {
             state,
             current_unprocessed_priority_op,
@@ -193,7 +196,12 @@ impl TreeState {
             }
         }
 
-        let fee_updates = self.state.collect_fee(&fees, block.fee_account);
+        let fee_account_address = self
+            .get_account(ops_block.fee_account)
+            .ok_or_else(|| format_err!("Nonexistent account"))?
+            .address;
+
+        let fee_updates = self.state.collect_fee(&fees, ops_block.fee_account);
         accounts_updated.extend(fee_updates.into_iter());
 
         self.last_fee_account_address = fee_account_address;
@@ -201,7 +209,7 @@ impl TreeState {
         let block = Block {
             block_number: ops_block.block_num,
             new_root_hash: self.state.root_hash(),
-            fee_account: fee_account_id,
+            fee_account: ops_block.fee_account,
             block_transactions: ops,
             processed_priority_ops: (
                 last_unprocessed_prior_op,

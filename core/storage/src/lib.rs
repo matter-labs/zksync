@@ -2063,18 +2063,16 @@ impl StorageProcessor {
         })
     }
 
-    pub fn save_events_state(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
-        for event in events.iter() {
-            diesel::insert_into(events_state::table)
-                .values(event)
-                .execute(self.conn())?;
-        }
-        Ok(())
-    }
-
-    pub fn delete_events_state(&self) -> QueryResult<()> {
-        diesel::delete(events_state::table).execute(self.conn())?;
-        Ok(())
+    pub fn update_events_state(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(events_state::table).execute(self.conn())?;
+            for event in events.iter() {
+                diesel::insert_into(events_state::table)
+                    .values(event)
+                    .execute(self.conn())?;
+            }
+            Ok(())
+        })
     }
 
     pub fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
@@ -2093,35 +2091,31 @@ impl StorageProcessor {
         Ok(events)
     }
 
-    pub fn save_storage_state(&self, state: &NewStorageState) -> QueryResult<()> {
-        diesel::insert_into(storage_state_update::table)
-            .values(state)
-            .execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn delete_data_restore_storage_state_status(&self) -> QueryResult<()> {
-        diesel::delete(storage_state_update::table).execute(self.conn())?;
-        Ok(())
+    pub fn update_storage_state(&self, state: &NewStorageState) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(storage_state_update::table).execute(self.conn())?;
+            diesel::insert_into(storage_state_update::table)
+                .values(state)
+                .execute(self.conn())?;
+            Ok(())
+        })
     }
 
     pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
         storage_state_update::table.first(self.conn())
     }
 
-    pub fn save_last_watched_block_number(
+    pub fn update_last_watched_block_number(
         &self,
         number: &NewLastWatchedEthBlockNumber,
     ) -> QueryResult<()> {
-        diesel::insert_into(data_restore_last_watched_eth_block::table)
-            .values(number)
-            .execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn delete_last_watched_block_number(&self) -> QueryResult<()> {
-        diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
-        Ok(())
+        self.conn().transaction(|| {
+            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
+            diesel::insert_into(data_restore_last_watched_eth_block::table)
+                .values(number)
+                .execute(self.conn())?;
+                Ok(())
+        })
     }
 
     pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {

@@ -4,21 +4,21 @@ extern crate log;
 // External uses
 use clap::{App, Arg};
 // Workspace uses
-use models::config_options::ConfigurationOptions;
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
-use tokio::runtime::Runtime;
+use models::config_options::ConfigurationOptions;
 use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL};
 use server::api_server::start_api_server;
 use server::block_proposer::run_block_proposer_task;
 use server::committer::run_committer;
+use server::eth_sender;
 use server::eth_watch::start_eth_watch;
 use server::mempool::run_mempool_task;
 use server::prover_server::start_prover_server;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
-use server::eth_sender;
 use std::cell::RefCell;
 use std::time::Duration;
 use storage::ConnectionPool;
+use tokio::runtime::Runtime;
 use web3::types::H160;
 
 fn main() {

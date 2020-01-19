@@ -19,10 +19,8 @@ pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account,
         &input_data[input_data.len() - INPUT_DATA_ROOT_HASH_BYTES_WIDTH - FR_ADDRESS_LEN
             ..input_data.len() - INPUT_DATA_ROOT_HASH_BYTES_WIDTH],
     )
-    .map_err(|e| format_err!("No genesis account address: {}", e.to_string()))?;
-    let mut acc = Account::default();
-    acc.address = genesis_operator_address;
-    Ok(acc)
+    .map_err(|e| format_err!("No genesis account address: {}", e))?;
+    Ok(Account::default_with_address(&genesis_operator_address))
 }
 
 /// Returns total number of verified blocks on Rollup contract
