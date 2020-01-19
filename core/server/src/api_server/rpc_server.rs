@@ -235,6 +235,14 @@ impl Rpc for RpcApp {
         &self,
         tx: FranklinTx,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send> {
+        if tx.is_close() {
+            return Box::new(futures01::future::err(Error {
+                code: 110.into(),
+                message: "Account close tx is disabled.".to_string(),
+                data: None,
+            }));
+        }
+
         let mut mempool_sender = self.mempool_request_sender.clone();
         let mempool_resp = async move {
             let hash = tx.hash();

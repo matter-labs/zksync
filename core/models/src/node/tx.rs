@@ -274,6 +274,13 @@ impl FranklinTx {
             _ => false,
         }
     }
+
+    pub fn is_close(&self) -> bool {
+        match self {
+            FranklinTx::Close(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -475,7 +482,8 @@ impl<'de> Deserialize<'de> for PackedSignature {
     }
 }
 
-/// Struct used for working with ethereym signatures created using eth_sign
+/// Struct used for working with ethereum signatures created using eth_sign (using geth, ethers.js, etc)
+/// message is serialized as 65 bytes long `0x` prefixed string.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PackedEthSignature(pub ETHSignature);
 
@@ -497,8 +505,12 @@ impl PackedEthSignature {
         }))
     }
 
+    /// Checks signature and returns ethereum address of the signer.
+    /// message should be the same message that was passed to `eth.sign`(or similar) method
+    /// as argument (no hashing and prefixes required).
     pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, failure::Error> {
         let mut signature = self.0.clone();
+        // workaround around ethsign library limitations
         signature.v = signature
             .v
             .checked_sub(27)
@@ -520,8 +532,6 @@ impl Serialize for PackedEthSignature {
     where
         S: Serializer,
     {
-        use serde::ser::Error;
-
         let packed_signature = self.serialize_packed();
         serializer.serialize_str(&format!("0x{}", &hex::encode(&packed_signature[..])))
     }
