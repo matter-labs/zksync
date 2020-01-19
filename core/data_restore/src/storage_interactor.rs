@@ -9,7 +9,7 @@ use crate::events::{BlockEvent, EventType};
 use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
 use models::node::block::Block;
-use models::node::{AccountMap, FranklinOp, AccountUpdate, AccountUpdates};
+use models::node::{AccountMap, AccountUpdate, AccountUpdates, FranklinOp};
 use models::TokenAddedEvent;
 use models::{Action, EncodedProof, Operation};
 use storage::{
@@ -110,11 +110,7 @@ pub fn save_events_state(
     };
 
     storage
-        .save_events_state_with_data_restore_state(
-            new_events.as_slice(),
-            tokens,
-            &block_number,
-        )
+        .save_events_state_with_data_restore_state(new_events.as_slice(), tokens, &block_number)
         .expect("Cant update events state");
 }
 
