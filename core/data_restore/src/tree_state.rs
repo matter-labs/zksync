@@ -348,8 +348,8 @@ mod test {
     use bigdecimal::BigDecimal;
     use models::node::tx::TxSignature;
     use models::node::{
-        AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp, Transfer, TransferOp,
-        TransferToNewOp, Withdraw, WithdrawOp,
+        AccountAddress, Deposit, DepositOp, FranklinOp, Transfer, TransferOp, TransferToNewOp,
+        Withdraw, WithdrawOp,
     };
 
     #[test]
@@ -488,7 +488,7 @@ mod test {
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(
             first_acc.address,
-            AccountAddress::from_hex("sync:0000000000000000000000000000000000000000").unwrap()
+            AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap()
         );
         assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }
@@ -558,24 +558,11 @@ mod test {
         }));
         let pub_data4 = op4.public_data();
 
-        let tx5 = Close {
-            account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
-                .unwrap(),
-            nonce: 2,
-            signature: TxSignature::default(),
-        };
-        let op5 = FranklinOp::Close(Box::new(CloseOp {
-            tx: tx5,
-            account_id: 1,
-        }));
-        let pub_data5 = op5.public_data();
-
         let mut pub_data = Vec::new();
         pub_data.extend_from_slice(&pub_data1);
         pub_data.extend_from_slice(&pub_data2);
         pub_data.extend_from_slice(&pub_data3);
         pub_data.extend_from_slice(&pub_data4);
-        pub_data.extend_from_slice(&pub_data5);
 
         let ops = RollupOpsBlock::get_rollup_ops_from_data(pub_data.as_slice())
             .expect("cant get ops from data 1");
@@ -601,7 +588,7 @@ mod test {
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(
             first_acc.address,
-            AccountAddress::from_hex("sync:0000000000000000000000000000000000000000").unwrap()
+            AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap()
         );
         assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }

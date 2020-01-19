@@ -24,3 +24,5 @@ hex = "0.3"
 failure = "0.1"
 log = "0.4"
 futures = { version = "0.3", features = ["compat"] }
+ethsign = "0.7.3"
+tiny-keccak = "1.4.2"

@@ -3,10 +3,10 @@ use secp256k1;
 use tiny_keccak;
 
 use self::rlp::RlpStream;
-use self::secp256k1::key::SecretKey;
-use self::secp256k1::Message;
-use self::secp256k1::Secp256k1;
 use self::tiny_keccak::keccak256;
+use secp256k1::key::SecretKey;
+use secp256k1::Message;
+use secp256k1::Secp256k1;
 use web3::types::{H160, H256, U256};
 
 /// Description of a Transaction, pending or in the chain.
@@ -97,8 +97,8 @@ fn keccak256_hash(bytes: &[u8]) -> Vec<u8> {
 fn ecdsa_sign(hash: &[u8], private_key: &[u8], chain_id: u8) -> EcdsaSig {
     let s = Secp256k1::signing_only();
     let msg = Message::from_slice(hash).unwrap();
-    let key = SecretKey::from_slice(&s, private_key).unwrap();
-    let (v, sig_bytes) = s.sign_recoverable(&msg, &key).serialize_compact(&s);
+    let key = SecretKey::from_slice(private_key).unwrap();
+    let (v, sig_bytes) = s.sign_recoverable(&msg, &key).serialize_compact();
 
     //debug!("V m8 {:?}", v);
 
