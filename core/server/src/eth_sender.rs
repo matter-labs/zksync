@@ -14,13 +14,12 @@
 // Built-in deps
 use std::collections::{HashSet, VecDeque};
 use std::str::FromStr;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::time::{Duration, Instant};
-// External deps
+use std::time::Duration;
+// External uses
 use bigdecimal::BigDecimal;
 use failure::ensure;
 use ff::{PrimeField, PrimeFieldRepr};
-use futures::{channel::mpsc as fmpsc, compat::Future01CompatExt, executor::block_on};
+use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on};
 use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H256, U256};
@@ -31,6 +30,8 @@ use eth_client::{ETHClient, SignedCallResult};
 use models::abi::FRANKLIN_CONTRACT;
 use models::{Action, ActionType, Operation};
 use storage::{ConnectionPool, StorageETHOperation};
+use tokio::runtime::Runtime;
+use tokio::time;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
@@ -79,14 +80,23 @@ struct ETHSender<T: Transport> {
     unconfirmed_ops: VecDeque<OperationETHState>,
     db_pool: ConnectionPool,
     eth_client: ETHClient<T>,
+    rx_for_eth: mpsc::Receiver<Operation>,
+    op_notify: mpsc::Sender<Operation>,
 }
 
 impl<T: Transport> ETHSender<T> {
-    fn new(db_pool: ConnectionPool, eth_client: ETHClient<T>) -> Self {
+    fn new(
+        db_pool: ConnectionPool,
+        eth_client: ETHClient<T>,
+        rx_for_eth: mpsc::Receiver<Operation>,
+        op_notify: mpsc::Sender<Operation>,
+    ) -> Self {
         let mut sender = Self {
             eth_client,
             unconfirmed_ops: VecDeque::new(),
             db_pool,
+            rx_for_eth,
+            op_notify,
         };
         sender.restore_state().expect("Eth sender state restore");
         sender
@@ -105,50 +115,50 @@ impl<T: Transport> ETHSender<T> {
         Ok(())
     }
 
-    fn run(&mut self, rx_for_eth: Receiver<Operation>, mut op_notify: fmpsc::Sender<Operation>) {
-        loop {
-            let last_poll_end_time = Instant::now();
+    fn try_commit_current_op(&mut self) {
+        if let Some(mut current_op) = self.unconfirmed_ops.pop_front() {
+            let success = self
+                .drive_to_completion(&mut current_op)
+                .map_err(|e| {
+                    warn!("Error while trying to complete uncommitted op: {}", e);
+                })
+                .unwrap_or_default();
 
-            // receive new operations from committer
-            while let Ok(operation) = rx_for_eth.try_recv() {
+            if success {
+                info!(
+                    "Operation {}, {}  block: {}, confirmed on ETH",
+                    current_op.operation.id.unwrap(),
+                    current_op.operation.action.to_string(),
+                    current_op.operation.block.block_number,
+                );
+
+                if current_op.operation.action.get_type() == ActionType::VERIFY {
+                    // we notify about verify only when commit is confirmed on the ethereum
+                    self.op_notify
+                        .try_send(current_op.operation)
+                        .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
+                        .unwrap_or_default();
+                }
+            } else {
+                self.unconfirmed_ops.push_front(current_op);
+            }
+        }
+    }
+
+    async fn run(mut self) {
+        let mut timer = time::interval(TX_POLL_PERIOD);
+
+        loop {
+            while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
                 self.unconfirmed_ops.push_back(OperationETHState {
                     operation,
                     txs: Vec::new(),
                 });
             }
 
-            if let Some(mut current_op) = self.unconfirmed_ops.pop_front() {
-                let success = self
-                    .drive_to_completion(&mut current_op)
-                    .map_err(|e| {
-                        warn!("Error while trying to complete uncommitted op: {}", e);
-                    })
-                    .unwrap_or_default();
+            timer.tick().await;
 
-                if success {
-                    info!(
-                        "Operation {}, {}  block: {}, confirmed on ETH",
-                        current_op.operation.id.unwrap(),
-                        current_op.operation.action.to_string(),
-                        current_op.operation.block.block_number,
-                    );
-
-                    if current_op.operation.action.get_type() == ActionType::VERIFY {
-                        // we notify about verify only when commit is confirmed on the ethereum
-                        op_notify
-                            .try_send(current_op.operation)
-                            .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
-                            .unwrap_or_default();
-                    }
-                } else {
-                    self.unconfirmed_ops.push_front(current_op);
-                }
-            }
-
-            let since_last_poll_time = last_poll_end_time.elapsed();
-            if since_last_poll_time < TX_POLL_PERIOD {
-                std::thread::sleep(TX_POLL_PERIOD - since_last_poll_time);
-            }
+            self.try_commit_current_op();
         }
     }
 
@@ -402,12 +412,11 @@ impl<T: Transport> ETHSender<T> {
 
 pub fn start_eth_sender(
     pool: ConnectionPool,
-    panic_notify: Sender<bool>,
-    op_notify_sender: fmpsc::Sender<Operation>,
+    panic_notify: mpsc::Sender<bool>,
+    op_notify_sender: mpsc::Sender<Operation>,
+    send_requst_receiver: mpsc::Receiver<Operation>,
     config_options: ConfigurationOptions,
-) -> Sender<Operation> {
-    let (tx_for_eth, rx_for_eth) = channel::<Operation>();
-
+) {
     std::thread::Builder::new()
         .name("eth_sender".to_string())
         .spawn(move || {
@@ -430,10 +439,10 @@ pub fn start_eth_sender(
                 config_options.gas_price_factor,
             );
 
-            let mut eth_sender = ETHSender::new(pool, eth_client);
-            eth_sender.run(rx_for_eth, op_notify_sender);
+            let mut runtime = Runtime::new().expect("eth-sender-runtime");
+            let eth_sender =
+                ETHSender::new(pool, eth_client, send_requst_receiver, op_notify_sender);
+            runtime.block_on(eth_sender.run());
         })
         .expect("Eth sender thread");
-
-    tx_for_eth
 }

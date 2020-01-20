@@ -4,8 +4,7 @@ metadata:
   name: api-ingress
 spec:
   rules:
-  - host: ${SERVER_API_HOST}
-    http:
+  - http:
       paths:
       - path: /
         backend:
@@ -19,6 +18,7 @@ spec:
         backend:
           serviceName: ${ZKSYNC_ENV}-server
           servicePort: 3031
+    host: ${SERVER_API_HOST}
 ---
 apiVersion: v1
 kind: Service
@@ -57,6 +57,10 @@ spec:
     targetPort: 3031
     protocol: TCP
     name: ${ZKSYNC_ENV}-server-jsrpc-ws
+  - port: 8088
+    targetPort: 8088
+    protocol: TCP
+    name: ${ZKSYNC_ENV}-prover-server-port
   selector:
     app: ${ZKSYNC_ENV}-server
 ---
@@ -107,6 +111,7 @@ spec:
             - containerPort: 3000
             - containerPort: 3030
             - containerPort: 3031
+            - containerPort: 8088
           envFrom:
             - secretRef:
                 name: ${ZKSYNC_ENV}-secret
