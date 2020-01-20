@@ -23,7 +23,7 @@
     "ts-node": "^8.3.0",
     "tslint": "^5.18.0",
     "typescript": "^3.5.3",
-    "zksync": "^0.3.9"
+    "zksync": "https://github.com/matter-labs/zksync.js.git"
   },
   "scripts": {
     "build": "waffle config.json && waffle config_flat.json",
