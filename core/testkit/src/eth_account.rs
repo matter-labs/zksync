@@ -303,6 +303,7 @@ impl<T: Transport> EthereumAccount<T> {
             .map_err(|e| format_err!("Commit block confirm err: {}", e))?)
     }
 
+    // Verifies block using empty proof. (`DUMMY_VERIFIER` should be enabled on the contract).
     pub async fn verify_block(&self, block: &Block) -> Result<TransactionReceipt, failure::Error> {
         let signed_tx = self
             .main_contract_eth_client

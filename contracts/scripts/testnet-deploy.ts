@@ -1,5 +1,5 @@
-import { ethers } from "ethers";
-import { ArgumentParser } from "argparse";
+import {ethers} from "ethers";
+import {ArgumentParser} from "argparse";
 import {
     addTestERC20Token,
     mintTestERC20Token,
@@ -29,9 +29,9 @@ async function main() {
         addHelp: true,
         description: 'Deploy contracts and publish them on Etherscan/Tesseracts',
     });
-    parser.addArgument('--deploy',  { action: 'storeTrue' });
-    parser.addArgument('--publish', { action: 'storeTrue' });
-    parser.addArgument('--test', { action: 'storeTrue' });
+    parser.addArgument('--deploy', {action: 'storeTrue'});
+    parser.addArgument('--publish', {action: 'storeTrue'});
+    parser.addArgument('--test', {action: 'storeTrue'});
     const args = parser.parseArgs(process.argv.slice(2));
     if (args.deploy == false && args.publish == false) {
         parser.printHelp();
@@ -42,23 +42,23 @@ async function main() {
         return;
     }
 
-        const provider   = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+    const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
     if (process.env.ETH_NETWORK == "localhost") {
         // small polling interval for localhost network
         provider.pollingInterval = 200;
     }
-    const wallet     = ethers.Wallet.fromMnemonic(process.env.MNEMONIC,      "m/44'/60'/0'/0/1").connect(provider);
+    const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
     const testWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
 
-    let governanceAddress    = process.env.GOVERNANCE_ADDR;
+    let governanceAddress = process.env.GOVERNANCE_ADDR;
     let priorityQueueAddress = process.env.PRIORITY_QUEUE_ADDR;
-    let verifierAddress      = process.env.VERIFIER_ADDR;
-    let franklinAddress      = process.env.CONTRACT_ADDR;
+    let verifierAddress = process.env.VERIFIER_ADDR;
+    let franklinAddress = process.env.CONTRACT_ADDR;
 
-    let governanceConstructorArgs    = [ wallet.address ];
-    let priorityQueueConstructorArgs = [ governanceAddress ];
-    let verifierConstructorArgs      = [];
-    let franklinConstructorArgs      = [
+    let governanceConstructorArgs = [wallet.address];
+    let priorityQueueConstructorArgs = [governanceAddress];
+    let verifierConstructorArgs = [];
+    let franklinConstructorArgs = [
         governanceAddress,
         verifierAddress,
         priorityQueueAddress,

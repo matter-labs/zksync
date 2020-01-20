@@ -1,3 +1,6 @@
+//! Run external commands from `$ZKSYNC_HOME/bin`
+//!`$ZKSYNC_HOME/bin` should be in path.
+//!
 use std::collections::HashMap;
 use std::process::Command;
 use std::str::FromStr;
