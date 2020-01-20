@@ -134,7 +134,7 @@ push-image-rust: image-rust
 
 # Contracts
 
-deploy-contracts: confirm_action
+deploy-contracts: confirm_action build-contracts
 	@bin/deploy-contracts.sh
 
 test-contracts: confirm_action build-contracts
@@ -162,6 +162,7 @@ gen-keys-if-not-present:
 	@touch contracts/build/Franklin.json
 	@touch contracts/build/Governance.json
 	@touch contracts/build/PriorityQueue.json
+	@touch contracts/build/IERC20.json
 	
 	test -f keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
 
@@ -172,6 +173,9 @@ prepare-contracts:
 
 loadtest: confirm_action
 	@bin/loadtest.sh
+
+integration-testkit: build-contracts
+	cargo run --bin testkit --release
 
 integration-simple:
 	@cd js/tests && yarn && yarn simple

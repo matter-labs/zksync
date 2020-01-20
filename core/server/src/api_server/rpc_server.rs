@@ -158,7 +158,7 @@ impl Rpc for RpcApp {
                 .await
                 .map_err(|_| Error::internal_error())?;
 
-            let committed = if let Some(account) = committed_account_state {
+            let committed = if let Some((_, account)) = committed_account_state {
                 ResponseAccountState::try_to_restore(account, &tokens)?
             } else {
                 ResponseAccountState::default()

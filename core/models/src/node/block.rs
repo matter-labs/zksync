@@ -3,6 +3,8 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::params::block_size_chunks;
+use ff::{PrimeField, PrimeFieldRepr};
+use web3::types::H256;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedTx {
@@ -53,6 +55,14 @@ pub struct Block {
 }
 
 impl Block {
+    pub fn get_eth_encoded_root(&self) -> H256 {
+        let mut be_bytes = [0u8; 32];
+        self.new_root_hash
+            .into_repr()
+            .write_be(be_bytes.as_mut())
+            .expect("Write commit bytes");
+        H256::from(be_bytes)
+    }
     pub fn get_eth_public_data(&self) -> Vec<u8> {
         let mut executed_tx_pub_data = self
             .block_transactions
