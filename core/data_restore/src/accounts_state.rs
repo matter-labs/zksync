@@ -193,8 +193,8 @@ mod test {
     use bigdecimal::BigDecimal;
     use models::node::tx::TxSignature;
     use models::node::{
-        AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp, Transfer, TransferOp,
-        TransferToNewOp, Withdraw, WithdrawOp,
+        AccountAddress, Deposit, DepositOp, FranklinOp, Transfer, TransferOp, TransferToNewOp,
+        Withdraw, WithdrawOp,
     };
 
     #[test]
@@ -290,25 +290,6 @@ mod test {
             fee_account: 0,
         };
 
-        let tx5 = Close {
-            account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
-                .unwrap(),
-            nonce: 2,
-            signature: TxSignature::default(),
-        };
-        let op5 = FranklinOp::Close(Box::new(CloseOp {
-            tx: tx5,
-            account_id: 1,
-        }));
-        let pub_data5 = op5.public_data();
-        let ops5 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data5)
-            .expect("cant get ops from data 5");
-        let block5 = FranklinOpsBlock {
-            block_num: 5,
-            ops: ops5,
-            fee_account: 0,
-        };
-
         let mut tree = FranklinAccountsState::new();
         tree.update_accounts_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
@@ -318,8 +299,6 @@ mod test {
             .expect("Cant update state from block 3");
         tree.update_accounts_states_from_ops_block(&block4)
             .expect("Cant update state from block 4");
-        tree.update_accounts_states_from_ops_block(&block5)
-            .expect("Cant update state from block 5");
 
         assert_eq!(tree.get_accounts().len(), 2);
 
@@ -333,7 +312,7 @@ mod test {
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(
             first_acc.address,
-            AccountAddress::from_hex("sync:0000000000000000000000000000000000000000").unwrap()
+            AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap()
         );
         assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }
@@ -403,24 +382,11 @@ mod test {
         }));
         let pub_data4 = op4.public_data();
 
-        let tx5 = Close {
-            account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
-                .unwrap(),
-            nonce: 2,
-            signature: TxSignature::default(),
-        };
-        let op5 = FranklinOp::Close(Box::new(CloseOp {
-            tx: tx5,
-            account_id: 1,
-        }));
-        let pub_data5 = op5.public_data();
-
         let mut pub_data = Vec::new();
         pub_data.extend_from_slice(&pub_data1);
         pub_data.extend_from_slice(&pub_data2);
         pub_data.extend_from_slice(&pub_data3);
         pub_data.extend_from_slice(&pub_data4);
-        pub_data.extend_from_slice(&pub_data5);
 
         let ops = FranklinOpsBlock::get_franklin_ops_from_data(pub_data.as_slice())
             .expect("cant get ops from data 1");
@@ -446,7 +412,7 @@ mod test {
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
         assert_eq!(
             first_acc.address,
-            AccountAddress::from_hex("sync:0000000000000000000000000000000000000000").unwrap()
+            AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap()
         );
         assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }

@@ -8,7 +8,7 @@ use crate::utils::{
     allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element, reverse_bytes,
 };
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use ff::{Field, PrimeField, PrimeFieldRepr};
+use ff::{Field, PrimeField};
 use franklin_crypto::circuit::boolean::Boolean;
 use franklin_crypto::circuit::ecc;
 use franklin_crypto::circuit::sha256;
@@ -19,7 +19,6 @@ use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
-use models::circuit::account::CircuitAccount;
 use models::params as franklin_constants;
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 7;
@@ -164,7 +163,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &allocated_chunk_data,
             )?;
             // calculate root for given account data
-            let (state_root, is_account_empty, subtree_root) = self
+            let (state_root, is_account_empty, _subtree_root) = self
                 .check_account_data(cs.namespace(|| "calculate account root"), &current_branch)?;
 
             // ensure root hash of state before applying operation is correct
@@ -183,7 +182,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &allocated_chunk_data,
                 &is_account_empty,
                 &operation_pub_data_chunk.get_number(),
-                &subtree_root,
+                // &subtree_root, // Close disable
                 &mut fees,
                 &mut prev,
             )?;
@@ -515,7 +514,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         chunk_data: &AllocatedChunkData<E>,
         is_account_empty: &Boolean,
         ext_pubdata_chunk: &AllocatedNum<E>,
-        subtree_root: &CircuitElement<E>,
+        // subtree_root: &CircuitElement<E>, // Close disable
         fees: &mut [AllocatedNum<E>],
         prev: &mut PreviousData<E>,
     ) -> Result<(), SynthesisError> {
@@ -670,16 +669,17 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &ext_pubdata_chunk,
             &signature_data.is_verified,
         )?);
-        op_flags.push(self.close_account(
-            cs.namespace(|| "close_account"),
-            &mut cur,
-            &chunk_data,
-            &ext_pubdata_chunk,
-            &op_data,
-            &signer_key,
-            &subtree_root,
-            &signature_data.is_verified,
-        )?);
+        // Close disable.
+        //  op_flags.push(self.close_account(
+        //      cs.namespace(|| "close_account"),
+        //      &mut cur,
+        //      &chunk_data,
+        //      &ext_pubdata_chunk,
+        //      &op_data,
+        //      &signer_key,
+        //      &subtree_root,
+        //      &signature_data.is_verified,
+        //  )?);
         op_flags.push(self.full_exit(
             cs.namespace(|| "full_exit"),
             &mut cur,
@@ -1187,103 +1187,104 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         Ok(tx_valid)
     }
 
-    fn close_account<CS: ConstraintSystem<E>>(
-        &self,
-        mut cs: CS,
-        cur: &mut AllocatedOperationBranch<E>,
-        chunk_data: &AllocatedChunkData<E>,
-        ext_pubdata_chunk: &AllocatedNum<E>,
-        op_data: &AllocatedOperationData<E>,
-        signer_key: &AllocatedSignerPubkey<E>,
-        subtree_root: &CircuitElement<E>,
-        is_sig_verified: &Boolean,
-    ) -> Result<Boolean, SynthesisError> {
-        let mut is_valid_flags = vec![];
-        //construct pubdata
-        let mut pubdata_bits = vec![];
-        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
-        pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
-        pubdata_bits.resize(
-            franklin_constants::CHUNK_BIT_WIDTH,
-            Boolean::constant(false),
-        );
+    // Close disable
+    // fn close_account<CS: ConstraintSystem<E>>(
+    //     &self,
+    //     mut cs: CS,
+    //     cur: &mut AllocatedOperationBranch<E>,
+    //     chunk_data: &AllocatedChunkData<E>,
+    //     ext_pubdata_chunk: &AllocatedNum<E>,
+    //     op_data: &AllocatedOperationData<E>,
+    //     signer_key: &AllocatedSignerPubkey<E>,
+    //     subtree_root: &CircuitElement<E>,
+    //     is_sig_verified: &Boolean,
+    // ) -> Result<Boolean, SynthesisError> {
+    //     let mut is_valid_flags = vec![];
+    //     //construct pubdata
+    //     let mut pubdata_bits = vec![];
+    //     pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+    //     pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+    //     pubdata_bits.resize(
+    //         franklin_constants::CHUNK_BIT_WIDTH,
+    //         Boolean::constant(false),
+    //     );
 
-        // construct signature message preimage (serialized_tx)
-        let mut serialized_tx_bits = vec![];
-        serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
-        serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+    //     // construct signature message preimage (serialized_tx)
+    //     let mut serialized_tx_bits = vec![];
+    //     serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+    //     serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
+    //     serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
 
-        let pubdata_chunk = select_pubdata_chunk(
-            cs.namespace(|| "select_pubdata_chunk"),
-            &pubdata_bits,
-            &chunk_data.chunk_number,
-            1,
-        )?;
+    //     let pubdata_chunk = select_pubdata_chunk(
+    //         cs.namespace(|| "select_pubdata_chunk"),
+    //         &pubdata_bits,
+    //         &chunk_data.chunk_number,
+    //         1,
+    //     )?;
 
-        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_pubdata_equal"),
-            &pubdata_chunk,
-            ext_pubdata_chunk,
-        )?);
-        is_valid_flags.push(is_pubdata_chunk_correct);
+    //     let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+    //         cs.namespace(|| "is_pubdata_equal"),
+    //         &pubdata_chunk,
+    //         ext_pubdata_chunk,
+    //     )?);
+    //     is_valid_flags.push(is_pubdata_chunk_correct);
 
-        let is_close_account = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_deposit"),
-            &chunk_data.tx_type.get_number(),
-            Expression::u64::<CS>(4), //close_account tx_type
-        )?);
-        is_valid_flags.push(is_close_account.clone());
+    //     let is_close_account = Boolean::from(Expression::equals(
+    //         cs.namespace(|| "is_deposit"),
+    //         &chunk_data.tx_type.get_number(),
+    //         Expression::u64::<CS>(4), //close_account tx_type
+    //     )?);
+    //     is_valid_flags.push(is_close_account.clone());
 
-        let tmp = CircuitAccount::<E>::empty_balances_root_hash();
-        let mut r_repr = E::Fr::zero().into_repr();
-        r_repr.read_be(&tmp[..]).unwrap();
-        let empty_root = E::Fr::from_repr(r_repr).unwrap();
+    //     let tmp = CircuitAccount::<E>::empty_balances_root_hash();
+    //     let mut r_repr = E::Fr::zero().into_repr();
+    //     r_repr.read_be(&tmp[..]).unwrap();
+    //     let empty_root = E::Fr::from_repr(r_repr).unwrap();
 
-        let are_balances_empty = Boolean::from(Expression::equals(
-            cs.namespace(|| "are_balances_empty"),
-            &subtree_root.get_number(),
-            Expression::constant::<CS>(empty_root), //This is precalculated root_hash of subtree with empty balances
-        )?);
-        is_valid_flags.push(are_balances_empty);
+    //     let are_balances_empty = Boolean::from(Expression::equals(
+    //         cs.namespace(|| "are_balances_empty"),
+    //         &subtree_root.get_number(),
+    //         Expression::constant::<CS>(empty_root), //This is precalculated root_hash of subtree with empty balances
+    //     )?);
+    //     is_valid_flags.push(are_balances_empty);
 
-        let is_serialized_tx_correct = verify_signature_message_construction(
-            cs.namespace(|| "is_serialized_tx_correct"),
-            serialized_tx_bits,
-            &op_data,
-        )?;
+    //     let is_serialized_tx_correct = verify_signature_message_construction(
+    //         cs.namespace(|| "is_serialized_tx_correct"),
+    //         serialized_tx_bits,
+    //         &op_data,
+    //     )?;
 
-        is_valid_flags.push(is_serialized_tx_correct);
-        is_valid_flags.push(is_sig_verified.clone());
-        let is_signer_valid = CircuitElement::equals(
-            cs.namespace(|| "signer_key_correct"),
-            &signer_key.pubkey.get_hash(),
-            &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
-        )?;
+    //     is_valid_flags.push(is_serialized_tx_correct);
+    //     is_valid_flags.push(is_sig_verified.clone());
+    //     let is_signer_valid = CircuitElement::equals(
+    //         cs.namespace(|| "signer_key_correct"),
+    //         &signer_key.pubkey.get_hash(),
+    //         &cur.account.pub_key_hash, //earlier we ensured that this new_pubkey_hash is equal to current if existed
+    //     )?;
 
-        is_valid_flags.push(is_signer_valid);
+    //     is_valid_flags.push(is_signer_valid);
 
-        let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
+    //     let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
 
-        // below we conditionally update state if it is valid operation
+    //     // below we conditionally update state if it is valid operation
 
-        // update pub_key
-        cur.account.pub_key_hash = CircuitElement::conditionally_select_with_number_strict(
-            cs.namespace(|| "mutated_pubkey"),
-            Expression::constant::<CS>(E::Fr::zero()),
-            &cur.account.pub_key_hash,
-            &tx_valid,
-        )?;
-        // update nonce
-        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
-            cs.namespace(|| "update cur nonce"),
-            Expression::constant::<CS>(E::Fr::zero()),
-            &cur.account.nonce,
-            &tx_valid,
-        )?;
+    //     // update pub_key
+    //     cur.account.pub_key_hash = CircuitElement::conditionally_select_with_number_strict(
+    //         cs.namespace(|| "mutated_pubkey"),
+    //         Expression::constant::<CS>(E::Fr::zero()),
+    //         &cur.account.pub_key_hash,
+    //         &tx_valid,
+    //     )?;
+    //     // update nonce
+    //     cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+    //         cs.namespace(|| "update cur nonce"),
+    //         Expression::constant::<CS>(E::Fr::zero()),
+    //         &cur.account.nonce,
+    //         &tx_valid,
+    //     )?;
 
-        Ok(tx_valid)
-    }
+    //     Ok(tx_valid)
+    // }
 
     fn noop<CS: ConstraintSystem<E>>(
         &self,
