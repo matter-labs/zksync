@@ -164,6 +164,8 @@ describe("INTEGRATION", function () {
 
         expect(verifiedEvent2.blockNumber).equal(2);
 
+        let v = await franklinDeployedContract.completeWithdrawals(1);
+        await v.wait();
         const afterPartExitBalance = await exitWallet.getBalance();
         expect(afterPartExitBalance.sub(beforePartExitBalance)).eq(exitValue);
 
@@ -235,7 +237,10 @@ describe("INTEGRATION", function () {
         expect(await priorityQueueDeployedContract.totalOpenPriorityRequests()).equal(0);
         expect(await priorityQueueDeployedContract.firstPriorityRequestId()).equal(2);
 
+        v = await franklinDeployedContract.completeWithdrawals(1);
+        await v.wait();
         const afterFullExitBalance = await wallet.getBalance();
+
         expect(afterFullExitBalance.sub(beforeFullExitBalance)).eq(fullExitMinusGas); // full exit amount minus gas fee for send transaction
 
         console.log("Full exit verified");
@@ -358,10 +363,14 @@ describe("INTEGRATION", function () {
         const verifyPartExReceipt = await verifyPartExTx.wait();
         const verifyPartExEvents = verifyPartExReceipt.events;
 
+        console.log("verifyPartExEvents:", verifyPartExEvents);
+
         const verifiedEvent2 = verifyPartExEvents.pop().args;
 
         expect(verifiedEvent2.blockNumber).equal(2);
 
+        let v = await franklinDeployedContract.completeWithdrawals(1);
+        await v.wait();
         const newBalance1 = await erc20DeployedToken.balanceOf(exitWallet.address);
 
         expect(newBalance1.sub(oldBalance1)).eq(exitValue);
@@ -431,6 +440,9 @@ describe("INTEGRATION", function () {
 
         expect(await priorityQueueDeployedContract.totalOpenPriorityRequests()).equal(0);
         expect(await priorityQueueDeployedContract.firstPriorityRequestId()).equal(2);
+
+        v = await franklinDeployedContract.completeWithdrawals(1);
+        await v.wait();
 
         const newBalance2 = await erc20DeployedToken.balanceOf(wallet.address);
 

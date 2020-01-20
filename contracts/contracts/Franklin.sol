@@ -122,6 +122,16 @@ contract Franklin {
     /// @notice Root-chain balances (per owner and token id) to withdraw
     mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
 
+    /// @notice verified withdrawal pending to be executed.
+    struct PendingWithdrawal {
+        address to;
+        uint16 tokenId;
+    }
+    /// @notice Verified but not executed withdrawals for addresses stored in here
+    mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
+    uint32 public firstPendingWithdrawalIndex;
+    uint32 public numberOfPendingWithdrawals;
+
     /// @notice Total number of verified blocks i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
     uint32 public totalBlocksVerified;
 
@@ -216,6 +226,38 @@ contract Franklin {
         blocks[0].stateRoot = _genesisRoot;
     }
 
+    /// @notice executes pending withdrawals
+    /// @param _n The number of withdrawals to complete starting from oldest
+    function completeWithdrawals(uint16 _n) external {
+        require(_n <= numberOfPendingWithdrawals, "dont have this many pending withdrawals to complete");
+
+        for (uint32 i = firstPendingWithdrawalIndex; i <= _n + firstPendingWithdrawalIndex; ++i) {
+            uint16 tokenId = pendingWithdrawals[i].tokenId;
+            address to = pendingWithdrawals[i].to;
+            uint128 amount = balancesToWithdraw[to][tokenId];
+            // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
+            if (amount != 0) { 
+                if (tokenId == 0) {
+                    address payable toPayable = address(uint160(to));
+                    if (toPayable.send(amount)) {
+                        delete amount;
+                    }
+                } else if (governance.isValidTokenId(tokenId)) {
+                    address tokenAddr = governance.tokenAddresses(tokenId);
+                    if(IERC20(tokenAddr).transfer(to, amount)) {
+                        delete amount;
+                    }
+                }
+            }
+
+            // send fails are ignored hence there is always a direct way to withdraw.
+            delete pendingWithdrawals[i];
+        }
+
+        firstPendingWithdrawalIndex += _n;
+        numberOfPendingWithdrawals -= _n;
+    }
+
     /// @notice Collects fees from provided requests number for the block validator, store it on her
     /// @notice balance to withdraw in Ether and delete this requests
     /// @param _number The number of requests
@@ -305,7 +347,7 @@ contract Franklin {
     /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
     /// @param _amount Ether amount to withdraw
     function withdrawETH(uint128 _amount) external {
-        registerWithdrawal(0, _amount);
+        registerSingleWithdrawal(0, _amount);
         msg.sender.transfer(_amount);
     }
 
@@ -349,7 +391,7 @@ contract Franklin {
     /// @param _amount amount to withdraw
     function withdrawERC20(address _token, uint128 _amount) external {
         uint16 tokenId = governance.validateTokenAddress(_token);
-        registerWithdrawal(tokenId, _amount);
+        registerSingleWithdrawal(tokenId, _amount);
         require(
             IERC20(_token).transfer(msg.sender, _amount),
             "fw011"
@@ -448,7 +490,7 @@ contract Franklin {
     /// @notice Register withdrawal - update user balances and emit OnchainWithdrawal event
     /// @param _token - token by id
     /// @param _amount - token amount
-    function registerWithdrawal(uint16 _token, uint128 _amount) internal {
+    function registerSingleWithdrawal(uint16 _token, uint128 _amount) internal {
         require(
             balancesToWithdraw[msg.sender][_token] >= _amount,
             "frw11"
@@ -717,23 +759,15 @@ contract Franklin {
         emit BlockVerified(_blockNumber);
     }
 
-    /// @notice When withdraw is verified we move funds to the user immediately, so that withdraw can be completed with one op.
-    /// @dev TODO: Temp. solution.
+    /// @notice When block with withdrawals is verified we store them and complete in separate tx. Withdrawals can be complete by calling withdrawEth, withdrawERC20 or completeWithdrawals.
     /// @param _to Reciever
     /// @param _tokenId Token id
     /// @param _amount Token amount
-    function payoutWithdrawNow(address _to, uint16 _tokenId, uint128 _amount) internal {
-        if (_tokenId == 0) {
-            address payable to = address(uint160(_to));
-            if (!to.send(_amount)) {
-                balancesToWithdraw[_to][_tokenId] += _amount;
-            }
-        } else if (governance.isValidTokenId(_tokenId)) {
-            address tokenAddr = governance.tokenAddresses(_tokenId);
-            if(!IERC20(tokenAddr).transfer(_to, _amount)) {
-                balancesToWithdraw[_to][_tokenId] += _amount;
-            }
-        }
+    function storeWithdrawalAsPending(address _to, uint16 _tokenId, uint128 _amount) internal {
+        pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
+        numberOfPendingWithdrawals++;
+
+        balancesToWithdraw[_to][_tokenId] += _amount;
     }
 
     /// @notice If block is verified the onchain operations from it must be completed
@@ -762,7 +796,7 @@ contract Franklin {
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
                 }
-                payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
+                storeWithdrawalAsPending(Bytes.bytesToAddress(ethAddress), tokenId, amount);
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
@@ -782,7 +816,7 @@ contract Franklin {
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + i];
                 }
-                payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
+                storeWithdrawalAsPending(Bytes.bytesToAddress(ethAddress), tokenId, amount);
             }
             delete onchainOps[current];
         }
