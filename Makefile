@@ -137,7 +137,7 @@ push-image-rust: image-rust
 deploy-contracts: confirm_action
 	@bin/deploy-contracts.sh
 
-test-contracts: confirm_action
+test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
 build-contracts: confirm_action flatten

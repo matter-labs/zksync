@@ -15,7 +15,7 @@ export function createDepositPublicData(tokenId, hexAmount: string, franklinAddr
     const amountBytes = Buffer.from(hexAmount, "hex");
     const pad1BytesLength = 16 - amountBytes.length;
     const pad1Bytes = Buffer.alloc(pad1BytesLength, 0);
-    if (franklinAddress.charAt(0) === "0" && franklinAddress.charAt(1) === "x") {
+    if (franklinAddress.startsWith("0x")) {
         franklinAddress = franklinAddress.substr(2);
     }
     const addressBytes = Buffer.from(franklinAddress, "hex");
