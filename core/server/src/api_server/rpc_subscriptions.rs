@@ -13,7 +13,6 @@ use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
 use models::node::tx::TxHash;
-use models::node::PubKeyHash;
 use models::{ActionType, Operation};
 use std::net::SocketAddr;
 use std::sync::Arc;

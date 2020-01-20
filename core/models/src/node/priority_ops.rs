@@ -1,10 +1,8 @@
-use super::tx::{PackedPublicKey, PackedSignature, TxSignature};
-use super::{AccountId, Nonce};
-use super::{PubKeyHash, TokenId};
+use super::AccountId;
+use super::TokenId;
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, FR_ADDRESS_LEN,
-    NONCE_BIT_WIDTH, SIGNATURE_R_BIT_WIDTH_PADDED, SIGNATURE_S_BIT_WIDTH_PADDED,
-    SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
+    TOKEN_BIT_WIDTH,
 };
 use crate::primitives::{bytes_slice_to_uint32, u128_to_bigdecimal};
 use bigdecimal::BigDecimal;
@@ -29,19 +27,6 @@ pub struct FullExit {
     pub account_id: AccountId,
     pub eth_address: Address,
     pub token: TokenId,
-}
-
-impl FullExit {
-    const TX_TYPE: u8 = 6;
-
-    pub fn get_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
-        out.extend_from_slice(&self.eth_address.as_bytes());
-        out.extend_from_slice(&self.token.to_be_bytes());
-        out
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

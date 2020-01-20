@@ -1,4 +1,3 @@
-use super::account::PubKeyHash;
 use super::tx::TxSignature;
 use super::AccountId;
 use super::FranklinTx;
@@ -10,12 +9,11 @@ use crate::node::{
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, BALANCE_BIT_WIDTH,
     ETHEREUM_KEY_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN,
-    NONCE_BIT_WIDTH, SIGNATURE_R_BIT_WIDTH_PADDED, SIGNATURE_S_BIT_WIDTH_PADDED,
-    SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
+    TOKEN_BIT_WIDTH,
 };
 use crate::primitives::{
-    big_decimal_to_u128, bytes32_from_slice, bytes_slice_to_uint128, bytes_slice_to_uint16,
-    bytes_slice_to_uint32, u128_to_bigdecimal,
+    big_decimal_to_u128, bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
+    u128_to_bigdecimal,
 };
 use bigdecimal::BigDecimal;
 use failure::{ensure, format_err};
@@ -379,13 +377,14 @@ pub struct ChangePubKeyOp {
 }
 
 impl ChangePubKeyOp {
-    pub const CHUNKS: usize = 14;
+    pub const CHUNKS: usize = 15;
     pub const OP_CODE: u8 = 0x07;
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.tx.nonce.to_be_bytes());
         data.extend_from_slice(&self.tx.new_pk_hash.data);
         data.extend_from_slice(&self.tx.account.as_bytes());
         data.extend_from_slice(&self.tx.eth_signature.0.r);
@@ -408,7 +407,7 @@ pub struct FullExitOp {
 }
 
 impl FullExitOp {
-    pub const CHUNKS: usize = 18;
+    pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x06;
 
     fn get_public_data(&self) -> Vec<u8> {
@@ -445,20 +444,13 @@ impl FullExitOp {
                 .ok_or_else(|| format_err!("Cant get amount from full exit pubdata"))?,
         );
 
-        // If full exit amount is 0 - full exit is considered failed
-        let withdraw_amount = if amount == BigDecimal::from(0) {
-            None
-        } else {
-            Some(amount)
-        };
-
         Ok(Self {
             priority_op: FullExit {
                 account_id,
                 eth_address,
                 token,
             },
-            withdraw_amount,
+            withdraw_amount: Some(amount),
         })
     }
 }

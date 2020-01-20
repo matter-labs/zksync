@@ -220,8 +220,11 @@ impl ChangePubKey {
     }
 
     pub fn verify_eth_signature(&self) -> Option<Address> {
+        let mut eth_signed_msg = Vec::with_capacity(24);
+        eth_signed_msg.extend_from_slice(&self.nonce.to_be_bytes());
+        eth_signed_msg.extend_from_slice(&self.new_pk_hash.data);
         self.eth_signature
-            .signature_recover_signer(&self.new_pk_hash.data)
+            .signature_recover_signer(&eth_signed_msg)
             .ok()
     }
 

@@ -1,7 +1,6 @@
 use actix_web::{web, App, HttpServer, Responder};
 use log::info;
 use models::node::tx::{FranklinTx, PackedPublicKey, TxSignature};
-use models::node::FullExit;
 use models::node::PubKeyHash;
 use serde::{Deserialize, Serialize};
 

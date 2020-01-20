@@ -139,14 +139,8 @@ impl PlasmaState {
         let account_balance = self
             .get_account(priority_op.account_id)
             .filter(|account| account.address == priority_op.eth_address)
-            .map(|acccount| acccount.get_balance(priority_op.token))
-            .filter(|balance| balance != &BigDecimal::from(0));
+            .map(|acccount| acccount.get_balance(priority_op.token));
 
-        assert_ne!(
-            account_balance,
-            Some(BigDecimal::from(0)),
-            "FullExit with zero balance should be failed"
-        );
         trace!("Balance: {:?}", account_balance);
         let op = FullExitOp {
             priority_op,

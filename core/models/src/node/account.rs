@@ -308,8 +308,7 @@ impl Account {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::node::{apply_updates, reverse_updates, AccountMap, AccountUpdates, PubKeyHash};
-    use failure::_core::ops::Add;
+    use crate::node::{apply_updates, reverse_updates, AccountMap, AccountUpdates};
 
     #[test]
     fn test_default_account() {

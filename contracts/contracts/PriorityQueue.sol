@@ -179,8 +179,8 @@ contract PriorityQueue {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, PUBKEY_HASH_BYTES + AMOUNT_BYTES + TOKEN_BYTES);
             onchainPubData = _pubData;
         } else if (_opType == FULL_EXIT_OP && priorityRequests[_priorityRequestId].opType == FULL_EXIT_OP) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES);
-            onchainPubData = Bytes.slice(_pubData, 0, ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES);
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES);
+            onchainPubData = Bytes.slice(_pubData, 0, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES);
         } else {
             revert("pid11"); // pid11 - wrong operation
         }

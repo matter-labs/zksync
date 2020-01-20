@@ -40,9 +40,6 @@ contract Franklin {
     /// @notice Franklin nonce bytes lengths
     uint8 constant NONCE_BYTES = 4;
 
-    /// @notice Signature (for example full exit signature) bytes length
-    uint8 constant SIGNATURE_BYTES = 64;
-
     /// @notice Public key bytes length
     uint8 constant PUBKEY_BYTES = 32;
 
@@ -89,10 +86,10 @@ contract Franklin {
     uint256 constant TRANSFER_BYTES = 2 * 8;
     
     /// @notice Full exit operation length
-    uint256 constant FULL_EXIT_BYTES = 18 * 8;
+    uint256 constant FULL_EXIT_BYTES = 6 * 8;
 
     /// @notice ChangePubKey operation length
-    uint256 constant CHANGE_PUBKEY_BYTES = 14 * 8;
+    uint256 constant CHANGE_PUBKEY_BYTES = 15 * 8;
 
     /// @notice Event emitted when a block is committed
     event BlockCommitted(uint32 indexed blockNumber);
@@ -365,16 +362,10 @@ contract Franklin {
     
     /// @notice Register full exit request - pack pubdata, add priority request
     /// @param _accountId Numerical id of the account
-    /// @param _pubKey Packed public key of the user account
     /// @param _token Token address, 0 address for ether
-    /// @param _signature User signature
-    /// @param _nonce Request nonce
     function fullExit (
         uint24 _accountId,
-        bytes calldata _pubKey,
-        address _token,
-        bytes calldata _signature,
-        uint32 _nonce
+        address _token
     ) external payable {
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
@@ -394,23 +385,10 @@ contract Franklin {
         
         requireActive();
 
-        require(
-            _signature.length == SIGNATURE_BYTES,
-            "fft12"
-        ); // fft12 - wrong signature length
-
-        require(
-            _pubKey.length == PUBKEY_BYTES,
-            "fft13"
-        ); // fft13 - wrong pubkey length
-
         // Priority Queue request
         bytes memory pubData = Bytes.toBytesFromUInt24(_accountId); // franklin id
-        pubData = Bytes.concat(pubData, _pubKey); // account id
         pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
         pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt32(_nonce)); // nonce
-        pubData = Bytes.concat(pubData, _signature); // signature
 
         priorityQueue.addPriorityRequest(uint8(OpType.FullExit), fee, pubData);
         
@@ -621,9 +599,9 @@ contract Franklin {
         }
 
         if (_opType == uint8(OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + AMOUNT_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + AMOUNT_BYTES);
             require(
-                pubData.length == ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + AMOUNT_BYTES,
+                pubData.length == ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + AMOUNT_BYTES,
                 "fpp13"
             ); // fpp13 - wrong full exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
@@ -635,6 +613,9 @@ contract Franklin {
 
         if (_opType == uint8(OpType.ChangePubKey)) {
             uint256 offset = opDataPointer + ACC_NUM_BYTES;
+
+            bytes memory nonce = Bytes.slice(_publicData, offset, NONCE_BYTES);
+            offset += NONCE_BYTES;
 
             bytes memory newPubKeyHash = Bytes.slice(_publicData, offset, PUBKEY_HASH_BYTES);
             offset += PUBKEY_HASH_BYTES;
@@ -650,7 +631,7 @@ contract Franklin {
 
             uint8 signV = uint8(_publicData[offset]);
 
-            bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n20", newPubKeyHash);
+            bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n24", nonce, newPubKeyHash);
             address recoveredAddress = ecrecover(keccak256(signedMessage), signV, signR, signS);
 
 //            emit DebugEvent(signR, signS, signV, signedMessage, recoveredAddress);
@@ -807,23 +788,17 @@ contract Franklin {
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
-                bytes memory tokenBytes = new bytes(TOKEN_BYTES);
-                for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-                    tokenBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + i];
-                }
-                uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
+                uint8 offset = ACC_NUM_BYTES;
 
-                bytes memory amountBytes = new bytes(AMOUNT_BYTES);
-                for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
-                    amountBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + i];
-                }
-                uint128 amount = Bytes.bytesToUInt128(amountBytes);
+                address ethAddress = Bytes.bytesToAddress(Bytes.slice(op.pubData, offset, ETH_ADDR_BYTES));
+                offset += ETH_ADDR_BYTES;
 
-                bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
-                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + i];
-                }
-                payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
+                uint16 tokenId = Bytes.bytesToUInt16(Bytes.slice(op.pubData, offset, TOKEN_BYTES));
+                offset += TOKEN_BYTES;
+
+                uint128 amount = Bytes.bytesToUInt128(Bytes.slice(op.pubData, offset, AMOUNT_BYTES));
+
+                payoutWithdrawNow(ethAddress, tokenId, amount);
             }
             delete onchainOps[current];
         }

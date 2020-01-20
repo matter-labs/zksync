@@ -19,8 +19,8 @@ use failure::Fail;
 use futures::channel::{mpsc, oneshot};
 use futures::StreamExt;
 use models::node::{
-    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, PubKeyHash,
-    TransferOp, TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TransferOp,
+    TransferToNewOp,
 };
 use models::params::block_size_chunks;
 use std::collections::{HashMap, VecDeque};
