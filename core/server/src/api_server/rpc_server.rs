@@ -256,7 +256,6 @@ impl Rpc for RpcApp {
             tx_add_result.map(|_| hash).map_err(|e| {
                 let code = match &e {
                     TxAddError::NonceMismatch => 101,
-                    TxAddError::InvalidSignature => 102,
                     TxAddError::IncorrectTx => 103,
                     TxAddError::Other => 104,
                 };

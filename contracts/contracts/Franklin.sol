@@ -46,6 +46,9 @@ contract Franklin {
     /// @notice Public key bytes length
     uint8 constant PUBKEY_BYTES = 32;
 
+    /// @notice Ethereum signature r/s bytes length
+    uint8 constant ETH_SIGN_RS_BYTES = 32;
+
     /// @notice Fee gas price for transactions
     uint256 constant FEE_GAS_PRICE_MULTIPLIER = 2; // 2 Gwei
 
@@ -87,6 +90,9 @@ contract Franklin {
     
     /// @notice Full exit operation length
     uint256 constant FULL_EXIT_BYTES = 18 * 8;
+
+    /// @notice ChangePubKey operation length
+    uint256 constant CHANGE_PUBKEY_BYTES = 14 * 8;
 
     /// @notice Event emitted when a block is committed
     event BlockCommitted(uint32 indexed blockNumber);
@@ -157,7 +163,8 @@ contract Franklin {
         PartialExit,
         CloseAccount,
         Transfer,
-        FullExit
+        FullExit,
+        ChangePubKey
     }
 
     /// @notice Onchain operations - operations processed inside rollup blocks
@@ -560,6 +567,14 @@ contract Franklin {
         ); // fcs12 - last chunk exceeds pubdata
     }
 
+    event DebugEvent(
+        bytes32 r,
+        bytes32 s,
+        uint8 v,
+        bytes msg,
+        address recovered
+    );
+
     /// @notice On the first byte determines the type of operation, if it is an onchain operation - saves it in storage
     /// @param _opType Operation type
     /// @param _currentPointer Current pointer in pubdata
@@ -616,6 +631,32 @@ contract Franklin {
                 pubData
             );
             return (FULL_EXIT_BYTES, 1, 1);
+        }
+
+        if (_opType == uint8(OpType.ChangePubKey)) {
+            uint256 offset = opDataPointer + ACC_NUM_BYTES;
+
+            bytes memory newPubKeyHash = Bytes.slice(_publicData, offset, PUBKEY_HASH_BYTES);
+            offset += PUBKEY_HASH_BYTES;
+
+            address ethAddress = Bytes.bytesToAddress(Bytes.slice(_publicData, offset, ETH_ADDR_BYTES));
+            offset += ETH_ADDR_BYTES;
+
+            bytes32 signR = Bytes.bytesToBytes32(Bytes.slice(_publicData, offset, ETH_SIGN_RS_BYTES));
+            offset += ETH_SIGN_RS_BYTES;
+
+            bytes32 signS = Bytes.bytesToBytes32(Bytes.slice(_publicData, offset, ETH_SIGN_RS_BYTES));
+            offset += ETH_SIGN_RS_BYTES;
+
+            uint8 signV = uint8(_publicData[offset]);
+
+            bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n20", newPubKeyHash);
+            address recoveredAddress = ecrecover(keccak256(signedMessage), signV, signR, signS);
+
+//            emit DebugEvent(signR, signS, signV, signedMessage, recoveredAddress);
+            require(recoveredAddress == ethAddress, "fpp15");
+            // fpp15 - failed to verify change pubkey hash signature
+            return (CHANGE_PUBKEY_BYTES, 0, 0);
         }
 
         revert("fpp14"); // fpp14 - unsupported op

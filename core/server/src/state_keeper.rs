@@ -90,6 +90,7 @@ impl PlasmaStateKeeper {
             .expect("db connection failed for statekeeper");
 
         let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
+        println!("accs: {:#?}", accounts);
         let last_verified = storage.get_last_verified_block().expect("db failed");
         let state = PlasmaState::new(accounts, last_committed + 1);
         let current_unprocessed_priority_op = storage

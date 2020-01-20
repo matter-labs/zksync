@@ -22,11 +22,24 @@ table! {
 }
 
 table! {
+    account_pubkey_updates (pubkey_update_id) {
+        pubkey_update_id -> Int4,
+        account_id -> Int8,
+        block_number -> Int8,
+        old_pubkey_hash -> Bytea,
+        new_pubkey_hash -> Bytea,
+        old_nonce -> Int8,
+        new_nonce -> Int8,
+    }
+}
+
+table! {
     accounts (id) {
         id -> Int8,
         last_block -> Int8,
         nonce -> Int8,
         address -> Bytea,
+        pubkey_hash -> Bytea,
     }
 }
 
@@ -197,6 +210,7 @@ joinable!(executed_transactions -> mempool (tx_hash));
 allow_tables_to_appear_in_same_query!(
     account_balance_updates,
     account_creates,
+    account_pubkey_updates,
     accounts,
     active_provers,
     balances,

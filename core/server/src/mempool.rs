@@ -36,8 +36,6 @@ const MAX_NUMBER_OF_WITHDRAWS: usize = 4;
 pub enum TxAddError {
     #[fail(display = "Tx nonce is too low.")]
     NonceMismatch,
-    #[fail(display = "Tx signature is incorrect.")]
-    InvalidSignature,
     #[fail(display = "Tx is incorrect")]
     IncorrectTx,
     #[fail(display = "Internal error")]
@@ -119,10 +117,6 @@ impl MempoolState {
     }
 
     fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
-        if tx.check_signature().is_none() {
-            return Err(TxAddError::InvalidSignature);
-        }
-
         if !tx.check_correctness() {
             return Err(TxAddError::IncorrectTx);
         }
@@ -176,8 +170,14 @@ impl Mempool {
                                     }
                                 }
                             }
-                            AccountUpdate::ChangePubKeyHash { .. } => {
-                                unimplemented!("change pubkey tx")
+                            AccountUpdate::ChangePubKeyHash { new_nonce, .. } => {
+                                if let Some(address) = self.mempool_state.account_ids.get(&id) {
+                                    if let Some(nonce) =
+                                        self.mempool_state.account_nonces.get_mut(address)
+                                    {
+                                        *nonce = new_nonce;
+                                    }
+                                }
                             }
                         }
                     }

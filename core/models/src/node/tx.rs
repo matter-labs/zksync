@@ -9,6 +9,7 @@ use crypto::{digest::Digest, sha2::Sha256};
 
 use super::account::PubKeyHash;
 use super::Engine;
+use crate::node::operations::ChangePubKeyOp;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
 use ethsign::Signature as ETHSignature;
@@ -80,13 +81,6 @@ impl<'de> Deserialize<'de> for TxHash {
 
 /// Signed by user.
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum TxType {
-    Transfer,
-    Withdraw,
-    Close,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transfer {
@@ -118,6 +112,7 @@ impl Transfer {
         self.from != self.to
             && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee)
+            && self.verify_signature().is_some()
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
@@ -157,7 +152,9 @@ impl Withdraw {
     }
 
     pub fn check_correctness(&self) -> bool {
-        is_fee_amount_packable(&self.fee) && self.amount <= u128_to_bigdecimal(u128::max_value())
+        is_fee_amount_packable(&self.fee)
+            && self.amount <= u128_to_bigdecimal(u128::max_value())
+            && self.verify_signature().is_some()
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
@@ -195,6 +192,42 @@ impl Close {
             None
         }
     }
+
+    pub fn check_correctness(&self) -> bool {
+        self.verify_signature().is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangePubKey {
+    pub account: Address,
+    pub new_pk_hash: PubKeyHash,
+    pub nonce: Nonce,
+    pub eth_signature: PackedEthSignature,
+}
+
+impl ChangePubKey {
+    const TX_TYPE: u8 = 7;
+
+    pub fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account.as_bytes());
+        out.extend_from_slice(&self.new_pk_hash.data);
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        out
+    }
+
+    pub fn verify_eth_signature(&self) -> Option<Address> {
+        self.eth_signature
+            .signature_recover_signer(&self.new_pk_hash.data)
+            .ok()
+    }
+
+    pub fn check_correctness(&self) -> bool {
+        self.verify_eth_signature() == Some(self.account)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -203,6 +236,7 @@ pub enum FranklinTx {
     Transfer(Transfer),
     Withdraw(Withdraw),
     Close(Close),
+    ChangePubKey(ChangePubKey),
 }
 
 impl FranklinTx {
@@ -211,6 +245,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
+            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
         };
 
         let mut hasher = Sha256::new();
@@ -222,9 +257,10 @@ impl FranklinTx {
 
     pub fn account(&self) -> Address {
         match self {
-            FranklinTx::Transfer(tx) => tx.from.clone(),
-            FranklinTx::Withdraw(tx) => tx.from.clone(),
-            FranklinTx::Close(tx) => tx.account.clone(),
+            FranklinTx::Transfer(tx) => tx.from,
+            FranklinTx::Withdraw(tx) => tx.from,
+            FranklinTx::Close(tx) => tx.account,
+            FranklinTx::ChangePubKey(tx) => tx.account,
         }
     }
 
@@ -233,6 +269,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.nonce,
             FranklinTx::Withdraw(tx) => tx.nonce,
             FranklinTx::Close(tx) => tx.nonce,
+            FranklinTx::ChangePubKey(tx) => tx.nonce,
         }
     }
 
@@ -240,15 +277,8 @@ impl FranklinTx {
         match self {
             FranklinTx::Transfer(tx) => tx.check_correctness(),
             FranklinTx::Withdraw(tx) => tx.check_correctness(),
-            FranklinTx::Close(_) => true,
-        }
-    }
-
-    pub fn check_signature(&self) -> Option<PubKeyHash> {
-        match self {
-            FranklinTx::Transfer(tx) => tx.verify_signature(),
-            FranklinTx::Withdraw(tx) => tx.verify_signature(),
-            FranklinTx::Close(tx) => tx.verify_signature(),
+            FranklinTx::Close(tx) => tx.check_correctness(),
+            FranklinTx::ChangePubKey(tx) => tx.check_correctness(),
         }
     }
 
@@ -257,6 +287,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
+            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
         }
     }
 
@@ -265,6 +296,7 @@ impl FranklinTx {
             FranklinTx::Transfer(_) => TransferOp::CHUNKS,
             FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
+            FranklinTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
         }
     }
 

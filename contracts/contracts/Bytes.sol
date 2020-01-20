@@ -107,6 +107,12 @@ library Bytes {
         return tempUint;
     }
 
+    function bytesToBytes32(bytes memory  _input) internal pure returns (bytes32 _output) {
+        for (uint i = 0; i < 32; i++) {
+            _output |= bytes32(_input[i] & 0xFF) >> (i * 8);
+        }
+    }
+
     // Original source code: https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol#L228
     // Get slice from bytes arrays
     // Returns the newly created 'bytes memory'

@@ -85,6 +85,7 @@ struct StorageAccount {
     pub last_block: i64,
     pub nonce: i64,
     pub address: Vec<u8>,
+    pub pubkey_hash: Vec<u8>,
 }
 
 #[derive(Identifiable, Insertable, QueryableByName, Queryable, Associations)]
@@ -128,6 +129,29 @@ struct StorageAccountUpdate {
     pub coin_id: i32,
     pub old_balance: BigDecimal,
     pub new_balance: BigDecimal,
+    pub old_nonce: i64,
+    pub new_nonce: i64,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "account_pubkey_updates"]
+struct StorageAccountPubkeyUpdateInsert {
+    pub account_id: i64,
+    pub block_number: i64,
+    pub old_pubkey_hash: Vec<u8>,
+    pub new_pubkey_hash: Vec<u8>,
+    pub old_nonce: i64,
+    pub new_nonce: i64,
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name = "account_pubkey_updates"]
+struct StorageAccountPubkeyUpdate {
+    pubkey_update_id: i32,
+    pub account_id: i64,
+    pub block_number: i64,
+    pub old_pubkey_hash: Vec<u8>,
+    pub new_pubkey_hash: Vec<u8>,
     pub old_nonce: i64,
     pub new_nonce: i64,
 }
@@ -313,6 +337,7 @@ enum StorageAccountDiff {
     BalanceUpdate(StorageAccountUpdate),
     Create(StorageAccountCreation),
     Delete(StorageAccountCreation),
+    ChangePubKey(StorageAccountPubkeyUpdate),
 }
 
 impl From<StorageAccountUpdate> for StorageAccountDiff {
@@ -328,6 +353,12 @@ impl From<StorageAccountCreation> for StorageAccountDiff {
         } else {
             StorageAccountDiff::Delete(create)
         }
+    }
+}
+
+impl From<StorageAccountPubkeyUpdate> for StorageAccountDiff {
+    fn from(update: StorageAccountPubkeyUpdate) -> Self {
+        StorageAccountDiff::ChangePubKey(update)
     }
 }
 
@@ -356,6 +387,17 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
                     address: Address::from_slice(&upd.address.as_slice()),
                 },
             ),
+            StorageAccountDiff::ChangePubKey(upd) => (
+                upd.account_id as u32,
+                AccountUpdate::ChangePubKeyHash {
+                    old_nonce: upd.old_nonce as u32,
+                    new_nonce: upd.new_nonce as u32,
+                    old_pub_key_hash: PubKeyHash::from_bytes(&upd.old_pubkey_hash)
+                        .expect("PubkeyHash update from db deserialzie"),
+                    new_pub_key_hash: PubKeyHash::from_bytes(&upd.new_pubkey_hash)
+                        .expect("PubkeyHash update from db deserialzie"),
+                },
+            ),
         }
     }
 }
@@ -366,6 +408,9 @@ impl StorageAccountDiff {
             StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { old_nonce, .. }) => old_nonce,
             StorageAccountDiff::Create(StorageAccountCreation { nonce, .. }) => nonce,
             StorageAccountDiff::Delete(StorageAccountCreation { nonce, .. }) => nonce,
+            StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate { old_nonce, .. }) => {
+                old_nonce
+            }
         }
     }
 
@@ -374,7 +419,8 @@ impl StorageAccountDiff {
             match diff {
                 StorageAccountDiff::Create(..) => 0,
                 StorageAccountDiff::BalanceUpdate(..) => 1,
-                StorageAccountDiff::Delete(..) => 2,
+                StorageAccountDiff::ChangePubKey(..) => 2,
+                StorageAccountDiff::Delete(..) => 3,
             }
         };
 
@@ -390,6 +436,9 @@ impl StorageAccountDiff {
             }
             StorageAccountDiff::Create(StorageAccountCreation { block_number, .. }) => block_number,
             StorageAccountDiff::Delete(StorageAccountCreation { block_number, .. }) => block_number,
+            StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate {
+                block_number, ..
+            }) => block_number,
         }
     }
 }
@@ -701,9 +750,7 @@ fn restore_account(
         account.set_balance(b.coin_id as TokenId, b.balance);
     }
     account.nonce = stored_account.nonce as u32;
-    account.pub_key_hash = PubKeyHash {
-        data: stored_account.address.as_slice().try_into().unwrap(),
-    };
+    account.address = Address::from_slice(&stored_account.address);
     (stored_account.id as u32, account)
 }
 
@@ -1264,8 +1311,22 @@ impl StorageProcessor {
                             })
                             .execute(self.conn())?;
                     }
-                    AccountUpdate::ChangePubKeyHash { .. } => {
-                        unimplemented!("Change pub key hash tx implement");
+                    AccountUpdate::ChangePubKeyHash {
+                        ref old_pub_key_hash,
+                        ref new_pub_key_hash,
+                        old_nonce,
+                        new_nonce,
+                    } => {
+                        diesel::insert_into(account_pubkey_updates::table)
+                            .values(&StorageAccountPubkeyUpdateInsert {
+                                account_id: i64::from(*id),
+                                block_number: i64::from(block_number),
+                                old_pubkey_hash: old_pub_key_hash.data.to_vec(),
+                                new_pubkey_hash: new_pub_key_hash.data.to_vec(),
+                                old_nonce: i64::from(old_nonce),
+                                new_nonce: i64::from(new_nonce),
+                            })
+                            .execute(self.conn())?;
                     }
                 }
             }
@@ -1284,6 +1345,10 @@ impl StorageProcessor {
                 .filter(account_creates::block_number.eq(&(i64::from(block_number))))
                 .load::<StorageAccountCreation>(self.conn())?;
 
+            let account_change_pubkey_diff = account_pubkey_updates::table
+                .filter(account_pubkey_updates::block_number.eq(&(i64::from(block_number))))
+                .load::<StorageAccountPubkeyUpdate>(self.conn())?;
+
             let account_updates: Vec<StorageAccountDiff> = {
                 let mut account_diff = Vec::new();
                 account_diff.extend(
@@ -1293,6 +1358,11 @@ impl StorageProcessor {
                 );
                 account_diff.extend(
                     account_creation_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
+                account_diff.extend(
+                    account_change_pubkey_diff
                         .into_iter()
                         .map(StorageAccountDiff::from),
                 );
@@ -1331,14 +1401,23 @@ impl StorageProcessor {
                             last_block: upd.block_number,
                             nonce: upd.nonce,
                             address: upd.address,
+                            pubkey_hash: Vec::new(),
                         };
                         insert_into(accounts::table)
                             .values(&storage_account)
                             .execute(self.conn())?;
                     }
-
                     StorageAccountDiff::Delete(upd) => {
                         delete(accounts::table.filter(accounts::id.eq(upd.account_id)))
+                            .execute(self.conn())?;
+                    }
+                    StorageAccountDiff::ChangePubKey(upd) => {
+                        update(accounts::table.filter(accounts::id.eq(upd.account_id)))
+                            .set((
+                                accounts::last_block.eq(upd.block_number),
+                                accounts::nonce.eq(upd.new_nonce),
+                                accounts::pubkey_hash.eq(upd.new_pubkey_hash),
+                            ))
                             .execute(self.conn())?;
                     }
                 }

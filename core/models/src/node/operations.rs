@@ -2,6 +2,7 @@ use super::account::PubKeyHash;
 use super::tx::TxSignature;
 use super::AccountId;
 use super::FranklinTx;
+use crate::node::tx::ChangePubKey;
 use crate::node::{
     pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
     FranklinPriorityOp, FullExit, Transfer, Withdraw,
@@ -372,6 +373,34 @@ impl CloseOp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChangePubKeyOp {
+    pub tx: ChangePubKey,
+    pub account_id: AccountId,
+}
+
+impl ChangePubKeyOp {
+    pub const CHUNKS: usize = 14;
+    pub const OP_CODE: u8 = 0x07;
+
+    fn get_public_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.push(Self::OP_CODE); // opcode
+        data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
+        data.extend_from_slice(&self.tx.new_pk_hash.data);
+        data.extend_from_slice(&self.tx.account.as_bytes());
+        data.extend_from_slice(&self.tx.eth_signature.0.r);
+        data.extend_from_slice(&self.tx.eth_signature.0.s);
+        data.push(self.tx.eth_signature.0.v);
+        data.resize(Self::CHUNKS * 8, 0x00);
+        data
+    }
+
+    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
+        unimplemented!("Tree restore for changepubkey op");
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExitOp {
     pub priority_op: FullExit,
     /// None if withdraw was unsuccessful
@@ -444,6 +473,7 @@ pub enum FranklinOp {
     Close(Box<CloseOp>),
     Transfer(Box<TransferOp>),
     FullExit(Box<FullExitOp>),
+    ChangePubKey(Box<ChangePubKeyOp>),
 }
 
 impl FranklinOp {
@@ -456,6 +486,7 @@ impl FranklinOp {
             FranklinOp::Close(_) => CloseOp::CHUNKS,
             FranklinOp::Transfer(_) => TransferOp::CHUNKS,
             FranklinOp::FullExit(_) => FullExitOp::CHUNKS,
+            FranklinOp::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
         }
     }
 
@@ -468,6 +499,7 @@ impl FranklinOp {
             FranklinOp::Close(op) => op.get_public_data(),
             FranklinOp::Transfer(op) => op.get_public_data(),
             FranklinOp::FullExit(op) => op.get_public_data(),
+            FranklinOp::ChangePubKey(op) => op.get_public_data(),
         }
     }
 
@@ -493,6 +525,9 @@ impl FranklinOp {
             FullExitOp::OP_CODE => Ok(FranklinOp::FullExit(Box::new(
                 FullExitOp::from_public_data(&bytes)?,
             ))),
+            ChangePubKeyOp::OP_CODE => Ok(FranklinOp::ChangePubKey(Box::new(
+                ChangePubKeyOp::from_public_data(&bytes)?,
+            ))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -506,6 +541,7 @@ impl FranklinOp {
             CloseOp::OP_CODE => Ok(CloseOp::CHUNKS * 8),
             TransferOp::OP_CODE => Ok(TransferOp::CHUNKS * 8),
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS * 8),
+            ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS * 8),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -516,6 +552,7 @@ impl FranklinOp {
             FranklinOp::TransferToNew(op) => Ok(FranklinTx::Transfer(op.tx.clone())),
             FranklinOp::Withdraw(op) => Ok(FranklinTx::Withdraw(op.tx.clone())),
             FranklinOp::Close(op) => Ok(FranklinTx::Close(op.tx.clone())),
+            FranklinOp::ChangePubKey(op) => Ok(FranklinTx::ChangePubKey(op.tx.clone())),
             _ => Err(format_err!("Wrong tx type")),
         }
     }

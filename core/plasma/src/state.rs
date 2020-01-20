@@ -2,8 +2,10 @@ use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
 use log::trace;
 use models::node::operations::{
-    CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
+    WithdrawOp,
 };
+use models::node::tx::ChangePubKey;
 use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
@@ -81,8 +83,7 @@ impl PlasmaState {
                     TransferToNewOp::CHUNKS
                 }
             }
-            FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
-            FranklinTx::Close(_) => CloseOp::CHUNKS,
+            _ => franklin_tx.min_chunks(),
         }
     }
 
@@ -99,6 +100,7 @@ impl PlasmaState {
             FranklinTx::Transfer(tx) => self.apply_transfer(tx),
             FranklinTx::Withdraw(tx) => self.apply_withdraw(tx),
             FranklinTx::Close(tx) => self.apply_close(tx),
+            FranklinTx::ChangePubKey(tx) => self.apply_change_pubkey(tx),
         }
     }
 
@@ -207,7 +209,10 @@ impl PlasmaState {
         let (from, from_account) = self
             .get_account_by_address(&tx.from)
             .ok_or_else(|| format_err!("From account does not exist"))?;
-
+        ensure!(
+            from_account.pub_key_hash != PubKeyHash::default(),
+            "Account is locked"
+        );
         ensure!(
             tx.verify_signature() == Some(from_account.pub_key_hash),
             "transfer signature is incorrect"
@@ -240,9 +245,17 @@ impl PlasmaState {
             tx.token < (params::TOTAL_TOKENS as TokenId),
             "Token id is not supported"
         );
-        let (account_id, _) = self
+        let (account_id, account) = self
             .get_account_by_address(&tx.from)
             .ok_or_else(|| format_err!("Account does not exist"))?;
+        ensure!(
+            account.pub_key_hash != PubKeyHash::default(),
+            "Account is locked"
+        );
+        ensure!(
+            tx.verify_signature() == Some(account.pub_key_hash),
+            "withdraw signature is incorrect"
+        );
         let withdraw_op = WithdrawOp { tx, account_id };
 
         let (fee, updates) = self.apply_withdraw_op(&withdraw_op)?;
@@ -255,10 +268,15 @@ impl PlasmaState {
 
     fn apply_close(&mut self, _tx: Close) -> Result<OpSuccess, Error> {
         bail!("Account closing is disabled");
-        // let (account_id, _) = self
+        // let (account_id, account) = self
         //     .get_account_by_address(&tx.account)
         //     .ok_or_else(|| format_err!("Account does not exist"))?;
         // let close_op = CloseOp { tx, account_id };
+        //        ensure!(account.pub_key_hash != PubKeyHash::default(), "Account is locked");
+        // ensure!(
+        //     tx.verify_signature() == Some(account.pub_key_hash),
+        //     "withdraw signature is incorrect"
+        // );
 
         // let (fee, updates) = self.apply_close_op(&close_op)?;
         // Ok(OpSuccess {
@@ -266,6 +284,24 @@ impl PlasmaState {
         //     updates,
         //     executed_op: FranklinOp::Close(Box::new(close_op)),
         // })
+    }
+
+    fn apply_change_pubkey(&mut self, tx: ChangePubKey) -> Result<OpSuccess, Error> {
+        let (account_id, account) = self
+            .get_account_by_address(&tx.account)
+            .ok_or_else(|| format_err!("Account does not exist"))?;
+        ensure!(
+            tx.verify_eth_signature() == Some(account.address),
+            "ChangePubKey signature is incorrect"
+        );
+        let change_pk_op = ChangePubKeyOp { tx, account_id };
+
+        let (fee, updates) = self.apply_change_pubkey_op(&change_pk_op)?;
+        Ok(OpSuccess {
+            fee: Some(fee),
+            updates,
+            executed_op: FranklinOp::ChangePubKey(Box::new(change_pk_op)),
+        })
     }
 
     pub fn collect_fee(&mut self, fees: &[CollectedFee], fee_account: AccountId) -> AccountUpdates {
@@ -477,6 +513,43 @@ impl PlasmaState {
             AccountUpdate::Delete {
                 address: account.address,
                 nonce: account.nonce,
+            },
+        ));
+
+        let fee = CollectedFee {
+            token: params::ETH_TOKEN_ID,
+            amount: BigDecimal::from(0),
+        };
+
+        Ok((fee, updates))
+    }
+
+    fn apply_change_pubkey_op(
+        &mut self,
+        op: &ChangePubKeyOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        let mut updates = Vec::new();
+        let mut account = self.get_account(op.account_id).unwrap();
+
+        let old_pub_key_hash = account.pub_key_hash.clone();
+        let old_nonce = account.nonce;
+
+        ensure!(op.tx.nonce == account.nonce, "Nonce mismatch");
+        account.pub_key_hash = op.tx.new_pk_hash.clone();
+        account.nonce += 1;
+
+        let new_pub_key_hash = account.pub_key_hash.clone();
+        let new_nonce = account.nonce;
+
+        self.insert_account(op.account_id, account);
+
+        updates.push((
+            op.account_id,
+            AccountUpdate::ChangePubKeyHash {
+                old_pub_key_hash,
+                old_nonce,
+                new_pub_key_hash,
+                new_nonce,
             },
         ));
 
