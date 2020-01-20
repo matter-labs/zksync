@@ -46,6 +46,9 @@ contract Franklin {
     /// @notice Ethereum signature r/s bytes length
     uint8 constant ETH_SIGN_RS_BYTES = 32;
 
+    /// @notice Success flag bytes length
+    uint8 constant SUCCESS_FLAG_BYTES = 1;
+
     /// @notice Fee gas price for transactions
     uint256 constant FEE_GAS_PRICE_MULTIPLIER = 2; // 2 Gwei
 
@@ -57,6 +60,9 @@ contract Franklin {
 
     /// @notice Base gas for full exit transaction
     uint256 constant BASE_FULL_EXIT_GAS = 170000;
+
+    /// @notice Base gas for deposit eth transaction
+    uint256 constant BASE_CHANGE_PUBKEY_PRIORITY_ETH_GAS = 100000;
 
     /// @notice Max amount of any token must fit into uint128
     uint256 constant MAX_VALUE = 2 ** 112 - 1;
@@ -90,6 +96,9 @@ contract Franklin {
 
     /// @notice ChangePubKey operation length
     uint256 constant CHANGE_PUBKEY_BYTES = 15 * 8;
+
+    /// @notice ChangePubKeyPriority operation length
+    uint256 constant CHANGE_PUBKEY_PRIORITY_BYTES = 6 * 8;
 
     /// @notice Event emitted when a block is committed
     event BlockCommitted(uint32 indexed blockNumber);
@@ -161,7 +170,8 @@ contract Franklin {
         CloseAccount,
         Transfer,
         FullExit,
-        ChangePubKey
+        ChangePubKey,
+        ChangePubKeyPriority
     }
 
     /// @notice Onchain operations - operations processed inside rollup blocks
@@ -448,6 +458,34 @@ contract Franklin {
         );
     }
 
+    function changePubKeyHash(bytes calldata _newPubKeyHash) external payable {
+        // Fee is:
+        //   fee coeff * base tx gas cost * gas price
+        uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_CHANGE_PUBKEY_PRIORITY_ETH_GAS * tx.gasprice;
+
+        requireActive();
+
+        require(
+            msg.value >= fee,
+            "cpk11"
+        ); // cpk11 - Not enough ETH provided
+
+        if (msg.value != fee) {
+            msg.sender.transfer(msg.value-fee);
+        }
+
+        require(
+            _newPubKeyHash.length == PUBKEY_HASH_BYTES,
+            "cpk12"
+        ); // cpk12 - wrong _newPubKeyHash length
+
+        // Priority Queue request
+        bytes memory pubData = _newPubKeyHash; // new pub key hash
+        pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address == sender
+
+        priorityQueue.addPriorityRequest(uint8(OpType.ChangePubKeyPriority), fee, pubData);
+    }
+
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommitted event
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
@@ -545,13 +583,13 @@ contract Franklin {
         ); // fcs12 - last chunk exceeds pubdata
     }
 
-    event DebugEvent(
-        bytes32 r,
-        bytes32 s,
-        uint8 v,
-        bytes msg,
-        address recovered
-    );
+//    event DebugEvent(
+//        bytes32 r,
+//        bytes32 s,
+//        uint8 v,
+//        bytes msg,
+//        address recovered
+//    );
 
     /// @notice On the first byte determines the type of operation, if it is an onchain operation - saves it in storage
     /// @param _opType Operation type
@@ -638,6 +676,19 @@ contract Franklin {
             require(recoveredAddress == ethAddress, "fpp15");
             // fpp15 - failed to verify change pubkey hash signature
             return (CHANGE_PUBKEY_BYTES, 0, 0);
+        }
+
+        if (_opType == uint8(OpType.ChangePubKeyPriority)) {
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + SUCCESS_FLAG_BYTES + PUBKEY_HASH_BYTES + ETH_ADDR_BYTES);
+            require(
+                pubData.length == ACC_NUM_BYTES + SUCCESS_FLAG_BYTES + PUBKEY_HASH_BYTES + ETH_ADDR_BYTES,
+                "fpp15"
+            ); // fpp15 - wrong change pubkey priority length
+            onchainOps[_currentOnchainOp] = OnchainOperation(
+                OpType.ChangePubKeyPriority,
+                pubData
+            );
+            return (CHANGE_PUBKEY_PRIORITY_BYTES, 1, 1);
         }
 
         revert("fpp14"); // fpp14 - unsupported op

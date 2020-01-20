@@ -19,6 +19,9 @@ contract PriorityQueue {
     /// @notice Full exit operation number
     uint8 constant FULL_EXIT_OP = 6;
 
+    /// @notice ChangePubKeyPriority operation number
+    uint8 constant CHANGE_PUBKEY_PRIORITY = 8;
+
     /// @notice Token id bytes length
     uint8 constant TOKEN_BYTES = 2;
 
@@ -31,17 +34,15 @@ contract PriorityQueue {
     /// @notice Rollup account id bytes length
     uint8 constant ACC_NUM_BYTES = 3;
 
+    /// @notice success flag length
+    uint8 constant SUCCESS_FLAG_BYTES = 1;
+
+
     /// @notice Rollup nonce bytes length
     uint8 constant NONCE_BYTES = 4;
 
     /// @notice Franklin chain address length
     uint8 constant PUBKEY_HASH_BYTES = 20;
-
-    /// @notice Signature (for example full exit signature) length
-    uint8 constant SIGNATURE_BYTES = 64;
-
-    /// @notice Public key length
-    uint8 constant PUBKEY_BYTES = 32;
 
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 4 * 60 * 24; // One day
@@ -181,6 +182,9 @@ contract PriorityQueue {
         } else if (_opType == FULL_EXIT_OP && priorityRequests[_priorityRequestId].opType == FULL_EXIT_OP) {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES);
             onchainPubData = Bytes.slice(_pubData, 0, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES);
+        } else if (_opType == CHANGE_PUBKEY_PRIORITY && priorityRequests[_priorityRequestId].opType == CHANGE_PUBKEY_PRIORITY) {
+            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, PUBKEY_HASH_BYTES + ETH_ADDR_BYTES);
+            onchainPubData = Bytes.slice(_pubData, ACC_NUM_BYTES + SUCCESS_FLAG_BYTES, PUBKEY_HASH_BYTES + ETH_ADDR_BYTES);
         } else {
             revert("pid11"); // pid11 - wrong operation
         }

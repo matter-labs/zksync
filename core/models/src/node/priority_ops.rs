@@ -13,6 +13,8 @@ use std::str::FromStr;
 use web3::types::{Address, Log, U256};
 
 use super::operations::{DepositOp, FullExitOp};
+use crate::node::operations::ChangePubkeyPriorityOp;
+use crate::node::PubKeyHash;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
@@ -30,10 +32,17 @@ pub struct FullExit {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChangePubKeyPriority {
+    pub new_pubkey_hash: PubKeyHash,
+    pub eth_address: Address,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinPriorityOp {
     Deposit(Deposit),
     FullExit(FullExit),
+    ChangePubKeyPriority(ChangePubKeyPriority),
 }
 
 impl FranklinPriorityOp {
@@ -94,6 +103,24 @@ impl FranklinPriorityOp {
                     token,
                 }))
             }
+            ChangePubkeyPriorityOp::OP_CODE => {
+                let (new_pubkey_hash, pub_data_left) = {
+                    let (pubkey_hash, left) = pub_data.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
+                    (PubKeyHash::from_bytes(pubkey_hash)?, left)
+                };
+                let (eth_address, pub_data_left) = {
+                    let (eth_address, left) = pub_data_left.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
+                    (Address::from_slice(eth_address), left)
+                };
+                ensure!(
+                    pub_data_left.is_empty(),
+                    "ChangePubkeyPriorityOp parse failed: input too big"
+                );
+                Ok(Self::ChangePubKeyPriority(ChangePubKeyPriority {
+                    new_pubkey_hash,
+                    eth_address,
+                }))
+            }
             _ => {
                 bail!("Unsupported priority op type");
             }
@@ -104,6 +131,7 @@ impl FranklinPriorityOp {
         match self {
             Self::Deposit(_) => DepositOp::CHUNKS,
             Self::FullExit(_) => FullExitOp::CHUNKS,
+            Self::ChangePubKeyPriority(_) => ChangePubkeyPriorityOp::CHUNKS,
         }
     }
 }
