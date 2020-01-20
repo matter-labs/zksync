@@ -14,7 +14,7 @@ use server::eth_sender;
 use server::eth_watch::start_eth_watch;
 use server::mempool::run_mempool_task;
 use server::prover_server::start_prover_server;
-use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
+use server::state_keeper::{start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper};
 use std::cell::RefCell;
 use std::time::Duration;
 use storage::ConnectionPool;
@@ -94,7 +94,7 @@ fn main() {
     let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     let state_keeper = PlasmaStateKeeper::new(
-        connection_pool.clone(),
+        PlasmaStateInitParams::restore_from_db(connection_pool.clone()),
         config_opts.operator_franklin_addr.clone(),
         state_keeper_req_receiver,
         proposed_blocks_sender,

@@ -5,8 +5,8 @@ use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor;
 use crate::tree_state::TreeState;
 use ethabi;
+use models::abi::{governance_contract, zksync_contract};
 use models::node::{AccountMap, AccountUpdate};
-use std::str::FromStr;
 use storage::ConnectionPool;
 use web3::contract::Contract;
 use web3::types::{H160, H256};
@@ -76,13 +76,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         let web3 = Web3::new(web3_transport);
 
         let governance_contract = {
-            let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
-                .expect("Governance contract abi error")
-                .get("abi")
-                .expect("Governance contract abi error")
-                .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes())
-                .expect("Governance contract abi error");
+            let abi = governance_contract();
             (
                 abi.clone(),
                 Contract::new(web3.eth(), governance_contract_eth_addr, abi.clone()),
@@ -90,13 +84,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         };
 
         let franklin_contract = {
-            let abi_string = serde_json::Value::from_str(models::abi::FRANKLIN_CONTRACT)
-                .expect("Franklin contract abi error")
-                .get("abi")
-                .expect("Franklin contract abi error")
-                .to_string();
-            let abi =
-                ethabi::Contract::load(abi_string.as_bytes()).expect("Franklin contract abi error");
+            let abi = zksync_contract();
             (
                 abi.clone(),
                 Contract::new(web3.eth(), franklin_contract_eth_addr, abi.clone()),

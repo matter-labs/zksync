@@ -1,7 +1,6 @@
 // Built-in deps
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::str::FromStr;
 use std::sync::mpsc::sync_channel;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -11,7 +10,8 @@ use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on};
 use web3::contract::Contract;
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, H160};
 use web3::{Transport, Web3};
-// Workspace uses
+// Workspace deps
+use models::abi::{governance_contract, priority_queue_contract};
 use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::{PriorityOp, TokenId};
 use models::params::PRIORITY_EXPIRATION;
@@ -47,30 +47,20 @@ impl<T: Transport> EthWatch<T> {
         priority_queue_address: H160,
     ) -> Self {
         let gov_contract = {
-            let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
-
             (
-                abi.clone(),
-                Contract::new(web3.eth(), governance_addr, abi.clone()),
+                governance_contract(),
+                Contract::new(web3.eth(), governance_addr, governance_contract()),
             )
         };
 
         let priority_queue_contract = {
-            let abi_string = serde_json::Value::from_str(models::abi::PRIORITY_QUEUE_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
-
             (
-                abi.clone(),
-                Contract::new(web3.eth(), priority_queue_address, abi.clone()),
+                priority_queue_contract(),
+                Contract::new(
+                    web3.eth(),
+                    priority_queue_address,
+                    priority_queue_contract(),
+                ),
             )
         };
 
@@ -174,7 +164,7 @@ impl<T: Transport> EthWatch<T> {
             eth_state.add_new_token(token.id as TokenId, token.address)
         }
 
-        debug!("ETH state: {:#?}", *eth_state);
+        trace!("ETH state: {:#?}", *eth_state);
     }
 
     fn process_new_blocks(&mut self, last_block: u64) -> Result<(), failure::Error> {
