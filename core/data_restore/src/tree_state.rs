@@ -445,24 +445,24 @@ mod test {
             fee_account: 0,
         };
 
-        let tx5 = Close {
-            account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
-                .unwrap(),
-            nonce: 2,
-            signature: TxSignature::default(),
-        };
-        let op5 = FranklinOp::Close(Box::new(CloseOp {
-            tx: tx5,
-            account_id: 1,
-        }));
-        let pub_data5 = op5.public_data();
-        let ops5 =
-            RollupOpsBlock::get_rollup_ops_from_data(&pub_data5).expect("cant get ops from data 5");
-        let block5 = RollupOpsBlock {
-            block_num: 5,
-            ops: ops5,
-            fee_account: 0,
-        };
+        // let tx5 = Close {
+        //     account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
+        //         .unwrap(),
+        //     nonce: 2,
+        //     signature: TxSignature::default(),
+        // };
+        // let op5 = FranklinOp::Close(Box::new(CloseOp {
+        //     tx: tx5,
+        //     account_id: 1,
+        // }));
+        // let pub_data5 = op5.public_data();
+        // let ops5 =
+        //     RollupOpsBlock::get_rollup_ops_from_data(&pub_data5).expect("cant get ops from data 5");
+        // let block5 = RollupOpsBlock {
+        //     block_num: 5,
+        //     ops: ops5,
+        //     fee_account: 0,
+        // };
 
         let mut tree = TreeState::new();
         tree.update_tree_states_from_ops_block(&block1)
@@ -473,8 +473,8 @@ mod test {
             .expect("Cant update state from block 3");
         tree.update_tree_states_from_ops_block(&block4)
             .expect("Cant update state from block 4");
-        tree.update_tree_states_from_ops_block(&block5)
-            .expect("Cant update state from block 5");
+        // tree.update_tree_states_from_ops_block(&block5)
+        //     .expect("Cant update state from block 5");
 
         assert_eq!(tree.get_accounts().len(), 2);
 
