@@ -1,3 +1,4 @@
+use crate::mempool::MempoolRequest;
 use actix_cors::Cors;
 use actix_web::{
     middleware,
@@ -5,15 +6,13 @@ use actix_web::{
     App, HttpResponse, HttpServer, Result as ActixResult,
 };
 use futures::channel::mpsc;
+use models::config_options::ThreadPanicNotify;
 use models::node::{Account, AccountAddress, AccountId, ExecutedOperations};
 use models::NetworkStatus;
-use storage::{ConnectionPool, StorageProcessor};
-
-use crate::mempool::MempoolRequest;
-use crate::ThreadPanicNotify;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
 

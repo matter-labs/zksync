@@ -10,6 +10,7 @@ use futures::{
     executor::block_on,
     SinkExt, StreamExt,
 };
+use models::config_options::ConfigurationOptions;
 use models::node::{
     Account, AccountAddress, AccountId, AccountMap, FranklinTx, Nonce, PriorityOp, TokenId,
 };
@@ -18,7 +19,6 @@ use server::mempool::ProposedBlock;
 use server::state_keeper::{
     start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper, StateKeeperRequest,
 };
-use server::ConfigurationOptions;
 use std::collections::HashMap;
 use std::thread::JoinHandle;
 use std::time::Instant;

@@ -1,58 +1,68 @@
 #[macro_use]
 extern crate log;
 
-pub mod accounts_state;
+pub mod contract_functions;
 pub mod data_restore_driver;
+pub mod eth_tx_helpers;
 pub mod events;
 pub mod events_state;
-pub mod franklin_ops;
-pub mod genesis_state;
-pub mod helpers;
+pub mod rollup_ops;
 pub mod storage_interactor;
+pub mod tree_state;
 
 use crate::data_restore_driver::DataRestoreDriver;
+use clap::{App, Arg};
+use models::config_options::ConfigurationOptions;
 use storage::ConnectionPool;
+use web3::transports::Http;
 
-/// Step of the considered blocks ethereum block
-const ETH_BLOCKS_DELTA: u64 = 250;
-/// Delta between last ethereum block and last watched ethereum block to prevent restart in case of reorder
-const END_ETH_BLOCKS_DELTA: u64 = 25;
+const ETH_BLOCKS_STEP: u64 = 1;
+const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
 fn main() {
+    info!("Restoring ZK Sync state from the contract");
     env_logger::init();
-    info!("Building Franklin accounts state");
-    load_state();
-}
-
-/// Creates data restore driver state
-///
-/// # Arguments
-///
-/// * `connection_pool` - Database connection pool
-///
-fn create_data_restore_driver(connection_pool: ConnectionPool) -> DataRestoreDriver {
-    DataRestoreDriver::new(connection_pool, ETH_BLOCKS_DELTA, END_ETH_BLOCKS_DELTA)
-}
-
-/// Loads states from storage and start update
-fn load_state() {
     let connection_pool = ConnectionPool::new();
+    let config_opts = ConfigurationOptions::from_env();
 
-    let mut data_restore_driver = create_data_restore_driver(connection_pool.clone());
-    info!("Driver created");
+    let cli = App::new("Data restore driver")
+        .author("Matter Labs")
+        .arg(
+            Arg::with_name("genesis")
+                .long("genesis")
+                .help("Restores data with provided genesis (zero) block"),
+        )
+        .arg(
+            Arg::with_name("continue")
+                .long("continue")
+                .help("Continues data restoreing"),
+        )
+        .get_matches();
 
-    data_restore_driver
-        .load_state_from_storage()
-        .expect("Cant load state");
-    run_state_update(&mut data_restore_driver);
-}
+    let (_event_loop, transport) =
+        Http::new(&config_opts.web3_url).expect("failed to start web3 transport");
+    let governance_addr = config_opts.governance_eth_addr;
+    let governance_genesis_tx_hash = config_opts.governance_genesis_tx_hash;
+    let contract_addr = config_opts.contract_eth_addr;
+    let contract_genesis_tx_hash = config_opts.contract_genesis_tx_hash;
 
-/// Runs states updates
-///
-/// # Arguments
-///
-/// * `driver` - DataRestore Driver config
-///
-fn run_state_update(driver: &mut DataRestoreDriver) {
-    driver.run_state_updates().expect("Cant update state");
+    let mut driver = DataRestoreDriver::new(
+        connection_pool,
+        transport,
+        governance_addr,
+        contract_addr,
+        ETH_BLOCKS_STEP,
+        END_ETH_BLOCKS_OFFSET,
+    );
+
+    // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address
+    if cli.is_present("genesis") {
+        driver.set_genesis_state(governance_genesis_tx_hash, contract_genesis_tx_hash);
+    }
+
+    if cli.is_present("continue") {
+        driver.load_state_from_storage();
+    }
+
+    driver.run_state_update();
 }

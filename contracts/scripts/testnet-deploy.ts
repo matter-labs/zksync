@@ -62,7 +62,7 @@ async function main() {
         governanceAddress,
         verifierAddress,
         priorityQueueAddress,
-        wallet.address,
+        process.env.OPERATOR_FRANKLIN_ADDRESS,
         process.env.GENESIS_ROOT || ethers.constants.HashZero,
     ];
 
@@ -89,7 +89,7 @@ async function main() {
             governanceAddress,
             verifierAddress,
             priorityQueueAddress,
-            wallet.address,
+            process.env.OPERATOR_FRANKLIN_ADDRESS.replace('sync:', '0x'),
             process.env.GENESIS_ROOT || ethers.constants.HashZero,
         ];
         timer = new Date().getTime();

@@ -23,12 +23,12 @@ use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H256, U256};
 use web3::Transport;
-// Workspace deps
-use crate::{ConfigurationOptions, ThreadPanicNotify};
+// Workspace uses
 use eth_client::{ETHClient, SignedCallResult};
 use models::abi::zksync_contract;
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::{Action, ActionType, Operation};
-use storage::{ConnectionPool, StorageETHOperation};
+use storage::{ConnectionPool, StorageETHOperation, StorageProcessor};
 use tokio::runtime::Runtime;
 use tokio::time;
 
@@ -93,16 +93,18 @@ impl<T: Transport> ETHSender<T> {
         let mut sender = Self {
             eth_client,
             unconfirmed_ops: VecDeque::new(),
-            db_pool,
+            db_pool: db_pool.clone(),
             rx_for_eth,
             op_notify,
         };
-        sender.restore_state().expect("Eth sender state restore");
+        let storage = db_pool.access_storage().expect("Failed to access storage");
+        if sender.restore_state(storage).is_err() {
+            info!("No unconfirmed operations");
+        }
         sender
     }
 
-    fn restore_state(&mut self) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
+    fn restore_state(&mut self, storage: StorageProcessor) -> Result<(), failure::Error> {
         self.unconfirmed_ops = storage
             .load_unconfirmed_operations()?
             .into_iter()

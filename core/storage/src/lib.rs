@@ -22,7 +22,9 @@ use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
     AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
 };
-use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_VERIFY};
+use models::{
+    Action, ActionType, EncodedProof, Operation, TokenAddedEvent, ACTION_COMMIT, ACTION_VERIFY,
+};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::convert::TryInto;
@@ -590,7 +592,7 @@ pub struct StoredBlockEvent {
 }
 
 #[derive(Debug, Insertable)]
-#[table_name = "franklin_ops"]
+#[table_name = "rollup_ops"]
 pub struct NewFranklinOp {
     pub block_num: i64,
     pub operation: Value,
@@ -612,7 +614,7 @@ impl NewFranklinOp {
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "franklin_ops"]
+#[table_name = "rollup_ops"]
 pub struct StoredFranklinOp {
     pub id: i32,
     pub block_num: i64,
@@ -627,7 +629,7 @@ impl StoredFranklinOp {
 }
 
 #[derive(Debug, Clone, Queryable)]
-pub struct StoredFranklinOpsBlock {
+pub struct StoredRollupOpsBlock {
     pub block_num: BlockNumber,
     pub ops: Vec<FranklinOp>,
     pub fee_account: AccountId,
@@ -2043,143 +2045,6 @@ impl StorageProcessor {
         Ok(serde_json::from_value(stored.proof).unwrap())
     }
 
-    pub fn save_events_state(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
-        for event in events.iter() {
-            diesel::insert_into(events_state::table)
-                .values(event)
-                .execute(self.conn())?;
-        }
-        Ok(())
-    }
-
-    pub fn delete_events_state(&self) -> QueryResult<()> {
-        diesel::delete(events_state::table).execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
-        let events = events_state::table
-            .filter(events_state::block_type.eq("Committed".to_string()))
-            .order(events_state::block_num.asc())
-            .load::<StoredBlockEvent>(self.conn())?;
-        Ok(events)
-    }
-
-    pub fn load_verified_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
-        let events = events_state::table
-            .filter(events_state::block_type.eq("Verified".to_string()))
-            .order(events_state::block_num.asc())
-            .load::<StoredBlockEvent>(self.conn())?;
-        Ok(events)
-    }
-
-    pub fn save_storage_state(&self, state: &NewStorageState) -> QueryResult<()> {
-        diesel::insert_into(storage_state_update::table)
-            .values(state)
-            .execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn delete_data_restore_storage_state_status(&self) -> QueryResult<()> {
-        diesel::delete(storage_state_update::table).execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
-        storage_state_update::table.first(self.conn())
-    }
-
-    pub fn save_last_watched_block_number(
-        &self,
-        number: &NewLastWatchedEthBlockNumber,
-    ) -> QueryResult<()> {
-        diesel::insert_into(data_restore_last_watched_eth_block::table)
-            .values(number)
-            .execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn delete_last_watched_block_number(&self) -> QueryResult<()> {
-        diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
-        data_restore_last_watched_eth_block::table.first(self.conn())
-    }
-
-    pub fn save_franklin_ops_block(
-        &self,
-        ops: &[FranklinOp],
-        block_num: BlockNumber,
-        fee_account: AccountId,
-    ) -> QueryResult<()> {
-        for op in ops.iter() {
-            let stored_op = NewFranklinOp::prepare_stored_op(&op, block_num, fee_account);
-            diesel::insert_into(franklin_ops::table)
-                .values(&stored_op)
-                .execute(self.conn())?;
-        }
-        Ok(())
-    }
-
-    pub fn delete_franklin_ops(&self) -> QueryResult<()> {
-        diesel::delete(franklin_ops::table).execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn load_franklin_ops_blocks(&self) -> QueryResult<Vec<StoredFranklinOpsBlock>> {
-        let stored_operations = franklin_ops::table
-            .order(franklin_ops::id.asc())
-            .load::<StoredFranklinOp>(self.conn())?;
-        let ops_blocks: Vec<StoredFranklinOpsBlock> = stored_operations
-            .into_iter()
-            .group_by(|op| op.block_num)
-            .into_iter()
-            .map(|(_, stored_ops)| {
-                // let stored_ops = group.clone();
-                // let mut ops: Vec<FranklinOp> = vec![];
-                let mut block_num: i64 = 0;
-                let mut fee_account: i64 = 0;
-                let ops: Vec<FranklinOp> = stored_ops
-                    .map(|stored_op| {
-                        block_num = stored_op.block_num;
-                        fee_account = stored_op.fee_account;
-                        stored_op.into_franklin_op()
-                    })
-                    .collect();
-                StoredFranklinOpsBlock {
-                    block_num: block_num as u32,
-                    ops,
-                    fee_account: fee_account as u32,
-                }
-            })
-            .collect();
-        Ok(ops_blocks)
-    }
-
-    pub fn update_tree_state(
-        &self,
-        block_number: BlockNumber,
-        updates: &[(u32, AccountUpdate)],
-    ) -> QueryResult<()> {
-        self.commit_state_update(block_number, &updates)?;
-        self.apply_state_update(block_number)?;
-        Ok(())
-    }
-
-    pub fn load_tree_state(&self) -> QueryResult<(u32, AccountMap)> {
-        Ok(self.load_verified_state()?)
-    }
-
-    pub fn delete_tree_state(&self) -> QueryResult<()> {
-        diesel::delete(balances::table).execute(self.conn())?;
-        diesel::delete(accounts::table).execute(self.conn())?;
-        diesel::delete(account_creates::table).execute(self.conn())?;
-        diesel::delete(account_balance_updates::table).execute(self.conn())?;
-        Ok(())
-    }
-
     pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
         let new_token = Token {
             id: i32::from(id),
@@ -2201,6 +2066,199 @@ impl StorageProcessor {
             .order(tokens::id.asc())
             .load::<Token>(self.conn())?;
         Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
+    }
+
+    // Data restore part
+
+    fn save_operation(&self, op: &Operation) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            match &op.action {
+                Action::Commit => {
+                    self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
+                    self.save_block(&op.block)?;
+                }
+                Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
+            };
+
+            let _stored: StoredOperation = diesel::insert_into(operations::table)
+                .values(&NewOperation {
+                    block_number: i64::from(op.block.block_number),
+                    action_type: op.action.to_string(),
+                })
+                .get_result(self.conn())?;
+            Ok(())
+        })
+    }
+
+    fn update_block_events(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(events_state::table).execute(self.conn())?;
+            for event in events.iter() {
+                diesel::insert_into(events_state::table)
+                    .values(event)
+                    .execute(self.conn())?;
+            }
+            Ok(())
+        })
+    }
+
+    fn update_last_watched_block_number(
+        &self,
+        number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
+            diesel::insert_into(data_restore_last_watched_eth_block::table)
+                .values(number)
+                .execute(self.conn())?;
+            Ok(())
+        })
+    }
+
+    fn update_storage_state(&self, state: NewStorageState) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(storage_state_update::table).execute(self.conn())?;
+            diesel::insert_into(storage_state_update::table)
+                .values(state)
+                .execute(self.conn())?;
+            Ok(())
+        })
+    }
+
+    pub fn save_genesis_state(&self, genesis_acc_update: AccountUpdate) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.commit_state_update(0, &[(0, genesis_acc_update)])?;
+            self.apply_state_update(0)?;
+            Ok(())
+        })
+    }
+
+    pub fn save_block_transactions_with_data_restore_state(
+        &self,
+        block: &Block,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.save_block_transactions(block)?;
+            let state = NewStorageState {
+                storage_state: "None".to_string(),
+            };
+            self.update_storage_state(state)?;
+            Ok(())
+        })
+    }
+
+    pub fn save_block_operations_with_data_restore_state(
+        &self,
+        commit_op: &Operation,
+        verify_op: &Operation,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.save_operation(commit_op)?;
+            self.save_operation(verify_op)?;
+            let state = NewStorageState {
+                storage_state: "None".to_string(),
+            };
+            self.update_storage_state(state)?;
+            Ok(())
+        })
+    }
+
+    pub fn save_events_state_with_data_restore_state(
+        &self,
+        block_events: &[NewBlockEvent],
+        token_events: &[TokenAddedEvent],
+        last_watched_eth_number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.update_block_events(block_events)?;
+
+            for token in token_events.iter() {
+                self.store_token(token.id as u16, &format!("0x{:x}", token.address), None)?;
+            }
+
+            self.update_last_watched_block_number(last_watched_eth_number)?;
+
+            let state = NewStorageState {
+                storage_state: "Events".to_string(),
+            };
+            self.update_storage_state(state)?;
+
+            Ok(())
+        })
+    }
+
+    pub fn save_rollup_ops_with_data_restore_state(
+        &self,
+        ops: &[(BlockNumber, &FranklinOp, AccountId)],
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(rollup_ops::table).execute(self.conn())?;
+            for op in ops.iter() {
+                let stored_op = NewFranklinOp::prepare_stored_op(&op.1, op.0, op.2);
+                diesel::insert_into(rollup_ops::table)
+                    .values(&stored_op)
+                    .execute(self.conn())?;
+            }
+            let state = NewStorageState {
+                storage_state: "Operations".to_string(),
+            };
+            self.update_storage_state(state)?;
+            Ok(())
+        })
+    }
+
+    pub fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
+        let events = events_state::table
+            .filter(events_state::block_type.eq("Committed".to_string()))
+            .order(events_state::block_num.asc())
+            .load::<StoredBlockEvent>(self.conn())?;
+        Ok(events)
+    }
+
+    pub fn load_verified_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
+        let events = events_state::table
+            .filter(events_state::block_type.eq("Verified".to_string()))
+            .order(events_state::block_num.asc())
+            .load::<StoredBlockEvent>(self.conn())?;
+        Ok(events)
+    }
+
+    pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
+        storage_state_update::table.first(self.conn())
+    }
+
+    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
+        data_restore_last_watched_eth_block::table.first(self.conn())
+    }
+
+    pub fn load_rollup_ops_blocks(&self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
+        let stored_operations = rollup_ops::table
+            .order(rollup_ops::id.asc())
+            .load::<StoredFranklinOp>(self.conn())?;
+        let ops_blocks: Vec<StoredRollupOpsBlock> = stored_operations
+            .into_iter()
+            .group_by(|op| op.block_num)
+            .into_iter()
+            .map(|(_, stored_ops)| {
+                // let stored_ops = group.clone();
+                // let mut ops: Vec<FranklinOp> = vec![];
+                let mut block_num: i64 = 0;
+                let mut fee_account: i64 = 0;
+                let ops: Vec<FranklinOp> = stored_ops
+                    .map(|stored_op| {
+                        block_num = stored_op.block_num;
+                        fee_account = stored_op.fee_account;
+                        stored_op.into_franklin_op()
+                    })
+                    .collect();
+                StoredRollupOpsBlock {
+                    block_num: block_num as u32,
+                    ops,
+                    fee_account: fee_account as u32,
+                }
+            })
+            .collect();
+        Ok(ops_blocks)
     }
 }
 

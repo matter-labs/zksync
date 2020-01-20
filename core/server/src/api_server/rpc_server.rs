@@ -1,7 +1,6 @@
 use crate::mempool::MempoolRequest;
 use crate::mempool::TxAddError;
 use crate::state_keeper::StateKeeperRequest;
-use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
 use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt, SinkExt, TryFutureExt};
@@ -9,6 +8,7 @@ use jsonrpc_core::{Error, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
+use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::{Account, AccountAddress, AccountId, FranklinTx, Nonce, TokenId};
 use std::collections::HashMap;
