@@ -2,7 +2,10 @@ use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use super::params;
 use super::primitives::{pack_as_float, u128_to_bigdecimal, unpack_float};
 use bigdecimal::BigDecimal;
-use franklin_crypto::jubjub::JubjubEngine;
+use franklin_crypto::{
+    eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
+    jubjub::JubjubEngine,
+};
 use pairing::bn256;
 
 pub mod account;
@@ -29,6 +32,13 @@ pub type Fs = <Engine as JubjubEngine>::Fs;
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
 pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
+
+pub type PrivateKey = PrivateKeyImport<Engine>;
+pub type PublicKey = PublicKeyImport<Engine>;
+
+pub fn priv_key_from_fs(fs: Fs) -> PrivateKey {
+    PrivateKeyImport(fs)
+}
 
 pub fn apply_updates(accounts: &mut AccountMap, updates: AccountUpdates) {
     for (id, update) in updates.into_iter() {

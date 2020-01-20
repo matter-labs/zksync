@@ -813,11 +813,13 @@ name = "data_restore"
 version = "0.1.0"
 dependencies = [
  "bigdecimal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "ethabi 8.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto)",
+ "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1877,6 +1879,7 @@ dependencies = [
  "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "fnv 1.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto)",
+ "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3063,6 +3066,28 @@ dependencies = [
  "models 0.0.1",
  "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "testkit"
+version = "0.1.0"
+dependencies = [
+ "bigdecimal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "eth_client 0.1.0",
+ "ethabi 8.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto)",
+ "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
+ "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
+ "models 0.0.1",
+ "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
+ "server 0.0.1",
+ "storage 0.0.1",
+ "tokio 0.2.9 (registry+https://github.com/rust-lang/crates.io-index)",
+ "web3 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use log::{error, info, trace};
 // Workspace deps
-use crate::ThreadPanicNotify;
+use models::config_options::ThreadPanicNotify;
 use prover::client;
 
 struct AppState {
