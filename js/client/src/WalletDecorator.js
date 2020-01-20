@@ -6,6 +6,8 @@ import config from './env-config';
 const zksync = require('zksync');
 const ethers = require('ethers');
 import franklin_abi from '../../../contracts/build/Franklin.json'
+import { Emitter } from './Emitter';
+
 
 const NUMERIC_LIMITS_UINT_256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
 
@@ -534,6 +536,8 @@ export class WalletDecorator {
         const txHashHtml = shortenedTxHash(syncOp.txHash);
     
         const receipt = await syncOp.awaitReceipt();
+        this.emit("receiptCommittedOrVerified");
+
         if (receipt.failReason) {
             yield error(`Transaction ${txHashHtml} with <code>${receipt.failReason}</code>`, { countdown: 10 });
             return;
@@ -547,6 +551,7 @@ export class WalletDecorator {
         let verified = false;
         syncOp.awaitVerifyReceipt()
             .then(verifyReceipt => {
+                this.emit("receiptCommittedOrVerified");
                 verified = true;
             });
 
@@ -579,7 +584,8 @@ export class WalletDecorator {
         await syncOp.awaitEthereumTxCommit();
 
         const receipt = await syncOp.awaitReceipt();
-
+        this.emit("receiptCommittedOrVerified");
+        
         yield combineMessages(
             info(`Transaction ${txHashHtml} got included in block <code>${receipt.block.blockNumber}</code>, waiting for prover...`),
             start_progress_bar({variant: 'half', duration: timeConstants.waitingForProverHalfLife})
@@ -588,6 +594,7 @@ export class WalletDecorator {
         let verified = false;
         syncOp.awaitVerifyReceipt()
             .then(verifyReceipt => {
+                this.emit("receiptCommittedOrVerified");
                 verified = true;
             });
 
@@ -658,3 +665,5 @@ export class WalletDecorator {
 
     // #endregion
 }
+
+Emitter(WalletDecorator.prototype);

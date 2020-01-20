@@ -46,6 +46,8 @@ spec:
           value: "${BLOCK_SIZE_CHUNKS}"
         - name: KEYS_SPACE_URL
           value: "${KEYS_SPACE_URL}"
+        - name: PROVER_SERVER_URL
+          value: "${PROVER_SERVER_URL}"
         - name: NODE_NAME
           valueFrom:
             fieldRef:

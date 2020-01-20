@@ -1,11 +1,12 @@
 mod pool;
 
 // Built-in
-use std::sync::{mpsc, Arc, RwLock};
+use std::sync::{Arc, RwLock};
 use std::thread;
 use std::{net, time};
 // External
 use actix_web::{web, App, HttpResponse, HttpServer};
+use futures::channel::mpsc;
 use log::{error, info, trace};
 // Workspace deps
 use crate::ThreadPanicNotify;

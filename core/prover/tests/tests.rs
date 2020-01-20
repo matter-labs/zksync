@@ -180,13 +180,13 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
         },
     )));
 
-    let (fee_account_id, fee_updates) = state.collect_fee(&fees, &validator_test_account.address);
+    let fee_updates = state.collect_fee(&fees, validator_account_id);
     accounts_updated.extend(fee_updates.into_iter());
 
     let block = models::node::block::Block {
         block_number: state.block_number,
         new_root_hash: state.root_hash(),
-        fee_account: fee_account_id,
+        fee_account: validator_account_id,
         block_transactions: ops,
         processed_priority_ops: (0, 1),
     };

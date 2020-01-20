@@ -225,13 +225,13 @@ contract Franklin {
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
     /// @dev WARNING: Only for Exodus mode
     /// @dev Canceling may take several separate transactions to be completed
-    /// @dev getOutstandingDeposits returns only limited number of deposits so as not to go beyond the block gas limit
+    /// @dev popOutstandingDeposits returns only limited number of deposits so as not to go beyond the block gas limit
     function cancelOutstandingDepositsForExodusMode() external {
         require(
             exodusMode,
             "frс11"
         ); // frс11 - exodus mode is not activated
-        bytes memory depositsPubData = priorityQueue.getOutstandingDeposits();
+        bytes memory depositsPubData = priorityQueue.popOutstandingDeposits();
         uint64 i = 0;
         while (i < depositsPubData.length) {
             bytes memory deposit = Bytes.slice(depositsPubData, i, ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES);
