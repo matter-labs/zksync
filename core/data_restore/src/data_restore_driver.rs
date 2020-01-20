@@ -4,7 +4,6 @@ use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
 use crate::storage_interactor;
 use crate::tree_state::TreeState;
-use ethabi;
 use models::abi::{governance_contract, zksync_contract};
 use models::node::{AccountMap, AccountUpdate};
 use storage::ConnectionPool;
