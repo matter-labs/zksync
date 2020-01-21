@@ -46,9 +46,6 @@ contract PriorityQueue {
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 4 * 60 * 24; // One day
 
-    /// @notice Maximum number of outstanding deposits to be canceled in one call
-    uint64 constant MAX_OUTSTANDING_DEPOSITS_TO_CANCEL_IN_ONE_CALL = 70;
-
     /// @notice New priority request event. Emitted when a request is placed into mapping
     event NewPriorityRequest(
         uint64 serialId,
