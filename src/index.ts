@@ -28,5 +28,5 @@ export {
     getEthereumBalance,
     types,
     utils,
-    crypto,
+    crypto
 };

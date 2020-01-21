@@ -5,4 +5,4 @@ import { closestPackableTransactionAmount, closestPackableTransactionFee } from 
 import * as types from "./types";
 import * as utils from "./utils";
 import * as crypto from "./crypto";
-export { Wallet, Signer, Provider, ETHProxy, closestPackableTransactionFee, closestPackableTransactionAmount, getDefaultProvider, depositFromETH, emergencyWithdraw, getEthereumBalance, types, utils, crypto, };
+export { Wallet, Signer, Provider, ETHProxy, closestPackableTransactionFee, closestPackableTransactionAmount, getDefaultProvider, depositFromETH, emergencyWithdraw, getEthereumBalance, types, utils, crypto };

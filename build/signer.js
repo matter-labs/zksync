@@ -113,8 +113,10 @@ var Signer = /** @class */ (function () {
 exports.Signer = Signer;
 // Sync or eth address
 function serializeAddress(address) {
-    var prefixlessAddress = address.startsWith('0x') ? address.substr(2)
-        : address.startsWith('sync:') ? address.substr(5)
+    var prefixlessAddress = address.startsWith("0x")
+        ? address.substr(2)
+        : address.startsWith("sync:")
+            ? address.substr(5)
             : null;
     if (prefixlessAddress === null) {
         throw new Error("ETH address must start with '0x' and Sync address start with 'sync:'");

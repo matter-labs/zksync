@@ -232,10 +232,10 @@ function depositFromETH(deposit) {
                 case 4:
                     mainZkSyncContract = new ethers_1.Contract(deposit.depositTo.provider.contractAddress.mainContract, utils_1.SYNC_MAIN_CONTRACT_INTERFACE, deposit.depositFrom);
                     if (!(deposit.token == "ETH")) return [3 /*break*/, 6];
-                    return [4 /*yield*/, mainZkSyncContract.depositETH(deposit.amount, deposit.depositTo.address().replace('sync:', '0x'), {
+                    return [4 /*yield*/, mainZkSyncContract.depositETH(deposit.amount, deposit.depositTo.address().replace("sync:", "0x"), {
                             value: ethers_1.utils.bigNumberify(deposit.amount).add(maxFeeInETHToken),
                             gasLimit: ethers_1.utils.bigNumberify("200000"),
-                            gasPrice: gasPrice,
+                            gasPrice: gasPrice
                         })];
                 case 5:
                     ethTransaction = _a.sent();
@@ -245,11 +245,11 @@ function depositFromETH(deposit) {
                     return [4 /*yield*/, erc20contract.approve(deposit.depositTo.provider.contractAddress.mainContract, deposit.amount)];
                 case 7:
                     approveTx = _a.sent();
-                    return [4 /*yield*/, mainZkSyncContract.depositERC20(deposit.token, deposit.amount, deposit.depositTo.address().replace('sync:', '0x'), {
+                    return [4 /*yield*/, mainZkSyncContract.depositERC20(deposit.token, deposit.amount, deposit.depositTo.address().replace("sync:", "0x"), {
                             gasLimit: ethers_1.utils.bigNumberify("250000"),
                             value: maxFeeInETHToken,
                             nonce: approveTx.nonce + 1,
-                            gasPrice: gasPrice,
+                            gasPrice: gasPrice
                         })];
                 case 8:
                     ethTransaction = _a.sent();
@@ -271,8 +271,7 @@ function emergencyWithdraw(withdraw) {
                     if (!(withdraw.maxFeeInETHToken != null)) return [3 /*break*/, 2];
                     maxFeeInETHToken = withdraw.maxFeeInETHToken;
                     return [3 /*break*/, 4];
-                case 2: return [4 /*yield*/, withdraw.withdrawFrom.ethProxy
-                        .estimateEmergencyWithdrawFeeInETHToken(gasPrice)];
+                case 2: return [4 /*yield*/, withdraw.withdrawFrom.ethProxy.estimateEmergencyWithdrawFeeInETHToken(gasPrice)];
                 case 3:
                     baseFee = _e.sent();
                     maxFeeInETHToken = baseFee;
@@ -321,7 +320,7 @@ function emergencyWithdraw(withdraw) {
                     return [4 /*yield*/, mainZkSyncContract.fullExit(accountId, crypto_1.serializePointPacked(withdraw.withdrawFrom.signer.publicKey), tokenAddress, emergencyWithdrawSignature, nonce, {
                             gasLimit: ethers_1.utils.bigNumberify("500000"),
                             value: maxFeeInETHToken,
-                            gasPrice: gasPrice,
+                            gasPrice: gasPrice
                         })];
                 case 14:
                     ethTransaction = _e.sent();

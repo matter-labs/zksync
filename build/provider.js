@@ -56,11 +56,11 @@ function getDefaultProvider(network, transport) {
                 case 5:
                     if (!(network == "testnet")) return [3 /*break*/, 9];
                     if (!(transport == "WS")) return [3 /*break*/, 7];
-                    return [4 /*yield*/, Provider.newWebsocketProvider("wss://testnet.matter-labs.io/jsrpc-ws")];
+                    return [4 /*yield*/, Provider.newWebsocketProvider("wss://testnet.zksync.dev/jsrpc-ws")];
                 case 6: return [2 /*return*/, _a.sent()];
                 case 7:
                     if (!(transport == "HTTP")) return [3 /*break*/, 9];
-                    return [4 /*yield*/, Provider.newHttpProvider("https://testnet.matter-labs.io/jsrpc")];
+                    return [4 /*yield*/, Provider.newHttpProvider("https://testnet.zksync.dev/jsrpc")];
                 case 8: return [2 /*return*/, _a.sent()];
                 case 9: return [2 /*return*/];
             }
@@ -226,8 +226,10 @@ var Provider = /** @class */ (function () {
                     case 3:
                         transactionStatus = _a.sent();
                         notifyDone = action == "COMMIT"
-                            ? transactionStatus.block && transactionStatus.block.committed
-                            : transactionStatus.block && transactionStatus.block.verified;
+                            ? transactionStatus.block &&
+                                transactionStatus.block.committed
+                            : transactionStatus.block &&
+                                transactionStatus.block.verified;
                         if (!notifyDone) return [3 /*break*/, 4];
                         return [2 /*return*/, transactionStatus];
                     case 4: return [4 /*yield*/, utils_1.sleep(3000)];

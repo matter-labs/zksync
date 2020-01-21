@@ -20,9 +20,7 @@ export class Wallet {
     public provider: Provider;
     public ethProxy: ETHProxy;
 
-    constructor(
-        public signer: Signer,
-    ) {}
+    constructor(public signer: Signer) {}
 
     connect(provider: Provider, ethProxy: ETHProxy) {
         this.provider = provider;
@@ -170,8 +168,8 @@ export async function depositFromETH(deposit: {
     maxFeeInETHToken?: utils.BigNumberish;
 }): Promise<ETHOperation> {
     const gasPrice = await deposit.depositFrom.provider.getGasPrice();
-    
-    let maxFeeInETHToken;    
+
+    let maxFeeInETHToken;
     if (deposit.maxFeeInETHToken != null) {
         maxFeeInETHToken = deposit.maxFeeInETHToken;
     } else {
@@ -192,11 +190,11 @@ export async function depositFromETH(deposit: {
     if (deposit.token == "ETH") {
         ethTransaction = await mainZkSyncContract.depositETH(
             deposit.amount,
-            deposit.depositTo.address().replace('sync:', '0x'),
+            deposit.depositTo.address().replace("sync:", "0x"),
             {
                 value: utils.bigNumberify(deposit.amount).add(maxFeeInETHToken),
                 gasLimit: utils.bigNumberify("200000"),
-                gasPrice,
+                gasPrice
             }
         );
     } else {
@@ -213,12 +211,12 @@ export async function depositFromETH(deposit: {
         ethTransaction = await mainZkSyncContract.depositERC20(
             deposit.token,
             deposit.amount,
-            deposit.depositTo.address().replace('sync:', '0x'),
+            deposit.depositTo.address().replace("sync:", "0x"),
             {
                 gasLimit: utils.bigNumberify("250000"),
                 value: maxFeeInETHToken,
                 nonce: approveTx.nonce + 1,
-                gasPrice,
+                gasPrice
             }
         );
     }
@@ -240,8 +238,9 @@ export async function emergencyWithdraw(withdraw: {
     if (withdraw.maxFeeInETHToken != null) {
         maxFeeInETHToken = withdraw.maxFeeInETHToken;
     } else {
-        const baseFee = await withdraw.withdrawFrom.ethProxy
-            .estimateEmergencyWithdrawFeeInETHToken(gasPrice);
+        const baseFee = await withdraw.withdrawFrom.ethProxy.estimateEmergencyWithdrawFeeInETHToken(
+            gasPrice
+        );
 
         maxFeeInETHToken = baseFee;
     }
@@ -292,7 +291,7 @@ export async function emergencyWithdraw(withdraw: {
         {
             gasLimit: utils.bigNumberify("500000"),
             value: maxFeeInETHToken,
-            gasPrice,
+            gasPrice
         }
     );
 

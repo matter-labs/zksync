@@ -154,13 +154,16 @@ export class Signer {
 
 // Sync or eth address
 function serializeAddress(address: Address | string): Buffer {
-    const prefixlessAddress
-        = address.startsWith('0x')    ? address.substr(2)
-        : address.startsWith('sync:') ? address.substr(5)
+    const prefixlessAddress = address.startsWith("0x")
+        ? address.substr(2)
+        : address.startsWith("sync:")
+        ? address.substr(5)
         : null;
 
     if (prefixlessAddress === null) {
-        throw new Error("ETH address must start with '0x' and Sync address start with 'sync:'")
+        throw new Error(
+            "ETH address must start with '0x' and Sync address start with 'sync:'"
+        );
     }
 
     const addressBytes = Buffer.from(prefixlessAddress, "hex");

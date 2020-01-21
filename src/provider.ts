@@ -32,11 +32,11 @@ export async function getDefaultProvider(
     } else if (network == "testnet") {
         if (transport == "WS") {
             return await Provider.newWebsocketProvider(
-                "wss://testnet.matter-labs.io/jsrpc-ws"
+                "wss://testnet.zksync.dev/jsrpc-ws"
             );
         } else if (transport == "HTTP") {
             return await Provider.newHttpProvider(
-                "https://testnet.matter-labs.io/jsrpc"
+                "https://testnet.zksync.dev/jsrpc"
             );
         }
     }
@@ -109,10 +109,10 @@ export class Provider {
         } else {
             while (true) {
                 const priorOpStatus = await this.getPriorityOpStatus(serialId);
-                const notifyDone
-                    = action == "COMMIT"
-                    ? priorOpStatus.block && priorOpStatus.block.committed
-                    : priorOpStatus.block && priorOpStatus.block.verified;
+                const notifyDone =
+                    action == "COMMIT"
+                        ? priorOpStatus.block && priorOpStatus.block.committed
+                        : priorOpStatus.block && priorOpStatus.block.verified;
                 if (notifyDone) {
                     return priorOpStatus;
                 } else {
@@ -141,10 +141,12 @@ export class Provider {
         } else {
             while (true) {
                 const transactionStatus = await this.getTxReceipt(hash);
-                const notifyDone 
-                    = action == "COMMIT"
-                    ? transactionStatus.block && transactionStatus.block.committed
-                    : transactionStatus.block && transactionStatus.block.verified;
+                const notifyDone =
+                    action == "COMMIT"
+                        ? transactionStatus.block &&
+                          transactionStatus.block.committed
+                        : transactionStatus.block &&
+                          transactionStatus.block.verified;
                 if (notifyDone) {
                     return transactionStatus;
                 } else {
@@ -192,14 +194,19 @@ export class ETHProxy {
         }
     }
 
-    async estimateDepositFeeInETHToken(token: Token, gasPrice?: utils.BigNumber): Promise<utils.BigNumber> {
-        gasPrice = gasPrice || await this.ethersProvider.getGasPrice();
+    async estimateDepositFeeInETHToken(
+        token: Token,
+        gasPrice?: utils.BigNumber
+    ): Promise<utils.BigNumber> {
+        gasPrice = gasPrice || (await this.ethersProvider.getGasPrice());
         const multiplier = token == "ETH" ? 179000 : 214000;
         return gasPrice.mul(2 * multiplier);
     }
 
-    async estimateEmergencyWithdrawFeeInETHToken(gasPrice?: utils.BigNumber): Promise<utils.BigNumber> {
-        gasPrice = gasPrice || await this.ethersProvider.getGasPrice();
+    async estimateEmergencyWithdrawFeeInETHToken(
+        gasPrice?: utils.BigNumber
+    ): Promise<utils.BigNumber> {
+        gasPrice = gasPrice || (await this.ethersProvider.getGasPrice());
         return gasPrice.mul(2 * 170000);
     }
 }
