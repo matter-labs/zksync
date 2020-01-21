@@ -241,15 +241,17 @@ contract Franklin {
             uint128 amount = balancesToWithdraw[to][tokenId];
             // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
             if (amount != 0) { 
+                // avoid reentrancy attack by using subtract and not "= 0" and changing local state before external call
+                balancesToWithdraw[to][tokenId] -= amount;
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
-                    if (toPayable.send(amount)) {
-                        delete balancesToWithdraw[to][tokenId];
+                    if (!toPayable.send(amount)) {
+                        balancesToWithdraw[to][tokenId] += amount;
                     }
                 } else if (governance.isValidTokenId(tokenId)) {
                     address tokenAddr = governance.tokenAddresses(tokenId);
-                    if(IERC20(tokenAddr).transfer(to, amount)) {
-                        delete balancesToWithdraw[to][tokenId];
+                    if(!IERC20(tokenAddr).transfer(to, amount)) {
+                        balancesToWithdraw[to][tokenId] += amount;
                     }
                 }
             }
