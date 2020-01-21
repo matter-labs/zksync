@@ -279,21 +279,18 @@ contract Franklin {
         bytes memory depositsPubData = priorityQueue.getOutstandingDeposits();
         uint64 i = 0;
         while (i < depositsPubData.length) {
-            bytes memory deposit = Bytes.slice(depositsPubData, i, ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES);
-            bytes memory owner = new bytes(ETH_ADDR_BYTES);
-            for (uint8 j = 0; j < ETH_ADDR_BYTES; ++j) {
-                owner[j] = deposit[j];
-            }
-            bytes memory token = new bytes(TOKEN_BYTES);
-            for (uint8 j = 0; j < TOKEN_BYTES; j++) {
-                token[j] = deposit[ETH_ADDR_BYTES + j];
-            }
-            bytes memory amount = new bytes(AMOUNT_BYTES);
-            for (uint8 j = 0; j < AMOUNT_BYTES; ++j) {
-                amount[j] = deposit[ETH_ADDR_BYTES + TOKEN_BYTES + j];
-            }
+            bytes memory owner = Bytes.slice(depositsPubData, i, ETH_ADDR_BYTES);
+            i += ETH_ADDR_BYTES;
+
+            bytes memory token = Bytes.slice(depositsPubData, i, TOKEN_BYTES);
+            i += TOKEN_BYTES;
+
+            bytes memory amount = Bytes.slice(depositsPubData, i, AMOUNT_BYTES);
+            i += AMOUNT_BYTES;
+
+            i += PUBKEY_HASH_BYTES;
+
             balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
-            i += ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES+PUBKEY_HASH_BYTES;
         }
     }
 
