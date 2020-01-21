@@ -160,27 +160,27 @@ contract PriorityQueue {
     }
 
     /// @notice Concates open (outstanding) deposit requests public data up to defined deposits number
-    /// @dev Deletes processed requests. Number of request is determined in MAX_OUTSTANDING_DEPOSITS_TO_CANCEL_IN_ONE_CALL
+    /// @dev Deletes processed requests.
+    /// @param _number Supposed number of open requests to look at and delete
     /// @return concated deposits public data for limited number of deposits so as not to go beyond the block gas limit in the caller function
-    function popOutstandingDeposits() external returns (bytes memory depositsPubData) {
+    function deletePriorityRequestsAndPopOutstandingDeposits(uint64 _number) external returns (bytes memory depositsPubData) {
         requireFranklin();
         require(
             totalOpenPriorityRequests > 0,
             "pgs11"
         ); // pgs11 - no one priority request left
-        uint64 k = 0; // Number of outstanding deposits
-        uint64 i = firstPriorityRequestId;
-        while(k < MAX_OUTSTANDING_DEPOSITS_TO_CANCEL_IN_ONE_CALL && i < firstPriorityRequestId + totalOpenPriorityRequests) {
+        uint64 number = firstPriorityRequestId + _number;
+        if (totalOpenPriorityRequests < _number) {
+            number = firstPriorityRequestId + totalOpenPriorityRequests;
+        }
+        for (uint64 i = firstPriorityRequestId; i < number; i++) {
             if (priorityRequests[i].opType == DEPOSIT_OP) {
                 depositsPubData = Bytes.concat(depositsPubData, priorityRequests[i].pubData);
-                k++;
             }
             delete priorityRequests[i];
-            i++;
         }
-        uint64 numberDeleted = i - firstPriorityRequestId;
-        firstPriorityRequestId = i;
-        totalOpenPriorityRequests -= numberDeleted;
+        firstPriorityRequestId = number;
+        totalOpenPriorityRequests -= number;
     }
 
     /// @notice Compares Rollup operation with corresponding priority requests' operation

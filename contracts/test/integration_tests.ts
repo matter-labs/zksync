@@ -171,7 +171,7 @@ describe("INTEGRATION", function() {
 
         // Full exit eth
         const fullExitAmount = parseEther("0.096778"); // amount after: tx value - some counted fee - exit amount
-        const fullExitMinusGas = parseEther("0.096047308");
+        const fullExitMinusGas = parseEther("0.096047605");
         const accId = 0;
         const pubkey = "0x0000000000000000000000000000000000000000000000000000000000000000";
         const signature = Buffer.from("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex");

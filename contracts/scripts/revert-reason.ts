@@ -26,7 +26,12 @@ async function reason() {
     if (!tx) {
         console.log("tx not found");
     } else {
-        console.log('tx:', tx);
+        const parsedTransaction = franklinInterface.parseTransaction({data: tx.data});
+        if (parsedTransaction) {
+            console.log("parsed tx: ", parsedTransaction);
+        } else {
+            console.log('tx:', tx);
+        }
 
 
         const receipt = await provider.getTransactionReceipt(hash);

@@ -11,8 +11,8 @@ mod rpc_subscriptions;
 
 use crate::mempool::MempoolRequest;
 use crate::state_keeper::{ExecutedOpsNotify, StateKeeperRequest};
-use crate::ConfigurationOptions;
 use futures::channel::mpsc;
+use models::config_options::ConfigurationOptions;
 use models::Operation;
 use storage::ConnectionPool;
 

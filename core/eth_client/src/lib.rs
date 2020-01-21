@@ -13,10 +13,10 @@ pub mod signer;
 pub struct ETHClient<T: Transport> {
     private_key: H256,
     pub sender_account: Address,
-    contract_addr: H160,
-    contract: ethabi::Contract,
-    chain_id: u8,
-    gas_price_factor: usize,
+    pub contract_addr: H160,
+    pub contract: ethabi::Contract,
+    pub chain_id: u8,
+    pub gas_price_factor: usize,
     pub web3: Web3<T>,
 }
 
@@ -31,7 +31,7 @@ pub struct SignedCallResult {
 impl<T: Transport> ETHClient<T> {
     pub fn new(
         transport: T,
-        contract_abi: String,
+        contract: ethabi::Contract,
         operator_eth_addr: H160,
         operator_pk: H256,
         contract_eth_addr: H160,
@@ -43,8 +43,7 @@ impl<T: Transport> ETHClient<T> {
             private_key: operator_pk,
             contract_addr: contract_eth_addr,
             chain_id,
-            contract: ethabi::Contract::load(contract_abi.as_bytes())
-                .expect("contract must be loaded correctly"),
+            contract,
             gas_price_factor,
             web3: Web3::new(transport),
         }
@@ -103,7 +102,7 @@ impl<T: Transport> ETHClient<T> {
             chain_id: self.chain_id,
             nonce,
             to: Some(self.contract_addr),
-            value: U256::zero(),
+            value: options.value.unwrap_or_default(),
             gas_price,
             gas: options.gas.unwrap_or_else(|| U256::from(3_000_000)),
             data,
