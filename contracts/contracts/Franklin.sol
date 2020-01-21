@@ -235,7 +235,7 @@ contract Franklin {
             n = numberOfPendingWithdrawals;
         }
 
-        for (uint32 i = firstPendingWithdrawalIndex; i <= n + firstPendingWithdrawalIndex; ++i) {
+        for (uint32 i = firstPendingWithdrawalIndex; i < n + firstPendingWithdrawalIndex; ++i) {
             uint16 tokenId = pendingWithdrawals[i].tokenId;
             address to = pendingWithdrawals[i].to;
             uint128 amount = balancesToWithdraw[to][tokenId];
@@ -244,12 +244,12 @@ contract Franklin {
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
                     if (toPayable.send(amount)) {
-                        delete amount;
+                        delete balancesToWithdraw[to][tokenId];
                     }
                 } else if (governance.isValidTokenId(tokenId)) {
                     address tokenAddr = governance.tokenAddresses(tokenId);
                     if(IERC20(tokenAddr).transfer(to, amount)) {
-                        delete amount;
+                        delete balancesToWithdraw[to][tokenId];
                     }
                 }
             }
@@ -258,8 +258,8 @@ contract Franklin {
             delete pendingWithdrawals[i];
         }
 
-        firstPendingWithdrawalIndex += _n;
-        numberOfPendingWithdrawals -= _n;
+        firstPendingWithdrawalIndex += n;
+        numberOfPendingWithdrawals -= n;
     }
 
     /// @notice Collects fees from provided requests number for the block validator, store it on her
