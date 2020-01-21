@@ -1097,7 +1097,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
-        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //NEW_PUBKEY_HASH_WIDTH=216
+        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.resize(
             6 * franklin_constants::CHUNK_BIT_WIDTH, //TODO: move to constant
             Boolean::constant(false),
@@ -1134,11 +1134,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
         is_valid_flags.push(is_deposit.clone());
 
-        // verify if new pubkey is equal to previous one (if existed)
+        // verify if address is to previous one (if existed)
         let is_pub_equal_to_previous = CircuitElement::equals(
-            cs.namespace(|| "is_pub_equal_to_previous"),
-            &op_data.new_pubkey_hash,
-            &cur.account.pub_key_hash,
+            cs.namespace(|| "is_address_equal_to_previous"),
+            &op_data.ethereum_key,
+            &cur.account.address,
         )?;
 
         //keys are same or account is empty
@@ -1178,10 +1178,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         // update pub_key
-        cur.account.pub_key_hash = CircuitElement::conditionally_select(
+        cur.account.address = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),
-            &op_data.new_pubkey_hash,
-            &cur.account.pub_key_hash,
+            &op_data.ethereum_key,
+            &cur.account.address,
             &is_valid_first,
         )?;
         Ok(tx_valid)

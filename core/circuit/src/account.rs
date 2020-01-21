@@ -14,6 +14,7 @@ pub struct AccountWitness<E: JubjubEngine> {
 pub struct AccountContent<E: JubjubEngine> {
     pub nonce: CircuitElement<E>,
     pub pub_key_hash: CircuitElement<E>,
+    pub address: CircuitElement<E>,
 }
 
 impl<E: JubjubEngine> AccountContent<E> {

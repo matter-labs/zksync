@@ -5,7 +5,7 @@ use crate::operation::*;
 use ff::{Field, PrimeField};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
+use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element, eth_address_to_fr};
 use models::node::DepositOp;
 use models::params as franklin_constants;
 use pairing::bn256::*;
@@ -14,7 +14,7 @@ pub struct DepositData {
     pub amount: u128,
     pub token: u32,
     pub account_address: u32,
-    pub new_pub_key_hash: Fr,
+    pub address: Fr,
 }
 pub struct DepositWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -51,13 +51,15 @@ impl<E: JubjubEngine> DepositWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.new_pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            &self.args.ethereum_key.unwrap(),
+            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
         //        assert_eq!(pubdata_bits.len(), 37 * 8);
         pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
+
+    // CLARIFY: What? Why?
     pub fn get_sig_bits(&self) -> Vec<bool> {
         let mut sig_bits = vec![];
         append_be_fixed_width(
@@ -93,12 +95,11 @@ pub fn apply_deposit_tx(
     tree: &mut CircuitAccountTree,
     deposit: &DepositOp,
 ) -> DepositWitness<Bn256> {
-    let alt_new_pubkey_hash = unimplemented!();
     let deposit_data = DepositData {
         amount: deposit.priority_op.amount.to_string().parse().unwrap(),
         token: u32::from(deposit.priority_op.token),
         account_address: deposit.account_id,
-        new_pub_key_hash: alt_new_pubkey_hash,
+        address: eth_address_to_fr(&deposit.priority_op.to),
     };
     apply_deposit(tree, &deposit_data)
 }
@@ -130,10 +131,10 @@ pub fn apply_deposit(
             deposit.token,
             |acc| {
                 assert!(
-                    (acc.pub_key_hash == deposit.new_pub_key_hash)
-                        || (acc.pub_key_hash == Fr::zero())
+                    (acc.address == deposit.address)
+                        || (acc.address == Fr::zero())
                 );
-                acc.pub_key_hash = deposit.new_pub_key_hash;
+                acc.address = deposit.address;
             },
             |bal| bal.value.add_assign(&amount_as_field_element),
         );
@@ -165,14 +166,14 @@ pub fn apply_deposit(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            ethereum_key: Some(deposit.address),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_as_field_element),
             fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
             pub_nonce: Some(Fr::zero()),
-            new_pub_key_hash: Some(deposit.new_pub_key_hash),
+            new_pub_key_hash: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
@@ -186,8 +187,11 @@ pub fn calculate_deposit_operations_from_witness(
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
     signature_data: &SignatureData,
-    signer_pub_key_packed: &[Option<bool>],
+    signer_pub_key_packed: &[Option<bool>], // WHY? What signer?
 ) -> Vec<Operation<Bn256>> {
+    
+    let plasma_state = PlasmaState::new()
+
     let pubdata_chunks: Vec<_> = deposit_witness
         .get_pubdata()
         .chunks(64)
