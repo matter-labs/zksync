@@ -169,18 +169,16 @@ contract PriorityQueue {
             totalOpenPriorityRequests > 0,
             "pgs11"
         ); // pgs11 - no one priority request left
-        uint64 number = firstPriorityRequestId + _number;
-        if (totalOpenPriorityRequests < _number) {
-            number = firstPriorityRequestId + totalOpenPriorityRequests;
-        }
-        for (uint64 i = firstPriorityRequestId; i < number; i++) {
-            if (priorityRequests[i].opType == DEPOSIT_OP) {
-                depositsPubData = Bytes.concat(depositsPubData, priorityRequests[i].pubData);
+        uint64 toProcess = totalOpenPriorityRequests < _number ? totalOpenPriorityRequests : _number;
+        for (uint64 i = 0; i < toProcess; i++) {
+            uint64 id = firstPriorityRequestId + i;
+            if (priorityRequests[id].opType == DEPOSIT_OP) {
+                depositsPubData = Bytes.concat(depositsPubData, priorityRequests[id].pubData);
             }
-            delete priorityRequests[i];
+            delete priorityRequests[id];
         }
-        firstPriorityRequestId = number;
-        totalOpenPriorityRequests -= number;
+        firstPriorityRequestId += toProcess;
+        totalOpenPriorityRequests -= toProcess;
     }
 
     /// @notice Compares Rollup operation with corresponding priority requests' operation
