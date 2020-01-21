@@ -369,13 +369,18 @@ describe("PLANNED FAILS", function() {
         await cancelTx1.wait();
         
         balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+        expect(await priorityQueueDeployedContract.totalOpenPriorityRequests()).equal(1);
+        expect(await priorityQueueDeployedContract.firstPriorityRequestId()).equal(2);
         expect(balanceToWithdraw).equal(parseEther("19.993556"));
 
-        // Cancel last deposit - try 3 but there is only 1 left
-        const cancelTx2 = await franklinDeployedContract.cancelOutstandingDepositsForExodusMode(3);
+        // Cancel last deposit - try 5 but there is only 1 left
+        const cancelTx2 = await franklinDeployedContract.cancelOutstandingDepositsForExodusMode(5);
         await cancelTx2.wait();
         
+        expect(await priorityQueueDeployedContract.totalOpenPriorityRequests()).equal(0);
+        expect(await priorityQueueDeployedContract.firstPriorityRequestId()).equal(3);
         balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+
         expect(balanceToWithdraw).equal(parseEther("29.990334"));
 
         console.log("Deposits canceled");
