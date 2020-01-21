@@ -229,6 +229,7 @@ contract Franklin {
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external {
+        // TODO: when switched to multi valiators model we need to add insentive mechanism to call complete.
         uint32 n = _n;
         if (n > numberOfPendingWithdrawals) {
             n = numberOfPendingWithdrawals;
