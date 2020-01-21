@@ -230,12 +230,12 @@ contract Franklin {
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external {
         // TODO: when switched to multi valiators model we need to add insentive mechanism to call complete.
-        uint32 n = _n;
-        if (n > numberOfPendingWithdrawals) {
-            n = numberOfPendingWithdrawals;
+        uint32 toProcess = _n;
+        if (toProcess > numberOfPendingWithdrawals) {
+            toProcess = numberOfPendingWithdrawals;
         }
 
-        for (uint32 i = firstPendingWithdrawalIndex; i < n + firstPendingWithdrawalIndex; ++i) {
+        for (uint32 i = firstPendingWithdrawalIndex; i < firstPendingWithdrawalIndex + toProcess; ++i) {
             uint16 tokenId = pendingWithdrawals[i].tokenId;
             address to = pendingWithdrawals[i].to;
             uint128 amount = balancesToWithdraw[to][tokenId];
@@ -258,8 +258,8 @@ contract Franklin {
             delete pendingWithdrawals[i];
         }
 
-        firstPendingWithdrawalIndex += n;
-        numberOfPendingWithdrawals -= n;
+        firstPendingWithdrawalIndex += toProcess;
+        numberOfPendingWithdrawals -= toProcess;
     }
 
     /// @notice Collects fees from provided requests number for the block validator, store it on her
