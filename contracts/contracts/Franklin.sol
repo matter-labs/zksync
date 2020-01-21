@@ -228,10 +228,13 @@ contract Franklin {
 
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
-    function completeWithdrawals(uint16 _n) external {
-        require(_n <= numberOfPendingWithdrawals, "dont have this many pending withdrawals to complete");
+    function completeWithdrawals(uint32 _n) external {
+        uint32 n = _n;
+        if (n > numberOfPendingWithdrawals) {
+            n = numberOfPendingWithdrawals;
+        }
 
-        for (uint32 i = firstPendingWithdrawalIndex; i <= _n + firstPendingWithdrawalIndex; ++i) {
+        for (uint32 i = firstPendingWithdrawalIndex; i <= n + firstPendingWithdrawalIndex; ++i) {
             uint16 tokenId = pendingWithdrawals[i].tokenId;
             address to = pendingWithdrawals[i].to;
             uint128 amount = balancesToWithdraw[to][tokenId];
