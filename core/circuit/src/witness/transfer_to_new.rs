@@ -438,205 +438,85 @@ pub fn calculate_transfer_to_new_operations_from_witness(
 #[cfg(test)]
 mod test {
     use super::*;
-    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-    use models::params as franklin_constants;
-    use models::primitives::bytes_into_be_bits;
+    use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
+    use bigdecimal::BigDecimal;
+    use models::node::{Account, AccountAddress};
+    use testkit::zksync_account::ZksyncAccount;
 
-    use crate::circuit::FranklinCircuit;
-    use bellman::Circuit;
-
-    use ff::{Field, PrimeField};
-    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use franklin_crypto::circuit::test::*;
-    use franklin_crypto::jubjub::FixedGenerators;
-    use models::circuit::account::{
-        Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
-    };
-    use models::circuit::utils::*;
-    use models::merkle_tree::PedersenHasher;
-    use models::node::tx::PackedPublicKey;
-    use rand::{Rng, SeedableRng, XorShiftRng};
-    #[test]
-    #[ignore]
-    fn test_transfer_to_new_signature() {
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-
-        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-
-        let validator_address_number = 7;
-        let _validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-        let phasher = PedersenHasher::<Bn256>::default();
-
-        let tree = CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
-
-        let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
-
-        let from_sk = PrivateKey::<Bn256>(rng.gen());
-        let from_pk = PublicKey::from_private(&from_sk, p_g, params);
-        let _from_pub_key_hash = pub_key_hash_fe(&from_pk, &phasher);
-        let (from_x, from_y) = from_pk.0.into_xy();
-        println!("x = {}, y = {}", from_x, from_y);
-
-        let _ = generate_sig_data(&[true; 1], &phasher, &from_sk, params);
-
-        let packed_public_key = PackedPublicKey(from_pk);
-        let mut packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-        packed_public_key_bytes.reverse();
-        let _signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
-            .iter()
-            .map(|x| Some(*x))
-            .collect();
-    }
     #[test]
     #[ignore]
     fn test_transfer_to_new() {
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-
-        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-
-        let validator_address_number = 7;
-        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-        let phasher = PedersenHasher::<Bn256>::default();
-
-        let mut tree = CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
-
-        let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
-
-        let from_sk = PrivateKey::<Bn256>(rng.gen());
-        let from_pk = PublicKey::from_private(&from_sk, p_g, params);
-        let from_pub_key_hash = pub_key_hash_fe(&from_pk, &phasher);
-        let (from_x, from_y) = from_pk.0.into_xy();
-        println!("x = {}, y = {}", from_x, from_y);
-
-        let new_sk = PrivateKey::<Bn256>(rng.gen());
-        let to_pk = PublicKey::from_private(&new_sk, p_g, params);
-        let to_pub_key_hash = pub_key_hash_fe(&to_pk, &phasher);
-        let (to_x, to_y) = to_pk.0.into_xy();
-        println!("x = {}, y = {}", to_x, to_y);
-
-        // give some funds to sender and make zero balance for recipient
-        let validator_sk = PrivateKey::<Bn256>(rng.gen());
-        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
-        let (validator_x, validator_y) = validator_pk.0.into_xy();
-        println!("x = {}, y = {}", validator_x, validator_y);
-        let validator_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: validator_pub_key_hash,
+        let from_zksync_account = ZksyncAccount::rand();
+        let from_account_id = 1;
+        let from_account_address = from_zksync_account.address.clone();
+        let from_account = {
+            let mut account = Account::default_with_address(&from_account_address);
+            account.add_balance(0, &BigDecimal::from(10));
+            account
         };
 
-        let mut validator_balances = vec![];
-        for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
-            validator_balances.push(Some(Fr::zero()));
-        }
-        tree.insert(validator_address_number, validator_leaf);
+        let to_account_id = 2;
+        let to_account_address =
+            AccountAddress::from_hex("sync:2222222222222222222222222222222222222222").unwrap();
 
-        let mut from_leaf_number: u32 = rng.gen();
-        from_leaf_number %= capacity;
+        let (mut plasma_state, mut witness_accum) =
+            test_genesis_plasma_state(vec![(from_account_id, from_account)]);
 
-        let mut to_leaf_number: u32 = rng.gen();
-        to_leaf_number %= capacity;
-
-        let from_balance_before: u128 = 2000;
-
-        let from_balance_before_as_field_element =
-            Fr::from_str(&from_balance_before.to_string()).unwrap();
-
-        let transfer_amount: u128 = 500;
-
-        let fee: u128 = 20;
-
-        let token: u32 = 2;
-        let block_number = Fr::from_str("1").unwrap();
-        // prepare state, so that we could make transfer
-        let mut from_balance_tree =
-            CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32);
-        from_balance_tree.insert(
-            token,
-            Balance {
-                value: from_balance_before_as_field_element,
-            },
-        );
-
-        let from_leaf_initial = CircuitAccount::<Bn256> {
-            subtree: from_balance_tree,
-            nonce: Fr::zero(),
-            pub_key_hash: from_pub_key_hash,
+        let transfer_op = TransferToNewOp {
+            tx: from_zksync_account.sign_transfer(
+                0,
+                BigDecimal::from(7),
+                BigDecimal::from(3),
+                &to_account_address,
+                None,
+                true,
+            ),
+            from: from_account_id,
+            to: to_account_id,
         };
 
-        tree.insert(from_leaf_number, from_leaf_initial);
+        let (fee, _) = plasma_state
+            .apply_transfer_to_new_op(&transfer_op)
+            .expect("transfer should be success");
+        plasma_state.collect_fee(&[fee.clone()], witness_accum.fee_account_id);
 
-        let transfer_witness = apply_transfer_to_new(
-            &mut tree,
-            &TransferToNewData {
-                amount: transfer_amount,
-                fee,
-                token,
-                from_account_address: from_leaf_number,
-                to_account_address: to_leaf_number,
-                new_pub_key_hash: to_pub_key_hash,
-            },
-        );
-
-        let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
-            generate_sig_data(&transfer_witness.get_sig_bits(), &phasher, &from_sk, params);
-        let packed_public_key = PackedPublicKey(from_pk);
-        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
-            .iter()
-            .map(|x| Some(*x))
-            .collect();
-
-        let operations = calculate_transfer_to_new_operations_from_witness(
+        let transfer_witness =
+            apply_transfer_to_new_tx(&mut witness_accum.account_tree, &transfer_op);
+        let sign_packed = transfer_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let (first_sig_msg, second_sig_msg, third_sig_msg, signature_data, signer_packed_key_bits) =
+            prepare_sig_data(
+                &sign_packed,
+                &transfer_op.tx.get_bytes(),
+                &transfer_op.tx.signature.pub_key,
+            )
+            .expect("prepare signature data");
+        let transfer_operations = calculate_transfer_to_new_operations_from_witness(
             &transfer_witness,
-            &first_sig_part,
-            &second_sig_part,
-            &third_sig_part,
+            &first_sig_msg,
+            &second_sig_msg,
+            &third_sig_msg,
             &signature_data,
             &signer_packed_key_bits,
         );
-        let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, token, fee);
-        let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
+        let pub_data_from_witness = transfer_witness.get_pubdata();
 
-        let public_data_commitment = public_data_commitment::<Bn256>(
-            &transfer_witness.get_pubdata(),
-            transfer_witness.before_root,
-            Some(root_after_fee),
-            Some(validator_address),
-            Some(block_number),
+        witness_accum.add_operation_with_pubdata(transfer_operations, pub_data_from_witness);
+        witness_accum.collect_fees(&[fee]);
+        witness_accum.calculate_pubdata_commitment();
+
+        assert_eq!(
+            plasma_state.root_hash(),
+            witness_accum
+                .root_after_fees
+                .expect("witness accum after root hash empty"),
+            "root hash in state keeper and witness generation code mismatch"
         );
-        {
-            let mut cs = TestConstraintSystem::<Bn256>::new();
 
-            let instance = FranklinCircuit {
-                operation_batch_size: 10,
-                params,
-                old_root: transfer_witness.before_root,
-                new_root: transfer_witness.after_root,
-                operations,
-                pub_data_commitment: Some(public_data_commitment),
-                block_number: Some(block_number),
-                validator_account: validator_account_witness,
-                validator_address: Some(validator_address),
-                validator_balances,
-                validator_audit_path,
-            };
-
-            instance.synthesize(&mut cs).unwrap();
-
-            println!("{}", cs.find_unconstrained());
-
-            println!("{}", cs.num_constraints());
-
-            if let Some(err) = cs.which_is_unsatisfied() {
-                panic!("ERROR satisfying in {}", err);
-            }
-        }
+        check_circuit(witness_accum.into_circuit_instance());
     }
 }

@@ -29,7 +29,7 @@ pub struct PlasmaState {
     pub block_number: BlockNumber,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CollectedFee {
     pub token: TokenId,
     pub amount: BigDecimal,
@@ -169,7 +169,7 @@ impl PlasmaState {
         }
     }
 
-    fn apply_full_exit_op(&mut self, op: &FullExitOp) -> AccountUpdates {
+    pub fn apply_full_exit_op(&mut self, op: &FullExitOp) -> AccountUpdates {
         let mut updates = Vec::new();
         let amount = if let Some(amount) = &op.withdraw_amount {
             amount.clone()
@@ -334,7 +334,7 @@ impl PlasmaState {
         }
     }
 
-    fn apply_deposit_op(&mut self, op: &DepositOp) -> AccountUpdates {
+    pub fn apply_deposit_op(&mut self, op: &DepositOp) -> AccountUpdates {
         let mut updates = Vec::new();
 
         let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
@@ -363,7 +363,7 @@ impl PlasmaState {
         updates
     }
 
-    fn apply_transfer_to_new_op(
+    pub fn apply_transfer_to_new_op(
         &mut self,
         op: &TransferToNewOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
@@ -425,7 +425,7 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_withdraw_op(
+    pub fn apply_withdraw_op(
         &mut self,
         op: &WithdrawOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
@@ -497,7 +497,7 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_transfer_op(
+    pub fn apply_transfer_op(
         &mut self,
         op: &TransferOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
