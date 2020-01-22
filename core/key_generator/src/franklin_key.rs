@@ -116,6 +116,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
                 account_witness: AccountWitness {
                     nonce: None,
                     pub_key_hash: None,
+                    address: None,
                 },
                 account_path: vec![None; params::account_tree_depth()],
                 balance_value: None,
@@ -129,6 +130,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
                 account_witness: AccountWitness {
                     nonce: None,
                     pub_key_hash: None,
+                    address: None,
                 },
                 account_path: vec![None; params::account_tree_depth()],
                 balance_value: None,
@@ -151,6 +153,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
         validator_account: AccountWitness {
             nonce: None,
             pub_key_hash: None,
+            address: None,
         },
     };
 

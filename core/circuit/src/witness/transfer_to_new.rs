@@ -5,7 +5,9 @@ use ff::{Field, PrimeField};
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
+use models::circuit::utils::{
+    append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
+};
 use models::node::TransferToNewOp;
 use models::params as franklin_constants;
 use pairing::bn256::*;
@@ -16,7 +18,7 @@ pub struct TransferToNewData {
     pub token: u32,
     pub from_account_address: u32,
     pub to_account_address: u32,
-    pub new_pub_key_hash: Fr,
+    pub new_address: Fr,
 }
 pub struct TransferToNewWitness<E: JubjubEngine> {
     pub from_before: OperationBranch<E>,
@@ -128,15 +130,13 @@ pub fn apply_transfer_to_new_tx(
     tree: &mut CircuitAccountTree,
     transfer_to_new: &TransferToNewOp,
 ) -> TransferToNewWitness<Bn256> {
-    let new_pubkey_hash = unimplemented!();
-
     let transfer_data = TransferToNewData {
         amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),
         fee: transfer_to_new.tx.fee.to_string().parse().unwrap(),
         token: u32::from(transfer_to_new.tx.token),
         from_account_address: transfer_to_new.from,
         to_account_address: transfer_to_new.to,
-        new_pub_key_hash: new_pubkey_hash,
+        new_address: eth_address_to_fr(&transfer_to_new.tx.to),
     };
     // le_bit_vector_into_field_element()
     apply_transfer_to_new(tree, &transfer_data)
@@ -239,8 +239,8 @@ pub fn apply_transfer_to_new(
         transfer_to_new.to_account_address,
         transfer_to_new.token,
         |acc| {
-            assert!((acc.pub_key_hash == Fr::zero()));
-            acc.pub_key_hash = transfer_to_new.new_pub_key_hash;
+            assert!((acc.address == Fr::zero()));
+            acc.address = transfer_to_new.new_address;
         },
         |bal| bal.value.add_assign(&amount_as_field_element),
     );
@@ -323,14 +323,14 @@ pub fn apply_transfer_to_new(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            ethereum_key: Some(transfer_to_new.new_address),
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
             pub_nonce: Some(Fr::zero()),
-            new_pub_key_hash: Some(transfer_to_new.new_pub_key_hash),
+            new_pub_key_hash: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         intermediate_root: Some(intermediate_root),
@@ -445,13 +445,14 @@ mod test {
 
     #[test]
     #[ignore]
-    fn test_transfer_to_new() {
+    fn test_transfer_to_new_success() {
         let from_zksync_account = ZksyncAccount::rand();
         let from_account_id = 1;
         let from_account_address = from_zksync_account.address.clone();
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
             account.add_balance(0, &BigDecimal::from(10));
+            account.pub_key_hash = from_zksync_account.pubkey_hash.clone();
             account
         };
 

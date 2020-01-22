@@ -308,21 +308,34 @@ mod test {
 
     #[test]
     #[ignore]
-    fn test_deposit_franklin_in_empty_leaf() {
+    fn test_deposit_in_empty_leaf() {
         let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(Vec::new());
 
         let empty_account_id = 1;
+        let empty_account_address = [7u8; 20].into();
         let deposit_op = DepositOp {
             priority_op: Deposit {
                 from: Address::zero(),
                 token: 0,
                 amount: BigDecimal::from(1),
-                to: unimplemented!("pay to eth circuit"),
+                to: empty_account_address,
             },
             account_id: empty_account_id,
         };
 
+        println!(
+            "node root hash before deposit: {:?}",
+            plasma_state.root_hash()
+        );
         plasma_state.apply_deposit_op(&deposit_op);
+        println!(
+            "node root hash after deposit: {:?}",
+            plasma_state.root_hash()
+        );
+        println!(
+            "node pub data: {}",
+            hex::encode(&deposit_op.get_public_data())
+        );
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
         let deposit_operations = calculate_deposit_operations_from_witness(
@@ -355,7 +368,7 @@ mod test {
 
     #[test]
     #[ignore]
-    fn test_deposit_franklin_existing_account() {
+    fn test_deposit_existing_account() {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
             "1111111111111111111111111111111111111111".parse().unwrap();

@@ -53,6 +53,7 @@ where
 struct AccountWitnessDef {
     pub nonce: Option<Fr>,
     pub pub_key_hash: Option<Fr>,
+    pub address: Option<Fr>,
 }
 
 #[derive(Serialize, Deserialize)]

@@ -355,6 +355,7 @@ mod test {
         let account = {
             let mut account = Account::default_with_address(&account_address);
             account.add_balance(0, &BigDecimal::from(10));
+            account.pub_key_hash = zksync_account.pubkey_hash.clone();
             account
         };
 
@@ -373,10 +374,17 @@ mod test {
             account_id,
         };
 
+        println!("node root hash before op: {:?}", plasma_state.root_hash());
         let (fee, _) = plasma_state
             .apply_withdraw_op(&withdraw_op)
             .expect("transfer should be success");
+        println!("node root hash after op: {:?}", plasma_state.root_hash());
         plasma_state.collect_fee(&[fee.clone()], witness_accum.fee_account_id);
+        println!("node root hash after fee: {:?}", plasma_state.root_hash());
+        println!(
+            "node withdraw tx bytes: {}",
+            hex::encode(&withdraw_op.tx.get_bytes())
+        );
 
         let withdraw_witness = apply_withdraw_tx(&mut witness_accum.account_tree, &withdraw_op);
         let sign_packed = withdraw_op

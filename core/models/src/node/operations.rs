@@ -17,7 +17,9 @@ use crate::primitives::{
     u128_to_bigdecimal,
 };
 use bigdecimal::BigDecimal;
+use failure::_core::cell::RefCell;
 use failure::{ensure, format_err};
+use std::cell::Cell;
 use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -30,7 +32,7 @@ impl DepositOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x01;
 
-    fn get_public_data(&self) -> Vec<u8> {
+    pub fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);

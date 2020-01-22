@@ -2,8 +2,8 @@ use bigdecimal::BigDecimal;
 use franklin_crypto::jubjub::FixedGenerators;
 use models::node::tx::{PackedPublicKey, TxSignature};
 use models::node::{
-    priv_key_from_fs, AccountId, Address, FullExit, Nonce, PrivateKey, PublicKey, TokenId,
-    Transfer, Withdraw,
+    priv_key_from_fs, AccountId, Address, FullExit, Nonce, PrivateKey, PubKeyHash, PublicKey,
+    TokenId, Transfer, Withdraw,
 };
 use models::params::JUBJUB_PARAMS;
 use rand::{thread_rng, Rng};
@@ -13,6 +13,7 @@ use std::convert::TryInto;
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZksyncAccount {
     pub private_key: PrivateKey,
+    pub pubkey_hash: PubKeyHash,
     pub address: Address,
     nonce: RefCell<Nonce>,
 }
@@ -22,13 +23,15 @@ impl ZksyncAccount {
         let rng = &mut thread_rng();
 
         let pk = priv_key_from_fs(rng.gen());
-        Self::new(pk, 0)
+        Self::new(pk, 0, rng.gen::<[u8; 20]>().into())
     }
 
-    pub fn new(private_key: PrivateKey, nonce: Nonce) -> Self {
+    pub fn new(private_key: PrivateKey, nonce: Nonce, address: Address) -> Self {
+        let pubkey_hash = PubKeyHash::from_privkey(&private_key);
         Self {
-            address: unimplemented!("pay to eth testkit"),
+            address,
             private_key,
+            pubkey_hash,
             nonce: RefCell::new(nonce),
         }
     }

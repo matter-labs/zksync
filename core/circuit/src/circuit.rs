@@ -221,6 +221,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         );
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
+        operator_account_data.extend(validator_account.address.get_bits_le());
         operator_account_data.extend(old_operator_balance_root_bits);
 
         let root_from_operator = allocate_merkle_root(
@@ -231,6 +232,33 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             self.params,
         )?;
 
+        {
+            let bits_vals = block_pub_data_bits.clone();
+            let mut pb_bits_bool: Vec<bool> = Vec::new();
+            for b in bits_vals {
+                let bit = b.get_value().unwrap();
+                pb_bits_bool.push(bit);
+            }
+            fn bits_as_bytes(bits: &[bool]) -> Vec<u8> {
+                let mut i = 0;
+                let mut bytes = Vec::new();
+                while (i < bits.len()) {
+                    let mut byte = 0u8;
+                    for j in 0..8 {
+                        if bits[i + (j as usize)] {
+                            byte |= (1 << (7 - j));
+                        }
+                    }
+                    bytes.push(byte);
+                    i += 8;
+                }
+                bytes
+            }
+            println!("pubdata: {}", hex::encode(&bits_as_bytes(&pb_bits_bool)));
+        }
+
+        println!("rolling root: {:?}", rolling_root.get_value());
+        println!("root from operator: {:?}", root_from_operator.get_value());
         // ensure that this operator leaf is correct for our tree state
         cs.enforce(
             || "root before applying fees is correct",
@@ -265,6 +293,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
+        operator_account_data.extend(validator_account.address.get_bits_le());
         operator_account_data.extend(new_operator_balance_root_bits);
 
         let root_from_operator_after_fees = allocate_merkle_root(
@@ -279,6 +308,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             cs.namespace(|| "final_root"),
             root_from_operator_after_fees.clone(),
         )?;
+
+        println!("final root: {:?}", final_root.get_number().get_value());
         {
             // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
             // and start rolling the hash
@@ -444,7 +475,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                     &second.account.pub_key_hash,
                     &is_left,
                 )?,
-                address: unimplemented!("pay to eth circuit"),
+                address: CircuitElement::conditionally_select(
+                    cs.namespace(|| "chosen address"),
+                    &first.account.address,
+                    &second.account.address,
+                    &is_left,
+                )?,
             },
             account_audit_path: select_vec_ifeq(
                 cs.namespace(|| "account_audit_path"),
@@ -759,7 +795,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut serialized_tx_bits = vec![];
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
+        serialized_tx_bits.extend(cur.account.address.get_bits_be());
         serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
@@ -1362,8 +1398,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             8,
         )?; //we use here transfer tx_code=5 to allow user sign message without knowing whether it is transfer_to_new or transfer
         serialized_tx_bits.extend(tx_code.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.pub_key_hash.get_bits_be());
-        serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
@@ -1511,10 +1547,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         cur.balance
             .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?; // TODO: this is actually redundant, cause they are both enforced to be of appropriate length
 
-        cur.account.pub_key_hash = CircuitElement::conditionally_select(
+        cur.account.address = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),
-            &op_data.new_pubkey_hash,
-            &cur.account.pub_key_hash,
+            &op_data.ethereum_key,
+            &cur.account.address,
             &rhs_valid,
         )?;
 
@@ -1566,8 +1602,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut serialized_tx_bits = vec![];
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.pub_key_hash.get_bits_be());
-        serialized_tx_bits.extend(rhs.account.pub_key_hash.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits.extend(rhs.account.address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
@@ -1726,6 +1762,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut account_data = vec![];
         account_data.extend(branch.account.nonce.get_bits_le());
         account_data.extend(branch.account.pub_key_hash.get_bits_le());
+        account_data.extend(branch.account.address.get_bits_le());
 
         let account_data_packed =
             pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;

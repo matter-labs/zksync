@@ -360,13 +360,14 @@ mod test {
 
     #[test]
     #[ignore]
-    fn test_transfer() {
+    fn test_transfer_success() {
         let from_zksync_account = ZksyncAccount::rand();
         let from_account_id = 1;
         let from_account_address = from_zksync_account.address.clone();
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
             account.add_balance(0, &BigDecimal::from(10));
+            account.pub_key_hash = from_zksync_account.pubkey_hash.clone();
             account
         };
 

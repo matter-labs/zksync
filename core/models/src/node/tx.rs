@@ -21,6 +21,7 @@ use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
 use franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::cell::{Cell, RefCell};
 use std::convert::TryInto;
 use std::str::FromStr;
 use web3::types::{Address, H256};

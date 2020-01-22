@@ -4,11 +4,23 @@ use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::JubjubEngine;
 // Workspace deps
 use crate::element::CircuitElement;
+use models::circuit::account::CircuitAccount;
 
 #[derive(Clone, Debug)]
 pub struct AccountWitness<E: JubjubEngine> {
     pub nonce: Option<E::Fr>,
     pub pub_key_hash: Option<E::Fr>,
+    pub address: Option<E::Fr>,
+}
+
+impl<E: JubjubEngine> AccountWitness<E> {
+    pub fn from_circuit_account(circuit_account: &CircuitAccount<E>) -> Self {
+        Self {
+            nonce: Some(circuit_account.nonce.clone()),
+            pub_key_hash: Some(circuit_account.pub_key_hash.clone()),
+            address: Some(circuit_account.address.clone()),
+        }
+    }
 }
 
 pub struct AccountContent<E: JubjubEngine> {
@@ -34,10 +46,16 @@ impl<E: JubjubEngine> AccountContent<E> {
             models::params::NEW_PUBKEY_HASH_WIDTH,
         )?;
 
+        let address = CircuitElement::from_fe_strict(
+            cs.namespace(|| "address"),
+            || witness.address.grab(),
+            models::params::ETHEREUM_KEY_BIT_WIDTH,
+        )?;
+
         Ok(Self {
             nonce,
             pub_key_hash,
-            address: unimplemented!("pay to eth circuit"),
+            address,
         })
     }
 }

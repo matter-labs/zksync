@@ -62,6 +62,7 @@ pub fn noop_operation(
                 account_witness: AccountWitness {
                     nonce: Some(acc.nonce),
                     pub_key_hash: Some(acc.pub_key_hash),
+                    address: Some(acc.address),
                 },
                 account_path: audit_account.clone(),
                 balance_value: Some(balance_value),
@@ -75,6 +76,7 @@ pub fn noop_operation(
                 account_witness: AccountWitness {
                     nonce: Some(acc.nonce),
                     pub_key_hash: Some(acc.pub_key_hash),
+                    address: Some(acc.address),
                 },
                 account_path: audit_account.clone(),
                 balance_value: Some(balance_value),

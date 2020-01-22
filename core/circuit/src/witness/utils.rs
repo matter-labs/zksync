@@ -252,10 +252,7 @@ pub fn apply_leaf_operation<
 
     //applying deposit
     let mut account = tree.remove(account_address).unwrap_or(default_account);
-    let account_witness_before = AccountWitness {
-        nonce: Some(account.nonce),
-        pub_key_hash: Some(account.pub_key_hash),
-    };
+    let account_witness_before = AccountWitness::from_circuit_account(&account);
     let mut balance = account
         .subtree
         .remove(token)
@@ -267,10 +264,7 @@ pub fn apply_leaf_operation<
 
     fa(&mut account);
 
-    let account_witness_after = AccountWitness {
-        nonce: Some(account.nonce),
-        pub_key_hash: Some(account.pub_key_hash),
-    };
+    let account_witness_after = AccountWitness::from_circuit_account(&account);
     tree.insert(account_address, account);
     (
         account_witness_before,
@@ -290,10 +284,7 @@ pub fn apply_fee(
     let mut validator_leaf = tree
         .remove(validator_address)
         .expect("validator_leaf is empty");
-    let validator_account_witness = AccountWitness {
-        nonce: Some(validator_leaf.nonce),
-        pub_key_hash: Some(validator_leaf.pub_key_hash),
-    };
+    let validator_account_witness = AccountWitness::from_circuit_account(&validator_leaf);
 
     let mut balance = validator_leaf.subtree.remove(token).unwrap_or_default();
     balance.value.add_assign(&fee_fe);
