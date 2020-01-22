@@ -236,6 +236,9 @@ contract Franklin {
         }
 
         for (uint32 i = firstPendingWithdrawalIndex; i < firstPendingWithdrawalIndex + toProcess; ++i) {
+            // send fails are ignored hence there is always a direct way to withdraw.
+            delete pendingWithdrawals[i];
+            
             uint16 tokenId = pendingWithdrawals[i].tokenId;
             address to = pendingWithdrawals[i].to;
             uint128 amount = balancesToWithdraw[to][tokenId];
@@ -243,21 +246,18 @@ contract Franklin {
             if (amount != 0) { 
                 // avoid reentrancy attack by using subtract and not "= 0" and changing local state before external call
                 balancesToWithdraw[to][tokenId] -= amount;
+                bool sent = false;
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
-                    if (!toPayable.send(amount)) {
-                        balancesToWithdraw[to][tokenId] += amount;
-                    }
+                    sent = toPayable.send(amount);
                 } else if (governance.isValidTokenId(tokenId)) {
                     address tokenAddr = governance.tokenAddresses(tokenId);
-                    if(!IERC20(tokenAddr).transfer(to, amount)) {
-                        balancesToWithdraw[to][tokenId] += amount;
-                    }
+                    sent = IERC20(tokenAddr).transfer(to, amount);
+                }
+                if (!sent) {
+                    balancesToWithdraw[to][tokenId] += amount;
                 }
             }
-
-            // send fails are ignored hence there is always a direct way to withdraw.
-            delete pendingWithdrawals[i];
         }
 
         firstPendingWithdrawalIndex += toProcess;
