@@ -1,4 +1,5 @@
 
+import { BigNumber } from "ethers/utils";
 import { utils as syncutils } from "zksync";
 import { BN } from "bn.js";
 

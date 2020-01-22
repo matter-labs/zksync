@@ -233,11 +233,11 @@ contract Franklin {
         }
 
         for (uint32 i = firstPendingWithdrawalIndex; i < firstPendingWithdrawalIndex + toProcess; ++i) {
-            // send fails are ignored hence there is always a direct way to withdraw.
-            delete pendingWithdrawals[i];
-            
             uint16 tokenId = pendingWithdrawals[i].tokenId;
             address to = pendingWithdrawals[i].to;
+            // send fails are ignored hence there is always a direct way to withdraw.
+            delete pendingWithdrawals[i];
+
             uint128 amount = balancesToWithdraw[to][tokenId];
             // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
             if (amount != 0) { 
