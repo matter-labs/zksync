@@ -18,15 +18,37 @@ export function * product(...arrays: any[][]) {
     }
 }
 
+export const insufficientFundsHandler = e => {
+    if (e.message.includes('insufficient funds')) {
+        return {
+            reason: 'insufficient funds',
+        };
+    }
+
+    throw e;
+}
+
 export function jrpcErrorHandler(message) {
     return error => {
         if (error.jrpcError) {
-            throw new Error(`${message}: ${error.jrpcError.message}`);
+            return {
+                error: error.jrpcError.message
+            };
         } else {
             error.message = `${message}: ${error.message}`; // we change the passed object, uh-oh
             throw error;
         }
     }
+}
+
+export function logAndReturn(arg) {
+    console.log(arg);
+    return arg;
+}
+
+export const logAndThrow = msg => arg => {
+    console.log(msg, ': ', arg);
+    throw arg;
 }
 
 export function splitAmount(totalAmount, feeDivisor = 100) {
@@ -46,3 +68,9 @@ export function * range(start, end?) {
 
     return;
 }
+
+export function rangearr(start, end?) {
+    return [...range(start, end)];
+}
+
+export const flat = arr => Array.isArray(arr) ? [].concat(...arr.map(flat)) : arr;
