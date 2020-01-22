@@ -74,6 +74,7 @@ impl FullExit {
 
         restored_signature
             .verify_musig_pedersen(&self.get_bytes())
+            .as_ref()
             .map(AccountAddress::from_pubkey)
     }
 }

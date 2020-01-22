@@ -17,7 +17,7 @@ struct ResultAddress {
 
 fn address(req: web::Json<PubkeyPoint>) -> impl Responder {
     info!("PubKey: {:?}", (req.0.pub_key.0).0.into_xy());
-    let address = AccountAddress::from_pubkey((req.0).pub_key.0);
+    let address = AccountAddress::from_pubkey(&(req.0).pub_key.0);
     info!("Address: {}", address.to_hex());
     web::Json(ResultAddress { address })
 }

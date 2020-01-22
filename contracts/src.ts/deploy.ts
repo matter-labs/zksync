@@ -103,6 +103,7 @@ export async function deployGovernance(
         let governance = await deployContract(wallet, governanceCode, constructorArgs, {
             gasLimit: 3000000,
         });
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${governance.deployTransaction.hash}`);
         console.log(`GOVERNANCE_ADDR=${governance.address}`);
 
         return governance;
@@ -166,6 +167,7 @@ export async function deployFranklin(
             {
                 gasLimit: 6600000,
             });
+        console.log(`CONTRACT_GENESIS_TX_HASH=${contract.deployTransaction.hash}`);
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
         const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);
@@ -198,7 +200,7 @@ export async function addTestERC20Token(wallet, governance) {
         await erc20.mint(wallet.address, parseEther("3000000000"));
         console.log("TEST_ERC20=" + erc20.address);
         await (await governance.addToken(erc20.address)).wait();
-        return erc20
+        return erc20;
     } catch (err) {
         console.log("Add token error:" + err);
     }
@@ -206,7 +208,8 @@ export async function addTestERC20Token(wallet, governance) {
 
 export async function mintTestERC20Token(wallet, erc20) {
     try {
-        await erc20.mint(wallet.address, parseEther("3000000000"));
+        const txCall = await erc20.mint(wallet.address, parseEther("3000000000"));
+        await txCall.wait();
     } catch (err) {
         console.log("Mint token error:" + err);
     }

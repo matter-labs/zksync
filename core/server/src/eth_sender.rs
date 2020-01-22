@@ -18,18 +18,17 @@ use std::time::Duration;
 // External uses
 use bigdecimal::BigDecimal;
 use failure::ensure;
-use ff::{PrimeField, PrimeFieldRepr};
 use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on};
 use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H256, U256};
 use web3::Transport;
-// Workspace deps
-use crate::{ConfigurationOptions, ThreadPanicNotify};
+// Workspace uses
 use eth_client::{ETHClient, SignedCallResult};
-use models::abi::FRANKLIN_CONTRACT;
+use models::abi::zksync_contract;
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::{Action, ActionType, Operation};
-use storage::{ConnectionPool, StorageETHOperation};
+use storage::{ConnectionPool, StorageETHOperation, StorageProcessor};
 use tokio::runtime::Runtime;
 use tokio::time;
 
@@ -94,16 +93,18 @@ impl<T: Transport> ETHSender<T> {
         let mut sender = Self {
             eth_client,
             unconfirmed_ops: VecDeque::new(),
-            db_pool,
+            db_pool: db_pool.clone(),
             rx_for_eth,
             op_notify,
         };
-        sender.restore_state().expect("Eth sender state restore");
+        let storage = db_pool.access_storage().expect("Failed to access storage");
+        if sender.restore_state(storage).is_err() {
+            info!("No unconfirmed operations");
+        }
         sender
     }
 
-    fn restore_state(&mut self) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
+    fn restore_state(&mut self, storage: StorageProcessor) -> Result<(), failure::Error> {
         self.unconfirmed_ops = storage
             .load_unconfirmed_operations()?
             .into_iter()
@@ -362,13 +363,6 @@ impl<T: Transport> ETHSender<T> {
     ) -> Result<SignedCallResult, failure::Error> {
         match &op.action {
             Action::Commit => {
-                let mut be_bytes = [0u8; 32];
-                op.block
-                    .new_root_hash
-                    .into_repr()
-                    .write_be(be_bytes.as_mut())
-                    .expect("Write commit bytes");
-
                 //                let mut block_number = op.block.block_number;
                 //                // FAIL TEST
                 //                let rnd = rand::thread_rng().gen_range(0,10);
@@ -377,7 +371,7 @@ impl<T: Transport> ETHSender<T> {
                 //                    block_number += rnd + 1;
                 //                }
                 //                // FAIL TEST
-                let root = H256::from(be_bytes);
+                let root = op.block.get_eth_encoded_root();
 
                 let public_data = op.block.get_eth_public_data();
                 debug!(
@@ -424,14 +418,9 @@ pub fn start_eth_sender(
             let (_event_loop, transport) =
                 Http::new(&config_options.web3_url).expect("failed to start web3 transport");
 
-            let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
             let eth_client = ETHClient::new(
                 transport,
-                abi_string,
+                zksync_contract(),
                 config_options.operator_eth_addr,
                 config_options.operator_private_key,
                 config_options.contract_eth_addr,

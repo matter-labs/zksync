@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::time::Instant;
 // External uses
 use futures::channel::{mpsc, oneshot};
 use futures::stream::StreamExt;
@@ -9,7 +10,8 @@ use crate::mempool::ProposedBlock;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
-    Account, AccountAddress, AccountId, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+    Account, AccountAddress, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
+    PriorityOp,
 };
 use models::params::block_size_chunks;
 use models::{ActionType, CommitRequest};
@@ -22,10 +24,14 @@ pub enum ExecutedOpId {
 }
 
 pub enum StateKeeperRequest {
-    GetAccount(AccountAddress, oneshot::Sender<Option<Account>>),
+    GetAccount(
+        AccountAddress,
+        oneshot::Sender<Option<(AccountId, Account)>>,
+    ),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
     GetExecutedInPendingBlock(ExecutedOpId, oneshot::Sender<Option<(BlockNumber, bool)>>),
+    SealBlock,
 }
 
 pub struct ExecutedOpsNotify {
@@ -75,23 +81,23 @@ pub struct PlasmaStateKeeper {
     executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
 }
 
-impl PlasmaStateKeeper {
-    pub fn new(
-        pool: ConnectionPool,
-        fee_account_address: AccountAddress,
-        rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
-        tx_for_commitments: mpsc::Sender<CommitRequest>,
-        executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
-    ) -> Self {
-        info!("constructing state keeper instance");
-        let storage = pool
+pub struct PlasmaStateInitParams {
+    pub accounts: AccountMap,
+    pub last_block_number: BlockNumber,
+    pub unprocessed_priority_op: u64,
+}
+
+impl PlasmaStateInitParams {
+    pub fn restore_from_db(db_pool: ConnectionPool) -> Self {
+        let timer = Instant::now();
+
+        let storage = db_pool
             .access_storage()
-            .expect("db connection failed for statekeeper");
+            .expect("db connection failed for state restore");
 
         let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
         let last_verified = storage.get_last_verified_block().expect("db failed");
-        let state = PlasmaState::new(accounts, last_committed + 1);
-        let current_unprocessed_priority_op = storage
+        let unprocessed_priority_op = storage
             .load_stored_op_with_block_number(last_committed, ActionType::COMMIT)
             .map(|storage_op| {
                 storage_op
@@ -104,9 +110,29 @@ impl PlasmaStateKeeper {
             .unwrap_or_default();
 
         info!(
-            "last_committed = {}, last_verified = {}",
-            last_committed, last_verified
+            "Restored committed state from db, committed: {}, verified: {}, elapsed time: {} ms",
+            last_committed,
+            last_verified,
+            timer.elapsed().as_millis()
         );
+
+        Self {
+            accounts,
+            last_block_number: last_committed,
+            unprocessed_priority_op,
+        }
+    }
+}
+
+impl PlasmaStateKeeper {
+    pub fn new(
+        initial_state: PlasmaStateInitParams,
+        fee_account_address: AccountAddress,
+        rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
+        tx_for_commitments: mpsc::Sender<CommitRequest>,
+        executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
+    ) -> Self {
+        let state = PlasmaState::new(initial_state.accounts, initial_state.last_block_number + 1);
 
         let (fee_account_id, _) = state
             .get_account_by_address(&fee_account_address)
@@ -115,10 +141,10 @@ impl PlasmaStateKeeper {
         let keeper = PlasmaStateKeeper {
             state,
             fee_account_id,
-            current_unprocessed_priority_op,
+            current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
             rx_for_blocks,
             tx_for_commitments,
-            pending_block: PendingBlock::new(current_unprocessed_priority_op),
+            pending_block: PendingBlock::new(initial_state.unprocessed_priority_op),
             executed_tx_notify_sender,
         };
 
@@ -173,6 +199,9 @@ impl PlasmaStateKeeper {
                 StateKeeperRequest::GetExecutedInPendingBlock(op_id, sender) => {
                     let result = self.check_executed_in_pending_block(op_id);
                     sender.send(result).unwrap_or_default();
+                }
+                StateKeeperRequest::SealBlock => {
+                    self.seal_pending_block().await;
                 }
             }
         }
@@ -404,8 +433,8 @@ impl PlasmaStateKeeper {
         None
     }
 
-    fn account(&self, address: &AccountAddress) -> Option<Account> {
-        self.state.get_account_by_address(address).map(|(_, a)| a)
+    fn account(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
+        self.state.get_account_by_address(address)
     }
 }
 
