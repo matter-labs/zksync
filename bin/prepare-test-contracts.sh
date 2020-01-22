@@ -34,7 +34,6 @@ set_constant() {
 set_constant EXPECT_VERIFICATION_IN 8 $OUT_DIR/FranklinTest.sol
 set_constant MAX_UNVERIFIED_BLOCKS 4 $OUT_DIR/FranklinTest.sol
 set_constant PRIORITY_EXPIRATION 16 $OUT_DIR/PriorityQueueTest.sol
-set_constant MAX_OUTSTANDING_DEPOSITS_TO_CANCEL_IN_ONE_CALL 2 $OUT_DIR/PriorityQueueTest.sol
 
 # Verify always true
 set_constant DUMMY_VERIFIER true $OUT_DIR/VerifierTest.sol
