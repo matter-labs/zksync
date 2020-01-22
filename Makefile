@@ -186,6 +186,9 @@ integration-full-exit:
 price:
 	@node contracts/scripts/check-price.js
 
+circuit-tests:
+	cargo test --no-fail-fast --release -p circuit -- --ignored
+
 # Loadtest
 
 run-loadtest: confirm_action
