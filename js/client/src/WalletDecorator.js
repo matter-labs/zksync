@@ -542,7 +542,7 @@ export class WalletDecorator {
     }
 
     async * verboseGetSyncOpStatus(syncOp) {
-        // this.emit("receiptCommittedOrVerified");
+        this.emit("receiptCommittedOrVerified");
 
         const txHashHtml = shortenedTxHash(syncOp.txHash);
     
@@ -592,7 +592,7 @@ export class WalletDecorator {
     }
 
     async * verboseGetSyncPriorityOpStatus(syncOp) {
-        // this.emit("receiptCommittedOrVerified");
+        this.emit("receiptCommittedOrVerified");
 
         let txHashHtml = shortenedTxHash(syncOp.ethTx.hash);
 
