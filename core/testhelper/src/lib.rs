@@ -20,8 +20,7 @@ impl TestAccount {
             p_g,
             jubjub_params,
         );
-        let address =
-            Address::from_slice(&models::node::account::PubKeyHash::from_pubkey(public_key).data);
+        let address = unimplemented!("use account address");
         let public_key = franklin_crypto::eddsa::PublicKey::<pairing::bn256::Bn256>::from_private(
             &private_key,
             p_g,

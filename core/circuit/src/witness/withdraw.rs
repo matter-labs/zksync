@@ -340,164 +340,80 @@ pub fn calculate_withdraw_operations_from_witness(
 mod test {
     use super::*;
 
-    use crate::witness::utils::public_data_commitment;
+    use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
+    use bigdecimal::BigDecimal;
+    use models::node::Account;
+    use testkit::zksync_account::ZksyncAccount;
+    use web3::types::Address;
 
-    use crate::circuit::FranklinCircuit;
-    use bellman::Circuit;
-    use ff::{Field, PrimeField};
-    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use franklin_crypto::circuit::test::*;
-    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-    use franklin_crypto::jubjub::FixedGenerators;
-    use models::circuit::account::{
-        Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
-    };
-    use models::circuit::utils::*;
-    use models::merkle_tree::PedersenHasher;
-    use models::node::tx::PackedPublicKey;
-    use models::params as franklin_constants;
-    use models::primitives::bytes_into_be_bits;
-    use rand::{Rng, SeedableRng, XorShiftRng};
     #[test]
     #[ignore]
-    fn test_withdraw_franklin() {
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let validator_address_number = 7;
-        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-        let block_number = Fr::from_str("1").unwrap();
-        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-        let phasher = PedersenHasher::<Bn256>::default();
-
-        let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
-
-        let sender_sk = PrivateKey::<Bn256>(rng.gen());
-        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
-        let (sender_x, sender_y) = sender_pk.0.into_xy();
-        println!("x = {}, y = {}", sender_x, sender_y);
-
-        // give some funds to sender and make zero balance for recipient
-        let validator_sk = PrivateKey::<Bn256>(rng.gen());
-        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
-        let (validator_x, validator_y) = validator_pk.0.into_xy();
-        println!("x = {}, y = {}", validator_x, validator_y);
-        let validator_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: validator_pub_key_hash,
-            address: unimplemented!(),
+    fn test_withdraw() {
+        let zksync_account = ZksyncAccount::rand();
+        let account_id = 1;
+        let account_address = zksync_account.address.clone();
+        let account = {
+            let mut account = Account::default_with_address(&account_address);
+            account.add_balance(0, &BigDecimal::from(10));
+            account
         };
 
-        let mut validator_balances = vec![];
-        for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
-            validator_balances.push(Some(Fr::zero()));
-        }
-        tree.insert(validator_address_number, validator_leaf);
+        let (mut plasma_state, mut witness_accum) =
+            test_genesis_plasma_state(vec![(account_id, account)]);
 
-        let mut account_address: u32 = rng.gen();
-        account_address %= tree.capacity();
-        let amount: u128 = 500;
-        let fee: u128 = 100;
-        let token: u32 = 2;
-        let ethereum_key = Fr::from_str("124").unwrap();
-
-        let sender_balance_before: u128 = 2000;
-
-        let sender_balance_before_as_field_element =
-            Fr::from_str(&sender_balance_before.to_string()).unwrap();
-
-        let mut sender_balance_tree =
-            CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32);
-        sender_balance_tree.insert(
-            token,
-            Balance {
-                value: sender_balance_before_as_field_element,
-            },
-        );
-
-        let sender_leaf_initial = CircuitAccount::<Bn256> {
-            subtree: sender_balance_tree,
-            nonce: Fr::zero(),
-            pub_key_hash: sender_pub_key_hash,
-            address: unimplemented!(),
+        let withdraw_op = WithdrawOp {
+            tx: zksync_account.sign_withdraw(
+                0,
+                BigDecimal::from(7),
+                BigDecimal::from(3),
+                &Address::zero(),
+                None,
+                true,
+            ),
+            account_id,
         };
 
-        tree.insert(account_address, sender_leaf_initial);
+        let (fee, _) = plasma_state
+            .apply_withdraw_op(&withdraw_op)
+            .expect("transfer should be success");
+        plasma_state.collect_fee(&[fee.clone()], witness_accum.fee_account_id);
 
-        let withdraw_witness = apply_withdraw(
-            &mut tree,
-            &WithdrawData {
-                amount,
-                fee,
-                token,
-                account_address,
-                ethereum_key,
-            },
-        );
-
-        let (signature_data, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
-            &withdraw_witness.get_sig_bits(),
-            &phasher,
-            &sender_sk,
-            params,
-        );
-        let packed_public_key = PackedPublicKey(sender_pk);
-        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
-            .iter()
-            .map(|x| Some(*x))
-            .collect();
-
-        let operations = calculate_withdraw_operations_from_witness(
+        let withdraw_witness = apply_withdraw_tx(&mut witness_accum.account_tree, &withdraw_op);
+        let sign_packed = withdraw_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let (first_sig_msg, second_sig_msg, third_sig_msg, signature_data, signer_packed_key_bits) =
+            prepare_sig_data(
+                &sign_packed,
+                &withdraw_op.tx.get_bytes(),
+                &withdraw_op.tx.signature.pub_key,
+            )
+            .expect("prepare signature data");
+        let withdraw_operations = calculate_withdraw_operations_from_witness(
             &withdraw_witness,
-            &first_sig_part,
-            &second_sig_part,
-            &third_sig_part,
+            &first_sig_msg,
+            &second_sig_msg,
+            &third_sig_msg,
             &signature_data,
             &signer_packed_key_bits,
         );
+        let pub_data_from_witness = withdraw_witness.get_pubdata();
 
-        let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, token, fee);
+        witness_accum.add_operation_with_pubdata(withdraw_operations, pub_data_from_witness);
+        witness_accum.collect_fees(&[fee]);
+        witness_accum.calculate_pubdata_commitment();
 
-        let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
-
-        let public_data_commitment = public_data_commitment::<Bn256>(
-            &withdraw_witness.get_pubdata(),
-            withdraw_witness.before_root,
-            Some(root_after_fee),
-            Some(validator_address),
-            Some(block_number),
+        assert_eq!(
+            plasma_state.root_hash(),
+            witness_accum
+                .root_after_fees
+                .expect("witness accum after root hash empty"),
+            "root hash in state keeper and witness generation code mismatch"
         );
-        {
-            let mut cs = TestConstraintSystem::<Bn256>::new();
 
-            let instance = FranklinCircuit {
-                operation_batch_size: 10,
-                params,
-                old_root: withdraw_witness.before_root,
-                new_root: Some(root_after_fee),
-                operations,
-                pub_data_commitment: Some(public_data_commitment),
-                block_number: Some(block_number),
-                validator_account: validator_account_witness,
-                validator_address: Some(validator_address),
-                validator_balances,
-                validator_audit_path,
-            };
-
-            instance.synthesize(&mut cs).unwrap();
-
-            println!("{}", cs.find_unconstrained());
-
-            println!("{}", cs.num_constraints());
-
-            if let Some(err) = cs.which_is_unsatisfied() {
-                panic!("ERROR satisfying in {}", err);
-            }
-        }
+        check_circuit(witness_accum.into_circuit_instance());
     }
 }

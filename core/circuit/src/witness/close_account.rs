@@ -174,141 +174,142 @@ pub fn calculate_close_account_operations_from_witness(
     let operations: Vec<Operation<_>> = vec![operation_zero];
     operations
 }
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::witness::utils::public_data_commitment;
-    use models::merkle_tree::PedersenHasher;
-    use models::primitives::bytes_into_be_bits;
 
-    use crate::circuit::FranklinCircuit;
-    use bellman::Circuit;
-    use ff::{Field, PrimeField};
-    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use franklin_crypto::circuit::test::*;
-    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-    use franklin_crypto::jubjub::FixedGenerators;
-    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
-    use models::circuit::utils::*;
-    use models::node::tx::PackedPublicKey;
-    use models::params as franklin_constants;
-    use rand::{Rng, SeedableRng, XorShiftRng};
+// Close disabled
+//
+//#[cfg(test)]
+//mod test {
+//    use super::*;
+//    use crate::witness::utils::public_data_commitment;
+//    use models::merkle_tree::PedersenHasher;
+//    use models::primitives::bytes_into_be_bits;
+//
+//    use crate::circuit::FranklinCircuit;
+//    use bellman::Circuit;
+//    use ff::{Field, PrimeField};
+//    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+//    use franklin_crypto::circuit::test::*;
+//    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
+//    use franklin_crypto::jubjub::FixedGenerators;
+//    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
+//    use models::circuit::utils::*;
+//    use models::node::tx::PackedPublicKey;
+//    use models::params as franklin_constants;
+//    use rand::{Rng, SeedableRng, XorShiftRng};
 
-    #[test]
-    #[ignore]
-    fn test_close_account_franklin_empty_leaf() {
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let validator_address_number = 7;
-        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-        let block_number = Fr::from_str("1").unwrap();
-        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-        let phasher = PedersenHasher::<Bn256>::default();
-
-        let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
-        let capacity = tree.capacity();
-
-        let sender_sk = PrivateKey::<Bn256>(rng.gen());
-        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
-        let sender_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: sender_pub_key_hash,
-            address: unimplemented!(),
-        };
-        let mut sender_leaf_number: u32 = rng.gen();
-        sender_leaf_number %= capacity;
-        println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
-
-        tree.insert(sender_leaf_number, sender_leaf);
-
-        // give some funds to sender and make zero balance for recipient
-        let validator_sk = PrivateKey::<Bn256>(rng.gen());
-        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
-
-        let validator_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: validator_pub_key_hash,
-            address: unimplemented!(),
-        };
-
-        let mut validator_balances = vec![];
-        for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
-            validator_balances.push(Some(Fr::zero()));
-        }
-        tree.insert(validator_address_number, validator_leaf);
-
-        let account_address = sender_leaf_number;
-
-        //-------------- Start applying changes to state
-        let close_account_witness =
-            apply_close_account(&mut tree, &CloseAccountData { account_address });
-        let (signature_data, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
-            &close_account_witness.get_sig_bits(),
-            &phasher,
-            &sender_sk,
-            params,
-        );
-        let packed_public_key = PackedPublicKey(sender_pk);
-        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
-        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
-            .iter()
-            .map(|x| Some(*x))
-            .collect();
-
-        let operations = calculate_close_account_operations_from_witness(
-            &close_account_witness,
-            &first_sig_part,
-            &second_sig_part,
-            &third_sig_part,
-            &signature_data,
-            &signer_packed_key_bits,
-        );
-
-        println!("tree before_applying fees: {}", tree.root_hash());
-
-        let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, 0, 0);
-        println!("test root after fees {}", root_after_fee);
-        let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
-
-        let public_data_commitment = public_data_commitment::<Bn256>(
-            &close_account_witness.get_pubdata(),
-            close_account_witness.before_root,
-            Some(root_after_fee),
-            Some(validator_address),
-            Some(block_number),
-        );
-
-        {
-            let mut cs = TestConstraintSystem::<Bn256>::new();
-
-            let instance = FranklinCircuit {
-                operation_batch_size: 10,
-                params,
-                old_root: close_account_witness.before_root,
-                new_root: Some(root_after_fee),
-                operations,
-                pub_data_commitment: Some(public_data_commitment),
-                block_number: Some(block_number),
-                validator_account: validator_account_witness,
-                validator_address: Some(validator_address),
-                validator_balances,
-                validator_audit_path,
-            };
-
-            instance.synthesize(&mut cs).unwrap();
-
-            println!("{}", cs.find_unconstrained());
-
-            println!("number of constraints {}", cs.num_constraints());
-            if let Some(err) = cs.which_is_unsatisfied() {
-                panic!("ERROR satisfying in {}", err);
-            }
-        }
-    }
-}
+//    #[test]
+//    #[ignore]
+//    fn test_close_account_franklin_empty_leaf() {
+//        let params = &AltJubjubBn256::new();
+//        let p_g = FixedGenerators::SpendingKeyGenerator;
+//        let validator_address_number = 7;
+//        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
+//        let block_number = Fr::from_str("1").unwrap();
+//        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+//        let phasher = PedersenHasher::<Bn256>::default();
+//
+//        let mut tree: CircuitAccountTree =
+//            CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
+//        let capacity = tree.capacity();
+//
+//        let sender_sk = PrivateKey::<Bn256>(rng.gen());
+//        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
+//        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
+//        let sender_leaf = CircuitAccount::<Bn256> {
+//            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
+//            nonce: Fr::zero(),
+//            pub_key_hash: sender_pub_key_hash,
+//        };
+//        let mut sender_leaf_number: u32 = rng.gen();
+//        sender_leaf_number %= capacity;
+//        println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
+//
+//        tree.insert(sender_leaf_number, sender_leaf);
+//
+//        // give some funds to sender and make zero balance for recipient
+//        let validator_sk = PrivateKey::<Bn256>(rng.gen());
+//        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
+//        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
+//
+//        let validator_leaf = CircuitAccount::<Bn256> {
+//            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
+//            nonce: Fr::zero(),
+//            pub_key_hash: validator_pub_key_hash,
+//        };
+//
+//        let mut validator_balances = vec![];
+//        for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
+//            validator_balances.push(Some(Fr::zero()));
+//        }
+//        tree.insert(validator_address_number, validator_leaf);
+//
+//        let account_address = sender_leaf_number;
+//
+//        //-------------- Start applying changes to state
+//        let close_account_witness =
+//            apply_close_account(&mut tree, &CloseAccountData { account_address });
+//        let (signature_data, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
+//            &close_account_witness.get_sig_bits(),
+//            &phasher,
+//            &sender_sk,
+//            params,
+//        );
+//        let packed_public_key = PackedPublicKey(sender_pk);
+//        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
+//        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
+//            .iter()
+//            .map(|x| Some(*x))
+//            .collect();
+//
+//        let operations = calculate_close_account_operations_from_witness(
+//            &close_account_witness,
+//            &first_sig_part,
+//            &second_sig_part,
+//            &third_sig_part,
+//            &signature_data,
+//            &signer_packed_key_bits,
+//        );
+//
+//        println!("tree before_applying fees: {}", tree.root_hash());
+//
+//        let (root_after_fee, validator_account_witness) =
+//            apply_fee(&mut tree, validator_address_number, 0, 0);
+//        println!("test root after fees {}", root_after_fee);
+//        let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
+//
+//        let public_data_commitment = public_data_commitment::<Bn256>(
+//            &close_account_witness.get_pubdata(),
+//            close_account_witness.before_root,
+//            Some(root_after_fee),
+//            Some(validator_address),
+//            Some(block_number),
+//        );
+//
+//        {
+//            let mut cs = TestConstraintSystem::<Bn256>::new();
+//
+//            let instance = FranklinCircuit {
+//                operation_batch_size: 10,
+//                params,
+//                old_root: close_account_witness.before_root,
+//                new_root: Some(root_after_fee),
+//                operations,
+//                pub_data_commitment: Some(public_data_commitment),
+//                block_number: Some(block_number),
+//                validator_account: validator_account_witness,
+//                validator_address: Some(validator_address),
+//                validator_balances,
+//                validator_audit_path,
+//            };
+//
+//            instance.synthesize(&mut cs).unwrap();
+//
+//            println!("{}", cs.find_unconstrained());
+//
+//            println!("number of constraints {}", cs.num_constraints());
+//            if let Some(err) = cs.which_is_unsatisfied() {
+//                panic!("ERROR satisfying in {}", err);
+//            }
+//        }
+//    }
+//}

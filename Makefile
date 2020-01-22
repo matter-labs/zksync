@@ -134,7 +134,7 @@ push-image-rust: image-rust
 
 # Contracts
 
-deploy-contracts: confirm_action
+deploy-contracts: confirm_action build-contracts
 	@bin/deploy-contracts.sh
 
 test-contracts: confirm_action build-contracts
@@ -162,6 +162,7 @@ gen-keys-if-not-present:
 	@touch contracts/build/Franklin.json
 	@touch contracts/build/Governance.json
 	@touch contracts/build/PriorityQueue.json
+	@touch contracts/build/IERC20.json
 	
 	test -f keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
 
@@ -173,6 +174,9 @@ prepare-contracts:
 loadtest: confirm_action
 	@bin/loadtest.sh
 
+integration-testkit: build-contracts
+	cargo run --bin testkit --release
+
 integration-simple:
 	@cd js/tests && yarn && yarn simple
 
@@ -181,6 +185,9 @@ integration-full-exit:
 
 price:
 	@node contracts/scripts/check-price.js
+
+circuit-tests:
+	cargo test --no-fail-fast --release -p circuit -- --ignored
 
 # Loadtest
 
@@ -306,13 +313,13 @@ make-keys:
 
 data-restore-setup-and-run: data-restore-build data-restore-restart
 
-data-restore-db-prepare: db-drop db-wait db-setup
+data-restore-db-prepare: confirm_action db-reset
 
 data-restore-build:
 	@cargo build -p data_restore --release --bin data_restore
 
 data-restore-restart: confirm_action data-restore-db-prepare
-	@./target/release/data_restore
+	@cargo run --bin data_restore --release -- --genesis
 
 data-restore-continue:
-	@./target/release/data_restore
+	@cargo run --bin data_restore --release -- --continue

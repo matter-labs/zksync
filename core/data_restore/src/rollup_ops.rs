@@ -1,46 +1,48 @@
-use crate::events::EventData;
-use crate::helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
-use failure::{ensure, format_err};
+use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
+use crate::events::BlockEvent;
+use failure::format_err;
 use models::node::operations::FranklinOp;
 use models::primitives::bytes_slice_to_uint32;
+use web3::{Transport, Web3};
 
-const BLOCK_NUMBER_LENGTH: usize = 32;
-const FEE_ACC_LENGTH: usize = 32;
-const ROOT_LENGTH: usize = 32;
-const EMPTY_LENGTH: usize = 64;
+use models::params::{
+    INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH, INPUT_DATA_EMPTY_BYTES_WIDTH,
+    INPUT_DATA_FEE_ACC_BYTES_WIDTH, INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET,
+    INPUT_DATA_ROOT_BYTES_WIDTH,
+};
 
-/// Description of a Franklin operations block
+/// Description of a Rollup operations block
 #[derive(Debug, Clone)]
-pub struct FranklinOpsBlock {
-    /// Franklin block number
+pub struct RollupOpsBlock {
+    /// Rollup block number
     pub block_num: u32,
-    /// Franklin operations in block
+    /// Rollup operations in block
     pub ops: Vec<FranklinOp>,
     /// Fee account
     pub fee_account: u32,
 }
 
-impl FranklinOpsBlock {
-    // Get ops block from Franklin Contract event description
-    pub fn get_from_event(event_data: &EventData) -> Result<Self, failure::Error> {
-        let ops_block = FranklinOpsBlock::get_franklin_ops_block(event_data)?;
-        Ok(ops_block)
-    }
-
-    /// Return Franklin operations block description
+impl RollupOpsBlock {
+    /// Returns a Rollup operations block description
     ///
     /// # Arguments
     ///
-    /// * `event_data` - Franklin Contract event description
+    /// * `web3` - Web3 provider url
+    /// * `event_data` - Rollup contract event description
     ///
-    fn get_franklin_ops_block(event_data: &EventData) -> Result<FranklinOpsBlock, failure::Error> {
-        let transaction = get_ethereum_transaction(&event_data.transaction_hash)?;
+    pub fn get_rollup_ops_block<T: Transport>(
+        web3: &Web3<T>,
+        event_data: &BlockEvent,
+    ) -> Result<Self, failure::Error> {
+        let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
-        let commitment_data = &input_data
-            [BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH + ROOT_LENGTH + EMPTY_LENGTH..input_data.len()];
-        let fee_account = FranklinOpsBlock::get_fee_account_from_tx_input(&input_data)?;
-        let ops = FranklinOpsBlock::get_franklin_ops_from_data(commitment_data)?;
-        let block = FranklinOpsBlock {
+        let commitment_data = &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
+            + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
+            + INPUT_DATA_ROOT_BYTES_WIDTH
+            + INPUT_DATA_EMPTY_BYTES_WIDTH..];
+        let fee_account = RollupOpsBlock::get_fee_account_from_tx_input(&input_data)?;
+        let ops = RollupOpsBlock::get_rollup_ops_from_data(commitment_data)?;
+        let block = RollupOpsBlock {
             block_num: event_data.block_num,
             ops,
             fee_account,
@@ -48,13 +50,13 @@ impl FranklinOpsBlock {
         Ok(block)
     }
 
-    /// Return Franklin operations vector
+    /// Returns a Rollup operations vector
     ///
     /// # Arguments
     ///
     /// * `data` - Franklin Contract event input data
     ///
-    pub fn get_franklin_ops_from_data(data: &[u8]) -> Result<Vec<FranklinOp>, failure::Error> {
+    pub fn get_rollup_ops_from_data(data: &[u8]) -> Result<Vec<FranklinOp>, failure::Error> {
         let mut current_pointer = 0;
         let mut ops = vec![];
         while current_pointer < data.len() {
@@ -66,25 +68,26 @@ impl FranklinOpsBlock {
             let post = pre + pub_data_size;
 
             let op = FranklinOp::from_public_data(&data[pre..post])?;
+
             ops.push(op);
             current_pointer += pub_data_size;
         }
         Ok(ops)
     }
 
-    /// Return fee account from Ethereum transaction input data
+    /// Returns fee account from Ethereum transaction input data
     ///
     /// # Arguments
     ///
     /// * `input` - Ethereum transaction input
     ///
     fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, failure::Error> {
-        ensure!(
-            input_data.len() == BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH,
-            "No fee account data in tx"
-        );
         Ok(bytes_slice_to_uint32(
-            &input_data[BLOCK_NUMBER_LENGTH..BLOCK_NUMBER_LENGTH + FEE_ACC_LENGTH],
+            &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
+                + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
+                - INPUT_DATA_FEE_ACC_BYTES_WIDTH
+                ..INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
+                    + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET],
         )
         .ok_or_else(|| format_err!("Cant convert bytes to fee account number"))?)
     }
@@ -92,7 +95,7 @@ impl FranklinOpsBlock {
 
 #[cfg(test)]
 mod test {
-    use crate::franklin_ops::FranklinOpsBlock;
+    use crate::rollup_ops::RollupOpsBlock;
     use bigdecimal::BigDecimal;
     use models::node::tx::TxSignature;
     use models::node::{
@@ -118,7 +121,7 @@ mod test {
             account_id: 6,
         }));
         let pub_data1 = op1.public_data();
-        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -141,7 +144,7 @@ mod test {
         };
         let op1 = FranklinOp::Withdraw(Box::new(WithdrawOp { tx, account_id: 3 }));
         let pub_data1 = op1.public_data();
-        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -161,7 +164,7 @@ mod test {
             withdraw_amount: Some(BigDecimal::from(444)),
         }));
         let pub_data1 = op1.public_data();
-        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -181,7 +184,7 @@ mod test {
             withdraw_amount: None,
         }));
         let pub_data1 = op1.public_data();
-        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -210,7 +213,7 @@ mod test {
             to: 12,
         }));
         let pub_data1 = op1.public_data();
-        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -239,7 +242,7 @@ mod test {
             to: 12,
         }));
         let pub_data1 = op1.public_data();
-        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");
@@ -258,7 +261,7 @@ mod test {
         };
         let op1 = FranklinOp::Close(Box::new(CloseOp { tx, account_id: 11 }));
         let pub_data1 = op1.public_data();
-        let op2 = FranklinOpsBlock::get_franklin_ops_from_data(&pub_data1)
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")
             .pop()
             .expect("empty ops array");

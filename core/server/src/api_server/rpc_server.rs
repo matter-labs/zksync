@@ -1,7 +1,6 @@
 use crate::mempool::MempoolRequest;
 use crate::mempool::TxAddError;
 use crate::state_keeper::StateKeeperRequest;
-use crate::ThreadPanicNotify;
 use bigdecimal::BigDecimal;
 use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt, SinkExt, TryFutureExt};
@@ -9,6 +8,7 @@ use jsonrpc_core::{Error, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
+use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
 use std::collections::HashMap;
@@ -142,8 +142,6 @@ impl Rpc for RpcApp {
             return Box::new(futures01::done(Err(Error::internal_error())));
         };
 
-        let id = account.committed.as_ref().map(|(id, _)| *id);
-
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
         let account_state_resp = async move {
             let state_keeper_response = oneshot::channel();
@@ -159,10 +157,13 @@ impl Rpc for RpcApp {
                 .await
                 .map_err(|_| Error::internal_error())?;
 
-            let committed = if let Some(account) = committed_account_state {
-                ResponseAccountState::try_to_restore(account, &tokens)?
+            let (id, committed) = if let Some((id, account)) = committed_account_state {
+                (
+                    Some(id),
+                    ResponseAccountState::try_to_restore(account, &tokens)?,
+                )
             } else {
-                ResponseAccountState::default()
+                (None, ResponseAccountState::default())
             };
 
             let verified = if let Some((_, account)) = account.verified {

@@ -5,7 +5,9 @@ use crate::operation::*;
 use ff::{Field, PrimeField};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element, eth_address_to_fr};
+use models::circuit::utils::{
+    append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
+};
 use models::node::DepositOp;
 use models::params as franklin_constants;
 use pairing::bn256::*;
@@ -130,10 +132,7 @@ pub fn apply_deposit(
             deposit.account_address,
             deposit.token,
             |acc| {
-                assert!(
-                    (acc.address == deposit.address)
-                        || (acc.address == Fr::zero())
-                );
+                assert!((acc.address == deposit.address) || (acc.address == Fr::zero()));
                 acc.address = deposit.address;
             },
             |bal| bal.value.add_assign(&amount_as_field_element),
@@ -189,9 +188,6 @@ pub fn calculate_deposit_operations_from_witness(
     signature_data: &SignatureData,
     signer_pub_key_packed: &[Option<bool>], // WHY? What signer?
 ) -> Vec<Operation<Bn256>> {
-    
-    let plasma_state = PlasmaState::new()
-
     let pubdata_chunks: Vec<_> = deposit_witness
         .get_pubdata()
         .chunks(64)
@@ -305,293 +301,107 @@ pub fn calculate_deposit_operations_from_witness(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::witness::utils::public_data_commitment;
-    use bellman::groth16::generate_random_parameters;
-    use bellman::groth16::{create_random_proof, prepare_verifying_key, verify_proof};
-    use models::merkle_tree::PedersenHasher;
-
-    use crate::circuit::FranklinCircuit;
-    use bellman::Circuit;
-    use ff::{Field, PrimeField};
-    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use models::primitives::GetBits;
-
-    use franklin_crypto::circuit::test::*;
-    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-    use franklin_crypto::jubjub::FixedGenerators;
-    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
-    use models::circuit::utils::*;
-    use models::params as franklin_constants;
-
-    use rand::{Rng, SeedableRng, XorShiftRng};
+    use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
+    use bigdecimal::BigDecimal;
+    use ff::Field;
+    use models::node::{Account, Address, Deposit};
 
     #[test]
     #[ignore]
     fn test_deposit_franklin_in_empty_leaf() {
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let validator_address_number = 7;
-        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-        let block_number = Fr::from_str("1").unwrap();
-        let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-        let phasher = PedersenHasher::<Bn256>::default();
+        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(Vec::new());
 
-        let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
-        println!("empty tree root_hash is: {}", tree.root_hash());
-        let sender_sk = PrivateKey::<Bn256>(rng.gen());
-        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
-        let sender_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: sender_pub_key_hash,
-            address: unimplemented!(),
-        };
-        println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
-
-        // give some funds to sender and make zero balance for recipient
-        let validator_sk = PrivateKey::<Bn256>(rng.gen());
-        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
-
-        let validator_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: validator_pub_key_hash,
-            address: unimplemented!(),
-        };
-        println!(
-            "validator_leaf_len {:?}",
-            validator_leaf.get_bits_le().len()
-        );
-        println!(
-            "validator_leaf_subree {:?}",
-            validator_leaf.subtree.root_hash()
-        );
-
-        let mut validator_balances = vec![];
-        for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
-            validator_balances.push(Some(Fr::zero()));
-        }
-        tree.insert(validator_address_number, validator_leaf);
-
-        let mut account_address: u32 = rng.gen();
-        account_address %= tree.capacity();
-        let amount: u128 = 500;
-        let token: u32 = 2;
-
-        //-------------- Start applying changes to state
-        let deposit_witness = apply_deposit(
-            &mut tree,
-            &DepositData {
-                amount,
-                token,
-                account_address,
-                new_pub_key_hash: sender_pub_key_hash,
+        let empty_account_id = 1;
+        let deposit_op = DepositOp {
+            priority_op: Deposit {
+                from: Address::zero(),
+                token: 0,
+                amount: BigDecimal::from(1),
+                to: unimplemented!("pay to eth circuit"),
             },
-        );
-        let (signature_data, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
-            &deposit_witness.get_sig_bits(),
-            &phasher,
-            &sender_sk,
-            params,
-        );
+            account_id: empty_account_id,
+        };
 
-        let operations = calculate_deposit_operations_from_witness(
+        plasma_state.apply_deposit_op(&deposit_op);
+
+        let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+        let deposit_operations = calculate_deposit_operations_from_witness(
             &deposit_witness,
-            &first_sig_part,
-            &second_sig_part,
-            &third_sig_part,
-            &signature_data,
-            &[Some(false); 256],
+            &Fr::zero(),
+            &Fr::zero(),
+            &Fr::zero(),
+            &SignatureData {
+                r_packed: vec![Some(false); 256],
+                s: vec![Some(false); 256],
+            },
+            &[Some(false); 256], //doesn't matter for deposit
+        );
+        let pub_data_from_witness = deposit_witness.get_pubdata();
+
+        witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+        witness_accum.collect_fees(&Vec::new());
+        witness_accum.calculate_pubdata_commitment();
+
+        assert_eq!(
+            plasma_state.root_hash(),
+            witness_accum
+                .root_after_fees
+                .expect("witness accum after root hash empty"),
+            "root hash in state keeper and witness generation code mismatch"
         );
 
-        println!("tree before_applying fees: {}", tree.root_hash());
-
-        let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, token, 0);
-        println!("test root after fees {}", root_after_fee);
-        let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
-
-        let public_data_commitment = public_data_commitment::<Bn256>(
-            &deposit_witness.get_pubdata(),
-            deposit_witness.before_root,
-            Some(root_after_fee),
-            Some(validator_address),
-            Some(block_number),
-        );
-        println!("validator balances: {}", validator_balances.len());
-
-        {
-            let mut cs = TestConstraintSystem::<Bn256>::new();
-
-            let instance = FranklinCircuit {
-                operation_batch_size: 10,
-                params,
-                old_root: deposit_witness.before_root,
-                new_root: Some(root_after_fee),
-                operations: operations.clone(),
-                pub_data_commitment: Some(public_data_commitment),
-                block_number: Some(block_number),
-                validator_account: validator_account_witness.clone(),
-                validator_address: Some(validator_address),
-                validator_balances: validator_balances.clone(),
-                validator_audit_path: validator_audit_path.clone(),
-            };
-            instance.synthesize(&mut cs).unwrap();
-
-            println!("unconstrained: {}", cs.find_unconstrained());
-            println!("number of constraints {}", cs.num_constraints());
-            if let Some(err) = cs.which_is_unsatisfied() {
-                panic!("ERROR satisfying in {}", err);
-            }
-        }
+        check_circuit(witness_accum.into_circuit_instance());
     }
 
     #[test]
     #[ignore]
-    fn test_deposit_franklin_proof() {
-        let params = &AltJubjubBn256::new();
-        let p_g = FixedGenerators::SpendingKeyGenerator;
-        let validator_address_number = 7;
-        let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-        let block_number = Fr::from_str("1").unwrap();
-        let mut rng =
-            &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-        let phasher = PedersenHasher::<Bn256>::default();
+    fn test_deposit_franklin_existing_account() {
+        let deposit_to_account_id = 1;
+        let deposit_to_account_address =
+            "1111111111111111111111111111111111111111".parse().unwrap();
+        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
+            deposit_to_account_id,
+            Account::default_with_address(&deposit_to_account_address),
+        )]);
 
-        let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
-        println!("empty tree root_hash is: {}", tree.root_hash());
-        let sender_sk = PrivateKey::<Bn256>(rng.gen());
-        let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
-        let sender_pub_key_hash = pub_key_hash_fe(&sender_pk, &phasher);
-        let sender_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: sender_pub_key_hash,
-            address: unimplemented!(),
-        };
-        println!("zero root_hash equals: {}", sender_leaf.subtree.root_hash());
-
-        // give some funds to sender and make zero balance for recipient
-        let validator_sk = PrivateKey::<Bn256>(rng.gen());
-        let validator_pk = PublicKey::from_private(&validator_sk, p_g, params);
-        let validator_pub_key_hash = pub_key_hash_fe(&validator_pk, &phasher);
-
-        let validator_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
-            nonce: Fr::zero(),
-            pub_key_hash: validator_pub_key_hash,
-            address: unimplemented!(),
-        };
-
-        let mut validator_balances = vec![];
-        for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
-            validator_balances.push(Some(Fr::zero()));
-        }
-        tree.insert(validator_address_number, validator_leaf);
-
-        let mut account_address: u32 = rng.gen();
-        account_address %= tree.capacity();
-        let amount: u128 = 500;
-        let token: u32 = 2;
-
-        //-------------- Start applying changes to state
-        let deposit_witness = apply_deposit(
-            &mut tree,
-            &DepositData {
-                amount,
-                token,
-                account_address,
-                new_pub_key_hash: sender_pub_key_hash,
+        let deposit_op = DepositOp {
+            priority_op: Deposit {
+                from: Address::zero(),
+                token: 0,
+                amount: BigDecimal::from(1),
+                to: deposit_to_account_address,
             },
-        );
+            account_id: deposit_to_account_id,
+        };
 
-        let (signature, first_sig_part, second_sig_part, third_sig_part) = generate_sig_data(
-            &deposit_witness.get_sig_bits(),
-            &phasher,
-            &sender_sk,
-            params,
-        );
+        plasma_state.apply_deposit_op(&deposit_op);
 
-        let operations = calculate_deposit_operations_from_witness(
+        let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+        let deposit_operations = calculate_deposit_operations_from_witness(
             &deposit_witness,
-            &first_sig_part,
-            &second_sig_part,
-            &third_sig_part,
-            &signature,
-            &[Some(false); 256],
+            &Fr::zero(),
+            &Fr::zero(),
+            &Fr::zero(),
+            &SignatureData {
+                r_packed: vec![Some(false); 256],
+                s: vec![Some(false); 256],
+            },
+            &[Some(false); 256], //doesn't matter for deposit
+        );
+        let pub_data_from_witness = deposit_witness.get_pubdata();
+
+        witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+        witness_accum.collect_fees(&Vec::new());
+        witness_accum.calculate_pubdata_commitment();
+
+        assert_eq!(
+            plasma_state.root_hash(),
+            witness_accum
+                .root_after_fees
+                .expect("witness accum after root hash empty"),
+            "root hash in state keeper and witness generation code mismatch"
         );
 
-        println!("tree before_applying fees: {}", tree.root_hash());
-
-        let (root_after_fee, validator_account_witness) =
-            apply_fee(&mut tree, validator_address_number, token, 0);
-        println!("test root after fees {}", root_after_fee);
-        let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
-
-        let public_data_commitment = public_data_commitment::<Bn256>(
-            &deposit_witness.get_pubdata(),
-            deposit_witness.before_root,
-            Some(root_after_fee),
-            Some(validator_address),
-            Some(block_number),
-        );
-        println!("validator balances: {}", validator_balances.len());
-
-        {
-            let instance = FranklinCircuit {
-                operation_batch_size: 10,
-                params,
-                old_root: deposit_witness.before_root,
-                new_root: Some(root_after_fee),
-                operations: operations.clone(),
-                pub_data_commitment: Some(public_data_commitment),
-                block_number: Some(block_number),
-                validator_account: validator_account_witness.clone(),
-                validator_address: Some(validator_address),
-                validator_balances: validator_balances.clone(),
-                validator_audit_path: validator_audit_path.clone(),
-            };
-
-            let tmp_cirtuit_params = generate_random_parameters(instance, &mut rng).unwrap();
-            println!("len a is {}", tmp_cirtuit_params.a.len());
-            let instance = FranklinCircuit {
-                operation_batch_size: 10,
-                params,
-                old_root: deposit_witness.before_root,
-                new_root: Some(root_after_fee),
-                operations,
-                pub_data_commitment: Some(public_data_commitment),
-                block_number: Some(block_number),
-                validator_account: validator_account_witness,
-                validator_address: Some(validator_address),
-                validator_balances,
-                validator_audit_path,
-            };
-
-            let proof = create_random_proof(instance, &tmp_cirtuit_params, &mut rng);
-            if proof.is_err() {
-                panic!("proof can not be created: {}", proof.err().unwrap());
-                //             return Err(BabyProverErr::Other("proof.is_err()".to_owned()));
-            }
-
-            let p = proof.unwrap();
-
-            let pvk = prepare_verifying_key(&tmp_cirtuit_params.vk);
-
-            let success = verify_proof(&pvk, &p.clone(), &[public_data_commitment]);
-            if success.is_err() {
-                panic!(
-                    "Proof is verification failed with error {}",
-                    success.err().unwrap()
-                );
-            }
-            if !success.unwrap() {
-                panic!("Proof is invalid");
-            }
-        }
+        check_circuit(witness_accum.into_circuit_instance());
     }
 }

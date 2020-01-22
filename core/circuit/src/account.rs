@@ -37,6 +37,7 @@ impl<E: JubjubEngine> AccountContent<E> {
         Ok(Self {
             nonce,
             pub_key_hash,
+            address: unimplemented!("pay to eth circuit"),
         })
     }
 }

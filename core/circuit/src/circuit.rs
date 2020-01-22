@@ -444,6 +444,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                     &second.account.pub_key_hash,
                     &is_left,
                 )?,
+                address: unimplemented!("pay to eth circuit"),
             },
             account_audit_path: select_vec_ifeq(
                 cs.namespace(|| "account_audit_path"),

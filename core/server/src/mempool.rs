@@ -42,7 +42,7 @@ pub enum TxAddError {
     Other,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ProposedBlock {
     pub priority_ops: Vec<PriorityOp>,
     pub txs: Vec<FranklinTx>,
