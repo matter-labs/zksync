@@ -112,7 +112,6 @@ describe("PLANNED FAILS", function () {
 
         const code3 = await provider.call(tx3, tx3.blockNumber);
         const reason3 = hex_to_ascii(code3.substr(138));
-
         expect(reason3.substring(0, 5)).equal("fd011");
         console.log(" + ERC20 deposit: Wrong tx value (msg.value < fee) passed");
 
@@ -365,17 +364,22 @@ describe("PLANNED FAILS", function () {
         expect(balanceToWithdraw).equal(parseEther("0"));
 
         // Cancel first 2 deposits
-        const cancelTx1 = await franklinDeployedContract.cancelOutstandingDepositsForExodusMode();
+        const cancelTx1 = await franklinDeployedContract.cancelOutstandingDepositsForExodusMode(2);
         await cancelTx1.wait();
 
         balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+        expect(await priorityQueueDeployedContract.totalOpenPriorityRequests()).equal(1);
+        expect(await priorityQueueDeployedContract.firstPriorityRequestId()).equal(2);
         expect(balanceToWithdraw).equal(parseEther("19.993556"));
 
-        // Cancel last deposit
-        const cancelTx2 = await franklinDeployedContract.cancelOutstandingDepositsForExodusMode();
+        // Cancel last deposit - try 5 but there is only 1 left
+        const cancelTx2 = await franklinDeployedContract.cancelOutstandingDepositsForExodusMode(5);
         await cancelTx2.wait();
 
+        expect(await priorityQueueDeployedContract.totalOpenPriorityRequests()).equal(0);
+        expect(await priorityQueueDeployedContract.firstPriorityRequestId()).equal(3);
         balanceToWithdraw = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+
         expect(balanceToWithdraw).equal(parseEther("29.990334"));
 
         console.log("Deposits canceled");
@@ -529,7 +533,6 @@ describe("PLANNED FAILS", function () {
 
         const code6 = await provider.call(tx6, tx6.blockNumber);
         const reason6 = hex_to_ascii(code6.substr(138));
-
         expect(reason6.substring(0, 5)).equal("fvs11");
         console.log(" + Wrong priority operation - different data passed");
 
@@ -548,7 +551,6 @@ describe("PLANNED FAILS", function () {
 
         const code7 = await provider.call(tx7, tx7.blockNumber);
         const reason7 = hex_to_ascii(code7.substr(138));
-
         expect(reason7.substring(0, 5)).equal("grr21");
         console.log(" + Not governor passed");
     });
@@ -574,7 +576,6 @@ describe("PLANNED FAILS", function () {
 
         const code1 = await provider.call(tx1, tx1.blockNumber);
         const reason1 = hex_to_ascii(code1.substr(138));
-
         expect(reason1.substring(0, 5)).equal("fvk11");
         console.log(" + Wrong verify number passed");
 
@@ -587,7 +588,6 @@ describe("PLANNED FAILS", function () {
 
         const code2 = await provider.call(tx2, tx2.blockNumber);
         const reason2 = hex_to_ascii(code2.substr(138));
-
         expect(reason2.substring(0, 5)).equal("grr21");
         console.log(" + Not governor passed");
     });
@@ -636,7 +636,6 @@ describe("PLANNED FAILS", function () {
 
         const code1 = await provider.call(prTx2, prTx2.blockNumber);
         const reason1 = hex_to_ascii(code1.substr(138));
-
         expect(reason1.substring(0, 5)).equal("pcs11");
         console.log(" + Set franklin address twice will not work passed");
     });

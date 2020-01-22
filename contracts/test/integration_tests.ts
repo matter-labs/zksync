@@ -16,7 +16,7 @@ import {
 import { expect, use } from "chai";
 import { solidity } from "ethereum-waffle";
 import { bigNumberify, parseEther, hexlify, formatEther } from "ethers/utils";
-import { createDepositPublicData, createWithdrawPublicData, createFullExitPublicData, hex_to_ascii } from "./helpers";
+import { createDepositPublicData, createWithdrawPublicData, createFullExitPublicData } from "./helpers";
 
 use(solidity);
 
@@ -113,7 +113,6 @@ describe("INTEGRATION", function () {
 
         // Commit block with eth partial exit.
         const exitValue = parseEther("0.2");
-
         const exitBlockPublicData = createWithdrawPublicData(tokenId, hexlify(exitValue), exitWallet.address);
 
         const partExTx = await franklinDeployedContract.commitBlock(2, 22,
@@ -173,7 +172,7 @@ describe("INTEGRATION", function () {
 
         // Full exit eth
         const fullExitAmount = parseEther("0.096778"); // amount after: tx value - some counted fee - exit amount
-        const fullExitMinusGas = parseEther("0.096047308");
+        const fullExitMinusGas = parseEther("0.096047605");
         const accId = 0;
         const pubkey = "0x0000000000000000000000000000000000000000000000000000000000000000";
         const signature = Buffer.from("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", "hex");

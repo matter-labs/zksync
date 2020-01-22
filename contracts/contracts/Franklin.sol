@@ -58,9 +58,6 @@ contract Franklin {
     /// @notice Base gas for full exit transaction
     uint256 constant BASE_FULL_EXIT_GAS = 170000;
 
-    /// @notice Max amount of any token must fit into uint128
-    uint256 constant MAX_VALUE = 2 ** 112 - 1;
-
     /// @notice ETH blocks verification expectation
     uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
 
@@ -275,8 +272,14 @@ contract Franklin {
 
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
     /// @dev WARNING: Only for Exodus mode
-    function cancelOutstandingDepositsForExodusMode() internal {
-        bytes memory depositsPubData = priorityQueue.getOutstandingDeposits();
+    /// @dev Canceling may take several separate transactions to be completed
+    /// @param _number Supposed number of requests to look at
+    function cancelOutstandingDepositsForExodusMode(uint64 _number) external {
+        require(
+            exodusMode,
+            "frс11"
+        ); // frс11 - exodus mode is not activated
+        bytes memory depositsPubData = priorityQueue.deletePriorityRequestsAndPopOutstandingDeposits(_number);
         uint64 i = 0;
         while (i < depositsPubData.length) {
             bytes memory owner = Bytes.slice(depositsPubData, i, ETH_ADDR_BYTES);
@@ -334,11 +337,6 @@ contract Franklin {
             msg.value >= fee + _amount,
             "fdh11"
         ); // fdh11 - Not enough ETH provided
-        
-        require(
-            _amount <= MAX_VALUE,
-            "fdh12"
-        ); // fdh12 - deposit amount value is heigher than Franklin is able to process
 
         if (msg.value != fee + _amount) {
             msg.sender.transfer(msg.value-(fee + _amount));
@@ -876,7 +874,6 @@ contract Franklin {
     function triggerExodusIfNeeded() internal returns (bool) {
         if (priorityQueue.triggerExodusIfNeeded()) {
             exodusMode = true;
-            cancelOutstandingDepositsForExodusMode();
             emit ExodusMode();
             return true;
         } else {

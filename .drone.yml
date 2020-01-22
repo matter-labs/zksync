@@ -62,6 +62,7 @@ steps:
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo test
+  - zksync circuit-tests
   depends_on:
   - rust-checks
 
