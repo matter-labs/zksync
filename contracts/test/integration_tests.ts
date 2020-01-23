@@ -171,7 +171,6 @@ describe("INTEGRATION", function() {
         const nonce = 0;
         await postFullExit(
             provider,
-            wallet,
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accId,
@@ -348,7 +347,6 @@ describe("INTEGRATION", function() {
         const nonce = 0;
         await postFullExit(
             provider,
-            wallet,
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accId,

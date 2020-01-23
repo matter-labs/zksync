@@ -170,7 +170,6 @@ describe("PLANNED FAILS", function() {
         const nonce = 0;
         await postFullExit(
             provider,
-            wallet,
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accountId,
@@ -188,7 +187,6 @@ describe("PLANNED FAILS", function() {
         const wrongValue = parseEther("0.001"); // the value passed to tx
         await postFullExit(
             provider,
-            wallet,
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accountId,
@@ -206,7 +204,6 @@ describe("PLANNED FAILS", function() {
         const wrongSignature = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
         await postFullExit(
             provider,
-            wallet,
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accountId,

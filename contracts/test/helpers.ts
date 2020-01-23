@@ -193,7 +193,7 @@ export async function postBlockCommit(
         
         const afterOnchainOps = await franklinDeployedContract.totalOnchainOps();
         expect(afterOnchainOps - beforeOnchainOps).equal(onchainOperationsNumber);
-        
+
         expect((await franklinDeployedContract.blocks(blockNumber)).onchainOperations).equal(onchainOperationsNumber);
         expect((await franklinDeployedContract.blocks(blockNumber)).priorityOperations).equal(priorityOperationsNumber);
         expect((await franklinDeployedContract.blocks(blockNumber)).commitment).equal(commitment);
@@ -298,7 +298,6 @@ export async function withdrawErcFromContract(
 
 export async function postFullExit(
     provider,
-    wallet,
     franklinDeployedContract,
     priorityQueueDeployedContract,
     accountId,
@@ -430,7 +429,7 @@ export function createFullExitPublicData(accId, ethAddress: string, tokenId, hex
         signatureBytes,
         pad1Bytes,
         amountBytes,
-        pad2Bytes
+        pad2Bytes,
     ]);
 }
 
