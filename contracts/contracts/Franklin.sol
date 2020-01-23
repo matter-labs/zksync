@@ -281,8 +281,12 @@ contract Franklin {
     function cancelOutstandingDepositsForExodusMode(uint64 _number) external {
         require(
             exodusMode,
-            "frс11"
-        ); // frс11 - exodus mode is not activated
+            "frc11"
+        ); // frc11 - exodus mode is not activated
+        require(
+            _number > 0,
+            "frс12"
+        ); // frс12 - provided zero number of requests
         bytes memory depositsPubData = priorityQueue.deletePriorityRequestsAndPopOutstandingDeposits(_number);
         uint64 i = 0;
         while (i < depositsPubData.length) {
