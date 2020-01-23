@@ -342,7 +342,7 @@ export function createDepositPublicData(tokenId, hexAmount: string, franklinAddr
     accountId.writeUIntBE(2, 0, 3);
     const tokenBytes = Buffer.alloc(2);
     tokenBytes.writeUInt16BE(tokenId, 0);
-    if (hexAmount.charAt(0) === "0" && hexAmount.charAt(1) === "x") {
+    if (hexAmount.startsWith("0x")) {
         hexAmount = hexAmount.substr(2);
     }
     const amountBytes = Buffer.from(hexAmount, "hex");
@@ -363,13 +363,13 @@ export function createWrongDepositPublicData(tokenId, hexAmount: string, frankli
     accountId.writeUIntBE(2, 0, 3);
     const tokenBytes = Buffer.alloc(2);
     tokenBytes.writeUInt16BE(tokenId, 0);
-    if (hexAmount.charAt(0) === "0" && hexAmount.charAt(1) === "x") {
+    if (hexAmount.startsWith("0x")) {
         hexAmount = hexAmount.substr(2);
     }
     const amountBytes = Buffer.from(hexAmount, "hex");
     const pad1BytesLength = 14 - amountBytes.length;
     const pad1Bytes = Buffer.alloc(pad1BytesLength, 0);
-    if (franklinAddress.charAt(0) === "0" && franklinAddress.charAt(1) === "x") {
+    if (franklinAddress.startsWith("0x")) {
         franklinAddress = franklinAddress.substr(2);
     }
     const addressBytes = Buffer.from(franklinAddress, "hex");
@@ -383,14 +383,14 @@ export function createWithdrawPublicData(tokenId, hexAmount: string, ethAddress:
     accountId.writeUIntBE(2, 0, 3);
     const tokenBytes = Buffer.alloc(2);
     tokenBytes.writeUInt16BE(tokenId, 0);
-    if (hexAmount.charAt(0) === "0" && hexAmount.charAt(1) === "x") {
+    if (hexAmount.startsWith("0x")) {
         hexAmount = hexAmount.substr(2);
     }
     const amountBytes = Buffer.from(hexAmount, "hex");
     const pad1BytesLength = 16 - amountBytes.length;
     const pad1Bytes = Buffer.alloc(pad1BytesLength, 0);
     const feeBytes = syncutils.packFeeChecked(new BN("0"));
-    if (ethAddress.charAt(0) === "0" && ethAddress.charAt(1) === "x") {
+    if (ethAddress.startsWith("0x")) {
         ethAddress = ethAddress.substr(2);
     }
     const addressBytes = Buffer.from(ethAddress, "hex");
@@ -404,7 +404,7 @@ export function createFullExitPublicData(accId, ethAddress: string, tokenId, hex
     const accountId = Buffer.alloc(3, 0);
     accountId.writeUIntBE(accId, 0, 3);
     const pubkeyBytes = Buffer.alloc(32, 0);
-    if (ethAddress.charAt(0) === "0" && ethAddress.charAt(1) === "x") {
+    if (ethAddress.startsWith("0x")) {
         ethAddress = ethAddress.substr(2);
     }
     const addressBytes = Buffer.from(ethAddress, "hex");
@@ -412,7 +412,7 @@ export function createFullExitPublicData(accId, ethAddress: string, tokenId, hex
     tokenBytes.writeUInt16BE(tokenId, 0);
     const nonceBytes = Buffer.alloc(4, 0);
     const signatureBytes = Buffer.alloc(64, 0);
-    if (hexAmount.charAt(0) === "0" && hexAmount.charAt(1) === "x") {
+    if (hexAmount.startsWith("0x")) {
         hexAmount = hexAmount.substr(2);
     }
     const amountBytes = Buffer.from(hexAmount, "hex");

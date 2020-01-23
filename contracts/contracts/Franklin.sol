@@ -238,21 +238,18 @@ contract Franklin {
         bytes memory depositsPubData = priorityQueue.deletePriorityRequestsAndPopOutstandingDeposits(_number);
         uint64 i = 0;
         while (i < depositsPubData.length) {
-            bytes memory deposit = Bytes.slice(depositsPubData, i, ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES);
-            bytes memory owner = new bytes(ETH_ADDR_BYTES);
-            for (uint8 j = 0; j < ETH_ADDR_BYTES; ++j) {
-                owner[j] = deposit[j];
-            }
-            bytes memory token = new bytes(TOKEN_BYTES);
-            for (uint8 j = 0; j < TOKEN_BYTES; j++) {
-                token[j] = deposit[ETH_ADDR_BYTES + j];
-            }
-            bytes memory amount = new bytes(AMOUNT_BYTES);
-            for (uint8 j = 0; j < AMOUNT_BYTES; ++j) {
-                amount[j] = deposit[ETH_ADDR_BYTES + TOKEN_BYTES + j];
-            }
+            bytes memory owner = Bytes.slice(depositsPubData, i, ETH_ADDR_BYTES);
+            i += ETH_ADDR_BYTES;
+
+            bytes memory token = Bytes.slice(depositsPubData, i, TOKEN_BYTES);
+            i += TOKEN_BYTES;
+
+            bytes memory amount = Bytes.slice(depositsPubData, i, AMOUNT_BYTES);
+            i += AMOUNT_BYTES;
+
+            i += PUBKEY_HASH_BYTES;
+
             balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
-            i += ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES+PUBKEY_HASH_BYTES;
         }
     }
 
@@ -286,11 +283,11 @@ contract Franklin {
     /// @param _amount Amount to deposit (if user specified msg.value more than this amount + fee - she will recieve difference)
     /// @param _franklinAddr The receiver Layer 2 address
     function depositETH(uint128 _amount, bytes calldata _franklinAddr) external payable {
+        requireActive();
+
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
-
-        requireActive();
 
         require(
             msg.value >= fee + _amount,
@@ -320,11 +317,11 @@ contract Franklin {
         uint128 _amount,
         bytes calldata _franklinAddr
     ) external payable {
+        requireActive();
+
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ERC_GAS * tx.gasprice;
-
-        requireActive();
 
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(_token);
