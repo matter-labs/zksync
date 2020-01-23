@@ -171,7 +171,9 @@ export async function deployFranklin(
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
         const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);
-        await (await priorityQueueContract.setFranklinAddress(contract.address)).wait();
+        const setAddressTx = await priorityQueueContract.setFranklinAddress(contract.address, { gasLimit: 1000000 })
+        await setAddressTx.wait();
+        
         return contract;
     } catch (err) {
         console.log("Franklin deploy error:" + err);
