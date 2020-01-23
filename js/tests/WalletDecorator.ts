@@ -1,6 +1,4 @@
 import * as ethers from 'ethers';
-// import * as zksync from 'zksync';
-// const ethers = require('ethers');
 const zksync = require('zksync');
 import * as utils from './utils';
 import { Token } from 'zksync/build/types';
@@ -93,11 +91,9 @@ export class WalletDecorator {
     static async revertReason(txHash) {
         const tx = await ethersProvider.getTransaction(txHash);
         if (tx == null) {
-            // console.log('tx null', txHash);
             return 'tx null';
         }
         if (tx.blockNumber == null) {
-            // console.log('tx blocknumberless', tx);
             return 'tx blocknumberless';
         }
         const code = await ethersProvider.call(tx, tx.blockNumber);
@@ -290,12 +286,6 @@ export class WalletDecorator {
                     error,
                 };
             })
-            // .map(promise => promise
-            //     .catch(utils.jrpcErrorHandler("Deposit error"))
-            //     .catch(WalletDecorator.revertReasonHandler)
-            //     .catch(WalletDecorator.replacementUnderpricedHandler)
-            //     .catch(utils.insufficientFundsHandler)
-            // )
         );
     }
 
