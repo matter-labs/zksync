@@ -220,12 +220,16 @@ impl ChangePubKey {
         out
     }
 
-    pub fn verify_eth_signature(&self) -> Option<Address> {
+    pub fn get_eth_signed_data(nonce: Nonce, new_pubkey_hash: &PubKeyHash) -> Vec<u8> {
         let mut eth_signed_msg = Vec::with_capacity(24);
-        eth_signed_msg.extend_from_slice(&self.nonce.to_be_bytes());
-        eth_signed_msg.extend_from_slice(&self.new_pk_hash.data);
+        eth_signed_msg.extend_from_slice(&nonce.to_be_bytes());
+        eth_signed_msg.extend_from_slice(&new_pubkey_hash.data);
+        eth_signed_msg
+    }
+
+    pub fn verify_eth_signature(&self) -> Option<Address> {
         self.eth_signature
-            .signature_recover_signer(&eth_signed_msg)
+            .signature_recover_signer(&Self::get_eth_signed_data(self.nonce, &self.new_pk_hash))
             .ok()
     }
 

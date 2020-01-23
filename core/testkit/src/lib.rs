@@ -11,6 +11,8 @@ use futures::{
     SinkExt, StreamExt,
 };
 use models::config_options::ConfigurationOptions;
+use models::node::tx::ChangePubKey;
+use models::node::tx::PackedEthSignature;
 use models::node::{
     Account, AccountId, AccountMap, Address, FranklinTx, Nonce, PriorityOp, TokenId,
 };
@@ -131,27 +133,44 @@ impl<T: Transport> AccountSet<T> {
         token: TokenId,
         token_address: Address,
         account_id: AccountId,
-        nonce: Option<Nonce>,
-        increment_nonce: bool,
     ) -> PriorityOp {
         let eth_address = self.eth_accounts[post_by.0].address;
-        let signed_full_exit = self.zksync_accounts[from.0].sign_full_exit(
-            account_id,
-            eth_address,
-            token,
+        block_on(self.eth_accounts[post_by.0].full_exit(account_id, token_address))
+            .expect("FullExit eth call failed")
+    }
+
+    fn change_pubkey_with_tx(
+        &self,
+        eth_signer: ETHAccountId,
+        zksync_signer: ZKSyncAccountId,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> FranklinTx {
+        let eth_private_key = &self.eth_accounts[eth_signer.0].private_key;
+        let zksync_account = &self.zksync_accounts[zksync_signer.0];
+        let sign_bytes = ChangePubKey::get_eth_signed_data(
+            nonce.unwrap_or_else(|| zksync_account.nonce()),
+            &zksync_account.pubkey_hash,
+        );
+        let signature = PackedEthSignature::sign(eth_private_key, &sign_bytes)
+            .expect("Signature should succeed");
+        FranklinTx::ChangePubKey(zksync_account.create_change_pubkey_tx(
+            signature,
             nonce,
             increment_nonce,
-        );
-        unimplemented!("pay to eth testkit")
-        //        let mut sign = ;
-        //        block_on(self.eth_accounts[post_by.0].full_exit(
-        //            account_id,
-        //            signed_full_exit.packed_pubkey.as_ref(),
-        //            token_address,
-        //            &sign,
-        //            signed_full_exit.nonce,
-        //        ))
-        //        .expect("FullExit eth call failed")
+        ))
+    }
+
+    fn change_pubkey_with_priority_op(
+        &self,
+        eth_signer: ETHAccountId,
+        zksync_signer: ZKSyncAccountId,
+    ) -> PriorityOp {
+        block_on(
+            self.eth_accounts[eth_signer.0]
+                .change_pubkey_priority_op(&self.zksync_accounts[zksync_signer.0].pubkey_hash),
+        )
+        .expect("ChangePubKeyHash priority op should not fail")
     }
 }
 
@@ -258,16 +277,22 @@ pub fn perform_basic_tests() {
                 &config,
             )
         })
-        .collect();
+        .collect::<Vec<_>>();
+
+    let zksync_accounts = {
+        let mut zksync_accounts = Vec::new();
+        zksync_accounts.push(fee_account);
+        zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
+            let mut account = ZksyncAccount::rand();
+            account.address = eth_account.address;
+            account
+        }));
+        zksync_accounts
+    };
 
     let accounts = AccountSet {
         eth_accounts,
-        zksync_accounts: vec![
-            fee_account,
-            ZksyncAccount::rand(),
-            ZksyncAccount::rand(),
-            ZksyncAccount::rand(),
-        ],
+        zksync_accounts,
         fee_account_id: ZKSyncAccountId(0),
     };
 
@@ -297,6 +322,9 @@ pub fn perform_basic_tests() {
 
         // test transfers
         test_setup.start_block();
+
+        test_setup.change_pubkey_with_tx(ETHAccountId(0), ZKSyncAccountId(1));
+
         //should be executed as a transfer
         test_setup.transfer(
             ZKSyncAccountId(1),
@@ -327,6 +355,8 @@ pub fn perform_basic_tests() {
             &deposit_amount / &BigDecimal::from(4),
         );
 
+        test_setup.change_pubkey_with_priority_op(ETHAccountId(1), ZKSyncAccountId(2));
+
         test_setup.withdraw(
             ZKSyncAccountId(2),
             ETHAccountId(0),
@@ -340,7 +370,7 @@ pub fn perform_basic_tests() {
         println!("Transfer test success, token_id: {}", token);
 
         test_setup.start_block();
-        test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(0), Token(token));
+        test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
         test_setup
             .execute_commit_and_verify_block()
             .expect("Block execution failed");
@@ -539,16 +569,30 @@ impl TestSetup {
                 .insert((post_by, 0), eth_balance);
         }
 
-        let full_exit = self.accounts.full_exit(
-            post_by,
-            from,
-            token.0,
-            token_address,
-            account_id,
-            None,
-            true,
-        );
+        let full_exit = self
+            .accounts
+            .full_exit(post_by, from, token.0, token_address, account_id);
         self.execute_priority_op(full_exit);
+    }
+
+    fn change_pubkey_with_tx(&mut self, eth_signer: ETHAccountId, zksync_signer: ZKSyncAccountId) {
+        let tx = self
+            .accounts
+            .change_pubkey_with_tx(eth_signer, zksync_signer, None, true);
+
+        self.execute_tx(tx);
+    }
+
+    fn change_pubkey_with_priority_op(
+        &mut self,
+        eth_signer: ETHAccountId,
+        zksync_signer: ZKSyncAccountId,
+    ) {
+        let op = self
+            .accounts
+            .change_pubkey_with_priority_op(eth_signer, zksync_signer);
+
+        self.execute_priority_op(op);
     }
 
     pub fn transfer(

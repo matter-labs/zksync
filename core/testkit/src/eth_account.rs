@@ -5,7 +5,7 @@ use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
-use models::node::{AccountId, Address, Nonce, PriorityOp};
+use models::node::{AccountId, Address, Nonce, PriorityOp, PubKeyHash};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
@@ -81,22 +81,13 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn full_exit(
         &self,
         account_id: AccountId,
-        pub_key: &[u8],
         token_address: Address,
-        signature: &[u8],
-        nonce: Nonce,
     ) -> Result<PriorityOp, failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "fullExit",
-                (
-                    u64::from(account_id),
-                    pub_key.to_vec(),
-                    token_address,
-                    signature.to_vec(),
-                    u64::from(nonce),
-                ),
+                (u64::from(account_id), token_address),
                 Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
             )
             .await
@@ -123,6 +114,43 @@ impl<T: Transport> EthereumAccount<T> {
             .filter_map(|op| op.ok())
             .next()
             .expect("no priority op log in full exit"))
+    }
+
+    pub async fn change_pubkey_priority_op(
+        &self,
+        new_pubkey_hash: &PubKeyHash,
+    ) -> Result<PriorityOp, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "changePubKeyHash",
+                (new_pubkey_hash.data.to_vec(),),
+                Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
+            )
+            .await
+            .map_err(|e| format_err!("ChangePubKeyHash send err: {}", e))?;
+        let receipt = self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("ChangePubKeyHash wait confirm err: {}", e))?;
+        ensure!(
+            receipt.status == Some(U64::from(1)),
+            "ChangePubKeyHash transaction failed"
+        );
+        Ok(receipt
+            .logs
+            .into_iter()
+            .map(PriorityOp::try_from)
+            .filter_map(|op| op.ok())
+            .next()
+            .expect("no priority op log in change pubkey hash"))
     }
 
     pub async fn deposit_eth(

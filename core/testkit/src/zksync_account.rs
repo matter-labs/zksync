@@ -1,6 +1,6 @@
 use bigdecimal::BigDecimal;
 use franklin_crypto::jubjub::FixedGenerators;
-use models::node::tx::{PackedPublicKey, TxSignature};
+use models::node::tx::{ChangePubKey, PackedEthSignature, PackedPublicKey, TxSignature};
 use models::node::{
     priv_key_from_fs, AccountId, Address, FullExit, Nonce, PrivateKey, PubKeyHash, PublicKey,
     TokenId, Transfer, Withdraw,
@@ -94,34 +94,23 @@ impl ZksyncAccount {
         withdraw
     }
 
-    pub fn sign_full_exit(
+    pub fn create_change_pubkey_tx(
         &self,
-        account_id: AccountId,
-        eth_address: Address,
-        token: TokenId,
+        eth_signature: PackedEthSignature,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> FullExit {
-        let pub_key = PackedPublicKey(PublicKey::from_private(
-            &self.private_key,
-            FixedGenerators::SpendingKeyGenerator,
-            &JUBJUB_PARAMS,
-        ));
+    ) -> ChangePubKey {
+        let change_pubkey = ChangePubKey {
+            account: self.address,
+            new_pk_hash: self.pubkey_hash.clone(),
+            nonce: nonce.unwrap_or_else(|| *self.nonce.borrow()),
+            eth_signature,
+        };
 
-        //        let mut full_exit =
-        unimplemented!("pay to eth testkit")
-        //
-        //        let signature_bytes =
-        //            TxSignature::sign_musig_pedersen(&self.private_key, &full_exit.get_bytes())
-        //                .signature
-        //                .serialize_packed()
-        //                .expect("signature serialize");
-        //        full_exit.signature_r = Box::new(signature_bytes[0..32].try_into().unwrap());
-        //        full_exit.signature_s = Box::new(signature_bytes[32..].try_into().unwrap());
-        //
-        //        if increment_nonce {
-        //            *self.nonce.borrow_mut() += 1;
-        //        }
-        //        full_exit
+        if increment_nonce {
+            *self.nonce.borrow_mut() += 1;
+        }
+
+        change_pubkey
     }
 }
