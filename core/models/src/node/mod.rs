@@ -35,6 +35,7 @@ pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
 
 pub type PrivateKey = PrivateKeyImport<Engine>;
 pub type PublicKey = PublicKeyImport<Engine>;
+pub type Address = web3::types::Address;
 
 pub fn priv_key_from_fs(fs: Fs) -> PrivateKey {
     PrivateKeyImport(fs)
