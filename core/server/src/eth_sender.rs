@@ -289,16 +289,16 @@ impl<T: Transport> ETHSender<T> {
                 "Sending tx for op, op_id: {} tx_hash: {:#x}",
                 new_tx.op_id, new_tx.signed_tx.hash
             );
-            self.send_tx(&new_tx)?;
+            self.send_tx(&new_tx.signed_tx)?;
         }
 
         Ok(false)
     }
 
-    fn send_tx(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
-        let hash = block_on(self.eth_client.send_raw_tx(tx.signed_tx.raw_tx.clone()))?;
+    fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error> {
+        let hash = block_on(self.eth_client.send_raw_tx(signed_tx.raw_tx.clone()))?;
         ensure!(
-            hash == tx.signed_tx.hash,
+            hash == signed_tx.hash,
             "Hash from signer and Ethereum node mismatch"
         );
         Ok(())
@@ -413,13 +413,13 @@ impl<T: Transport> ETHSender<T> {
 
     fn call_complete_withdrawals(&self) -> Result<(), failure::Error> {
         // function completeWithdrawals(uint32 _n) external {
-        block_on(self.eth_client.sign_call_tx(
+        let tx = block_on(self.eth_client.sign_call_tx(
             "completeWithdrawals",
             config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
             Options::default(),
         ))
         .map_err(|e| failure::format_err!("completeWithdrawals: {}", e))?;
-        Ok(())
+        self.send_tx(&tx)
     }
 }
 
