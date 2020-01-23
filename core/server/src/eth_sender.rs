@@ -419,6 +419,7 @@ impl<T: Transport> ETHSender<T> {
             Options::default(),
         ))
         .map_err(|e| failure::format_err!("completeWithdrawals: {}", e))?;
+        info!("Sending completeWithdrawals tx with hash: {:#?}", tx.hash);
         self.send_tx(&tx)
     }
 }
