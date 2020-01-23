@@ -231,8 +231,15 @@ contract Franklin {
         if (toProcess > numberOfPendingWithdrawals) {
             toProcess = numberOfPendingWithdrawals;
         }
+        uint32 startIndex = firstPendingWithdrawalIndex;
+        numberOfPendingWithdrawals -= toProcess;
+        if (numberOfPendingWithdrawals == 0) {
+            firstPendingWithdrawalIndex = 0;
+        } else {
+            firstPendingWithdrawalIndex += toProcess;
+        }
 
-        for (uint32 i = firstPendingWithdrawalIndex; i < firstPendingWithdrawalIndex + toProcess; ++i) {
+        for (uint32 i = startIndex; i < startIndex + toProcess; ++i) {
             uint16 tokenId = pendingWithdrawals[i].tokenId;
             address to = pendingWithdrawals[i].to;
             // send fails are ignored hence there is always a direct way to withdraw.
@@ -256,9 +263,6 @@ contract Franklin {
                 }
             }
         }
-
-        firstPendingWithdrawalIndex += toProcess;
-        numberOfPendingWithdrawals -= toProcess;
     }
 
     /// @notice Collects fees from provided requests number for the block validator, store it on her
