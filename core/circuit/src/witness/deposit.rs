@@ -387,7 +387,9 @@ mod test {
             account_id: deposit_to_account_id,
         };
 
+        println!("node root hash before op: {:?}", plasma_state.root_hash());
         plasma_state.apply_deposit_op(&deposit_op);
+        println!("node root hash after op: {:?}", plasma_state.root_hash());
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
         let deposit_operations = calculate_deposit_operations_from_witness(
@@ -416,5 +418,6 @@ mod test {
         );
 
         check_circuit(witness_accum.into_circuit_instance());
+        panic!("unimplemented");
     }
 }

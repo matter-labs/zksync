@@ -133,7 +133,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         // Main cycle that processes operations:
         for (i, operation) in self.operations.iter().enumerate() {
-            debug!("operation number {} processing started \n", i);
+            println!("operation number {} processing started", i);
             let cs = &mut cs.namespace(|| format!("chunk number {}", i));
 
             let (next_chunk, chunk_data) = self.verify_correct_chunking(
@@ -166,6 +166,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let (state_root, is_account_empty, _subtree_root) = self
                 .check_account_data(cs.namespace(|| "calculate account root"), &current_branch)?;
 
+            println!("chunk old state root : {:?}", state_root.get_value());
             // ensure root hash of state before applying operation is correct
             cs.enforce(
                 || "root state before applying operation is valid",
@@ -190,6 +191,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
             )?;
+            println!("new state root root : {:?}", new_state_root.get_value());
 
             rolling_root = new_state_root;
         }
@@ -943,46 +945,17 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
 
         // MUST be true for all chunks
-        let is_signature_witness_correct = {
-            let correct_in_first_chunk = {
-                // construct signature message
-                let mut serialized_tx_bits = vec![];
-                serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-                serialized_tx_bits.extend(cur.account_address.get_bits_be());
-                serialized_tx_bits.extend(signer_key.pubkey.get_external_packing());
-                serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
-                serialized_tx_bits.extend(cur.token.get_bits_be());
-                serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-
-                verify_signature_message_construction(
-                    cs.namespace(|| "is_serialized_op_withess_correct"),
-                    serialized_tx_bits.clone(),
-                    &op_data,
-                )?
-            };
-
-            multi_or(
-                cs.namespace(|| "sig is valid or not first chunk"),
-                &[correct_in_first_chunk, is_first_chunk.clone().not()],
-            )?
-        };
-
-        // MUST be true for all chunks
         let is_pubdata_chunk_correct = {
             //construct pubdata
             let pubdata_bits = {
                 let mut pub_data = Vec::new();
                 pub_data.extend(chunk_data.tx_type.get_bits_be()); //1
                 pub_data.extend(cur.account_address.get_bits_be()); //3
-                pub_data.extend(signer_key.pubkey.get_external_packing());
                 pub_data.extend(op_data.ethereum_key.get_bits_be()); //20
                 pub_data.extend(cur.token.get_bits_be()); // 2
-                pub_data.extend(op_data.pub_nonce.get_bits_be()); // 4
-                pub_data.extend(signature.get_packed_r().clone());
-                pub_data.extend(reverse_bytes(&signature.sig_s_bits.clone()));
                 pub_data.extend(op_data.full_amount.get_bits_be());
                 pub_data.resize(
-                    18 * franklin_constants::CHUNK_BIT_WIDTH,
+                    6 * franklin_constants::CHUNK_BIT_WIDTH,
                     Boolean::constant(false),
                 );
                 pub_data
@@ -992,7 +965,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 cs.namespace(|| "select_pubdata_chunk"),
                 &pubdata_bits,
                 &chunk_data.chunk_number,
-                18,
+                6,
             )?;
 
             Boolean::from(Expression::equals(
@@ -1021,48 +994,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             multi_and(cs.namespace(|| "valid base full_exit"), &base_valid_flags)?
         };
 
-        // SHOULD be true for successful exit-- true if signature is verified for the given account
-        let is_signed_correctly = {
-            let is_signer_valid = CircuitElement::equals(
-                cs.namespace(|| "signer_key_correct"),
-                &signer_key.pubkey.get_hash(),
-                &cur.account.pub_key_hash,
-            )?;
-            debug!(
-                "is_signature_witness_correct {:?}",
-                is_signature_witness_correct.get_value()
-            );
-            debug!("is_signer_valid {:?}", is_signer_valid.get_value());
-            debug!(
-                "signature.is_verified. {:?}",
-                signature.is_verified.get_value()
-            );
-
-            multi_and(
-                cs.namespace(|| "is_signed_correctly"),
-                &[
-                    is_signature_witness_correct,
-                    is_signer_valid,
-                    signature.is_verified.clone(),
-                ],
-            )?
-        };
-
-        // SHOULD be true for successful exit
-        let is_nonce_correct = CircuitElement::equals(
-            cs.namespace(|| "is_nonce_correct"),
-            &cur.account.nonce,
-            &op_data.pub_nonce,
-        )?;
-
         // SHOULD be true for successful exit
         // otherwise it is impossible to decide from pub data if nonce should be updated
-        let is_balance_not_zero = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_balance_not_zero"),
-            &cur.balance.get_number(),
-            Expression::constant::<CS>(E::Fr::zero()),
-        )?)
-        .not();
+        let is_address_correct = CircuitElement::equals(
+            cs.namespace(|| "is_address_correct"),
+            &cur.account.address,
+            &op_data.ethereum_key,
+        )?;
 
         // MUST be true for correct op. First chunk is correct and tree update can be executed.
         let first_chunk_valid = {
@@ -1079,27 +1017,19 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         // Full exit was a success, update account is the first chunk.
         let success_account_update = multi_and(
             cs.namespace(|| "success_account_update"),
-            &[
-                first_chunk_valid.clone(),
-                is_signed_correctly,
-                is_nonce_correct,
-                is_balance_not_zero,
-            ],
+            &[first_chunk_valid.clone(), is_address_correct],
         )?;
+
+        println!(
+            "success_account_update: {:?}",
+            success_account_update.get_value()
+        );
 
         //mutate current branch if it is first chunk of a successful withdraw transaction
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
             cs.namespace(|| "mutated balance"),
             Expression::constant::<CS>(E::Fr::zero()),
             &cur.balance,
-            &success_account_update,
-        )?;
-
-        //mutate current branch if it is first chunk of a successful withdraw transaction
-        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
-            cs.namespace(|| "update cur nonce"),
-            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1),
-            &cur.account.nonce,
             &success_account_update,
         )?;
 
@@ -1671,6 +1601,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 
+        // TODO: add flag for is account address is correct(!)
         let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correct"),
             &signer_key.pubkey.get_hash(),
@@ -2000,7 +1931,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     for i in &[6] {
         //full_exit
         let x = E::Fr::from_str(&i.to_string()).unwrap();
-        let y = E::Fr::from_str("17").unwrap();
+        let y = E::Fr::from_str("5").unwrap();
         points.push((x, y));
     }
 
