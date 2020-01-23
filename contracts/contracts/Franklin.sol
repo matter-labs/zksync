@@ -327,11 +327,11 @@ contract Franklin {
     /// @param _amount Amount to deposit (if user specified msg.value more than this amount + fee - she will recieve difference)
     /// @param _franklinAddr The receiver Layer 2 address
     function depositETH(uint128 _amount, bytes calldata _franklinAddr) external payable {
+        requireActive();
+
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
-
-        requireActive();
 
         require(
             msg.value >= fee + _amount,
@@ -361,11 +361,11 @@ contract Franklin {
         uint128 _amount,
         bytes calldata _franklinAddr
     ) external payable {
+        requireActive();
+
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ERC_GAS * tx.gasprice;
-
-        requireActive();
 
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(_token);
