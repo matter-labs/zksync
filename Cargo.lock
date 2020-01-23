@@ -585,6 +585,7 @@ name = "circuit"
 version = "0.1.1"
 dependencies = [
  "bellman_ce 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "bigdecimal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "ff_ce 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "franklin-crypto 0.0.5 (git+https://github.com/matter-labs/franklin-crypto)",
  "hex 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -592,11 +593,14 @@ dependencies = [
  "models 0.0.1",
  "num-traits 0.2.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "pairing_ce 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "plasma 0.1.1",
  "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "rust-crypto 0.2.36 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
+ "testkit 0.1.0",
+ "web3 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
