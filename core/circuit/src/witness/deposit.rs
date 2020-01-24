@@ -424,6 +424,5 @@ mod test {
         );
 
         check_circuit(witness_accum.into_circuit_instance());
-        panic!("unimplemented");
     }
 }
