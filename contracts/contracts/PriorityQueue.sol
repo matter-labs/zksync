@@ -157,14 +157,26 @@ contract PriorityQueue {
         return totalFee;
     }
 
-    /// @notice Concates open (outstanding) deposit requests public data
-    /// @return concated deposits public data
-    function getOutstandingDeposits() external view returns (bytes memory depositsPubData) {
-        for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + totalOpenPriorityRequests; i++) {
-            if (priorityRequests[i].opType == DEPOSIT_OP) {
-                depositsPubData = Bytes.concat(depositsPubData, priorityRequests[i].pubData);
+    /// @notice Concates open (outstanding) deposit requests public data up to defined deposits number
+    /// @dev Deletes processed requests.
+    /// @param _number Supposed number of open requests to look at and delete
+    /// @return concated deposits public data for limited number of deposits so as not to go beyond the block gas limit in the caller function
+    function deletePriorityRequestsAndPopOutstandingDeposits(uint64 _number) external returns (bytes memory depositsPubData) {
+        requireFranklin();
+        require(
+            totalOpenPriorityRequests > 0,
+            "pgs11"
+        ); // pgs11 - no one priority request left
+        uint64 toProcess = totalOpenPriorityRequests < _number ? totalOpenPriorityRequests : _number;
+        for (uint64 i = 0; i < toProcess; i++) {
+            uint64 id = firstPriorityRequestId + i;
+            if (priorityRequests[id].opType == DEPOSIT_OP) {
+                depositsPubData = Bytes.concat(depositsPubData, priorityRequests[id].pubData);
             }
+            delete priorityRequests[id];
         }
+        firstPriorityRequestId += toProcess;
+        totalOpenPriorityRequests -= toProcess;
     }
 
     /// @notice Compares Rollup operation with corresponding priority requests' operation

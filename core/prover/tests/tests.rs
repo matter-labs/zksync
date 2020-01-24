@@ -287,6 +287,7 @@ fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engin
         let mut out_dir = path::PathBuf::new();
         out_dir.push(&env::var("KEY_DIR").expect("KEY_DIR not set"));
         out_dir.push(&format!("{}", models::params::block_size_chunks()));
+        out_dir.push(&format!("{}", models::params::account_tree_depth()));
         out_dir
     };
     let key_file_path = {
