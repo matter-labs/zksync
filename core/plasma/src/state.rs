@@ -255,7 +255,10 @@ impl PlasmaState {
         }
     }
 
-    fn apply_change_pubkey_priority_op(&mut self, op: &ChangePubkeyPriorityOp) -> AccountUpdates {
+    pub fn apply_change_pubkey_priority_op(
+        &mut self,
+        op: &ChangePubkeyPriorityOp,
+    ) -> AccountUpdates {
         let mut updates = Vec::new();
         let account_id = if let Some(account_id) = &op.account_id {
             *account_id

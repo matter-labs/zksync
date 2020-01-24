@@ -61,6 +61,7 @@ pub const ADDRESS_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //
+pub const SUCCESS_FLAG_WIDTH: usize = 8;
 //
 pub const CHUNK_BIT_WIDTH: usize = 64;
 

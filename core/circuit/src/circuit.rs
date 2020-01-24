@@ -21,7 +21,7 @@ use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use models::params as franklin_constants;
 
-const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 7;
+const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
 #[derive(Clone)]
 pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub params: &'a E::Params,
@@ -191,9 +191,12 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
             )?;
+
             println!("new state root root : {:?}", new_state_root.get_value());
 
             rolling_root = new_state_root;
+
+            println!()
         }
 
         cs.enforce(
@@ -728,6 +731,15 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &ext_pubdata_chunk,
             &signature_data,
         )?);
+        op_flags.push(self.change_pubkey_onhcain(
+            cs.namespace(|| "change_pubkey_onhcain"),
+            &mut cur,
+            &chunk_data,
+            &op_data,
+            &signer_key,
+            &ext_pubdata_chunk,
+            &signature_data,
+        )?);
         op_flags.push(self.noop(cs.namespace(|| "noop"), &chunk_data, &ext_pubdata_chunk)?);
 
         let op_valid = multi_or(cs.namespace(|| "op_valid"), &op_flags)?;
@@ -925,6 +937,134 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         Ok(tx_valid)
     }
 
+    fn change_pubkey_onhcain<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        chunk_data: &AllocatedChunkData<E>,
+        op_data: &AllocatedOperationData<E>,
+        signer_key: &AllocatedSignerPubkey<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+        signature: &AllocatedSignatureData<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        // Execute first chunk
+
+        //TODO: this flag is used too often, we better compute it above
+        let is_first_chunk = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &chunk_data.chunk_number,
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?);
+
+        // MUST be true for all chunks
+        let is_pubdata_chunk_correct = {
+            //construct pubdata
+            let pubdata_bits = {
+                let mut pub_data = Vec::new();
+                pub_data.extend(chunk_data.tx_type.get_bits_be()); //1
+                pub_data.extend(cur.account_address.get_bits_be()); //3
+                pub_data.extend(
+                    op_data
+                        .a
+                        .get_bits_le()
+                        .into_iter()
+                        .take(franklin_constants::SUCCESS_FLAG_WIDTH)
+                        .rev(),
+                ); // 1 success byte
+                pub_data.extend(op_data.new_pubkey_hash.get_bits_be()); //20
+                pub_data.extend(cur.account.address.get_bits_be()); //20
+                pub_data.resize(
+                    6 * franklin_constants::CHUNK_BIT_WIDTH,
+                    Boolean::constant(false),
+                );
+                pub_data
+            };
+
+            let pubdata_chunk = select_pubdata_chunk(
+                cs.namespace(|| "select_pubdata_chunk"),
+                &pubdata_bits,
+                &chunk_data.chunk_number,
+                6,
+            )?;
+
+            Boolean::from(Expression::equals(
+                cs.namespace(|| "is_pubdata_equal"),
+                &pubdata_chunk,
+                ext_pubdata_chunk,
+            )?)
+        };
+
+        let is_base_valid = {
+            let mut base_valid_flags = Vec::new();
+
+            debug!(
+                "is_pubdata_chunk_correct {:?}",
+                is_pubdata_chunk_correct.get_value()
+            );
+            base_valid_flags.push(is_pubdata_chunk_correct);
+            // MUST be true
+            let is_change_pubkey = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_change_pubkey"),
+                &chunk_data.tx_type.get_number(),
+                Expression::u64::<CS>(8), //full_exit tx code
+            )?);
+
+            base_valid_flags.push(is_change_pubkey.clone());
+            multi_and(
+                cs.namespace(|| "valid base change_pubkey"),
+                &base_valid_flags,
+            )?
+        };
+
+        // SHOULD be true for successful change pubkey onchain
+        let is_address_correct = CircuitElement::equals(
+            cs.namespace(|| "is_address_correct"),
+            &cur.account.address,
+            &op_data.ethereum_key,
+        )?;
+
+        // MUST be true for correct op. First chunk is correct and tree update can be executed.
+        let first_chunk_valid = {
+            let mut flags = Vec::new();
+            flags.push(is_first_chunk.clone());
+            flags.push(is_base_valid.clone());
+            multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
+        };
+
+        // Full exit was a success, update account is the first chunk.
+        let success_account_update = multi_and(
+            cs.namespace(|| "success_account_update"),
+            &[first_chunk_valid.clone(), is_address_correct],
+        )?;
+
+        //mutate current branch if it is first chunk of a successful withdraw transaction
+        cur.account.pub_key_hash = CircuitElement::conditionally_select(
+            cs.namespace(|| "mutated_pubkey_hash"),
+            &op_data.new_pubkey_hash,
+            &cur.account.pub_key_hash,
+            &success_account_update,
+        )?;
+        println!(
+            "account pkh after: {:?}",
+            cur.account.pub_key_hash.get_number().get_value()
+        );
+
+        // Check other chunks
+        let other_chunks_valid = {
+            let mut flags = Vec::new();
+            flags.push(is_base_valid);
+            flags.push(is_first_chunk.not());
+            multi_and(cs.namespace(|| "other_chunks_valid"), &flags)?
+        };
+
+        // MUST be true for correct (successful or not) full exit
+        let tx_valid = multi_or(
+            cs.namespace(|| "tx_valid"),
+            &[first_chunk_valid.clone(), other_chunks_valid],
+        )?;
+        Ok(tx_valid)
+    }
+
     fn full_exit<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -1019,11 +1159,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "success_account_update"),
             &[first_chunk_valid.clone(), is_address_correct],
         )?;
-
-        println!(
-            "success_account_update: {:?}",
-            success_account_update.get_value()
-        );
 
         //mutate current branch if it is first chunk of a successful withdraw transaction
         cur.balance = CircuitElement::conditionally_select_with_number_strict(
@@ -1930,6 +2065,13 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     }
     for i in &[6] {
         //full_exit
+        let x = E::Fr::from_str(&i.to_string()).unwrap();
+        let y = E::Fr::from_str("5").unwrap();
+        points.push((x, y));
+    }
+
+    for i in &[8] {
+        //change pubkey priority
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::from_str("5").unwrap();
         points.push((x, y));
