@@ -66,6 +66,51 @@ steps:
   depends_on:
   - rust-checks
 
+- name: rust-release-build
+  image: matterlabs/ci
+  command:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - f cargo build --release
+  depends_on:
+  - rust-tests
+  - rust-checks
+
+- name: build-and-publish-server
+  image: matterlabs/ci
+  environment:
+    USERNAME:
+      from_secret: dockerhub_username
+    PASSWORD:
+      from_secret: dockerhub_password
+  command:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export SERVER_DOCKER_IMAGE="matterlabs/server:${DRONE_TAG}"
+  - docker login -u ${USERNAME} -p ${PASSWORD}
+  - docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
+  - docker push "${SERVER_DOCKER_IMAGE}"
+  depends_on:
+  - rust-release-build
+
+- name: build-and-publish-prover
+  image: matterlabs/ci
+  environment:
+    USERNAME:
+      from_secret: dockerhub_username
+    PASSWORD:
+      from_secret: dockerhub_password
+  command:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export PROVER_DOCKER_IMAGE="matterlabs/prover:${DRONE_TAG}"
+  - docker login -u ${USERNAME} -p ${PASSWORD}
+  - docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
+  - docker push "${PROVER_DOCKER_IMAGE}"
+  depends_on:
+  - rust-release-build
+
 - name: deploy-test
   image: matterlabs/ci
   commands:
