@@ -1,7 +1,11 @@
-use log::info;
-use models::node::config::{PROVER_CYCLE_WAIT, PROVER_TIMEOUT};
-use models::EncodedProof;
+// Built-in deps
+use std::time;
 use std::time::Duration;
+// External deps
+use log::info;
+// Workspace deps
+use models::node::config::{PROVER_CYCLE_WAIT, PROVER_GONE_TIMEOUT};
+use models::EncodedProof;
 use storage::ConnectionPool;
 
 fn main() {
@@ -13,7 +17,10 @@ fn main() {
     loop {
         let storage = pool.access_storage().expect("Storage access");
         let job = storage
-            .fetch_prover_job(worker, PROVER_TIMEOUT)
+            .prover_run_for_next_commit(
+                worker,
+                time::Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
+            )
             .expect("prover job, db access");
         if let Some(job) = job {
             info!("Received job for block: {}", job.block_number);

@@ -1,18 +1,18 @@
+use crate::mempool::MempoolRequest;
 use actix_cors::Cors;
 use actix_web::{
     middleware,
     web::{self},
     App, HttpResponse, HttpServer, Result as ActixResult,
 };
-use models::node::{Account, AccountAddress, AccountId, ExecutedOperations, FranklinTx};
+use futures::channel::mpsc;
+use models::config_options::ThreadPanicNotify;
+use models::node::{Account, AccountAddress, AccountId, ExecutedOperations};
 use models::NetworkStatus;
-use std::sync::mpsc;
-use storage::{ConnectionPool, StorageProcessor};
-
-use crate::ThreadPanicNotify;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
 
@@ -32,6 +32,7 @@ struct AppState {
     connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
     contract_address: String,
+    mempool_request_sender: mpsc::Sender<MempoolRequest>,
 }
 
 impl AppState {
@@ -94,37 +95,12 @@ fn handle_get_network_status(data: web::Data<AppState>) -> ActixResult<HttpRespo
     Ok(HttpResponse::Ok().json(network_status))
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-struct NewTxResponse {
-    hash: String,
-}
-
-fn handle_submit_tx(
-    data: web::Data<AppState>,
-    req: web::Json<FranklinTx>,
-) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
-
-    let tx_add_result = storage
-        .mempool_add_tx(&req)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
-
-    if let Err(e) = tx_add_result {
-        Err(HttpResponse::NotAcceptable().body(e.to_string()).into())
-    } else {
-        Ok(HttpResponse::Ok().json(NewTxResponse {
-            hash: req.hash().to_str(),
-        }))
-    }
-}
-
 #[derive(Debug, Serialize)]
 struct AccountStateResponse {
     // None if account is not created yet.
     id: Option<AccountId>,
     commited: Account,
     verified: Account,
-    pending_txs: Vec<FranklinTx>,
 }
 
 fn handle_get_account_state(
@@ -157,15 +133,10 @@ fn handle_get_account_state(
         (id, verified, committed)
     };
 
-    let pending_txs = storage
-        .get_pending_txs(&account_address)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
-
     let res = AccountStateResponse {
         id,
         commited,
         verified,
-        pending_txs,
     };
 
     Ok(HttpResponse::Ok().json(res))
@@ -360,7 +331,7 @@ fn handle_get_block_transactions(
         .into_iter()
         .map(|op| {
             let tx_hash = match &op {
-                ExecutedOperations::Tx(tx) => tx.tx.hash().to_str(),
+                ExecutedOperations::Tx(tx) => tx.tx.hash().to_string(),
                 ExecutedOperations::PriorityOp(tx) => {
                     format!("0x{}", hex::encode(&tx.priority_op.eth_hash))
                 }
@@ -405,7 +376,6 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                     )
                     .route("/testnet_config", web::get().to(handle_get_testnet_config))
                     .route("/status", web::get().to(handle_get_network_status))
-                    .route("/submit_tx", web::post().to(handle_submit_tx))
                     .route(
                         "/account/{address}",
                         web::get().to(handle_get_account_state),
@@ -460,6 +430,7 @@ pub(super) fn start_server_thread_detached(
     connection_pool: ConnectionPool,
     listen_addr: SocketAddr,
     contract_address: H160,
+    mempool_request_sender: mpsc::Sender<MempoolRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -473,6 +444,7 @@ pub(super) fn start_server_thread_detached(
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{}", contract_address),
+                mempool_request_sender,
             };
             state.spawn_network_status_updater(panic_notify);
 

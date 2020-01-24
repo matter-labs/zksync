@@ -11,7 +11,7 @@ CREATE TABLE events_state (
     block_num BIGINT NOT NULL
 );
 
-CREATE TABLE franklin_ops (
+CREATE TABLE rollup_ops (
     id SERIAL PRIMARY KEY,
     block_num BIGINT NOT NULL,
     operation JSONB NOT NULL,

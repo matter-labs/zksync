@@ -1,9 +1,9 @@
-// Built-in uses
+// Built-in deps
 use std::cmp::Ordering;
-// External uses
+// External deps
 use web3::types::H256;
 
-/// Franklin Contract event type describing the state of the corresponding Franklin block
+/// Rollup contract event type describing the state of the corresponding Rollup block
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum EventType {
     /// Committed event
@@ -12,31 +12,31 @@ pub enum EventType {
     Verified,
 }
 
-/// Franklin Contract event description
+/// Rollup Contract event description
 #[derive(Debug, Copy, Clone, Eq)]
-pub struct EventData {
-    /// Franklin block number
+pub struct BlockEvent {
+    /// Rollup block number
     pub block_num: u32,
     /// Ethereum transaction type
     pub transaction_hash: H256,
-    /// Franklin Block type
+    /// Rollup block type
     pub block_type: EventType,
 }
 
-impl PartialOrd for EventData {
-    fn partial_cmp(&self, other: &EventData) -> Option<Ordering> {
+impl PartialOrd for BlockEvent {
+    fn partial_cmp(&self, other: &BlockEvent) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for EventData {
-    fn cmp(&self, other: &EventData) -> Ordering {
+impl Ord for BlockEvent {
+    fn cmp(&self, other: &BlockEvent) -> Ordering {
         self.block_num.cmp(&other.block_num)
     }
 }
 
-impl PartialEq for EventData {
-    fn eq(&self, other: &EventData) -> bool {
+impl PartialEq for BlockEvent {
+    fn eq(&self, other: &BlockEvent) -> bool {
         self.block_num == other.block_num
     }
 }

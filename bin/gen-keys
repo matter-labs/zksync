@@ -2,10 +2,9 @@
 
 . .setup_env
 
-ZKSYNC_HOME=`dirname $0`/..
 
 
 mkdir -p $ZKSYNC_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH
 cargo run --bin key_generator --release
 
-cp $ZKSYNC_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS//$ACCOUNT_TREE_DEPTH/VerificationKey.sol $ZKSYNC_HOME/contracts/contracts
+cp $ZKSYNC_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH/VerificationKey.sol $ZKSYNC_HOME/contracts/contracts

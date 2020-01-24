@@ -58,9 +58,6 @@ contract Franklin {
     /// @notice Base gas for full exit transaction
     uint256 constant BASE_FULL_EXIT_GAS = 170000;
 
-    /// @notice Max amount of any token must fit into uint128
-    uint256 constant MAX_VALUE = 2 ** 112 - 1;
-
     /// @notice ETH blocks verification expectation
     uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
 
@@ -121,6 +118,16 @@ contract Franklin {
 
     /// @notice Root-chain balances (per owner and token id) to withdraw
     mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
+
+    /// @notice verified withdrawal pending to be executed.
+    struct PendingWithdrawal {
+        address to;
+        uint16 tokenId;
+    }
+    /// @notice Verified but not executed withdrawals for addresses stored in here
+    mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
+    uint32 public firstPendingWithdrawalIndex;
+    uint32 public numberOfPendingWithdrawals;
 
     /// @notice Total number of verified blocks i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
     uint32 public totalBlocksVerified;
@@ -216,6 +223,48 @@ contract Franklin {
         blocks[0].stateRoot = _genesisRoot;
     }
 
+    /// @notice executes pending withdrawals
+    /// @param _n The number of withdrawals to complete starting from oldest
+    function completeWithdrawals(uint32 _n) external {
+        // TODO: when switched to multi valiators model we need to add insentive mechanism to call complete.
+        uint32 toProcess = _n;
+        if (toProcess > numberOfPendingWithdrawals) {
+            toProcess = numberOfPendingWithdrawals;
+        }
+        uint32 startIndex = firstPendingWithdrawalIndex;
+        numberOfPendingWithdrawals -= toProcess;
+        if (numberOfPendingWithdrawals == 0) {
+            firstPendingWithdrawalIndex = 0;
+        } else {
+            firstPendingWithdrawalIndex += toProcess;
+        }
+
+        for (uint32 i = startIndex; i < startIndex + toProcess; ++i) {
+            uint16 tokenId = pendingWithdrawals[i].tokenId;
+            address to = pendingWithdrawals[i].to;
+            // send fails are ignored hence there is always a direct way to withdraw.
+            delete pendingWithdrawals[i];
+
+            uint128 amount = balancesToWithdraw[to][tokenId];
+            // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
+            if (amount != 0) { 
+                // avoid reentrancy attack by using subtract and not "= 0" and changing local state before external call
+                balancesToWithdraw[to][tokenId] -= amount;
+                bool sent = false;
+                if (tokenId == 0) {
+                    address payable toPayable = address(uint160(to));
+                    sent = toPayable.send(amount);
+                } else if (governance.isValidTokenId(tokenId)) {
+                    address tokenAddr = governance.tokenAddresses(tokenId);
+                    sent = IERC20(tokenAddr).transfer(to, amount);
+                }
+                if (!sent) {
+                    balancesToWithdraw[to][tokenId] += amount;
+                }
+            }
+        }
+    }
+
     /// @notice Collects fees from provided requests number for the block validator, store it on her
     /// @notice balance to withdraw in Ether and delete this requests
     /// @param _number The number of requests
@@ -227,25 +276,32 @@ contract Franklin {
 
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
     /// @dev WARNING: Only for Exodus mode
-    function cancelOutstandingDepositsForExodusMode() internal {
-        bytes memory depositsPubData = priorityQueue.getOutstandingDeposits();
+    /// @dev Canceling may take several separate transactions to be completed
+    /// @param _number Supposed number of requests to look at
+    function cancelOutstandingDepositsForExodusMode(uint64 _number) external {
+        require(
+            exodusMode,
+            "frc11"
+        ); // frc11 - exodus mode is not activated
+        require(
+            _number > 0,
+            "frс12"
+        ); // frс12 - provided zero number of requests
+        bytes memory depositsPubData = priorityQueue.deletePriorityRequestsAndPopOutstandingDeposits(_number);
         uint64 i = 0;
         while (i < depositsPubData.length) {
-            bytes memory deposit = Bytes.slice(depositsPubData, i, ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES);
-            bytes memory owner = new bytes(ETH_ADDR_BYTES);
-            for (uint8 j = 0; j < ETH_ADDR_BYTES; ++j) {
-                owner[j] = deposit[j];
-            }
-            bytes memory token = new bytes(TOKEN_BYTES);
-            for (uint8 j = 0; j < TOKEN_BYTES; j++) {
-                token[j] = deposit[ETH_ADDR_BYTES + j];
-            }
-            bytes memory amount = new bytes(AMOUNT_BYTES);
-            for (uint8 j = 0; j < AMOUNT_BYTES; ++j) {
-                amount[j] = deposit[ETH_ADDR_BYTES + TOKEN_BYTES + j];
-            }
+            bytes memory owner = Bytes.slice(depositsPubData, i, ETH_ADDR_BYTES);
+            i += ETH_ADDR_BYTES;
+
+            bytes memory token = Bytes.slice(depositsPubData, i, TOKEN_BYTES);
+            i += TOKEN_BYTES;
+
+            bytes memory amount = Bytes.slice(depositsPubData, i, AMOUNT_BYTES);
+            i += AMOUNT_BYTES;
+
+            i += PUBKEY_HASH_BYTES;
+
             balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
-            i += ETH_ADDR_BYTES+TOKEN_BYTES+AMOUNT_BYTES+PUBKEY_HASH_BYTES;
         }
     }
 
@@ -279,21 +335,16 @@ contract Franklin {
     /// @param _amount Amount to deposit (if user specified msg.value more than this amount + fee - she will recieve difference)
     /// @param _franklinAddr The receiver Layer 2 address
     function depositETH(uint128 _amount, bytes calldata _franklinAddr) external payable {
+        requireActive();
+
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
-
-        requireActive();
 
         require(
             msg.value >= fee + _amount,
             "fdh11"
         ); // fdh11 - Not enough ETH provided
-        
-        require(
-            _amount <= MAX_VALUE,
-            "fdh12"
-        ); // fdh12 - deposit amount value is heigher than Franklin is able to process
 
         if (msg.value != fee + _amount) {
             msg.sender.transfer(msg.value-(fee + _amount));
@@ -305,7 +356,7 @@ contract Franklin {
     /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
     /// @param _amount Ether amount to withdraw
     function withdrawETH(uint128 _amount) external {
-        registerWithdrawal(0, _amount);
+        registerSingleWithdrawal(0, _amount);
         msg.sender.transfer(_amount);
     }
 
@@ -318,11 +369,11 @@ contract Franklin {
         uint128 _amount,
         bytes calldata _franklinAddr
     ) external payable {
+        requireActive();
+
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ERC_GAS * tx.gasprice;
-
-        requireActive();
 
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(_token);
@@ -349,7 +400,7 @@ contract Franklin {
     /// @param _amount amount to withdraw
     function withdrawERC20(address _token, uint128 _amount) external {
         uint16 tokenId = governance.validateTokenAddress(_token);
-        registerWithdrawal(tokenId, _amount);
+        registerSingleWithdrawal(tokenId, _amount);
         require(
             IERC20(_token).transfer(msg.sender, _amount),
             "fw011"
@@ -448,7 +499,7 @@ contract Franklin {
     /// @notice Register withdrawal - update user balances and emit OnchainWithdrawal event
     /// @param _token - token by id
     /// @param _amount - token amount
-    function registerWithdrawal(uint16 _token, uint128 _amount) internal {
+    function registerSingleWithdrawal(uint16 _token, uint128 _amount) internal {
         require(
             balancesToWithdraw[msg.sender][_token] >= _amount,
             "frw11"
@@ -717,23 +768,15 @@ contract Franklin {
         emit BlockVerified(_blockNumber);
     }
 
-    /// @notice When withdraw is verified we move funds to the user immediately, so that withdraw can be completed with one op.
-    /// @dev TODO: Temp. solution.
+    /// @notice When block with withdrawals is verified we store them and complete in separate tx. Withdrawals can be complete by calling withdrawEth, withdrawERC20 or completeWithdrawals.
     /// @param _to Reciever
     /// @param _tokenId Token id
     /// @param _amount Token amount
-    function payoutWithdrawNow(address _to, uint16 _tokenId, uint128 _amount) internal {
-        if (_tokenId == 0) {
-            address payable to = address(uint160(_to));
-            if (!to.send(_amount)) {
-                balancesToWithdraw[_to][_tokenId] += _amount;
-            }
-        } else if (governance.isValidTokenId(_tokenId)) {
-            address tokenAddr = governance.tokenAddresses(_tokenId);
-            if(!IERC20(tokenAddr).transfer(_to, _amount)) {
-                balancesToWithdraw[_to][_tokenId] += _amount;
-            }
-        }
+    function storeWithdrawalAsPending(address _to, uint16 _tokenId, uint128 _amount) internal {
+        pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
+        numberOfPendingWithdrawals++;
+
+        balancesToWithdraw[_to][_tokenId] += _amount;
     }
 
     /// @notice If block is verified the onchain operations from it must be completed
@@ -762,7 +805,7 @@ contract Franklin {
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
                 }
-                payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
+                storeWithdrawalAsPending(Bytes.bytesToAddress(ethAddress), tokenId, amount);
             }
             if (op.opType == OpType.FullExit) {
                 // full exit was successful, accrue balance
@@ -782,7 +825,7 @@ contract Franklin {
                 for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
                     ethAddress[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + i];
                 }
-                payoutWithdrawNow(Bytes.bytesToAddress(ethAddress), tokenId, amount);
+                storeWithdrawalAsPending(Bytes.bytesToAddress(ethAddress), tokenId, amount);
             }
             delete onchainOps[current];
         }
@@ -839,7 +882,6 @@ contract Franklin {
     function triggerExodusIfNeeded() internal returns (bool) {
         if (priorityQueue.triggerExodusIfNeeded()) {
             exodusMode = true;
-            cancelOutstandingDepositsForExodusMode();
             emit ExodusMode();
             return true;
         } else {

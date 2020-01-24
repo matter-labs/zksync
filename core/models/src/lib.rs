@@ -5,6 +5,7 @@ extern crate log;
 
 pub mod abi;
 pub mod circuit;
+pub mod config_options;
 pub mod merkle_tree;
 pub mod node;
 pub mod params;
@@ -12,13 +13,14 @@ pub mod primitives;
 
 // TODO: refactor, find new home for all this stuff
 
-use crate::node::account::{Account, AccountAddress};
 use crate::node::block::Block;
 use crate::node::AccountUpdates;
 use crate::node::BlockNumber;
+use ethabi::{decode, ParamType};
+use failure::format_err;
 use serde_bytes;
-use std::sync::mpsc::Sender;
-use web3::types::U256;
+use std::convert::TryFrom;
+use web3::types::{Address, Log, U256};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta {
@@ -82,12 +84,6 @@ pub struct Operation {
     pub accounts_updated: AccountUpdates,
 }
 
-pub enum StateKeeperRequest {
-    GetAccount(AccountAddress, Sender<Option<Account>>),
-    GetNetworkStatus(Sender<NetworkStatus>),
-    TimerTick,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CommitRequest {
     pub block: Block,
@@ -124,5 +120,29 @@ impl std::str::FromStr for ActionType {
                 ACTION_COMMIT, ACTION_VERIFY
             )),
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct TokenAddedEvent {
+    pub address: Address,
+    pub id: u32,
+}
+
+impl TryFrom<Log> for TokenAddedEvent {
+    type Error = failure::Error;
+
+    fn try_from(event: Log) -> Result<TokenAddedEvent, failure::Error> {
+        let mut dec_ev = decode(&[ParamType::Address, ParamType::Uint(32)], &event.data.0)
+            .map_err(|e| format_err!("Event data decode: {:?}", e))?;
+        Ok(TokenAddedEvent {
+            address: dec_ev.remove(0).to_address().unwrap(),
+            id: dec_ev
+                .remove(0)
+                .to_uint()
+                .as_ref()
+                .map(U256::as_u32)
+                .unwrap(),
+        })
     }
 }

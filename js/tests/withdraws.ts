@@ -1,7 +1,9 @@
 const ethers = require('ethers');
+import * as zksync from 'zksync';
+
 import * as assert from 'assert';
 import * as utils from './utils';
-import { WalletDecorator, tokens } from './WalletDecorator';
+import { WalletDecorator, /* tokens */ } from './WalletDecorator';
 
 const NUM_WALLETS    = 64;
 const DEPOSIT_AMOUNT = ethers.utils.parseEther('0.1');
@@ -10,6 +12,8 @@ assert(utils.isPowerOfTwo(NUM_WALLETS));
 
 async function test() {
     await WalletDecorator.waitReady();
+    
+    const tokens = ['ETH'];
 
     const ids = [...utils.range(NUM_WALLETS)];
     const wallets = await Promise.all(ids.map(WalletDecorator.fromId));    

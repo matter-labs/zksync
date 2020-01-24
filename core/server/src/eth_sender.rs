@@ -11,26 +11,27 @@
 //! Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 //! that state is always recoverable.
 
-// Built-in uses
+// Built-in deps
 use std::collections::{HashSet, VecDeque};
 use std::str::FromStr;
-use std::sync::mpsc::{channel, Receiver, Sender};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 // External uses
 use bigdecimal::BigDecimal;
 use failure::ensure;
-use ff::{PrimeField, PrimeFieldRepr};
-use futures::{channel::mpsc as fmpsc, compat::Future01CompatExt, executor::block_on};
+use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on};
+use tokio::runtime::Runtime;
+use tokio::time;
 use web3::contract::Options;
 use web3::transports::Http;
 use web3::types::{TransactionReceipt, H256, U256};
 use web3::Transport;
 // Workspace uses
-use crate::{ConfigurationOptions, ThreadPanicNotify};
 use eth_client::{ETHClient, SignedCallResult};
-use models::abi::FRANKLIN_CONTRACT;
+use models::abi::zksync_contract;
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
+use models::node::config;
 use models::{Action, ActionType, Operation};
-use storage::{ConnectionPool, StorageETHOperation};
+use storage::{ConnectionPool, StorageETHOperation, StorageProcessor};
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
@@ -79,21 +80,32 @@ struct ETHSender<T: Transport> {
     unconfirmed_ops: VecDeque<OperationETHState>,
     db_pool: ConnectionPool,
     eth_client: ETHClient<T>,
+    rx_for_eth: mpsc::Receiver<Operation>,
+    op_notify: mpsc::Sender<Operation>,
 }
 
 impl<T: Transport> ETHSender<T> {
-    fn new(db_pool: ConnectionPool, eth_client: ETHClient<T>) -> Self {
+    fn new(
+        db_pool: ConnectionPool,
+        eth_client: ETHClient<T>,
+        rx_for_eth: mpsc::Receiver<Operation>,
+        op_notify: mpsc::Sender<Operation>,
+    ) -> Self {
         let mut sender = Self {
             eth_client,
             unconfirmed_ops: VecDeque::new(),
-            db_pool,
+            db_pool: db_pool.clone(),
+            rx_for_eth,
+            op_notify,
         };
-        sender.restore_state().expect("Eth sender state restore");
+        let storage = db_pool.access_storage().expect("Failed to access storage");
+        if sender.restore_state(storage).is_err() {
+            info!("No unconfirmed operations");
+        }
         sender
     }
 
-    fn restore_state(&mut self) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
+    fn restore_state(&mut self, storage: StorageProcessor) -> Result<(), failure::Error> {
         self.unconfirmed_ops = storage
             .load_unconfirmed_operations()?
             .into_iter()
@@ -105,50 +117,57 @@ impl<T: Transport> ETHSender<T> {
         Ok(())
     }
 
-    fn run(&mut self, rx_for_eth: Receiver<Operation>, mut op_notify: fmpsc::Sender<Operation>) {
-        loop {
-            let last_poll_end_time = Instant::now();
+    fn try_commit_current_op(&mut self) {
+        if let Some(mut current_op) = self.unconfirmed_ops.pop_front() {
+            let success = self
+                .drive_to_completion(&mut current_op)
+                .map_err(|e| {
+                    warn!("Error while trying to complete uncommitted op: {}", e);
+                })
+                .unwrap_or_default();
 
-            // receive new operations from committer
-            while let Ok(operation) = rx_for_eth.try_recv() {
+            if success {
+                info!(
+                    "Operation {}, {}  block: {}, confirmed on ETH",
+                    current_op.operation.id.unwrap(),
+                    current_op.operation.action.to_string(),
+                    current_op.operation.block.block_number,
+                );
+
+                if current_op.operation.action.get_type() == ActionType::VERIFY {
+                    // we notify about verify only when commit is confirmed on the ethereum
+                    self.op_notify
+                        .try_send(current_op.operation)
+                        .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
+                        .unwrap_or_default();
+
+                    // complete pending withdrawals after each verify.
+                    self.call_complete_withdrawals()
+                        .map_err(|e| {
+                            warn!("Error: {}", e);
+                        })
+                        .unwrap_or_default();
+                }
+            } else {
+                self.unconfirmed_ops.push_front(current_op);
+            }
+        }
+    }
+
+    async fn run(mut self) {
+        let mut timer = time::interval(TX_POLL_PERIOD);
+
+        loop {
+            while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
                 self.unconfirmed_ops.push_back(OperationETHState {
                     operation,
                     txs: Vec::new(),
                 });
             }
 
-            if let Some(mut current_op) = self.unconfirmed_ops.pop_front() {
-                let success = self
-                    .drive_to_completion(&mut current_op)
-                    .map_err(|e| {
-                        warn!("Error while trying to complete uncommitted op: {}", e);
-                    })
-                    .unwrap_or_default();
+            timer.tick().await;
 
-                if success {
-                    info!(
-                        "Operation {}, {}  block: {}, confirmed on ETH",
-                        current_op.operation.id.unwrap(),
-                        current_op.operation.action.to_string(),
-                        current_op.operation.block.block_number,
-                    );
-
-                    if current_op.operation.action.get_type() == ActionType::VERIFY {
-                        // we notify about verify only when commit is confirmed on the ethereum
-                        op_notify
-                            .try_send(current_op.operation)
-                            .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
-                            .unwrap_or_default();
-                    }
-                } else {
-                    self.unconfirmed_ops.push_front(current_op);
-                }
-            }
-
-            let since_last_poll_time = last_poll_end_time.elapsed();
-            if since_last_poll_time < TX_POLL_PERIOD {
-                std::thread::sleep(TX_POLL_PERIOD - since_last_poll_time);
-            }
+            self.try_commit_current_op();
         }
     }
 
@@ -270,16 +289,16 @@ impl<T: Transport> ETHSender<T> {
                 "Sending tx for op, op_id: {} tx_hash: {:#x}",
                 new_tx.op_id, new_tx.signed_tx.hash
             );
-            self.send_tx(&new_tx)?;
+            self.send_tx(&new_tx.signed_tx)?;
         }
 
         Ok(false)
     }
 
-    fn send_tx(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
-        let hash = block_on(self.eth_client.send_raw_tx(tx.signed_tx.raw_tx.clone()))?;
+    fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error> {
+        let hash = block_on(self.eth_client.send_raw_tx(signed_tx.raw_tx.clone()))?;
         ensure!(
-            hash == tx.signed_tx.hash,
+            hash == signed_tx.hash,
             "Hash from signer and Ethereum node mismatch"
         );
         Ok(())
@@ -352,13 +371,6 @@ impl<T: Transport> ETHSender<T> {
     ) -> Result<SignedCallResult, failure::Error> {
         match &op.action {
             Action::Commit => {
-                let mut be_bytes = [0u8; 32];
-                op.block
-                    .new_root_hash
-                    .into_repr()
-                    .write_be(be_bytes.as_mut())
-                    .expect("Write commit bytes");
-
                 //                let mut block_number = op.block.block_number;
                 //                // FAIL TEST
                 //                let rnd = rand::thread_rng().gen_range(0,10);
@@ -367,7 +379,7 @@ impl<T: Transport> ETHSender<T> {
                 //                    block_number += rnd + 1;
                 //                }
                 //                // FAIL TEST
-                let root = H256::from(be_bytes);
+                let root = op.block.get_eth_encoded_root();
 
                 let public_data = op.block.get_eth_public_data();
                 debug!(
@@ -398,16 +410,27 @@ impl<T: Transport> ETHSender<T> {
             }
         }
     }
+
+    fn call_complete_withdrawals(&self) -> Result<(), failure::Error> {
+        // function completeWithdrawals(uint32 _n) external {
+        let tx = block_on(self.eth_client.sign_call_tx(
+            "completeWithdrawals",
+            config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+            Options::default(),
+        ))
+        .map_err(|e| failure::format_err!("completeWithdrawals: {}", e))?;
+        info!("Sending completeWithdrawals tx with hash: {:#?}", tx.hash);
+        self.send_tx(&tx)
+    }
 }
 
 pub fn start_eth_sender(
     pool: ConnectionPool,
-    panic_notify: Sender<bool>,
-    op_notify_sender: fmpsc::Sender<Operation>,
+    panic_notify: mpsc::Sender<bool>,
+    op_notify_sender: mpsc::Sender<Operation>,
+    send_requst_receiver: mpsc::Receiver<Operation>,
     config_options: ConfigurationOptions,
-) -> Sender<Operation> {
-    let (tx_for_eth, rx_for_eth) = channel::<Operation>();
-
+) {
     std::thread::Builder::new()
         .name("eth_sender".to_string())
         .spawn(move || {
@@ -415,14 +438,9 @@ pub fn start_eth_sender(
             let (_event_loop, transport) =
                 Http::new(&config_options.web3_url).expect("failed to start web3 transport");
 
-            let abi_string = serde_json::Value::from_str(FRANKLIN_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
             let eth_client = ETHClient::new(
                 transport,
-                abi_string,
+                zksync_contract(),
                 config_options.operator_eth_addr,
                 config_options.operator_private_key,
                 config_options.contract_eth_addr,
@@ -430,10 +448,10 @@ pub fn start_eth_sender(
                 config_options.gas_price_factor,
             );
 
-            let mut eth_sender = ETHSender::new(pool, eth_client);
-            eth_sender.run(rx_for_eth, op_notify_sender);
+            let mut runtime = Runtime::new().expect("eth-sender-runtime");
+            let eth_sender =
+                ETHSender::new(pool, eth_client, send_requst_receiver, op_notify_sender);
+            runtime.block_on(eth_sender.run());
         })
         .expect("Eth sender thread");
-
-    tx_for_eth
 }

@@ -2,9 +2,12 @@ import {
     depositFromETH,
     Wallet,
     Provider,
-    ETHProxy, getDefaultProvider, types
+    ETHProxy, getDefaultProvider, types,
+    getEthereumBalance
 } from "zksync";
-import { ethers, utils } from "ethers";
+// HACK: using require as type system work-around
+const franklin_abi = require('../../contracts/build/Franklin.json');
+import { ethers, utils, Contract } from "ethers";
 
 
 let syncProvider: Provider;
@@ -25,14 +28,18 @@ async function getOperatorBalance(token: types.Token, type: "committed" | "verif
 
 async function testDeposit(ethWallet: ethers.Signer, syncWallet: Wallet, token: types.Token, amount: utils.BigNumberish) {
     const balanceBeforeDep = await syncWallet.getBalance(token);
+
+    const startTime = new Date().getTime();
     const depositHandle = await depositFromETH(
-    {
-        depositFrom: ethWallet,
-        depositTo:  syncWallet,
-        token: token,
-        amount,
-    });
+        {
+            depositFrom: ethWallet,
+            depositTo: syncWallet,
+            token: token,
+            amount,
+        });
+    console.log(`Deposit posted: ${(new Date().getTime()) - startTime} ms`);
     await depositHandle.awaitReceipt();
+    console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
     const balanceAfterDep = await syncWallet.getBalance(token);
 
     if (!balanceAfterDep.sub(balanceBeforeDep).eq(amount)) {
@@ -44,13 +51,16 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     const wallet1BeforeTransfer = await syncWallet1.getBalance(token);
     const wallet2BeforeTransfer = await syncWallet2.getBalance(token);
     const operatorBeforeTransfer = await getOperatorBalance(token);
+    const startTime = new Date().getTime();
     const transferToNewHandle = await syncWallet1.syncTransfer({
         to: syncWallet2.address(),
         token,
         amount,
         fee
     });
+    console.log(`Transfer posted: ${(new Date().getTime()) - startTime} ms`);
     await transferToNewHandle.awaitReceipt();
+    console.log(`Transfer committed: ${(new Date().getTime()) - startTime} ms`);
     const wallet1AfterTransfer = await syncWallet1.getBalance(token);
     const wallet2AfterTransfer = await syncWallet2.getBalance(token);
     const operatorAfterTransfer = await getOperatorBalance(token);
@@ -64,29 +74,42 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     }
 }
 
-async function testWithdraw(ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
+async function testWithdraw(contract: Contract, ethProxy: ETHProxy, ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.Token, amount: utils.BigNumber, fee: utils.BigNumber) {
     const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
     const operatorBeforeWithdraw = await getOperatorBalance(token);
+    const onchainBalanceBeforeWithdraw = await getEthereumBalance(ethWallet, token);
+    const startTime = new Date().getTime();
     const withdrawHandle = await syncWallet.withdrawTo({
         ethAddress: ethWallet.address,
         token,
         amount,
         fee
     });
-    await withdrawHandle.awaitReceipt();
+    console.log(`Withdraw posted: ${(new Date().getTime()) - startTime} ms`);
+    await withdrawHandle.awaitVerifyReceipt();
+    console.log(`Withdraw verified: ${(new Date().getTime()) - startTime} ms`);
     const wallet2AfterWithdraw = await syncWallet.getBalance(token);
     const operatorAfterWithdraw = await getOperatorBalance(token);
+    const onchainBalanceAfterWithdraw = await getEthereumBalance(ethWallet, token);
 
-    let withdrawCorrect = true;
-    withdrawCorrect = withdrawCorrect && wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee));
-    withdrawCorrect = withdrawCorrect && operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee);
+    const tokenId = await ethProxy.resolveTokenId(token);
+    const pendingToBeOnchainBalance = await contract.balancesToWithdraw(
+        await ethWallet.getAddress(),
+        tokenId,
+    );
 
-    if (!withdrawCorrect) {
-        throw new Error("Withdraw checks failed");
+    if (!wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee))) {
+        return new Error("Wrong amount on wallet after WITHDRAW");
+    }
+    if (!operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee)) {
+        return new Error("Wrong amount of operator fees after WITHDRAW");
+    }
+    if (!(onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance)).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
+        return new Error("Wrong amount onchain after WITHDRAW");
     }
 }
 
-async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: ethers.Wallet, syncWallet2: Wallet, token: types.Token, depositAmountETH: string) {
+async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: ethers.Wallet, syncWallet2: Wallet, token: types.Token, depositAmountETH: string) {
     const depositAmount = utils.parseEther(depositAmountETH);
 
     // we do two transfers to test transfer to new and ordinary transfer.
@@ -102,13 +125,13 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: e
     console.log(`Transfer to new ok, Token: ${token}`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, transfersFee);
     console.log(`Transfer ok, Token: ${token}`);
-    await testWithdraw(wallet2, syncWallet2, token, withdrawAmount, withdrawFee);
+    await testWithdraw(contract, ethProxy, wallet2, syncWallet2, token, withdrawAmount, withdrawFee);
     console.log(`Withdraw ok, Token: ${token}`);
 }
 
 (async () => {
     const WEB3_URL = process.env.WEB3_URL;
-// Mnemonic for eth wallet.
+    // Mnemonic for eth wallet.
     const MNEMONIC = process.env.MNEMONIC;
     const ERC_20TOKEN = process.env.TEST_ERC20;
 
@@ -130,6 +153,12 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: e
         ethProxy
     );
 
+    const contract = new Contract(
+        syncProvider.contractAddress.mainContract,
+        franklin_abi.interface,
+        ethWallet,
+    );
+
     const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
     const syncWallet2 = await Wallet.fromEthSigner(
         ethWallet2,
@@ -144,8 +173,8 @@ async function moveFunds(wallet1: ethers.Wallet, syncWallet1: Wallet, wallet2: e
         ethProxy
     );
 
-    await moveFunds(ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "0.018");
-    await moveFunds(ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "0.018");
+    await moveFunds(contract, ethProxy, ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "0.018");
+    await moveFunds(contract, ethProxy, ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "0.018");
 
     await syncProvider.disconnect();
 })();

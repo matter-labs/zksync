@@ -29,7 +29,7 @@ export const priorityQueueContractSourceCode = fs.readFileSync('flat/PriorityQue
 export const franklinTestContractCode      = require('../build/FranklinTest');
 export const verifierTestContractCode      = require('../build/VerifierTest');
 export const governanceTestContractCode    = require('../build/GovernanceTest');
-export const priorityQueueTestContractCode = require('../build/PriorityQueueTest')
+export const priorityQueueTestContractCode = require('../build/PriorityQueueTest');
 
 export async function publishSourceCodeToEtherscan(contractname, contractaddress, sourceCode, compiled, constructorParams: any[]) {
     const network = process.env.ETH_NETWORK;
@@ -103,6 +103,7 @@ export async function deployGovernance(
         let governance = await deployContract(wallet, governanceCode, constructorArgs, {
             gasLimit: 3000000,
         });
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${governance.deployTransaction.hash}`);
         console.log(`GOVERNANCE_ADDR=${governance.address}`);
 
         return governance;
@@ -166,10 +167,13 @@ export async function deployFranklin(
             {
                 gasLimit: 6600000,
             });
+        console.log(`CONTRACT_GENESIS_TX_HASH=${contract.deployTransaction.hash}`);
         console.log(`CONTRACT_ADDR=${contract.address}`);
 
         const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);
-        await (await priorityQueueContract.setFranklinAddress(contract.address)).wait();
+        const setAddressTx = await priorityQueueContract.setFranklinAddress(contract.address, { gasLimit: 1000000 })
+        await setAddressTx.wait();
+        
         return contract;
     } catch (err) {
         console.log("Franklin deploy error:" + err);
@@ -198,7 +202,7 @@ export async function addTestERC20Token(wallet, governance) {
         await erc20.mint(wallet.address, parseEther("3000000000"));
         console.log("TEST_ERC20=" + erc20.address);
         await (await governance.addToken(erc20.address)).wait();
-        return erc20
+        return erc20;
     } catch (err) {
         console.log("Add token error:" + err);
     }
@@ -206,7 +210,8 @@ export async function addTestERC20Token(wallet, governance) {
 
 export async function mintTestERC20Token(wallet, erc20) {
     try {
-        await erc20.mint(wallet.address, parseEther("3000000000"));
+        const txCall = await erc20.mint(wallet.address, parseEther("3000000000"));
+        await txCall.wait();
     } catch (err) {
         console.log("Mint token error:" + err);
     }
@@ -222,3 +227,4 @@ export async function addTestNotApprovedERC20Token(wallet) {
         console.log("Add token error:" + err);
     }
 }
+

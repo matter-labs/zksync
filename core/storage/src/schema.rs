@@ -112,7 +112,7 @@ table! {
 }
 
 table! {
-    franklin_ops (id) {
+    rollup_ops (id) {
         id -> Int4,
         block_num -> Int8,
         operation -> Jsonb,
@@ -206,7 +206,7 @@ allow_tables_to_appear_in_same_query!(
     events_state,
     executed_priority_operations,
     executed_transactions,
-    franklin_ops,
+    rollup_ops,
     mempool,
     op_config,
     operations,

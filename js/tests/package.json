@@ -5,15 +5,19 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^12.12.14",
-    "ethers": "^4.0.40",
+    "array-flat-polyfill": "^1.0.1",
+    "cli-progress": "^3.5.0",
+    "ethers": "^4.0.33",
+    "openzeppelin-solidity": "^2.4.0",
     "ts-node": "^8.5.4",
     "typescript": "^3.7.4",
-    "zksync": "ssh://git@github.com:matter-labs/zksync.js.git"
+    "zksync": "^0.3.10"
   },
   "scripts": {
     "simple": "f ts-node simple-integration-test.ts",
     "full-exit": "f ts-node full-exit-inegration-test.ts",
     "loadtest": "f ts-node loadtest.ts",
-    "update_zksync.js": "cd ../../../zksync.js && yarn build && cd ../zksync/js/tests && yarn upgrade zksync"
+    "withdraws": "f ts-node withdraws.ts",
+    "print-test-accounts": "f ts-node print-test-accounts.ts"
   }
 }

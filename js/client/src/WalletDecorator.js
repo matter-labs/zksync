@@ -6,6 +6,8 @@ import config from './env-config';
 const zksync = require('zksync');
 const ethers = require('ethers');
 import franklin_abi from '../../../contracts/build/Franklin.json'
+import { Emitter } from './Emitter';
+
 
 const NUMERIC_LIMITS_UINT_256 = '115792089237316195423570985008687907853269984665640564039457584007913129639935';
 
@@ -399,6 +401,8 @@ export class WalletDecorator {
         const address = options.address;
 
         try {
+            yield info(`Sending transfer...`);
+
             const transferTransaction = await window.syncWallet.syncTransfer({
                 to: address,
                 token,
@@ -409,6 +413,8 @@ export class WalletDecorator {
             yield info(`Sent transfer to Matter server`);
     
             yield * this.verboseGetSyncOpStatus(transferTransaction);
+
+            yield info(`Transfer succeeded!`);
             return;
         } catch (e) {
             console.log(e);
@@ -433,9 +439,11 @@ export class WalletDecorator {
                 fee,
             });
 
+            yield info(`Sent withdraw to Matter server`);
+
             yield * this.verboseGetSyncOpStatus(withdrawTransaction);
 
-            yield info(`Offchain withdraw succeeded!`);
+            yield info(`Withdraw succeeded!`);
         } catch (e) {
             console.log('error in verboseWithdrawOffchain', e);
             yield combineMessages(
@@ -503,6 +511,7 @@ export class WalletDecorator {
         const amount = utils.bigNumberify(options.amount);
         try {
             yield info(`Sending deposit...`);
+
             const maxFeeInETHToken = await this.getDepositFee(token);
             const deposit = await zksync.depositFromETH({
                 depositFrom: window.ethSigner,
@@ -521,6 +530,8 @@ export class WalletDecorator {
             yield * this.verboseGetRevertReason(deposit.ethTx.hash);
             
             yield * this.verboseGetSyncPriorityOpStatus(deposit);
+
+            yield info(`Deposit succeeded!`);
         } catch (e) {
             yield combineMessages(
                 info(`Onchain deposit failed with "${e.message}"`, { countdown: 7 }),
@@ -531,9 +542,14 @@ export class WalletDecorator {
     }
 
     async * verboseGetSyncOpStatus(syncOp) {
+        this.emit("receiptCommittedOrVerified");
+
         const txHashHtml = shortenedTxHash(syncOp.txHash);
     
         const receipt = await syncOp.awaitReceipt();
+        this.emit("receiptCommittedOrVerified"); 
+        console.log('awaitReceipt');
+
         if (receipt.failReason) {
             yield error(`Transaction ${txHashHtml} with <code>${receipt.failReason}</code>`, { countdown: 10 });
             return;
@@ -547,6 +563,8 @@ export class WalletDecorator {
         let verified = false;
         syncOp.awaitVerifyReceipt()
             .then(verifyReceipt => {
+                this.emit("receiptCommittedOrVerified");
+                console.log('verifyReceipt');
                 verified = true;
             });
 
@@ -574,12 +592,16 @@ export class WalletDecorator {
     }
 
     async * verboseGetSyncPriorityOpStatus(syncOp) {
+        this.emit("receiptCommittedOrVerified");
+
         let txHashHtml = shortenedTxHash(syncOp.ethTx.hash);
 
         await syncOp.awaitEthereumTxCommit();
 
         const receipt = await syncOp.awaitReceipt();
-
+        this.emit("receiptCommittedOrVerified");
+        console.log('awaitReceipt')
+        
         yield combineMessages(
             info(`Transaction ${txHashHtml} got included in block <code>${receipt.block.blockNumber}</code>, waiting for prover...`),
             start_progress_bar({variant: 'half', duration: timeConstants.waitingForProverHalfLife})
@@ -588,6 +610,8 @@ export class WalletDecorator {
         let verified = false;
         syncOp.awaitVerifyReceipt()
             .then(verifyReceipt => {
+                this.emit("receiptCommittedOrVerified");
+                console.log('verifyReceipt');
                 verified = true;
             });
 
@@ -658,3 +682,5 @@ export class WalletDecorator {
 
     // #endregion
 }
+
+Emitter(WalletDecorator.prototype);

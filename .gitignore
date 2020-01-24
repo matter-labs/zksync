@@ -14,7 +14,7 @@ env-config.js
 a.out 
 .gitconfig
 
-franklin_pk.key
+zksync_pk.key
 dist
 npm-debug.log
 
@@ -33,4 +33,4 @@ Cargo.lock
 /volumes
 /logs
 
-/js/franklin_lib/build
+.ipynb_checkpoints

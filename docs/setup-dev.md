@@ -4,10 +4,6 @@
 
 Install docker.
 
-## Minikube
-
-https://kubernetes.io/docs/tasks/tools/install-minikube
-
 ## Node & Yarn
 
 Install Node.
@@ -98,4 +94,3 @@ cmds=( ${(uf)"$(grep -oE '^[a-zA-Z0-9_.-]+:([^=]|$)' $ZKSYNC_HOME/Makefile | sed
 
 _describe 'zksync make cmds' cmds
 ```
-

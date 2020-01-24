@@ -16,16 +16,19 @@ extern crate log;
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
-use failure::{bail, Fail};
+use failure::bail;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
     AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
 };
-use models::{Action, ActionType, EncodedProof, Operation, ACTION_COMMIT, ACTION_VERIFY};
+use models::{
+    Action, ActionType, EncodedProof, Operation, TokenAddedEvent, ACTION_COMMIT, ACTION_VERIFY,
+};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::convert::TryInto;
+use std::time;
 use web3::types::H256;
 
 mod schema;
@@ -589,7 +592,7 @@ pub struct StoredBlockEvent {
 }
 
 #[derive(Debug, Insertable)]
-#[table_name = "franklin_ops"]
+#[table_name = "rollup_ops"]
 pub struct NewFranklinOp {
     pub block_num: i64,
     pub operation: Value,
@@ -611,7 +614,7 @@ impl NewFranklinOp {
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "franklin_ops"]
+#[table_name = "rollup_ops"]
 pub struct StoredFranklinOp {
     pub id: i32,
     pub block_num: i64,
@@ -626,7 +629,7 @@ impl StoredFranklinOp {
 }
 
 #[derive(Debug, Clone, Queryable)]
-pub struct StoredFranklinOpsBlock {
+pub struct StoredRollupOpsBlock {
     pub block_num: BlockNumber,
     pub ops: Vec<FranklinOp>,
     pub fee_account: AccountId,
@@ -648,16 +651,6 @@ struct ReadTx {
     nonce: i64,
     tx: Value,
     created_at: NaiveDateTime,
-}
-
-#[derive(Debug, Serialize, Deserialize, Fail)]
-pub enum TxAddError {
-    #[fail(display = "Tx nonce is too low.")]
-    NonceTooLow,
-    #[fail(display = "Tx signature is incorrect.")]
-    InvalidSignature,
-    #[fail(display = "Tx is incorrect")]
-    IncorrectTx,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -800,6 +793,15 @@ impl StorageProcessor {
                 ExecutedOperations::Tx(tx) => {
                     let stored_tx =
                         NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
+                    diesel::insert_into(mempool::table)
+                        .values(&InsertTx {
+                            hash: tx.tx.hash().as_ref().to_vec(),
+                            primary_account_address: tx.tx.account().data.to_vec(),
+                            nonce: tx.tx.nonce() as i64,
+                            tx: serde_json::to_value(&tx.tx).unwrap_or_default(),
+                        })
+                        .on_conflict_do_nothing()
+                        .execute(self.conn())?;
                     diesel::insert_into(executed_transactions::table)
                         .values(&stored_tx)
                         .execute(self.conn())?;
@@ -1726,22 +1728,33 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_unverified_commitments(&self) -> QueryResult<Vec<Operation>> {
+    pub fn load_unverified_commits_after_block(
+        &self,
+        block: i64,
+        limit: i64,
+    ) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
-            let ops: Vec<StoredOperation> = diesel::sql_query(
+            let ops: Vec<StoredOperation> = diesel::sql_query(format!(
                 "
                 SELECT * FROM operations
-                WHERE action_type = 'COMMIT'
-                AND block_number > (
-                    SELECT COALESCE(max(block_number), 0)  
-                    FROM operations 
-                    WHERE action_type = 'VERIFY'
-                )
+                  WHERE action_type = 'COMMIT'
+                   AND block_number > (
+                     SELECT COALESCE(max(block_number), 0)
+                       FROM operations
+                       WHERE action_type = 'VERIFY'
+                   )
+                   AND block_number > {}
+                  LIMIT {}
             ",
-            )
+                block, limit
+            ))
             .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
+    }
+
+    pub fn load_unverified_commits(&self) -> QueryResult<Vec<Operation>> {
+        self.load_unverified_commits_after_block(0, 10e9 as i64)
     }
 
     fn get_account_and_last_block(
@@ -1938,10 +1951,10 @@ impl StorageProcessor {
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
 
-    pub fn fetch_prover_job(
+    pub fn prover_run_for_next_commit(
         &self,
         worker_: &str,
-        timeout_seconds: usize,
+        prover_timeout: time::Duration,
     ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
@@ -1955,14 +1968,10 @@ impl StorageProcessor {
                     AND NOT EXISTS
                         (SELECT * FROM prover_runs 
                             WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
-                ", timeout_seconds))
+                ", prover_timeout.as_secs()))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             if let Some(block_number_) = job {
-                // let to_store = NewProverRun{
-                //     block_number: i64::from(block_number),
-                //     worker: worker.to_string(),
-                // };
                 use crate::schema::prover_runs::dsl::*;
                 let inserted: ProverRun = insert_into(prover_runs)
                     .values(&vec![(
@@ -1977,7 +1986,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn update_prover_job(&self, job_id: i32) -> QueryResult<()> {
+    pub fn record_prover_is_working(&self, job_id: i32) -> QueryResult<()> {
         use crate::schema::prover_runs::dsl::*;
 
         let target = prover_runs.filter(id.eq(job_id));
@@ -1993,6 +2002,15 @@ impl StorageProcessor {
             .values(&vec![(worker.eq(worker_.to_string()))])
             .get_result(self.conn())?;
         Ok(inserted.id)
+    }
+
+    pub fn prover_by_id(&self, prover_id: i32) -> QueryResult<ActiveProver> {
+        use crate::schema::active_provers::dsl::*;
+
+        let ret: ActiveProver = active_provers
+            .filter(id.eq(prover_id))
+            .get_result(self.conn())?;
+        Ok(ret)
     }
 
     pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
@@ -2027,143 +2045,6 @@ impl StorageProcessor {
         Ok(serde_json::from_value(stored.proof).unwrap())
     }
 
-    pub fn save_events_state(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
-        for event in events.iter() {
-            diesel::insert_into(events_state::table)
-                .values(event)
-                .execute(self.conn())?;
-        }
-        Ok(())
-    }
-
-    pub fn delete_events_state(&self) -> QueryResult<()> {
-        diesel::delete(events_state::table).execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
-        let events = events_state::table
-            .filter(events_state::block_type.eq("Committed".to_string()))
-            .order(events_state::block_num.asc())
-            .load::<StoredBlockEvent>(self.conn())?;
-        Ok(events)
-    }
-
-    pub fn load_verified_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
-        let events = events_state::table
-            .filter(events_state::block_type.eq("Verified".to_string()))
-            .order(events_state::block_num.asc())
-            .load::<StoredBlockEvent>(self.conn())?;
-        Ok(events)
-    }
-
-    pub fn save_storage_state(&self, state: &NewStorageState) -> QueryResult<()> {
-        diesel::insert_into(storage_state_update::table)
-            .values(state)
-            .execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn delete_data_restore_storage_state_status(&self) -> QueryResult<()> {
-        diesel::delete(storage_state_update::table).execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
-        storage_state_update::table.first(self.conn())
-    }
-
-    pub fn save_last_watched_block_number(
-        &self,
-        number: &NewLastWatchedEthBlockNumber,
-    ) -> QueryResult<()> {
-        diesel::insert_into(data_restore_last_watched_eth_block::table)
-            .values(number)
-            .execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn delete_last_watched_block_number(&self) -> QueryResult<()> {
-        diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
-        data_restore_last_watched_eth_block::table.first(self.conn())
-    }
-
-    pub fn save_franklin_ops_block(
-        &self,
-        ops: &[FranklinOp],
-        block_num: BlockNumber,
-        fee_account: AccountId,
-    ) -> QueryResult<()> {
-        for op in ops.iter() {
-            let stored_op = NewFranklinOp::prepare_stored_op(&op, block_num, fee_account);
-            diesel::insert_into(franklin_ops::table)
-                .values(&stored_op)
-                .execute(self.conn())?;
-        }
-        Ok(())
-    }
-
-    pub fn delete_franklin_ops(&self) -> QueryResult<()> {
-        diesel::delete(franklin_ops::table).execute(self.conn())?;
-        Ok(())
-    }
-
-    pub fn load_franklin_ops_blocks(&self) -> QueryResult<Vec<StoredFranklinOpsBlock>> {
-        let stored_operations = franklin_ops::table
-            .order(franklin_ops::id.asc())
-            .load::<StoredFranklinOp>(self.conn())?;
-        let ops_blocks: Vec<StoredFranklinOpsBlock> = stored_operations
-            .into_iter()
-            .group_by(|op| op.block_num)
-            .into_iter()
-            .map(|(_, stored_ops)| {
-                // let stored_ops = group.clone();
-                // let mut ops: Vec<FranklinOp> = vec![];
-                let mut block_num: i64 = 0;
-                let mut fee_account: i64 = 0;
-                let ops: Vec<FranklinOp> = stored_ops
-                    .map(|stored_op| {
-                        block_num = stored_op.block_num;
-                        fee_account = stored_op.fee_account;
-                        stored_op.into_franklin_op()
-                    })
-                    .collect();
-                StoredFranklinOpsBlock {
-                    block_num: block_num as u32,
-                    ops,
-                    fee_account: fee_account as u32,
-                }
-            })
-            .collect();
-        Ok(ops_blocks)
-    }
-
-    pub fn update_tree_state(
-        &self,
-        block_number: BlockNumber,
-        updates: &[(u32, AccountUpdate)],
-    ) -> QueryResult<()> {
-        self.commit_state_update(block_number, &updates)?;
-        self.apply_state_update(block_number)?;
-        Ok(())
-    }
-
-    pub fn load_tree_state(&self) -> QueryResult<(u32, AccountMap)> {
-        Ok(self.load_verified_state()?)
-    }
-
-    pub fn delete_tree_state(&self) -> QueryResult<()> {
-        diesel::delete(balances::table).execute(self.conn())?;
-        diesel::delete(accounts::table).execute(self.conn())?;
-        diesel::delete(account_creates::table).execute(self.conn())?;
-        diesel::delete(account_balance_updates::table).execute(self.conn())?;
-        Ok(())
-    }
-
     pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
         let new_token = Token {
             id: i32::from(id),
@@ -2187,148 +2068,197 @@ impl StorageProcessor {
         Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
     }
 
-    pub fn mempool_get_size(&self) -> QueryResult<usize> {
-        mempool::table
-            .select(count(mempool::primary_account_address))
-            .execute(self.conn())
-    }
+    // Data restore part
 
-    pub fn mempool_add_tx(&self, tx: &FranklinTx) -> QueryResult<Result<(), TxAddError>> {
-        if !tx.check_signature() {
-            return Ok(Err(TxAddError::InvalidSignature));
-        }
+    fn save_operation(&self, op: &Operation) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            match &op.action {
+                Action::Commit => {
+                    self.commit_state_update(op.block.block_number, &op.accounts_updated)?;
+                    self.save_block(&op.block)?;
+                }
+                Action::Verify { .. } => self.apply_state_update(op.block.block_number)?,
+            };
 
-        if !tx.check_correctness() {
-            return Ok(Err(TxAddError::IncorrectTx));
-        }
-
-        let StoredAccountState {
-            committed: commited_state,
-            ..
-        } = self.account_state_by_address(&tx.account())?;
-        let lowest_possible_nonce = commited_state
-            .map(|(_, a)| a.nonce as u32)
-            .unwrap_or_default();
-        if tx.nonce() < lowest_possible_nonce {
-            return Ok(Err(TxAddError::NonceTooLow));
-        }
-
-        let tx_failed = executed_transactions::table
-            .filter(executed_transactions::tx_hash.eq(tx.hash().as_ref().to_vec()))
-            .filter(executed_transactions::success.eq(false))
-            .first::<StoredExecutedTransaction>(self.conn())
-            .optional()?;
-        // Remove executed tx from db
-        if let Some(tx_failed) = tx_failed {
-            diesel::delete(
-                executed_transactions::table.filter(executed_transactions::id.eq(tx_failed.id)),
-            )
-            .execute(self.conn())?;
-        } else {
-            // TODO Check tx and add only txs with valid nonce.
-            insert_into(mempool::table)
-                .values(&InsertTx {
-                    hash: tx.hash().as_ref().to_vec(),
-                    primary_account_address: tx.account().data.to_vec(),
-                    nonce: i64::from(tx.nonce()),
-                    tx: serde_json::to_value(tx).unwrap(),
+            let _stored: StoredOperation = diesel::insert_into(operations::table)
+                .values(&NewOperation {
+                    block_number: i64::from(op.block.block_number),
+                    action_type: op.action.to_string(),
                 })
-                .execute(self.conn())
-                .map(drop)?;
-        }
-
-        Ok(Ok(()))
+                .get_result(self.conn())?;
+            Ok(())
+        })
     }
 
-    pub fn get_pending_txs(&self, address: &AccountAddress) -> QueryResult<Vec<FranklinTx>> {
-        let StoredAccountState {
-            committed: commited_state,
-            ..
-        } = self.account_state_by_address(address)?;
-        let commited_nonce = commited_state
-            .map(|(_, a)| i64::from(a.nonce))
-            .unwrap_or_default();
-
-        let pending_txs: Vec<_> = mempool::table
-            .filter(mempool::primary_account_address.eq(address.data.to_vec()))
-            .filter(mempool::nonce.ge(commited_nonce))
-            .left_join(
-                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
-            )
-            .filter(executed_transactions::tx_hash.is_null())
-            .load::<(ReadTx, Option<StoredExecutedTransaction>)>(self.conn())?;
-
-        Ok(pending_txs
-            .into_iter()
-            .map(|(stored_tx, _)| serde_json::from_value(stored_tx.tx).unwrap())
-            .collect())
+    fn update_block_events(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(events_state::table).execute(self.conn())?;
+            for event in events.iter() {
+                diesel::insert_into(events_state::table)
+                    .values(event)
+                    .execute(self.conn())?;
+            }
+            Ok(())
+        })
     }
 
-    pub fn mempool_get_txs(&self, max_size: usize) -> QueryResult<Vec<FranklinTx>> {
-        let query = format!(
-            "
-            with good_accounts as (
-                select distinct
-                    address,
-                    accounts.nonce as acc_nonce
-                from 
-                    accounts 
-                join 
-                    mempool
-                on 
-                    accounts.address = mempool.primary_account_address
-                    and accounts.nonce = mempool.nonce
-            ), txs_with_diffs as (
-                select 
-                    coalesce(nonce - lag(nonce, 1) over (partition by primary_account_address order by nonce, created_at desc), 1) as noncediff,
-                    hash,
-                    primary_account_address,
-                    nonce,
-                    tx,
-                    created_at
-                from 
-                    mempool
-                join
-                    good_accounts
-                on 
-                    mempool.primary_account_address = good_accounts.address
-                    and mempool.nonce >= good_accounts.acc_nonce
-                left join 
-                    executed_transactions
-                on
-                    mempool.hash = executed_transactions.tx_hash
-                where 
-                    executed_transactions.tx_hash is null
-            ), txs_with_maxdiffs as (
-                select 
-                    *,
-                    max(noncediff) over (partition by primary_account_address order by nonce) as maxdiff
-                from 
-                    txs_with_diffs
-            ) 
-            select 
-                *
-            from 
-                txs_with_maxdiffs
-            where
-                maxdiff = 1
-            limit 
-                {max_size}
-            ",
-            max_size = max_size
-        );
+    fn update_last_watched_block_number(
+        &self,
+        number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.conn())?;
+            diesel::insert_into(data_restore_last_watched_eth_block::table)
+                .values(number)
+                .execute(self.conn())?;
+            Ok(())
+        })
+    }
 
-        #[derive(QueryableByName)]
-        struct StoredTxValue {
-            #[sql_type = "Jsonb"]
-            pub tx: Value,
-        }
+    fn update_storage_state(&self, state: NewStorageState) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(storage_state_update::table).execute(self.conn())?;
+            diesel::insert_into(storage_state_update::table)
+                .values(state)
+                .execute(self.conn())?;
+            Ok(())
+        })
+    }
 
-        let stored_txs: Vec<_> = diesel::sql_query(query).load::<StoredTxValue>(self.conn())?;
-        Ok(stored_txs
+    pub fn save_genesis_state(&self, genesis_acc_update: AccountUpdate) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.commit_state_update(0, &[(0, genesis_acc_update)])?;
+            self.apply_state_update(0)?;
+            Ok(())
+        })
+    }
+
+    pub fn save_block_transactions_with_data_restore_state(
+        &self,
+        block: &Block,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.save_block_transactions(block)?;
+            let state = NewStorageState {
+                storage_state: "None".to_string(),
+            };
+            self.update_storage_state(state)?;
+            Ok(())
+        })
+    }
+
+    pub fn save_block_operations_with_data_restore_state(
+        &self,
+        commit_op: &Operation,
+        verify_op: &Operation,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.save_operation(commit_op)?;
+            self.save_operation(verify_op)?;
+            let state = NewStorageState {
+                storage_state: "None".to_string(),
+            };
+            self.update_storage_state(state)?;
+            Ok(())
+        })
+    }
+
+    pub fn save_events_state_with_data_restore_state(
+        &self,
+        block_events: &[NewBlockEvent],
+        token_events: &[TokenAddedEvent],
+        last_watched_eth_number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.update_block_events(block_events)?;
+
+            for token in token_events.iter() {
+                self.store_token(token.id as u16, &format!("0x{:x}", token.address), None)?;
+            }
+
+            self.update_last_watched_block_number(last_watched_eth_number)?;
+
+            let state = NewStorageState {
+                storage_state: "Events".to_string(),
+            };
+            self.update_storage_state(state)?;
+
+            Ok(())
+        })
+    }
+
+    pub fn save_rollup_ops_with_data_restore_state(
+        &self,
+        ops: &[(BlockNumber, &FranklinOp, AccountId)],
+    ) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            diesel::delete(rollup_ops::table).execute(self.conn())?;
+            for op in ops.iter() {
+                let stored_op = NewFranklinOp::prepare_stored_op(&op.1, op.0, op.2);
+                diesel::insert_into(rollup_ops::table)
+                    .values(&stored_op)
+                    .execute(self.conn())?;
+            }
+            let state = NewStorageState {
+                storage_state: "Operations".to_string(),
+            };
+            self.update_storage_state(state)?;
+            Ok(())
+        })
+    }
+
+    pub fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
+        let events = events_state::table
+            .filter(events_state::block_type.eq("Committed".to_string()))
+            .order(events_state::block_num.asc())
+            .load::<StoredBlockEvent>(self.conn())?;
+        Ok(events)
+    }
+
+    pub fn load_verified_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
+        let events = events_state::table
+            .filter(events_state::block_type.eq("Verified".to_string()))
+            .order(events_state::block_num.asc())
+            .load::<StoredBlockEvent>(self.conn())?;
+        Ok(events)
+    }
+
+    pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
+        storage_state_update::table.first(self.conn())
+    }
+
+    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
+        data_restore_last_watched_eth_block::table.first(self.conn())
+    }
+
+    pub fn load_rollup_ops_blocks(&self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
+        let stored_operations = rollup_ops::table
+            .order(rollup_ops::id.asc())
+            .load::<StoredFranklinOp>(self.conn())?;
+        let ops_blocks: Vec<StoredRollupOpsBlock> = stored_operations
             .into_iter()
-            .map(|stored_tx| serde_json::from_value(stored_tx.tx).unwrap())
-            .collect())
+            .group_by(|op| op.block_num)
+            .into_iter()
+            .map(|(_, stored_ops)| {
+                // let stored_ops = group.clone();
+                // let mut ops: Vec<FranklinOp> = vec![];
+                let mut block_num: i64 = 0;
+                let mut fee_account: i64 = 0;
+                let ops: Vec<FranklinOp> = stored_ops
+                    .map(|stored_op| {
+                        block_num = stored_op.block_num;
+                        fee_account = stored_op.fee_account;
+                        stored_op.into_franklin_op()
+                    })
+                    .collect();
+                StoredRollupOpsBlock {
+                    block_num: block_num as u32,
+                    ops,
+                    fee_account: fee_account as u32,
+                }
+            })
+            .collect();
+        Ok(ops_blocks)
     }
 }
 
@@ -2486,7 +2416,7 @@ mod test {
         conn.execute_operation(&dummy_op(Action::Commit, 1))
             .unwrap();
 
-        let pending = conn.load_unverified_commitments().unwrap();
+        let pending = conn.load_unverified_commits().unwrap();
         assert_eq!(pending.len(), 1);
 
         conn.execute_operation(&dummy_op(
@@ -2497,7 +2427,7 @@ mod test {
         ))
         .unwrap();
 
-        let pending = conn.load_unverified_commitments().unwrap();
+        let pending = conn.load_unverified_commits().unwrap();
         assert_eq!(pending.len(), 0);
     }
 

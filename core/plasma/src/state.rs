@@ -29,7 +29,7 @@ pub struct PlasmaState {
     pub block_number: BlockNumber,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CollectedFee {
     pub token: TokenId,
     pub amount: BigDecimal,
@@ -169,7 +169,7 @@ impl PlasmaState {
         }
     }
 
-    fn apply_full_exit_op(&mut self, op: &FullExitOp) -> AccountUpdates {
+    pub fn apply_full_exit_op(&mut self, op: &FullExitOp) -> AccountUpdates {
         let mut updates = Vec::new();
         let amount = if let Some(amount) = &op.withdraw_amount {
             amount.clone()
@@ -261,36 +261,30 @@ impl PlasmaState {
         })
     }
 
-    fn apply_close(&mut self, tx: Close) -> Result<OpSuccess, Error> {
-        let (account_id, _) = self
-            .get_account_by_address(&tx.account)
-            .ok_or_else(|| format_err!("Account does not exist"))?;
-        let close_op = CloseOp { tx, account_id };
+    fn apply_close(&mut self, _tx: Close) -> Result<OpSuccess, Error> {
+        bail!("Account closing is disabled");
+        // let (account_id, _) = self
+        //     .get_account_by_address(&tx.account)
+        //     .ok_or_else(|| format_err!("Account does not exist"))?;
+        // let close_op = CloseOp { tx, account_id };
 
-        let (fee, updates) = self.apply_close_op(&close_op)?;
-        Ok(OpSuccess {
-            fee: Some(fee),
-            updates,
-            executed_op: FranklinOp::Close(Box::new(close_op)),
-        })
+        // let (fee, updates) = self.apply_close_op(&close_op)?;
+        // Ok(OpSuccess {
+        //     fee: Some(fee),
+        //     updates,
+        //     executed_op: FranklinOp::Close(Box::new(close_op)),
+        // })
     }
 
-    pub fn collect_fee(
-        &mut self,
-        fees: &[CollectedFee],
-        fee_account: &AccountAddress,
-    ) -> (AccountId, AccountUpdates) {
+    pub fn collect_fee(&mut self, fees: &[CollectedFee], fee_account: AccountId) -> AccountUpdates {
         let mut updates = Vec::new();
 
-        let (id, mut account) =
-            if let Some((id, account)) = self.get_account_by_address(fee_account) {
-                (id, account)
-            } else {
-                panic!(
-                    "Fee account should be present in the account tree: {}",
-                    fee_account.to_hex()
-                );
-            };
+        let mut account = self.get_account(fee_account).unwrap_or_else(|| {
+            panic!(
+                "Fee account should be present in the account tree: {}",
+                fee_account
+            )
+        });
 
         for fee in fees {
             if fee.amount == BigDecimal::from(0) {
@@ -303,7 +297,7 @@ impl PlasmaState {
             let new_amount = account.get_balance(fee.token).clone();
 
             updates.push((
-                id,
+                fee_account,
                 AccountUpdate::UpdateBalance {
                     balance_update: (fee.token, old_amount, new_amount),
                     old_nonce: nonce,
@@ -312,9 +306,9 @@ impl PlasmaState {
             ));
         }
 
-        self.insert_account(id, account);
+        self.insert_account(fee_account, account);
 
-        (id, updates)
+        updates
     }
 
     pub fn get_account_by_address(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
@@ -332,6 +326,7 @@ impl PlasmaState {
         self.balance_tree.insert(id, account);
     }
 
+    #[allow(dead_code)]
     fn remove_account(&mut self, id: AccountId) {
         if let Some(account) = self.get_account(id) {
             self.account_id_by_address.remove(&account.address);
@@ -339,7 +334,7 @@ impl PlasmaState {
         }
     }
 
-    fn apply_deposit_op(&mut self, op: &DepositOp) -> AccountUpdates {
+    pub fn apply_deposit_op(&mut self, op: &DepositOp) -> AccountUpdates {
         let mut updates = Vec::new();
 
         let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
@@ -368,7 +363,7 @@ impl PlasmaState {
         updates
     }
 
-    fn apply_transfer_to_new_op(
+    pub fn apply_transfer_to_new_op(
         &mut self,
         op: &TransferToNewOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
@@ -430,7 +425,7 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_withdraw_op(
+    pub fn apply_withdraw_op(
         &mut self,
         op: &WithdrawOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
@@ -471,6 +466,7 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
+    #[allow(dead_code)]
     fn apply_close_op(&mut self, op: &CloseOp) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
         let account = self.get_account(op.account_id).unwrap();
@@ -501,7 +497,7 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_transfer_op(
+    pub fn apply_transfer_op(
         &mut self,
         op: &TransferOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {

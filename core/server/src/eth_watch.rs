@@ -1,21 +1,21 @@
-// Built-in uses
+// Built-in deps
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::str::FromStr;
-use std::sync::mpsc::{self, sync_channel};
+use std::sync::mpsc::sync_channel;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 // External uses
-use ethabi::{decode, ParamType};
 use failure::format_err;
-use futures::{compat::Future01CompatExt, executor::block_on};
+use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on};
 use web3::contract::Contract;
-use web3::types::{Address, BlockNumber, Filter, FilterBuilder, Log, H160, U256};
+use web3::types::{Address, BlockNumber, Filter, FilterBuilder, H160};
 use web3::{Transport, Web3};
-// Workspace uses
-use crate::{ConfigurationOptions, ThreadPanicNotify};
+// Workspace deps
+use models::abi::{governance_contract, priority_queue_contract};
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::{PriorityOp, TokenId};
 use models::params::PRIORITY_EXPIRATION;
+use models::TokenAddedEvent;
 use storage::ConnectionPool;
 
 pub struct EthWatch<T: Transport> {
@@ -39,30 +39,6 @@ impl ETHState {
     }
 }
 
-#[derive(Debug)]
-struct TokenAddedEvent {
-    address: Address,
-    id: u32,
-}
-
-impl TryFrom<Log> for TokenAddedEvent {
-    type Error = failure::Error;
-
-    fn try_from(event: Log) -> Result<TokenAddedEvent, failure::Error> {
-        let mut dec_ev = decode(&[ParamType::Address, ParamType::Uint(32)], &event.data.0)
-            .map_err(|e| format_err!("Event data decode: {:?}", e))?;
-        Ok(TokenAddedEvent {
-            address: dec_ev.remove(0).to_address().unwrap(),
-            id: dec_ev
-                .remove(0)
-                .to_uint()
-                .as_ref()
-                .map(U256::as_u32)
-                .unwrap(),
-        })
-    }
-}
-
 impl<T: Transport> EthWatch<T> {
     pub fn new(
         web3: Web3<T>,
@@ -71,30 +47,20 @@ impl<T: Transport> EthWatch<T> {
         priority_queue_address: H160,
     ) -> Self {
         let gov_contract = {
-            let abi_string = serde_json::Value::from_str(models::abi::GOVERNANCE_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
-
             (
-                abi.clone(),
-                Contract::new(web3.eth(), governance_addr, abi.clone()),
+                governance_contract(),
+                Contract::new(web3.eth(), governance_addr, governance_contract()),
             )
         };
 
         let priority_queue_contract = {
-            let abi_string = serde_json::Value::from_str(models::abi::PRIORITY_QUEUE_CONTRACT)
-                .unwrap()
-                .get("abi")
-                .unwrap()
-                .to_string();
-            let abi = ethabi::Contract::load(abi_string.as_bytes()).unwrap();
-
             (
-                abi.clone(),
-                Contract::new(web3.eth(), priority_queue_address, abi.clone()),
+                priority_queue_contract(),
+                Contract::new(
+                    web3.eth(),
+                    priority_queue_address,
+                    priority_queue_contract(),
+                ),
             )
         };
 
@@ -198,7 +164,7 @@ impl<T: Transport> EthWatch<T> {
             eth_state.add_new_token(token.id as TokenId, token.address)
         }
 
-        debug!("ETH state: {:#?}", *eth_state);
+        trace!("ETH state: {:#?}", *eth_state);
     }
 
     fn process_new_blocks(&mut self, last_block: u64) -> Result<(), failure::Error> {

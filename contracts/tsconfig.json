@@ -1,5 +1,10 @@
 {
     "compilerOptions": {
-        "types" : ["node"]
+        "types": [
+            "node",
+            "mocha",
+            "zksync",
+        ],
+        "downlevelIteration": true,
     }
 }
