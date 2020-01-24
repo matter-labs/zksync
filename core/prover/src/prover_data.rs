@@ -4,7 +4,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 // Workspace
 use circuit::account::AccountWitness;
 use circuit::operation::{
-    Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
+    ETHSignatureData, Operation, OperationArguments, OperationBranch, OperationBranchWitness,
+    SignatureData,
 };
 use models::node::{Engine, Fr};
 
@@ -57,6 +58,14 @@ struct AccountWitnessDef {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(remote = "circuit::operation::ETHSignatureData::<Engine>")]
+pub struct ETHSignatureDataDef {
+    pub r: Vec<Option<bool>>,
+    pub s: Vec<Option<bool>>,
+    pub v: Option<Fr>,
+}
+
+#[derive(Serialize, Deserialize)]
 #[serde(remote = "circuit::operation::Operation::<Engine>")]
 pub struct OperationDef {
     pub new_root: Option<Fr>,
@@ -68,6 +77,8 @@ pub struct OperationDef {
     pub second_sig_msg: Option<Fr>,
     pub third_sig_msg: Option<Fr>,
     pub signature_data: SignatureData,
+    #[serde(with = "ETHSignatureDataDef")]
+    pub eth_signature_data: ETHSignatureData<Engine>,
     #[serde(with = "OperationArgumentsDef")]
     pub args: OperationArguments<Engine>,
     #[serde(with = "OperationBranchDef")]

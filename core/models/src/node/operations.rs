@@ -383,7 +383,7 @@ impl ChangePubKeyOp {
     pub const CHUNKS: usize = 15;
     pub const OP_CODE: u8 = 0x07;
 
-    fn get_public_data(&self) -> Vec<u8> {
+    pub fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);

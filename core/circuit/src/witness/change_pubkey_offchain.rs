@@ -1,34 +1,36 @@
 use super::utils::*;
-
 use crate::operation::SignatureData;
 use crate::operation::*;
+use crate::utils::convert_eth_signature_to_representation;
 use ff::{Field, PrimeField};
+use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
-use models::node::operations::ChangePubkeyPriorityOp;
+use models::node::operations::ChangePubKeyOp;
+use models::node::tx::PackedEthSignature;
+use models::node::{Engine, TransferToNewOp};
 use models::params as franklin_constants;
 use pairing::bn256::*;
 
-pub struct ChangePubkeyOnchainData {
+pub struct ChangePubkeyOffChainData {
     pub account_id: u32,
     pub address: Fr,
-    pub new_pubkeyhash: Fr,
+    pub new_pubkey_hash: Fr,
+    pub eth_signature_data: ETHSignatureData<Engine>,
 }
-
-#[derive(Debug, Clone)]
-pub struct ChangePubkeyOnchainWitness<E: JubjubEngine> {
+pub struct ChangePubkeyOffChainWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
     pub after: OperationBranch<E>,
     pub args: OperationArguments<E>,
     pub before_root: Option<E::Fr>,
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
+    pub eth_signature_data: ETHSignatureData<E>,
 }
-
-impl<E: JubjubEngine> ChangePubkeyOnchainWitness<E> {
+impl<E: JubjubEngine> ChangePubkeyOffChainWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
@@ -43,8 +45,8 @@ impl<E: JubjubEngine> ChangePubkeyOnchainWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.a.unwrap(),
-            franklin_constants::SUCCESS_FLAG_WIDTH,
+            &self.before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -56,70 +58,76 @@ impl<E: JubjubEngine> ChangePubkeyOnchainWitness<E> {
             &self.args.ethereum_key.unwrap(),
             franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
-        //        assert_eq!(pubdata_bits.len(), 37 * 8);
-        pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
+
+        pubdata_bits.extend(self.eth_signature_data.r.iter().map(|x| x.unwrap()));
+        pubdata_bits.extend(self.eth_signature_data.s.iter().map(|x| x.unwrap()));
+        append_be_fixed_width(
+            &mut pubdata_bits,
+            &self.eth_signature_data.v.unwrap(),
+            franklin_constants::ETH_SIGNATURE_V_BIT_WIDTH,
+        );
+
+        pubdata_bits.resize(15 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
 }
 
-pub fn apply_change_pubkey_onchain_tx(
+pub fn apply_change_pubkey_offchain_tx(
     tree: &mut CircuitAccountTree,
-    deposit: &ChangePubkeyPriorityOp,
-) -> ChangePubkeyOnchainWitness<Bn256> {
-    let change_pubkey_data = ChangePubkeyOnchainData {
-        account_id: deposit.account_id.unwrap_or_default(),
-        new_pubkeyhash: deposit.priority_op.new_pubkey_hash.to_fr(),
-        address: eth_address_to_fr(&deposit.priority_op.eth_address),
+    change_pubkey_offchain: &ChangePubKeyOp,
+) -> ChangePubkeyOffChainWitness<Bn256> {
+    let change_pubkey_data = ChangePubkeyOffChainData {
+        account_id: change_pubkey_offchain.account_id,
+        address: eth_address_to_fr(&change_pubkey_offchain.tx.account),
+        new_pubkey_hash: change_pubkey_offchain.tx.new_pk_hash.to_fr(),
+        eth_signature_data: convert_eth_signature_to_representation(
+            &change_pubkey_offchain.tx.eth_signature,
+        ),
     };
 
-    apply_change_pubkey_onchain(tree, &change_pubkey_data, deposit.account_id.is_some())
+    apply_change_pubkey_offchain(tree, change_pubkey_data)
 }
-pub fn apply_change_pubkey_onchain(
+
+pub fn apply_change_pubkey_offchain(
     tree: &mut CircuitAccountTree,
-    pubkey_change: &ChangePubkeyOnchainData,
-    success: bool,
-) -> ChangePubkeyOnchainWitness<Bn256> {
+    change_pubkey_offcahin: ChangePubkeyOffChainData,
+) -> ChangePubkeyOffChainWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
-    println!("change pk onchain Initial root = {}", before_root);
+    println!("Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
-        get_audits(tree, pubkey_change.account_id, 0);
+        get_audits(tree, change_pubkey_offcahin.account_id, 0);
 
     let capacity = tree.capacity();
     assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
-    let account_id_fe = Fr::from_str(&pubkey_change.account_id.to_string()).unwrap();
+    let account_id_fe = Fr::from_str(&change_pubkey_offcahin.account_id.to_string()).unwrap();
     //calculate a and b
-    let a = if success {
-        Fr::from_str("1").unwrap()
-    } else {
-        Fr::zero()
-    };
+    let a = Fr::zero();
     let b = Fr::zero();
 
     //applying deposit
     let (account_witness_before, account_witness_after, balance_before, balance_after) =
         apply_leaf_operation(
             tree,
-            pubkey_change.account_id,
+            change_pubkey_offcahin.account_id,
             0,
             |acc| {
-                if success {
-                    assert_eq!(
-                        acc.address, pubkey_change.address,
-                        "successful operation account address mismatch"
-                    );
-                    acc.pub_key_hash = pubkey_change.new_pubkeyhash;
-                }
+                assert_eq!(
+                    acc.address, change_pubkey_offcahin.address,
+                    "change pubkey address tx mismatch"
+                );
+                acc.pub_key_hash = change_pubkey_offcahin.new_pubkey_hash;
+                acc.nonce.add_assign(&Fr::from_str("1").unwrap());
             },
             |_| {},
         );
 
     let after_root = tree.root_hash();
-    println!("change pk onchain After root = {}", after_root);
+    println!("After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
-        get_audits(tree, pubkey_change.account_id, 0);
+        get_audits(tree, change_pubkey_offcahin.account_id, 0);
 
-    ChangePubkeyOnchainWitness {
+    ChangePubkeyOffChainWitness {
         before: OperationBranch {
             address: Some(account_id_fe),
             token: Some(Fr::zero()),
@@ -141,46 +149,44 @@ pub fn apply_change_pubkey_onchain(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(pubkey_change.address),
+            ethereum_key: Some(change_pubkey_offcahin.address),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
             fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
             pub_nonce: Some(Fr::zero()),
-            new_pub_key_hash: Some(pubkey_change.new_pubkeyhash),
+            new_pub_key_hash: Some(change_pubkey_offcahin.new_pubkey_hash),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
-        tx_type: Some(Fr::from_str("8").unwrap()),
+        tx_type: Some(Fr::from_str("7").unwrap()),
+        eth_signature_data: change_pubkey_offcahin.eth_signature_data,
     }
 }
 
-pub fn calculate_change_pubkey_operations_from_witness(
-    deposit_witness: &ChangePubkeyOnchainWitness<Bn256>,
+pub fn calculate_change_pubkey_offchain_from_witness(
+    change_pubkey_offchain_witness: &ChangePubkeyOffChainWitness<Bn256>,
 ) -> Vec<Operation<Bn256>> {
-    deposit_witness
+    change_pubkey_offchain_witness
         .get_pubdata()
         .chunks(64)
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .enumerate()
         .map(|(chunk_n, pubdata_chunk)| Operation {
-            new_root: deposit_witness.after_root,
-            tx_type: deposit_witness.tx_type,
+            new_root: change_pubkey_offchain_witness.after_root,
+            tx_type: change_pubkey_offchain_witness.tx_type,
             chunk: Some(Fr::from_str(&chunk_n.to_string()).unwrap()),
             pubdata_chunk: Some(pubdata_chunk),
             first_sig_msg: Some(Fr::zero()),
             second_sig_msg: Some(Fr::zero()),
             third_sig_msg: Some(Fr::zero()),
-            signature_data: SignatureData {
-                r_packed: vec![Some(false); 256],
-                s: vec![Some(false); 256],
-            },
-            eth_signature_data: ETHSignatureData::init_empty(),
+            signature_data: SignatureData::init_empty(),
             signer_pub_key_packed: vec![Some(false); 256],
-            args: deposit_witness.args.clone(),
-            lhs: deposit_witness.before.clone(),
-            rhs: deposit_witness.after.clone(),
+            eth_signature_data: change_pubkey_offchain_witness.eth_signature_data.clone(),
+            args: change_pubkey_offchain_witness.args.clone(),
+            lhs: change_pubkey_offchain_witness.before.clone(),
+            rhs: change_pubkey_offchain_witness.after.clone(),
         })
         .collect()
 }
@@ -190,35 +196,31 @@ mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
-    use ff::Field;
-    use models::node::priority_ops::ChangePubKeyPriority;
-    use models::node::{Account, Address, Deposit, PubKeyHash};
+    use models::node::account::AccountUpdate::ChangePubKeyHash;
+    use models::node::operations::ChangePubkeyPriorityOp;
+    use models::node::tx::ChangePubKey;
+    use models::node::{Account, Address};
     use models::primitives::pack_bits_into_bytes_in_order;
+    use testkit::zksync_account::ZksyncAccount;
 
     #[test]
     #[ignore]
-    fn test_change_pubkey_onchain_success() {
+    fn test_change_pubkey_offchain_success() {
+        let zksync_account = ZksyncAccount::rand();
         let change_pkhash_to_account_id = 0xc1;
-        let change_pkhash_to_account_address =
-            "9090909090909090909090909090909090909090".parse().unwrap();
+        let change_pkhash_to_account_address = zksync_account.address;
         let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
             change_pkhash_to_account_id,
             Account::default_with_address(&change_pkhash_to_account_address),
         )]);
 
-        let change_pkhash_op = ChangePubkeyPriorityOp {
-            priority_op: ChangePubKeyPriority {
-                new_pubkey_hash: PubKeyHash::from_hex(
-                    "sync:0808080808080808080808080808080808080808",
-                )
-                .unwrap(),
-                eth_address: change_pkhash_to_account_address,
-            },
-            account_id: Some(change_pkhash_to_account_id),
+        let change_pkhash_op = ChangePubKeyOp {
+            tx: zksync_account.create_change_pubkey_tx(None, true),
+            account_id: change_pkhash_to_account_id,
         };
 
         println!("node root hash before op: {:?}", plasma_state.root_hash());
-        plasma_state.apply_change_pubkey_priority_op(&change_pkhash_op);
+        plasma_state.apply_change_pubkey_op(&change_pkhash_op);
         println!("node root hash after op: {:?}", plasma_state.root_hash());
         println!(
             "node pubdata: {}",
@@ -226,18 +228,17 @@ mod test {
         );
 
         let change_pkhash_witness =
-            apply_change_pubkey_onchain_tx(&mut witness_accum.account_tree, &change_pkhash_op);
+            apply_change_pubkey_offchain_tx(&mut witness_accum.account_tree, &change_pkhash_op);
         let change_pkhash_operations =
-            calculate_change_pubkey_operations_from_witness(&change_pkhash_witness);
+            calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
         let pub_data_from_witness = change_pkhash_witness.get_pubdata();
 
-        println!("Change pk onchain witness: {:#?}", change_pkhash_witness);
+        //        println!("Change pk onchain witness: {:#?}", change_pkhash_witness);
 
-        println!(
-            "pubdata from witness: {}",
-            hex::encode(&pack_bits_into_bytes_in_order(
-                pub_data_from_witness.clone()
-            ))
+        assert_eq!(
+            hex::encode(pack_bits_into_bytes_in_order(pub_data_from_witness.clone())),
+            hex::encode(change_pkhash_op.get_public_data()),
+            "pubdata from witness incorrect"
         );
 
         witness_accum.add_operation_with_pubdata(change_pkhash_operations, pub_data_from_witness);

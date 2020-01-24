@@ -21,7 +21,7 @@ use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use models::params as franklin_constants;
 
-const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
+const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 9;
 #[derive(Clone)]
 pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub params: &'a E::Params,
@@ -69,6 +69,9 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 third_sig_msg: zero_circuit_element.clone(),
                 a: zero_circuit_element.clone(),
                 b: zero_circuit_element.clone(),
+                eth_signature_r: zero_circuit_element.clone(),
+                eth_signature_s: zero_circuit_element.clone(),
+                eth_signature_v: zero_circuit_element.clone(),
             },
         };
         // this is only public input to our circuit
@@ -740,6 +743,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &ext_pubdata_chunk,
             &signature_data,
         )?);
+        op_flags.push(self.change_pubkey_offchain(
+            cs.namespace(|| "change_pubkey_offchain"),
+            &mut cur,
+            &chunk_data,
+            &is_account_empty,
+            &op_data,
+            &ext_pubdata_chunk,
+        )?);
         op_flags.push(self.noop(cs.namespace(|| "noop"), &chunk_data, &ext_pubdata_chunk)?);
 
         let op_valid = multi_or(cs.namespace(|| "op_valid"), &op_flags)?;
@@ -1044,10 +1055,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &cur.account.pub_key_hash,
             &success_account_update,
         )?;
-        println!(
-            "account pkh after: {:?}",
-            cur.account.pub_key_hash.get_number().get_value()
-        );
 
         // Check other chunks
         let other_chunks_valid = {
@@ -1286,6 +1293,97 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &cur.account.address,
             &is_valid_first,
         )?;
+        Ok(tx_valid)
+    }
+
+    fn change_pubkey_offchain<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        chunk_data: &AllocatedChunkData<E>,
+        is_account_empty: &Boolean,
+        op_data: &AllocatedOperationData<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        //construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+        pubdata_bits.extend(cur.account.nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
+        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
+        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
+        pubdata_bits.extend(op_data.eth_signature_r.get_bits_be());
+        pubdata_bits.extend(op_data.eth_signature_s.get_bits_be());
+        pubdata_bits.extend(op_data.eth_signature_v.get_bits_be());
+        pubdata_bits.resize(
+            15 * franklin_constants::CHUNK_BIT_WIDTH, //TODO: move to constant
+            Boolean::constant(false),
+        );
+
+        //useful below
+        let is_first_chunk = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &chunk_data.chunk_number,
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?);
+
+        let mut is_valid_flags = vec![];
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &chunk_data.chunk_number,
+            15,
+        )?;
+
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        is_valid_flags.push(is_pubdata_chunk_correct);
+
+        // verify correct tx_code
+        let is_change_pubkey_offchain = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_change_pubkey_offchain"),
+            &chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(7), //TODO: move to constants
+        )?);
+        is_valid_flags.push(is_change_pubkey_offchain.clone());
+
+        // verify if address is to previous one (if existed)
+        let is_address_correct = CircuitElement::equals(
+            cs.namespace(|| "is_address_correct"),
+            &op_data.ethereum_key,
+            &cur.account.address,
+        )?;
+
+        is_valid_flags.push(is_address_correct);
+
+        let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
+
+        let is_valid_first = Boolean::and(
+            cs.namespace(|| "is valid and first"),
+            &tx_valid,
+            &is_first_chunk,
+        )?;
+
+        // update pub_key
+        cur.account.pub_key_hash = CircuitElement::conditionally_select(
+            cs.namespace(|| "mutated_pubkey_hash"),
+            &op_data.new_pubkey_hash,
+            &cur.account.pub_key_hash,
+            &is_valid_first,
+        )?;
+
+        //update nonce
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1),
+            &cur.account.nonce,
+            &is_valid_first,
+        )?;
+
         Ok(tx_valid)
     }
 
@@ -2067,6 +2165,13 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
         //full_exit
         let x = E::Fr::from_str(&i.to_string()).unwrap();
         let y = E::Fr::from_str("5").unwrap();
+        points.push((x, y));
+    }
+
+    for i in &[7] {
+        //change pubkey tx
+        let x = E::Fr::from_str(&i.to_string()).unwrap();
+        let y = E::Fr::from_str("14").unwrap();
         points.push((x, y));
     }
 

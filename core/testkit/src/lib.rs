@@ -141,24 +141,12 @@ impl<T: Transport> AccountSet<T> {
 
     fn change_pubkey_with_tx(
         &self,
-        eth_signer: ETHAccountId,
         zksync_signer: ZKSyncAccountId,
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> FranklinTx {
-        let eth_private_key = &self.eth_accounts[eth_signer.0].private_key;
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
-        let sign_bytes = ChangePubKey::get_eth_signed_data(
-            nonce.unwrap_or_else(|| zksync_account.nonce()),
-            &zksync_account.pubkey_hash,
-        );
-        let signature = PackedEthSignature::sign(eth_private_key, &sign_bytes)
-            .expect("Signature should succeed");
-        FranklinTx::ChangePubKey(zksync_account.create_change_pubkey_tx(
-            signature,
-            nonce,
-            increment_nonce,
-        ))
+        FranklinTx::ChangePubKey(zksync_account.create_change_pubkey_tx(nonce, increment_nonce))
     }
 
     fn change_pubkey_with_priority_op(
@@ -283,9 +271,13 @@ pub fn perform_basic_tests() {
         let mut zksync_accounts = Vec::new();
         zksync_accounts.push(fee_account);
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
-            let mut account = ZksyncAccount::rand();
-            account.address = eth_account.address;
-            account
+            let rng_zksync_key = ZksyncAccount::rand().private_key;
+            ZksyncAccount::new(
+                rng_zksync_key,
+                0,
+                eth_account.address,
+                eth_account.private_key,
+            )
         }));
         zksync_accounts
     };
@@ -323,7 +315,7 @@ pub fn perform_basic_tests() {
         // test transfers
         test_setup.start_block();
 
-        test_setup.change_pubkey_with_tx(ETHAccountId(0), ZKSyncAccountId(1));
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
 
         //should be executed as a transfer
         test_setup.transfer(
@@ -575,10 +567,10 @@ impl TestSetup {
         self.execute_priority_op(full_exit);
     }
 
-    fn change_pubkey_with_tx(&mut self, eth_signer: ETHAccountId, zksync_signer: ZKSyncAccountId) {
+    fn change_pubkey_with_tx(&mut self, zksync_signer: ZKSyncAccountId) {
         let tx = self
             .accounts
-            .change_pubkey_with_tx(eth_signer, zksync_signer, None, true);
+            .change_pubkey_with_tx(zksync_signer, None, true);
 
         self.execute_tx(tx);
     }

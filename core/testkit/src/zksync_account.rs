@@ -9,29 +9,55 @@ use models::params::JUBJUB_PARAMS;
 use rand::{thread_rng, Rng};
 use std::cell::RefCell;
 use std::convert::TryInto;
+use web3::types::H256;
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZksyncAccount {
     pub private_key: PrivateKey,
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
+    pub eth_private_key: H256,
     nonce: RefCell<Nonce>,
 }
 
 impl ZksyncAccount {
+    /// Note: probably not secure, use for testing.
     pub fn rand() -> Self {
         let rng = &mut thread_rng();
 
         let pk = priv_key_from_fs(rng.gen());
-        Self::new(pk, 0, rng.gen::<[u8; 20]>().into())
+        let (eth_pk, eth_address) = {
+            let eth_pk = rng.gen::<[u8; 32]>().into();
+            let mut eth_address = Address::zero();
+            loop {
+                if let Ok(address) = PackedEthSignature::address_from_private_key(&eth_pk) {
+                    eth_address = address;
+                    break;
+                }
+            }
+            (eth_pk, eth_address)
+        };
+        Self::new(pk, 0, eth_address, eth_pk)
     }
 
-    pub fn new(private_key: PrivateKey, nonce: Nonce, address: Address) -> Self {
+    pub fn new(
+        private_key: PrivateKey,
+        nonce: Nonce,
+        address: Address,
+        eth_private_key: H256,
+    ) -> Self {
         let pubkey_hash = PubKeyHash::from_privkey(&private_key);
+        assert_eq!(
+            address,
+            PackedEthSignature::address_from_private_key(&eth_private_key)
+                .expect("private key is incorrect"),
+            "address should correspond to private key"
+        );
         Self {
             address,
             private_key,
             pubkey_hash,
+            eth_private_key,
             nonce: RefCell::new(nonce),
         }
     }
@@ -96,16 +122,24 @@ impl ZksyncAccount {
 
     pub fn create_change_pubkey_tx(
         &self,
-        eth_signature: PackedEthSignature,
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> ChangePubKey {
+        let nonce = nonce.unwrap_or_else(|| *self.nonce.borrow());
+        let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash);
+        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
+            .expect("Signature should succeed");
         let change_pubkey = ChangePubKey {
             account: self.address,
             new_pk_hash: self.pubkey_hash.clone(),
-            nonce: nonce.unwrap_or_else(|| *self.nonce.borrow()),
+            nonce,
             eth_signature,
         };
+        assert_eq!(
+            change_pubkey.verify_eth_signature(),
+            Some(self.address),
+            "eth signature is incorrect"
+        );
 
         if increment_nonce {
             *self.nonce.borrow_mut() += 1;

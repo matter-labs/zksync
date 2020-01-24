@@ -99,6 +99,11 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
             r_packed: vec![None; params::FR_BIT_WIDTH_PADDED],
             s: vec![None; params::FR_BIT_WIDTH_PADDED],
         },
+        eth_signature_data: ETHSignatureData {
+            r: vec![None; 256],
+            s: vec![None; 256],
+            v: None,
+        },
         args: OperationArguments {
             a: None,
             b: None,

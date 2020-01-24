@@ -8,9 +8,10 @@ use franklin_crypto::eddsa::Signature;
 use franklin_crypto::eddsa::{PrivateKey, PublicKey};
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
-use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
+use crate::operation::{ETHSignatureData, SignatureData};
 use models::circuit::utils::le_bit_vector_into_field_element;
+use models::node::tx::PackedEthSignature;
 use models::params as franklin_constants;
 use models::primitives::*;
 
@@ -87,6 +88,30 @@ where
     SignatureData {
         r_packed: sig_r_packed_bits.iter().map(|x| Some(*x)).collect(),
         s: sig_s_bits.iter().map(|x| Some(*x)).collect(),
+    }
+}
+
+pub fn convert_eth_signature_to_representation<E>(
+    signature: &PackedEthSignature,
+) -> ETHSignatureData<E>
+where
+    E: JubjubEngine,
+{
+    let mut signature_r_be_bits: Vec<bool> = bytes_into_be_bits(&signature.0.r);
+    signature_r_be_bits.reverse();
+    signature_r_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    signature_r_be_bits.reverse();
+    let mut signature_s_be_bits: Vec<bool> = bytes_into_be_bits(&signature.0.s);
+    signature_s_be_bits.reverse();
+    signature_s_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
+    signature_s_be_bits.reverse();
+
+    //maybe reverse bytes?
+
+    ETHSignatureData {
+        r: signature_r_be_bits.iter().map(|x| Some(*x)).collect(),
+        s: signature_s_be_bits.iter().map(|x| Some(*x)).collect(),
+        v: Some(E::Fr::from_str(&signature.0.v.to_string()).unwrap()),
     }
 }
 

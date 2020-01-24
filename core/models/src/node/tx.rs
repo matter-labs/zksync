@@ -581,6 +581,13 @@ impl PackedEthSignature {
             .ok_or_else(|| format_err!("failed to add 27 to signature v"))?;
         Ok(PackedEthSignature(signed_message))
     }
+
+    /// Get Ethereum address from private key,
+    /// TODO: refactor eth signing with utils to other module.
+    pub fn address_from_private_key(private_key: &H256) -> Result<Address, failure::Error> {
+        let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
+        Ok(Address::from_slice(secret_key.public().address()))
+    }
 }
 
 impl Serialize for PackedEthSignature {

@@ -86,6 +86,9 @@ pub const SIGNATURE_R_X_BIT_WIDTH: usize = 254;
 pub const SIGNATURE_R_Y_BIT_WIDTH: usize = 254;
 pub const SIGNATURE_R_BIT_WIDTH_PADDED: usize = 256;
 
+// ETH signature data
+pub const ETH_SIGNATURE_V_BIT_WIDTH: usize = 8;
+
 // Fr element encoding
 pub const FR_BIT_WIDTH: usize = 254;
 pub const FR_BIT_WIDTH_PADDED: usize = 256;

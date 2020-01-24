@@ -1,3 +1,4 @@
+pub mod change_pubkey_offchain;
 pub mod change_pubkey_onchain;
 pub mod close_account;
 pub mod deposit;

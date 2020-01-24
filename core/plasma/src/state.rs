@@ -577,7 +577,7 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    fn apply_change_pubkey_op(
+    pub fn apply_change_pubkey_op(
         &mut self,
         op: &ChangePubKeyOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
