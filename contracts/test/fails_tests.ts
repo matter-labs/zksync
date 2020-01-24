@@ -1,4 +1,4 @@
-import {ethers} from "ethers";
+import { ethers } from "ethers";
 import {
     addTestERC20Token,
     addTestNotApprovedERC20Token,
@@ -12,9 +12,9 @@ import {
     priorityQueueTestContractCode,
     verifierTestContractCode,
 } from "../src.ts/deploy";
-import {expect, use} from "chai";
-import {solidity} from "ethereum-waffle";
-import {bigNumberify, hexlify, parseEther} from "ethers/utils";
+import { expect, use } from "chai";
+import { solidity } from "ethereum-waffle";
+import { bigNumberify, hexlify, parseEther } from "ethers/utils";
 import {
     cancelOustandingDepositsForExodus,
     createDepositPublicData,
@@ -40,7 +40,7 @@ const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0
 const franklinAddress = "0809101112131415161718192021222334252627";
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 
-describe("PLANNED FAILS", function() {
+describe("PLANNED FAILS", function () {
     this.timeout(100000);
 
     let franklinDeployedContract;
@@ -76,7 +76,7 @@ describe("PLANNED FAILS", function() {
         await mintTestERC20Token(wallet, erc20DeployedToken1);
         await mintTestERC20Token(wallet, erc20DeployedToken2);
         // Make sure that exit wallet can execute transactions.
-        await wallet.sendTransaction({to: exitWallet.address, value: parseEther("1.0")});
+        await wallet.sendTransaction({ to: exitWallet.address, value: parseEther("1.0") });
     });
 
     it("Onchain errors", async () => {
@@ -101,7 +101,7 @@ describe("PLANNED FAILS", function() {
         console.log("\n - ERC20 deposit: Wrong tx value (msg.value < fee) started");
         const depositERCValue = 78;
         const notCorrectFeeValue = parseEther("0.001");
-        
+
         await postErc20Deposit(
             provider,
             wallet,
@@ -238,7 +238,7 @@ describe("PLANNED FAILS", function() {
                 depositValue,
                 null,
             );
-            console.log(`Posted ${i+1} deposit`);
+            console.log(`Posted ${i + 1} deposit`);
         }
 
         // Try to cancel deposits in not exodus mode
@@ -389,7 +389,6 @@ describe("PLANNED FAILS", function() {
             null,
             "fck11",
         );
-
         console.log(" + Wrong commit number passed");
 
         // Wrong noop pubdata - less length
@@ -409,14 +408,13 @@ describe("PLANNED FAILS", function() {
             null,
             "fcs11",
         );
-
         console.log(" + Wrong noop pubdata - less length passed");
 
         // Wrong deposit pubdata - less length
         console.log("\n - Wrong deposit pubdata - less length started");
         let depositAmount = parseEther("0.3");
         const wrongDepositBlockPublicData = createWrongDepositPublicData(0, hexlify(depositAmount), franklinAddress);
-        
+
         await postBlockCommit(
             provider,
             wallet,
@@ -430,7 +428,6 @@ describe("PLANNED FAILS", function() {
             null,
             "bse11",
         );
-
         console.log(" + Wrong deposit pubdata - less length passed");
 
         // Wrong operation id
@@ -450,13 +447,12 @@ describe("PLANNED FAILS", function() {
             null,
             "fpp14",
         );
-
         console.log(" + Wrong operation pubdata - wrong op id passed");
 
         // Wrong priority operation - non existed
         console.log("\n - Wrong priority operation - non existed started");
         const depositPublicData = createDepositPublicData(0, hexlify(depositAmount), franklinAddress);
-        
+
         await postBlockCommit(
             provider,
             wallet,
@@ -470,7 +466,6 @@ describe("PLANNED FAILS", function() {
             null,
             "pvs11",
         );
-
         console.log(" + Wrong priority operation - non existed passed");
 
         // Wrong priority operation - different data
@@ -503,13 +498,12 @@ describe("PLANNED FAILS", function() {
             null,
             "fvs11",
         );
-        
         console.log(" + Wrong priority operation - different data passed");
 
         // Not governor commit
         console.log("\n - Not governor started");
         const exitWalletFranklinContract = franklinDeployedContract.connect(exitWallet);
-       
+
         await postBlockCommit(
             provider,
             wallet,
@@ -523,7 +517,6 @@ describe("PLANNED FAILS", function() {
             null,
             "grr21",
         );
-        
         console.log(" + Not governor passed");
     });
 
@@ -558,7 +551,7 @@ describe("PLANNED FAILS", function() {
             dummyBlockProof,
             "fvk11",
         );
-        
+
         console.log(" + Wrong verify number passed");
 
         // Not governor commit
@@ -616,11 +609,11 @@ describe("PLANNED FAILS", function() {
             },
         );
         await prTx2.wait()
-        .catch(() => {});
+            .catch(() => { });
 
         const code1 = await provider.call(prTx2, prTx2.blockNumber);
         const reason1 = hex_to_ascii(code1.substr(138));
-        
+
         expect(reason1.substring(0, 5)).equal("pcs11");
         console.log(" + Set franklin address twice will not work passed");
     });

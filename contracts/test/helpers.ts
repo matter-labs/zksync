@@ -1,9 +1,9 @@
 
-import {utils as syncutils} from "zksync";
-import {BN} from "bn.js";
-import {expect, use} from "chai";
-import {solidity} from "ethereum-waffle";
-import {bigNumberify} from "ethers/utils";
+import { utils as syncutils } from "zksync";
+import { BN } from "bn.js";
+import { expect, use } from "chai";
+import { solidity } from "ethereum-waffle";
+import { bigNumberify } from "ethers/utils";
 
 use(solidity);
 
@@ -38,10 +38,10 @@ export async function cancelOustandingDepositsForExodus(
     } else {
         const tx = await franklinDeployedContract.cancelOutstandingDepositsForExodusMode(
             expectedToCancel,
-            {gasLimit: bigNumberify("8000000")},
+            { gasLimit: bigNumberify("8000000") },
         );
         await tx.wait()
-        .catch(() => {});
+            .catch(() => { });
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -62,7 +62,7 @@ export async function postEthDeposit(
     revertCode,
 ) {
     const franklinAddressBinary = Buffer.from(franklinAddress, "hex");
-    
+
     const oldOpenPriorityRequests = await priorityQueueDeployedContract.totalOpenPriorityRequests();
     const oldCommittedPriorityRequests = await priorityQueueDeployedContract.totalCommittedPriorityRequests();
     const oldFirstPriorityRequestId = await priorityQueueDeployedContract.firstPriorityRequestId();
@@ -70,30 +70,30 @@ export async function postEthDeposit(
     const tx = await franklinDeployedContract.depositETH(
         depositAmount,
         franklinAddressBinary,
-        {value: txValue, gasLimit: bigNumberify("8000000")},
+        { value: txValue, gasLimit: bigNumberify("8000000") },
     );
 
     if (!revertCode) {
         const receipt = await tx.wait();
         const event = receipt.events[1].args;
-    
+
         expect(event.owner).equal(wallet.address);
         expect(event.tokenId).equal(0);
         expect(event.amount).equal(depositAmount);
         expect(event.fee).equal(fee);
         expect(event.franklinAddress).equal("0x" + franklinAddress);
-    
+
         const newOpenPriorityRequests = await priorityQueueDeployedContract.totalOpenPriorityRequests();
         const newCommittedPriorityRequests = await priorityQueueDeployedContract.totalCommittedPriorityRequests();
         const newFirstPriorityRequestId = await priorityQueueDeployedContract.firstPriorityRequestId();
-    
+
         expect(newOpenPriorityRequests - oldOpenPriorityRequests).equal(1);
         expect(newCommittedPriorityRequests - oldCommittedPriorityRequests).equal(0);
         expect(newFirstPriorityRequestId - oldFirstPriorityRequestId).equal(0);
-    
+
     } else {
         await tx.wait()
-        .catch(() => {});
+            .catch(() => { });
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -117,7 +117,7 @@ export async function postErc20Deposit(
     await token.approve(franklinDeployedContract.address, depositAmount);
 
     const franklinAddressBinary = Buffer.from(franklinAddress, "hex");
-    
+
     const oldOpenPriorityRequests = await priorityQueueDeployedContract.totalOpenPriorityRequests();
     const oldCommittedPriorityRequests = await priorityQueueDeployedContract.totalCommittedPriorityRequests();
     const oldFirstPriorityRequestId = await priorityQueueDeployedContract.firstPriorityRequestId();
@@ -126,30 +126,30 @@ export async function postErc20Deposit(
         token.address,
         depositAmount,
         franklinAddressBinary,
-        {value: txValue, gasLimit: bigNumberify("8000000")},
+        { value: txValue, gasLimit: bigNumberify("8000000") },
     );
 
     if (!revertCode) {
         const receipt = await tx.wait();
         const event = receipt.events[3].args;
-    
+
         expect(event.owner).equal(wallet.address);
         expect(event.amount).equal(depositAmount);
         expect(event.fee).equal(fee);
         expect(event.franklinAddress).equal("0x" + franklinAddress);
-    
+
         const newOpenPriorityRequests = await priorityQueueDeployedContract.totalOpenPriorityRequests();
         const newCommittedPriorityRequests = await priorityQueueDeployedContract.totalCommittedPriorityRequests();
         const newFirstPriorityRequestId = await priorityQueueDeployedContract.firstPriorityRequestId();
-    
+
         expect(newOpenPriorityRequests - oldOpenPriorityRequests).equal(1);
         expect(newCommittedPriorityRequests - oldCommittedPriorityRequests).equal(0);
         expect(newFirstPriorityRequestId - oldFirstPriorityRequestId).equal(0);
-    
+
         console.log("Posted new deposit");
     } else {
         await tx.wait()
-        .catch(() => {});
+            .catch(() => { });
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -188,9 +188,9 @@ export async function postBlockCommit(
         const commitEvents = commitReceipt.events;
 
         const commitedEvent1 = commitEvents[0].args;
-        
+
         expect(commitedEvent1.blockNumber).equal(blockNumber);
-        
+
         const afterOnchainOps = await franklinDeployedContract.totalOnchainOps();
         expect(afterOnchainOps - beforeOnchainOps).equal(onchainOperationsNumber);
 
@@ -201,7 +201,7 @@ export async function postBlockCommit(
         expect((await franklinDeployedContract.blocks(blockNumber)).validator).equal(wallet.address);
     } else {
         await tx.wait()
-        .catch(() => {});
+            .catch(() => { });
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -219,18 +219,18 @@ export async function postBlockVerify(
     const tx = await franklinDeployedContract.verifyBlock(
         blockNumber,
         proof,
-        {gasLimit: bigNumberify("500000")},
+        { gasLimit: bigNumberify("500000") },
     );
     if (!revertCode) {
         const receipt = await tx.wait();
         const events = receipt.events;
-        
+
         const event = events.pop().args;
 
         expect(event.blockNumber).equal(blockNumber);
     } else {
         await tx.wait()
-        .catch(() => {});
+            .catch(() => { });
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -256,7 +256,7 @@ export async function withdrawEthFromContract(
         expect(newBalance.sub(oldBalance).add(gasUsed)).eq(balanceToWithdraw);
     } else {
         await exitTx.wait()
-        .catch(() => {});
+            .catch(() => { });
 
         const code = await provider.call(exitTx, exitTx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -278,7 +278,7 @@ export async function withdrawErcFromContract(
     const exitTx = await franklinDeployedContract.withdrawERC20(
         token.address,
         balanceToWithdraw,
-        {gasLimit: bigNumberify("500000")},
+        { gasLimit: bigNumberify("500000") },
     );
     if (!revertCode) {
         await exitTx.wait();
@@ -288,7 +288,7 @@ export async function withdrawErcFromContract(
         expect(newBalance.sub(oldBalance)).eq(balanceToWithdraw);
     } else {
         await exitTx.wait()
-        .catch(() => {});
+            .catch(() => { });
 
         const code = await provider.call(exitTx, exitTx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -327,7 +327,7 @@ export async function postFullExit(
         expect(afterTotalOpenRequests - beforeTotalOpenRequests).equal(1);
     } else {
         await tx.wait()
-        .catch(() => {});
+            .catch(() => { });
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -455,10 +455,10 @@ export function createWrongOperationPublicData(): Buffer {
 }
 
 export function hex_to_ascii(str1) {
-	const hex = str1.toString();
-	let str = "";
-	for (let n = 0; n < hex.length; n += 2) {
-		str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
-	}
-	return str;
+    const hex = str1.toString();
+    let str = "";
+    for (let n = 0; n < hex.length; n += 2) {
+        str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
+    }
+    return str;
 }

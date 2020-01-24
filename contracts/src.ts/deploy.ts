@@ -227,3 +227,4 @@ export async function addTestNotApprovedERC20Token(wallet) {
         console.log("Add token error:" + err);
     }
 }
+

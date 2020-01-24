@@ -654,6 +654,13 @@ impl TestSetup {
             "Block verify failed: {:?}",
             block_rec.transaction_hash
         );
+        let block_rec = block_on(self.commit_account.complete_withdrawals())
+            .expect("failed to complete pending withdrawals");
+        ensure!(
+            block_rec.status == Some(U64::from(1)),
+            "Block commit failed: {:?}",
+            block_rec.transaction_hash
+        );
 
         let mut block_checks_failed = false;
         for ((eth_account, token), (balance, allowed_margin)) in
