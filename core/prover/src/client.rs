@@ -33,7 +33,7 @@ pub struct PublishReq {
 
 #[derive(Debug)]
 pub struct FullBabyProof {
-    proof: bellman::groth16::Proof<models::node::Engine>,
+    proof: franklin_crypto::bellman::groth16::Proof<models::node::Engine>,
     inputs: [models::node::Fr; 1],
     public_data: Vec<u8>,
 }

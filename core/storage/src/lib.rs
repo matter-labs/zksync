@@ -17,8 +17,8 @@ use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
 use failure::bail;
-use models::{from_hex, to_hex, GenericFrHolder};
-use models::node::block::{Block, FrHolder, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use models::{from_hex, to_hex};
+use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
     AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
@@ -772,7 +772,7 @@ impl StorageProcessor {
         self.conn().transaction(|| {
             self.save_block_transactions(block)?;
 
-            let h = to_hex(&block.new_root_hash.0);
+            let h = to_hex(&block.new_root_hash);
 
             let new_block = StorageBlock {
                 number: i64::from(block.block_number),
@@ -1144,7 +1144,6 @@ impl StorageProcessor {
 
         let new_root_hash: Fr = from_hex(&format!("0x{}", &stored_block.root_hash[8..])).expect("Unparsable root hash");
 
-        let new_root_hash: FrHolder = GenericFrHolder(new_root_hash);
         Ok(Some(Block {
             block_number: block,
             new_root_hash: new_root_hash,

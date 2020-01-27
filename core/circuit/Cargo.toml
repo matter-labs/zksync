@@ -27,5 +27,5 @@ serde_json = "1.0.0"
 [dev-dependencies]
 plasma = { path = "../plasma", version = "0.1.1" }
 bigdecimal = { version = "0.1.0", features = ["serde"]}
-# testkit = { path = "../testkit", version = "0.1.0"}
+testkit = { path = "../testkit", version = "0.1.0"}
 web3 = "0.8.0"
