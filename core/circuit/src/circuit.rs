@@ -4,9 +4,7 @@ use crate::allocated_structures::*;
 use crate::element::CircuitElement;
 use crate::operation::Operation;
 use crate::signature::*;
-use crate::utils::{
-    allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element, reverse_bytes,
-};
+use crate::utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::boolean::Boolean;
@@ -136,7 +134,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         // Main cycle that processes operations:
         for (i, operation) in self.operations.iter().enumerate() {
-            println!("operation number {} processing started", i);
             let cs = &mut cs.namespace(|| format!("chunk number {}", i));
 
             let (next_chunk, chunk_data) = self.verify_correct_chunking(
@@ -169,7 +166,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let (state_root, is_account_empty, _subtree_root) = self
                 .check_account_data(cs.namespace(|| "calculate account root"), &current_branch)?;
 
-            println!("chunk old state root : {:?}", state_root.get_value());
             // ensure root hash of state before applying operation is correct
             cs.enforce(
                 || "root state before applying operation is valid",
@@ -195,11 +191,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &current_branch,
             )?;
 
-            println!("new state root root : {:?}", new_state_root.get_value());
-
             rolling_root = new_state_root;
-
-            println!()
         }
 
         cs.enforce(
@@ -240,33 +232,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             self.params,
         )?;
 
-        {
-            let bits_vals = block_pub_data_bits.clone();
-            let mut pb_bits_bool: Vec<bool> = Vec::new();
-            for b in bits_vals {
-                let bit = b.get_value().unwrap();
-                pb_bits_bool.push(bit);
-            }
-            fn bits_as_bytes(bits: &[bool]) -> Vec<u8> {
-                let mut i = 0;
-                let mut bytes = Vec::new();
-                while (i < bits.len()) {
-                    let mut byte = 0u8;
-                    for j in 0..8 {
-                        if bits[i + (j as usize)] {
-                            byte |= (1 << (7 - j));
-                        }
-                    }
-                    bytes.push(byte);
-                    i += 8;
-                }
-                bytes
-            }
-            println!("pubdata: {}", hex::encode(&bits_as_bytes(&pb_bits_bool)));
-        }
-
-        println!("rolling root: {:?}", rolling_root.get_value());
-        println!("root from operator: {:?}", root_from_operator.get_value());
         // ensure that this operator leaf is correct for our tree state
         cs.enforce(
             || "root before applying fees is correct",
@@ -730,24 +695,19 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &mut cur,
             &chunk_data,
             &op_data,
-            &signer_key,
             &ext_pubdata_chunk,
-            &signature_data,
         )?);
         op_flags.push(self.change_pubkey_onhcain(
             cs.namespace(|| "change_pubkey_onhcain"),
             &mut cur,
             &chunk_data,
             &op_data,
-            &signer_key,
             &ext_pubdata_chunk,
-            &signature_data,
         )?);
         op_flags.push(self.change_pubkey_offchain(
             cs.namespace(|| "change_pubkey_offchain"),
             &mut cur,
             &chunk_data,
-            &is_account_empty,
             &op_data,
             &ext_pubdata_chunk,
         )?);
@@ -954,9 +914,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         cur: &mut AllocatedOperationBranch<E>,
         chunk_data: &AllocatedChunkData<E>,
         op_data: &AllocatedOperationData<E>,
-        signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
-        signature: &AllocatedSignatureData<E>,
     ) -> Result<Boolean, SynthesisError> {
         // Execute first chunk
 
@@ -1078,9 +1036,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         cur: &mut AllocatedOperationBranch<E>,
         chunk_data: &AllocatedChunkData<E>,
         op_data: &AllocatedOperationData<E>,
-        signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
-        signature: &AllocatedSignatureData<E>,
     ) -> Result<Boolean, SynthesisError> {
         // Execute first chunk
 
@@ -1301,7 +1257,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
         chunk_data: &AllocatedChunkData<E>,
-        is_account_empty: &Boolean,
         op_data: &AllocatedOperationData<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
     ) -> Result<Boolean, SynthesisError> {

@@ -11,8 +11,6 @@ use futures::{
     SinkExt, StreamExt,
 };
 use models::config_options::ConfigurationOptions;
-use models::node::tx::ChangePubKey;
-use models::node::tx::PackedEthSignature;
 use models::node::{
     Account, AccountId, AccountMap, Address, FranklinTx, Nonce, PriorityOp, TokenId,
 };
@@ -129,12 +127,9 @@ impl<T: Transport> AccountSet<T> {
     fn full_exit(
         &self,
         post_by: ETHAccountId,
-        from: ZKSyncAccountId,
-        token: TokenId,
         token_address: Address,
         account_id: AccountId,
     ) -> PriorityOp {
-        let eth_address = self.eth_accounts[post_by.0].address;
         block_on(self.eth_accounts[post_by.0].full_exit(account_id, token_address))
             .expect("FullExit eth call failed")
     }
@@ -561,9 +556,7 @@ impl TestSetup {
                 .insert((post_by, 0), eth_balance);
         }
 
-        let full_exit = self
-            .accounts
-            .full_exit(post_by, from, token.0, token_address, account_id);
+        let full_exit = self.accounts.full_exit(post_by, token_address, account_id);
         self.execute_priority_op(full_exit);
     }
 

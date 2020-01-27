@@ -11,7 +11,6 @@ use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, Execute
 use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
-    PubKeyHash,
 };
 use models::params::block_size_chunks;
 use models::{ActionType, CommitRequest};

@@ -445,7 +445,7 @@ mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
-    use models::node::{Account, Address};
+    use models::node::Account;
     use testkit::zksync_account::ZksyncAccount;
 
     #[test]

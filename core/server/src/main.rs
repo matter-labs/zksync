@@ -129,14 +129,13 @@ fn main() {
         state_keeper_req_sender.clone(),
         config_opts.clone(),
     );
-    // TODO: tmp disable proving
-    //    start_prover_server(
-    //        connection_pool.clone(),
-    //        config_opts.prover_server_address,
-    //        Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
-    //        Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
-    //        stop_signal_sender.clone(),
-    //    );
+    start_prover_server(
+        connection_pool.clone(),
+        config_opts.prover_server_address,
+        Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
+        Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
+        stop_signal_sender.clone(),
+    );
 
     run_mempool_task(
         shared_eth_state,

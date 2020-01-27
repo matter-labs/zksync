@@ -286,12 +286,6 @@ mod test {
         let zksync_account = ZksyncAccount::rand();
         let account_id = 1;
         let account_address = zksync_account.address.clone();
-        let account = {
-            let mut account = Account::default_with_address(&account_address);
-            account.add_balance(0, &BigDecimal::from(10));
-            account.pub_key_hash = zksync_account.pubkey_hash.clone();
-            account
-        };
 
         let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(Vec::new());
 

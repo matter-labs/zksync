@@ -17,11 +17,7 @@ use jsonrpc_pubsub::{
 use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::BlockNumber;
-use models::{
-    node::block::ExecutedOperations,
-    node::{AccountId, PubKeyHash},
-    ActionType, Operation,
-};
+use models::{node::block::ExecutedOperations, node::AccountId, ActionType, Operation};
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use storage::ConnectionPool;

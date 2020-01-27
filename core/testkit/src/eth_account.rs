@@ -5,7 +5,7 @@ use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
-use models::node::{AccountId, Address, Nonce, PriorityOp, PubKeyHash};
+use models::node::{AccountId, Address, PriorityOp, PubKeyHash};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;

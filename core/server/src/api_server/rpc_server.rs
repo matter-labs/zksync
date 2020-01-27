@@ -10,7 +10,7 @@ use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
-use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
+use models::node::{Account, AccountId, FranklinTx, Nonce, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use storage::{ConnectionPool, StorageProcessor, Token};

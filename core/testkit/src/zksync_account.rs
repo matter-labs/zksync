@@ -1,14 +1,10 @@
 use bigdecimal::BigDecimal;
-use franklin_crypto::jubjub::FixedGenerators;
-use models::node::tx::{ChangePubKey, PackedEthSignature, PackedPublicKey, TxSignature};
+use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
-    priv_key_from_fs, AccountId, Address, FullExit, Nonce, PrivateKey, PubKeyHash, PublicKey,
-    TokenId, Transfer, Withdraw,
+    priv_key_from_fs, Address, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
-use models::params::JUBJUB_PARAMS;
 use rand::{thread_rng, Rng};
 use std::cell::RefCell;
-use std::convert::TryInto;
 use web3::types::H256;
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
@@ -28,7 +24,7 @@ impl ZksyncAccount {
         let pk = priv_key_from_fs(rng.gen());
         let (eth_pk, eth_address) = {
             let eth_pk = rng.gen::<[u8; 32]>().into();
-            let mut eth_address = Address::zero();
+            let eth_address;
             loop {
                 if let Ok(address) = PackedEthSignature::address_from_private_key(&eth_pk) {
                     eth_address = address;

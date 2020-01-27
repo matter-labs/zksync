@@ -189,10 +189,8 @@ pub fn calculate_change_pubkey_operations_from_witness(
 mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
-    use bigdecimal::BigDecimal;
-    use ff::Field;
     use models::node::priority_ops::ChangePubKeyPriority;
-    use models::node::{Account, Address, Deposit, PubKeyHash};
+    use models::node::{Account, PubKeyHash};
     use models::primitives::pack_bits_into_bytes_in_order;
 
     #[test]

@@ -3,15 +3,13 @@ use crate::operation::SignatureData;
 use crate::operation::*;
 use crate::utils::convert_eth_signature_to_representation;
 use ff::{Field, PrimeField};
-use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
 use models::node::operations::ChangePubKeyOp;
-use models::node::tx::PackedEthSignature;
-use models::node::{Engine, TransferToNewOp};
+use models::node::Engine;
 use models::params as franklin_constants;
 use pairing::bn256::*;
 
@@ -195,11 +193,7 @@ pub fn calculate_change_pubkey_offchain_from_witness(
 mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
-    use bigdecimal::BigDecimal;
-    use models::node::account::AccountUpdate::ChangePubKeyHash;
-    use models::node::operations::ChangePubkeyPriorityOp;
-    use models::node::tx::ChangePubKey;
-    use models::node::{Account, Address};
+    use models::node::Account;
     use models::primitives::pack_bits_into_bytes_in_order;
     use testkit::zksync_account::ZksyncAccount;
 
@@ -220,7 +214,9 @@ mod test {
         };
 
         println!("node root hash before op: {:?}", plasma_state.root_hash());
-        plasma_state.apply_change_pubkey_op(&change_pkhash_op);
+        plasma_state
+            .apply_change_pubkey_op(&change_pkhash_op)
+            .expect("applying op fail");
         println!("node root hash after op: {:?}", plasma_state.root_hash());
         println!(
             "node pubdata: {}",
