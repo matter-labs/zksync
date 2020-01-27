@@ -892,7 +892,7 @@ contract Franklin {
 
                 uint128 amount = Bytes.bytesToUInt128(Bytes.slice(op.pubData, offset, AMOUNT_BYTES));
 
-                payoutWithdrawNow(ethAddress, tokenId, amount);
+                storeWithdrawalAsPending(ethAddress, tokenId, amount);
             }
             delete onchainOps[current];
         }
