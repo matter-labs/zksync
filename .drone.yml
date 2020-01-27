@@ -44,38 +44,15 @@ steps:
   depends_on:
   - init
 
-- name: rust-checks
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - cargo fmt -- --check
-  - f cargo clippy --tests --benches -- -D warnings
-  depends_on:
-  - build-contracts
-
-- name: rust-tests
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - f cargo test
-  - zksync circuit-tests
-  depends_on:
-  - rust-checks
-
 - name: rust-release-build
   image: matterlabs/ci
-  command:
+  commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo build --release
   depends_on:
-  - rust-tests
-  - rust-checks
+  - build-contracts
 
 - name: build-and-publish-server
   image: matterlabs/ci
@@ -84,12 +61,12 @@ steps:
       from_secret: dockerhub_username
     PASSWORD:
       from_secret: dockerhub_password
-  command:
+  commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export SERVER_DOCKER_IMAGE="matterlabs/server:${DRONE_TAG}"
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - docker login -u ${USERNAME} -p ${PASSWORD}
-  - docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
+  - docker build -t "${SERVER_DOCKER_IMAGE}" -f $ZKSYNC_HOME/docker/server/Dockerfile .
   - docker push "${SERVER_DOCKER_IMAGE}"
   depends_on:
   - rust-release-build
@@ -101,56 +78,15 @@ steps:
       from_secret: dockerhub_username
     PASSWORD:
       from_secret: dockerhub_password
-  command:
+  commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export PROVER_DOCKER_IMAGE="matterlabs/prover:${DRONE_TAG}"
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - docker login -u ${USERNAME} -p ${PASSWORD}
-  - docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
+  - docker build -t "${PROVER_DOCKER_IMAGE}" -f $ZKSYNC_HOME/docker/prover/Dockerfile .
   - docker push "${PROVER_DOCKER_IMAGE}"
   depends_on:
   - rust-release-build
-
-- name: deploy-test
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync genesis
-  - zksync redeploy
-  - zksync integration-testkit
-  depends_on:
-  - rust-tests
-
-- name: contract-test
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync test-contracts
-  depends_on:
-  - build-contracts
-
-
-- name: rebuild-cache
-  image: drillster/drone-volume-cache
-  volumes:
-  - name: cache
-    path: /cache
-  settings:
-    rebuild: true
-    mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
-      - ./target/cargo
-      - ./keys
-  depends_on:
-     - init
-     - rust-checks
-
 
 volumes:
   - name: cache
