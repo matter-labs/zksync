@@ -6,7 +6,7 @@ use franklin_crypto::{
     eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
     jubjub::JubjubEngine,
 };
-use pairing::bn256;
+use franklin_crypto::bellman::pairing::bn256;
 
 pub mod account;
 pub mod block;

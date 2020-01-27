@@ -3,7 +3,7 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::params::block_size_chunks;
-use ff::{PrimeField, PrimeFieldRepr};
+use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use web3::types::H256;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -44,10 +44,14 @@ impl ExecutedOperations {
     }
 }
 
+use crate::GenericFrHolder;
+
+pub type FrHolder = GenericFrHolder<Fr>;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block {
     pub block_number: BlockNumber,
-    pub new_root_hash: Fr,
+    pub new_root_hash: FrHolder,
     pub fee_account: AccountId,
     pub block_transactions: Vec<ExecutedOperations>,
     /// (unprocessed prior op id before block, unprocessed prior op id after block)
@@ -58,6 +62,7 @@ impl Block {
     pub fn get_eth_encoded_root(&self) -> H256 {
         let mut be_bytes = [0u8; 32];
         self.new_root_hash
+            .0
             .into_repr()
             .write_be(be_bytes.as_mut())
             .expect("Write commit bytes");

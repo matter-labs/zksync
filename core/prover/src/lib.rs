@@ -6,8 +6,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::{fmt, thread, time};
 // External deps
-use bellman::groth16;
-use ff::PrimeField;
+use franklin_crypto::bellman::groth16;
+use franklin_crypto::bellman::pairing::ff::PrimeField;
 use log::{error, info, trace};
 // Workspace deps
 use models::node::Engine;
@@ -168,13 +168,13 @@ impl<C: ApiClient> BabyProver<C> {
             validator_account: prover_data.validator_account,
         };
 
-        let p = bellman::groth16::create_random_proof(instance, &self.circuit_params, rng)
+        let p = franklin_crypto::bellman::groth16::create_random_proof(instance, &self.circuit_params, rng)
             .map_err(|e| BabyProverError::Internal(format!("failed to create a proof: {}", e)))?;
 
-        let pvk = bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
+        let pvk = franklin_crypto::bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
 
         let proof_verified =
-            bellman::groth16::verify_proof(&pvk, &p.clone(), &[prover_data.public_data_commitment])
+            franklin_crypto::bellman::groth16::verify_proof(&pvk, &p.clone(), &[prover_data.public_data_commitment])
                 .map_err(|e| {
                     BabyProverError::Internal(format!("failed to verify created proof: {}", e))
                 })?;

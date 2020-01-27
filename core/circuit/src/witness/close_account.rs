@@ -3,13 +3,13 @@ use super::utils::*;
 use crate::operation::*;
 
 use crate::operation::SignatureData;
-use ff::{Field, PrimeField};
+use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::operations::CloseOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
+use franklin_crypto::bellman::pairing::bn256::*;
 
 pub struct CloseAccountData {
     pub account_address: u32,
@@ -186,7 +186,7 @@ pub fn calculate_close_account_operations_from_witness(
 //
 //    use crate::circuit::FranklinCircuit;
 //    use bellman::Circuit;
-//    use ff::{Field, PrimeField};
+//    use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 //    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 //    use franklin_crypto::circuit::test::*;
 //    use franklin_crypto::eddsa::{PrivateKey, PublicKey};

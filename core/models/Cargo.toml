@@ -4,11 +4,14 @@ version = "0.0.1"
 edition = "2018"
 
 [dependencies]
-ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+# ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 bigdecimal = { version = "0.1.0", features = ["serde"]}
-pairing = { package = "pairing_ce", version = "0.17.0" }
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
-bellman = { package = "bellman_ce", version = "0.3.0" }
+# pairing = { package = "pairing_ce", version = "0.17.0" }
+# franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
+# bellman = { package = "bellman_ce", version = "0.3.0" }
+
+franklin_crypto = { path = "../../../franklin-crypto", package = "franklin-crypto"}
+
 ethabi = "8.0.0"
 web3 = "0.8.0"
 serde = "1.0.90"

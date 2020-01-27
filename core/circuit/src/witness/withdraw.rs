@@ -2,7 +2,7 @@ use super::utils::*;
 
 use crate::operation::*;
 
-use ff::{Field, PrimeField};
+use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
 use crate::operation::SignatureData;
 use franklin_crypto::circuit::float_point::convert_to_float;
@@ -13,7 +13,7 @@ use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_ele
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
 use models::primitives::big_decimal_to_u128;
-use pairing::bn256::*;
+use franklin_crypto::bellman::pairing::bn256::*;
 
 pub struct WithdrawData {
     pub amount: u128,

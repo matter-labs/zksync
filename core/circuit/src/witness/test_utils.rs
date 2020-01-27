@@ -1,8 +1,8 @@
 use crate::account::AccountWitness;
 use crate::circuit::FranklinCircuit;
 use crate::operation::Operation;
-use bellman::Circuit;
-use ff::{Field, PrimeField};
+use franklin_crypto::bellman::Circuit;
+use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use franklin_crypto::circuit::test::TestConstraintSystem;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;

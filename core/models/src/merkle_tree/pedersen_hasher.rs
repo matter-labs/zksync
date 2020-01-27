@@ -1,10 +1,10 @@
 // Pedersen hash implementation of the Hasher trait
 
-use ff::PrimeField;
+use franklin_crypto::bellman::pairing::ff::PrimeField;
 use franklin_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
 use franklin_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
-use pairing::bn256::Bn256;
+use franklin_crypto::bellman::pairing::bn256::Bn256;
 
 use super::hasher::Hasher;
 use crate::primitives::BitIteratorLe;

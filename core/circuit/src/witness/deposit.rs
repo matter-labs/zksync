@@ -2,13 +2,13 @@ use super::utils::*;
 
 use crate::operation::SignatureData;
 use crate::operation::*;
-use ff::{Field, PrimeField};
+use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::DepositOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
+use franklin_crypto::bellman::pairing::bn256::*;
 
 pub struct DepositData {
     pub amount: u128,
@@ -303,7 +303,7 @@ mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
-    use ff::Field;
+    use franklin_crypto::bellman::pairing::ff::Field;
     use models::node::{Account, AccountAddress, Address, Deposit};
 
     #[test]

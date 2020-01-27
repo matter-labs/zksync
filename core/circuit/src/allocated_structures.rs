@@ -3,14 +3,14 @@ use crate::account::AccountContent;
 use crate::element::CircuitElement;
 use crate::operation::{Operation, OperationBranch};
 use crate::utils;
-use bellman::{ConstraintSystem, SynthesisError};
+use franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use franklin_crypto::circuit::float_point::parse_with_exponent_le;
 use models::params as franklin_constants;
 
 use franklin_crypto::circuit::boolean::Boolean;
 use franklin_crypto::circuit::num::AllocatedNum;
 
-use ff::PrimeField;
+use franklin_crypto::bellman::pairing::ff::PrimeField;
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::JubjubEngine;
 pub struct AllocatedOperationBranch<E: JubjubEngine> {

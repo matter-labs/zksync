@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{env, fs, io, path, thread, time};
 // External deps
-use ff::{Field, PrimeField};
+use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 // Workspace deps
 use prover;
 use testhelper::TestAccount;
@@ -77,7 +77,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
 fn prover_proves_a_block_and_publishes_result() {
     // Testing [black box] the actual proof calculation by mocking genesis and +1 block.
     let circuit_params = read_circuit_parameters();
-    let verify_key = bellman::groth16::prepare_verifying_key(&circuit_params.vk);
+    let verify_key = franklin_crypto::bellman::groth16::prepare_verifying_key(&circuit_params.vk);
     let stop_signal = Arc::new(AtomicBool::new(false));
     let (proof_tx, proof_rx) = mpsc::channel();
     let prover_data = new_test_data_for_prover();
@@ -117,7 +117,7 @@ fn prover_proves_a_block_and_publishes_result() {
     stop_signal.store(true, Ordering::SeqCst);
     println!("verifying proof...");
     let verify_result =
-        bellman::groth16::verify_proof(&verify_key, &proof.clone(), &[public_data_commitment]);
+        franklin_crypto::bellman::groth16::verify_proof(&verify_key, &proof.clone(), &[public_data_commitment]);
     assert!(!verify_result.is_err());
     assert!(verify_result.unwrap(), "invalid proof");
 }
@@ -282,7 +282,7 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
     }
 }
 
-fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engine> {
+fn read_circuit_parameters() -> franklin_crypto::bellman::groth16::Parameters<models::node::Engine> {
     let out_dir = {
         let mut out_dir = path::PathBuf::new();
         out_dir.push(&env::var("KEY_DIR").expect("KEY_DIR not set"));
@@ -298,7 +298,7 @@ fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engin
     println!("key file path is {:?}", key_file_path);
     let f = fs::File::open(&key_file_path).expect("Unable to open file");
     let mut r = io::BufReader::new(f);
-    bellman::groth16::Parameters::<models::node::Engine>::read(&mut r, true)
+    franklin_crypto::bellman::groth16::Parameters::<models::node::Engine>::read(&mut r, true)
         .expect("Unable to read proving key")
 }
 
@@ -344,7 +344,7 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
     fn publish(
         &self,
         _block: i64,
-        p: bellman::groth16::Proof<models::node::Engine>,
+        p: franklin_crypto::bellman::groth16::Proof<models::node::Engine>,
         _public_data_commitment: models::node::Fr,
     ) -> Result<(), failure::Error> {
         // No more blocks to prove. We're only testing single rounds.

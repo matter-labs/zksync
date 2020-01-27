@@ -13,7 +13,7 @@ use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
 use ethsign::Signature as ETHSignature;
 use failure::{ensure, format_err};
-use ff::{PrimeField, PrimeFieldRepr};
+use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};

@@ -1,5 +1,5 @@
-use bellman::{ConstraintSystem, SynthesisError};
-use ff::{BitIterator, Field, PrimeField};
+use franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
+use franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField};
 
 use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use franklin_crypto::circuit::num::{AllocatedNum, Num};

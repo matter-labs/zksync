@@ -6,7 +6,7 @@ use std::convert::TryInto;
 
 use bigdecimal::BigDecimal;
 use failure::ensure;
-use ff::PrimeField;
+use franklin_crypto::bellman::pairing::ff::PrimeField;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::Engine;

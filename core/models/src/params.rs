@@ -17,7 +17,8 @@ pub fn account_tree_depth() -> usize {
     // and set environment value multuple times, which is ok.
     unsafe {
         if ACCOUNT_TREE_DEPTH_VALUE == 0 {
-            let value: &'static str = env!("ACCOUNT_TREE_DEPTH");
+            // let value: &'static str = env!("ACCOUNT_TREE_DEPTH");
+            let value: &'static str = "24";
             ACCOUNT_TREE_DEPTH_VALUE =
                 usize::from_str_radix(value, 10).expect("account tree depth value is invalid");
             let runtime_value = env::var("ACCOUNT_TREE_DEPTH").expect("ACCOUNT_TREE_DEPTH missing");
@@ -101,7 +102,8 @@ pub fn block_size_chunks() -> usize {
     // happen is we read and set environment value multuple times, which is ok.
     unsafe {
         if BLOCK_SIZE_CHUNKS_VALUE == 0 {
-            let value: &'static str = env!("BLOCK_SIZE_CHUNKS");
+            // let value: &'static str = env!("BLOCK_SIZE_CHUNKS");
+            let value: &'static str = "4";
             BLOCK_SIZE_CHUNKS_VALUE =
                 usize::from_str_radix(value, 10).expect("block size chunks value is invalid");
             let runtime_value = env::var("BLOCK_SIZE_CHUNKS").expect("BLOCK_SIZE_CHUNKS missing");

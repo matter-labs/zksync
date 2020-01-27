@@ -11,13 +11,14 @@ authors = [
 [dependencies]
 rand = "0.4"
 time = "0.1"
-pairing = { package = "pairing_ce", version = "0.17.0" }
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
-bellman = { package = "bellman_ce", version = "0.3.0" }
+# pairing = { package = "pairing_ce", version = "0.17.0" }
+# franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
+franklin_crypto = { path = "../../../franklin-crypto", package = "franklin-crypto"}
+# bellman = { package = "bellman_ce", version = "0.3.0" }
 models = { path = "../models", version = "0.0.1" }
 circuit= { path = "../circuit", version = "0.1.1" }
 hex = "0.3.2"
 rust-crypto = "0.2"
-ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+# ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
 log = "0.4"
 env_logger = "0.6"

@@ -1,14 +1,14 @@
 use super::utils::*;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use ff::{Field, PrimeField};
+use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use franklin_crypto::circuit::float_point::convert_to_float;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::TransferToNewOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
+use franklin_crypto::bellman::pairing::bn256::*;
 
 pub struct TransferToNewData {
     pub amount: u128,

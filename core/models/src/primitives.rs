@@ -4,11 +4,11 @@ use std::str::FromStr;
 // External deps
 use bigdecimal::BigDecimal;
 use failure::bail;
-use ff::ScalarEngine;
-use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
+use franklin_crypto::bellman::pairing::ff::ScalarEngine;
+use franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
 use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
-use pairing::bn256::Bn256;
-use pairing::{CurveAffine, Engine};
+use franklin_crypto::bellman::pairing::bn256::Bn256;
+use franklin_crypto::bellman::pairing::{CurveAffine, Engine};
 use web3::types::U256;
 // Workspace deps
 use crate::circuit::utils::append_le_fixed_width;
@@ -181,7 +181,7 @@ pub fn pack_edwards_point<E: JubjubEngine>(
 
 #[test]
 fn test_get_bits() {
-    use pairing::bn256::Fr;
+    use franklin_crypto::bellman::pairing::bn256::Fr;
 
     // 12 = b1100, 3 lowest bits in little endian encoding are: 0, 0, 1.
     let bits = Fr::from_str("12").unwrap().get_bits_le_fixed(3);

@@ -1,6 +1,6 @@
 use crate::params;
 
-use ff::{BitIterator, PrimeField};
+use franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField};
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 
 use crate::merkle_tree::hasher::Hasher;

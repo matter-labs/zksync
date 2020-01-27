@@ -1,5 +1,5 @@
 // External
-use ff::Field;
+use franklin_crypto::bellman::pairing::ff::Field;
 use franklin_crypto::jubjub::JubjubEngine;
 use franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Serialize};

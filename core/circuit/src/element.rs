@@ -1,5 +1,5 @@
 use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
-use bellman::{ConstraintSystem, SynthesisError};
+use franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use franklin_crypto::circuit::boolean::Boolean;
 
 use franklin_crypto::circuit::expression::Expression;

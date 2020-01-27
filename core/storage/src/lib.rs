@@ -17,7 +17,8 @@ use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
 use failure::bail;
-use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
+use models::{from_hex, to_hex, GenericFrHolder};
+use models::node::block::{Block, FrHolder, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
     AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
@@ -771,9 +772,11 @@ impl StorageProcessor {
         self.conn().transaction(|| {
             self.save_block_transactions(block)?;
 
+            let h = to_hex(&block.new_root_hash.0);
+
             let new_block = StorageBlock {
                 number: i64::from(block.block_number),
-                root_hash: format!("sync-bl:{}", &block.new_root_hash.to_hex()),
+                root_hash: format!("sync-bl:{}", &h),
                 fee_account_id: i64::from(block.fee_account),
                 unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
                 unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
@@ -1139,10 +1142,12 @@ impl StorageProcessor {
 
         let block_transactions = self.get_block_executed_ops(block)?;
 
+        let new_root_hash: Fr = from_hex(&format!("0x{}", &stored_block.root_hash[8..])).expect("Unparsable root hash");
+
+        let new_root_hash: FrHolder = GenericFrHolder(new_root_hash);
         Ok(Some(Block {
             block_number: block,
-            new_root_hash: Fr::from_hex(&format!("0x{}", &stored_block.root_hash[8..]))
-                .expect("Unparsable root hash"),
+            new_root_hash: new_root_hash,
             fee_account: stored_block.fee_account_id as AccountId,
             block_transactions,
             processed_priority_ops: (

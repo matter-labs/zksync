@@ -2,7 +2,7 @@
 use std::str::FromStr;
 use std::{thread, time};
 // External deps
-use bellman::groth16;
+use franklin_crypto::bellman::groth16;
 use failure::format_err;
 use serde::{Deserialize, Serialize};
 // Workspace deps

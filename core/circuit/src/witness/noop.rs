@@ -2,14 +2,14 @@ use super::utils::*;
 
 use crate::operation::*;
 
-use ff::{Field, PrimeField};
+use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
 use crate::account::AccountWitness;
 use crate::operation::SignatureData;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::le_bit_vector_into_field_element;
 
-use pairing::bn256::*;
+use franklin_crypto::bellman::pairing::bn256::*;
 
 pub fn noop_operation(
     tree: &CircuitAccountTree,
@@ -89,9 +89,9 @@ mod test {
     use crate::witness::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
-    use bellman::Circuit;
+    use franklin_crypto::bellman::Circuit;
 
-    use ff::{Field, PrimeField};
+    use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 
     use franklin_crypto::circuit::test::*;

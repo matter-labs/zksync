@@ -7,8 +7,8 @@ use crate::signature::*;
 use crate::utils::{
     allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element, reverse_bytes,
 };
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use ff::{Field, PrimeField};
+use franklin_crypto::bellman::{Circuit, ConstraintSystem, SynthesisError};
+use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use franklin_crypto::circuit::boolean::Boolean;
 use franklin_crypto::circuit::ecc;
 use franklin_crypto::circuit::sha256;

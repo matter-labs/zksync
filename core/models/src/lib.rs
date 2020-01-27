@@ -22,6 +22,75 @@ use serde_bytes;
 use std::convert::TryFrom;
 use web3::types::{Address, Log, U256};
 
+use std::fmt;
+
+#[derive(Clone, Copy, Debug)]
+pub struct GenericFrHolder<F: franklin_crypto::bellman::pairing::ff::PrimeField>(pub F);
+
+impl<F: franklin_crypto::bellman::pairing::ff::PrimeField> serde::Serialize for GenericFrHolder<F> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ::serde::Serializer,
+    {
+        let hex = to_hex(self.0);
+        serializer.serialize_str(&format!("0x{}", hex))
+    }
+}
+
+pub fn to_hex<F: franklin_crypto::bellman::pairing::ff::PrimeField>(value: &F) -> String {
+    use franklin_crypto::bellman::pairing::ff::PrimeFieldRepr;
+
+    let mut buf: Vec<u8> = vec![];
+    value.into_repr().write_be(&mut buf).unwrap();
+    hex::encode(&buf)
+}
+
+struct ReprVisitor<F: franklin_crypto::bellman::pairing::ff::PrimeField> {
+    _marker: std::marker::PhantomData<F>
+}
+
+pub fn from_hex<F: franklin_crypto::bellman::pairing::ff::PrimeField>(value: &str) -> Result<F, String> {
+    use franklin_crypto::bellman::pairing::ff::PrimeFieldRepr;
+    
+    let value = if value.starts_with("0x") { &value[2..] } else { value };
+    if value.len() % 2 != 0 {return Err(format!("hex length must be even for full byte encoding: {}", value))}
+    let mut buf = hex::decode(&value).map_err(|_| format!("could not decode hex: {}", value))?;
+    buf.reverse();
+    let mut repr = F::Repr::default();
+    buf.resize(repr.as_ref().len() * 8, 0);
+    repr.read_le(&buf[..]).map_err(|e| format!("could not read {}: {}", value, &e))?;
+    F::from_repr(repr).map_err(|e| format!("could not convert into prime field: {}: {}", value, &e))
+}
+
+impl<'de, F: franklin_crypto::bellman::pairing::ff::PrimeField> serde::de::Visitor<'de> for ReprVisitor<F> {
+    type Value = GenericFrHolder<F>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a hex string with prefix: 0x012ab...")
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+    where
+        E: ::serde::de::Error,
+    {
+        let value = from_hex::<F>(&value[2..]).map_err(|e| E::custom(e))?;
+
+        Ok(GenericFrHolder(value))
+    }
+}
+
+impl<'de, F: franklin_crypto::bellman::pairing::ff::PrimeField> serde::Deserialize<'de> for GenericFrHolder<F> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: ::serde::Deserializer<'de>,
+    {
+        deserializer.deserialize_str(ReprVisitor::<F> {
+            _marker: std::marker::PhantomData
+        })
+    }
+}
+
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta {
     pub addr: String,
