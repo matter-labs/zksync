@@ -341,12 +341,13 @@ mod test {
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
     use models::node::Account;
-    use testkit::zksync_account::ZksyncAccount;
     use web3::types::Address;
 
     #[test]
     #[ignore]
     fn test_withdraw() {
+        use testkit::zksync_account::ZksyncAccount;
+        
         let zksync_account = ZksyncAccount::rand();
         let account_id = 1;
         let account_address = zksync_account.address.clone();

@@ -441,11 +441,12 @@ mod test {
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
     use models::node::{Account, AccountAddress};
-    use testkit::zksync_account::ZksyncAccount;
 
     #[test]
     #[ignore]
     fn test_transfer_to_new() {
+        use testkit::zksync_account::ZksyncAccount;
+
         let from_zksync_account = ZksyncAccount::rand();
         let from_account_id = 1;
         let from_account_address = from_zksync_account.address.clone();

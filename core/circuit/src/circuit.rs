@@ -22,7 +22,7 @@ use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use models::params as franklin_constants;
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 7;
-#[derive(Clone)]
+// #[derive(Clone)]
 pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub params: &'a E::Params,
     pub operation_batch_size: usize,
@@ -40,6 +40,25 @@ pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub validator_balances: Vec<Option<E::Fr>>,
     pub validator_audit_path: Vec<Option<E::Fr>>,
     pub validator_account: AccountWitness<E>,
+}
+
+impl<'a, E: JubjubEngine> std::clone::Clone for FranklinCircuit<'a, E> {
+    fn clone(&self) -> Self {
+        Self {
+            params: self.params,
+            operation_batch_size: self.operation_batch_size,
+            old_root: self.old_root,
+            new_root: self.new_root,
+            block_number: self.block_number,
+            validator_address: self.validator_address,
+            pub_data_commitment: self.pub_data_commitment,
+            operations: self.operations.clone(),
+        
+            validator_balances: self.validator_balances.clone(),
+            validator_audit_path: self.validator_audit_path.clone(),
+            validator_account: self.validator_account.clone(),
+        }
+    }
 }
 
 struct PreviousData<E: JubjubEngine> {

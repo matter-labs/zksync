@@ -644,7 +644,6 @@ dependencies = [
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.44 (registry+https://github.com/rust-lang/crates.io-index)",
- "testkit 0.1.0",
  "web3 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 

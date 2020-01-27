@@ -405,4 +405,89 @@ mod test {
 
         check_circuit(witness_accum.into_circuit_instance());
     }
+
+    #[test]
+    // #[ignore]
+    fn test_deposit_franklin_existing_account_with_transpiler() {
+        let deposit_to_account_id = 1;
+        let deposit_to_account_address =
+            AccountAddress::from_hex("sync:1111111111111111111111111111111111111111").unwrap();
+        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
+            deposit_to_account_id,
+            Account::default_with_address(&deposit_to_account_address),
+        )]);
+
+        let deposit_op = DepositOp {
+            priority_op: Deposit {
+                sender: Address::zero(),
+                token: 0,
+                amount: BigDecimal::from(1),
+                account: deposit_to_account_address,
+            },
+            account_id: deposit_to_account_id,
+        };
+
+        plasma_state.apply_deposit_op(&deposit_op);
+
+        let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+        let deposit_operations = calculate_deposit_operations_from_witness(
+            &deposit_witness,
+            &Fr::zero(),
+            &Fr::zero(),
+            &Fr::zero(),
+            &SignatureData {
+                r_packed: vec![Some(false); 256],
+                s: vec![Some(false); 256],
+            },
+            &[Some(false); 256], //doesn't matter for deposit
+        );
+        let pub_data_from_witness = deposit_witness.get_pubdata();
+
+        witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+        witness_accum.collect_fees(&Vec::new());
+        witness_accum.calculate_pubdata_commitment();
+
+        assert_eq!(
+            plasma_state.root_hash(),
+            witness_accum
+                .root_after_fees
+                .expect("witness accum after root hash empty"),
+            "root hash in state keeper and witness generation code mismatch"
+        );
+
+        use franklin_crypto::bellman::plonk::adaptor::alternative::*;
+        use franklin_crypto::bellman::plonk::plonk::generator::*;
+        use franklin_crypto::bellman::plonk::plonk::prover::*;
+        use franklin_crypto::bellman::pairing::bn256::Bn256;
+
+        use franklin_crypto::bellman::Circuit;
+
+        let mut transpiler = Transpiler::new();
+
+        let c = witness_accum.into_circuit_instance();
+
+        c.clone().synthesize(&mut transpiler).unwrap();
+    
+        let hints = transpiler.into_hints();
+
+        use franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
+
+        let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
+
+        let mut assembly = GeneratorAssembly::<Bn256>::new();
+        adapted_curcuit.synthesize(&mut assembly).unwrap();
+        assembly.finalize();
+
+        println!("Transpiled into {} gates", assembly.num_gates());
+
+        println!("Trying to prove");
+
+        let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
+
+        let mut prover = ProvingAssembly::<Bn256>::new();
+        adapted_curcuit.synthesize(&mut prover).unwrap();
+        prover.finalize();
+
+        // assert!(prover.is_satisfied());
+    }
 }

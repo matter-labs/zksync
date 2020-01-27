@@ -32,7 +32,7 @@ impl<F: franklin_crypto::bellman::pairing::ff::PrimeField> serde::Serialize for 
     where
         S: ::serde::Serializer,
     {
-        let hex = to_hex(self.0);
+        let hex = to_hex(&self.0);
         serializer.serialize_str(&format!("0x{}", hex))
     }
 }
