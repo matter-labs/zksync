@@ -10,4 +10,4 @@ if [ "$1" == "reset" ]; then
     diesel migration run
 fi
 
-cargo test --features "db_test"
+cargo test --release -p storage --features "db_test" $2

@@ -33,10 +33,10 @@ confirm_action:
 sql = psql "$(DATABASE_URL)" -c 
 
 db-test:
-	@bin/db-test
-
-db-test-reset:
 	@bin/db-test reset
+
+db-test-no-reset:
+	@bin/db-test no-reset
 
 db-setup:
 	@bin/db-setup
