@@ -63,6 +63,8 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo test
   - zksync circuit-tests
+  - zksync prover-tests
+  - zksync db-test
   depends_on:
   - rust-checks
 

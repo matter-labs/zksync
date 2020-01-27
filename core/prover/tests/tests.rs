@@ -285,7 +285,8 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
 fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engine> {
     let out_dir = {
         let mut out_dir = path::PathBuf::new();
-        out_dir.push(&env::var("KEY_DIR").expect("KEY_DIR not set"));
+        out_dir.push(&env::var("ZKSYNC_HOME").expect("ZKSYNC_HOME is not set"));
+        out_dir.push(&env::var("KEY_DIR").expect("KEY_DIR is not set"));
         out_dir.push(&format!("{}", models::params::block_size_chunks()));
         out_dir.push(&format!("{}", models::params::account_tree_depth()));
         out_dir

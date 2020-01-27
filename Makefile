@@ -189,6 +189,9 @@ price:
 circuit-tests:
 	cargo test --no-fail-fast --release -p circuit -- --ignored
 
+prover-tests:
+	f cargo test -p prover --release -- --ignored
+
 # Loadtest
 
 run-loadtest: confirm_action
