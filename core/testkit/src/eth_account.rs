@@ -1,18 +1,22 @@
+use crate::external_commands::get_revert_reason;
 use bigdecimal::BigDecimal;
 use eth_client::ETHClient;
 use failure::{ensure, format_err};
 use futures::compat::Future01CompatExt;
+use futures::future::IntoFuture;
 use models::abi::{erc20_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
-use models::node::{AccountAddress, AccountId, Nonce, PriorityOp};
+use models::node::{AccountAddress, AccountId, Nonce, TokenId, PriorityOp};
+use models::EncodedProof;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
 use web3::contract::{Contract, Options};
-use web3::types::{Address, TransactionReceipt, H256, U256, U64};
+use web3::contract::tokens::{Tokenize, Tokenizable};
+use web3::types::{Address, TransactionReceipt, H256, U256, U128, U64};
 use web3::Transport;
-
+use web3::Error;
 pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
     let split = eth_value.split('.').collect::<Vec<&str>>();
     ensure!(split.len() == 1 || split.len() == 2, "Wrong eth value");
@@ -78,6 +82,32 @@ impl<T: Transport> EthereumAccount<T> {
         }
     }
 
+    pub async fn is_exodus(&self) -> Result<bool, failure::Error> {
+        let contract = Contract::new(
+            self.main_contract_eth_client.web3.eth(),
+            self.main_contract_eth_client.contract_addr.clone(),
+            self.main_contract_eth_client.contract.clone()
+        );
+
+        // let result = contract.query("exodusMode", (), None, Options::default(), None);
+        // let whatever = result.into_future().await.unwrap()
+
+
+        Ok(false)
+        // self
+        //     .main_contract_eth_client
+        //     .contract
+        //     .query(
+        //         "exodusMode",
+        //         (),
+        //         None,
+        //         Options::default(),
+        //         None
+        //     )
+        //     .await
+        //     .map_err(|e| format_err!("Is exodus query err: {}", e))
+    }
+
     pub async fn full_exit(
         &self,
         account_id: AccountId,
@@ -123,6 +153,63 @@ impl<T: Transport> EthereumAccount<T> {
             .filter_map(|op| op.ok())
             .next()
             .expect("no priority op log in full exit"))
+    }
+
+    pub async fn exit(
+        &self,
+        tokenId: TokenId,
+        owner: Address,
+        amount: u128,
+        proof: EncodedProof,
+    ) -> Result<String, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "exit",
+                (
+                    u64::from(tokenId),
+                    owner,
+                    U128::from(amount),
+                    proof,
+                ),
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("Exit send err: {}", e))?;
+        
+        let receipt: web3::types::TransactionReceipt = self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("Exit wait confirm err: {}", e))?;
+
+        let hash = format!("{:#?}", &receipt.transaction_hash);
+        let reason = get_revert_reason(&hash);
+        println!(
+            "hash: {}, reason: {}",
+            &hash,
+            &reason
+        );
+
+        ensure!(
+            receipt.status == Some(U64::from(1)),
+            "Exit submit fail"
+        );
+
+        Ok(reason)
+        // Ok(receipt
+        //     .logs
+        //     .into_iter()
+        //     .map(PriorityOp::try_from)
+        //     .filter_map(|op| op.ok())
+        //     .next()
+        //     .expect("no priority op log in full exit"))
     }
 
     pub async fn deposit_eth(
