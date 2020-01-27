@@ -113,3 +113,20 @@ pub fn get_test_accounts() -> Vec<ETHAccountInfo> {
 
     panic!("Print test accounts script output is not parsed correctly")
 }
+pub fn get_revert_reason(tx_hash: &str) -> String {
+    let result = Command::new("revert-reason-compact")
+        .arg(tx_hash)
+        .output()
+        .expect("failed");
+
+    if !result.status.success() {
+        panic!("print test accounts script failed")
+    }
+    let stdout = String::from_utf8(result.stdout).expect("stdout is not valid utf8");
+    
+    stdout
+        .split("\n")
+        .collect::<Vec<_>>()
+        [2]
+        .into()
+}
