@@ -27,7 +27,6 @@ use models::{
 };
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
-use std::convert::TryInto;
 use std::time;
 use web3::types::H256;
 
@@ -753,6 +752,8 @@ fn restore_account(
     }
     account.nonce = stored_account.nonce as u32;
     account.address = Address::from_slice(&stored_account.address);
+    account.pub_key_hash = PubKeyHash::from_bytes(&stored_account.pubkey_hash)
+        .expect("db stored pubkey hash deserialize");
     (stored_account.id as u32, account)
 }
 
@@ -1432,6 +1433,10 @@ impl StorageProcessor {
     pub fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
         self.conn().transaction(|| {
             let (verif_block, mut accounts) = self.load_verified_state()?;
+            debug!(
+                "Verified state block: {}, accounts: {:#?}",
+                verif_block, accounts
+            );
 
             // Fetch updates from blocks: verif_block +/- 1, ... , block
             if let Some((block, state_diff)) = self.load_state_diff(verif_block, block)? {
@@ -1509,6 +1514,13 @@ impl StorageProcessor {
                         .and(account_creates::block_number.le(&(i64::from(end_block)))),
                 )
                 .load::<StorageAccountCreation>(self.conn())?;
+            let account_pubkey_diff = account_pubkey_updates::table
+                .filter(
+                    account_pubkey_updates::block_number
+                        .gt(&(i64::from(start_block)))
+                        .and(account_pubkey_updates::block_number.le(&(i64::from(end_block)))),
+                )
+                .load::<StorageAccountPubkeyUpdate>(self.conn())?;
 
             debug!(
                 "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
@@ -1529,6 +1541,11 @@ impl StorageProcessor {
                 );
                 account_diff.extend(
                     account_creation_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
+                account_diff.extend(
+                    account_pubkey_diff
                         .into_iter()
                         .map(StorageAccountDiff::from),
                 );
@@ -2344,30 +2361,48 @@ impl StorageProcessor {
 mod test {
     use super::*;
     use diesel::Connection;
+    use models::primitives::u128_to_bigdecimal;
+    use rand::prelude::*;
 
-    fn acc_create_updates(
-        id: u32,
-        balance: u32,
-        nonce: u32,
+    fn acc_create_random_updates<R: Rng>(
+        rng: &mut R,
     ) -> impl Iterator<Item = (u32, AccountUpdate)> {
-        let mut a = models::node::account::Account::default();
-        a.nonce = nonce;
+        let id: u32 = rng.gen();
+        let balance: u128 = rng.gen();
+        let nonce: u32 = rng.gen();
+        let pub_key_hash = PubKeyHash { data: rng.gen() };
+        let address: Address = rng.gen::<[u8; 20]>().into();
+
+        let mut a = models::node::account::Account::default_with_address(&address);
+        let old_nonce = nonce;
+        a.nonce = old_nonce + 2;
+        a.pub_key_hash = pub_key_hash;
+
         let old_balance = a.get_balance(0).clone();
-        a.set_balance(0, BigDecimal::from(balance));
+        a.set_balance(0, u128_to_bigdecimal(balance));
         let new_balance = a.get_balance(0).clone();
         vec![
             (
                 id,
                 AccountUpdate::Create {
-                    nonce: a.nonce,
+                    nonce: old_nonce,
                     address: a.address,
                 },
             ),
             (
                 id,
+                AccountUpdate::ChangePubKeyHash {
+                    old_nonce,
+                    old_pub_key_hash: PubKeyHash::default(),
+                    new_nonce: old_nonce + 1,
+                    new_pub_key_hash: a.pub_key_hash.clone(),
+                },
+            ),
+            (
+                id,
                 AccountUpdate::UpdateBalance {
-                    old_nonce: a.nonce,
-                    new_nonce: a.nonce,
+                    old_nonce: old_nonce + 1,
+                    new_nonce: old_nonce + 2,
                     balance_update: (0, old_balance, new_balance),
                 },
             ),
@@ -2383,6 +2418,8 @@ mod test {
     fn test_commit_rewind() {
         let _ = env_logger::try_init();
 
+        let mut rng = StdRng::seed_from_u64(0x1234);
+
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
@@ -2391,9 +2428,9 @@ mod test {
             let mut accounts = AccountMap::default();
             let updates = {
                 let mut updates = Vec::new();
-                updates.extend(acc_create_updates(1, 1, 2));
-                updates.extend(acc_create_updates(2, 2, 4));
-                updates.extend(acc_create_updates(3, 3, 8));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
                 updates
             };
             apply_updates(&mut accounts, updates.clone());
@@ -2404,9 +2441,9 @@ mod test {
             let mut accounts = accounts_block_1.clone();
             let updates = {
                 let mut updates = Vec::new();
-                updates.extend(acc_create_updates(4, 1, 2));
-                updates.extend(acc_create_updates(5, 2, 4));
-                updates.extend(acc_create_updates(6, 3, 8));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
                 updates
             };
             apply_updates(&mut accounts, updates.clone());
@@ -2416,9 +2453,9 @@ mod test {
             let mut accounts = accounts_block_2.clone();
             let updates = {
                 let mut updates = Vec::new();
-                updates.extend(acc_create_updates(7, 1, 2));
-                updates.extend(acc_create_updates(8, 2, 4));
-                updates.extend(acc_create_updates(9, 3, 8));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
                 updates
             };
             apply_updates(&mut accounts, updates.clone());

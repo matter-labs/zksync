@@ -282,9 +282,12 @@ impl Account {
                     Some(account)
                 }
                 AccountUpdate::ChangePubKeyHash {
-                    new_pub_key_hash, ..
+                    new_pub_key_hash,
+                    new_nonce,
+                    ..
                 } => {
                     account.pub_key_hash = new_pub_key_hash;
+                    account.nonce = new_nonce;
                     Some(account)
                 }
                 _ => {
