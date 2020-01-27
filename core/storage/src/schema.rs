@@ -125,15 +125,6 @@ table! {
 }
 
 table! {
-    rollup_ops (id) {
-        id -> Int4,
-        block_num -> Int8,
-        operation -> Jsonb,
-        fee_account -> Int8,
-    }
-}
-
-table! {
     mempool (hash) {
         hash -> Bytea,
         primary_account_address -> Bytea,
@@ -179,6 +170,15 @@ table! {
 }
 
 table! {
+    rollup_ops (id) {
+        id -> Int4,
+        block_num -> Int8,
+        operation -> Jsonb,
+        fee_account -> Int8,
+    }
+}
+
+table! {
     server_config (id) {
         id -> Bool,
         contract_addr -> Nullable<Text>,
@@ -220,12 +220,12 @@ allow_tables_to_appear_in_same_query!(
     events_state,
     executed_priority_operations,
     executed_transactions,
-    rollup_ops,
     mempool,
     op_config,
     operations,
     proofs,
     prover_runs,
+    rollup_ops,
     server_config,
     storage_state_update,
     tokens,
