@@ -1,4 +1,4 @@
-use crate::node::{Address, PubKeyHash};
+use crate::node::Address;
 use futures::{channel::mpsc, executor::block_on, SinkExt};
 use std::env;
 use std::net::SocketAddr;

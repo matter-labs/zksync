@@ -2,24 +2,24 @@ use super::tx::TxSignature;
 use super::AccountId;
 use super::FranklinTx;
 use crate::node::priority_ops::ChangePubKeyPriority;
-use crate::node::tx::ChangePubKey;
+use crate::node::tx::{ChangePubKey, PackedEthSignature};
 use crate::node::{
     pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
-    FranklinPriorityOp, FullExit, Transfer, Withdraw,
+    FranklinPriorityOp, FullExit, PubKeyHash, Transfer, Withdraw,
 };
 use crate::params::{
-    ACCOUNT_ID_BIT_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, BALANCE_BIT_WIDTH,
-    ETHEREUM_KEY_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN,
-    TOKEN_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
+    BALANCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, ETH_SIGNATURE_RS_BIT_WIDTH,
+    ETH_SIGNATURE_V_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN,
+    NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, SUCCESS_FLAG_WIDTH, TOKEN_BIT_WIDTH,
 };
 use crate::primitives::{
     big_decimal_to_u128, bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
     u128_to_bigdecimal,
 };
 use bigdecimal::BigDecimal;
-use failure::_core::cell::RefCell;
 use failure::{ensure, format_err};
-use std::cell::Cell;
+use std::convert::TryInto;
 use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -398,7 +398,82 @@ impl ChangePubKeyOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        unimplemented!("Tree restore for changepubkey op");
+        let mut offset = 1;
+
+        let mut len = ACCOUNT_ID_BIT_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey offchain, pubdata too short"
+        );
+        let account_id = bytes_slice_to_uint32(&bytes[offset..offset + len])
+            .ok_or_else(|| format_err!("Change pubkey offchain, fail to get account id"))?;
+        offset += len;
+
+        len = NONCE_BIT_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey offchain, pubdata too short"
+        );
+        let nonce = bytes_slice_to_uint32(&bytes[offset..offset + len])
+            .ok_or_else(|| format_err!("Change pubkey offchain, fail to get nonce"))?;
+        offset += len;
+
+        len = NEW_PUBKEY_HASH_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey offchain, pubdata too short"
+        );
+        let new_pk_hash = PubKeyHash::from_bytes(&bytes[offset..offset + len])?;
+        offset += len;
+
+        len = ADDRESS_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey offchain, pubdata too short"
+        );
+        let account = Address::from_slice(&bytes[offset..offset + len]);
+        offset += len;
+
+        len = ETH_SIGNATURE_RS_BIT_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey offchain, pubdata too short"
+        );
+        let eth_signature_r: [u8; ETH_SIGNATURE_RS_BIT_WIDTH / 8] = bytes[offset..offset + len]
+            .try_into()
+            .expect("eth signature incorrect len");
+        offset += len;
+
+        len = ETH_SIGNATURE_RS_BIT_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey offchain, pubdata too short"
+        );
+        let eth_signature_s: [u8; ETH_SIGNATURE_RS_BIT_WIDTH / 8] = bytes[offset..offset + len]
+            .try_into()
+            .expect("eth signature incorrect len");
+        offset += len;
+
+        len = ETH_SIGNATURE_V_BIT_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey offchain, pubdata too short"
+        );
+        let eth_signature_v = bytes[offset + len - 1];
+
+        Ok(ChangePubKeyOp {
+            tx: ChangePubKey {
+                account,
+                new_pk_hash,
+                nonce,
+                eth_signature: PackedEthSignature(ethsign::Signature {
+                    v: eth_signature_v,
+                    r: eth_signature_r,
+                    s: eth_signature_s,
+                }),
+            },
+            account_id,
+        })
     }
 }
 
@@ -485,12 +560,53 @@ impl ChangePubkeyPriorityOp {
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        ensure!(
-            bytes.len() == Self::CHUNKS * 8,
-            "Wrong bytes length for change pub key priority pubdata"
-        );
+        let mut offset = 1;
 
-        unimplemented!("tree restore for change pub key operation")
+        let mut len = ACCOUNT_ID_BIT_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey onchain, pubdata too short"
+        );
+        let account_id = bytes_slice_to_uint32(&bytes[offset..offset + len])
+            .ok_or_else(|| format_err!("Change pubkey onchain, fail to get account id"))?;
+        offset += len;
+
+        len = SUCCESS_FLAG_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey onchain, pubdata too short"
+        );
+        let success = bytes[offset + len - 1];
+        offset += len;
+
+        len = NEW_PUBKEY_HASH_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey offchain, pubdata too short"
+        );
+        let new_pubkey_hash = PubKeyHash::from_bytes(&bytes[offset..offset + len])?;
+        offset += len;
+
+        len = ADDRESS_WIDTH / 8;
+        ensure!(
+            bytes.len() >= offset + len,
+            "Change pubkey offchain, pubdata too short"
+        );
+        let eth_address = Address::from_slice(&bytes[offset..offset + len]);
+
+        Ok(ChangePubkeyPriorityOp {
+            priority_op: ChangePubKeyPriority {
+                new_pubkey_hash,
+                eth_address,
+            },
+            account_id: if success == 1 {
+                Some(account_id)
+            } else if success == 0 {
+                None
+            } else {
+                failure::bail!("Change pubkey offchain, incorrect success value, should be 0 or 1")
+            },
+        })
     }
 }
 

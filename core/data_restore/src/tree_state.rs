@@ -33,7 +33,7 @@ impl TreeState {
         Self {
             state: PlasmaState::empty(),
             current_unprocessed_priority_op: 0,
-            last_fee_account_address: unimplemented!("tree restore"),
+            last_fee_account_address: Address::default(),
         }
     }
 
@@ -180,7 +180,7 @@ impl TreeState {
                         &mut ops,
                     );
                 }
-                FranklinOp::FullExit(mut op) => {
+                FranklinOp::FullExit(op) => {
                     let priority_op = FranklinPriorityOp::FullExit(op.priority_op);
                     let op_result = self.state.execute_priority_op(priority_op.clone());
                     current_op_block_index = self.update_from_priority_operation(
