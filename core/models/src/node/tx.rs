@@ -17,7 +17,7 @@ use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
-use franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
+use franklin_crypto::eddsa::{Seed, PrivateKey, PublicKey, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
@@ -330,9 +330,10 @@ impl TxSignature {
 
     pub fn sign_musig_pedersen(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         let hashed_msg = pedersen_hash_tx_msg(msg);
+        let seed = Seed::deterministic_seed(&pk, &hashed_msg);
         let signature = pk.musig_pedersen_sign(
             &hashed_msg,
-            &mut rand::thread_rng(),
+            &seed,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );
@@ -349,9 +350,10 @@ impl TxSignature {
 
     pub fn sign_musig_sha256(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         let hashed_msg = pedersen_hash_tx_msg(msg);
+        let seed = Seed::deterministic_seed(&pk, &hashed_msg);
         let signature = pk.musig_sha256_sign(
             &hashed_msg,
-            &mut rand::thread_rng(),
+            &seed,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );

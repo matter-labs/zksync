@@ -12,7 +12,7 @@ authors = [
 rand = "0.4"
 time = "0.1"
 pairing = { package = "pairing_ce", version = "0.17.0" }
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="baldyash/deterministic_sig"}
 bellman = { package = "bellman_ce", version = "0.3.0" }
 models = { path = "../models", version = "0.0.1" }
 circuit= { path = "../circuit", version = "0.1.1" }
