@@ -413,4 +413,29 @@ impl<T: Transport> EthereumAccount<T> {
             .await
             .map_err(|e| format_err!("Verify block confirm err: {}", e))?)
     }
+
+    // Completes pending withdrawals.
+    pub async fn complete_withdrawals(&self) -> Result<TransactionReceipt, failure::Error> {
+        let max_withdrawals_to_complete: u64 = 999;
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "completeWithdrawals",
+                max_withdrawals_to_complete,
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("Complete withdrawals send err: {}", e))?;
+        Ok(self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("Complete withdrawals confirm err: {}", e))?)
+    }
 }
