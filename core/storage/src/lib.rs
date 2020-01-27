@@ -2340,7 +2340,7 @@ impl StorageProcessor {
 
 #[cfg(test)]
 /// This tests require empty DB setup and ignored by default
-/// use `franklin db-test-reset`/`franklin db-test` script to run them
+/// use `franklin db-test-no-reset`/`franklin db-test` script to run them
 mod test {
     use super::*;
     use diesel::Connection;
@@ -2425,44 +2425,51 @@ mod test {
             (accounts, updates)
         };
 
+        let save_test_block = |block_number| {
+            conn.save_block(&Block {
+                block_number,
+                new_root_hash: Fr::default(),
+                fee_account: 0,
+                block_transactions: Vec::new(),
+                processed_priority_ops: (0, 0),
+            })
+            .unwrap();
+        };
+
         conn.commit_state_update(1, &updates_block_1).unwrap();
+        save_test_block(1);
         conn.commit_state_update(2, &updates_block_2).unwrap();
+        save_test_block(2);
         conn.commit_state_update(3, &updates_block_3).unwrap();
+        save_test_block(3);
 
         let (block, state) = conn.load_committed_state(Some(1)).unwrap();
-        assert_eq!(block, 1);
-        assert_eq!(state, accounts_block_1);
+        assert_eq!((block, &state), (1, &accounts_block_1));
 
         let (block, state) = conn.load_committed_state(Some(2)).unwrap();
-        assert_eq!(block, 2);
-        assert_eq!(state, accounts_block_2);
+        assert_eq!((block, &state), (2, &accounts_block_2));
 
         let (block, state) = conn.load_committed_state(Some(3)).unwrap();
-        assert_eq!(block, 3);
-        assert_eq!(state, accounts_block_3);
+        assert_eq!((block, &state), (3, &accounts_block_3));
 
         conn.apply_state_update(1).unwrap();
         conn.apply_state_update(2).unwrap();
 
         let (block, state) = conn.load_committed_state(Some(1)).unwrap();
-        assert_eq!(block, 1);
-        assert_eq!(state, accounts_block_1);
+        assert_eq!((block, &state), (1, &accounts_block_1));
 
         let (block, state) = conn.load_committed_state(Some(2)).unwrap();
-        assert_eq!(block, 2);
-        assert_eq!(state, accounts_block_2);
+        assert_eq!((block, &state), (2, &accounts_block_2));
 
         let (block, state) = conn.load_committed_state(Some(3)).unwrap();
-        assert_eq!(block, 3);
-        assert_eq!(state, accounts_block_3);
+        assert_eq!((block, &state), (3, &accounts_block_3));
 
         let (block, state) = conn.load_committed_state(None).unwrap();
-        assert_eq!(block, 3);
-        assert_eq!(state, accounts_block_3);
+        assert_eq!((block, &state), (3, &accounts_block_3));
     }
 
     #[test]
-    #[cfg_attr(not(feature = "db_test"), ignore)]
+    #[ignore]
     // TODO: Implement
     fn test_eth_sender_storage() {}
 
@@ -2480,45 +2487,5 @@ mod test {
 
         let loaded = conn.load_proof(1).expect("must load proof");
         assert_eq!(loaded, proof);
-    }
-
-    #[test]
-    #[cfg_attr(not(feature = "db_test"), ignore)]
-    fn test_store_proof_reqs() {
-        let pool = ConnectionPool::new();
-        let conn = pool.access_storage().unwrap();
-        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-
-        conn.execute_operation(&dummy_op(Action::Commit, 1))
-            .unwrap();
-
-        let pending = conn.load_unverified_commits().unwrap();
-        assert_eq!(pending.len(), 1);
-
-        conn.execute_operation(&dummy_op(
-            Action::Verify {
-                proof: Box::new(EncodedProof::default()),
-            },
-            1,
-        ))
-        .unwrap();
-
-        let pending = conn.load_unverified_commits().unwrap();
-        assert_eq!(pending.len(), 0);
-    }
-
-    fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
-        Operation {
-            id: None,
-            action,
-            block: Block {
-                block_number,
-                new_root_hash: Fr::default(),
-                fee_account: 0,
-                block_transactions: Vec::new(),
-                processed_priority_ops: (0, 0),
-            },
-            accounts_updated: AccountUpdates::default(),
-        }
     }
 }
