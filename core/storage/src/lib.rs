@@ -1404,7 +1404,7 @@ impl StorageProcessor {
                             last_block: upd.block_number,
                             nonce: upd.nonce,
                             address: upd.address,
-                            pubkey_hash: Vec::new(),
+                            pubkey_hash: PubKeyHash::default().data.to_vec(),
                         };
                         insert_into(accounts::table)
                             .values(&storage_account)
