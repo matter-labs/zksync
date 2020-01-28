@@ -29,8 +29,6 @@ steps:
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
-  - zksync db-wait
-  - zksync db-setup
   depends_on:
   - restore-cache
 
@@ -55,49 +53,52 @@ steps:
   - build-contracts
 
 - name: build-and-publish-server
-  image: matterlabs/ci
+  image: docker
+  commands:
+  - docker login -u $USERNAME -p $PASSWORD
+  - docker build --build-arg BINARY=/drone/src/target/x86_64-unknown-linux-musl/release/server -t $REPO:${DRONE_COMMIT_SHA:0:8} -t $REPO:${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
+  - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
+  - docker push $REPO:latest
   environment:
     USERNAME:
-      from_secret: dockerhub_username
+      from_secret: docker_username
     PASSWORD:
-      from_secret: dockerhub_password
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - docker login -u ${USERNAME} -p ${PASSWORD}
-  - docker build -t "${SERVER_DOCKER_IMAGE}" -f $ZKSYNC_HOME/docker/server/Dockerfile .
-  - docker push "${SERVER_DOCKER_IMAGE}"
+      from_secret: docker_password
+    DOCKERFILE: ./docker/server/Dockerfile
+    REPO: matterlabs/server
   depends_on:
   - rust-release-build
+  volumes:
+  - name: docker-sock
+    path: /var/run/docker.sock
 
 - name: build-and-publish-prover
-  image: matterlabs/ci
+  image: docker
+  commands:
+  - docker login -u $USERNAME -p $PASSWORD
+  - docker build --build-arg BINARY=/drone/src/target/x86_64-unknown-linux-musl/release/prover -t $REPO:${DRONE_COMMIT_SHA:0:8} -t $REPO:latest -f $DOCKERFILE .
+  - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
+  - docker push $REPO:latest
   environment:
     USERNAME:
-      from_secret: dockerhub_username
+      from_secret: docker_username
     PASSWORD:
-      from_secret: dockerhub_password
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - docker login -u ${USERNAME} -p ${PASSWORD}
-  - docker build -t "${PROVER_DOCKER_IMAGE}" -f $ZKSYNC_HOME/docker/prover/Dockerfile .
-  - docker push "${PROVER_DOCKER_IMAGE}"
+      from_secret: docker_password
+    DOCKERFILE: ./docker/prover/Dockerfile
+    REPO: matterlabs/prover
   depends_on:
   - rust-release-build
+  volumes:
+  - name: docker-sock
+    path: /var/run/docker.sock
 
 volumes:
   - name: cache
     host:
       path: /tmp/cache
-
-services:
-  - name: geth
-    image: matterlabs/geth:latest
-  - name: postgres
-    image: postgres:10.4
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
 
 trigger:
   event:
