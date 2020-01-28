@@ -508,22 +508,21 @@ impl TestSetup {
         block_on(block_sender);
     }
 
-    pub fn exit(
+    pub async fn exit(
         &mut self,
         accountId: ETHAccountId,
         token_id: TokenId,
         amount: u128,
         proof: EncodedProof,
-    ) {
+    ) -> Result<String, failure::Error> {
         let account = &self.accounts.eth_accounts[accountId.0];
-        block_on(
-            account.exit(
-                token_id,
-                account.address.clone(),
-                amount,
-                proof,
-            )
-        );
+        account.exit(
+            token_id,
+            account.address.clone(),
+            amount,
+            proof,
+        )
+        .await
     }
 
     pub fn full_exit(&mut self, post_by: ETHAccountId, from: ZKSyncAccountId, token: Token) {
@@ -641,7 +640,7 @@ impl TestSetup {
         self.execute_tx(withdraw);
     }
 
-    pub fn execute_commit_block(&mut self) -> Result<(), failure::Error> {
+    pub fn execute_commit_block(&mut self/* , nonce: Option<U256> */) -> Result<(), failure::Error> {
         let block_sender = async {
             self.state_keeper_request_sender
                 .clone()
@@ -658,7 +657,7 @@ impl TestSetup {
             }
         });
 
-        let block_rec = block_on(self.commit_account.commit_block(&new_block.block))
+        let block_rec = block_on(self.commit_account.commit_block(&new_block.block/* , nonce */))
             .expect("block commit fail");
         ensure!(
             block_rec.status == Some(U64::from(1)),
@@ -820,5 +819,13 @@ impl TestSetup {
             block_on(account.erc20_balance(&self.tokens[&token]))
                 .expect("Failed to get erc20 balance")
         }
+    }
+
+    pub fn is_exodus(&self) -> Result<bool, failure::Error> {
+        block_on(self.accounts.eth_accounts[0].is_exodus())
+    }
+
+    pub fn total_blocks_committed(&self) -> Result<u64, failure::Error> {
+        block_on(self.accounts.eth_accounts[0].total_blocks_committed())
     }
 }

@@ -1,14 +1,19 @@
 const ethers = require('ethers');
 const ethersProvider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 
-async function revertReason(txHash) {
-    const tx = await ethersProvider.getTransaction(txHash);
-    if (tx == null) {
-        return 'tx null';
+async function revertReason(hash) {
+    const tx = await ethersProvider.getTransaction(hash);
+
+    if (!tx) {
+        return "tx not found";
     }
-    if (tx.blockNumber == null) {
-        return 'tx blocknumberless';
-    }
+    
+    const receipt = await ethersProvider.getTransactionReceipt(hash);
+
+    if (receipt.status) {
+        return "tx success";
+    } 
+    
     const code = await ethersProvider.call(tx, tx.blockNumber);
 
     if (code == '0x') {
