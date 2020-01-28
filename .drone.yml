@@ -101,5 +101,7 @@ volumes:
       path: /var/run/docker.sock
 
 trigger:
+  branch:
+  - fk/test-branch
   event:
-  - pull_request
+  - push
