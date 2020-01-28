@@ -10,16 +10,18 @@ use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
-use models::node::{Account, AccountId, FranklinTx, Nonce, TokenId};
+use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use storage::{ConnectionPool, StorageProcessor, Token};
 use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
     balances: HashMap<String, BigDecimal>,
     nonce: Nonce,
+    pub_key_hash: PubKeyHash,
 }
 
 impl ResponseAccountState {
@@ -37,6 +39,7 @@ impl ResponseAccountState {
         Ok(Self {
             balances,
             nonce: account.nonce,
+            pub_key_hash: account.pub_key_hash,
         })
     }
 }
