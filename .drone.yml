@@ -1,10 +1,20 @@
 kind: pipeline
 type: docker
-name: default
-
+name: tests
 clone:
     depth: 10
-
+volumes:
+  - name: cache
+    host:
+      path: /tmp/cache
+services:
+  - name: geth
+    image: matterlabs/geth:latest
+  - name: postgres
+    image: postgres:10.4
+trigger:
+  event:
+  - pull_request
 steps:
 - name: restore-cache
   image: drillster/drone-volume-cache
@@ -19,7 +29,120 @@ steps:
       - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
-
+- name: init
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - ci-prepare-env.sh
+  - zksync env ci
+  - zksync yarn
+  - zksync db-wait
+  - zksync db-setup
+  depends_on:
+  - restore-cache
+- name: build-contracts
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync build-contracts
+  depends_on:
+  - init
+- name: rust-checks
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - cargo fmt -- --check
+  - f cargo clippy --tests --benches -- -D warnings
+  depends_on:
+  - build-contracts
+- name: rust-tests
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - f cargo test
+  - zksync circuit-tests
+  - zksync prover-tests
+  - zksync db-test
+  depends_on:
+  - rust-checks
+- name: deploy-test
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync genesis
+  - zksync redeploy
+  - zksync integration-testkit
+  depends_on:
+  - rust-tests
+- name: contract-test
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync test-contracts
+  depends_on:
+  - build-contracts
+- name: rebuild-cache
+  image: drillster/drone-volume-cache
+  volumes:
+  - name: cache
+    path: /cache
+  settings:
+    rebuild: true
+    mount:
+      - ./contracts/node_modules
+      - ./js/client/node_modules
+      - ./js/explorer/node_modules
+      - ./target/cargo
+      - ./keys
+  depends_on:
+     - init
+     - rust-checks
+---
+# This pipeline builds and publishes server and prover images.
+# TODO: deploy staging.
+kind: pipeline
+type: docker
+name: update-stage
+clone:
+    depth: 10
+volumes:
+  - name: cache
+    host:
+      path: /tmp/cache
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
+trigger:
+  branch:
+  - dev
+  event:
+  - push
+steps:
+- name: restore-cache
+  image: drillster/drone-volume-cache
+  volumes:
+  - name: cache
+    path: /cache
+  settings:
+    restore: true
+    mount:
+      - ./contracts/node_modules
+      - ./js/client/node_modules
+      - ./js/explorer/node_modules
+      - ./target/cargo
+      - ./keys
 - name: init
   image: matterlabs/ci
   commands:
@@ -31,7 +154,6 @@ steps:
   - zksync yarn
   depends_on:
   - restore-cache
-
 - name: build-contracts
   image: matterlabs/ci
   commands:
@@ -41,7 +163,6 @@ steps:
   - zksync build-contracts
   depends_on:
   - init
-
 - name: rust-release-build
   image: matterlabs/ci
   commands:
@@ -51,7 +172,6 @@ steps:
   - f cargo build --release
   depends_on:
   - build-contracts
-
 - name: build-and-publish-server
   image: docker
   commands:
@@ -71,7 +191,6 @@ steps:
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
-
 - name: build-and-publish-prover
   image: docker
   commands:
@@ -91,17 +210,3 @@ steps:
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
-
-volumes:
-  - name: cache
-    host:
-      path: /tmp/cache
-  - name: docker-sock
-    host:
-      path: /var/run/docker.sock
-
-trigger:
-  branch:
-  - fk/test-branch
-  event:
-  - push
