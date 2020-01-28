@@ -16,7 +16,7 @@ var Signer = /** @class */ (function () {
     };
     Signer.prototype.signSyncTransfer = function (transfer) {
         var type = Buffer.from([5]); // tx type
-        var from = serializeAddress(this.address());
+        var from = serializeAddress(this.pubKeyHash());
         var to = serializeAddress(transfer.to);
         var token = serializeTokenId(transfer.tokenId);
         var amount = serializeAmountPacked(transfer.amount);
@@ -34,7 +34,7 @@ var Signer = /** @class */ (function () {
         var signature = crypto_1.signTransactionBytes(this.privateKey, msgBytes);
         return {
             type: "Transfer",
-            from: this.address(),
+            from: this.pubKeyHash(),
             to: transfer.to,
             token: transfer.tokenId,
             amount: ethers_1.utils.bigNumberify(transfer.amount).toString(),
@@ -45,7 +45,7 @@ var Signer = /** @class */ (function () {
     };
     Signer.prototype.signSyncWithdraw = function (withdraw) {
         var typeBytes = Buffer.from([3]);
-        var accountBytes = serializeAddress(this.address());
+        var accountBytes = serializeAddress(this.pubKeyHash());
         var ethAddressBytes = serializeAddress(withdraw.ethAddress);
         var tokenIdBytes = serializeTokenId(withdraw.tokenId);
         var amountBytes = serializeAmountFull(withdraw.amount);
@@ -63,7 +63,7 @@ var Signer = /** @class */ (function () {
         var signature = crypto_1.signTransactionBytes(this.privateKey, msgBytes);
         return {
             type: "Withdraw",
-            account: this.address(),
+            account: this.pubKeyHash(),
             ethAddress: withdraw.ethAddress,
             token: withdraw.tokenId,
             amount: ethers_1.utils.bigNumberify(withdraw.amount).toString(),
@@ -74,13 +74,13 @@ var Signer = /** @class */ (function () {
     };
     Signer.prototype.signSyncCloseAccount = function (close) {
         var type = Buffer.from([4]);
-        var account = serializeAddress(this.address());
+        var account = serializeAddress(this.pubKeyHash());
         var nonce = serializeNonce(close.nonce);
         var msg = Buffer.concat([type, account, nonce]);
         var signature = crypto_1.signTransactionBytes(this.privateKey, msg);
         return {
             type: "Close",
-            account: this.address(),
+            account: this.pubKeyHash(),
             nonce: close.nonce,
             signature: signature
         };

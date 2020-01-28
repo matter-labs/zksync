@@ -145,7 +145,7 @@ var Wallet = /** @class */ (function () {
                 switch (_a.label) {
                     case 0:
                         if (!(nonce == "committed")) return [3 /*break*/, 2];
-                        return [4 /*yield*/, this.provider.getState(this.signer.address())];
+                        return [4 /*yield*/, this.provider.getState(this.signer.pubKeyHash())];
                     case 1: return [2 /*return*/, (_a.sent())
                             .committed.nonce];
                     case 2:
@@ -183,7 +183,7 @@ var Wallet = /** @class */ (function () {
     Wallet.prototype.getAccountState = function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
-                return [2 /*return*/, this.provider.getState(this.signer.address())];
+                return [2 /*return*/, this.provider.getState(this.signer.pubKeyHash())];
             });
         });
     };
