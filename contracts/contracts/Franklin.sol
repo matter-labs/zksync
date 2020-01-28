@@ -247,7 +247,7 @@ contract Franklin {
 
             uint128 amount = balancesToWithdraw[to][tokenId];
             // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
-            if (amount != 0) { 
+            if (amount != 0) {
                 // avoid reentrancy attack by using subtract and not "= 0" and changing local state before external call
                 balancesToWithdraw[to][tokenId] -= amount;
                 bool sent = false;
@@ -916,6 +916,6 @@ contract Franklin {
         ); // fet13 - verification failed
 
         balancesToWithdraw[_owner][_tokenId] += _amount;
-        exited[_owner][_tokenId] == false;
+        exited[_owner][_tokenId] = true;
     }
 }

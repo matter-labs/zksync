@@ -91,7 +91,7 @@ fn exit_test() {
     for token in 0..=1 {
         println!("token {}", &token);
         test_setup.start_block();
-        for account in 0..1 {
+        for account in 0..=1 {
             test_setup.deposit(
                 ETHAccountId(0),
                 ZKSyncAccountId(account),
@@ -127,41 +127,82 @@ fn exit_test() {
     }
 
 
-    // after a lot unverified blocks,
-    // state doesn't change by transactions and withdraws.
-    // But it is changed by deposits. So count deposit amounts.
-    // And call cancelOutstandingDeposits
-    // and check the balances to withdraw.
-    // 
-    // After that, for every balance in last verified state,
-    // call exit()
+    // // after a lot unverified blocks,
+    // // state doesn't change by transactions and withdraws.
+    // // But it is changed by deposits. So count deposit amounts.
+    // // And call cancelOutstandingDeposits
+    // // and check the balances to withdraw.
+    // // 
+    // // After that, for every balance in last verified state,
+    // // call exit()
+    // block_on(async {
+    //     for account in 0..=1  /* as AccountId  */{
+    //         for token in 0..=1 {
+    //             let balance_before: BigDecimal = test_setup
+    //                 .accounts
+    //                 .eth_accounts[account]
+    //                 .balances_to_withdraw(token)
+    //                 .await
+    //                 .expect("Failed to call balances_to_withdraw");
+    
+    //             println!("not bigdecimal: {:?}", balance_before);
+    
+    //             assert!(balance_before == BigDecimal::from(0));
+    
+    //             test_setup.exit(
+    //                 ETHAccountId(account),
+    //                 token,
+    //                 deposit_amount.to_u128().unwrap(),
+    //                 get_exit_proof(account as AccountId, token).unwrap(),
+    //             ).await;
+    
+    //             let balances_after = test_setup
+    //                 .accounts
+    //                 .eth_accounts[account]
+    //                 .balances_to_withdraw(token)
+    //                 .await
+    //                 .expect("Failed to call balances_to_withdraw");
+
+    //             assert!(balances_after == deposit_amount);
+    //         }
+    //     }
+    // });
 
     block_on(async {
+        // nobody has any balance
         for account in 0..1 {
-            println!(
-                "{:?}", 
-                test_setup
-                    .accounts
-                    .eth_accounts[account]
-                    .balances_to_withdraw(0)
-                    .await
-            );
+            for token in 0..=1 {
+                assert!(
+                    BigDecimal::from(0) == test_setup
+                        .accounts
+                        .eth_accounts[account]
+                        .balances_to_withdraw(token)
+                        .await
+                        .unwrap()
+                );
+            }
+        }
 
-            test_setup.exit(
-                ETHAccountId(account),
-                0,
-                deposit_amount.to_u128().unwrap(),
-                get_exit_proof(0, 0).unwrap(),
-            ).await;
-
-            println!(
-                "{:?}", 
-                test_setup
-                    .accounts
-                    .eth_accounts[account]
-                    .balances_to_withdraw(0)
-                    .await
-            );
+        for account in 0..1 {
+            for token in 0..=1 {
+                for _ in 0..3 {
+                    // first it should bump from 0 to deposit_amount, then shouldn't change
+                    test_setup.exit(
+                        ETHAccountId(account),
+                        token,
+                        deposit_amount.to_u128().unwrap(),
+                        get_exit_proof(account as AccountId, token).unwrap(),
+                    ).await;
+                    assert!(
+                        deposit_amount == test_setup
+                            .accounts
+                            .eth_accounts[account]
+                            .balances_to_withdraw(token)
+                            .await
+                            .unwrap()
+                    );        
+                }
+            }
         }
     });
 
