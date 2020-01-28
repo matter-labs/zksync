@@ -2357,7 +2357,7 @@ impl StorageProcessor {
 
 #[cfg(test)]
 /// This tests require empty DB setup and ignored by default
-/// use `franklin db-test-no-reset`/`franklin db-test` script to run them
+/// use `zksync db-test-no-reset`/`franklin db-test` script to run them
 mod test {
     use super::*;
     use diesel::Connection;
