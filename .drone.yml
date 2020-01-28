@@ -163,6 +163,25 @@ steps:
   - zksync build-contracts
   depends_on:
   - init
+- name: nginx-build-and-publish
+  image: docker
+  commands:
+  - docker login -u $USERNAME -p $PASSWORD
+  - docker build -t $REPO:${DRONE_COMMIT_SHA:0:8} -t $REPO:latest -f $DOCKERFILE .
+  - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
+  - docker push $REPO:latest
+  environment:
+    USERNAME:
+      from_secret: docker_username
+    PASSWORD:
+      from_secret: docker_password
+    DOCKERFILE: ./docker/nginx/Dockerfile
+    REPO: matterlabs/nginx
+  volumes:
+  - name: docker-sock
+    path: /var/run/docker.sock
+  depends_on:
+  - build-contracts
 - name: rust-release-build
   image: matterlabs/ci
   commands:
@@ -172,7 +191,7 @@ steps:
   - f cargo build --release
   depends_on:
   - build-contracts
-- name: build-and-publish-server
+- name: server-build-and-publish
   image: docker
   commands:
   - docker login -u $USERNAME -p $PASSWORD
@@ -186,12 +205,12 @@ steps:
       from_secret: docker_password
     DOCKERFILE: ./docker/server/Dockerfile
     REPO: matterlabs/server
-  depends_on:
-  - rust-release-build
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
-- name: build-and-publish-prover
+  depends_on:
+  - rust-release-build
+- name: prover-build-and-publish
   image: docker
   commands:
   - docker login -u $USERNAME -p $PASSWORD
@@ -205,8 +224,8 @@ steps:
       from_secret: docker_password
     DOCKERFILE: ./docker/prover/Dockerfile
     REPO: matterlabs/prover
-  depends_on:
-  - rust-release-build
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
+  depends_on:
+  - rust-release-build
