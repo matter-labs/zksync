@@ -167,9 +167,11 @@ fn build_prover_data(
 
     let block_number = commit_operation.block.block_number;
 
+    info!("UPDATING ACCOUNTS HERE");
     let (_, accounts) = storage
         .load_committed_state(Some(block_number - 1))
         .map_err(|e| format!("failed to load commited state: {}", e))?;
+    info!("UPDATING ACCOUNTS HERE STOP");
     let mut accounts_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
     for acc in accounts {

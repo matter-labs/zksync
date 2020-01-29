@@ -8,6 +8,7 @@ import {
 // HACK: using require as type system work-around
 const franklin_abi = require('../../contracts/build/Franklin.json');
 import { ethers, utils, Contract } from "ethers";
+import {parseEther} from "ethers/utils";
 
 
 let syncProvider: Provider;
@@ -99,13 +100,39 @@ async function testWithdraw(contract: Contract, ethProxy: ETHProxy, ethWallet: e
     );
 
     if (!wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee))) {
-        return new Error("Wrong amount on wallet after WITHDRAW");
+        throw new Error("Wrong amount on wallet after WITHDRAW");
     }
     if (!operatorAfterWithdraw.sub(operatorBeforeWithdraw).eq(fee)) {
-        return new Error("Wrong amount of operator fees after WITHDRAW");
+        throw new Error("Wrong amount of operator fees after WITHDRAW");
     }
     if (!(onchainBalanceAfterWithdraw.add(pendingToBeOnchainBalance)).sub(onchainBalanceBeforeWithdraw).eq(amount)) {
-        return new Error("Wrong amount onchain after WITHDRAW");
+        throw new Error("Wrong amount onchain after WITHDRAW");
+    }
+}
+
+async function testChangePubkeyOnchain(syncWallet: Wallet) {
+    if (! await syncWallet.isCurrentPubkeySet()) {
+        const startTime = new Date().getTime();
+        const changePubkeyHandle = await syncWallet.setCurrentPubkeyWithEthereumTx();
+        console.log(`Change pubkey onchain posted: ${(new Date().getTime()) - startTime} ms`);
+        await changePubkeyHandle.awaitReceipt();
+        console.log(`Change pubkey onchain committed: ${(new Date().getTime()) - startTime} ms`);
+        if (! await syncWallet.isCurrentPubkeySet()) {
+            throw new Error("Change pubkey onchain failed");
+        }
+    }
+}
+
+async function testChangePubkeyOffchain(syncWallet: Wallet) {
+    if (! await syncWallet.isCurrentPubkeySet()) {
+        const startTime = new Date().getTime();
+        const changePubkeyHandle = await syncWallet.setCurrentPubkeyWithZksyncTx();
+        console.log(`Change pubkey offchain posted: ${(new Date().getTime()) - startTime} ms`);
+        await changePubkeyHandle.awaitReceipt();
+        console.log(`Change pubkey offchain committed: ${(new Date().getTime()) - startTime} ms`);
+        if (! await syncWallet.isCurrentPubkeySet()) {
+            throw new Error("Change pubkey offchain failed");
+        }
     }
 }
 
@@ -121,10 +148,14 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
 
     await testDeposit(wallet1, syncWallet1, token, depositAmount);
     console.log(`Deposit ok, Token: ${token}`);
+    await testChangePubkeyOnchain(syncWallet1);
+    console.log(`Change pubkey onchain ok`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, transfersFee);
     console.log(`Transfer to new ok, Token: ${token}`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, transfersFee);
     console.log(`Transfer ok, Token: ${token}`);
+    await testChangePubkeyOffchain(syncWallet2);
+    console.log(`Change pubkey offchain ok`);
     await testWithdraw(contract, ethProxy, wallet2, syncWallet2, token, withdrawAmount, withdrawFee);
     console.log(`Withdraw ok, Token: ${token}`);
 }
@@ -132,7 +163,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
 (async () => {
     const WEB3_URL = process.env.WEB3_URL;
     // Mnemonic for eth wallet.
-    const MNEMONIC = process.env.MNEMONIC;
+    const MNEMONIC = process.env.TEST_MNEMONIC;
     const ERC_20TOKEN = process.env.TEST_ERC20;
 
     const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
@@ -145,7 +176,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
 
     const ethWallet = ethers.Wallet.fromMnemonic(
         MNEMONIC,
-        "m/44'/60'/0'/0/1"
+        "m/44'/60'/0'/0/0"
     ).connect(ethersProvider);
     const syncWallet = await Wallet.fromEthSigner(
         ethWallet,
@@ -160,6 +191,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
     );
 
     const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
+    await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.5")}));
     const syncWallet2 = await Wallet.fromEthSigner(
         ethWallet2,
         syncProvider,
@@ -167,6 +199,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
     );
 
     const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
+    await (await ethWallet.sendTransaction({to: ethWallet3.address, value: parseEther("0.05")}));
     const syncWallet3 = await Wallet.fromEthSigner(
         ethWallet3,
         syncProvider,

@@ -22,9 +22,7 @@ use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
     AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
 };
-use models::{
-    Action, ActionType, EncodedProof, Operation, TokenAddedEvent, ACTION_COMMIT, ACTION_VERIFY,
-};
+use models::{Action, ActionType, EncodedProof, Operation, TokenAddedEvent};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
 use std::time;
@@ -45,6 +43,7 @@ use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
 
 use itertools::Itertools;
 use models::node::PubKeyHash;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use web3::types::Address;
 
@@ -425,6 +424,13 @@ impl StorageAccountDiff {
                 ..
             }) => update_order_id,
         }
+    }
+
+    /// Compares updates by `block number` then by `update_order_id(number within block)`.
+    fn cmp_order(&self, other: &Self) -> Ordering {
+        self.block_number()
+            .cmp(&other.block_number())
+            .then(self.update_order_id().cmp(&other.update_order_id()))
     }
 
     fn block_number(&self) -> i64 {
@@ -1370,7 +1376,7 @@ impl StorageProcessor {
                         .into_iter()
                         .map(StorageAccountDiff::from),
                 );
-                account_diff.sort_by_key(|l| l.update_order_id());
+                account_diff.sort_by(StorageAccountDiff::cmp_order);
                 account_diff
             };
 
@@ -1452,15 +1458,12 @@ impl StorageProcessor {
 
     pub fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
         self.conn().transaction(|| {
+            let last_block = self.get_last_verified_block()?;
+
             let accounts: Vec<StorageAccount> = accounts::table.load(self.conn())?;
             let balances: Vec<Vec<StorageBalance>> = StorageBalance::belonging_to(&accounts)
                 .load(self.conn())?
                 .grouped_by(&accounts);
-            let last_block = accounts
-                .iter()
-                .map(|a| a.last_block as u32)
-                .max()
-                .unwrap_or(0);
 
             let account_map: AccountMap = accounts
                 .into_iter()
@@ -1555,7 +1558,7 @@ impl StorageProcessor {
                     .map(|acc| acc.block_number())
                     .max()
                     .unwrap_or(0);
-                account_diff.sort_by_key(|l| l.update_order_id());
+                account_diff.sort_by(StorageAccountDiff::cmp_order);
                 (
                     account_diff
                         .into_iter()
@@ -1985,7 +1988,7 @@ impl StorageProcessor {
                         .into_iter()
                         .map(StorageAccountDiff::from),
                 );
-                account_diff.sort_by_key(|l| l.update_order_id());
+                account_diff.sort_by(StorageAccountDiff::cmp_order);
                 account_diff
                     .into_iter()
                     .map(|upd| upd.into())
@@ -2031,7 +2034,7 @@ impl StorageProcessor {
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
-            .filter(action_type.eq(ACTION_COMMIT))
+            .filter(action_type.eq(&ActionType::COMMIT.to_string()))
             .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
@@ -2040,7 +2043,7 @@ impl StorageProcessor {
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
-            .filter(action_type.eq(ACTION_VERIFY))
+            .filter(action_type.eq(&ActionType::VERIFY.to_string()))
             .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }

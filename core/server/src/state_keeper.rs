@@ -107,10 +107,11 @@ impl PlasmaStateInitParams {
             .unwrap_or_default();
 
         info!(
-            "Restored committed state from db, committed: {}, verified: {}, elapsed time: {} ms",
+            "Restored committed state from db, committed: {}, verified: {}, unprocessed priority op: {}, elapsed time: {} ms",
             last_committed,
             last_verified,
-            timer.elapsed().as_millis()
+            unprocessed_priority_op,
+            timer.elapsed().as_millis(),
         );
 
         Self {
