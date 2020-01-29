@@ -35,6 +35,7 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - cargo install diesel_cli --no-default-features --features postgres
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
@@ -110,8 +111,7 @@ steps:
      - init
      - rust-checks
 ---
-# This pipeline builds and publishes server and prover images.
-# TODO: deploy staging.
+# This pipeline publishes images and updates staging
 kind: pipeline
 type: docker
 name: update-stage
@@ -154,16 +154,34 @@ steps:
   - zksync yarn
   depends_on:
   - restore-cache
-- name: build-contracts
+- name: rebuild-cache
+  image: drillster/drone-volume-cache
+  volumes:
+  - name: cache
+    path: /cache
+  settings:
+    rebuild: true
+    mount:
+      - ./contracts/node_modules
+      - ./js/client/node_modules
+      - ./js/explorer/node_modules
+      - ./target/cargo
+      - ./keys
+  depends_on:
+     - init
+- name: client-and-explorer-build
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync build-contracts
+  # too much logs and pipeline is failing
+  - zksync yarn
+  - zksync dist-client > /dev/null
+  - zksync dist-explorer > /dev/null
   depends_on:
   - init
-- name: nginx-build-and-publish
+- name: nginx-image-publish
   image: docker
   commands:
   - docker login -u $USERNAME -p $PASSWORD
@@ -181,7 +199,7 @@ steps:
   - name: docker-sock
     path: /var/run/docker.sock
   depends_on:
-  - build-contracts
+  - client-and-explorer-build
 - name: rust-release-build
   image: matterlabs/ci
   commands:
@@ -190,8 +208,8 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo build --release
   depends_on:
-  - build-contracts
-- name: server-build-and-publish
+  - init
+- name: server-image-publish
   image: docker
   commands:
   - docker login -u $USERNAME -p $PASSWORD
@@ -210,7 +228,7 @@ steps:
     path: /var/run/docker.sock
   depends_on:
   - rust-release-build
-- name: prover-build-and-publish
+- name: prover-image-publish
   image: docker
   commands:
   - docker login -u $USERNAME -p $PASSWORD
@@ -229,3 +247,24 @@ steps:
     path: /var/run/docker.sock
   depends_on:
   - rust-release-build
+- name: staging-deploy
+  image: matterlabs/ci
+  environment:
+    KUBE_CA_DATA:
+      from_secret: k8s_ca
+    KUBE_SERVER:
+      from_secret: k8s_server
+    KUBE_USER:
+      from_secret: k8s_user
+    KUBE_TOKEN:
+      from_secret: k8s_token
+  commands:
+  - envsubst < `pwd`/etc/kube/kubeconfig-template.yaml > `pwd`/kubeconfig.yaml
+  - export KUBECONFIG=`pwd`/kubeconfig.yaml
+  - kubectl set image deployment staging-nginx staging-nginx=matterlabs/nginx:${DRONE_COMMIT_SHA:0:8} --record
+  - kubectl set image deployment staging-prover staging-prover=matterlabs/prover:${DRONE_COMMIT_SHA:0:8} --record
+  - kubectl set image deployment staging-server server=matterlabs/server:${DRONE_COMMIT_SHA:0:8} --record
+  depends_on:
+  - nginx-image-publish
+  - server-image-publish
+  - prover-image-publish

@@ -10,7 +10,7 @@ echo Checking environment
 
 check_tool yarn
 check_tool node
-node --version | grep "v10.*" > /dev/null  || (echo "Node version 10 is supported" && exit 1)
+node --version | grep "v10.*" > /dev/null  || (echo "ERROR, need node version 10" && exit 1)
 check_tool docker
 check_tool docker-compose
 check_tool envsubst

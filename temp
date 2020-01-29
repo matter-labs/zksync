@@ -1,0 +1,11 @@
+docker run -d \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -e DRONE_RPC_PROTO=https \
+  -e DRONE_RPC_HOST=ci.zksync.dev \
+  -e DRONE_RPC_SECRET=2d672f92f0c13e26b9cd323ccfef0bcf \
+  -e DRONE_RUNNER_CAPACITY=2 \
+  -e DRONE_RUNNER_NAME=deploy-tester \
+  -p 3000:3000 \
+  --restart always \
+  --name runner \
+  drone/drone-runner-docker:1
