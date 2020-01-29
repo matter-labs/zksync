@@ -19,7 +19,7 @@ spec:
           path: /home/docker
       containers:
       - name: ${ZKSYNC_ENV}-prover
-        image: matterlabs/prover:${ZKSYNC_ENV}
+        image: matterlabs/prover:${IMAGE_TAG}
         imagePullPolicy: Always
         volumeMounts:
         - name: keys-dir
