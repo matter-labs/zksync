@@ -38,10 +38,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 var ethers_1 = require("ethers");
 var signer_1 = require("./signer");
 var utils_1 = require("./utils");
-var crypto_1 = require("./crypto");
 var Wallet = /** @class */ (function () {
-    function Wallet(signer) {
+    function Wallet(signer, ethSigner, cachedAddress) {
         this.signer = signer;
+        this.ethSigner = ethSigner;
+        this.cachedAddress = cachedAddress;
     }
     Wallet.prototype.connect = function (provider, ethProxy) {
         this.provider = provider;
@@ -68,6 +69,7 @@ var Wallet = /** @class */ (function () {
                     case 5:
                         nonce = _a;
                         transactionData = {
+                            from: this.address(),
                             to: transfer.to,
                             tokenId: tokenId,
                             amount: transfer.amount,
@@ -85,10 +87,12 @@ var Wallet = /** @class */ (function () {
     };
     Wallet.prototype.withdrawTo = function (withdraw) {
         return __awaiter(this, void 0, void 0, function () {
-            var tokenId, nonce, _a, transactionData, signedWithdrawTransaction, submitResponse;
+            var withdrawAddress, tokenId, nonce, _a, transactionData, signedWithdrawTransaction, submitResponse;
             return __generator(this, function (_b) {
                 switch (_b.label) {
-                    case 0: return [4 /*yield*/, this.ethProxy.resolveTokenId(withdraw.token)];
+                    case 0:
+                        withdrawAddress = withdraw.ethAddress == null ? this.address() : withdraw.ethAddress;
+                        return [4 /*yield*/, this.ethProxy.resolveTokenId(withdraw.token)];
                     case 1:
                         tokenId = _b.sent();
                         if (!(withdraw.nonce != null)) return [3 /*break*/, 3];
@@ -103,7 +107,8 @@ var Wallet = /** @class */ (function () {
                     case 5:
                         nonce = _a;
                         transactionData = {
-                            ethAddress: withdraw.ethAddress,
+                            from: this.address(),
+                            ethAddress: withdrawAddress,
                             tokenId: tokenId,
                             amount: withdraw.amount,
                             fee: withdraw.fee,
@@ -138,6 +143,98 @@ var Wallet = /** @class */ (function () {
             });
         });
     };
+    Wallet.prototype.isCurrentPubkeySet = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var currentPubKeyHash, signerPubKeyHash;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, this.getCurrentPubKeyHash()];
+                    case 1:
+                        currentPubKeyHash = _a.sent();
+                        signerPubKeyHash = this.signer.pubKeyHash();
+                        return [2 /*return*/, currentPubKeyHash === signerPubKeyHash];
+                }
+            });
+        });
+    };
+    Wallet.prototype.setCurrentPubkeyWithZksyncTx = function (nonce) {
+        if (nonce === void 0) { nonce = "committed"; }
+        return __awaiter(this, void 0, void 0, function () {
+            var currentPubKeyHash, newPubKeyHash, numNonce, newPkHash, message, ethSignature, txData, transactionHash;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, this.getCurrentPubKeyHash()];
+                    case 1:
+                        currentPubKeyHash = _a.sent();
+                        newPubKeyHash = this.signer.pubKeyHash();
+                        if (currentPubKeyHash == newPubKeyHash) {
+                            throw new Error("Current PubKeyHash is the same as new");
+                        }
+                        return [4 /*yield*/, this.getNonce(nonce)];
+                    case 2:
+                        numNonce = _a.sent();
+                        newPkHash = signer_1.serializeAddress(newPubKeyHash);
+                        message = Buffer.concat([signer_1.serializeNonce(numNonce), newPkHash]);
+                        return [4 /*yield*/, this.ethSigner.signMessage(message)];
+                    case 3:
+                        ethSignature = _a.sent();
+                        txData = {
+                            type: "ChangePubKey",
+                            account: this.address(),
+                            newPkHash: this.signer.pubKeyHash(),
+                            nonce: numNonce,
+                            ethSignature: ethSignature
+                        };
+                        return [4 /*yield*/, this.provider.submitTx(txData)];
+                    case 4:
+                        transactionHash = _a.sent();
+                        return [2 /*return*/, new Transaction(txData, transactionHash, this.provider)];
+                }
+            });
+        });
+    };
+    Wallet.prototype.setCurrentPubkeyWithEthereumTx = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            var currentPubKeyHash, newPubKeyHash, gasPrice, maxFeeInETHToken, mainZkSyncContract, ethTransaction;
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, this.getCurrentPubKeyHash()];
+                    case 1:
+                        currentPubKeyHash = _a.sent();
+                        newPubKeyHash = this.signer.pubKeyHash();
+                        if (currentPubKeyHash == newPubKeyHash) {
+                            throw new Error("Current PubKeyHash is the same as new");
+                        }
+                        return [4 /*yield*/, this.ethSigner.provider.getGasPrice()];
+                    case 2:
+                        gasPrice = _a.sent();
+                        return [4 /*yield*/, this.ethProxy.estimateEmergencyWithdrawFeeInETHToken(gasPrice)];
+                    case 3:
+                        maxFeeInETHToken = _a.sent();
+                        mainZkSyncContract = new ethers_1.Contract(this.ethProxy.contractAddress.mainContract, utils_1.SYNC_MAIN_CONTRACT_INTERFACE, this.ethSigner);
+                        return [4 /*yield*/, mainZkSyncContract.changePubKeyHash(newPubKeyHash.replace("sync:", "0x"), {
+                                gasLimit: ethers_1.utils.bigNumberify("200000"),
+                                value: maxFeeInETHToken,
+                                gasPrice: gasPrice
+                            })];
+                    case 4:
+                        ethTransaction = _a.sent();
+                        return [2 /*return*/, new ETHOperation(ethTransaction, this.provider)];
+                }
+            });
+        });
+    };
+    Wallet.prototype.getCurrentPubKeyHash = function () {
+        return __awaiter(this, void 0, void 0, function () {
+            return __generator(this, function (_a) {
+                switch (_a.label) {
+                    case 0: return [4 /*yield*/, this.provider.getState(this.address())];
+                    case 1: return [2 /*return*/, (_a.sent()).committed
+                            .pubKeyHash];
+                }
+            });
+        });
+    };
     Wallet.prototype.getNonce = function (nonce) {
         if (nonce === void 0) { nonce = "committed"; }
         return __awaiter(this, void 0, void 0, function () {
@@ -145,9 +242,9 @@ var Wallet = /** @class */ (function () {
                 switch (_a.label) {
                     case 0:
                         if (!(nonce == "committed")) return [3 /*break*/, 2];
-                        return [4 /*yield*/, this.provider.getState(this.signer.pubKeyHash())];
-                    case 1: return [2 /*return*/, (_a.sent())
-                            .committed.nonce];
+                        return [4 /*yield*/, this.provider.getState(this.address())];
+                    case 1: return [2 /*return*/, (_a.sent()).committed
+                            .nonce];
                     case 2:
                         if (typeof nonce == "number") {
                             return [2 /*return*/, nonce];
@@ -159,19 +256,24 @@ var Wallet = /** @class */ (function () {
         });
     };
     Wallet.prototype.address = function () {
-        return this.signer.address();
+        return this.cachedAddress;
     };
     Wallet.fromEthSigner = function (ethWallet, provider, ethProxy) {
         return __awaiter(this, void 0, void 0, function () {
-            var seedHex, seed, signer, wallet;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
+            var seedHex, seed, signer, wallet, _a, _b;
+            return __generator(this, function (_c) {
+                switch (_c.label) {
                     case 0: return [4 /*yield*/, ethWallet.signMessage("Matter login")];
                     case 1:
-                        seedHex = (_a.sent()).substr(2);
+                        seedHex = (_c.sent()).substr(2);
                         seed = Buffer.from(seedHex, "hex");
                         signer = signer_1.Signer.fromSeed(seed);
-                        wallet = new Wallet(signer);
+                        _a = Wallet.bind;
+                        _b = [void 0, signer,
+                            ethWallet];
+                        return [4 /*yield*/, ethWallet.getAddress()];
+                    case 2:
+                        wallet = new (_a.apply(Wallet, _b.concat([_c.sent()])))();
                         if (provider && ethProxy) {
                             wallet.connect(provider, ethProxy);
                         }
@@ -183,7 +285,7 @@ var Wallet = /** @class */ (function () {
     Wallet.prototype.getAccountState = function () {
         return __awaiter(this, void 0, void 0, function () {
             return __generator(this, function (_a) {
-                return [2 /*return*/, this.provider.getState(this.signer.pubKeyHash())];
+                return [2 /*return*/, this.provider.getState(this.address())];
             });
         });
     };
@@ -262,68 +364,44 @@ function depositFromETH(deposit) {
 exports.depositFromETH = depositFromETH;
 function emergencyWithdraw(withdraw) {
     return __awaiter(this, void 0, void 0, function () {
-        var gasPrice, maxFeeInETHToken, baseFee, accountId, accountState, tokenId, nonce, _a, emergencyWithdrawSignature, _b, _c, _d, mainZkSyncContract, tokenAddress, ethTransaction;
-        return __generator(this, function (_e) {
-            switch (_e.label) {
-                case 0: return [4 /*yield*/, withdraw.withdrawTo.provider.getGasPrice()];
+        var gasPrice, maxFeeInETHToken, accountId, accountState, mainZkSyncContract, tokenAddress, ethTransaction;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0: return [4 /*yield*/, withdraw.withdrawFrom.ethSigner.provider.getGasPrice()];
                 case 1:
-                    gasPrice = _e.sent();
+                    gasPrice = _a.sent();
                     if (!(withdraw.maxFeeInETHToken != null)) return [3 /*break*/, 2];
                     maxFeeInETHToken = withdraw.maxFeeInETHToken;
                     return [3 /*break*/, 4];
                 case 2: return [4 /*yield*/, withdraw.withdrawFrom.ethProxy.estimateEmergencyWithdrawFeeInETHToken(gasPrice)];
                 case 3:
-                    baseFee = _e.sent();
-                    maxFeeInETHToken = baseFee;
-                    _e.label = 4;
+                    maxFeeInETHToken = _a.sent();
+                    _a.label = 4;
                 case 4:
                     if (!(withdraw.accountId != null)) return [3 /*break*/, 5];
                     accountId = withdraw.accountId;
                     return [3 /*break*/, 7];
                 case 5: return [4 /*yield*/, withdraw.withdrawFrom.getAccountState()];
                 case 6:
-                    accountState = _e.sent();
+                    accountState = _a.sent();
                     if (!accountState.id) {
                         throw new Error("Can't resolve account id from the ZK Sync node");
                     }
                     accountId = accountState.id;
-                    _e.label = 7;
-                case 7: return [4 /*yield*/, withdraw.withdrawFrom.ethProxy.resolveTokenId(withdraw.token)];
-                case 8:
-                    tokenId = _e.sent();
-                    if (!(withdraw.nonce != null)) return [3 /*break*/, 10];
-                    return [4 /*yield*/, withdraw.withdrawFrom.getNonce(withdraw.nonce)];
-                case 9:
-                    _a = _e.sent();
-                    return [3 /*break*/, 12];
-                case 10: return [4 /*yield*/, withdraw.withdrawFrom.getNonce()];
-                case 11:
-                    _a = _e.sent();
-                    _e.label = 12;
-                case 12:
-                    nonce = _a;
-                    _c = (_b = withdraw.withdrawFrom.signer).syncEmergencyWithdrawSignature;
-                    _d = {
-                        accountId: accountId
-                    };
-                    return [4 /*yield*/, withdraw.withdrawTo.getAddress()];
-                case 13:
-                    emergencyWithdrawSignature = _c.apply(_b, [(_d.ethAddress = _e.sent(),
-                            _d.tokenId = tokenId,
-                            _d.nonce = nonce,
-                            _d)]);
-                    mainZkSyncContract = new ethers_1.Contract(withdraw.withdrawFrom.ethProxy.contractAddress.mainContract, utils_1.SYNC_MAIN_CONTRACT_INTERFACE, withdraw.withdrawTo);
+                    _a.label = 7;
+                case 7:
+                    mainZkSyncContract = new ethers_1.Contract(withdraw.withdrawFrom.ethProxy.contractAddress.mainContract, utils_1.SYNC_MAIN_CONTRACT_INTERFACE, withdraw.withdrawFrom.ethSigner);
                     tokenAddress = "0x0000000000000000000000000000000000000000";
                     if (withdraw.token != "ETH") {
                         tokenAddress = withdraw.token;
                     }
-                    return [4 /*yield*/, mainZkSyncContract.fullExit(accountId, crypto_1.serializePointPacked(withdraw.withdrawFrom.signer.publicKey), tokenAddress, emergencyWithdrawSignature, nonce, {
+                    return [4 /*yield*/, mainZkSyncContract.fullExit(accountId, tokenAddress, {
                             gasLimit: ethers_1.utils.bigNumberify("500000"),
                             value: maxFeeInETHToken,
                             gasPrice: gasPrice
                         })];
-                case 14:
-                    ethTransaction = _e.sent();
+                case 8:
+                    ethTransaction = _a.sent();
                     return [2 /*return*/, new ETHOperation(ethTransaction, withdraw.withdrawFrom.provider)];
             }
         });

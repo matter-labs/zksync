@@ -1,12 +1,14 @@
 import { ContractTransaction, ethers, utils } from "ethers";
 import { ETHProxy, Provider } from "./provider";
 import { Signer } from "./signer";
-import { AccountState, Address, Token, Nonce, PriorityOperationReceipt, TransactionReceipt } from "./types";
+import { AccountState, Address, Token, Nonce, PriorityOperationReceipt, TransactionReceipt, PubKeyHash } from "./types";
 export declare class Wallet {
     signer: Signer;
+    ethSigner: ethers.Signer;
+    cachedAddress: string;
     provider: Provider;
     ethProxy: ETHProxy;
-    constructor(signer: Signer);
+    private constructor();
     connect(provider: Provider, ethProxy: ETHProxy): this;
     syncTransfer(transfer: {
         to: Address;
@@ -16,13 +18,17 @@ export declare class Wallet {
         nonce?: Nonce;
     }): Promise<Transaction>;
     withdrawTo(withdraw: {
-        ethAddress: string;
+        ethAddress?: string;
         token: Token;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction>;
     close(nonce?: Nonce): Promise<Transaction>;
+    isCurrentPubkeySet(): Promise<boolean>;
+    setCurrentPubkeyWithZksyncTx(nonce?: Nonce): Promise<Transaction>;
+    setCurrentPubkeyWithEthereumTx(): Promise<ETHOperation>;
+    getCurrentPubKeyHash(): Promise<PubKeyHash>;
     getNonce(nonce?: Nonce): Promise<number>;
     address(): Address;
     static fromEthSigner(ethWallet: ethers.Signer, provider?: Provider, ethProxy?: ETHProxy): Promise<Wallet>;
@@ -37,7 +43,6 @@ export declare function depositFromETH(deposit: {
     maxFeeInETHToken?: utils.BigNumberish;
 }): Promise<ETHOperation>;
 export declare function emergencyWithdraw(withdraw: {
-    withdrawTo: ethers.Signer;
     withdrawFrom: Wallet;
     token: Token;
     maxFeeInETHToken?: utils.BigNumberish;
