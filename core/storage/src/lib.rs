@@ -112,6 +112,7 @@ pub struct Token {
 #[derive(Debug, Insertable)]
 #[table_name = "account_balance_updates"]
 struct StorageAccountUpdateInsert {
+    pub update_order_id: i32,
     pub account_id: i64,
     pub block_number: i64,
     pub coin_id: i32,
@@ -132,11 +133,13 @@ struct StorageAccountUpdate {
     pub new_balance: BigDecimal,
     pub old_nonce: i64,
     pub new_nonce: i64,
+    pub update_order_id: i32,
 }
 
 #[derive(Debug, Insertable)]
 #[table_name = "account_pubkey_updates"]
 struct StorageAccountPubkeyUpdateInsert {
+    pub update_order_id: i32,
     pub account_id: i64,
     pub block_number: i64,
     pub old_pubkey_hash: Vec<u8>,
@@ -149,6 +152,7 @@ struct StorageAccountPubkeyUpdateInsert {
 #[table_name = "account_pubkey_updates"]
 struct StorageAccountPubkeyUpdate {
     pubkey_update_id: i32,
+    pub update_order_id: i32,
     pub account_id: i64,
     pub block_number: i64,
     pub old_pubkey_hash: Vec<u8>,
@@ -165,6 +169,7 @@ struct StorageAccountCreation {
     block_number: i64,
     address: Vec<u8>,
     nonce: i64,
+    update_order_id: i32,
 }
 
 #[derive(Debug, Insertable)]
@@ -404,30 +409,22 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
 }
 
 impl StorageAccountDiff {
-    fn nonce(&self) -> i64 {
+    fn update_order_id(&self) -> i32 {
         *match self {
-            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { old_nonce, .. }) => old_nonce,
-            StorageAccountDiff::Create(StorageAccountCreation { nonce, .. }) => nonce,
-            StorageAccountDiff::Delete(StorageAccountCreation { nonce, .. }) => nonce,
-            StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate { old_nonce, .. }) => {
-                old_nonce
-            }
+            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate {
+                update_order_id, ..
+            }) => update_order_id,
+            StorageAccountDiff::Create(StorageAccountCreation {
+                update_order_id, ..
+            }) => update_order_id,
+            StorageAccountDiff::Delete(StorageAccountCreation {
+                update_order_id, ..
+            }) => update_order_id,
+            StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate {
+                update_order_id,
+                ..
+            }) => update_order_id,
         }
-    }
-
-    fn cmp_nonce(&self, other: &Self) -> std::cmp::Ordering {
-        let type_cmp_number = |diff: &StorageAccountDiff| -> u32 {
-            match diff {
-                StorageAccountDiff::Create(..) => 0,
-                StorageAccountDiff::BalanceUpdate(..) => 1,
-                StorageAccountDiff::ChangePubKey(..) => 2,
-                StorageAccountDiff::Delete(..) => 3,
-            }
-        };
-
-        self.nonce()
-            .cmp(&other.nonce())
-            .then(type_cmp_number(self).cmp(&type_cmp_number(other)))
     }
 
     fn block_number(&self) -> i64 {
@@ -1269,7 +1266,7 @@ impl StorageProcessor {
         accounts_updated: &[(u32, AccountUpdate)],
     ) -> QueryResult<()> {
         self.conn().transaction(|| {
-            for (id, upd) in accounts_updated.iter() {
+            for (update_order_id, (id, upd)) in accounts_updated.iter().enumerate() {
                 debug!(
                     "Committing state update for account {} in block {}",
                     id, block_number
@@ -1278,6 +1275,7 @@ impl StorageProcessor {
                     AccountUpdate::Create { ref address, nonce } => {
                         diesel::insert_into(account_creates::table)
                             .values(&StorageAccountCreation {
+                                update_order_id: update_order_id as i32,
                                 account_id: i64::from(*id),
                                 is_create: true,
                                 block_number: i64::from(block_number),
@@ -1289,6 +1287,7 @@ impl StorageProcessor {
                     AccountUpdate::Delete { ref address, nonce } => {
                         diesel::insert_into(account_creates::table)
                             .values(&StorageAccountCreation {
+                                update_order_id: update_order_id as i32,
                                 account_id: i64::from(*id),
                                 is_create: false,
                                 block_number: i64::from(block_number),
@@ -1304,6 +1303,7 @@ impl StorageProcessor {
                     } => {
                         diesel::insert_into(account_balance_updates::table)
                             .values(&StorageAccountUpdateInsert {
+                                update_order_id: update_order_id as i32,
                                 account_id: i64::from(*id),
                                 block_number: i64::from(block_number),
                                 coin_id: i32::from(token),
@@ -1322,6 +1322,7 @@ impl StorageProcessor {
                     } => {
                         diesel::insert_into(account_pubkey_updates::table)
                             .values(&StorageAccountPubkeyUpdateInsert {
+                                update_order_id: update_order_id as i32,
                                 account_id: i64::from(*id),
                                 block_number: i64::from(block_number),
                                 old_pubkey_hash: old_pub_key_hash.data.to_vec(),
@@ -1369,7 +1370,7 @@ impl StorageProcessor {
                         .into_iter()
                         .map(StorageAccountDiff::from),
                 );
-                account_diff.sort_by(|l, r| l.cmp_nonce(r));
+                account_diff.sort_by_key(|l| l.update_order_id());
                 account_diff
             };
 
@@ -1554,7 +1555,7 @@ impl StorageProcessor {
                     .map(|acc| acc.block_number())
                     .max()
                     .unwrap_or(0);
-                account_diff.sort_by(|l, r| l.cmp_nonce(r));
+                account_diff.sort_by_key(|l| l.update_order_id());
                 (
                     account_diff
                         .into_iter()
@@ -1984,7 +1985,7 @@ impl StorageProcessor {
                         .into_iter()
                         .map(StorageAccountDiff::from),
                 );
-                account_diff.sort_by(|l, r| l.cmp_nonce(r));
+                account_diff.sort_by_key(|l| l.update_order_id());
                 account_diff
                     .into_iter()
                     .map(|upd| upd.into())

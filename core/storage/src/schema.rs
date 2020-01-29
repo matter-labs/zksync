@@ -8,6 +8,7 @@ table! {
         new_balance -> Numeric,
         old_nonce -> Int8,
         new_nonce -> Int8,
+        update_order_id -> Int4,
     }
 }
 
@@ -18,12 +19,14 @@ table! {
         block_number -> Int8,
         address -> Bytea,
         nonce -> Int8,
+        update_order_id -> Int4,
     }
 }
 
 table! {
     account_pubkey_updates (pubkey_update_id) {
         pubkey_update_id -> Int4,
+        update_order_id -> Int4,
         account_id -> Int8,
         block_number -> Int8,
         old_pubkey_hash -> Bytea,
