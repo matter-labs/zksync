@@ -546,8 +546,10 @@ impl PlasmaState {
         Ok((fee, updates))
     }
 
-    #[allow(dead_code)]
-    fn apply_close_op(&mut self, op: &CloseOp) -> Result<(CollectedFee, AccountUpdates), Error> {
+    pub fn apply_close_op(
+        &mut self,
+        op: &CloseOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
         let account = self.get_account(op.account_id).unwrap();
 

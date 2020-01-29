@@ -101,12 +101,21 @@ impl TreeState {
                     let from = self
                         .state
                         .get_account(op.from)
-                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("TransferToNew fail: Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.nonce = from.nonce;
+                    let tx = FranklinTx::Transfer(op.tx.clone());
 
-                    let tx = FranklinTx::Transfer(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone());
+                    let (fee, updates) = self
+                        .state
+                        .apply_transfer_to_new_op(&op)
+                        .map_err(|e| format_err!("TransferToNew fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::TransferToNew(op),
+                    };
+
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
@@ -121,12 +130,20 @@ impl TreeState {
                     let account = self
                         .state
                         .get_account(op.account_id)
-                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Withdraw fail: Nonexistent account"))?;
                     op.tx.from = account.address;
                     op.tx.nonce = account.nonce;
 
-                    let tx = FranklinTx::Withdraw(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone());
+                    let tx = FranklinTx::Withdraw(op.tx.clone());
+                    let (fee, updates) = self
+                        .state
+                        .apply_withdraw_op(&op)
+                        .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::Withdraw(op),
+                    };
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
@@ -141,12 +158,20 @@ impl TreeState {
                     let account = self
                         .state
                         .get_account(op.account_id)
-                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Close fail: Nonexistent account"))?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
 
-                    let tx = FranklinTx::Close(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone());
+                    let tx = FranklinTx::Close(op.tx.clone());
+                    let (fee, updates) = self
+                        .state
+                        .apply_close_op(&op)
+                        .map_err(|e| format_err!("Close fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::Close(op),
+                    };
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
@@ -169,8 +194,16 @@ impl TreeState {
                     op.tx.to = to.address;
                     op.tx.nonce = from.nonce;
 
-                    let tx = FranklinTx::Transfer(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone());
+                    let tx = FranklinTx::Transfer(op.tx.clone());
+                    let (fee, updates) = self
+                        .state
+                        .apply_transfer_op(&op)
+                        .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::Transfer(op),
+                    };
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
@@ -192,7 +225,45 @@ impl TreeState {
                         &mut ops,
                     );
                 }
-                _ => {}
+                FranklinOp::ChangePubKey(mut op) => {
+                    let account = self.state.get_account(op.account_id).ok_or_else(|| {
+                        format_err!("ChangePubKeyOffChain fail: Nonexistent account")
+                    })?;
+                    op.tx.account = account.address;
+                    op.tx.nonce = account.nonce;
+
+                    let tx = FranklinTx::ChangePubKey(op.tx.clone());
+                    let (fee, updates) = self
+                        .state
+                        .apply_change_pubkey_op(&op)
+                        .map_err(|e| format_err!("ChangePubKeyOffChain fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::ChangePubKey(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                FranklinOp::ChangePubKeyPriority(op) => {
+                    let priority_op = FranklinPriorityOp::ChangePubKeyPriority(op.priority_op);
+                    let op_result = self.state.execute_priority_op(priority_op.clone());
+                    current_op_block_index = self.update_from_priority_operation(
+                        priority_op,
+                        op_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                FranklinOp::Noop(_) => {}
             }
         }
 
@@ -279,45 +350,32 @@ impl TreeState {
     fn update_from_tx(
         &mut self,
         tx: FranklinTx,
-        tx_result: Result<OpSuccess, failure::Error>,
+        tx_result: OpSuccess,
         fees: &mut Vec<CollectedFee>,
         accounts_updated: &mut AccountUpdates,
         current_op_block_index: u32,
         ops: &mut Vec<ExecutedOperations>,
     ) -> u32 {
-        match tx_result {
-            Ok(OpSuccess {
-                fee,
-                mut updates,
-                executed_op,
-            }) => {
-                accounts_updated.append(&mut updates);
-                if let Some(fee) = fee {
-                    fees.push(fee);
-                }
-                let block_index = current_op_block_index;
-                let exec_result = ExecutedTx {
-                    tx,
-                    success: true,
-                    op: Some(executed_op),
-                    fail_reason: None,
-                    block_index: Some(block_index),
-                };
-                ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
-                current_op_block_index + 1
-            }
-            Err(e) => {
-                let exec_result = ExecutedTx {
-                    tx,
-                    success: false,
-                    op: None,
-                    fail_reason: Some(e.to_string()),
-                    block_index: None,
-                };
-                ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
-                current_op_block_index
-            }
+        let OpSuccess {
+            fee,
+            mut updates,
+            executed_op,
+        } = tx_result;
+
+        accounts_updated.append(&mut updates);
+        if let Some(fee) = fee {
+            fees.push(fee);
         }
+        let block_index = current_op_block_index;
+        let exec_result = ExecutedTx {
+            tx,
+            success: true,
+            op: Some(executed_op),
+            fail_reason: None,
+            block_index: Some(block_index),
+        };
+        ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
+        current_op_block_index + 1
     }
 
     /// Returns map of Franklin accounts ids and their descriptions
