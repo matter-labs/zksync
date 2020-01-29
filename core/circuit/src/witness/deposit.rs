@@ -408,7 +408,7 @@ mod test {
 
     #[test]
     // #[ignore]
-    fn test_deposit_franklin_existing_account_with_transpiler() {
+    fn test_transpile_deposit_franklin_existing_account() {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
             AccountAddress::from_hex("sync:1111111111111111111111111111111111111111").unwrap();
@@ -467,6 +467,8 @@ mod test {
         let c = witness_accum.into_circuit_instance();
 
         c.clone().synthesize(&mut transpiler).unwrap();
+
+        println!("Done transpiling");
     
         let hints = transpiler.into_hints();
 
@@ -475,10 +477,11 @@ mod test {
         let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
 
         let mut assembly = GeneratorAssembly::<Bn256>::new();
-        adapted_curcuit.synthesize(&mut assembly).unwrap();
-        assembly.finalize();
 
+        adapted_curcuit.synthesize(&mut assembly).unwrap();
         println!("Transpiled into {} gates", assembly.num_gates());
+
+        assembly.finalize();
 
         println!("Trying to prove");
 
@@ -488,6 +491,7 @@ mod test {
         adapted_curcuit.synthesize(&mut prover).unwrap();
         prover.finalize();
 
-        // assert!(prover.is_satisfied());
+        println!("Checking if is satisfied");
+        assert!(prover.is_satisfied());
     }
 }

@@ -68,11 +68,21 @@ struct PreviousData<E: JubjubEngine> {
 // Implementation of our circuit:
 impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        // we only need this for consistency of first operation
-        let zero_circuit_element = CircuitElement::from_expression_padded(
-            cs.namespace(|| "zero_circuit_element"),
-            Expression::u64::<CS>(0),
+        let zero = AllocatedNum::alloc(
+            cs.namespace(|| "allocate element equal to zero"),
+            || {
+                Ok(E::Fr::zero())
+            }
         )?;
+
+        zero.assert_zero(cs.namespace(|| "enforce zero on the zero element"))?;
+
+        // we only need this for consistency of first operation
+        let zero_circuit_element = CircuitElement::zero(zero);
+        // let zero_circuit_element = CircuitElement::from_expression_padded(
+        //     cs.namespace(|| "zero_circuit_element"),
+        //     Expression::u64::<CS>(0),
+        // )?;
         let mut prev = PreviousData {
             op_data: AllocatedOperationData {
                 ethereum_key: zero_circuit_element.clone(),

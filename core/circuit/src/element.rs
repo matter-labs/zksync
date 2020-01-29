@@ -15,6 +15,15 @@ pub struct CircuitElement<E: JubjubEngine> {
     length: usize,
 }
 impl<E: JubjubEngine> CircuitElement<E> {
+    pub fn zero(zero_num: AllocatedNum<E>) -> Self {
+        let bits = vec![Boolean::constant(false); 256];
+        CircuitElement {
+            number: zero_num,
+            bits_le: bits,
+            length: 256,
+        }
+    }
+
     pub fn pad(self, n: usize) -> Self {
         assert!(self.length <= n);
         let mut padded_bits = self.get_bits_le();

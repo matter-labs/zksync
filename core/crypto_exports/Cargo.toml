@@ -1,0 +1,10 @@
+[package]
+name = "crypto_exports"
+version = "0.1.0"
+authors = ["furkhat <vailodf@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="plonk"}
