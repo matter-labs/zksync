@@ -2,6 +2,7 @@ use testkit::*;
 use models::config_options::ConfigurationOptions;
 use models::EncodedProof;
 use std::time::Instant;
+use std::thread::JoinHandle;
 use web3::transports::Http;
 use web3::types::{Address, U64, U128, U256};
 use web3::Transport;
@@ -87,11 +88,13 @@ fn exit_test() {
 
     let deposit_amount = parse_ether("0.1").unwrap();
 
-    // create some initial state, verify
-    for token in 0..=1 {
-        println!("token {}", &token);
+    let account_ids: Vec<usize> = vec![0, 1];
+    let token_ids: Vec<TokenId> = vec![0, 1];
+
+    println!("### Create some initial state, verify");
+    for token in token_ids.clone() {
         test_setup.start_block();
-        for account in 0..=1 {
+        for account in account_ids.clone() {
             test_setup.deposit(
                 ETHAccountId(0),
                 ZKSyncAccountId(account),
@@ -102,90 +105,90 @@ fn exit_test() {
         test_setup.execute_commit_and_verify_block();
     }
 
-    // trigger exodus (
-    // send at least one deposit, 
-    // commit a lot of blocks,
-    // verify none
-    // )
-    for block_n in 0..20 {
-        test_setup.start_block();
-        test_setup.deposit(
-            ETHAccountId(0),
-            ZKSyncAccountId(0),
-            Token(0),
-            deposit_amount.clone(),
-        );
-        println!("total_blocks_committed: {}", test_setup.total_blocks_committed().unwrap());
-        test_setup.execute_commit_block();
+    // Then trigger exodus: 
+    println!("### send some deposits, but don't verify them");
+    let trigger_exodus_deposit_account_ids = vec![0];
+    let num_sent_deposits = {
+        let mut sent_deposits_count = 0;
+        loop {
+            test_setup.start_block();
+            for account in trigger_exodus_deposit_account_ids.clone() {
+                for token in token_ids.clone() {
+                    test_setup.deposit(
+                        ETHAccountId(account),
+                        ZKSyncAccountId(account),
+                        Token(token),
+                        deposit_amount.clone(),
+                    );
+                }
+            }
+            println!("total_blocks_committed: {}", test_setup.total_blocks_committed().unwrap());
+            if let Ok(reason) = test_setup.execute_commit_block() {
+                if reason == "tx success" {
+                    sent_deposits_count += 1;
+                }
+            }
 
-        if test_setup.is_exodus().unwrap() {
-            println!("Finally exodus'");
-            break;
-        } else {
-            println!("Not yet exodus, oh");
-        }
-    }
-
-
-    // // after a lot unverified blocks,
-    // // state doesn't change by transactions and withdraws.
-    // // But it is changed by deposits. So count deposit amounts.
-    // // And call cancelOutstandingDeposits
-    // // and check the balances to withdraw.
-    // // 
-    // // After that, for every balance in last verified state,
-    // // call exit()
-    // block_on(async {
-    //     for account in 0..=1  /* as AccountId  */{
-    //         for token in 0..=1 {
-    //             let balance_before: BigDecimal = test_setup
-    //                 .accounts
-    //                 .eth_accounts[account]
-    //                 .balances_to_withdraw(token)
-    //                 .await
-    //                 .expect("Failed to call balances_to_withdraw");
-    
-    //             println!("not bigdecimal: {:?}", balance_before);
-    
-    //             assert!(balance_before == BigDecimal::from(0));
-    
-    //             test_setup.exit(
-    //                 ETHAccountId(account),
-    //                 token,
-    //                 deposit_amount.to_u128().unwrap(),
-    //                 get_exit_proof(account as AccountId, token).unwrap(),
-    //             ).await;
-    
-    //             let balances_after = test_setup
-    //                 .accounts
-    //                 .eth_accounts[account]
-    //                 .balances_to_withdraw(token)
-    //                 .await
-    //                 .expect("Failed to call balances_to_withdraw");
-
-    //             assert!(balances_after == deposit_amount);
-    //         }
-    //     }
-    // });
-
-    block_on(async {
-        // nobody has any balance
-        for account in 0..1 {
-            for token in 0..=1 {
-                assert!(
-                    BigDecimal::from(0) == test_setup
-                        .accounts
-                        .eth_accounts[account]
-                        .balances_to_withdraw(token)
-                        .await
-                        .unwrap()
-                );
+            if test_setup.is_exodus().unwrap() {
+                println!("Finally exodus'");
+                break;
+            } else {
+                println!("Not yet exodus, oh");
             }
         }
+        sent_deposits_count
+    };
 
-        for account in 0..1 {
-            for token in 0..=1 {
-                for _ in 0..3 {
+    let balance_from_cancel_deposits = &deposit_amount * BigDecimal::from(num_sent_deposits);
+
+    println!("### We managed to send {} deposits totalling {}, let's try to cancel them", &num_sent_deposits, &balance_from_cancel_deposits);
+    block_on(async {
+        println!("cancelDeposits: {}", test_setup.accounts.eth_accounts[0].cancel_outstanding_deposits_for_exodus_mode(0).await.unwrap());
+        println!("cancelDeposits: {}", test_setup.accounts.eth_accounts[0]
+            .cancel_outstanding_deposits_for_exodus_mode(num_sent_deposits + 20).await.unwrap());
+
+        for account in trigger_exodus_deposit_account_ids.clone() {
+            for token in token_ids.clone() {
+                let bal = test_setup.get_balance_to_withdraw_async(ETHAccountId(account), token).await;
+                println!("bal {}", &bal);
+                assert!(bal == balance_from_cancel_deposits);
+            }
+        }
+    });
+
+    println!("### Now call exit for every account:");
+    block_on(async {
+        for account in account_ids.clone()  /* as AccountId  */{
+            for token in token_ids.clone() {
+                let balance_before: BigDecimal = 
+                    test_setup.get_balance_to_withdraw_async(ETHAccountId(account), token).await;
+                
+                if let Err(payload) = test_setup.exit(
+                    ETHAccountId(account),
+                    token,
+                    deposit_amount.to_u128().unwrap(),
+                    get_exit_proof(account as AccountId, token).unwrap(),
+                ).await {
+                    println!("{:?}", payload);
+                }
+
+                let balances_after = 
+                    test_setup.get_balance_to_withdraw_async(ETHAccountId(account), token).await;
+                println!("account {}, token {}, balances_after {}, balance_before {}", &account, &token, &balances_after, &balance_before);
+                
+                assert!(balances_after - balance_before == deposit_amount);
+            }
+        }
+    });
+
+    println!("### Ok, but can a user call exit twice and still get money?");
+    block_on(async {
+        for account in account_ids.clone() {
+            for token in token_ids.clone() {
+                let balance_before: BigDecimal = 
+                    test_setup.get_balance_to_withdraw_async(ETHAccountId(account), token).await;
+
+                for _ in 0..2 {
                     // first it should bump from 0 to deposit_amount, then shouldn't change
                     test_setup.exit(
                         ETHAccountId(account),
@@ -193,15 +196,44 @@ fn exit_test() {
                         deposit_amount.to_u128().unwrap(),
                         get_exit_proof(account as AccountId, token).unwrap(),
                     ).await;
-                    assert!(
-                        deposit_amount == test_setup
-                            .accounts
-                            .eth_accounts[account]
-                            .balances_to_withdraw(token)
-                            .await
-                            .unwrap()
-                    );        
                 }
+
+                assert!(
+                    test_setup.get_balance_to_withdraw_async(
+                        ETHAccountId(account), token
+                    ).await == balance_before
+                );
+            }
+        }
+    });
+
+    println!("### try to withdraw not real user balance, should fail.");
+    block_on(async {
+        // nobody has any balance
+        for account in account_ids.clone() {
+            for token in token_ids.clone() {
+                assert!(
+                    test_setup.get_balance_to_withdraw_async(
+                        ETHAccountId(account), token
+                    ).await == BigDecimal::from(0)
+                );
+            }
+        }
+
+        let account = 0;
+        for token in token_ids.clone() {
+            for _ in 0..3 {
+                test_setup.exit(
+                    ETHAccountId(account),
+                    token,
+                    (&deposit_amount + &deposit_amount).to_u128().unwrap(),
+                    get_exit_proof(account as AccountId, token).unwrap(),
+                ).await;
+                assert!(
+                    test_setup.get_balance_to_withdraw_async(
+                        ETHAccountId(account), token
+                    ).await == BigDecimal::from(0)
+                );
             }
         }
     });

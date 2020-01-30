@@ -285,8 +285,8 @@ contract Franklin {
         ); // frc11 - exodus mode is not activated
         require(
             _number > 0,
-            "frс12"
-        ); // frс12 - provided zero number of requests
+            "frc12"
+        ); // frc12 - provided zero number of requests
         bytes memory depositsPubData = priorityQueue.deletePriorityRequestsAndPopOutstandingDeposits(_number);
         uint64 i = 0;
         while (i < depositsPubData.length) {

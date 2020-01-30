@@ -1,7 +1,7 @@
 //use log::*;
 
 use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
+use crate::external_commands::{deploy_test_contracts, get_test_accounts, get_revert_reason, Contracts};
 use crate::zksync_account::ZksyncAccount;
 use bigdecimal::BigDecimal;
 use failure::{bail, ensure};
@@ -515,8 +515,9 @@ impl TestSetup {
         amount: u128,
         proof: EncodedProof,
     ) -> Result<String, failure::Error> {
+        let sending_account = &self.accounts.eth_accounts[0];
         let account = &self.accounts.eth_accounts[accountId.0];
-        account.exit(
+        sending_account.exit(
             token_id,
             account.address.clone(),
             amount,
@@ -640,7 +641,7 @@ impl TestSetup {
         self.execute_tx(withdraw);
     }
 
-    pub fn execute_commit_block(&mut self/* , nonce: Option<U256> */) -> Result<(), failure::Error> {
+    pub fn execute_commit_block(&mut self/* , nonce: Option<U256> */) -> Result<String, failure::Error> {
         let block_sender = async {
             self.state_keeper_request_sender
                 .clone()
@@ -707,7 +708,9 @@ impl TestSetup {
             bail!("Block checks failed")
         }
 
-        Ok(())
+        let hash = format!("{:#?}", &block_rec.transaction_hash);
+        let reason = get_revert_reason(&hash);
+        Ok(reason)
     }
 
     pub fn execute_commit_and_verify_block(&mut self) -> Result<(), failure::Error> {
@@ -819,6 +822,15 @@ impl TestSetup {
             block_on(account.erc20_balance(&self.tokens[&token]))
                 .expect("Failed to get erc20 balance")
         }
+    }
+
+    pub async fn get_balance_to_withdraw_async(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigDecimal {
+        self
+            .accounts
+            .eth_accounts[eth_account_id.0]
+            .balances_to_withdraw(token)
+            .await
+            .expect("failed to query balance to withdraws")
     }
 
     pub fn is_exodus(&self) -> Result<bool, failure::Error> {

@@ -195,7 +195,8 @@ impl<T: Transport> EthereumAccount<T> {
         let hash = format!("{:#?}", &receipt.transaction_hash);
         let reason = get_revert_reason(&hash);
         println!(
-            "hash: {}, reason: {}",
+            "Exit token: {}, hash: {}, reason: {}",
+            tokenId,
             &hash,
             &reason
         );
@@ -206,6 +207,49 @@ impl<T: Transport> EthereumAccount<T> {
         );
 
         Ok(reason)
+    }
+
+    pub async fn cancel_outstanding_deposits_for_exodus_mode(
+        &self,
+        number: u64
+    ) -> Result<String, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "cancelOutstandingDepositsForExodusMode",
+                (number),
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("cancelOutstandingDepositsForExodusMode send err: {}", e))?;
+        
+        let receipt: web3::types::TransactionReceipt = self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("cancelOutstandingDepositsForExodusMode wait confirm err: {}", e))?;
+
+        // ensure!(
+        //     receipt.status == Some(U64::from(1)),
+        //     "cancelOutstandingDepositsForExodusMode submit fail"
+        // );
+    
+        let hash = format!("{:#?}", &receipt.transaction_hash);
+        let reason = get_revert_reason(&hash);
+
+        Ok(
+            format!(
+                "hash: {}, reason: {}",
+                &hash,
+                &reason
+            )
+        )
     }
 
     pub async fn deposit_eth(
@@ -391,7 +435,6 @@ impl<T: Transport> EthereumAccount<T> {
     }
 
     pub async fn commit_block(&self, block: &Block/* , nonce: Option<U256> */) -> Result<TransactionReceipt, failure::Error> {
-        println!("Block: {:?}", &block.block_number);
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -424,8 +467,7 @@ impl<T: Transport> EthereumAccount<T> {
         let tx_hash = format!("{:#?}", &receipt.transaction_hash);
         let reason = get_revert_reason(&tx_hash);
         let nonce = self.nonceFromHash(receipt.transaction_hash.clone()).await;
-        println!("commit hash: {}, reason: {}, nonce: {}", &tx_hash, &reason, &nonce);
-
+        println!("Block: {:?}, hash: {}, reason: {}, nonce: {}", &block.block_number, &tx_hash, &reason, &nonce);
         Ok(receipt)
     }
 
