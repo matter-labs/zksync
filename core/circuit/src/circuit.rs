@@ -163,8 +163,11 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &allocated_chunk_data,
             )?;
             // calculate root for given account data
-            let (state_root, is_account_empty, _subtree_root) = self
-                .check_account_data(cs.namespace(|| "calculate account root"), &current_branch)?;
+            let (state_root, is_account_empty, _subtree_root) = check_account_data(
+                cs.namespace(|| "calculate account root"),
+                &current_branch,
+                self.params,
+            )?;
 
             // ensure root hash of state before applying operation is correct
             cs.enforce(
@@ -186,9 +189,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &mut fees,
                 &mut prev,
             )?;
-            let (new_state_root, _, _) = self.check_account_data(
+            let (new_state_root, _, _) = check_account_data(
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
+                self.params,
             )?;
 
             rolling_root = new_state_root;
@@ -487,30 +491,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 &is_left,
             )?,
         })
-    }
-
-    fn check_account_data<CS: ConstraintSystem<E>>(
-        &self,
-        mut cs: CS,
-        cur: &AllocatedOperationBranch<E>,
-    ) -> Result<(AllocatedNum<E>, Boolean, CircuitElement<E>), SynthesisError> {
-        //first we prove calculate root of the subtree to obtain account_leaf_data:
-        let (cur_account_leaf_bits, is_account_empty, subtree_root) = self
-            .allocate_account_leaf_bits(
-                cs.namespace(|| "allocate current_account_leaf_hash"),
-                cur,
-            )?;
-        Ok((
-            allocate_merkle_root(
-                cs.namespace(|| "account_merkle_root"),
-                &cur_account_leaf_bits,
-                &cur.account_address.get_bits_le(),
-                &cur.account_audit_path,
-                self.params,
-            )?,
-            is_account_empty,
-            subtree_root,
-        ))
     }
 
     fn execute_op<CS: ConstraintSystem<E>>(
@@ -1888,46 +1868,70 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?
         .not())
     }
-
-    fn allocate_account_leaf_bits<CS: ConstraintSystem<E>>(
-        &self,
-        mut cs: CS,
-        branch: &AllocatedOperationBranch<E>,
-    ) -> Result<(Vec<Boolean>, Boolean, CircuitElement<E>), SynthesisError> {
-        //first we prove calculate root of the subtree to obtain account_leaf_data:
-
-        let balance_data = &branch.balance.get_bits_le();
-        let balance_root = allocate_merkle_root(
-            cs.namespace(|| "balance_subtree_root"),
-            balance_data,
-            &branch.token.get_bits_le(),
-            &branch.balance_audit_path,
-            self.params,
-        )?;
-
-        // debug!("balance root: {}", balance_root.get_value().unwrap());
-        let subtree_root =
-            CircuitElement::from_number_padded(cs.namespace(|| "subtree_root_ce"), balance_root)?;
-
-        let mut account_data = vec![];
-        account_data.extend(branch.account.nonce.get_bits_le());
-        account_data.extend(branch.account.pub_key_hash.get_bits_le());
-        account_data.extend(branch.account.address.get_bits_le());
-
-        let account_data_packed =
-            pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
-
-        let is_account_empty = Expression::equals(
-            cs.namespace(|| "is_account_empty"),
-            &account_data_packed,
-            Expression::constant::<CS>(E::Fr::zero()),
-        )?;
-        account_data.extend(subtree_root.get_bits_le());
-        Ok((account_data, Boolean::from(is_account_empty), subtree_root))
-    }
 }
 
-fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
+pub fn check_account_data<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    cur: &AllocatedOperationBranch<E>,
+    params: &E::Params,
+) -> Result<(AllocatedNum<E>, Boolean, CircuitElement<E>), SynthesisError> {
+    //first we prove calculate root of the subtree to obtain account_leaf_data:
+    let (cur_account_leaf_bits, is_account_empty, subtree_root) = allocate_account_leaf_bits(
+        cs.namespace(|| "allocate current_account_leaf_hash"),
+        cur,
+        params,
+    )?;
+    Ok((
+        allocate_merkle_root(
+            cs.namespace(|| "account_merkle_root"),
+            &cur_account_leaf_bits,
+            &cur.account_address.get_bits_le(),
+            &cur.account_audit_path,
+            params,
+        )?,
+        is_account_empty,
+        subtree_root,
+    ))
+}
+
+pub fn allocate_account_leaf_bits<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    branch: &AllocatedOperationBranch<E>,
+    params: &E::Params,
+) -> Result<(Vec<Boolean>, Boolean, CircuitElement<E>), SynthesisError> {
+    //first we prove calculate root of the subtree to obtain account_leaf_data:
+
+    let balance_data = &branch.balance.get_bits_le();
+    let balance_root = allocate_merkle_root(
+        cs.namespace(|| "balance_subtree_root"),
+        balance_data,
+        &branch.token.get_bits_le(),
+        &branch.balance_audit_path,
+        params,
+    )?;
+
+    // debug!("balance root: {}", balance_root.get_value().unwrap());
+    let subtree_root =
+        CircuitElement::from_number_padded(cs.namespace(|| "subtree_root_ce"), balance_root)?;
+
+    let mut account_data = vec![];
+    account_data.extend(branch.account.nonce.get_bits_le());
+    account_data.extend(branch.account.pub_key_hash.get_bits_le());
+    account_data.extend(branch.account.address.get_bits_le());
+
+    let account_data_packed =
+        pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
+
+    let is_account_empty = Expression::equals(
+        cs.namespace(|| "is_account_empty"),
+        &account_data_packed,
+        Expression::constant::<CS>(E::Fr::zero()),
+    )?;
+    account_data.extend(subtree_root.get_bits_le());
+    Ok((account_data, Boolean::from(is_account_empty), subtree_root))
+}
+
+pub fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     leaf_bits: &[Boolean],
     index: &[Boolean],

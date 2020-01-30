@@ -8,12 +8,11 @@ use ff::{Field, PrimeField};
 use franklin_crypto::circuit::boolean::Boolean;
 use franklin_crypto::circuit::sha256;
 
+use crate::circuit::check_account_data;
 use crate::witness::utils::{apply_leaf_operation, get_audits};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
-use franklin_crypto::circuit::expression::Expression;
 use franklin_crypto::circuit::num::AllocatedNum;
-use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::utils::{append_be_fixed_width, be_bit_vector_into_bytes};
@@ -50,8 +49,11 @@ impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
             &self.account_audit_data,
         )?;
         // calculate root for given account data
-        let (state_root, _, _) =
-            self.check_account_data(cs.namespace(|| "calculate account root"), &branch)?;
+        let (state_root, _, _) = check_account_data(
+            cs.namespace(|| "calculate account root"),
+            &branch,
+            self.params,
+        )?;
 
         // ensure root hash of state before applying operation is correct
         cs.enforce(
@@ -61,9 +63,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
             |lc| lc + root_hash.get_variable(),
         );
         {
-            // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
-            // and start rolling the hash
-
             let mut initial_hash_data: Vec<Boolean> = vec![];
             let root_hash_ce =
                 CircuitElement::from_number_padded(cs.namespace(|| "root_hash_ce"), root_hash)?;
@@ -89,130 +88,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
         }
         Ok(())
     }
-}
-
-impl<'a, E: JubjubEngine> ZksyncExitCircuit<'a, E> {
-    fn check_account_data<CS: ConstraintSystem<E>>(
-        &self,
-        mut cs: CS,
-        cur: &AllocatedOperationBranch<E>,
-    ) -> Result<(AllocatedNum<E>, Boolean, CircuitElement<E>), SynthesisError> {
-        //first we prove calculate root of the subtree to obtain account_leaf_data:
-        let (cur_account_leaf_bits, is_account_empty, subtree_root) = self
-            .allocate_account_leaf_bits(
-                cs.namespace(|| "allocate current_account_leaf_hash"),
-                cur,
-            )?;
-        Ok((
-            allocate_merkle_root(
-                cs.namespace(|| "account_merkle_root"),
-                &cur_account_leaf_bits,
-                &cur.account_address.get_bits_le(),
-                &cur.account_audit_path,
-                self.params,
-            )?,
-            is_account_empty,
-            subtree_root,
-        ))
-    }
-
-    fn allocate_account_leaf_bits<CS: ConstraintSystem<E>>(
-        &self,
-        mut cs: CS,
-        branch: &AllocatedOperationBranch<E>,
-    ) -> Result<(Vec<Boolean>, Boolean, CircuitElement<E>), SynthesisError> {
-        //first we prove calculate root of the subtree to obtain account_leaf_data:
-
-        let balance_data = &branch.balance.get_bits_le();
-        let balance_root = allocate_merkle_root(
-            cs.namespace(|| "balance_subtree_root"),
-            balance_data,
-            &branch.token.get_bits_le(),
-            &branch.balance_audit_path,
-            self.params,
-        )?;
-
-        let subtree_root =
-            CircuitElement::from_number_padded(cs.namespace(|| "subtree_root_ce"), balance_root)?;
-
-        let mut account_data = vec![];
-        account_data.extend(branch.account.nonce.get_bits_le());
-        account_data.extend(branch.account.pub_key_hash.get_bits_le());
-        account_data.extend(branch.account.address.get_bits_le());
-
-        let account_data_packed =
-            pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
-
-        let is_account_empty = Expression::equals(
-            cs.namespace(|| "is_account_empty"),
-            &account_data_packed,
-            Expression::constant::<CS>(E::Fr::zero()),
-        )?;
-        account_data.extend(subtree_root.get_bits_le());
-        Ok((account_data, Boolean::from(is_account_empty), subtree_root))
-    }
-}
-
-fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
-    mut cs: CS,
-    leaf_bits: &[Boolean],
-    index: &[Boolean],
-    audit_path: &[AllocatedNum<E>],
-    params: &E::Params,
-) -> Result<AllocatedNum<E>, SynthesisError> {
-    // only first bits of index are considered valuable
-    assert!(index.len() >= audit_path.len());
-    let index = &index[0..audit_path.len()];
-
-    let account_leaf_hash = pedersen_hash::pedersen_hash(
-        cs.namespace(|| "account leaf content hash"),
-        pedersen_hash::Personalization::NoteCommitment,
-        &leaf_bits,
-        params,
-    )?;
-    // This is an injective encoding, as cur is a
-    // point in the prime order subgroup.
-    let mut cur_hash = account_leaf_hash.get_x().clone();
-
-    // Ascend the merkle tree authentication path
-    for (i, direction_bit) in index.iter().enumerate() {
-        let cs = &mut cs.namespace(|| format!("from merkle tree hash {}", i));
-
-        // "direction_bit" determines if the current subtree
-        // is the "right" leaf at this depth of the tree.
-
-        // Witness the authentication path element adjacent
-        // at this depth.
-        let path_element = &audit_path[i];
-
-        // Swap the two if the current subtree is on the right
-        let (xl, xr) = AllocatedNum::conditionally_reverse(
-            cs.namespace(|| "conditional reversal of preimage"),
-            &cur_hash,
-            path_element,
-            &direction_bit,
-        )?;
-
-        // We don't need to be strict, because the function is
-        // collision-resistant. If the prover witnesses a congruency,
-        // they will be unable to find an authentication path in the
-        // tree with high probability.
-        let mut preimage = vec![];
-        preimage.extend(xl.into_bits_le(cs.namespace(|| "xl into bits"))?);
-        preimage.extend(xr.into_bits_le(cs.namespace(|| "xr into bits"))?);
-
-        // Compute the new subtree value
-        cur_hash = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "computation of pedersen hash"),
-            pedersen_hash::Personalization::MerkleTree(i),
-            &preimage,
-            params,
-        )?
-        .get_x()
-        .clone(); // Injective encoding
-    }
-
-    Ok(cur_hash.clone())
 }
 
 pub fn create_exit_circuit(
@@ -288,6 +163,7 @@ mod test {
     use models::node::Account;
 
     #[test]
+    #[ignore]
     fn test_zksync_exit_circuit_correct_proof() {
         let test_account_id = 0xde;
         let token_id = 0x1d;
