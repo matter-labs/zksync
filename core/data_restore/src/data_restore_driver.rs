@@ -78,7 +78,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             let abi = governance_contract();
             (
                 abi.clone(),
-                Contract::new(web3.eth(), governance_contract_eth_addr, abi.clone()),
+                Contract::new(web3.eth(), governance_contract_eth_addr, abi),
             )
         };
 
@@ -86,7 +86,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             let abi = zksync_contract();
             (
                 abi.clone(),
-                Contract::new(web3.eth(), franklin_contract_eth_addr, abi.clone()),
+                Contract::new(web3.eth(), franklin_contract_eth_addr, abi),
             )
         };
 
@@ -150,7 +150,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         };
 
         let mut account_map = AccountMap::default();
-        account_map.insert(0, genesis_account.clone());
+        account_map.insert(0, genesis_account);
 
         let current_block = 0;
         let current_unprocessed_priority_op = 0;

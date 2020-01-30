@@ -202,7 +202,7 @@ pub fn start_ws_server(
         op_recv,
         event_sub_receiver,
         executed_tx_receiver,
-        state_keeper_request_sender.clone(),
+        state_keeper_request_sender,
         panic_notify.clone(),
     );
 
