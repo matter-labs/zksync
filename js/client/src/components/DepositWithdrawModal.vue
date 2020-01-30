@@ -8,7 +8,7 @@
         </TokenSelector>
         <div>
             Amount <span v-if="maxAmountVisible">(<span v-if="tokenReadablyPrintable">in {{ token }} coins, </span>max {{ displayableBalancesDict[token] }} {{ token }})</span>:
-            <b-form-input autocomplete="off" v-model="amountSelected" class="mb-2"></b-form-input>
+            <b-form-input autocomplete="off" type="number" step="any" v-model="amountSelected" class="mb-2"></b-form-input>
             <div v-if="feeNeeded">
                 Fee:
                 <FeeSelector 
@@ -18,7 +18,7 @@
                 </FeeSelector>
             </div>
             <div v-else>
-                The fee is <b>ETH</b> {{ depositFee }}. The change will be put on your ZK Sync account.
+                The fee is <b>ETH</b> {{ depositFee }}. The change will be put on your zkSync account.
             </div>
             <p v-if="alertVisible"> {{ alertText }} </p>
             <b-button class="w-50 mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>

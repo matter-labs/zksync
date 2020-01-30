@@ -4,12 +4,24 @@
         <b-card class="w-100 mx-3 mb-3" no-title>
             <b-row>
                 <b-col class="col-auto">
-                    <span style="line-height: 2em; font-size: 1.2em;">ZK Sync address:</span>
+                    <span style="line-height: 2em; font-size: 1.2em;">zkSync address:</span>
                 </b-col>
                 <b-col>
                     <CopyableAddress id="franklinAddressFormInput" :address="franklinAddress" />
                 </b-col>
+                <b-col class="col-auto" style="line-height: 2.25em; font-size: 1.05em;">
+                    <a :href="`/explorer/accounts/${franklinAddress}`" target="_blank">View in zkSync explorer <i class="ml-1 fas fa-external-link-alt"></i></a>
+                </b-col>
             </b-row>
+            <b-card-text class="mt-2" style="font-size: 1.05em; color: #666;">
+                <b-row>
+                    <b-col class="col-auto p-0"></b-col>
+                    <b-col>
+                        You can now immediately receive ETH or tokens to this address from other zkSync accounts, no extra step required. You will also be able to withdraw to Ethereum without any gas.
+                    </b-col>
+                    <b-col class="col-auto p-0"></b-col>
+                </b-row>
+            </b-card-text>
         </b-card>
     </b-row>
     <b-row>

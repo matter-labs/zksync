@@ -3,7 +3,7 @@
         <header>
             <b-navbar toggleable="md" type="dark" variant="info" class="mb-4">
                 <b-container>
-                    <a href="/explorer/"><b-navbar-brand>ZK Sync Devnet</b-navbar-brand></a>
+                    <a href="/explorer/"><b-navbar-brand>zkSync Devnet</b-navbar-brand></a>
                     <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
                     <b-collapse id="nav-collapse" is-nav>
                         <b-navbar-nav target>
@@ -68,6 +68,7 @@ export default {
         walletInfo: null,
         historyInfo: null,
         message: null,
+        componentAlive: true,
     }),
     watch: {
         async componentToBeShown() {
@@ -84,6 +85,7 @@ export default {
         );
 
         const timeOut = async () => {
+            if (this.componentAlive == false) return;
             await this.updateAccountInfo();
             await sleep(timeConstants.updateInfo);
             timeOut();
@@ -91,6 +93,9 @@ export default {
         timeOut();
 
         new ClipboardJS('.copyable');
+    },
+    destroyed() {
+        this.componentAlive = false;
     },
     methods: {
         displayAlert(options) {
@@ -117,14 +122,14 @@ export default {
                 let message = e.message;
                 let franklinServerReachable = await isReachable(this.config.API_SERVER);
                 if (franklinServerReachable == false) {
-                    message = "ZK Sync server unavailable, check your internet connection.";
+                    message = "zkSync server unavailable, check your internet connection.";
                 }
                 
                 this.displayAlert({
                     message: message,
                     variant: 'danger',
                     countdown: 10,
-                })
+                });
             }
         }
     },
