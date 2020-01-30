@@ -4,7 +4,7 @@
         <b-card class="w-100 mx-3 mb-3" no-title>
             <b-row>
                 <b-col class="col-auto">
-                    <span style="line-height: 2em; font-size: 1.2em;">ZK Sync address:</span>
+                    <span style="line-height: 2em; font-size: 1.2em;">zkSync address:</span>
                 </b-col>
                 <b-col>
                     <CopyableAddress id="franklinAddressFormInput" :address="franklinAddress" />
