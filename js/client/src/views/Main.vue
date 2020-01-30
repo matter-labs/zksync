@@ -68,6 +68,7 @@ export default {
         walletInfo: null,
         historyInfo: null,
         message: null,
+        componentAlive: true,
     }),
     watch: {
         async componentToBeShown() {
@@ -84,6 +85,7 @@ export default {
         );
 
         const timeOut = async () => {
+            if (this.componentAlive == false) return;
             await this.updateAccountInfo();
             await sleep(timeConstants.updateInfo);
             timeOut();
@@ -91,6 +93,9 @@ export default {
         timeOut();
 
         new ClipboardJS('.copyable');
+    },
+    destroyed() {
+        this.componentAlive = false;
     },
     methods: {
         displayAlert(options) {
@@ -124,7 +129,7 @@ export default {
                     message: message,
                     variant: 'danger',
                     countdown: 10,
-                })
+                });
             }
         }
     },

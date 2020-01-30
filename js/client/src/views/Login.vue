@@ -64,7 +64,9 @@ export default {
 
                 window.walletDecorator = await WalletDecorator.new();
 
-                this.$parent.$router.push('/main')
+                if (this.$parent.$router.currentRoute.path !== '/main') {
+                    this.$parent.$router.push('/main');
+                }
             } catch (e) {
                 this.$refs.alertLogin.display({
                     message: `Login failed with ${e.message}`,
