@@ -64,7 +64,7 @@ pub fn update_tree_state(
         let commit_op = Operation {
             action: Action::Commit,
             block: block.clone(),
-            accounts_updated: accounts_updated.clone(),
+            accounts_updated,
             id: None,
         };
 

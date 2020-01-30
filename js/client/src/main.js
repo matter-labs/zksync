@@ -71,6 +71,11 @@ new Vue({
                 }
             });
         };
+        window.ethereum.on('accountsChanged', accounts => {
+            if (router.currentRoute.path !== '/login') {
+                router.push('/login');
+            }
+        });
 
         checkNetwork(); // the first time
         setInterval(checkNetwork, 1000);
