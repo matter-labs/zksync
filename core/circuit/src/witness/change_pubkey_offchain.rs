@@ -8,7 +8,7 @@ use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
-use models::node::operations::ChangePubKeyOp;
+use models::node::operations::ChangePubKeyOffchainOp;
 use models::node::Engine;
 use models::params as franklin_constants;
 use pairing::bn256::*;
@@ -72,7 +72,7 @@ impl<E: JubjubEngine> ChangePubkeyOffChainWitness<E> {
 
 pub fn apply_change_pubkey_offchain_tx(
     tree: &mut CircuitAccountTree,
-    change_pubkey_offchain: &ChangePubKeyOp,
+    change_pubkey_offchain: &ChangePubKeyOffchainOp,
 ) -> ChangePubkeyOffChainWitness<Bn256> {
     let change_pubkey_data = ChangePubkeyOffChainData {
         account_id: change_pubkey_offchain.account_id,
@@ -208,7 +208,7 @@ mod test {
             Account::default_with_address(&change_pkhash_to_account_address),
         )]);
 
-        let change_pkhash_op = ChangePubKeyOp {
+        let change_pkhash_op = ChangePubKeyOffchainOp {
             tx: zksync_account.create_change_pubkey_tx(None, true),
             account_id: change_pkhash_to_account_id,
         };

@@ -16,9 +16,9 @@ pub struct AccountWitness<E: JubjubEngine> {
 impl<E: JubjubEngine> AccountWitness<E> {
     pub fn from_circuit_account(circuit_account: &CircuitAccount<E>) -> Self {
         Self {
-            nonce: Some(circuit_account.nonce.clone()),
-            pub_key_hash: Some(circuit_account.pub_key_hash.clone()),
-            address: Some(circuit_account.address.clone()),
+            nonce: Some(circuit_account.nonce),
+            pub_key_hash: Some(circuit_account.pub_key_hash),
+            address: Some(circuit_account.address),
         }
     }
 }

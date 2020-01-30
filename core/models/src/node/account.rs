@@ -169,11 +169,11 @@ impl AccountUpdate {
     pub fn reversed_update(&self) -> Self {
         match self {
             AccountUpdate::Create { address, nonce } => AccountUpdate::Delete {
-                address: address.clone(),
+                address: *address,
                 nonce: *nonce,
             },
             AccountUpdate::Delete { address, nonce } => AccountUpdate::Create {
-                address: address.clone(),
+                address: *address,
                 nonce: *nonce,
             },
             AccountUpdate::UpdateBalance {

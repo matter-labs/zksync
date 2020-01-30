@@ -97,10 +97,12 @@ impl RollupOpsBlock {
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use bigdecimal::BigDecimal;
-    use models::node::tx::TxSignature;
+    use models::node::operations::{ChangePubKeyOffchainOp, ChangePubkeyOnchainOp};
+    use models::node::priority_ops::ChangePubKeyOnchain;
+    use models::node::tx::{ChangePubKeyOffchain, PackedEthSignature, TxSignature};
     use models::node::{
-        Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, Transfer, TransferOp,
-        TransferToNewOp, Withdraw, WithdrawOp,
+        Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
+        TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
 
     #[test]
@@ -109,9 +111,7 @@ mod test {
             from: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(10),
-            to: "0x7777777777777777777777777777777777777777"
-                .parse()
-                .unwrap(),
+            to: "7777777777777777777777777777777777777777".parse().unwrap(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op,
@@ -129,9 +129,7 @@ mod test {
     #[test]
     fn test_part_exit() {
         let tx = Withdraw {
-            from: "0x7777777777777777777777777777777777777777"
-                .parse()
-                .unwrap(),
+            from: "7777777777777777777777777777777777777777".parse().unwrap(),
             to: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(20),
@@ -192,12 +190,8 @@ mod test {
     #[test]
     fn test_transfer_to_new() {
         let tx = Transfer {
-            from: "0x7777777777777777777777777777777777777777"
-                .parse()
-                .unwrap(),
-            to: "0x8888888888888888888888888888888888888888"
-                .parse()
-                .unwrap(),
+            from: "7777777777777777777777777777777777777777".parse().unwrap(),
+            to: "8888888888888888888888888888888888888888".parse().unwrap(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(10),
@@ -221,12 +215,8 @@ mod test {
     #[test]
     fn test_transfer() {
         let tx = Transfer {
-            from: "0x7777777777777777777777777777777777777777"
-                .parse()
-                .unwrap(),
-            to: "0x8888888888888888888888888888888888888888"
-                .parse()
-                .unwrap(),
+            from: "7777777777777777777777777777777777777777".parse().unwrap(),
+            to: "8888888888888888888888888888888888888888".parse().unwrap(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(10),
@@ -250,13 +240,53 @@ mod test {
     #[test]
     fn test_close() {
         let tx = Close {
-            account: "0x7777777777777777777777777777777777777777"
-                .parse()
-                .unwrap(),
+            account: "7777777777777777777777777777777777777777".parse().unwrap(),
             nonce: 3,
             signature: TxSignature::default(),
         };
         let op1 = FranklinOp::Close(Box::new(CloseOp { tx, account_id: 11 }));
+        let pub_data1 = op1.public_data();
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
+    }
+
+    #[test]
+    fn test_change_pubkey_offchain() {
+        let tx = ChangePubKeyOffchain {
+            account: "7777777777777777777777777777777777777777".parse().unwrap(),
+            new_pk_hash: PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")
+                .unwrap(),
+            nonce: 3,
+            eth_signature: PackedEthSignature::deserialize_packed(&[0xffu8; 65]).unwrap(),
+        };
+        let op1 = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOffchainOp {
+            tx,
+            account_id: 11,
+        }));
+        let pub_data1 = op1.public_data();
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
+    }
+
+    #[test]
+    fn test_change_pubkey_onchain() {
+        let priority_op = ChangePubKeyOnchain {
+            eth_address: "7777777777777777777777777777777777777777".parse().unwrap(),
+            new_pubkey_hash: PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")
+                .unwrap(),
+        };
+        let op1 = FranklinOp::ChangePubKeyOnchain(Box::new(ChangePubkeyOnchainOp {
+            priority_op,
+            account_id: Some(11),
+        }));
         let pub_data1 = op1.public_data();
         let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")

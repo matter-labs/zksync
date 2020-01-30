@@ -1,5 +1,5 @@
 use bigdecimal::BigDecimal;
-use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
+use models::node::tx::{ChangePubKeyOffchain, PackedEthSignature, TxSignature};
 use models::node::{
     priv_key_from_fs, Address, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
@@ -72,8 +72,8 @@ impl ZksyncAccount {
         increment_nonce: bool,
     ) -> Transfer {
         let mut transfer = Transfer {
-            from: self.address.clone(),
-            to: to.clone(),
+            from: self.address,
+            to: *to,
             token: token_id,
             amount,
             fee,
@@ -99,7 +99,7 @@ impl ZksyncAccount {
         increment_nonce: bool,
     ) -> Withdraw {
         let mut withdraw = Withdraw {
-            from: self.address.clone(),
+            from: self.address,
             to: *eth_address,
             token: token_id,
             amount,
@@ -120,12 +120,12 @@ impl ZksyncAccount {
         &self,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> ChangePubKey {
+    ) -> ChangePubKeyOffchain {
         let nonce = nonce.unwrap_or_else(|| *self.nonce.borrow());
-        let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash);
+        let sign_bytes = ChangePubKeyOffchain::get_eth_signed_data(nonce, &self.pubkey_hash);
         let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
             .expect("Signature should succeed");
-        let change_pubkey = ChangePubKey {
+        let change_pubkey = ChangePubKeyOffchain {
             account: self.address,
             new_pk_hash: self.pubkey_hash.clone(),
             nonce,

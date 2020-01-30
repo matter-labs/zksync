@@ -13,7 +13,7 @@ use std::str::FromStr;
 use web3::types::{Address, Log, U256};
 
 use super::operations::{DepositOp, FullExitOp};
-use crate::node::operations::ChangePubkeyPriorityOp;
+use crate::node::operations::ChangePubkeyOnchainOp;
 use crate::node::PubKeyHash;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,7 +32,7 @@ pub struct FullExit {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChangePubKeyPriority {
+pub struct ChangePubKeyOnchain {
     pub new_pubkey_hash: PubKeyHash,
     pub eth_address: Address,
 }
@@ -42,7 +42,7 @@ pub struct ChangePubKeyPriority {
 pub enum FranklinPriorityOp {
     Deposit(Deposit),
     FullExit(FullExit),
-    ChangePubKeyPriority(ChangePubKeyPriority),
+    ChangePubKeyOnchain(ChangePubKeyOnchain),
 }
 
 impl FranklinPriorityOp {
@@ -103,7 +103,7 @@ impl FranklinPriorityOp {
                     token,
                 }))
             }
-            ChangePubkeyPriorityOp::OP_CODE => {
+            ChangePubkeyOnchainOp::OP_CODE => {
                 let (new_pubkey_hash, pub_data_left) = {
                     let (pubkey_hash, left) = pub_data.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
                     (PubKeyHash::from_bytes(pubkey_hash)?, left)
@@ -116,7 +116,7 @@ impl FranklinPriorityOp {
                     pub_data_left.is_empty(),
                     "ChangePubkeyPriorityOp parse failed: input too big"
                 );
-                Ok(Self::ChangePubKeyPriority(ChangePubKeyPriority {
+                Ok(Self::ChangePubKeyOnchain(ChangePubKeyOnchain {
                     new_pubkey_hash,
                     eth_address,
                 }))
@@ -131,7 +131,7 @@ impl FranklinPriorityOp {
         match self {
             Self::Deposit(_) => DepositOp::CHUNKS,
             Self::FullExit(_) => FullExitOp::CHUNKS,
-            Self::ChangePubKeyPriority(_) => ChangePubkeyPriorityOp::CHUNKS,
+            Self::ChangePubKeyOnchain(_) => ChangePubkeyOnchainOp::CHUNKS,
         }
     }
 }

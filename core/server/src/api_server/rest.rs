@@ -116,7 +116,7 @@ fn handle_get_account_state(
 
         let empty_state = |address: &Address| {
             let mut acc = Account::default();
-            acc.address = address.clone();
+            acc.address = *address;
             acc
         };
 

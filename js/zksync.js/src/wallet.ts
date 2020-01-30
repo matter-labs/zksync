@@ -141,7 +141,7 @@ export class Wallet {
         const ethSignature = await this.ethSigner.signMessage(message);
 
         const txData = {
-            type: "ChangePubKey",
+            type: "ChangePubKeyOffchain",
             account: this.address(),
             newPkHash: this.signer.pubKeyHash(),
             nonce: numNonce,

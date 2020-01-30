@@ -179,7 +179,7 @@ var Wallet = /** @class */ (function () {
                     case 3:
                         ethSignature = _a.sent();
                         txData = {
-                            type: "ChangePubKey",
+                            type: "ChangePubKeyOffchain",
                             account: this.address(),
                             newPkHash: this.signer.pubKeyHash(),
                             nonce: numNonce,

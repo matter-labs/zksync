@@ -8,7 +8,7 @@ use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
-use models::node::operations::ChangePubkeyPriorityOp;
+use models::node::operations::ChangePubkeyOnchainOp;
 use models::params as franklin_constants;
 use pairing::bn256::*;
 
@@ -64,7 +64,7 @@ impl<E: JubjubEngine> ChangePubkeyOnchainWitness<E> {
 
 pub fn apply_change_pubkey_onchain_tx(
     tree: &mut CircuitAccountTree,
-    deposit: &ChangePubkeyPriorityOp,
+    deposit: &ChangePubkeyOnchainOp,
 ) -> ChangePubkeyOnchainWitness<Bn256> {
     let change_pubkey_data = ChangePubkeyOnchainData {
         account_id: deposit.account_id.unwrap_or_default(),
@@ -189,7 +189,7 @@ pub fn calculate_change_pubkey_operations_from_witness(
 mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
-    use models::node::priority_ops::ChangePubKeyPriority;
+    use models::node::priority_ops::ChangePubKeyOnchain;
     use models::node::{Account, PubKeyHash};
     use models::primitives::pack_bits_into_bytes_in_order;
 
@@ -204,8 +204,8 @@ mod test {
             Account::default_with_address(&change_pkhash_to_account_address),
         )]);
 
-        let change_pkhash_op = ChangePubkeyPriorityOp {
-            priority_op: ChangePubKeyPriority {
+        let change_pkhash_op = ChangePubkeyOnchainOp {
+            priority_op: ChangePubKeyOnchain {
                 new_pubkey_hash: PubKeyHash::from_hex(
                     "sync:0808080808080808080808080808080808080808",
                 )

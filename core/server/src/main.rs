@@ -95,7 +95,7 @@ fn main() {
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     let state_keeper = PlasmaStateKeeper::new(
         PlasmaStateInitParams::restore_from_db(connection_pool.clone()),
-        config_opts.operator_franklin_addr.clone(),
+        config_opts.operator_franklin_addr,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,

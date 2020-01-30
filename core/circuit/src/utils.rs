@@ -106,8 +106,6 @@ where
     signature_s_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
     signature_s_be_bits.reverse();
 
-    //maybe reverse bytes?
-
     ETHSignatureData {
         r: signature_r_be_bits.iter().map(|x| Some(*x)).collect(),
         s: signature_s_be_bits.iter().map(|x| Some(*x)).collect(),

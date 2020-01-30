@@ -634,14 +634,6 @@ contract Franklin {
         ); // fcs12 - last chunk exceeds pubdata
     }
 
-//    event DebugEvent(
-//        bytes32 r,
-//        bytes32 s,
-//        uint8 v,
-//        bytes msg,
-//        address recovered
-//    );
-
     /// @notice On the first byte determines the type of operation, if it is an onchain operation - saves it in storage
     /// @param _opType Operation type
     /// @param _currentPointer Current pointer in pubdata
@@ -723,7 +715,6 @@ contract Franklin {
             bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n24", nonce, newPubKeyHash);
             address recoveredAddress = ecrecover(keccak256(signedMessage), signV, signR, signS);
 
-//            emit DebugEvent(signR, signS, signV, signedMessage, recoveredAddress);
             require(recoveredAddress == ethAddress, "fpp15");
             // fpp15 - failed to verify change pubkey hash signature
             return (CHANGE_PUBKEY_BYTES, 0, 0);
@@ -733,8 +724,8 @@ contract Franklin {
             bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + SUCCESS_FLAG_BYTES + PUBKEY_HASH_BYTES + ETH_ADDR_BYTES);
             require(
                 pubData.length == ACC_NUM_BYTES + SUCCESS_FLAG_BYTES + PUBKEY_HASH_BYTES + ETH_ADDR_BYTES,
-                "fpp15"
-            ); // fpp15 - wrong change pubkey priority length
+                "fpp16"
+            ); // fpp16 - wrong change pubkey priority length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.ChangePubKeyPriority,
                 pubData

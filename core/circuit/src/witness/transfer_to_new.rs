@@ -62,8 +62,8 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.new_pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            &self.args.ethereum_key.unwrap(),
+            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -453,7 +453,7 @@ mod test {
     fn test_transfer_to_new_success() {
         let from_zksync_account = ZksyncAccount::rand();
         let from_account_id = 1;
-        let from_account_address = from_zksync_account.address.clone();
+        let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
             account.add_balance(0, &BigDecimal::from(10));

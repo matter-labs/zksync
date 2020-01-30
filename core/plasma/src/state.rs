@@ -2,11 +2,11 @@ use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
 use log::trace;
 use models::node::operations::{
-    ChangePubKeyOp, ChangePubkeyPriorityOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp,
-    TransferToNewOp, WithdrawOp,
+    ChangePubKeyOffchainOp, ChangePubkeyOnchainOp, CloseOp, DepositOp, FranklinOp, FullExitOp,
+    TransferOp, TransferToNewOp, WithdrawOp,
 };
-use models::node::priority_ops::ChangePubKeyPriority;
-use models::node::tx::ChangePubKey;
+use models::node::priority_ops::ChangePubKeyOnchain;
+use models::node::tx::ChangePubKeyOffchain;
 use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
@@ -93,16 +93,16 @@ impl PlasmaState {
         match op {
             FranklinPriorityOp::Deposit(op) => self.apply_deposit(op),
             FranklinPriorityOp::FullExit(op) => self.apply_full_exit(op),
-            FranklinPriorityOp::ChangePubKeyPriority(op) => self.apply_change_pubkey_priority(op),
+            FranklinPriorityOp::ChangePubKeyOnchain(op) => self.apply_change_pubkey_priority(op),
         }
     }
 
     pub fn execute_tx(&mut self, tx: FranklinTx) -> Result<OpSuccess, Error> {
         match tx {
-            FranklinTx::Transfer(tx) => self.apply_transfer(tx),
-            FranklinTx::Withdraw(tx) => self.apply_withdraw(tx),
-            FranklinTx::Close(tx) => self.apply_close(tx),
-            FranklinTx::ChangePubKey(tx) => self.apply_change_pubkey(tx),
+            FranklinTx::Transfer(tx) => self.apply_transfer(*tx),
+            FranklinTx::Withdraw(tx) => self.apply_withdraw(*tx),
+            FranklinTx::Close(tx) => self.apply_close(*tx),
+            FranklinTx::ChangePubKey(tx) => self.apply_change_pubkey(*tx),
         }
     }
 
@@ -236,14 +236,14 @@ impl PlasmaState {
         }
     }
 
-    fn apply_change_pubkey_priority(&mut self, priority_op: ChangePubKeyPriority) -> OpSuccess {
+    fn apply_change_pubkey_priority(&mut self, priority_op: ChangePubKeyOnchain) -> OpSuccess {
         // NOTE: Authroization of the ChangePubKeyPriority is verified on the contract.
         trace!("Processing {:?}", priority_op);
         let account_id = self
             .get_account_by_address(&priority_op.eth_address)
             .map(|(id, _)| id);
 
-        let op = ChangePubkeyPriorityOp {
+        let op = ChangePubkeyOnchainOp {
             priority_op,
             account_id,
         };
@@ -251,13 +251,13 @@ impl PlasmaState {
         OpSuccess {
             fee: None,
             updates: self.apply_change_pubkey_priority_op(&op),
-            executed_op: FranklinOp::ChangePubKeyPriority(Box::new(op)),
+            executed_op: FranklinOp::ChangePubKeyOnchain(Box::new(op)),
         }
     }
 
     pub fn apply_change_pubkey_priority_op(
         &mut self,
-        op: &ChangePubkeyPriorityOp,
+        op: &ChangePubkeyOnchainOp,
     ) -> AccountUpdates {
         let mut updates = Vec::new();
         let account_id = if let Some(account_id) = &op.account_id {
@@ -339,7 +339,7 @@ impl PlasmaState {
         // })
     }
 
-    fn apply_change_pubkey(&mut self, tx: ChangePubKey) -> Result<OpSuccess, Error> {
+    fn apply_change_pubkey(&mut self, tx: ChangePubKeyOffchain) -> Result<OpSuccess, Error> {
         let (account_id, account) = self
             .get_account_by_address(&tx.account)
             .ok_or_else(|| format_err!("Account does not exist"))?;
@@ -347,13 +347,13 @@ impl PlasmaState {
             tx.verify_eth_signature() == Some(account.address),
             "ChangePubKey signature is incorrect"
         );
-        let change_pk_op = ChangePubKeyOp { tx, account_id };
+        let change_pk_op = ChangePubKeyOffchainOp { tx, account_id };
 
         let (fee, updates) = self.apply_change_pubkey_op(&change_pk_op)?;
         Ok(OpSuccess {
             fee: Some(fee),
             updates,
-            executed_op: FranklinOp::ChangePubKey(Box::new(change_pk_op)),
+            executed_op: FranklinOp::ChangePubKeyOffchain(Box::new(change_pk_op)),
         })
     }
 
@@ -419,7 +419,7 @@ impl PlasmaState {
         let mut updates = Vec::new();
 
         let mut account = self.get_account(op.account_id).unwrap_or_else(|| {
-            let (account, upd) = Account::create_account(op.account_id, op.priority_op.to.clone());
+            let (account, upd) = Account::create_account(op.account_id, op.priority_op.to);
             updates.extend(upd.into_iter());
             account
         });
@@ -454,7 +454,7 @@ impl PlasmaState {
             "Transfer to new account exists"
         );
         let mut to_account = {
-            let (acc, upd) = Account::create_account(op.to, op.tx.to.clone());
+            let (acc, upd) = Account::create_account(op.to, op.tx.to);
             updates.extend(upd.into_iter());
             acc
         };
@@ -581,7 +581,7 @@ impl PlasmaState {
 
     pub fn apply_change_pubkey_op(
         &mut self,
-        op: &ChangePubKeyOp,
+        op: &ChangePubKeyOffchainOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
         let mut account = self.get_account(op.account_id).unwrap();

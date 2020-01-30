@@ -20,6 +20,7 @@ use circuit::witness::full_exit::{
 use circuit::witness::utils::prepare_sig_data;
 use models::merkle_tree::PedersenHasher;
 use models::node::{Engine, Fr};
+use models::primitives::pack_bits_into_bytes_in_order;
 use prover::prover_data::ProverData;
 
 pub struct ProversDataPool {
@@ -167,11 +168,9 @@ fn build_prover_data(
 
     let block_number = commit_operation.block.block_number;
 
-    info!("UPDATING ACCOUNTS HERE");
     let (_, accounts) = storage
         .load_committed_state(Some(block_number - 1))
         .map_err(|e| format!("failed to load commited state: {}", e))?;
-    info!("UPDATING ACCOUNTS HERE STOP");
     let mut accounts_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
     for acc in accounts {
@@ -362,7 +361,7 @@ fn build_prover_data(
                 operations.extend(full_exit_operations);
                 pub_data.extend(full_exit_witness.get_pubdata());
             }
-            models::node::FranklinOp::ChangePubKey(change_pkhash_op) => {
+            models::node::FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
                 let change_pkhash_witness =
                     apply_change_pubkey_offchain_tx(&mut accounts_tree, &change_pkhash_op);
                 let change_pkhash_operations =
@@ -370,7 +369,7 @@ fn build_prover_data(
                 operations.extend(change_pkhash_operations);
                 pub_data.extend(change_pkhash_witness.get_pubdata());
             }
-            models::node::FranklinOp::ChangePubKeyPriority(change_pkhash_op) => {
+            models::node::FranklinOp::ChangePubKeyOnchain(change_pkhash_op) => {
                 let change_pkhash_witness =
                     apply_change_pubkey_onchain_tx(&mut accounts_tree, &change_pkhash_op);
                 let change_pkhash_operations =
@@ -399,6 +398,11 @@ fn build_prover_data(
     }
     assert_eq!(pub_data.len(), 64 * models::params::block_size_chunks());
     assert_eq!(operations.len(), models::params::block_size_chunks());
+
+    debug!(
+        "Prover pubdata: {}",
+        hex::encode(pack_bits_into_bytes_in_order(pub_data.clone()))
+    );
 
     let validator_acc = match accounts_tree.get(commit_operation.block.fee_account as u32) {
         Some(v) => v,

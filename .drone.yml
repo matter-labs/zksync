@@ -106,7 +106,7 @@ steps:
       - ./keys
   depends_on:
      - init
-     - rust-checks
+     - deploy-test
 
 
 volumes:

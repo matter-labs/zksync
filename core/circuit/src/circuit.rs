@@ -282,7 +282,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             root_from_operator_after_fees.clone(),
         )?;
 
-        println!("final root: {:?}", final_root.get_number().get_value());
         {
             // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
             // and start rolling the hash
@@ -697,7 +696,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &op_data,
             &ext_pubdata_chunk,
         )?);
-        op_flags.push(self.change_pubkey_onhcain(
+        op_flags.push(self.change_pubkey_onchain(
             cs.namespace(|| "change_pubkey_onhcain"),
             &mut cur,
             &chunk_data,
@@ -908,7 +907,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         Ok(tx_valid)
     }
 
-    fn change_pubkey_onhcain<CS: ConstraintSystem<E>>(
+    fn change_pubkey_onchain<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
         cur: &mut AllocatedOperationBranch<E>,
@@ -918,7 +917,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
     ) -> Result<Boolean, SynthesisError> {
         // Execute first chunk
 
-        //TODO: this flag is used too often, we better compute it above
         let is_first_chunk = Boolean::from(Expression::equals(
             cs.namespace(|| "is_first_chunk"),
             &chunk_data.chunk_number,
@@ -975,7 +973,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             let is_change_pubkey = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_change_pubkey"),
                 &chunk_data.tx_type.get_number(),
-                Expression::u64::<CS>(8), //full_exit tx code
+                Expression::u64::<CS>(8), //change_pubkey_onchain tx code
             )?);
 
             base_valid_flags.push(is_change_pubkey.clone());
@@ -1000,8 +998,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
         };
 
-        // Full exit was a success, update account is the first chunk.
-        let success_account_update = multi_and(
+        // Change pubkey onchain was a success, update account is the first chunk.
+        let success_pubkey_update = multi_and(
             cs.namespace(|| "success_account_update"),
             &[first_chunk_valid.clone(), is_address_correct],
         )?;
@@ -1011,7 +1009,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "mutated_pubkey_hash"),
             &op_data.new_pubkey_hash,
             &cur.account.pub_key_hash,
-            &success_account_update,
+            &success_pubkey_update,
         )?;
 
         // Check other chunks
@@ -1022,10 +1020,42 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             multi_and(cs.namespace(|| "other_chunks_valid"), &flags)?
         };
 
-        // MUST be true for correct (successful or not) full exit
+        let valid_success_flag_and_first_chunk = {
+            let is_success_flag_one = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_success_flag_one"),
+                &op_data.a.get_number(),
+                Expression::u64::<CS>(1),
+            )?);
+            let is_success_flag_zero = Boolean::from(Expression::equals(
+                cs.namespace(|| "is_success_flag_zero"),
+                &op_data.a.get_number(),
+                Expression::u64::<CS>(0),
+            )?);
+
+            let is_one_correct = multi_and(
+                cs.namespace(|| "is_one_correct"),
+                &[is_success_flag_one, success_pubkey_update.clone()],
+            )?;
+            let is_zero_correct = multi_and(
+                cs.namespace(|| "is_zero_correct"),
+                &[is_success_flag_zero, success_pubkey_update.not()],
+            )?;
+            let flag_valid = multi_or(
+                cs.namespace(|| "valid_success_flag"),
+                &[is_one_correct, is_zero_correct],
+            )?;
+            multi_and(
+                cs.namespace(|| "valid_success_flag_and_first_chunk"),
+                &[flag_valid, first_chunk_valid],
+            )?
+        };
+        // MUST be true for correct (successful or not) change pubkey_hash
         let tx_valid = multi_or(
             cs.namespace(|| "tx_valid"),
-            &[first_chunk_valid.clone(), other_chunks_valid],
+            &[
+                valid_success_flag_and_first_chunk.clone(),
+                other_chunks_valid,
+            ],
         )?;
         Ok(tx_valid)
     }
@@ -1264,6 +1294,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+                                                                // NOTE: nonce if verified implicitly here. Current account nonce goes to pubdata and to contract.
         pubdata_bits.extend(cur.account.nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
@@ -1500,7 +1531,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(lhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(cur.token.get_bits_be()); //16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
-        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //160
+        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //160
         pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
         pubdata_bits.resize(

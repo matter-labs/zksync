@@ -83,14 +83,14 @@ impl<T: Transport> AccountSet<T> {
         let from = &self.zksync_accounts[from.0];
         let to = &self.zksync_accounts[to.0];
 
-        FranklinTx::Transfer(from.sign_transfer(
+        FranklinTx::Transfer(Box::new(from.sign_transfer(
             token_id.0,
             amount,
             fee,
             &to.address,
             nonce,
             increment_nonce,
-        ))
+        )))
     }
 
     /// Create withdraw from zksync account to eth account
@@ -110,14 +110,14 @@ impl<T: Transport> AccountSet<T> {
         let from = &self.zksync_accounts[from.0];
         let to = &self.eth_accounts[to.0];
 
-        FranklinTx::Withdraw(from.sign_withdraw(
+        FranklinTx::Withdraw(Box::new(from.sign_withdraw(
             token_id.0,
             amount,
             fee,
             &to.address,
             nonce,
             increment_nonce,
-        ))
+        )))
     }
 
     /// Create full exit from zksync account to eth account
@@ -141,7 +141,9 @@ impl<T: Transport> AccountSet<T> {
         increment_nonce: bool,
     ) -> FranklinTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
-        FranklinTx::ChangePubKey(zksync_account.create_change_pubkey_tx(nonce, increment_nonce))
+        FranklinTx::ChangePubKey(Box::new(
+            zksync_account.create_change_pubkey_tx(nonce, increment_nonce),
+        ))
     }
 
     fn change_pubkey_with_priority_op(
@@ -176,7 +178,7 @@ async fn state_keeper_get_account(
 ) -> Option<(AccountId, Account)> {
     let resp = oneshot::channel();
     sender
-        .send(StateKeeperRequest::GetAccount(address.clone(), resp.0))
+        .send(StateKeeperRequest::GetAccount(*address, resp.0))
         .await
         .expect("sk request send");
     resp.1.await.expect("sk account resp recv")
@@ -197,7 +199,7 @@ fn spawn_state_keeper(
 
     let state_keeper = PlasmaStateKeeper::new(
         genesis_state(fee_account),
-        fee_account.clone(),
+        *fee_account,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,

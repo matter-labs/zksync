@@ -9,7 +9,7 @@ use crypto::{digest::Digest, sha2::Sha256};
 
 use super::account::PubKeyHash;
 use super::Engine;
-use crate::node::operations::ChangePubKeyOp;
+use crate::node::operations::ChangePubKeyOffchainOp;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
 use ethsign::{SecretKey, Signature as ETHSignature};
@@ -200,14 +200,14 @@ impl Close {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChangePubKey {
+pub struct ChangePubKeyOffchain {
     pub account: Address,
     pub new_pk_hash: PubKeyHash,
     pub nonce: Nonce,
     pub eth_signature: PackedEthSignature,
 }
 
-impl ChangePubKey {
+impl ChangePubKeyOffchain {
     const TX_TYPE: u8 = 7;
 
     pub fn get_bytes(&self) -> Vec<u8> {
@@ -240,10 +240,10 @@ impl ChangePubKey {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinTx {
-    Transfer(Transfer),
-    Withdraw(Withdraw),
-    Close(Close),
-    ChangePubKey(ChangePubKey),
+    Transfer(Box<Transfer>),
+    Withdraw(Box<Withdraw>),
+    Close(Box<Close>),
+    ChangePubKey(Box<ChangePubKeyOffchain>),
 }
 
 impl FranklinTx {
@@ -303,7 +303,7 @@ impl FranklinTx {
             FranklinTx::Transfer(_) => TransferOp::CHUNKS,
             FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
-            FranklinTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
+            FranklinTx::ChangePubKey(_) => ChangePubKeyOffchainOp::CHUNKS,
         }
     }
 
@@ -747,7 +747,7 @@ mod test {
             .unwrap();
 
         let examples = vec![
-            ("hello world".as_bytes().to_vec(), "12c24491eefbac7e80f4d3f0400cd804667dab026fda1bc8bfe86650d872ba4215b0a0e297c48a54d9020daa3130222dadcb8f5ffdafc4b9293c3ef818b322b01c"),
+            (b"hello world".to_vec(), "12c24491eefbac7e80f4d3f0400cd804667dab026fda1bc8bfe86650d872ba4215b0a0e297c48a54d9020daa3130222dadcb8f5ffdafc4b9293c3ef818b322b01c"),
             // empty message
             (Vec::new(), "8b7385c7bb8913b9fd176247efab0ccc72e3197abe8e2d4c6596ba58a32a91675f66e80560a5f1a42bd50d58da055630ac6c18875e5ba14a362e87e903f083941c"),
             // v = 27(others v = 28)

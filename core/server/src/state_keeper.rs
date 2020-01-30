@@ -164,9 +164,9 @@ impl PlasmaStateKeeper {
             "db should be empty"
         );
         let mut fee_account = Account::default();
-        fee_account.address = fee_account_address.clone();
+        fee_account.address = *fee_account_address;
         let db_account_update = AccountUpdate::Create {
-            address: fee_account_address.clone(),
+            address: *fee_account_address,
             nonce: fee_account.nonce,
         };
         accounts.insert(0, fee_account);

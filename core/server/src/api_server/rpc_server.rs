@@ -150,7 +150,7 @@ impl Rpc for RpcApp {
             let state_keeper_response = oneshot::channel();
             state_keeper_request_sender
                 .send(StateKeeperRequest::GetAccount(
-                    address.clone(),
+                    address,
                     state_keeper_response.0,
                 ))
                 .await
