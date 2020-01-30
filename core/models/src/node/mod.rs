@@ -123,8 +123,8 @@ mod test {
         {
             let round_trip_zero = unpack_fee_amount(&pack_fee_amount(&zero));
             let round_trip_one = unpack_fee_amount(&pack_fee_amount(&one));
-            assert_eq!(Some(zero.clone()), round_trip_zero);
-            assert_eq!(Some(one.clone()), round_trip_one);
+            assert_eq!(Some(zero), round_trip_zero);
+            assert_eq!(Some(one), round_trip_one);
         }
     }
 

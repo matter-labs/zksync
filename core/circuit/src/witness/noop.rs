@@ -76,9 +76,9 @@ pub fn noop_operation(
                     nonce: Some(acc.nonce),
                     pub_key_hash: Some(acc.pub_key_hash),
                 },
-                account_path: audit_account.clone(),
+                account_path: audit_account,
                 balance_value: Some(balance_value),
-                balance_subtree_path: audit_balance.clone(),
+                balance_subtree_path: audit_balance,
             },
         },
     }

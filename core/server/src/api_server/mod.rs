@@ -44,9 +44,9 @@ pub fn start_api_server(
 
     rpc_server::start_rpc_server(
         config_options.json_rpc_http_server_address,
-        connection_pool.clone(),
-        mempool_request_sender.clone(),
+        connection_pool,
+        mempool_request_sender,
         state_keeper_request_sender,
-        panic_notify.clone(),
+        panic_notify,
     );
 }
