@@ -9,34 +9,27 @@ use circuit::operation::*;
 use franklin_crypto::bellman::groth16::Parameters;
 use pairing::bn256::*;
 use rand::OsRng;
-use time::PreciseTime;
 // Workspace deps
 use crate::vk_contract_generator::generate_vk_contract;
+use circuit::exit_circuit::ZksyncExitCircuit;
 use models::params;
+use std::time::Instant;
 
 const CONTRACT_FILENAME: &str = "VerificationKey.sol";
 const CONTRACT_NAME: &str = "VerificationKey";
 const CONTRACT_FUNCTION_NAME: &str = "getVk";
 
-pub fn make_franklin_key() {
-    let out_dir = {
-        let mut out_dir = PathBuf::new();
-        out_dir.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
-        out_dir.push(&format!("{}", params::block_size_chunks()));
-        out_dir.push(&format!("{}", params::account_tree_depth()));
-        out_dir
-    };
-    let key_file_path = {
-        let mut key_file_path = out_dir.clone();
-        key_file_path.push(params::KEY_FILENAME);
-        key_file_path
-    };
-    let contract_file_path = {
-        let mut contract_file_path = out_dir.clone();
-        contract_file_path.push(CONTRACT_FILENAME);
-        contract_file_path
-    };
+const CONTRACT_FILENAME_EXIT_CIRCUIT: &str = "VerificationKeyExit.sol";
+const CONTRACT_NAME_EXIT_CIRCUIT: &str = "VerificationKeyExit";
+const CONTRACT_FUNCTION_NAME_EXIT_CIRCUIT: &str = "getVkExit";
 
+fn generate_and_write_parameters<F: Fn() -> Parameters<Bn256>>(
+    key_file_path: PathBuf,
+    contract_file_path: PathBuf,
+    gen_parameters: F,
+    contract_name: &str,
+    contract_function_name: &str,
+) {
     info!(
         "Generating key file into: {}",
         key_file_path.to_str().unwrap()
@@ -47,7 +40,7 @@ pub fn make_franklin_key() {
     );
     let f_cont = File::create(contract_file_path).expect("Unable to create file");
 
-    let tmp_cirtuit_params = make_circuit_parameters();
+    let tmp_cirtuit_params = gen_parameters();
 
     use std::fs::File;
     use std::io::{BufWriter, Write};
@@ -68,14 +61,66 @@ pub fn make_franklin_key() {
 
     let contract_content = generate_vk_contract(
         &circuit_params.vk,
-        CONTRACT_NAME.to_string(),
-        CONTRACT_FUNCTION_NAME.to_string(),
+        contract_name.to_string(),
+        contract_function_name.to_string(),
     );
 
     let mut f_cont = BufWriter::new(f_cont);
     f_cont
         .write_all(contract_content.as_bytes())
         .expect("Unable to write contract");
+}
+
+pub fn make_franklin_key() {
+    let out_dir = {
+        let mut out_dir = PathBuf::new();
+        out_dir.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
+        out_dir.push(&format!("{}", params::block_size_chunks()));
+        out_dir.push(&format!("{}", params::account_tree_depth()));
+        out_dir
+    };
+
+    // Generate main circuit parameters
+    {
+        let key_file_path = {
+            let mut key_file_path = out_dir.clone();
+            key_file_path.push(params::KEY_FILENAME);
+            key_file_path
+        };
+        let contract_file_path = {
+            let mut contract_file_path = out_dir.clone();
+            contract_file_path.push(CONTRACT_FILENAME);
+            contract_file_path
+        };
+        generate_and_write_parameters(
+            key_file_path,
+            contract_file_path,
+            make_circuit_parameters,
+            CONTRACT_NAME,
+            CONTRACT_FUNCTION_NAME,
+        );
+    }
+
+    // Generate exit circuit parameters
+    {
+        let key_file_path = {
+            let mut key_file_path = out_dir.clone();
+            key_file_path.push(params::EXIT_KEY_FILENAME);
+            key_file_path
+        };
+        let contract_file_path = {
+            let mut contract_file_path = out_dir.clone();
+            contract_file_path.push(CONTRACT_FILENAME_EXIT_CIRCUIT);
+            contract_file_path
+        };
+        generate_and_write_parameters(
+            key_file_path,
+            contract_file_path,
+            make_exit_circuit_parameters,
+            CONTRACT_NAME_EXIT_CIRCUIT,
+            CONTRACT_FUNCTION_NAME_EXIT_CIRCUIT,
+        );
+    }
 
     info!("Done");
 }
@@ -163,12 +208,42 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
     };
 
     info!("generating setup...");
-    let start = PreciseTime::now();
+    let start = Instant::now();
     let tmp_cirtuit_params = generate_random_parameters(instance_for_generation, rng).unwrap();
-    info!(
-        "setup generated in {} s",
-        start.to(PreciseTime::now()).num_milliseconds() as f64 / 1000.0
-    );
+    info!("setup generated in {} s", start.elapsed().as_secs());
+
+    tmp_cirtuit_params
+}
+
+pub fn make_exit_circuit_parameters() -> Parameters<Bn256> {
+    // let p_g = FixedGenerators::SpendingKeyGenerator;
+    let params = &params::JUBJUB_PARAMS;
+    // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
+    let rng = &mut OsRng::new().unwrap();
+    let exit_circuit_instance = ZksyncExitCircuit::<'_, Bn256> {
+        params,
+        pub_data_commitment: None,
+        root_hash: None,
+        account_audit_data: OperationBranch {
+            address: None,
+            token: None,
+            witness: OperationBranchWitness {
+                account_witness: AccountWitness {
+                    nonce: None,
+                    pub_key_hash: None,
+                    address: None,
+                },
+                account_path: vec![None; params::account_tree_depth()],
+                balance_value: None,
+                balance_subtree_path: vec![None; params::BALANCE_TREE_DEPTH],
+            },
+        },
+    };
+
+    info!("generating setup for exit circuit...");
+    let start = Instant::now();
+    let tmp_cirtuit_params = generate_random_parameters(exit_circuit_instance, rng).unwrap();
+    info!("setup generated in {} s", start.elapsed().as_secs());
 
     tmp_cirtuit_params
 }

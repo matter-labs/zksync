@@ -128,6 +128,7 @@ pub const PRIORITY_EXPIRATION: u64 = 250;
 pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const KEY_FILENAME: &str = "zksync_pk.key";
+pub const EXIT_KEY_FILENAME: &str = "zksync_exit_pk.key";
 
 pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 

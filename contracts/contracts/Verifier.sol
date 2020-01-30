@@ -1,12 +1,13 @@
 pragma solidity 0.5.10;
 
 import "./VerificationKey.sol";
+import "./VerificationKeyExit.sol";
 
 /// @title Verifier Contract
 /// @notice Based on https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
 /// @dev TODO: - remove DUMMY_VERIFIER variable for production
 /// @author Matter Labs
-contract Verifier is VerificationKey {
+contract Verifier is VerificationKey, VerificationKeyExit {
     /// @notice If this flag is true - dummy verification is used instead of full verifier
     bool constant DUMMY_VERIFIER = false;
 
@@ -34,20 +35,20 @@ contract Verifier is VerificationKey {
     /// @param _proof Proof that user committed
     /// @return bool flag that indicates if exit proof is valid
     function verifyExitProof(
-        uint16 _tokenId,
+        bytes32 _root_hash,
         address _owner,
+        uint16 _tokenId,
         uint128 _amount,
         uint256[8] calldata _proof
     ) external view returns (bool) {
         bytes32 hash = sha256(
-            abi.encodePacked(uint256(_tokenId), uint256(_owner))
+            abi.encodePacked(_root_hash, _owner, _tokenId, _amount)
         );
-        hash = sha256(abi.encodePacked(hash, uint256(_amount)));
 
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
-        (vk, gammaABC) = getVk();
+        (vk, gammaABC) = getVkExit();
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(hash) & mask;
         return Verify(vk, gammaABC, _proof, inputs);

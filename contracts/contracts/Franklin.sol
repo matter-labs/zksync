@@ -969,11 +969,13 @@ contract Franklin {
         ); // fet12 - already exited
 
         require(
-            verifier.verifyExitProof(_tokenId, _owner, _amount, _proof),
+            verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot,_owner, _tokenId, _amount, _proof),
             "fet13"
         ); // fet13 - verification failed
 
+
+
         balancesToWithdraw[_owner][_tokenId] += _amount;
-        exited[_owner][_tokenId] == false;
+        exited[_owner][_tokenId] == true;
     }
 }
