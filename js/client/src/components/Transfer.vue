@@ -10,7 +10,7 @@
             :selected.sync="token">
         </TokenSelector>
         Amount <span v-if="maxAmountVisible">(max {{ token }} {{ displayableBalancesDict[token] }})</span>:
-        <b-form-input autocomplete="off" type="number" v-model="amountSelected" class="mb-3"></b-form-input>
+        <b-form-input autocomplete="off" type="number" step="any" v-model="amountSelected" class="mb-3"></b-form-input>
         Choose fee:
         <FeeSelector 
             class="mb-3"
