@@ -45,7 +45,7 @@ where
     struct Wrapper(#[serde(with = "OperationDef")] Operation<Engine>);
 
     let v = Vec::deserialize(deserializer)?;
-    Ok(v.into_iter().map(|Wrapper(a)| a.clone()).collect())
+    Ok(v.into_iter().map(|Wrapper(a)| a).collect())
 }
 
 #[derive(Serialize, Deserialize)]

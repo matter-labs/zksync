@@ -1357,7 +1357,7 @@ impl StorageProcessor {
             // Fetch updates from blocks: verif_block +/- 1, ... , block
             if let Some((block, state_diff)) = self.load_state_diff(verif_block, block)? {
                 debug!("Loaded state diff: {:#?}", state_diff);
-                apply_updates(&mut accounts, state_diff.clone());
+                apply_updates(&mut accounts, state_diff);
                 Ok((block, accounts))
             } else {
                 Ok((verif_block, accounts))
@@ -2276,9 +2276,9 @@ mod test {
     ) -> impl Iterator<Item = (u32, AccountUpdate)> {
         let mut a = models::node::account::Account::default();
         a.nonce = nonce;
-        let old_balance = a.get_balance(0).clone();
+        let old_balance = a.get_balance(0);
         a.set_balance(0, BigDecimal::from(balance));
-        let new_balance = a.get_balance(0).clone();
+        let new_balance = a.get_balance(0);
         vec![
             (
                 id,

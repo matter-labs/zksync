@@ -263,7 +263,7 @@ pub fn apply_leaf_operation<
     let balance_before = balance.value;
     fb(&mut balance);
     let balance_after = balance.value;
-    account.subtree.insert(token, balance.clone());
+    account.subtree.insert(token, balance);
 
     fa(&mut account);
 
