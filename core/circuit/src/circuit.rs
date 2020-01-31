@@ -976,7 +976,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 Expression::u64::<CS>(8), //change_pubkey_onchain tx code
             )?);
 
-            base_valid_flags.push(is_change_pubkey.clone());
+            base_valid_flags.push(is_change_pubkey);
             multi_and(
                 cs.namespace(|| "valid base change_pubkey"),
                 &base_valid_flags,
@@ -1052,10 +1052,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         // MUST be true for correct (successful or not) change pubkey_hash
         let tx_valid = multi_or(
             cs.namespace(|| "tx_valid"),
-            &[
-                valid_success_flag_and_first_chunk.clone(),
-                other_chunks_valid,
-            ],
+            &[valid_success_flag_and_first_chunk, other_chunks_valid],
         )?;
         Ok(tx_valid)
     }
@@ -1335,7 +1332,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(7), //TODO: move to constants
         )?);
-        is_valid_flags.push(is_change_pubkey_offchain.clone());
+        is_valid_flags.push(is_change_pubkey_offchain);
 
         // verify if address is to previous one (if existed)
         let is_address_correct = CircuitElement::equals(

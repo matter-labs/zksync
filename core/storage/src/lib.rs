@@ -2382,9 +2382,9 @@ mod test {
         a.nonce = old_nonce + 2;
         a.pub_key_hash = pub_key_hash;
 
-        let old_balance = a.get_balance(0).clone();
+        let old_balance = a.get_balance(0);
         a.set_balance(0, u128_to_bigdecimal(balance));
-        let new_balance = a.get_balance(0).clone();
+        let new_balance = a.get_balance(0);
         vec![
             (
                 id,
@@ -2399,7 +2399,7 @@ mod test {
                     old_nonce,
                     old_pub_key_hash: PubKeyHash::default(),
                     new_nonce: old_nonce + 1,
-                    new_pub_key_hash: a.pub_key_hash.clone(),
+                    new_pub_key_hash: a.pub_key_hash,
                 },
             ),
             (
