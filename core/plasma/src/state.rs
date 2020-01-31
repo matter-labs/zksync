@@ -102,7 +102,7 @@ impl PlasmaState {
             FranklinTx::Transfer(tx) => self.apply_transfer(*tx),
             FranklinTx::Withdraw(tx) => self.apply_withdraw(*tx),
             FranklinTx::Close(tx) => self.apply_close(*tx),
-            FranklinTx::ChangePubKey(tx) => self.apply_change_pubkey(*tx),
+            FranklinTx::ChangePubKeyOffchain(tx) => self.apply_change_pubkey(*tx),
         }
     }
 

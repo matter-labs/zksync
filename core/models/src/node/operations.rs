@@ -707,7 +707,7 @@ impl FranklinOp {
             FranklinOp::Withdraw(op) => Ok(FranklinTx::Withdraw(Box::new(op.tx.clone()))),
             FranklinOp::Close(op) => Ok(FranklinTx::Close(Box::new(op.tx.clone()))),
             FranklinOp::ChangePubKeyOffchain(op) => {
-                Ok(FranklinTx::ChangePubKey(Box::new(op.tx.clone())))
+                Ok(FranklinTx::ChangePubKeyOffchain(Box::new(op.tx.clone())))
             }
             _ => Err(format_err!("Wrong tx type")),
         }
