@@ -9,8 +9,8 @@ Vue.use(Router);
 
 const router = new Router({
   routes: [
-    { path: '/login', component: Login, meta: {title: 'ZK Sync Wallet'} },
-    { path: '/main',  component: Main,  meta: {title: 'ZK Sync Wallet'} },
+    { path: '/login', component: Login, meta: {title: 'zkSync Wallet'} },
+    { path: '/main',  component: Main,  meta: {title: 'zkSync Wallet'} },
     { path: '*', redirect: '/login' },
   ],
   mode:   'history',

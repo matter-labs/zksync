@@ -273,9 +273,9 @@ pub fn apply_transfer(
             token: Some(token_fe),
             witness: OperationBranchWitness {
                 account_witness: account_witness_to_intermediate,
-                account_path: audit_path_to_intermediate.clone(),
+                account_path: audit_path_to_intermediate,
                 balance_value: Some(balance_to_intermediate),
-                balance_subtree_path: audit_balance_path_to_intermediate.clone(),
+                balance_subtree_path: audit_balance_path_to_intermediate,
             },
         },
         to_after: OperationBranch {

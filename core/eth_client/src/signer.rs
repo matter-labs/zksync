@@ -55,7 +55,7 @@ impl RawTransaction {
         let r = &sig.r.clone()[r_start..];
         tx.append(&r);
         let s_start = find_first_nonzero(&sig.s);
-        let s = &sig.s.clone()[s_start..];
+        let s = &sig.s[s_start..];
         tx.append(&s);
 
         // tx.append(&sig.r);

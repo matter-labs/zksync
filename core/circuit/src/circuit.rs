@@ -279,7 +279,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         let final_root = CircuitElement::from_number_padded(
             cs.namespace(|| "final_root"),
-            root_from_operator_after_fees.clone(),
+            root_from_operator_after_fees,
         )?;
 
         {
@@ -618,7 +618,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &signer_key,
             op.signature_data.clone(),
             self.params,
-            generator.clone(),
+            generator,
         )?;
 
         let diff_a_b =
@@ -813,7 +813,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(3), //withdraw tx code
         )?);
-        base_valid_flags.push(is_withdraw.clone());
+        base_valid_flags.push(is_withdraw);
 
         let is_serialized_tx_correct = verify_signature_message_construction(
             cs.namespace(|| "is_serialized_tx_correct"),
@@ -1123,7 +1123,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 Expression::u64::<CS>(6), //full_exit tx code
             )?);
 
-            base_valid_flags.push(is_full_exit.clone());
+            base_valid_flags.push(is_full_exit);
             multi_and(cs.namespace(|| "valid base full_exit"), &base_valid_flags)?
         };
 
@@ -1172,7 +1172,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         // MUST be true for correct (successful or not) full exit
         let tx_valid = multi_or(
             cs.namespace(|| "tx_valid"),
-            &[first_chunk_valid.clone(), other_chunks_valid],
+            &[first_chunk_valid, other_chunks_valid],
         )?;
         Ok(tx_valid)
     }
@@ -1227,7 +1227,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(1), //TODO: move to constants
         )?);
-        is_valid_flags.push(is_deposit.clone());
+        is_valid_flags.push(is_deposit);
 
         // verify if address is to previous one (if existed)
         let is_pub_equal_to_previous = CircuitElement::equals(
@@ -1505,7 +1505,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data.tx_type.get_number(),
             Expression::u64::<CS>(0), //noop tx_type
         )?);
-        is_valid_flags.push(is_noop.clone());
+        is_valid_flags.push(is_noop);
 
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
 
@@ -1704,9 +1704,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         let mut ohs_valid_flags = vec![];
-        ohs_valid_flags.push(is_pubdata_chunk_correct.clone());
-        ohs_valid_flags.push(is_first_chunk.not().clone());
-        ohs_valid_flags.push(is_second_chunk.not().clone());
+        ohs_valid_flags.push(is_pubdata_chunk_correct);
+        ohs_valid_flags.push(is_first_chunk.not());
+        ohs_valid_flags.push(is_second_chunk.not());
         ohs_valid_flags.push(is_transfer);
 
         let is_ohs_valid = multi_and(cs.namespace(|| "is_ohs_valid"), &ohs_valid_flags)?;
@@ -1788,7 +1788,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &chunk_data.chunk_number,
             Expression::constant::<CS>(E::Fr::zero()),
         )?);
-        lhs_valid_flags.push(is_first_chunk.clone());
+        lhs_valid_flags.push(is_first_chunk);
 
         // check operation arguments
         let is_a_correct =
@@ -1856,7 +1856,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // rhs
         let mut rhs_valid_flags = vec![];
-        rhs_valid_flags.push(is_transfer.clone());
+        rhs_valid_flags.push(is_transfer);
 
         let is_chunk_second = Boolean::from(Expression::equals(
             cs.namespace(|| "is_chunk_second"),
@@ -1866,7 +1866,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         rhs_valid_flags.push(is_chunk_second);
         rhs_valid_flags.push(is_account_empty.not());
 
-        rhs_valid_flags.push(is_pubdata_chunk_correct.clone());
+        rhs_valid_flags.push(is_pubdata_chunk_correct);
         let is_rhs_valid = multi_and(cs.namespace(|| "is_rhs_valid"), &rhs_valid_flags)?;
 
         // calculate new rhs balance value
@@ -1986,7 +1986,7 @@ fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
         .clone(); // Injective encoding
     }
 
-    Ok(cur_hash.clone())
+    Ok(cur_hash)
 }
 
 fn select_vec_ifeq<

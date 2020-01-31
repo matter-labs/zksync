@@ -82,7 +82,7 @@ where
         franklin_constants::FR_BIT_WIDTH_PADDED
     );
 
-    let sig_s_bits = signature_s_be_bits.clone();
+    let sig_s_bits = signature_s_be_bits;
     let sig_s_bits = reverse_bytes(&sig_s_bits);
 
     SignatureData {

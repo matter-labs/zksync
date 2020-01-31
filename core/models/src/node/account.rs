@@ -366,7 +366,7 @@ mod test {
         }
         {
             assert_eq!(
-                Account::apply_update(Some(Account::default()), create.clone())
+                Account::apply_update(Some(Account::default()), create)
                     .unwrap()
                     .get_bits_le(),
                 Account::default().get_bits_le()
@@ -376,13 +376,13 @@ mod test {
                 updated_account.nonce = 2;
                 updated_account.set_balance(0, BigDecimal::from(5));
                 assert_eq!(
-                    Account::apply_update(Some(Account::default()), bal_update.clone())
+                    Account::apply_update(Some(Account::default()), bal_update)
                         .unwrap()
                         .get_bits_le(),
                     updated_account.get_bits_le()
                 );
             }
-            assert!(Account::apply_update(Some(Account::default()), delete.clone()).is_none());
+            assert!(Account::apply_update(Some(Account::default()), delete).is_none());
         }
     }
 
@@ -451,7 +451,7 @@ mod test {
         assert_eq!(account_map_updated, account_map_updated_expected);
 
         let account_map_updated_back = {
-            let mut map = account_map_updated.clone();
+            let mut map = account_map_updated;
             let mut reversed = updates;
             reverse_updates(&mut reversed);
             apply_updates(&mut map, reversed);

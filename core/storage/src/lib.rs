@@ -1448,7 +1448,7 @@ impl StorageProcessor {
             // Fetch updates from blocks: verif_block +/- 1, ... , block
             if let Some((block, state_diff)) = self.load_state_diff(verif_block, block)? {
                 debug!("Loaded state diff: {:#?}", state_diff);
-                apply_updates(&mut accounts, state_diff.clone());
+                apply_updates(&mut accounts, state_diff);
                 Ok((block, accounts))
             } else {
                 Ok((verif_block, accounts))
