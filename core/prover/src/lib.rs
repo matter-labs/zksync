@@ -33,7 +33,6 @@ pub trait ApiClient {
         &self,
         block: i64,
         p: groth16::Proof<models::node::Engine>,
-        public_data_commitment: models::node::Fr,
     ) -> Result<(), failure::Error>;
 }
 
@@ -185,7 +184,7 @@ impl<C: ApiClient> BabyProver<C> {
         }
 
         self.api_client
-            .publish(block, p, prover_data.public_data_commitment)
+            .publish(block, p)
             .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
 
         info!("finished and published proof for block {}", block);

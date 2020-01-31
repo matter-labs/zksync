@@ -346,7 +346,6 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
         &self,
         _block: i64,
         p: bellman::groth16::Proof<models::node::Engine>,
-        _public_data_commitment: models::node::Fr,
     ) -> Result<(), failure::Error> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();
