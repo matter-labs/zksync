@@ -109,7 +109,7 @@ library Bytes {
 
     function bytesToBytes32(bytes memory  _input) internal pure returns (bytes32 _output) {
         for (uint i = 0; i < 32; i++) {
-            _output |= bytes32(_input[i] & 0xFF) >> (i * 8);
+            _output |= bytes32(_input[i]) >> (i * 8);
         }
     }
 
