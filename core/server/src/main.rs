@@ -40,7 +40,7 @@ fn main() {
     if cli.is_present("genesis") {
         info!("Generating genesis block.");
         PlasmaStateKeeper::create_genesis_block(
-            connection_pool.clone(),
+            connection_pool,
             &config_opts.operator_franklin_addr,
         );
         return;
@@ -134,12 +134,12 @@ fn main() {
         config_opts.prover_server_address,
         Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
         Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
-        stop_signal_sender.clone(),
+        stop_signal_sender,
     );
 
     run_mempool_task(
         shared_eth_state,
-        connection_pool.clone(),
+        connection_pool,
         mempool_request_receiver,
         &main_runtime,
     );

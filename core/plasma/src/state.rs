@@ -344,10 +344,10 @@ impl PlasmaState {
             account
         });
 
-        let old_amount = account.get_balance(op.priority_op.token).clone();
+        let old_amount = account.get_balance(op.priority_op.token);
         let old_nonce = account.nonce;
         account.add_balance(op.priority_op.token, &op.priority_op.amount);
-        let new_amount = account.get_balance(op.priority_op.token).clone();
+        let new_amount = account.get_balance(op.priority_op.token);
 
         self.insert_account(op.account_id, account);
 
@@ -380,7 +380,7 @@ impl PlasmaState {
         };
 
         let mut from_account = self.get_account(op.from).unwrap();
-        let from_old_balance = from_account.get_balance(op.tx.token).clone();
+        let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
         ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
         ensure!(
@@ -389,13 +389,13 @@ impl PlasmaState {
         );
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         from_account.nonce += 1;
-        let from_new_balance = from_account.get_balance(op.tx.token).clone();
+        let from_new_balance = from_account.get_balance(op.tx.token);
         let from_new_nonce = from_account.nonce;
 
-        let to_old_balance = to_account.get_balance(op.tx.token).clone();
+        let to_old_balance = to_account.get_balance(op.tx.token);
         let to_account_nonce = to_account.nonce;
         to_account.add_balance(op.tx.token, &op.tx.amount);
-        let to_new_balance = to_account.get_balance(op.tx.token).clone();
+        let to_new_balance = to_account.get_balance(op.tx.token);
 
         self.insert_account(op.from, from_account);
         self.insert_account(op.to, to_account);
@@ -432,7 +432,7 @@ impl PlasmaState {
         let mut updates = Vec::new();
         let mut from_account = self.get_account(op.account_id).unwrap();
 
-        let from_old_balance = from_account.get_balance(op.tx.token).clone();
+        let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
 
         ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
@@ -444,7 +444,7 @@ impl PlasmaState {
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         from_account.nonce += 1;
 
-        let from_new_balance = from_account.get_balance(op.tx.token).clone();
+        let from_new_balance = from_account.get_balance(op.tx.token);
         let from_new_nonce = from_account.nonce;
 
         self.insert_account(op.account_id, from_account);
@@ -506,7 +506,7 @@ impl PlasmaState {
         let mut from_account = self.get_account(op.from).unwrap();
         let mut to_account = self.get_account(op.to).unwrap();
 
-        let from_old_balance = from_account.get_balance(op.tx.token).clone();
+        let from_old_balance = from_account.get_balance(op.tx.token);
         let from_old_nonce = from_account.nonce;
 
         ensure!(op.tx.nonce == from_old_nonce, "Nonce mismatch");
@@ -518,15 +518,15 @@ impl PlasmaState {
         from_account.sub_balance(op.tx.token, &(&op.tx.amount + &op.tx.fee));
         from_account.nonce += 1;
 
-        let from_new_balance = from_account.get_balance(op.tx.token).clone();
+        let from_new_balance = from_account.get_balance(op.tx.token);
         let from_new_nonce = from_account.nonce;
 
-        let to_old_balance = to_account.get_balance(op.tx.token).clone();
+        let to_old_balance = to_account.get_balance(op.tx.token);
         let to_account_nonce = to_account.nonce;
 
         to_account.add_balance(op.tx.token, &op.tx.amount);
 
-        let to_new_balance = to_account.get_balance(op.tx.token).clone();
+        let to_new_balance = to_account.get_balance(op.tx.token);
 
         self.insert_account(op.from, from_account);
         self.insert_account(op.to, to_account);

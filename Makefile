@@ -33,10 +33,10 @@ confirm_action:
 sql = psql "$(DATABASE_URL)" -c 
 
 db-test:
-	@bin/db-test
+	@bin/db-test.sh reset
 
-db-test-reset:
-	@bin/db-test reset
+db-test-no-reset:
+	@bin/db-test.sh no-reset
 
 db-setup:
 	@bin/db-setup
@@ -188,6 +188,9 @@ price:
 
 circuit-tests:
 	cargo test --no-fail-fast --release -p circuit -- --ignored
+
+prover-tests:
+	f cargo test -p prover --release -- --ignored
 
 # Loadtest
 
