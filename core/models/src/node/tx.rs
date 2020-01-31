@@ -17,7 +17,7 @@ use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
-use franklin_crypto::eddsa::{Seed, PrivateKey, PublicKey, Signature};
+use franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;

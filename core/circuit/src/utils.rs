@@ -5,7 +5,7 @@ use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use franklin_crypto::circuit::num::{AllocatedNum, Num};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::eddsa::Signature;
-use franklin_crypto::eddsa::{Seed, PrivateKey, PublicKey};
+use franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
 use crate::operation::SignatureData;
@@ -27,7 +27,7 @@ pub fn sign_pedersen<E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,
-    params: &E::Params
+    params: &E::Params,
 ) -> SignatureData
 where
     E: JubjubEngine,
@@ -93,7 +93,7 @@ pub fn sign_sha<E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,
-    params: &E::Params
+    params: &E::Params,
 ) -> Option<TransactionSignature<E>>
 where
     E: JubjubEngine,
