@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
+use models::config_options::ConfigurationOptions;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {
@@ -47,10 +48,12 @@ pub struct ApiClient {
     publish_url: String,
     stopped_url: String,
     worker: String,
+    timeout: u64,
 }
 
 impl ApiClient {
     pub fn new(base_url: &str, worker: &str) -> Self {
+        let config_opts = ConfigurationOptions::from_env();
         if worker == "" {
             panic!("worker name cannot be empty")
         }
@@ -62,11 +65,14 @@ impl ApiClient {
             publish_url: format!("{}/publish", base_url),
             stopped_url: format!("{}/stopped", base_url),
             worker: worker.to_string(),
+            timeout: config_opts.timeout,
         }
     }
 
     pub fn register_prover(&self) -> Result<i32, failure::Error> {
-        let client = reqwest::Client::new();
+        let mut client_builder = reqwest::ClientBuilder::new();
+        client_builder = client_builder.timeout(time::Duration::from_secs(self.timeout));
+        let client = client_builder.build().expect("failed to create client");
         let res = client
             .post(&self.register_url)
             .json(&client::ProverReq {
@@ -82,7 +88,9 @@ impl ApiClient {
     }
 
     pub fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
-        let client = reqwest::Client::new();
+        let mut client_builder = reqwest::ClientBuilder::new();
+        client_builder = client_builder.timeout(time::Duration::from_secs(self.timeout));
+        let client = client_builder.build().expect("failed to create client");
         client
             .post(&self.stopped_url)
             .json(&prover_run_id)
@@ -94,7 +102,9 @@ impl ApiClient {
 
 impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
-        let client = reqwest::Client::new();
+        let mut client_builder = reqwest::ClientBuilder::new();
+        client_builder = client_builder.timeout(time::Duration::from_secs(self.timeout));
+        let client = client_builder.build().expect("failed to create client");
         let mut res = client
             .get(&self.block_to_prove_url)
             .json(&client::ProverReq {
@@ -114,7 +124,9 @@ impl crate::ApiClient for ApiClient {
     }
 
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
-        let client = reqwest::Client::new();
+        let mut client_builder = reqwest::ClientBuilder::new();
+        client_builder = client_builder.timeout(time::Duration::from_secs(self.timeout));
+        let client = client_builder.build().expect("failed to create client");
         let res = client
             .post(&self.working_on_url)
             .json(&client::WorkingOnReq {
@@ -133,7 +145,9 @@ impl crate::ApiClient for ApiClient {
         block: i64,
         timeout: time::Duration,
     ) -> Result<ProverData, failure::Error> {
-        let client = reqwest::Client::new();
+        let mut client_builder = reqwest::ClientBuilder::new();
+        client_builder = client_builder.timeout(time::Duration::from_secs(self.timeout));
+        let client = client_builder.build().expect("failed to create client");
         let now = time::Instant::now();
         while now.elapsed() < timeout {
             let mut res = client
@@ -149,7 +163,7 @@ impl crate::ApiClient for ApiClient {
             if let Some(res) = res {
                 return Ok(res);
             }
-            thread::sleep(time::Duration::from_secs(10));
+            thread::sleep(time::Duration::from_secs(self.timeout));
         }
 
         failure::bail!("timeout")
@@ -169,7 +183,9 @@ impl crate::ApiClient for ApiClient {
 
         let encoded = encode_proof(&full_proof);
 
-        let client = reqwest::Client::new();
+        let mut client_builder = reqwest::ClientBuilder::new();
+        client_builder = client_builder.timeout(time::Duration::from_secs(self.timeout));
+        let client = client_builder.build().expect("failed to create client");
         let res = client
             .post(&self.publish_url)
             .json(&client::PublishReq {

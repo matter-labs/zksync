@@ -33,6 +33,7 @@ pub struct ConfigurationOptions {
     pub gas_price_factor: usize,
     pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
+    pub timeout: u64,
 }
 
 impl ConfigurationOptions {
@@ -84,6 +85,7 @@ impl ConfigurationOptions {
             prover_server_address: get_env("PROVER_SERVER_BIND")
                 .parse()
                 .expect("Failed to parse PROVER_SERVER_BIND bind address"),
+            timeout: get_env("TIMEOUT").parse().expect("TIMEOUT invalid value"),
         }
     }
 }
