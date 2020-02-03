@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-DIR=$KEY_DIR$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH
+DIR=$KEY_DIR/$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH
 echo "Checking keys in $DIR"
 mkdir -p $DIR
 
