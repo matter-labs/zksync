@@ -35,13 +35,14 @@ import {
 use(solidity);
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+const wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
+const exitWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 const franklinAddress = "0809101112131415161718192021222334252627";
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 
 describe("PLANNED FAILS", function () {
     this.timeout(100000);
+    provider.pollingInterval = 100; // faster deploys/txs on localhost
 
     let franklinDeployedContract;
     let governanceDeployedContract;
@@ -165,18 +166,12 @@ describe("PLANNED FAILS", function () {
         console.log("\n - Full Exit: Wrong token address started");
         const value = parseEther("0.3"); // the value passed to tx
         const accountId = 0;
-        const pubKey = "0x0000000000000000000000000000000000000000000000000000000000000000";
-        const signature = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-        const nonce = 0;
         await postFullExit(
             provider,
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accountId,
-            pubKey,
             erc20DeployedToken2.address,
-            signature,
-            nonce,
             value,
             "gvs11",
         );
@@ -190,31 +185,12 @@ describe("PLANNED FAILS", function () {
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accountId,
-            pubKey,
             erc20DeployedToken1.address,
-            signature,
-            nonce,
             wrongValue,
             "fft11",
         );
         console.log(" + Full Exit: Wrong tx value (lower than fee) passed");
 
-        // Full Exit: Wrong signature length
-        console.log("\n - Full Exit: Wrong signature length started");
-        const wrongSignature = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-        await postFullExit(
-            provider,
-            franklinDeployedContract,
-            priorityQueueDeployedContract,
-            accountId,
-            pubKey,
-            erc20DeployedToken1.address,
-            wrongSignature,
-            nonce,
-            value,
-            "fft12",
-        );
-        console.log(" + Full Exit: Wrong signature length passed");
     });
 
     it("Enter Exodus Mode", async () => {

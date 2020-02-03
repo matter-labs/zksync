@@ -301,24 +301,17 @@ export async function postFullExit(
     franklinDeployedContract,
     priorityQueueDeployedContract,
     accountId,
-    pubKey,
     tokenAddress,
-    signature,
-    nonce,
     value,
     revertCode,
 ) {
-    const sig = Buffer.from(signature, "hex");
     const beforeTotalOpenRequests = await priorityQueueDeployedContract.totalOpenPriorityRequests();
     const tx = await franklinDeployedContract.fullExit(
         accountId,
-        pubKey,
         tokenAddress,
-        sig,
-        nonce,
         {
-            value,
             gasLimit: bigNumberify("500000"),
+            value,
         },
     );
     if (!revertCode) {
@@ -402,35 +395,25 @@ export function createFullExitPublicData(accId, ethAddress: string, tokenId, hex
     const txId = Buffer.from("06", "hex");
     const accountId = Buffer.alloc(3, 0);
     accountId.writeUIntBE(accId, 0, 3);
-    const pubkeyBytes = Buffer.alloc(32, 0);
-    if (ethAddress.startsWith("0x")) {
-        ethAddress = ethAddress.substr(2);
-    }
-    const addressBytes = Buffer.from(ethAddress, "hex");
+    const addressBytes = Buffer.from(ethAddress.substr(2), "hex");
     const tokenBytes = Buffer.alloc(2);
     tokenBytes.writeUInt16BE(tokenId, 0);
-    const nonceBytes = Buffer.alloc(4, 0);
-    const signatureBytes = Buffer.alloc(64, 0);
-    if (hexAmount.startsWith("0x")) {
-        hexAmount = hexAmount.substr(2);
-    }
-    const amountBytes = Buffer.from(hexAmount, "hex");
+    const amountBytes = Buffer.from(hexAmount.substr(2), "hex");
     const pad1BytesLength = 16 - amountBytes.length;
     const pad1Bytes = Buffer.alloc(pad1BytesLength, 0);
-    const pad2Bytes = Buffer.alloc(2, 0);
 
-    return Buffer.concat([
+    const dataWithouPad = Buffer.concat([
         txId,
         accountId,
-        pubkeyBytes,
         addressBytes,
         tokenBytes,
-        nonceBytes,
-        signatureBytes,
         pad1Bytes,
         amountBytes,
-        pad2Bytes,
     ]);
+    const resultPubData = Buffer.alloc(6 * 8, 0);
+    dataWithouPad.copy(resultPubData);
+
+    return resultPubData;
 }
 
 export function createNoopPublicData(): Buffer {
