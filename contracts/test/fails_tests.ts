@@ -1,4 +1,4 @@
-import { ethers } from "ethers";
+import {ethers} from "ethers";
 import {
     addTestERC20Token,
     addTestNotApprovedERC20Token,
@@ -12,9 +12,9 @@ import {
     priorityQueueTestContractCode,
     verifierTestContractCode,
 } from "../src.ts/deploy";
-import { expect, use } from "chai";
-import { solidity } from "ethereum-waffle";
-import { bigNumberify, hexlify, parseEther } from "ethers/utils";
+import {expect, use} from "chai";
+import {solidity} from "ethereum-waffle";
+import {bigNumberify, hexlify, parseEther} from "ethers/utils";
 import {
     cancelOustandingDepositsForExodus,
     createDepositPublicData,
@@ -35,13 +35,15 @@ import {
 use(solidity);
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+const wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
+const exitWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 const franklinAddress = "0809101112131415161718192021222334252627";
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
+const PRIORITY_QUEUE_EXIRATION = 16;
 
 describe("PLANNED FAILS", function () {
     this.timeout(100000);
+    provider.pollingInterval = 100; // faster deploys/txs on localhost
 
     let franklinDeployedContract;
     let governanceDeployedContract;
@@ -76,7 +78,7 @@ describe("PLANNED FAILS", function () {
         await mintTestERC20Token(wallet, erc20DeployedToken1);
         await mintTestERC20Token(wallet, erc20DeployedToken2);
         // Make sure that exit wallet can execute transactions.
-        await wallet.sendTransaction({ to: exitWallet.address, value: parseEther("1.0") });
+        await wallet.sendTransaction({to: exitWallet.address, value: parseEther("1.0")});
     });
 
     it("Onchain errors", async () => {
@@ -165,18 +167,12 @@ describe("PLANNED FAILS", function () {
         console.log("\n - Full Exit: Wrong token address started");
         const value = parseEther("0.3"); // the value passed to tx
         const accountId = 0;
-        const pubKey = "0x0000000000000000000000000000000000000000000000000000000000000000";
-        const signature = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-        const nonce = 0;
         await postFullExit(
             provider,
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accountId,
-            pubKey,
             erc20DeployedToken2.address,
-            signature,
-            nonce,
             value,
             "gvs11",
         );
@@ -190,31 +186,12 @@ describe("PLANNED FAILS", function () {
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accountId,
-            pubKey,
             erc20DeployedToken1.address,
-            signature,
-            nonce,
             wrongValue,
             "fft11",
         );
         console.log(" + Full Exit: Wrong tx value (lower than fee) passed");
 
-        // Full Exit: Wrong signature length
-        console.log("\n - Full Exit: Wrong signature length started");
-        const wrongSignature = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-        await postFullExit(
-            provider,
-            franklinDeployedContract,
-            priorityQueueDeployedContract,
-            accountId,
-            pubKey,
-            erc20DeployedToken1.address,
-            wrongSignature,
-            nonce,
-            value,
-            "fft12",
-        );
-        console.log(" + Full Exit: Wrong signature length passed");
     });
 
     it("Enter Exodus Mode", async () => {
@@ -226,6 +203,7 @@ describe("PLANNED FAILS", function () {
         const depositAmount = parseEther("9.996778"); // amount after: tx value - some counted fee
         const depositFee = parseEther("0.003222"); // tx fee
 
+        let blockNumberSinceLastDeposit = await provider.getBlockNumber();
         for (let i = 0; i < 5; i++) {
             await postEthDeposit(
                 provider,
@@ -238,6 +216,7 @@ describe("PLANNED FAILS", function () {
                 depositValue,
                 null,
             );
+            blockNumberSinceLastDeposit = await provider.getBlockNumber();
             console.log(`Posted ${i + 1} deposit`);
         }
 
@@ -254,7 +233,12 @@ describe("PLANNED FAILS", function () {
             "frc11",
         );
 
-        console.log("Got revert code when there is not exodus mode");
+        console.log("Cancel deposits before exodus is triggered failed, ok");
+
+
+        while (await provider.getBlockNumber() - blockNumberSinceLastDeposit < PRIORITY_QUEUE_EXIRATION) {
+            await new Promise((r) => setTimeout(r, 300));
+        }
 
         // Get commit exodus mode revert code
         const noopBlockPublicData = createNoopPublicData();
@@ -269,16 +253,15 @@ describe("PLANNED FAILS", function () {
             null,
             null,
             null,
-            "fre11",
+            null,
+            true,
         );
-
-        console.log("Got exodus mode commit tx revert code while creating block");
 
         // Get commit exodus event
         const exodus = await franklinDeployedContract.exodusMode();
-        expect(exodus).equal(true);
+        expect(exodus, "exodus mode is not triggered").equal(true);
 
-        console.log("Got commit exodus event");
+        console.log("Exodus mode triggered");
 
         // Get deposit exodus mode revert code
         await postEthDeposit(
@@ -574,8 +557,9 @@ describe("PLANNED FAILS", function () {
         const noopBlockPublicData = createNoopPublicData();
 
         let reverted = false;
-        for (let i = 0; i < 10000; i++) {
-
+        let i = 0;
+        let blockNumberSinceLastBlock = await provider.getBlockNumber();
+        for (i = 0; i < 2; i++) {
             expect(await franklinDeployedContract.totalBlocksCommitted()).equal(i);
             const tx = await franklinDeployedContract.commitBlock(i + 1, 22,
                 Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
@@ -584,17 +568,29 @@ describe("PLANNED FAILS", function () {
                     gasLimit: bigNumberify("500000"),
                 },
             );
-            const receipt = await tx.wait();
-
-            const event = receipt.events.pop();
-            if (event.event == "BlocksReverted") {
-                expect(await franklinDeployedContract.totalBlocksCommitted()).equal(0);
-                reverted = true;
-                break;
-            }
+            await tx.wait();
+            blockNumberSinceLastBlock = await provider.getBlockNumber();
         }
 
-        expect(reverted).equal(true);
+        while (await provider.getBlockNumber() - blockNumberSinceLastBlock < 8) {
+        }
+
+        const tx = await franklinDeployedContract.commitBlock(i + 1, 22,
+            Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            noopBlockPublicData,
+            {
+                gasLimit: bigNumberify("500000"),
+            },
+        );
+        const receipt = await tx.wait();
+
+        const event = receipt.events.pop();
+        if (event.event == "BlocksReverted") {
+            expect(await franklinDeployedContract.totalBlocksCommitted()).equal(0);
+            reverted = true;
+        }
+
+        expect(reverted, "reverted event expected").equal(true);
         console.log(" + Blocks revert passed");
     });
 
@@ -609,7 +605,8 @@ describe("PLANNED FAILS", function () {
             },
         );
         await prTx2.wait()
-            .catch(() => { });
+            .catch(() => {
+            });
 
         const code1 = await provider.call(prTx2, prTx2.blockNumber);
         const reason1 = hex_to_ascii(code1.substr(138));

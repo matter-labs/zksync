@@ -18,7 +18,7 @@ use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
 use franklin_crypto::alt_babyjubjub::JubjubEngine;
 use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
-use franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
+use franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed, Signature};
 use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
@@ -243,7 +243,7 @@ pub enum FranklinTx {
     Transfer(Box<Transfer>),
     Withdraw(Box<Withdraw>),
     Close(Box<Close>),
-    ChangePubKey(Box<ChangePubKeyOffchain>),
+    ChangePubKeyOffchain(Box<ChangePubKeyOffchain>),
 }
 
 impl FranklinTx {
@@ -252,7 +252,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
-            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
+            FranklinTx::ChangePubKeyOffchain(tx) => tx.get_bytes(),
         };
 
         let mut hasher = Sha256::new();
@@ -267,7 +267,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.from,
             FranklinTx::Withdraw(tx) => tx.from,
             FranklinTx::Close(tx) => tx.account,
-            FranklinTx::ChangePubKey(tx) => tx.account,
+            FranklinTx::ChangePubKeyOffchain(tx) => tx.account,
         }
     }
 
@@ -276,7 +276,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.nonce,
             FranklinTx::Withdraw(tx) => tx.nonce,
             FranklinTx::Close(tx) => tx.nonce,
-            FranklinTx::ChangePubKey(tx) => tx.nonce,
+            FranklinTx::ChangePubKeyOffchain(tx) => tx.nonce,
         }
     }
 
@@ -285,7 +285,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.check_correctness(),
             FranklinTx::Withdraw(tx) => tx.check_correctness(),
             FranklinTx::Close(tx) => tx.check_correctness(),
-            FranklinTx::ChangePubKey(tx) => tx.check_correctness(),
+            FranklinTx::ChangePubKeyOffchain(tx) => tx.check_correctness(),
         }
     }
 
@@ -294,7 +294,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
-            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
+            FranklinTx::ChangePubKeyOffchain(tx) => tx.get_bytes(),
         }
     }
 
@@ -303,7 +303,7 @@ impl FranklinTx {
             FranklinTx::Transfer(_) => TransferOp::CHUNKS,
             FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
-            FranklinTx::ChangePubKey(_) => ChangePubKeyOffchainOp::CHUNKS,
+            FranklinTx::ChangePubKeyOffchain(_) => ChangePubKeyOffchainOp::CHUNKS,
         }
     }
 
@@ -369,9 +369,10 @@ impl TxSignature {
 
     pub fn sign_musig_pedersen(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         let hashed_msg = pedersen_hash_tx_msg(msg);
+        let seed = Seed::deterministic_seed(&pk, &hashed_msg);
         let signature = pk.musig_pedersen_sign(
             &hashed_msg,
-            &mut rand::thread_rng(),
+            &seed,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );
@@ -388,9 +389,10 @@ impl TxSignature {
 
     pub fn sign_musig_sha256(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         let hashed_msg = pedersen_hash_tx_msg(msg);
+        let seed = Seed::deterministic_seed(&pk, &hashed_msg);
         let signature = pk.musig_sha256_sign(
             &hashed_msg,
-            &mut rand::thread_rng(),
+            &seed,
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );

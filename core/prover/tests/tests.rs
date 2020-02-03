@@ -117,7 +117,7 @@ fn prover_proves_a_block_and_publishes_result() {
     stop_signal.store(true, Ordering::SeqCst);
     println!("verifying proof...");
     let verify_result =
-        bellman::groth16::verify_proof(&verify_key, &proof.clone(), &[public_data_commitment]);
+        bellman::groth16::verify_proof(&verify_key, &proof, &[public_data_commitment]);
     assert!(!verify_result.is_err());
     assert!(verify_result.unwrap(), "invalid proof");
 }
@@ -145,7 +145,7 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
     println!("Genesis block root hash: {}", genesis_root_hash);
     circuit_tree.insert(
         0,
-        models::circuit::account::CircuitAccount::from(validator_account.clone()),
+        models::circuit::account::CircuitAccount::from(validator_account),
     );
     assert_eq!(circuit_tree.root_hash(), genesis_root_hash);
 
@@ -292,7 +292,7 @@ fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engin
         out_dir
     };
     let key_file_path = {
-        let mut key_file_path = out_dir.clone();
+        let mut key_file_path = out_dir;
         key_file_path.push(models::params::KEY_FILENAME);
         key_file_path
     };

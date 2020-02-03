@@ -1,9 +1,8 @@
-
-import { utils as syncutils } from "zksync";
-import { BN } from "bn.js";
-import { expect, use } from "chai";
-import { solidity } from "ethereum-waffle";
-import { bigNumberify } from "ethers/utils";
+import {utils as syncutils} from "zksync";
+import {BN} from "bn.js";
+import {expect, use} from "chai";
+import {solidity} from "ethereum-waffle";
+import {bigNumberify} from "ethers/utils";
 
 use(solidity);
 
@@ -38,10 +37,15 @@ export async function cancelOustandingDepositsForExodus(
     } else {
         const tx = await franklinDeployedContract.cancelOutstandingDepositsForExodusMode(
             expectedToCancel,
-            { gasLimit: bigNumberify("8000000") },
+            {gasLimit: bigNumberify("8000000")},
         );
-        await tx.wait()
-            .catch(() => { });
+        const receipt = await tx.wait()
+            .catch(() => {
+            });
+
+        if (receipt && receipt.status) {
+            expect(receipt.status, `transaction should fail ${receipt.transactionHash}`).not.eq(1);
+        }
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -70,7 +74,7 @@ export async function postEthDeposit(
     const tx = await franklinDeployedContract.depositETH(
         depositAmount,
         franklinAddressBinary,
-        { value: txValue, gasLimit: bigNumberify("8000000") },
+        {value: txValue, gasLimit: bigNumberify("8000000")},
     );
 
     if (!revertCode) {
@@ -92,8 +96,12 @@ export async function postEthDeposit(
         expect(newFirstPriorityRequestId - oldFirstPriorityRequestId).equal(0);
 
     } else {
-        await tx.wait()
-            .catch(() => { });
+        const receipt = await tx.wait()
+            .catch(() => {
+            });
+        if (receipt && receipt.status) {
+            expect(receipt.status, `tx should fail ${receipt.transactionHash}`).not.eq(1);
+        }
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -126,7 +134,7 @@ export async function postErc20Deposit(
         token.address,
         depositAmount,
         franklinAddressBinary,
-        { value: txValue, gasLimit: bigNumberify("8000000") },
+        {value: txValue, gasLimit: bigNumberify("8000000")},
     );
 
     if (!revertCode) {
@@ -148,8 +156,12 @@ export async function postErc20Deposit(
 
         console.log("Posted new deposit");
     } else {
-        await tx.wait()
-            .catch(() => { });
+        const receipt = await tx.wait()
+            .catch(() => {
+            });
+        if (receipt && receipt.status) {
+            expect(receipt.status, `tx should fail ${receipt.transactionHash}`).not.eq(1);
+        }
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -170,6 +182,7 @@ export async function postBlockCommit(
     priorityOperationsNumber,
     commitment,
     revertCode,
+    triggerExodus = false,
 ) {
     const root = Buffer.from(newRoot, "hex");
     const tx = await franklinDeployedContract.commitBlock(
@@ -186,22 +199,30 @@ export async function postBlockCommit(
 
         const commitReceipt = await tx.wait();
         const commitEvents = commitReceipt.events;
+        const commitedEvent1 = commitEvents[0];
 
-        const commitedEvent1 = commitEvents[0].args;
+        if (!triggerExodus) {
 
-        expect(commitedEvent1.blockNumber).equal(blockNumber);
+            expect(commitedEvent1.args.blockNumber).equal(blockNumber);
 
-        const afterOnchainOps = await franklinDeployedContract.totalOnchainOps();
-        expect(afterOnchainOps - beforeOnchainOps).equal(onchainOperationsNumber);
+            const afterOnchainOps = await franklinDeployedContract.totalOnchainOps();
+            expect(afterOnchainOps - beforeOnchainOps).equal(onchainOperationsNumber);
 
-        expect((await franklinDeployedContract.blocks(blockNumber)).onchainOperations).equal(onchainOperationsNumber);
-        expect((await franklinDeployedContract.blocks(blockNumber)).priorityOperations).equal(priorityOperationsNumber);
-        expect((await franklinDeployedContract.blocks(blockNumber)).commitment).equal(commitment);
-        expect((await franklinDeployedContract.blocks(blockNumber)).stateRoot).equal("0x" + newRoot);
-        expect((await franklinDeployedContract.blocks(blockNumber)).validator).equal(wallet.address);
+            expect((await franklinDeployedContract.blocks(blockNumber)).onchainOperations).equal(onchainOperationsNumber);
+            expect((await franklinDeployedContract.blocks(blockNumber)).priorityOperations).equal(priorityOperationsNumber);
+            expect((await franklinDeployedContract.blocks(blockNumber)).commitment).equal(commitment);
+            expect((await franklinDeployedContract.blocks(blockNumber)).stateRoot).equal("0x" + newRoot);
+            expect((await franklinDeployedContract.blocks(blockNumber)).validator).equal(wallet.address);
+        } else {
+            expect(commitedEvent1.event, "ExodusEvent expected").eq("ExodusMode");
+        }
     } else {
-        await tx.wait()
-            .catch(() => { });
+        const receipt = await tx.wait()
+            .catch(() => {
+            });
+        if (receipt && receipt.status) {
+            expect(receipt.status, `tx should fail ${receipt.transactionHash}`).not.eq(1);
+        }
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -219,7 +240,7 @@ export async function postBlockVerify(
     const tx = await franklinDeployedContract.verifyBlock(
         blockNumber,
         proof,
-        { gasLimit: bigNumberify("500000") },
+        {gasLimit: bigNumberify("500000")},
     );
     if (!revertCode) {
         const receipt = await tx.wait();
@@ -229,8 +250,12 @@ export async function postBlockVerify(
 
         expect(event.blockNumber).equal(blockNumber);
     } else {
-        await tx.wait()
-            .catch(() => { });
+        const receipt = await tx.wait()
+            .catch(() => {
+            });
+        if (receipt && receipt.status) {
+            expect(receipt.status, `tx should fail ${receipt.transactionHash}`).not.eq(1);
+        }
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -255,8 +280,12 @@ export async function withdrawEthFromContract(
         const newBalance = await wallet.getBalance();
         expect(newBalance.sub(oldBalance).add(gasUsed)).eq(balanceToWithdraw);
     } else {
-        await exitTx.wait()
-            .catch(() => { });
+        const receipt = await exitTx.wait()
+            .catch(() => {
+            });
+        if (receipt && receipt.status) {
+            expect(receipt.status, `tx should fail ${receipt.transactionHash}`).not.eq(1);
+        }
 
         const code = await provider.call(exitTx, exitTx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -278,7 +307,7 @@ export async function withdrawErcFromContract(
     const exitTx = await franklinDeployedContract.withdrawERC20(
         token.address,
         balanceToWithdraw,
-        { gasLimit: bigNumberify("500000") },
+        {gasLimit: bigNumberify("500000")},
     );
     if (!revertCode) {
         await exitTx.wait();
@@ -287,8 +316,12 @@ export async function withdrawErcFromContract(
         expect(rollupBalance - newRollupBalance).equal(bigNumberify(balanceToWithdraw));
         expect(newBalance.sub(oldBalance)).eq(balanceToWithdraw);
     } else {
-        await exitTx.wait()
-            .catch(() => { });
+        const receipt = await exitTx.wait()
+            .catch(() => {
+            });
+        if (receipt && receipt.status) {
+            expect(receipt.status, `tx should fail ${receipt.transactionHash}`).not.eq(1);
+        }
 
         const code = await provider.call(exitTx, exitTx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -301,24 +334,17 @@ export async function postFullExit(
     franklinDeployedContract,
     priorityQueueDeployedContract,
     accountId,
-    pubKey,
     tokenAddress,
-    signature,
-    nonce,
     value,
     revertCode,
 ) {
-    const sig = Buffer.from(signature, "hex");
     const beforeTotalOpenRequests = await priorityQueueDeployedContract.totalOpenPriorityRequests();
     const tx = await franklinDeployedContract.fullExit(
         accountId,
-        pubKey,
         tokenAddress,
-        sig,
-        nonce,
         {
-            value,
             gasLimit: bigNumberify("500000"),
+            value,
         },
     );
     if (!revertCode) {
@@ -326,8 +352,12 @@ export async function postFullExit(
         const afterTotalOpenRequests = await priorityQueueDeployedContract.totalOpenPriorityRequests();
         expect(afterTotalOpenRequests - beforeTotalOpenRequests).equal(1);
     } else {
-        await tx.wait()
-            .catch(() => { });
+        const receipt = await tx.wait()
+            .catch(() => {
+            });
+        if (receipt && receipt.status) {
+            expect(receipt.status, `tx should fail ${receipt.transactionHash}`).not.eq(1);
+        }
 
         const code = await provider.call(tx, tx.blockNumber);
         const reason = hex_to_ascii(code.substr(138));
@@ -402,35 +432,25 @@ export function createFullExitPublicData(accId, ethAddress: string, tokenId, hex
     const txId = Buffer.from("06", "hex");
     const accountId = Buffer.alloc(3, 0);
     accountId.writeUIntBE(accId, 0, 3);
-    const pubkeyBytes = Buffer.alloc(32, 0);
-    if (ethAddress.startsWith("0x")) {
-        ethAddress = ethAddress.substr(2);
-    }
-    const addressBytes = Buffer.from(ethAddress, "hex");
+    const addressBytes = Buffer.from(ethAddress.substr(2), "hex");
     const tokenBytes = Buffer.alloc(2);
     tokenBytes.writeUInt16BE(tokenId, 0);
-    const nonceBytes = Buffer.alloc(4, 0);
-    const signatureBytes = Buffer.alloc(64, 0);
-    if (hexAmount.startsWith("0x")) {
-        hexAmount = hexAmount.substr(2);
-    }
-    const amountBytes = Buffer.from(hexAmount, "hex");
+    const amountBytes = Buffer.from(hexAmount.substr(2), "hex");
     const pad1BytesLength = 16 - amountBytes.length;
     const pad1Bytes = Buffer.alloc(pad1BytesLength, 0);
-    const pad2Bytes = Buffer.alloc(2, 0);
 
-    return Buffer.concat([
+    const dataWithouPad = Buffer.concat([
         txId,
         accountId,
-        pubkeyBytes,
         addressBytes,
         tokenBytes,
-        nonceBytes,
-        signatureBytes,
         pad1Bytes,
         amountBytes,
-        pad2Bytes,
     ]);
+    const resultPubData = Buffer.alloc(6 * 8, 0);
+    dataWithouPad.copy(resultPubData);
+
+    return resultPubData;
 }
 
 export function createNoopPublicData(): Buffer {
@@ -448,7 +468,7 @@ export function createWrongNoopPublicData(): Buffer {
 }
 
 export function createWrongOperationPublicData(): Buffer {
-    const txId = Buffer.from("07", "hex");
+    const txId = Buffer.from("99", "hex");
     const padBytes = Buffer.alloc(7, 0);
 
     return Buffer.concat([txId, padBytes]);

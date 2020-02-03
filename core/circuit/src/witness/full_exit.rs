@@ -240,7 +240,7 @@ mod test {
         let account = {
             let mut account = Account::default_with_address(&account_address);
             account.add_balance(0, &BigDecimal::from(10));
-            account.pub_key_hash = zksync_account.pubkey_hash.clone();
+            account.pub_key_hash = zksync_account.pubkey_hash;
             account
         };
 

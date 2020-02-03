@@ -189,7 +189,7 @@ price:
 	@node contracts/scripts/check-price.js
 
 circuit-tests:
-	cargo test --no-fail-fast --release -p circuit -- --ignored
+	cargo test --no-fail-fast --release -p circuit -- --ignored --test-threads 1
 
 prover-tests:
 	f cargo test -p prover --release -- --ignored

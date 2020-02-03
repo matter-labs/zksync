@@ -100,7 +100,7 @@ pub fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, widt
     token_bits.reverse();
     // token_bits.truncate(width);
     token_bits.resize(width, false);
-    content.extend(token_bits.clone());
+    content.extend(token_bits);
 }
 
 pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
@@ -108,7 +108,7 @@ pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, widt
     token_bits.reverse();
     token_bits.resize(width, false);
     token_bits.reverse();
-    content.extend(token_bits.clone());
+    content.extend(token_bits);
 }
 
 pub fn encode_fs_into_fr<E: JubjubEngine>(input: E::Fs) -> E::Fr {
