@@ -45,7 +45,7 @@ pub fn generate_dummy_sig_data(
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
-    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
+    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
     (
         signature_data,
@@ -80,7 +80,6 @@ pub fn generate_sig_data(
     private_key: &PrivateKey<Bn256>,
     params: &AltJubjubBn256,
 ) -> (SignatureData, Fr, Fr, Fr) {
-    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
     assert!(sig_bits_to_hash.len() <= franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
@@ -107,7 +106,7 @@ pub fn generate_sig_data(
         "inside generation: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits))
     );
-    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
+    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
 
     (
@@ -263,7 +262,7 @@ pub fn apply_leaf_operation<
     let balance_before = balance.value;
     fb(&mut balance);
     let balance_after = balance.value;
-    account.subtree.insert(token, balance.clone());
+    account.subtree.insert(token, balance);
 
     fa(&mut account);
 

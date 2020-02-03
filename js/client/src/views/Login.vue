@@ -3,7 +3,7 @@
     <Alert class="w-100 mb-1" ref="alertLogin"></Alert>
     <b-jumbotron bg-variant="light" border-variant="dark">
         <template slot="header">
-            ZK Sync Wallet <span style="font-size: 0.3em"><strong>ALPHA</strong></span>
+            zkSync Wallet <span style="font-size: 0.3em"><strong>ALPHA</strong></span>
         </template>
         <template slot="lead">
             <span v-if="isDev" class="local">API at {{ config.API_SERVER }}</span>
@@ -64,7 +64,9 @@ export default {
 
                 window.walletDecorator = await WalletDecorator.new();
 
-                this.$parent.$router.push('/main')
+                if (this.$parent.$router.currentRoute.path !== '/main') {
+                    this.$parent.$router.push('/main');
+                }
             } catch (e) {
                 this.$refs.alertLogin.display({
                     message: `Login failed with ${e.message}`,

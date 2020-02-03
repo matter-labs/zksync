@@ -151,7 +151,7 @@ pub fn test_operation_and_wanted_prover_data(
         sender: web3::types::Address::zero(),
         token: 0,
         amount: bigdecimal::BigDecimal::from(10),
-        account: validator_test_account.address.clone(),
+        account: validator_test_account.address,
     });
     let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
     let mut fees = Vec::new();
