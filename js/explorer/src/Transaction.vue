@@ -79,7 +79,7 @@ export default {
                 return;
             }
 
-            txData.tokenName = tokens[txData.token].symbol;
+            txData.tokenName = tokens[txData.token].syncSymbol;
             
             const block = await client.getBlock(txData.block_number);
             txData.status = block.verified_at ? `Verified`

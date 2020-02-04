@@ -153,11 +153,16 @@ steps:
 
 - name: init
   image: matterlabs/ci
+  environment:
+    DB_URL:
+      from_secret: stage_db_url
+    WEB3_URL:
+      from_secret: stage_web3_url
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - stage-prepare-env.sh
+  - stage-prepare-env.sh $DB_URL $WEB3_URL
   - zksync env stage
   - zksync yarn
   depends_on:

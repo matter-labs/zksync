@@ -1,5 +1,5 @@
 <template>
-    <b-card title="Transfer in ZK Sync network" class="px-0">
+    <b-card title="Transfer in zkSync network" class="px-0">
         Address:
         <b-form-input autocomplete="off" type="text" v-model="address" class="mb-2"></b-form-input>
         <p>(for testing, use <code style="cursor: pointer" @click="address='sync:2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e'">sync:2d5bf7a3ab29f0ff424d738a83f9b0588bc9241e</code>)</p>
@@ -10,7 +10,7 @@
             :selected.sync="token">
         </TokenSelector>
         Amount <span v-if="maxAmountVisible">(max {{ token }} {{ displayableBalancesDict[token] }})</span>:
-        <b-form-input autocomplete="off" type="number" v-model="amountSelected" class="mb-3"></b-form-input>
+        <b-form-input autocomplete="off" type="number" step="any" v-model="amountSelected" class="mb-3"></b-form-input>
         Choose fee:
         <FeeSelector 
             class="mb-3"
@@ -115,13 +115,13 @@ export default {
                 return;
             }
             if (this.address.startsWith('sync:') === false) {
-                this.localDisplayAlert(`ZK Sync Devnet addresses are hex strings starting with 'sync:'. `
-                    + `Are you sure this is a ZK Sync Devnet address?`);
+                this.localDisplayAlert(`zkSync Devnet addresses are hex strings starting with 'sync:'. `
+                    + `Are you sure this is a zkSync Devnet address?`);
                 return;
             }
             if (this.address.length != addressLength) {
-                this.localDisplayAlert(`ZK Sync Devnet addresses are hex strings `
-                    + `of length ${addressLength}. Are you sure this is a ZK Sync Devnet address?`);
+                this.localDisplayAlert(`zkSync Devnet addresses are hex strings `
+                    + `of length ${addressLength}. Are you sure this is a zkSync Devnet address?`);
                 return;
             }
 
