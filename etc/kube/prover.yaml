@@ -48,8 +48,8 @@ spec:
           value: "${KEYS_SPACE_URL}"
         - name: PROVER_SERVER_URL
           value: "${PROVER_SERVER_URL}"
-        - name: TIMEOUT
-          value: "${TIMEOUT}"
+        - name: REQ_SERVER_TIMEOUT
+          value: "${REQ_SERVER_TIMEOUT}"
         - name: NODE_NAME
           valueFrom:
             fieldRef:
