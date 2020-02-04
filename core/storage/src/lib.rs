@@ -2466,23 +2466,27 @@ mod test {
             (accounts, updates)
         };
 
-        let save_test_block = |block_number| {
-            conn.save_block(&Block {
-                block_number,
-                new_root_hash: Fr::default(),
-                fee_account: 0,
-                block_transactions: Vec::new(),
-                processed_priority_ops: (0, 0),
-            })
-            .unwrap();
+        let get_operation = |block_number, action, accounts_updated| -> Operation {
+            Operation {
+                id: None,
+                action,
+                block: Block {
+                    block_number,
+                    new_root_hash: Fr::default(),
+                    fee_account: 0,
+                    block_transactions: Vec::new(),
+                    processed_priority_ops: (0, 0),
+                },
+                accounts_updated,
+            }
         };
 
-        conn.commit_state_update(1, &updates_block_1).unwrap();
-        save_test_block(1);
-        conn.commit_state_update(2, &updates_block_2).unwrap();
-        save_test_block(2);
-        conn.commit_state_update(3, &updates_block_3).unwrap();
-        save_test_block(3);
+        conn.execute_operation(&get_operation(1, Action::Commit, updates_block_1))
+            .expect("Commit block 1");
+        conn.execute_operation(&get_operation(2, Action::Commit, updates_block_2))
+            .expect("Commit block 2");
+        conn.execute_operation(&get_operation(3, Action::Commit, updates_block_3))
+            .expect("Commit block 3");
 
         let (block, state) = conn.load_committed_state(Some(1)).unwrap();
         assert_eq!((block, &state), (1, &accounts_block_1));
@@ -2493,8 +2497,26 @@ mod test {
         let (block, state) = conn.load_committed_state(Some(3)).unwrap();
         assert_eq!((block, &state), (3, &accounts_block_3));
 
-        conn.apply_state_update(1).unwrap();
-        conn.apply_state_update(2).unwrap();
+        conn.store_proof(1, &Default::default())
+            .expect("Store proof block 1");
+        conn.execute_operation(&get_operation(
+            1,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            Vec::new(),
+        ))
+        .expect("Verify block 1");
+        conn.store_proof(2, &Default::default())
+            .expect("Store proof block 2");
+        conn.execute_operation(&get_operation(
+            2,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            Vec::new(),
+        ))
+        .expect("Verify block 2");
 
         let (block, state) = conn.load_committed_state(Some(1)).unwrap();
         assert_eq!((block, &state), (1, &accounts_block_1));
