@@ -1,18 +1,22 @@
+use crate::external_commands::get_revert_reason;
 use bigdecimal::BigDecimal;
 use eth_client::ETHClient;
 use failure::{ensure, format_err};
 use futures::compat::Future01CompatExt;
+use futures::future::IntoFuture;
 use models::abi::{erc20_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
-use models::node::{AccountId, Address, PriorityOp, PubKeyHash};
+use models::node::{AccountId, Nonce, TokenId, PriorityOp, PubKeyHash};
+use models::EncodedProof;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
 use web3::contract::{Contract, Options};
-use web3::types::{TransactionReceipt, H256, U256, U64};
+use web3::contract::tokens::{Tokenize, Tokenizable};
+use web3::types::{Address, TransactionReceipt, TransactionId, H256, U256, U128, U64};
 use web3::Transport;
-
+use web3::Error;
 pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
     let split = eth_value.split('.').collect::<Vec<&str>>();
     ensure!(split.len() == 1 || split.len() == 2, "Wrong eth value");
@@ -78,6 +82,35 @@ impl<T: Transport> EthereumAccount<T> {
         }
     }
 
+    pub async fn total_blocks_committed(&self) -> Result<u64, failure::Error> {
+        let contract = Contract::new(
+            self.main_contract_eth_client.web3.eth(),
+            self.main_contract_eth_client.contract_addr.clone(),
+            self.main_contract_eth_client.contract.clone()
+        );
+
+        contract
+            .query("totalBlocksCommitted", (), None, Options::default(), None)
+            .compat()
+            .await
+            .map_err(|e| format_err!("Contract query fail: {}", e))
+    }
+
+
+    pub async fn is_exodus(&self) -> Result<bool, failure::Error> {
+        let contract = Contract::new(
+            self.main_contract_eth_client.web3.eth(),
+            self.main_contract_eth_client.contract_addr.clone(),
+            self.main_contract_eth_client.contract.clone()
+        );
+
+        contract
+            .query("exodusMode", (), None, Options::default(), None)
+            .compat()
+            .await
+            .map_err(|e| format_err!("Contract query fail: {}", e))
+    }
+
     pub async fn full_exit(
         &self,
         account_id: AccountId,
@@ -114,6 +147,100 @@ impl<T: Transport> EthereumAccount<T> {
             .filter_map(|op| op.ok())
             .next()
             .expect("no priority op log in full exit"))
+    }
+
+    pub async fn exit(
+        &self,
+        tokenId: TokenId,
+        owner: Address,
+        amount: u128,
+        proof: EncodedProof,
+    ) -> Result<String, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "exit",
+                (
+                    u64::from(tokenId),
+                    owner,
+                    U128::from(amount),
+                    proof,
+                ),
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("Exit send err: {}", e))?;
+
+        let receipt: web3::types::TransactionReceipt = self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("Exit wait confirm err: {}", e))?;
+
+        let hash = format!("{:#?}", &receipt.transaction_hash);
+        let reason = get_revert_reason(&hash);
+        println!(
+            "Exit token: {}, hash: {}, reason: {}",
+            tokenId,
+            &hash,
+            &reason
+        );
+
+        ensure!(
+            receipt.status == Some(U64::from(1)),
+            "Exit submit fail"
+        );
+
+        Ok(reason)
+    }
+
+    pub async fn cancel_outstanding_deposits_for_exodus_mode(
+        &self,
+        number: u64
+    ) -> Result<String, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "cancelOutstandingDepositsForExodusMode",
+                (number),
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("cancelOutstandingDepositsForExodusMode send err: {}", e))?;
+
+        let receipt: web3::types::TransactionReceipt = self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("cancelOutstandingDepositsForExodusMode wait confirm err: {}", e))?;
+
+        // ensure!(
+        //     receipt.status == Some(U64::from(1)),
+        //     "cancelOutstandingDepositsForExodusMode submit fail"
+        // );
+
+        let hash = format!("{:#?}", &receipt.transaction_hash);
+        let reason = get_revert_reason(&hash);
+
+        Ok(
+            format!(
+                "hash: {}, reason: {}",
+                &hash,
+                &reason
+            )
+        )
     }
 
     pub async fn change_pubkey_priority_op(
@@ -218,6 +345,24 @@ impl<T: Transport> EthereumAccount<T> {
             .map_err(|e| format_err!("Contract query fail: {}", e))
     }
 
+    pub async fn balances_to_withdraw(
+        &self,
+        token: TokenId
+    ) -> Result<BigDecimal, failure::Error> {
+        let contract = Contract::new(
+            self.main_contract_eth_client.web3.eth(),
+            self.main_contract_eth_client.contract_addr.clone(),
+            self.main_contract_eth_client.contract.clone()
+        );
+
+        Ok(contract
+            .query("balancesToWithdraw", (self.address, u64::from(token)), None, Options::default(), None)
+            .compat()
+            .await
+            .map(u256_to_big_dec)
+            .map_err(|e| format_err!("Contract query fail: {}", e))?)
+    }
+
     pub async fn approve_erc20(
         &self,
         token_contract: Address,
@@ -303,7 +448,21 @@ impl<T: Transport> EthereumAccount<T> {
             .expect("no priority op log in deposit"))
     }
 
-    pub async fn commit_block(&self, block: &Block) -> Result<TransactionReceipt, failure::Error> {
+    pub async fn nonceFromHash(&self, tx_hash: H256) -> u64 {
+        self
+            .main_contract_eth_client
+            .web3
+            .eth()
+            .transaction(TransactionId::Hash(tx_hash))
+            .compat()
+            .await
+            .unwrap()
+            .unwrap()
+            .nonce
+            .as_u64()
+    }
+
+    pub async fn commit_block(&self, block: &Block/* , nonce: Option<U256> */) -> Result<TransactionReceipt, failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -318,7 +477,8 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .await
             .map_err(|e| format_err!("Commit block send err: {}", e))?;
-        Ok(self
+
+        let receipt = self
             .main_contract_eth_client
             .web3
             .send_raw_transaction_with_confirmation(
@@ -328,7 +488,15 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .compat()
             .await
-            .map_err(|e| format_err!("Commit block confirm err: {}", e))?)
+            .map_err(|e| format_err!("Commit block confirm err: {}", e))?;
+
+        // println!("Tx: {:#?}", &receipt);
+
+        let tx_hash = format!("{:#?}", &receipt.transaction_hash);
+        let reason = get_revert_reason(&tx_hash);
+        let nonce = self.nonceFromHash(receipt.transaction_hash.clone()).await;
+        println!("Block: {:?}, hash: {}, reason: {}, nonce: {}", &block.block_number, &tx_hash, &reason, &nonce);
+        Ok(receipt)
     }
 
     // Verifies block using empty proof. (`DUMMY_VERIFIER` should be enabled on the contract).
