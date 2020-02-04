@@ -18,6 +18,7 @@
 /bin @dvush
 /Makefile @dvush
 /etc/kube @furkhat
+/.drone.yml @dvush @furkhat
 
 # js
 /js/zksync.js @dvush
