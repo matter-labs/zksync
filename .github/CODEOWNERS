@@ -2,16 +2,28 @@
 # https://help.github.com/articles/about-codeowners/
 
 # notify gluk64 about changes in codeowners file
-/.github/       @gluk64 @furkhat
+/.github/       @gluk64 @furkhat @dvush
 
 # notify gluk64 about changes in docs
 /docs/          @gluk64
 *.md            @gluk64
 
-# notify dvush about any circuit, prover and server changes
-/core/circuit/  @dvush @furkhat
-/core/server/   @dvush @furkhat
-/core/prover/   @dvush @furkhat
+# notify about any circuit, prover and server changes
+/core/circuit/ @alexander-movchan @gluk64
+/core/prover/ @furkhat
+/core/data_restore @BaldyAsh
+/core @dvush
+
+# dev tools
+/bin @dvush
+/Makefile @dvush
+/etc/kube @furkhat
+
+# js
+/js/zksync.js @dvush
+/js/tests @dvush
+/js/client @jazzandrock
+/js/explorer @jazzandrock
 
 # notify BaldyAsh and dvush about contracts changes
-/contracts/     @dvush @BaldyAsh gluk64
+/contracts/     @dvush @BaldyAsh @gluk64
