@@ -1,19 +1,19 @@
-use testkit::*;
-use models::config_options::ConfigurationOptions;
-use models::EncodedProof;
-use std::time::Instant;
-use std::thread::JoinHandle;
-use web3::transports::Http;
-use web3::types::{Address, U64, U128, U256};
-use web3::Transport;
+use crate::eth_account::{parse_ether, EthereumAccount};
+use crate::external_commands::{
+    deploy_test_contracts, get_revert_reason, get_test_accounts, Contracts,
+};
+use crate::zksync_account::ZksyncAccount;
 use bigdecimal::BigDecimal;
 use bigdecimal::ToPrimitive;
-use models::node::{
-    Account, AccountId, AccountMap, FranklinTx, Nonce, PriorityOp, TokenId,
-};
-use crate::eth_account::{parse_ether, EthereumAccount};
-use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts, get_revert_reason};
-use crate::zksync_account::ZksyncAccount;
+use models::config_options::ConfigurationOptions;
+use models::node::{Account, AccountId, AccountMap, FranklinTx, Nonce, PriorityOp, TokenId};
+use models::EncodedProof;
+use std::thread::JoinHandle;
+use std::time::Instant;
+use testkit::*;
+use web3::transports::Http;
+use web3::types::{Address, U128, U256, U64};
+use web3::Transport;
 
 use futures::{
     channel::{mpsc, oneshot},
@@ -21,17 +21,16 @@ use futures::{
     SinkExt, StreamExt,
 };
 
-
 fn get_exit_proof(account: AccountId, token: TokenId) -> Option<EncodedProof> {
     // get tree of accounts
     // get hashes of account and token
-    // get proof 
-    // 
-    // return proof 
+    // get proof
+    //
+    // return proof
     // uint256[8] calldata in solidity
-    // uint256[8] calldata _proof 
+    // uint256[8] calldata _proof
     // pub type EncodedProof = [U256; 8];
-    // 
+    //
     Some(EncodedProof::default())
 }
 
@@ -105,7 +104,7 @@ fn exit_test() {
         test_setup.execute_commit_and_verify_block();
     }
 
-    // Then trigger exodus: 
+    // Then trigger exodus:
     println!("### send some deposits, but don't verify them");
     let trigger_exodus_deposit_account_ids = vec![0];
     let num_sent_deposits = {
@@ -122,7 +121,10 @@ fn exit_test() {
                     );
                 }
             }
-            println!("total_blocks_committed: {}", test_setup.total_blocks_committed().unwrap());
+            println!(
+                "total_blocks_committed: {}",
+                test_setup.total_blocks_committed().unwrap()
+            );
             if let Ok(reason) = test_setup.execute_commit_block() {
                 if reason == "tx success" {
                     sent_deposits_count += 1;
@@ -141,15 +143,31 @@ fn exit_test() {
 
     let balance_from_cancel_deposits = &deposit_amount * BigDecimal::from(num_sent_deposits);
 
-    println!("### We managed to send {} deposits totalling {}, let's try to cancel them", &num_sent_deposits, &balance_from_cancel_deposits);
+    println!(
+        "### We managed to send {} deposits totalling {}, let's try to cancel them",
+        &num_sent_deposits, &balance_from_cancel_deposits
+    );
     block_on(async {
-        println!("cancelDeposits: {}", test_setup.accounts.eth_accounts[0].cancel_outstanding_deposits_for_exodus_mode(0).await.unwrap());
-        println!("cancelDeposits: {}", test_setup.accounts.eth_accounts[0]
-            .cancel_outstanding_deposits_for_exodus_mode(num_sent_deposits + 20).await.unwrap());
+        println!(
+            "cancelDeposits: {}",
+            test_setup.accounts.eth_accounts[0]
+                .cancel_outstanding_deposits_for_exodus_mode(0)
+                .await
+                .unwrap()
+        );
+        println!(
+            "cancelDeposits: {}",
+            test_setup.accounts.eth_accounts[0]
+                .cancel_outstanding_deposits_for_exodus_mode(num_sent_deposits + 20)
+                .await
+                .unwrap()
+        );
 
         for account in trigger_exodus_deposit_account_ids.clone() {
             for token in token_ids.clone() {
-                let bal = test_setup.get_balance_to_withdraw_async(ETHAccountId(account), token).await;
+                let bal = test_setup
+                    .get_balance_to_withdraw_async(ETHAccountId(account), token)
+                    .await;
                 println!("bal {}", &bal);
                 assert!(bal == balance_from_cancel_deposits);
             }
@@ -158,24 +176,34 @@ fn exit_test() {
 
     println!("### Now call exit for every account:");
     block_on(async {
-        for account in account_ids.clone()  /* as AccountId  */{
+        for account in account_ids.clone()
+        /* as AccountId  */
+        {
             for token in token_ids.clone() {
-                let balance_before: BigDecimal = 
-                    test_setup.get_balance_to_withdraw_async(ETHAccountId(account), token).await;
-                
-                if let Err(payload) = test_setup.exit(
-                    ETHAccountId(account),
-                    token,
-                    deposit_amount.to_u128().unwrap(),
-                    get_exit_proof(account as AccountId, token).unwrap(),
-                ).await {
+                let balance_before: BigDecimal = test_setup
+                    .get_balance_to_withdraw_async(ETHAccountId(account), token)
+                    .await;
+
+                if let Err(payload) = test_setup
+                    .exit(
+                        ETHAccountId(account),
+                        token,
+                        deposit_amount.to_u128().unwrap(),
+                        get_exit_proof(account as AccountId, token).unwrap(),
+                    )
+                    .await
+                {
                     println!("{:?}", payload);
                 }
 
-                let balances_after = 
-                    test_setup.get_balance_to_withdraw_async(ETHAccountId(account), token).await;
-                println!("account {}, token {}, balances_after {}, balance_before {}", &account, &token, &balances_after, &balance_before);
-                
+                let balances_after = test_setup
+                    .get_balance_to_withdraw_async(ETHAccountId(account), token)
+                    .await;
+                println!(
+                    "account {}, token {}, balances_after {}, balance_before {}",
+                    &account, &token, &balances_after, &balance_before
+                );
+
                 assert!(balances_after - balance_before == deposit_amount);
             }
         }
@@ -185,23 +213,27 @@ fn exit_test() {
     block_on(async {
         for account in account_ids.clone() {
             for token in token_ids.clone() {
-                let balance_before: BigDecimal = 
-                    test_setup.get_balance_to_withdraw_async(ETHAccountId(account), token).await;
+                let balance_before: BigDecimal = test_setup
+                    .get_balance_to_withdraw_async(ETHAccountId(account), token)
+                    .await;
 
                 for _ in 0..2 {
                     // first it should bump from 0 to deposit_amount, then shouldn't change
-                    test_setup.exit(
-                        ETHAccountId(account),
-                        token,
-                        deposit_amount.to_u128().unwrap(),
-                        get_exit_proof(account as AccountId, token).unwrap(),
-                    ).await;
+                    test_setup
+                        .exit(
+                            ETHAccountId(account),
+                            token,
+                            deposit_amount.to_u128().unwrap(),
+                            get_exit_proof(account as AccountId, token).unwrap(),
+                        )
+                        .await;
                 }
 
                 assert!(
-                    test_setup.get_balance_to_withdraw_async(
-                        ETHAccountId(account), token
-                    ).await == balance_before
+                    test_setup
+                        .get_balance_to_withdraw_async(ETHAccountId(account), token)
+                        .await
+                        == balance_before
                 );
             }
         }
@@ -213,9 +245,10 @@ fn exit_test() {
         for account in account_ids.clone() {
             for token in token_ids.clone() {
                 assert!(
-                    test_setup.get_balance_to_withdraw_async(
-                        ETHAccountId(account), token
-                    ).await == BigDecimal::from(0)
+                    test_setup
+                        .get_balance_to_withdraw_async(ETHAccountId(account), token)
+                        .await
+                        == BigDecimal::from(0)
                 );
             }
         }
@@ -223,16 +256,19 @@ fn exit_test() {
         let account = 0;
         for token in token_ids.clone() {
             for _ in 0..3 {
-                test_setup.exit(
-                    ETHAccountId(account),
-                    token,
-                    (&deposit_amount + &deposit_amount).to_u128().unwrap(),
-                    get_exit_proof(account as AccountId, token).unwrap(),
-                ).await;
+                test_setup
+                    .exit(
+                        ETHAccountId(account),
+                        token,
+                        (&deposit_amount + &deposit_amount).to_u128().unwrap(),
+                        get_exit_proof(account as AccountId, token).unwrap(),
+                    )
+                    .await;
                 assert!(
-                    test_setup.get_balance_to_withdraw_async(
-                        ETHAccountId(account), token
-                    ).await == BigDecimal::from(0)
+                    test_setup
+                        .get_balance_to_withdraw_async(ETHAccountId(account), token)
+                        .await
+                        == BigDecimal::from(0)
                 );
             }
         }

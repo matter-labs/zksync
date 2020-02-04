@@ -123,10 +123,6 @@ pub fn get_revert_reason(tx_hash: &str) -> String {
         panic!("print test accounts script failed")
     }
     let stdout = String::from_utf8(result.stdout).expect("stdout is not valid utf8");
-    
-    stdout
-        .split("\n")
-        .collect::<Vec<_>>()
-        [2]
-        .into()
+
+    stdout.split("\n").collect::<Vec<_>>()[2].into()
 }
