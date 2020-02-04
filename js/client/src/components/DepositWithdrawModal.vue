@@ -7,7 +7,7 @@
             :selected.sync="token">
         </TokenSelector>
         <div>
-            Amount <span v-if="maxAmountVisible">(<span v-if="tokenReadablyPrintable">in {{ token }} coins, </span>max {{ displayableBalancesDict[token] }} {{ token }})</span>:
+            Amount <span v-if="maxAmountVisible">(<span v-if="tokenReadablyPrintable">in {{ token }} coins, </span>max {{ formattedBalancesDict[token] }} {{ token }})</span>:
             <b-form-input autocomplete="off" type="number" step="any" v-model="amountSelected" class="mb-2"></b-form-input>
             <div v-if="feeNeeded">
                 Fee:
@@ -54,6 +54,7 @@ export default {
 
         maxAmountVisible: false,
         balancesDict: {},
+        formattedBalancesDict: {},
         displayableBalancesDict: {},
         alertVisible: false,
         alertText: '',
@@ -87,11 +88,15 @@ export default {
             if (this.balances) {
                 this.tokensForTokenSelector = this.balances.map(b => b.tokenName);
 
-                this.balancesDict = this.balances
-                    .reduce((acc, bal) => {
-                        acc[bal.tokenName] = bal.amount;
-                        return acc;
-                    }, {});
+                const balancesDict = {};
+                const formattedBalancesDict = {};
+                for (const { tokenName, amount } of this.balances) {
+                    balancesDict[tokenName] = amount;
+                    formattedBalancesDict[tokenName] = utils.formatEther(amount);
+                }
+                this.balancesDict = balancesDict;
+                this.formattedBalancesDict = formattedBalancesDict;
+                
                 this.displayableBalancesDict = getDisplayableBalanceDict(this.balancesDict);
             }
         },
