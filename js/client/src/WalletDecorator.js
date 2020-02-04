@@ -114,17 +114,14 @@ export class WalletDecorator {
     }
 
     async updateState() {
-        const onchainBalances = [];
-        await Promise.all(
+        const onchainBalances = await Promise.all(
             window.tokensList.map(
                 async tokenInfo => {
                     const token = tokenInfo.symbol === 'ETH' 
                         ? 'ETH' 
                         : tokenInfo.address;
 
-                    onchainBalances.push(
-                        await zksync.getEthereumBalance(window.ethSigner, token)
-                    );
+                    return await zksync.getEthereumBalance(window.ethSigner, token);
                 }
             )
         );
