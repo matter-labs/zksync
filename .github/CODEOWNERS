@@ -1,10 +1,10 @@
 # about codeowners:
 # https://help.github.com/articles/about-codeowners/
 
-# notify gluk64 about changes in codeowners file
+# notify about changes in codeowners file
 /.github/       @gluk64 @furkhat @dvush
 
-# notify gluk64 about changes in docs
+# notify about changes in docs
 /docs/          @gluk64
 *.md            @gluk64
 
