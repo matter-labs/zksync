@@ -85,7 +85,9 @@ impl ConfigurationOptions {
             prover_server_address: get_env("PROVER_SERVER_BIND")
                 .parse()
                 .expect("Failed to parse PROVER_SERVER_BIND bind address"),
-            req_server_timeout: get_env("REQ_SERVER_TIMEOUT").parse().expect("REQ_SERVER_TIMEOUT invalid value"),
+            req_server_timeout: get_env("REQ_SERVER_TIMEOUT")
+                .parse()
+                .expect("REQ_SERVER_TIMEOUT invalid value"),
         }
     }
 }
