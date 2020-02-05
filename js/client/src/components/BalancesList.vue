@@ -18,7 +18,7 @@
                         ></CompleteOperationButton>
                 </template>
             </b-table>
-            <span v-if="disabledReason != 'Not loaded yet.'">
+            <span v-if="disabledReason == 'ETH or FAU missing'">
                 You can get some 
                 <a href="https://faucet.rinkeby.io/" target="_blank">ETH</a>
                 or
@@ -70,8 +70,10 @@ export default {
     },
     computed: {
         disabledReason() {
-            return this.balances == null        ? "Not loaded yet."
-                 : this.balances.length == 0    ? "No tokens"
+            const ethOrFau = bal => ['ETH', 'FAU'].includes(bal.tokenName);
+            return this.balances == null                     ? "Not loaded yet."
+                 : this.balances.length == 0                 ? "No tokens"
+                 : this.balances.filter(ethOrFau).length < 2 ? "ETH or FAU missing"
                  : null;
         },
     },

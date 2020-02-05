@@ -9,11 +9,11 @@
                 <b-col>
                     <CopyableAddress id="franklinAddressFormInput" :address="franklinAddress" />
                 </b-col>
-                <b-col class="col-auto" style="line-height: 2.25em; font-size: 1.05em;">
+                <b-col class="col-auto" style="line-height: 2.55em;">
                     <a :href="`/explorer/accounts/${franklinAddress}`" target="_blank">View in zkSync explorer <i class="ml-1 fas fa-external-link-alt"></i></a>
                 </b-col>
             </b-row>
-            <b-card-text class="mt-2" style="font-size: 1.05em; color: #666;">
+            <b-card-text class="mt-2" style="color: #666;">
                 <b-row>
                     <b-col class="col-auto p-0"></b-col>
                     <b-col>
