@@ -1,4 +1,5 @@
 pub mod client;
+pub mod exit_proof;
 pub mod prover_data;
 
 // Built-in deps

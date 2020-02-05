@@ -109,7 +109,7 @@ pub fn make_franklin_key() {
             key_file_path
         };
         let contract_file_path = {
-            let mut contract_file_path = out_dir.clone();
+            let mut contract_file_path = out_dir;
             contract_file_path.push(CONTRACT_FILENAME_EXIT_CIRCUIT);
             contract_file_path
         };

@@ -1,5 +1,5 @@
 import {utils as syncutils} from "zksync";
-import {BN} from "bn.js";
+import * as BN from "bn.js";
 import {expect, use} from "chai";
 import {solidity} from "ethereum-waffle";
 import {bigNumberify} from "ethers/utils";

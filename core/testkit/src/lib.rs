@@ -1,6 +1,6 @@
 //use log::*;
 
-use crate::eth_account::{parse_ether, EthereumAccount};
+use crate::eth_account::{parse_ether, ETHExecResult, EthereumAccount};
 use crate::external_commands::{
     deploy_test_contracts, get_revert_reason, get_test_accounts, Contracts,
 };
@@ -409,6 +409,7 @@ impl TestSetup {
     ) -> Self {
         let mut tokens = HashMap::new();
         tokens.insert(1, deployed_contracts.test_erc20_address.clone());
+        tokens.insert(0, Address::default());
         Self {
             state_keeper_request_sender: sk_channels.requests,
             proposed_blocks_receiver: sk_channels.new_blocks,
@@ -527,18 +528,20 @@ impl TestSetup {
         block_on(block_sender);
     }
 
-    pub async fn exit(
+    pub fn exit(
         &mut self,
-        accountId: ETHAccountId,
-        token_id: TokenId,
-        amount: u128,
+        sending_account: ETHAccountId,
+        fund_owner: ZKSyncAccountId,
+        token_id: Token,
+        amount: &BigDecimal,
         proof: EncodedProof,
-    ) -> Result<String, failure::Error> {
-        let sending_account = &self.accounts.eth_accounts[0];
-        let account = &self.accounts.eth_accounts[accountId.0];
-        sending_account
-            .exit(token_id, account.address.clone(), amount, proof)
-            .await
+    ) -> ETHExecResult {
+        let fund_owner = self.accounts.zksync_accounts[fund_owner.0].address;
+        block_on(
+            self.accounts.eth_accounts[sending_account.0]
+                .exit(token_id.0, fund_owner, amount, proof),
+        )
+        .expect("Failed to post exit tx")
     }
 
     pub fn full_exit(&mut self, post_by: ETHAccountId, from: ZKSyncAccountId, token: Token) {
@@ -856,22 +859,66 @@ impl TestSetup {
         }
     }
 
-    pub async fn get_balance_to_withdraw_async(
+    pub fn get_balance_to_withdraw(
         &self,
         eth_account_id: ETHAccountId,
-        token: TokenId,
+        token: Token,
     ) -> BigDecimal {
-        self.accounts.eth_accounts[eth_account_id.0]
-            .balances_to_withdraw(token)
-            .await
+        block_on(self.accounts.eth_accounts[eth_account_id.0].balances_to_withdraw(token.0))
             .expect("failed to query balance to withdraws")
     }
 
-    pub fn is_exodus(&self) -> Result<bool, failure::Error> {
-        block_on(self.accounts.eth_accounts[0].is_exodus())
+    pub fn is_exodus(&self) -> bool {
+        block_on(self.commit_account.is_exodus()).expect("Exodus query")
     }
 
     pub fn total_blocks_committed(&self) -> Result<u64, failure::Error> {
         block_on(self.accounts.eth_accounts[0].total_blocks_committed())
+    }
+
+    pub fn eth_block_number(&self) -> u64 {
+        block_on(self.commit_account.eth_block_number()).expect("Block number query")
+    }
+
+    pub fn get_tokens(&self) -> Vec<Token> {
+        self.tokens.iter().map(|(id, _)| Token(*id)).collect()
+    }
+
+    pub fn trigger_exodus_if_needed(&self, eth_account: ETHAccountId) {
+        block_on(self.accounts.eth_accounts[eth_account.0].trigger_exodus_if_needed())
+            .expect("Trigger exodus if needed call");
+    }
+
+    pub fn cancel_outstanding_deposits(&self, eth_account: ETHAccountId) {
+        const DEPOSITS_TO_CANCEL: u64 = 100;
+        block_on(
+            self.accounts.eth_accounts[eth_account.0]
+                .cancel_outstanding_deposits_for_exodus_mode(DEPOSITS_TO_CANCEL),
+        )
+        .expect("Failed to cancel outstanding deposits");
+    }
+
+    pub fn get_accounts_state(&self) -> AccountMap {
+        let mut account_map = AccountMap::default();
+        for id in 0..self.accounts.zksync_accounts.len() {
+            if let Some((id, account)) =
+                self.get_zksync_account_committed_state(ZKSyncAccountId(id))
+            {
+                account_map.insert(id, account);
+            }
+        }
+        account_map
+    }
+
+    pub fn gen_exit_proof(
+        &self,
+        accounts: AccountMap,
+        fund_owner: ZKSyncAccountId,
+        token: Token,
+    ) -> (EncodedProof, BigDecimal) {
+        let owner_address = self.accounts.zksync_accounts[fund_owner.0].address;
+        // restore account state
+        prover::exit_proof::create_exit_proof(accounts, owner_address, token.0)
+            .expect("Failed to generate exit proof")
     }
 }

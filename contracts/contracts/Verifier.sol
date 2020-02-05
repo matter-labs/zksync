@@ -19,6 +19,10 @@ contract Verifier is VerificationKey, VerificationKeyExit {
         uint256[8] calldata _proof,
         bytes32 _commitment
     ) external view returns (bool) {
+        if (DUMMY_VERIFIER) {
+            return true;
+        }
+
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
@@ -74,10 +78,6 @@ contract Verifier is VerificationKey, VerificationKeyExit {
         uint256[8] memory in_proof,
         uint256[] memory proof_inputs
     ) internal view returns (bool) {
-        if (DUMMY_VERIFIER) {
-            return true;
-        }
-
         // Start
         require(
             ((vk_gammaABC.length / 2) - 1) == proof_inputs.length,

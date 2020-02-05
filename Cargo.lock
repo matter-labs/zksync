@@ -3081,6 +3081,7 @@ name = "testkit"
 version = "0.1.0"
 dependencies = [
  "bigdecimal 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "eth_client 0.1.0",
  "ethabi 8.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -3088,6 +3089,7 @@ dependencies = [
  "futures 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "models 0.0.1",
+ "prover 0.0.1",
  "rand 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.104 (registry+https://github.com/rust-lang/crates.io-index)",
