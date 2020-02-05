@@ -34,16 +34,16 @@ pub mod zksync_account;
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ETHAccountId(usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ZKSyncAccountId(usize);
+pub struct ZKSyncAccountId(pub usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Token(TokenId);
 
 /// Account set is used to create transactions using stored account
-/// in a covenient way
+/// in a convenient way
 pub struct AccountSet<T: Transport> {
-    eth_accounts: Vec<EthereumAccount<T>>,
-    zksync_accounts: Vec<ZksyncAccount>,
-    fee_account_id: ZKSyncAccountId,
+    pub eth_accounts: Vec<EthereumAccount<T>>,
+    pub zksync_accounts: Vec<ZksyncAccount>,
+    pub fee_account_id: ZKSyncAccountId,
 }
 
 impl<T: Transport> AccountSet<T> {

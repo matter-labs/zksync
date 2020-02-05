@@ -79,7 +79,7 @@ const FEE_DIVISOR = 50;
                 console.log(`Failed transfer: ${promise.reason}`);
             }
         }
-        
+
         // Transfers
         let promises = [];
 
@@ -136,7 +136,7 @@ async function deposit(ethWallet: ethers.Wallet, syncWallet: Wallet, tokens: typ
         for (const token of tokens) {
             const depositHandle = await depositFromETH({
                 depositFrom: ethWallet,
-                depositTo:  syncWallet,
+                depositTo: syncWallet,
                 token,
                 amount,
             });
