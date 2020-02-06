@@ -18,6 +18,7 @@ use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use models::params as franklin_constants;
+use models::params::FR_BIT_WIDTH_PADDED;
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 9;
 #[derive(Clone)]
@@ -217,16 +218,21 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         )?;
 
         let mut operator_account_data = vec![];
-        let mut old_operator_balance_root_bits = old_operator_balance_root
-            .into_bits_le(cs.namespace(|| "old_operator_balance_root_bits"))?;
-        old_operator_balance_root_bits.resize(
-            franklin_constants::FR_BIT_WIDTH_PADDED,
-            Boolean::constant(false),
-        );
+        let old_operator_state_root = {
+            let balance_root = CircuitElement::from_number_padded(
+                cs.namespace(|| "old_operator_balance_root_ce"),
+                old_operator_balance_root,
+            )?;
+            calc_account_state_tree_root(
+                cs.namespace(|| "old_operator_state_root"),
+                &balance_root,
+                &self.params,
+            )?
+        };
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
         operator_account_data.extend(validator_account.address.get_bits_le());
-        operator_account_data.extend(old_operator_balance_root_bits);
+        operator_account_data.extend(old_operator_state_root.get_bits_le());
 
         let root_from_operator = allocate_merkle_root(
             cs.namespace(|| "root from operator_account"),
@@ -261,17 +267,21 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         )?;
 
         let mut operator_account_data = vec![];
-        let mut new_operator_balance_root_bits = new_operator_balance_root
-            .into_bits_le(cs.namespace(|| "new_operator_balance_root_bits"))?;
-        new_operator_balance_root_bits.resize(
-            franklin_constants::FR_BIT_WIDTH_PADDED,
-            Boolean::constant(false),
-        );
-
+        let new_operator_state_root = {
+            let balance_root = CircuitElement::from_number_padded(
+                cs.namespace(|| "new_operator_balance_root_ce"),
+                new_operator_balance_root,
+            )?;
+            calc_account_state_tree_root(
+                cs.namespace(|| "new_operator_state_root"),
+                &balance_root,
+                &self.params,
+            )?
+        };
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
         operator_account_data.extend(validator_account.address.get_bits_le());
-        operator_account_data.extend(new_operator_balance_root_bits);
+        operator_account_data.extend(new_operator_state_root.get_bits_le());
 
         let root_from_operator_after_fees = allocate_merkle_root(
             cs.namespace(|| "root from operator_account after fees"),
@@ -1891,6 +1901,29 @@ pub fn check_account_data<E: JubjubEngine, CS: ConstraintSystem<E>>(
     ))
 }
 
+/// Idea is that account tree state will be extended in the future, so for current balance tree we
+/// append emtpy root hash of the future tree before hashing.
+pub fn calc_account_state_tree_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    padded_balance_root: &CircuitElement<E>,
+    params: &E::Params,
+) -> Result<CircuitElement<E>, SynthesisError> {
+    let mut state_tree_root_input = padded_balance_root.get_bits_le();
+
+    // Pad with empty hash for future account sub tree extension.
+    state_tree_root_input.resize(FR_BIT_WIDTH_PADDED * 2, Boolean::constant(false));
+
+    let state_tree_root = pedersen_hash::pedersen_hash(
+        cs.namespace(|| "hash state root and balance root"),
+        pedersen_hash::Personalization::NoteCommitment,
+        &state_tree_root_input,
+        params,
+    )?
+    .get_x()
+    .clone();
+    CircuitElement::from_number_padded(cs.namespace(|| "total_subtree_root_ce"), state_tree_root)
+}
+
 pub fn allocate_account_leaf_bits<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     branch: &AllocatedOperationBranch<E>,
@@ -1907,10 +1940,6 @@ pub fn allocate_account_leaf_bits<E: JubjubEngine, CS: ConstraintSystem<E>>(
         params,
     )?;
 
-    // debug!("balance root: {}", balance_root.get_value().unwrap());
-    let subtree_root =
-        CircuitElement::from_number_padded(cs.namespace(|| "subtree_root_ce"), balance_root)?;
-
     let mut account_data = vec![];
     account_data.extend(branch.account.nonce.get_bits_le());
     account_data.extend(branch.account.pub_key_hash.get_bits_le());
@@ -1924,7 +1953,15 @@ pub fn allocate_account_leaf_bits<E: JubjubEngine, CS: ConstraintSystem<E>>(
         &account_data_packed,
         Expression::constant::<CS>(E::Fr::zero()),
     )?;
-    account_data.extend(subtree_root.get_bits_le());
+    let subtree_root = CircuitElement::from_number_padded(
+        cs.namespace(|| "balance_subtree_root_ce"),
+        balance_root,
+    )?;
+    let state_tree_root =
+        calc_account_state_tree_root(cs.namespace(|| "state_tree_root"), &subtree_root, params)?;
+
+    account_data.extend(state_tree_root.get_bits_le());
+
     Ok((account_data, Boolean::from(is_account_empty), subtree_root))
 }
 
