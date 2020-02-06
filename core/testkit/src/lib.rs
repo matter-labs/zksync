@@ -531,17 +531,12 @@ impl TestSetup {
     pub fn exit(
         &mut self,
         sending_account: ETHAccountId,
-        fund_owner: ZKSyncAccountId,
         token_id: Token,
         amount: &BigDecimal,
         proof: EncodedProof,
     ) -> ETHExecResult {
-        let fund_owner = self.accounts.zksync_accounts[fund_owner.0].address;
-        block_on(
-            self.accounts.eth_accounts[sending_account.0]
-                .exit(token_id.0, fund_owner, amount, proof),
-        )
-        .expect("Failed to post exit tx")
+        block_on(self.accounts.eth_accounts[sending_account.0].exit(token_id.0, amount, proof))
+            .expect("Failed to post exit tx")
     }
 
     pub fn full_exit(&mut self, post_by: ETHAccountId, from: ZKSyncAccountId, token: Token) {

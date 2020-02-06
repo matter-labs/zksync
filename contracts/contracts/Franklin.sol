@@ -950,11 +950,9 @@ contract Franklin {
     /// @notice Withdraws token from Franklin to root chain in case of exodus mode. User must provide proof that he owns funds
     /// @param _proof Proof
     /// @param _tokenId Verified token id
-    /// @param _owner Owner
     /// @param _amount Amount for owner
     function exit(
         uint16 _tokenId,
-        address _owner,
         uint128 _amount,
         uint256[8] calldata _proof
     ) external {
@@ -964,18 +962,18 @@ contract Franklin {
         ); // fet11 - must be in exodus mode
 
         require(
-            exited[_owner][_tokenId] == false,
+            exited[msg.sender][_tokenId] == false,
             "fet12"
         ); // fet12 - already exited
 
         require(
-            verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot,_owner, _tokenId, _amount, _proof),
+            verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, msg.sender, _tokenId, _amount, _proof),
             "fet13"
         ); // fet13 - verification failed
 
 
 
         balancesToWithdraw[msg.sender][_tokenId] += _amount;
-        exited[_owner][_tokenId] = true;
+        exited[msg.sender][_tokenId] = true;
     }
 }

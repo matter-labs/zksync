@@ -148,7 +148,6 @@ impl<T: Transport> EthereumAccount<T> {
     pub async fn exit(
         &self,
         token_id: TokenId,
-        fund_owner: Address,
         amount: &BigDecimal,
         proof: EncodedProof,
     ) -> Result<ETHExecResult, failure::Error> {
@@ -158,7 +157,6 @@ impl<T: Transport> EthereumAccount<T> {
                 "exit",
                 (
                     u64::from(token_id),
-                    fund_owner,
                     U128::from(big_decimal_to_u128(amount)),
                     proof,
                 ),
