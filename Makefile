@@ -178,6 +178,7 @@ loadtest: confirm_action
 
 integration-testkit: build-contracts
 	cargo run --bin testkit --release
+	cargo run --bin exodus --release
 
 integration-simple:
 	@cd js/tests && yarn && yarn simple
