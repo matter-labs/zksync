@@ -55,14 +55,7 @@ fn commit_deposit_to_expire(
     info!("Commit deposit to expire");
     test_setup.start_block();
     test_setup.deposit(from, to, token, deposit_amount.clone());
-    let reason = test_setup
-        .execute_commit_block()
-        .expect("commit expired deposit fail");
-    assert_eq!(
-        reason,
-        String::from("tx success"),
-        "Expired deposit commit should succeed."
-    );
+    test_setup.execute_commit_block().expect_success();
 
     info!("Done commit deposit to expire");
     test_setup.eth_block_number()
@@ -354,7 +347,6 @@ fn exit_test() {
         &test_accounts,
     );
     let verified_accounts_state = test_setup.get_accounts_state();
-    println!("{:#?}", verified_accounts_state);
 
     let expire_count_start_block = commit_deposit_to_expire(
         &mut test_setup,

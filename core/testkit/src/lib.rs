@@ -1,12 +1,10 @@
 //use log::*;
 
 use crate::eth_account::{parse_ether, ETHExecResult, EthereumAccount};
-use crate::external_commands::{
-    deploy_test_contracts, get_revert_reason, get_test_accounts, Contracts,
-};
+use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
 use bigdecimal::BigDecimal;
-use failure::{bail, ensure};
+use failure::bail;
 use futures::{
     channel::{mpsc, oneshot},
     executor::block_on,
@@ -26,7 +24,6 @@ use std::thread::JoinHandle;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 use web3::transports::Http;
-use web3::types::U64;
 use web3::Transport;
 
 pub mod eth_account;
@@ -666,9 +663,8 @@ impl TestSetup {
         self.execute_tx(withdraw);
     }
 
-    pub fn execute_commit_block(
-        &mut self, /* , nonce: Option<U256> */
-    ) -> Result<String, failure::Error> {
+    /// Should not be used execept special cases(when we want to commit but don't want to verify block)
+    pub fn execute_commit_block(&mut self) -> ETHExecResult {
         let block_sender = async {
             self.state_keeper_request_sender
                 .clone()
@@ -677,70 +673,10 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        let new_block = block_on(async {
-            if let Some(op) = self.proposed_blocks_receiver.next().await {
-                op
-            } else {
-                panic!("State keeper channel closed");
-            }
-        });
+        let new_block =
+            block_on(self.proposed_blocks_receiver.next()).expect("State keeper channel closed");
 
-        let block_rec = block_on(
-            self.commit_account
-                .commit_block(&new_block.block /* , nonce */),
-        )
-        .expect("block commit fail");
-        ensure!(
-            block_rec.status == Some(U64::from(1)),
-            "Block commit failed: {:?}",
-            block_rec.transaction_hash
-        );
-
-        let mut block_checks_failed = false;
-        for ((eth_account, token), (balance, allowed_margin)) in
-            &self.expected_changes_for_current_block.eth_accounts_state
-        {
-            let real_balance = self.get_eth_balance(*eth_account, *token);
-            let diff = balance - &real_balance;
-            let is_diff_valid = diff >= BigDecimal::from(0) && diff <= *allowed_margin;
-            if !is_diff_valid {
-                println!(
-                    "eth acc: {}, token: {}, diff: {}, within bounds: {}",
-                    eth_account.0, token, diff, is_diff_valid
-                );
-                println!("expected: {}", balance);
-                println!("real: {}", real_balance);
-                block_checks_failed = true;
-            }
-        }
-
-        for ((zksync_account, token), balance) in
-            &self.expected_changes_for_current_block.sync_accounts_state
-        {
-            let real = self.get_zksync_balance(*zksync_account, *token);
-            let is_diff_valid = real.clone() - balance == BigDecimal::from(0);
-            if !is_diff_valid {
-                println!(
-                    "zksync acc {} diff {}, real: {}",
-                    zksync_account.0,
-                    real.clone() - balance,
-                    real.clone()
-                );
-                block_checks_failed = true;
-            }
-        }
-
-        if block_checks_failed {
-            println!(
-                "Failed block exec_operations: {:#?}",
-                new_block.block.block_transactions
-            );
-            bail!("Block checks failed")
-        }
-
-        let hash = format!("{:#?}", &block_rec.transaction_hash);
-        let reason = get_revert_reason(&hash);
-        Ok(reason)
+        block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
     }
 
     pub fn execute_commit_and_verify_block(&mut self) -> Result<(), failure::Error> {
@@ -752,35 +688,18 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        let new_block = block_on(async {
-            if let Some(op) = self.proposed_blocks_receiver.next().await {
-                op
-            } else {
-                panic!("State keeper channel closed");
-            }
-        });
+        let new_block =
+            block_on(self.proposed_blocks_receiver.next()).expect("State keeper channel closed");
 
-        let block_rec = block_on(self.commit_account.commit_block(&new_block.block))
-            .expect("block commit fail");
-        ensure!(
-            block_rec.status == Some(U64::from(1)),
-            "Block commit failed: {:?}",
-            block_rec.transaction_hash
-        );
-        let block_rec = block_on(self.commit_account.verify_block(&new_block.block))
-            .expect("block verify fail");
-        ensure!(
-            block_rec.status == Some(U64::from(1)),
-            "Block verify failed: {:?}",
-            block_rec.transaction_hash
-        );
-        let block_rec = block_on(self.commit_account.complete_withdrawals())
-            .expect("failed to complete pending withdrawals");
-        ensure!(
-            block_rec.status == Some(U64::from(1)),
-            "Block commit failed: {:?}",
-            block_rec.transaction_hash
-        );
+        block_on(self.commit_account.commit_block(&new_block.block))
+            .expect("block commit send tx")
+            .expect_success();
+        block_on(self.commit_account.verify_block(&new_block.block))
+            .expect("block verify send tx")
+            .expect_success();
+        block_on(self.commit_account.complete_withdrawals())
+            .expect("complete withdrawal send tx")
+            .expect_success();
 
         let mut block_checks_failed = false;
         for ((eth_account, token), (balance, allowed_margin)) in
