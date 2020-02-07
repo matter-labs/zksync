@@ -1,3 +1,4 @@
 /kubeconfig*.yaml
+!/kubeconfig-template.yaml
 /gen
 /clusters
