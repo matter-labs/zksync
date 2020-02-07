@@ -9,7 +9,7 @@ use crate::node::{
 };
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
-    BALANCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, ETH_SIGNATURE_RS_BIT_WIDTH,
+    BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, ETH_SIGNATURE_RS_BIT_WIDTH,
     ETH_SIGNATURE_V_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN,
     NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, SUCCESS_FLAG_WIDTH, TOKEN_BIT_WIDTH,
 };
@@ -302,7 +302,7 @@ impl WithdrawOp {
             bytes_slice_to_uint16(&bytes[token_id_offset..token_id_offset + TOKEN_BIT_WIDTH / 8])
                 .ok_or_else(|| format_err!("Cant get token id from withdraw pubdata"))?;
         let to = Address::from_slice(
-            &bytes[eth_address_offset..eth_address_offset + ETHEREUM_KEY_BIT_WIDTH / 8],
+            &bytes[eth_address_offset..eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8],
         );
         let amount = u128_to_bigdecimal(
             bytes_slice_to_uint128(&bytes[amount_offset..amount_offset + BALANCE_BIT_WIDTH / 8])
@@ -509,7 +509,7 @@ impl FullExitOp {
 
         let account_id_offset = 1;
         let eth_address_offset = account_id_offset + ACCOUNT_ID_BIT_WIDTH / 8;
-        let token_offset = eth_address_offset + ETHEREUM_KEY_BIT_WIDTH / 8;
+        let token_offset = eth_address_offset + ETH_ADDRESS_BIT_WIDTH / 8;
         let amount_offset = token_offset + TOKEN_BIT_WIDTH / 8;
 
         let account_id = bytes_slice_to_uint32(&bytes[account_id_offset..eth_address_offset])

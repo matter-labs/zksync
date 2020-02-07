@@ -14,7 +14,7 @@ use pairing::bn256::*;
 pub struct FullExitData {
     pub token: u32,
     pub account_address: u32,
-    pub ethereum_key: Fr,
+    pub eth_address: Fr,
 }
 pub struct FullExitWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -39,8 +39,8 @@ impl<E: JubjubEngine> FullExitWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -66,7 +66,7 @@ pub fn apply_full_exit_tx(
     let full_exit = FullExitData {
         token: u32::from(full_exit.priority_op.token),
         account_address: full_exit.priority_op.account_id,
-        ethereum_key: eth_address_to_fr(&full_exit.priority_op.eth_address),
+        eth_address: eth_address_to_fr(&full_exit.priority_op.eth_address),
     };
 
     // le_bit_vector_into_field_element()
@@ -156,7 +156,7 @@ pub fn apply_full_exit(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(full_exit.ethereum_key),
+            eth_address: Some(full_exit.eth_address),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_to_exit),
             fee: Some(Fr::zero()),

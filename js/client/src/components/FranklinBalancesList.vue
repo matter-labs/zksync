@@ -43,7 +43,7 @@ const components = {
 };
 
 export default {
-    name: 'BalancesList',
+    name: 'FranklinBalancesList',
     data: () => ({
         fields: [
             { key: 'tokenName', label: 'Token' }, 

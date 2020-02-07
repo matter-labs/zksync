@@ -96,7 +96,7 @@ pub struct OperationArgumentsDef {
     pub full_amount: Option<Fr>,
     pub fee: Option<Fr>,
     pub new_pub_key_hash: Option<Fr>,
-    pub ethereum_key: Option<Fr>,
+    pub eth_address: Option<Fr>,
     pub pub_nonce: Option<Fr>,
 }
 

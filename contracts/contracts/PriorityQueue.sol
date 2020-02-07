@@ -186,22 +186,42 @@ contract PriorityQueue {
     /// @return bool flag that indicates if priority operation is valid (exists in priority requests list on the specified place)
     function isPriorityOpValid(uint8 _opType, bytes calldata _pubData, uint64 _id) external view returns (bool) {
         uint64 _priorityRequestId = _id + firstPriorityRequestId + totalCommittedPriorityRequests;
-        bytes memory priorityPubData;
-        bytes memory onchainPubData;
-        if (_opType == DEPOSIT_OP && priorityRequests[_priorityRequestId].opType == DEPOSIT_OP) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, ETH_ADDR_BYTES, PUBKEY_HASH_BYTES + AMOUNT_BYTES + TOKEN_BYTES);
-            onchainPubData = _pubData;
-        } else if (_opType == FULL_EXIT_OP && priorityRequests[_priorityRequestId].opType == FULL_EXIT_OP) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES);
-            onchainPubData = Bytes.slice(_pubData, 0, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES);
-        } else if (_opType == CHANGE_PUBKEY_PRIORITY && priorityRequests[_priorityRequestId].opType == CHANGE_PUBKEY_PRIORITY) {
-            priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, PUBKEY_HASH_BYTES + ETH_ADDR_BYTES);
-            onchainPubData = Bytes.slice(_pubData, ACC_NUM_BYTES + SUCCESS_FLAG_BYTES, PUBKEY_HASH_BYTES + ETH_ADDR_BYTES);
+        uint8 priorReqType = priorityRequests[_priorityRequestId].opType;
+        bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
+
+        require(priorReqType == _opType, "pid10"); // pid10 - incorrect priority op type
+
+        bytes memory cmpPriorityQueueBytes;
+        bytes memory cmpOpCommittedBytes;
+        if (_opType == DEPOSIT_OP) {
+            // we don't know account if of the receiver when we create priority queue request
+            // that's why we ignore it here
+            uint comparePubdataLen = TOKEN_BYTES + AMOUNT_BYTES + ETH_ADDR_BYTES;
+
+            // deposit pubdata contains ETH address of the sender, that is why we have `ETH_ADDR_BYTES` as an offset
+            cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, ETH_ADDR_BYTES, comparePubdataLen);
+            cmpOpCommittedBytes = Bytes.slice(_pubData, 0, comparePubdataLen);
+
+        } else if (_opType == FULL_EXIT_OP) {
+            // we don't know full exit amount when we create full exit request, that why full amount is ignored here
+            uint comparePubdataLen = ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES;
+
+            cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, 0, comparePubdataLen);
+            cmpOpCommittedBytes = Bytes.slice(_pubData, 0, comparePubdataLen);
+
+        } else if (_opType == CHANGE_PUBKEY_PRIORITY) {
+            uint comparePubdataLen = PUBKEY_HASH_BYTES + ETH_ADDR_BYTES;
+
+            cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, 0, comparePubdataLen);
+            // we don't know account id and success flag when we create priority operation that why
+            // we ignore this field from pubdata (using offset)
+            cmpOpCommittedBytes = Bytes.slice(_pubData, ACC_NUM_BYTES + SUCCESS_FLAG_BYTES, comparePubdataLen);
         } else {
-            revert("pid11"); // pid11 - wrong operation
+            revert("pid11");
+            // pid11 - wrong operation
         }
-        return (priorityPubData.length > 0) &&
-            (keccak256(onchainPubData) == keccak256(priorityPubData));
+        return (cmpPriorityQueueBytes.length > 0) &&
+        (keccak256(cmpOpCommittedBytes) == keccak256(cmpPriorityQueueBytes));
     }
 
     /// @notice Checks if provided number is less than uncommitted requests count

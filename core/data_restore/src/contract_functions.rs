@@ -1,6 +1,6 @@
 use crate::eth_tx_helpers::get_input_data_from_ethereum_transaction;
 use models::node::account::Account;
-use models::params::{ETHEREUM_KEY_BIT_WIDTH, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
+use models::params::{ETH_ADDRESS_BIT_WIDTH, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};
 use web3::contract::{Contract, Options};
 use web3::futures::Future;
 use web3::types::{Address, BlockNumber, Transaction, U256};
@@ -15,7 +15,7 @@ use web3::Transport;
 pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account, failure::Error> {
     let input_data = get_input_data_from_ethereum_transaction(&genesis_transaction)?;
     let genesis_operator_address = Address::from_slice(
-        &input_data[input_data.len() - INPUT_DATA_ROOT_HASH_BYTES_WIDTH - ETHEREUM_KEY_BIT_WIDTH / 8
+        &input_data[input_data.len() - INPUT_DATA_ROOT_HASH_BYTES_WIDTH - ETH_ADDRESS_BIT_WIDTH / 8
             ..input_data.len() - INPUT_DATA_ROOT_HASH_BYTES_WIDTH],
     );
     Ok(Account::default_with_address(&genesis_operator_address))

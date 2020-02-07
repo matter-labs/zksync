@@ -157,7 +157,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
             fee: None,
             pub_nonce: None,
             new_pub_key_hash: None,
-            ethereum_key: None,
+            eth_address: None,
         },
         lhs: OperationBranch {
             address: None,

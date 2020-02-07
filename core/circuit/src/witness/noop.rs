@@ -47,7 +47,7 @@ pub fn noop_operation(
         eth_signature_data: ETHSignatureData::init_empty(),
 
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            eth_address: Some(Fr::zero()),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
             fee: Some(Fr::zero()),

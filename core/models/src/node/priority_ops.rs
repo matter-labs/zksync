@@ -1,8 +1,7 @@
 use super::AccountId;
 use super::TokenId;
 use crate::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, FR_ADDRESS_LEN,
-    TOKEN_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
 use crate::primitives::{bytes_slice_to_uint32, u128_to_bigdecimal};
 use bigdecimal::BigDecimal;
@@ -53,7 +52,7 @@ impl FranklinPriorityOp {
         match op_type_id {
             DepositOp::OP_CODE => {
                 let (sender, pub_data_left) = {
-                    let (sender, left) = pub_data.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
+                    let (sender, left) = pub_data.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
                     (Address::from_slice(sender), left)
                 };
                 let (token, pub_data_left) = {
@@ -86,7 +85,7 @@ impl FranklinPriorityOp {
                     (bytes_slice_to_uint32(account_id).unwrap(), left)
                 };
                 let (eth_address, pub_data_left) = {
-                    let (eth_address, left) = pub_data_left.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
+                    let (eth_address, left) = pub_data_left.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
                     (Address::from_slice(eth_address), left)
                 };
                 let (token, pub_data_left) = {
@@ -105,11 +104,11 @@ impl FranklinPriorityOp {
             }
             ChangePubkeyOnchainOp::OP_CODE => {
                 let (new_pubkey_hash, pub_data_left) = {
-                    let (pubkey_hash, left) = pub_data.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
+                    let (pubkey_hash, left) = pub_data.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
                     (PubKeyHash::from_bytes(pubkey_hash)?, left)
                 };
                 let (eth_address, pub_data_left) = {
-                    let (eth_address, left) = pub_data_left.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
+                    let (eth_address, left) = pub_data_left.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
                     (Address::from_slice(eth_address), left)
                 };
                 ensure!(

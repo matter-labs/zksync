@@ -62,8 +62,8 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -323,7 +323,7 @@ pub fn apply_transfer_to_new(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(transfer_to_new.new_address),
+            eth_address: Some(transfer_to_new.new_address),
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),

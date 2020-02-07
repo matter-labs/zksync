@@ -6,6 +6,30 @@ import {bigNumberify} from "ethers/utils";
 
 use(solidity);
 
+export const OPERATIONS = {
+    changePubkeyOnchain: {
+        chunks: 6,
+        id: 0x08,
+    },
+    deposit: {
+        chunks: 6,
+        id: 0x01,
+    },
+    fullExit: {
+        chunks: 6,
+        id: 0x06,
+    },
+    noop: {
+        chunks: 1,
+        id: 0x00,
+    },
+    withdraw: {
+        chunks: 6,
+        id: 0x03,
+    },
+};
+export const CHUNKS_SIZE = 8;
+
 export async function cancelOustandingDepositsForExodus(
     provider,
     wallet,
@@ -454,24 +478,18 @@ export function createFullExitPublicData(accId, ethAddress: string, tokenId, hex
 }
 
 export function createNoopPublicData(): Buffer {
-    const txId = Buffer.from("00", "hex");
-    const padBytes = Buffer.alloc(7, 0);
-
-    return Buffer.concat([txId, padBytes]);
+    return Buffer.alloc(OPERATIONS.noop.chunks * CHUNKS_SIZE, 0);
 }
 
 export function createWrongNoopPublicData(): Buffer {
-    const txId = Buffer.from("00", "hex");
-    const padBytes = Buffer.alloc(6, 0);
-
-    return Buffer.concat([txId, padBytes]);
+    return Buffer.alloc(OPERATIONS.noop.chunks * (CHUNKS_SIZE - 1), 0);
 }
 
 export function createWrongOperationPublicData(): Buffer {
-    const txId = Buffer.from("99", "hex");
-    const padBytes = Buffer.alloc(7, 0);
+    const pubdata = Buffer.alloc(CHUNKS_SIZE, 0);
+    pubdata[0] = 0xff; // Unknown op type
 
-    return Buffer.concat([txId, padBytes]);
+    return pubdata;
 }
 
 export function hex_to_ascii(str1) {

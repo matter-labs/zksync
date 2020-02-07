@@ -53,8 +53,8 @@ impl<E: JubjubEngine> ChangePubkeyOffChainWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
 
         pubdata_bits.extend(self.eth_signature_data.r.iter().map(|x| x.unwrap()));
@@ -147,7 +147,7 @@ pub fn apply_change_pubkey_offchain(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(change_pubkey_offcahin.address),
+            eth_address: Some(change_pubkey_offcahin.address),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
             fee: Some(Fr::zero()),
