@@ -276,8 +276,7 @@ pub fn append_packed_public_key(
     content.extend(x_bits);
 }
 
-
-pub(crate) fn print_boolean_vec(bits: &[Boolean]) {
+pub fn print_boolean_vec(bits: &[Boolean]) {
     let mut bytes = vec![];
     for slice in bits.chunks(8) {
         let mut b = 0u8;

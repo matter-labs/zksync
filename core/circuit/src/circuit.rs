@@ -188,9 +188,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let (state_root, is_account_empty, _subtree_root) = self
                 .check_account_data(cs.namespace(|| "calculate account root"), &current_branch)?;
 
-            println!("State root = {}", state_root.get_value().unwrap());
-            println!("Rolling root = {}", rolling_root.get_value().unwrap());
-
             // ensure root hash of state before applying operation is correct
             cs.enforce(
                 || "root state before applying operation is valid",
@@ -520,8 +517,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 cs.namespace(|| "allocate current_account_leaf_hash"),
                 cur,
             )?;
-
-        println!("Account is empty = {}", is_account_empty.get_value().unwrap());
 
         let merkle_root = allocate_merkle_root(
             cs.namespace(|| "account_merkle_root"),

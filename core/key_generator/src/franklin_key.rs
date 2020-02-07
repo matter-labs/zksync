@@ -1,7 +1,6 @@
 // Built-in deps
 use std::path::PathBuf;
 // External deps
-use bellman;
 use franklin_crypto::bellman::groth16::generate_random_parameters;
 use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
@@ -63,7 +62,7 @@ pub fn make_franklin_key() {
 
     let f_r = File::open(&key_file_path).expect("Unable to open file");
     let mut r = BufReader::new(f_r);
-    let circuit_params = franklin_crypto::franklin_crypto::bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
+    let circuit_params = franklin_crypto::bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
         .expect("Unable to read proving key");
 
     let contract_content = generate_vk_contract(

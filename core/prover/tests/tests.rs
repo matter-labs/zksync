@@ -305,7 +305,7 @@ fn read_circuit_parameters() -> franklin_crypto::bellman::groth16::Parameters<mo
 struct MockApiClient<F: Fn() -> Option<prover::prover_data::ProverData>> {
     block_to_prove: Mutex<Option<(i64, i32)>>,
     heartbeats_tx: Arc<Mutex<mpsc::Sender<()>>>,
-    publishes_tx: Arc<Mutex<mpsc::Sender<bellman::groth16::Proof<models::node::Engine>>>>,
+    publishes_tx: Arc<Mutex<mpsc::Sender<franklin_crypto::bellman::groth16::Proof<models::node::Engine>>>>,
     prover_data_fn: F,
 }
 
