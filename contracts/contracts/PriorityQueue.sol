@@ -189,12 +189,11 @@ contract PriorityQueue {
         uint8 priorReqType = priorityRequests[_priorityRequestId].opType;
         bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
 
+        require(priorReqType == _opType, "pid10"); // pid10 - incorrect priority op type
+
         bytes memory cmpPriorityQueueBytes;
         bytes memory cmpOpCommittedBytes;
         if (_opType == DEPOSIT_OP) {
-            require(priorReqType == DEPOSIT_OP, "pid12");
-            // pid12 - expected deposit as next priority op
-
             // we don't know account if of the receiver when we create priority queue request
             // that's why we ignore it here
             uint comparePubdataLen = TOKEN_BYTES + AMOUNT_BYTES + ETH_ADDR_BYTES;
@@ -204,9 +203,6 @@ contract PriorityQueue {
             cmpOpCommittedBytes = Bytes.slice(_pubData, 0, comparePubdataLen);
 
         } else if (_opType == FULL_EXIT_OP) {
-            require(priorReqType == FULL_EXIT_OP, "pid13");
-            // pid13 - expected full exit as next priority op
-
             // we don't know full exit amount when we create full exit request, that why full amount is ignored here
             uint comparePubdataLen = ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES;
 
@@ -214,8 +210,6 @@ contract PriorityQueue {
             cmpOpCommittedBytes = Bytes.slice(_pubData, 0, comparePubdataLen);
 
         } else if (_opType == CHANGE_PUBKEY_PRIORITY) {
-            require(priorReqType == CHANGE_PUBKEY_PRIORITY, "pid14");
-            // pid14 - expected change pubkey onchain as next priority op
             uint comparePubdataLen = PUBKEY_HASH_BYTES + ETH_ADDR_BYTES;
 
             cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, 0, comparePubdataLen);
