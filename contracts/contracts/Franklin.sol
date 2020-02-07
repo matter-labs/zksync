@@ -655,10 +655,6 @@ contract Franklin {
 
         if (_opType == uint8(OpType.Deposit)) {
             bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES);
-            require(
-                pubData.length == TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES,
-                "fpp11"
-            ); // fpp11 - wrong deposit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.Deposit,
                 pubData
@@ -668,10 +664,6 @@ contract Franklin {
 
         if (_opType == uint8(OpType.PartialExit)) {
             bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES);
-            require(
-                pubData.length == TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES,
-                "fpp12"
-            ); // fpp12 - wrong partial exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.PartialExit,
                 pubData
@@ -681,10 +673,6 @@ contract Franklin {
 
         if (_opType == uint8(OpType.FullExit)) {
             bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + AMOUNT_BYTES);
-            require(
-                pubData.length == ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + AMOUNT_BYTES,
-                "fpp13"
-            ); // fpp13 - wrong full exit length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.FullExit,
                 pubData
@@ -722,10 +710,6 @@ contract Franklin {
 
         if (_opType == uint8(OpType.ChangePubKeyPriority)) {
             bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + SUCCESS_FLAG_BYTES + PUBKEY_HASH_BYTES + ETH_ADDR_BYTES);
-            require(
-                pubData.length == ACC_NUM_BYTES + SUCCESS_FLAG_BYTES + PUBKEY_HASH_BYTES + ETH_ADDR_BYTES,
-                "fpp16"
-            ); // fpp16 - wrong change pubkey priority length
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 OpType.ChangePubKeyPriority,
                 pubData
