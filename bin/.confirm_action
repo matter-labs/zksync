@@ -1,8 +1,8 @@
 #!/bin/bash
 
-if [ "$ZKSYNC_ENV" != "dev" ] && [ "$ZKSYNC_ENV" != "ci" ]
+if [ "$ZKSYNC_ACTION" != "dont_ask" ]
 then
-    echo -n "Dangerous action. Type environment name ('$ZKSYNC_ENV') to confirm: "
+    echo -n "Dangerous action (You can change ZKSYNC_ACTION=dont_ask to always allow). Type environment name ('$ZKSYNC_ENV') to confirm: "
     read CONFIRMED
     if [ ! "$ZKSYNC_ENV" == "$CONFIRMED" ]; then
         exit 1
