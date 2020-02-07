@@ -34,7 +34,7 @@ pub mod zksync_account;
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ETHAccountId(usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ZKSyncAccountId(pub usize);
+pub struct ZKSyncAccountId(usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Token(TokenId);
 

@@ -23,3 +23,9 @@ pairing = { package = "pairing_ce", version = "0.17.0" }
 franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
 
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+
+futures = "0.3"
+
+failure = "0.1"
+
+bigdecimal = { version = "0.1.0", features = ["serde"]}
