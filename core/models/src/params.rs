@@ -67,7 +67,7 @@ pub const CHUNK_BIT_WIDTH: usize = 64;
 
 pub const MAX_CIRCUIT_PEDERSEN_HASH_BITS: usize = 736;
 
-pub const ETHEREUM_KEY_BIT_WIDTH: usize = 160;
+pub const ETH_ADDRESS_BIT_WIDTH: usize = 160;
 /// Block number bit width
 pub const BLOCK_NUMBER_BIT_WIDTH: usize = 32;
 

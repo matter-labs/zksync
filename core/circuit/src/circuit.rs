@@ -54,7 +54,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         )?;
         let mut prev = PreviousData {
             op_data: AllocatedOperationData {
-                ethereum_key: zero_circuit_element.clone(),
+                eth_address: zero_circuit_element.clone(),
                 new_pubkey_hash: zero_circuit_element.clone(),
                 pub_nonce: zero_circuit_element.clone(),
                 amount_packed: zero_circuit_element.clone(),
@@ -572,9 +572,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 &prev.op_data.fee_packed,
             )?);
             is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is ethereum_key equal to previous"),
-                &op_data.ethereum_key,
-                &prev.op_data.ethereum_key,
+                cs.namespace(|| "is eth_address equal to previous"),
+                &op_data.eth_address,
+                &prev.op_data.eth_address,
             )?);
             is_op_data_correct_flags.push(CircuitElement::equals(
                 cs.namespace(|| "is new_pubkey_hash equal to previous"),
@@ -767,8 +767,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
-        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETHEREUM_KEY=160
-                                                                 //        assert_eq!(pubdata_bits.len(), 30 * 8);
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_ADDRESS=160
+                                                                //        assert_eq!(pubdata_bits.len(), 30 * 8);
         pubdata_bits.resize(
             6 * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
@@ -780,7 +780,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
         serialized_tx_bits.extend(cur.account.address.get_bits_be());
-        serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
+        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
@@ -987,7 +987,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_address_correct = CircuitElement::equals(
             cs.namespace(|| "is_address_correct"),
             &cur.account.address,
-            &op_data.ethereum_key,
+            &op_data.eth_address,
         )?;
 
         // MUST be true for correct op. First chunk is correct and tree update can be executed.
@@ -1081,7 +1081,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 let mut pub_data = Vec::new();
                 pub_data.extend(chunk_data.tx_type.get_bits_be()); //1
                 pub_data.extend(cur.account_address.get_bits_be()); //3
-                pub_data.extend(op_data.ethereum_key.get_bits_be()); //20
+                pub_data.extend(op_data.eth_address.get_bits_be()); //20
                 pub_data.extend(cur.token.get_bits_be()); // 2
                 pub_data.extend(op_data.full_amount.get_bits_be());
                 pub_data.resize(
@@ -1129,7 +1129,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_address_correct = CircuitElement::equals(
             cs.namespace(|| "is_address_correct"),
             &cur.account.address,
-            &op_data.ethereum_key,
+            &op_data.eth_address,
         )?;
 
         // MUST be true for correct op. First chunk is correct and tree update can be executed.
@@ -1189,7 +1189,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
-        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.resize(
             6 * franklin_constants::CHUNK_BIT_WIDTH, //TODO: move to constant
             Boolean::constant(false),
@@ -1229,7 +1229,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         // verify if address is to previous one (if existed)
         let is_pub_equal_to_previous = CircuitElement::equals(
             cs.namespace(|| "is_address_equal_to_previous"),
-            &op_data.ethereum_key,
+            &op_data.eth_address,
             &cur.account.address,
         )?;
 
@@ -1272,7 +1272,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         // update pub_key
         cur.account.address = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),
-            &op_data.ethereum_key,
+            &op_data.eth_address,
             &cur.account.address,
             &is_valid_first,
         )?;
@@ -1294,7 +1294,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                                                                 // NOTE: nonce if verified implicitly here. Current account nonce goes to pubdata and to contract.
         pubdata_bits.extend(cur.account.nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
-        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.extend(op_data.eth_signature_r.get_bits_be());
         pubdata_bits.extend(op_data.eth_signature_s.get_bits_be());
         pubdata_bits.extend(op_data.eth_signature_v.get_bits_be());
@@ -1337,7 +1337,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         // verify if address is to previous one (if existed)
         let is_address_correct = CircuitElement::equals(
             cs.namespace(|| "is_address_correct"),
-            &op_data.ethereum_key,
+            &op_data.eth_address,
             &cur.account.address,
         )?;
 
@@ -1528,7 +1528,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(lhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(cur.token.get_bits_be()); //16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
-        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //160
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //160
         pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
         pubdata_bits.resize(
@@ -1545,7 +1545,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?; //we use here transfer tx_code=5 to allow user sign message without knowing whether it is transfer_to_new or transfer
         serialized_tx_bits.extend(tx_code.get_bits_be());
         serialized_tx_bits.extend(lhs.account.address.get_bits_be());
-        serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
+        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
@@ -1695,7 +1695,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         cur.account.address = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),
-            &op_data.ethereum_key,
+            &op_data.eth_address,
             &cur.account.address,
             &rhs_valid,
         )?;

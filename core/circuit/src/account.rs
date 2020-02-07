@@ -49,7 +49,7 @@ impl<E: JubjubEngine> AccountContent<E> {
         let address = CircuitElement::from_fe_strict(
             cs.namespace(|| "address"),
             || witness.address.grab(),
-            models::params::ETHEREUM_KEY_BIT_WIDTH,
+            models::params::ETH_ADDRESS_BIT_WIDTH,
         )?;
 
         Ok(Self {
