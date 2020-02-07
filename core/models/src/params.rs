@@ -91,12 +91,14 @@ pub const SIGNATURE_R_BIT_WIDTH_PADDED: usize = 256;
 pub const FR_BIT_WIDTH: usize = 254;
 pub const FR_BIT_WIDTH_PADDED: usize = 256;
 
+pub const LEAF_DATA_BIT_WIDTH: usize = NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED;
+
 /// Number of supported tokens.
 pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
 // static mut BLOCK_SIZE_CHUNKS_VALUE: usize = 0;
-static mut BLOCK_SIZE_CHUNKS_VALUE: usize = 25;
+static mut BLOCK_SIZE_CHUNKS_VALUE: usize = 5;
 /// block_size_chunks.
 /// Value must be specified as environment variable at compile time under `BLOCK_SIZE_CHUNKS` key.
 pub fn block_size_chunks() -> usize {

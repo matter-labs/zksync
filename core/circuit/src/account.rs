@@ -21,13 +21,13 @@ impl<E: JubjubEngine> AccountContent<E> {
         mut cs: CS,
         witness: &AccountWitness<E>,
     ) -> Result<Self, SynthesisError> {
-        let nonce = CircuitElement::from_fe_strict(
+        let nonce = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "nonce"),
             || Ok(witness.nonce.grab()?),
             models::params::NONCE_BIT_WIDTH,
         )?;
 
-        let pub_key_hash = CircuitElement::from_fe_strict(
+        let pub_key_hash = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "pub_key_hash"),
             || witness.pub_key_hash.grab(),
             models::params::NEW_PUBKEY_HASH_WIDTH,
