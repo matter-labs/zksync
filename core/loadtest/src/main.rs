@@ -1,6 +1,6 @@
 use bigdecimal::BigDecimal;
 use futures::executor::block_on;
-use futures::try_join;
+use futures::future::try_join_all;
 use models::config_options::ConfigurationOptions;
 use serde::Deserialize;
 use std::env;
@@ -32,23 +32,18 @@ fn main() {
     let test_accounts = construct_test_accounts(input_accs, transport, &config);
     let deposit_amount = parse_ether("0.00001").expect("failed to parse ETH");
     block_on(do_deposits(&test_accounts[..], deposit_amount));
+    println!("End");
 }
 
 async fn do_deposits(test_accounts: &[TestAccount], deposit_amount: BigDecimal) {
-    // TODO: how to destruct vector to pass items down as arguments to join!/try_join!
-    try_join!(
-        deposit_single(&test_accounts[0], deposit_amount.clone()),
-        deposit_single(&test_accounts[1], deposit_amount.clone()),
-        deposit_single(&test_accounts[2], deposit_amount.clone()),
-        deposit_single(&test_accounts[3], deposit_amount.clone()),
-        deposit_single(&test_accounts[4], deposit_amount.clone()),
-        deposit_single(&test_accounts[5], deposit_amount.clone()),
-        deposit_single(&test_accounts[6], deposit_amount.clone()),
-        deposit_single(&test_accounts[7], deposit_amount.clone()),
-        deposit_single(&test_accounts[8], deposit_amount.clone()),
-        deposit_single(&test_accounts[9], deposit_amount.clone())
+    try_join_all(
+        test_accounts
+            .iter()
+            .map(|test_acc| deposit_single(&test_acc, deposit_amount.clone()))
+            .collect::<Vec<_>>(),
     )
-    .expect("failed to perform deposits");
+    .await
+    .expect("failed to deposit");
 }
 
 async fn deposit_single(
