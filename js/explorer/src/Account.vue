@@ -109,6 +109,11 @@ export default {
         intervalHandle: null,
         client: null,
     }),
+    watch: {
+        async currentPage() {
+            await this.update();
+        }
+    },
     async created() {
         this.client = await clientPromise;
 
