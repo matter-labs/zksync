@@ -5,7 +5,7 @@ use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
-use models::node::{AccountId, Address, PriorityOp, PubKeyHash};
+use models::node::{AccountId, Address, PriorityOp};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
@@ -114,43 +114,6 @@ impl<T: Transport> EthereumAccount<T> {
             .filter_map(|op| op.ok())
             .next()
             .expect("no priority op log in full exit"))
-    }
-
-    pub async fn change_pubkey_priority_op(
-        &self,
-        new_pubkey_hash: &PubKeyHash,
-    ) -> Result<PriorityOp, failure::Error> {
-        let signed_tx = self
-            .main_contract_eth_client
-            .sign_call_tx(
-                "changePubKeyHash",
-                (new_pubkey_hash.data.to_vec(),),
-                Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
-            )
-            .await
-            .map_err(|e| format_err!("ChangePubKeyHash send err: {}", e))?;
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(
-                signed_tx.raw_tx.into(),
-                Duration::from_millis(500),
-                1,
-            )
-            .compat()
-            .await
-            .map_err(|e| format_err!("ChangePubKeyHash wait confirm err: {}", e))?;
-        ensure!(
-            receipt.status == Some(U64::from(1)),
-            "ChangePubKeyHash transaction failed"
-        );
-        Ok(receipt
-            .logs
-            .into_iter()
-            .map(PriorityOp::try_from)
-            .filter_map(|op| op.ok())
-            .next()
-            .expect("no priority op log in change pubkey hash"))
     }
 
     pub async fn deposit_eth(
@@ -304,6 +267,7 @@ impl<T: Transport> EthereumAccount<T> {
     }
 
     pub async fn commit_block(&self, block: &Block) -> Result<TransactionReceipt, failure::Error> {
+        let witness_data = block.get_eth_witness_data();
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -313,11 +277,14 @@ impl<T: Transport> EthereumAccount<T> {
                     u64::from(block.fee_account),
                     block.get_eth_encoded_root(),
                     block.get_eth_public_data(),
+                    witness_data.0,
+                    witness_data.1,
                 ),
                 Options::default(),
             )
             .await
             .map_err(|e| format_err!("Commit block send err: {}", e))?;
+        println!("commit hash 0x:{:x}", signed_tx.hash);
         Ok(self
             .main_contract_eth_client
             .web3

@@ -61,9 +61,6 @@ contract Franklin {
     /// @notice Base gas for full exit transaction
     uint256 constant BASE_FULL_EXIT_GAS = 170000;
 
-    /// @notice Base gas for deposit eth transaction
-    uint256 constant BASE_CHANGE_PUBKEY_PRIORITY_ETH_GAS = 100000;
-
     /// @notice ETH blocks verification expectation
     uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
 
@@ -92,10 +89,7 @@ contract Franklin {
     uint256 constant FULL_EXIT_BYTES = 6 * 8;
 
     /// @notice ChangePubKey operation length
-    uint256 constant CHANGE_PUBKEY_BYTES = 15 * 8;
-
-    /// @notice ChangePubKeyPriority operation length
-    uint256 constant CHANGE_PUBKEY_PRIORITY_BYTES = 6 * 8;
+    uint256 constant CHANGE_PUBKEY_BYTES = 6 * 8;
 
     /// @notice Event emitted when a block is committed
     event BlockCommitted(uint32 indexed blockNumber);
@@ -177,8 +171,7 @@ contract Franklin {
         CloseAccount,
         Transfer,
         FullExit,
-        ChangePubKey,
-        ChangePubKeyPriority
+        ChangePubKey
     }
 
     /// @notice Onchain operations - operations processed inside rollup blocks
@@ -202,6 +195,9 @@ contract Franklin {
     /// @notice Once it was raised, it can not be cleared again, and all users must exit
     bool public exodusMode;
 
+    /// @notice User authenticated facts for some nonce.
+    mapping(address => mapping(uint32 => bytes)) public authFacts;
+
     // // Migration
 
     // // Address of the new version of the contract to migrate accounts to
@@ -221,13 +217,13 @@ contract Franklin {
     /// @param _governanceAddress The address of Governance contract
     /// @param _verifierAddress The address of Verifier contract
     /// @param _priorityQueueAddress The address of Priority Queue contract
-    /// @param _genesisAccAddress The address of single account, that exists in genesis block
+    /// _genesisAccAddress The address of single account, that exists in genesis block
     /// @param _genesisRoot Genesis blocks (first block) root
     constructor(
         address _governanceAddress,
         address _verifierAddress,
         address _priorityQueueAddress,
-        address _genesisAccAddress,
+        address, //_genesisAccAddress,
         bytes32 _genesisRoot
     ) public {
         verifier = Verifier(_verifierAddress);
@@ -509,44 +505,20 @@ contract Franklin {
         );
     }
 
-    function changePubKeyHash(bytes calldata _newPubKeyHash) external payable {
-        // Fee is:
-        //   fee coeff * base tx gas cost * gas price
-        uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_CHANGE_PUBKEY_PRIORITY_ETH_GAS * tx.gasprice;
-
-        requireActive();
-
-        require(
-            msg.value >= fee,
-            "cpk11"
-        ); // cpk11 - Not enough ETH provided
-
-        if (msg.value != fee) {
-            msg.sender.transfer(msg.value-fee);
-        }
-
-        require(
-            _newPubKeyHash.length == PUBKEY_HASH_BYTES,
-            "cpk12"
-        ); // cpk12 - wrong _newPubKeyHash length
-
-        // Priority Queue request
-        bytes memory pubData = _newPubKeyHash; // new pub key hash
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address == sender
-
-        priorityQueue.addPriorityRequest(uint8(OpType.ChangePubKeyPriority), fee, pubData);
-    }
-
     /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommitted event
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
     /// @param _newRoot New tree root
     /// @param _publicData Operations pubdata
+    /// @param _ethWitness Data passed to ethereum outside pubdata of the circuit.
+    /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     function commitBlock(
         uint32 _blockNumber,
         uint24 _feeAccount,
         bytes32 _newRoot,
-        bytes calldata _publicData
+        bytes calldata _publicData,
+        bytes calldata _ethWitness,
+        uint64[] calldata _ethWitnessSizes
     ) external {
         requireActive();
         require(
@@ -563,30 +535,14 @@ contract Franklin {
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
-            (uint64 startId, uint64 totalProcessed, uint64 priorityNumber) = collectOnchainOps(_publicData);
+            uint64 startId = totalOnchainOps;
+            (uint64 totalProcessed, uint64 priorityNumber) = collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
 
             // Verify that priority operations from this block are valid
             // (their data is similar to data from priority requests mapping)
             verifyPriorityOperations(startId, totalProcessed, priorityNumber);
 
-            // Create block commitment for verification proof
-            bytes32 commitment = createBlockCommitment(
-                _blockNumber,
-                _feeAccount,
-                blocks[_blockNumber - 1].stateRoot,
-                _newRoot,
-                _publicData
-            );
-
-            blocks[_blockNumber] = Block(
-                msg.sender, // validator
-                uint32(block.number), // committed at
-                startId, // blocks' onchain ops start id in global operations
-                totalProcessed, // total number of onchain ops in block
-                priorityNumber, // total number of priority onchain ops in block
-                commitment, // blocks' commitment
-                _newRoot // new root
-            );
+            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _publicData, startId, totalProcessed, priorityNumber);
 
             totalOnchainOps = startId + totalProcessed;
 
@@ -598,40 +554,96 @@ contract Franklin {
         }
     }
 
+    /// @notice Store committed block structure to the storage.
+    /// @param _startId - blocks' onchain ops start id in global operations
+    /// @param _totalProcessed - total number of onchain ops in block
+    /// @param _priorityNumber - total number of priority onchain ops in block
+    function createCommittedBlock(
+        uint32 _blockNumber,
+        uint24 _feeAccount,
+        bytes32 _newRoot,
+        bytes memory _publicData,
+        uint64 _startId, uint64 _totalProcessed, uint64 _priorityNumber
+    ) internal {
+        // Create block commitment for verification proof
+        bytes32 commitment = createBlockCommitment(
+            _blockNumber,
+            _feeAccount,
+            blocks[_blockNumber - 1].stateRoot,
+            _newRoot,
+            _publicData
+        );
+
+        blocks[_blockNumber] = Block(
+            msg.sender, // validator
+            uint32(block.number), // committed at
+            _startId, // blocks' onchain ops start id in global operations
+            _totalProcessed, // total number of onchain ops in block
+            _priorityNumber, // total number of priority onchain ops in block
+            commitment, // blocks' commitment
+            _newRoot // new root
+        );
+    }
+
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
     /// @param _publicData Operations packed in bytes array
+    /// @param _ethWitness Eth witness that was posted with commit
+    /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     /// @return onchain operations start id for global onchain operations counter, nchain operations number for this block, priority operations number for this block
-    function collectOnchainOps(bytes memory _publicData)
+    function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint64[] memory _ethWitnessSizes)
         internal
-        returns (uint64 onchainOpsStartId, uint64 processedOnchainOps, uint64 priorityCount)
+        returns (uint64 processedOnchainOps, uint64 priorityCount)
     {
         require(
             _publicData.length % 8 == 0,
             "fcs11"
         ); // fcs11 - pubdata.len % 8 != 0
 
-        onchainOpsStartId = totalOnchainOps;
         uint64 currentOnchainOp = totalOnchainOps;
 
         uint256 currentPointer = 0;
 
+        // (current element, offset)
+        uint64[2] memory currentEthWitness;
+
         while (currentPointer < _publicData.length) {
             uint8 opType = uint8(_publicData[currentPointer]);
+            bytes memory currentEthWitnessBytes = Bytes.slice(_ethWitness, currentEthWitness[1], _ethWitnessSizes[currentEthWitness[0]]);
             (uint256 len, uint64 ops, uint64 priority) = processOp(
                 opType,
                 currentPointer,
                 _publicData,
-                currentOnchainOp
+                currentOnchainOp,
+                currentEthWitnessBytes
             );
             currentPointer += len;
             processedOnchainOps += ops;
             priorityCount += priority;
             currentOnchainOp += ops;
+
+            currentEthWitness[1] += _ethWitnessSizes[currentEthWitness[0]];
+            currentEthWitness[0] += 1;
         }
         require(
             currentPointer == _publicData.length,
             "fcs12"
         ); // fcs12 - last chunk exceeds pubdata
+    }
+
+    function verifyChangePubkeySignature(bytes memory _signature, bytes memory _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
+        uint offset = 0;
+
+        bytes32 signR = Bytes.bytesToBytes32(Bytes.slice(_signature, offset, ETH_SIGN_RS_BYTES));
+        offset += ETH_SIGN_RS_BYTES;
+
+        bytes32 signS = Bytes.bytesToBytes32(Bytes.slice(_signature, offset, ETH_SIGN_RS_BYTES));
+        offset += ETH_SIGN_RS_BYTES;
+
+        uint8 signV = uint8(_signature[offset]);
+
+        bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n24", _nonce, _newPkHash);
+        address recoveredAddress = ecrecover(keccak256(signedMessage), signV, signR, signS);
+        return recoveredAddress == _ethAddress;
     }
 
     /// @notice On the first byte determines the type of operation, if it is an onchain operation - saves it in storage
@@ -644,7 +656,8 @@ contract Franklin {
         uint8 _opType,
         uint256 _currentPointer,
         bytes memory _publicData,
-        uint64 _currentOnchainOp
+        uint64 _currentOnchainOp,
+        bytes memory _currentEthWitness
     ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint64 priorityCount) {
         uint256 opDataPointer = _currentPointer + 1; // operation type byte
 
@@ -683,38 +696,23 @@ contract Franklin {
         if (_opType == uint8(OpType.ChangePubKey)) {
             uint256 offset = opDataPointer + ACC_NUM_BYTES;
 
-            bytes memory nonce = Bytes.slice(_publicData, offset, NONCE_BYTES);
-            offset += NONCE_BYTES;
-
             bytes memory newPubKeyHash = Bytes.slice(_publicData, offset, PUBKEY_HASH_BYTES);
             offset += PUBKEY_HASH_BYTES;
 
             address ethAddress = Bytes.bytesToAddress(Bytes.slice(_publicData, offset, ETH_ADDR_BYTES));
             offset += ETH_ADDR_BYTES;
 
-            bytes32 signR = Bytes.bytesToBytes32(Bytes.slice(_publicData, offset, ETH_SIGN_RS_BYTES));
-            offset += ETH_SIGN_RS_BYTES;
+            uint32 nonce = Bytes.bytesToUInt32(Bytes.slice(_publicData, offset, NONCE_BYTES));
+            offset += NONCE_BYTES;
 
-            bytes32 signS = Bytes.bytesToBytes32(Bytes.slice(_publicData, offset, ETH_SIGN_RS_BYTES));
-            offset += ETH_SIGN_RS_BYTES;
-
-            uint8 signV = uint8(_publicData[offset]);
-
-            bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n24", nonce, newPubKeyHash);
-            address recoveredAddress = ecrecover(keccak256(signedMessage), signV, signR, signS);
-
-            require(recoveredAddress == ethAddress, "fpp15");
-            // fpp15 - failed to verify change pubkey hash signature
+            if (_currentEthWitness.length > 0) {
+                require(verifyChangePubkeySignature(_currentEthWitness, newPubKeyHash, nonce, ethAddress), "fpp15");
+                // fpp15 - failed to verify change pubkey hash signature
+            } else {
+                require(keccak256(authFacts[ethAddress][nonce]) == keccak256(newPubKeyHash), "fpp16");
+                // fpp16 - new pub key hash is not authenticated properly
+            }
             return (CHANGE_PUBKEY_BYTES, 0, 0);
-        }
-
-        if (_opType == uint8(OpType.ChangePubKeyPriority)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + SUCCESS_FLAG_BYTES + PUBKEY_HASH_BYTES + ETH_ADDR_BYTES);
-            onchainOps[_currentOnchainOp] = OnchainOperation(
-                OpType.ChangePubKeyPriority,
-                pubData
-            );
-            return (CHANGE_PUBKEY_PRIORITY_BYTES, 1, 1);
         }
 
         revert("fpp14"); // fpp14 - unsupported op
@@ -959,5 +957,17 @@ contract Franklin {
 
         balancesToWithdraw[_owner][_tokenId] += _amount;
         exited[_owner][_tokenId] == false;
+    }
+
+    function isPackableToFr(bytes memory _data) internal pure returns (bool) {
+        // safe bound
+        return _data.length <= 31;
+    }
+
+    function authFact(bytes calldata _fact, uint32 _nonce) external {
+        require(isPackableToFr(_fact), "ahf10"); // ahf10 - auth fact should be packable to fr.
+        require(authFacts[msg.sender][_nonce].length == 0, "ahf11"); // ahf11 - auth fact for nonce should be empty
+
+        authFacts[msg.sender][_nonce] = _fact;
     }
 }

@@ -61,8 +61,6 @@ pub const ADDRESS_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
 //
-pub const SUCCESS_FLAG_WIDTH: usize = 8;
-//
 pub const CHUNK_BIT_WIDTH: usize = 64;
 
 pub const MAX_CIRCUIT_PEDERSEN_HASH_BITS: usize = 736;
@@ -85,10 +83,6 @@ pub const SIGNATURE_S_BIT_WIDTH_PADDED: usize = 256;
 pub const SIGNATURE_R_X_BIT_WIDTH: usize = 254;
 pub const SIGNATURE_R_Y_BIT_WIDTH: usize = 254;
 pub const SIGNATURE_R_BIT_WIDTH_PADDED: usize = 256;
-
-// ETH signature data
-pub const ETH_SIGNATURE_V_BIT_WIDTH: usize = 8;
-pub const ETH_SIGNATURE_RS_BIT_WIDTH: usize = 8 * 32;
 
 // Fr element encoding
 pub const FR_BIT_WIDTH: usize = 254;

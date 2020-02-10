@@ -129,7 +129,7 @@ impl ZksyncAccount {
             account: self.address,
             new_pk_hash: self.pubkey_hash.clone(),
             nonce,
-            eth_signature,
+            eth_signature: Some(eth_signature),
         };
         assert_eq!(
             change_pubkey.verify_eth_signature(),

@@ -97,9 +97,8 @@ impl RollupOpsBlock {
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use bigdecimal::BigDecimal;
-    use models::node::operations::{ChangePubKeyOffchainOp, ChangePubkeyOnchainOp};
-    use models::node::priority_ops::ChangePubKeyOnchain;
-    use models::node::tx::{ChangePubKeyOffchain, PackedEthSignature, TxSignature};
+    use models::node::operations::ChangePubKeyOffchainOp;
+    use models::node::tx::{ChangePubKeyOffchain, TxSignature};
     use models::node::{
         Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
         TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
@@ -261,31 +260,11 @@ mod test {
             new_pk_hash: PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")
                 .unwrap(),
             nonce: 3,
-            eth_signature: PackedEthSignature::deserialize_packed(&[0xffu8; 65]).unwrap(),
+            eth_signature: None,
         };
         let op1 = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOffchainOp {
             tx,
             account_id: 11,
-        }));
-        let pub_data1 = op1.public_data();
-        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
-            .expect("cant get ops from data")
-            .pop()
-            .expect("empty ops array");
-        let pub_data2 = op2.public_data();
-        assert_eq!(pub_data1, pub_data2);
-    }
-
-    #[test]
-    fn test_change_pubkey_onchain() {
-        let priority_op = ChangePubKeyOnchain {
-            eth_address: "7777777777777777777777777777777777777777".parse().unwrap(),
-            new_pubkey_hash: PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")
-                .unwrap(),
-        };
-        let op1 = FranklinOp::ChangePubKeyOnchain(Box::new(ChangePubkeyOnchainOp {
-            priority_op,
-            account_id: Some(11),
         }));
         let pub_data1 = op1.public_data();
         let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)

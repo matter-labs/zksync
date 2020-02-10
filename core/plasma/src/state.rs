@@ -2,10 +2,9 @@ use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
 use log::trace;
 use models::node::operations::{
-    ChangePubKeyOffchainOp, ChangePubkeyOnchainOp, CloseOp, DepositOp, FranklinOp, FullExitOp,
-    TransferOp, TransferToNewOp, WithdrawOp,
+    ChangePubKeyOffchainOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp,
+    TransferToNewOp, WithdrawOp,
 };
-use models::node::priority_ops::ChangePubKeyOnchain;
 use models::node::tx::ChangePubKeyOffchain;
 use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{
@@ -93,7 +92,6 @@ impl PlasmaState {
         match op {
             FranklinPriorityOp::Deposit(op) => self.apply_deposit(op),
             FranklinPriorityOp::FullExit(op) => self.apply_full_exit(op),
-            FranklinPriorityOp::ChangePubKeyOnchain(op) => self.apply_change_pubkey_priority(op),
         }
     }
 
@@ -234,63 +232,6 @@ impl PlasmaState {
                 executed_op: FranklinOp::TransferToNew(Box::new(transfer_to_new_op)),
             })
         }
-    }
-
-    fn apply_change_pubkey_priority(&mut self, priority_op: ChangePubKeyOnchain) -> OpSuccess {
-        // NOTE: Authroization of the ChangePubKeyPriority is verified on the contract.
-        trace!("Processing {:?}", priority_op);
-        let account_id = self
-            .get_account_by_address(&priority_op.eth_address)
-            .map(|(id, _)| id);
-
-        let op = ChangePubkeyOnchainOp {
-            priority_op,
-            account_id,
-        };
-
-        OpSuccess {
-            fee: None,
-            updates: self.apply_change_pubkey_priority_op(&op),
-            executed_op: FranklinOp::ChangePubKeyOnchain(Box::new(op)),
-        }
-    }
-
-    pub fn apply_change_pubkey_priority_op(
-        &mut self,
-        op: &ChangePubkeyOnchainOp,
-    ) -> AccountUpdates {
-        let mut updates = Vec::new();
-        let account_id = if let Some(account_id) = &op.account_id {
-            *account_id
-        } else {
-            return updates;
-        };
-
-        // expect is ok since account since existence was verified before
-        let mut account = self
-            .get_account(account_id)
-            .expect("ChangePubKeyPriority account not found");
-
-        let old_pub_key_hash = account.pub_key_hash.clone();
-        let old_nonce = account.nonce;
-
-        account.pub_key_hash = op.priority_op.new_pubkey_hash.clone();
-
-        let new_pub_key_hash = account.pub_key_hash.clone();
-        let new_nonce = account.nonce;
-
-        self.insert_account(account_id, account);
-        updates.push((
-            account_id,
-            AccountUpdate::ChangePubKeyHash {
-                old_pub_key_hash,
-                old_nonce,
-                new_pub_key_hash,
-                new_nonce,
-            },
-        ));
-
-        updates
     }
 
     fn apply_withdraw(&mut self, tx: Withdraw) -> Result<OpSuccess, Error> {

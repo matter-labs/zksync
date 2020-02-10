@@ -208,7 +208,6 @@ pub fn calculate_deposit_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.before.clone(),
@@ -224,7 +223,6 @@ pub fn calculate_deposit_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: deposit_witness.args.clone(),
         lhs: deposit_witness.after.clone(),
@@ -244,7 +242,6 @@ pub fn calculate_deposit_operations_from_witness(
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
     };
 
     let operation_three = Operation {
@@ -260,7 +257,6 @@ pub fn calculate_deposit_operations_from_witness(
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
     };
 
     let operation_four = Operation {
@@ -276,7 +272,6 @@ pub fn calculate_deposit_operations_from_witness(
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
     };
 
     let operation_five = Operation {
@@ -292,7 +287,6 @@ pub fn calculate_deposit_operations_from_witness(
         lhs: deposit_witness.after.clone(),
         rhs: deposit_witness.after.clone(),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
     };
     let operations: Vec<Operation<_>> = vec![
         operation_zero,

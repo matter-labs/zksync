@@ -204,18 +204,22 @@ pub struct ChangePubKeyOffchain {
     pub account: Address,
     pub new_pk_hash: PubKeyHash,
     pub nonce: Nonce,
-    pub eth_signature: PackedEthSignature,
+    pub eth_signature: Option<PackedEthSignature>,
 }
 
 impl ChangePubKeyOffchain {
     const TX_TYPE: u8 = 7;
 
+    /// GetBytes for this transaction is used for hashing.
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
         out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);
         out.extend_from_slice(&self.nonce.to_be_bytes());
+        if let Some(sign) = &self.eth_signature {
+            out.extend_from_slice(&sign.serialize_packed())
+        }
         out
     }
 
@@ -227,13 +231,14 @@ impl ChangePubKeyOffchain {
     }
 
     pub fn verify_eth_signature(&self) -> Option<Address> {
-        self.eth_signature
-            .signature_recover_signer(&Self::get_eth_signed_data(self.nonce, &self.new_pk_hash))
-            .ok()
+        self.eth_signature.as_ref().and_then(|sign| {
+            sign.signature_recover_signer(&Self::get_eth_signed_data(self.nonce, &self.new_pk_hash))
+                .ok()
+        })
     }
 
     pub fn check_correctness(&self) -> bool {
-        self.verify_eth_signature() == Some(self.account)
+        self.eth_signature.is_none() || self.verify_eth_signature() == Some(self.account)
     }
 }
 

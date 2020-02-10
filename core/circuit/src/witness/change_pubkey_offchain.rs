@@ -1,7 +1,6 @@
 use super::utils::*;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use crate::utils::convert_eth_signature_to_representation;
 use ff::{Field, PrimeField};
 use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
@@ -9,7 +8,6 @@ use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
 use models::node::operations::ChangePubKeyOffchainOp;
-use models::node::Engine;
 use models::params as franklin_constants;
 use pairing::bn256::*;
 
@@ -17,7 +15,6 @@ pub struct ChangePubkeyOffChainData {
     pub account_id: u32,
     pub address: Fr,
     pub new_pubkey_hash: Fr,
-    pub eth_signature_data: ETHSignatureData<Engine>,
 }
 pub struct ChangePubkeyOffChainWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -26,8 +23,8 @@ pub struct ChangePubkeyOffChainWitness<E: JubjubEngine> {
     pub before_root: Option<E::Fr>,
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
-    pub eth_signature_data: ETHSignatureData<E>,
 }
+
 impl<E: JubjubEngine> ChangePubkeyOffChainWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
@@ -43,11 +40,6 @@ impl<E: JubjubEngine> ChangePubkeyOffChainWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.before.witness.account_witness.nonce.unwrap(),
-            franklin_constants::NONCE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut pubdata_bits,
             &self.args.new_pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
@@ -56,16 +48,16 @@ impl<E: JubjubEngine> ChangePubkeyOffChainWitness<E> {
             &self.args.eth_address.unwrap(),
             franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
-
-        pubdata_bits.extend(self.eth_signature_data.r.iter().map(|x| x.unwrap()));
-        pubdata_bits.extend(self.eth_signature_data.s.iter().map(|x| x.unwrap()));
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.eth_signature_data.v.unwrap(),
-            franklin_constants::ETH_SIGNATURE_V_BIT_WIDTH,
+            &self.before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
         );
 
-        pubdata_bits.resize(15 * franklin_constants::CHUNK_BIT_WIDTH, false);
+        pubdata_bits.resize(
+            ChangePubKeyOffchainOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
+            false,
+        );
         pubdata_bits
     }
 }
@@ -78,9 +70,6 @@ pub fn apply_change_pubkey_offchain_tx(
         account_id: change_pubkey_offchain.account_id,
         address: eth_address_to_fr(&change_pubkey_offchain.tx.account),
         new_pubkey_hash: change_pubkey_offchain.tx.new_pk_hash.to_fr(),
-        eth_signature_data: convert_eth_signature_to_representation(
-            &change_pubkey_offchain.tx.eth_signature,
-        ),
     };
 
     apply_change_pubkey_offchain(tree, change_pubkey_data)
@@ -159,7 +148,6 @@ pub fn apply_change_pubkey_offchain(
         before_root: Some(before_root),
         after_root: Some(after_root),
         tx_type: Some(Fr::from_str("7").unwrap()),
-        eth_signature_data: change_pubkey_offcahin.eth_signature_data,
     }
 }
 
@@ -181,7 +169,6 @@ pub fn calculate_change_pubkey_offchain_from_witness(
             third_sig_msg: Some(Fr::zero()),
             signature_data: SignatureData::init_empty(),
             signer_pub_key_packed: vec![Some(false); 256],
-            eth_signature_data: change_pubkey_offchain_witness.eth_signature_data.clone(),
             args: change_pubkey_offchain_witness.args.clone(),
             lhs: change_pubkey_offchain_witness.before.clone(),
             rhs: change_pubkey_offchain_witness.after.clone(),

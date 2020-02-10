@@ -145,18 +145,6 @@ impl<T: Transport> AccountSet<T> {
             zksync_account.create_change_pubkey_tx(nonce, increment_nonce),
         ))
     }
-
-    fn change_pubkey_with_priority_op(
-        &self,
-        eth_signer: ETHAccountId,
-        zksync_signer: ZKSyncAccountId,
-    ) -> PriorityOp {
-        block_on(
-            self.eth_accounts[eth_signer.0]
-                .change_pubkey_priority_op(&self.zksync_accounts[zksync_signer.0].pubkey_hash),
-        )
-        .expect("ChangePubKeyHash priority op should not fail")
-    }
 }
 
 /// Initialize plasma state with one account - fee account.
@@ -344,7 +332,7 @@ pub fn perform_basic_tests() {
             &deposit_amount / &BigDecimal::from(4),
         );
 
-        test_setup.change_pubkey_with_priority_op(ETHAccountId(1), ZKSyncAccountId(2));
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
 
         test_setup.withdraw(
             ZKSyncAccountId(2),
@@ -568,18 +556,6 @@ impl TestSetup {
             .change_pubkey_with_tx(zksync_signer, None, true);
 
         self.execute_tx(tx);
-    }
-
-    fn change_pubkey_with_priority_op(
-        &mut self,
-        eth_signer: ETHAccountId,
-        zksync_signer: ZKSyncAccountId,
-    ) {
-        let op = self
-            .accounts
-            .change_pubkey_with_priority_op(eth_signer, zksync_signer);
-
-        self.execute_priority_op(op);
     }
 
     pub fn transfer(

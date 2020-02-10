@@ -1,17 +1,15 @@
 use super::tx::TxSignature;
 use super::AccountId;
 use super::FranklinTx;
-use crate::node::priority_ops::ChangePubKeyOnchain;
-use crate::node::tx::{ChangePubKeyOffchain, PackedEthSignature};
+use crate::node::tx::ChangePubKeyOffchain;
 use crate::node::{
     pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
     FranklinPriorityOp, FullExit, PubKeyHash, Transfer, Withdraw,
 };
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH,
-    BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, ETH_SIGNATURE_RS_BIT_WIDTH,
-    ETH_SIGNATURE_V_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, FR_ADDRESS_LEN,
-    NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, SUCCESS_FLAG_WIDTH, TOKEN_BIT_WIDTH,
+    BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH,
+    FR_ADDRESS_LEN, NEW_PUBKEY_HASH_WIDTH, NONCE_BIT_WIDTH, TOKEN_BIT_WIDTH,
 };
 use crate::primitives::{
     big_decimal_to_u128, bytes_slice_to_uint128, bytes_slice_to_uint16, bytes_slice_to_uint32,
@@ -19,7 +17,6 @@ use crate::primitives::{
 };
 use bigdecimal::BigDecimal;
 use failure::{ensure, format_err};
-use std::convert::TryInto;
 use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -380,21 +377,30 @@ pub struct ChangePubKeyOffchainOp {
 }
 
 impl ChangePubKeyOffchainOp {
-    pub const CHUNKS: usize = 15;
+    pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x07;
 
     pub fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
         data.push(Self::OP_CODE); // opcode
         data.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
-        data.extend_from_slice(&self.tx.nonce.to_be_bytes());
         data.extend_from_slice(&self.tx.new_pk_hash.data);
         data.extend_from_slice(&self.tx.account.as_bytes());
-        data.extend_from_slice(&self.tx.eth_signature.0.r);
-        data.extend_from_slice(&self.tx.eth_signature.0.s);
-        data.push(self.tx.eth_signature.0.v);
+        data.extend_from_slice(&self.tx.nonce.to_be_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
         data
+    }
+
+    pub fn get_eth_witness(&self) -> Vec<u8> {
+        if let Some(eth_signature) = &self.tx.eth_signature {
+            let mut data = Vec::with_capacity(65);
+            data.extend_from_slice(&eth_signature.0.r);
+            data.extend_from_slice(&eth_signature.0.s);
+            data.push(eth_signature.0.v);
+            data
+        } else {
+            Vec::new()
+        }
     }
 
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
@@ -407,15 +413,6 @@ impl ChangePubKeyOffchainOp {
         );
         let account_id = bytes_slice_to_uint32(&bytes[offset..offset + len])
             .ok_or_else(|| format_err!("Change pubkey offchain, fail to get account id"))?;
-        offset += len;
-
-        len = NONCE_BIT_WIDTH / 8;
-        ensure!(
-            bytes.len() >= offset + len,
-            "Change pubkey offchain, pubdata too short"
-        );
-        let nonce = bytes_slice_to_uint32(&bytes[offset..offset + len])
-            .ok_or_else(|| format_err!("Change pubkey offchain, fail to get nonce"))?;
         offset += len;
 
         len = NEW_PUBKEY_HASH_WIDTH / 8;
@@ -434,43 +431,20 @@ impl ChangePubKeyOffchainOp {
         let account = Address::from_slice(&bytes[offset..offset + len]);
         offset += len;
 
-        len = ETH_SIGNATURE_RS_BIT_WIDTH / 8;
+        len = NONCE_BIT_WIDTH / 8;
         ensure!(
             bytes.len() >= offset + len,
             "Change pubkey offchain, pubdata too short"
         );
-        let eth_signature_r: [u8; ETH_SIGNATURE_RS_BIT_WIDTH / 8] = bytes[offset..offset + len]
-            .try_into()
-            .expect("eth signature incorrect len");
-        offset += len;
-
-        len = ETH_SIGNATURE_RS_BIT_WIDTH / 8;
-        ensure!(
-            bytes.len() >= offset + len,
-            "Change pubkey offchain, pubdata too short"
-        );
-        let eth_signature_s: [u8; ETH_SIGNATURE_RS_BIT_WIDTH / 8] = bytes[offset..offset + len]
-            .try_into()
-            .expect("eth signature incorrect len");
-        offset += len;
-
-        len = ETH_SIGNATURE_V_BIT_WIDTH / 8;
-        ensure!(
-            bytes.len() >= offset + len,
-            "Change pubkey offchain, pubdata too short"
-        );
-        let eth_signature_v = bytes[offset + len - 1];
+        let nonce = bytes_slice_to_uint32(&bytes[offset..offset + len])
+            .ok_or_else(|| format_err!("Change pubkey offchain, fail to get nonce"))?;
 
         Ok(ChangePubKeyOffchainOp {
             tx: ChangePubKeyOffchain {
                 account,
                 new_pk_hash,
                 nonce,
-                eth_signature: PackedEthSignature(ethsign::Signature {
-                    v: eth_signature_v,
-                    r: eth_signature_r,
-                    s: eth_signature_s,
-                }),
+                eth_signature: None,
             },
             account_id,
         })
@@ -534,83 +508,6 @@ impl FullExitOp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChangePubkeyOnchainOp {
-    pub priority_op: ChangePubKeyOnchain,
-    // None if not success
-    pub account_id: Option<AccountId>,
-}
-
-impl ChangePubkeyOnchainOp {
-    pub const CHUNKS: usize = 6;
-    pub const OP_CODE: u8 = 0x08;
-
-    pub fn get_public_data(&self) -> Vec<u8> {
-        let mut data = Vec::new();
-        data.push(Self::OP_CODE); // opcode
-        data.extend_from_slice(&self.account_id.unwrap_or_default().to_be_bytes()[1..]);
-        if self.account_id.is_some() {
-            data.push(0x01);
-        } else {
-            data.push(0x00);
-        }
-        data.extend_from_slice(&self.priority_op.new_pubkey_hash.data);
-        data.extend_from_slice(self.priority_op.eth_address.as_bytes());
-        data.resize(Self::CHUNKS * 8, 0x00);
-        data
-    }
-
-    pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
-        let mut offset = 1;
-
-        let mut len = ACCOUNT_ID_BIT_WIDTH / 8;
-        ensure!(
-            bytes.len() >= offset + len,
-            "Change pubkey onchain, pubdata too short"
-        );
-        let account_id = bytes_slice_to_uint32(&bytes[offset..offset + len])
-            .ok_or_else(|| format_err!("Change pubkey onchain, fail to get account id"))?;
-        offset += len;
-
-        len = SUCCESS_FLAG_WIDTH / 8;
-        ensure!(
-            bytes.len() >= offset + len,
-            "Change pubkey onchain, pubdata too short"
-        );
-        let success = bytes[offset + len - 1];
-        offset += len;
-
-        len = NEW_PUBKEY_HASH_WIDTH / 8;
-        ensure!(
-            bytes.len() >= offset + len,
-            "Change pubkey offchain, pubdata too short"
-        );
-        let new_pubkey_hash = PubKeyHash::from_bytes(&bytes[offset..offset + len])?;
-        offset += len;
-
-        len = ADDRESS_WIDTH / 8;
-        ensure!(
-            bytes.len() >= offset + len,
-            "Change pubkey offchain, pubdata too short"
-        );
-        let eth_address = Address::from_slice(&bytes[offset..offset + len]);
-
-        Ok(ChangePubkeyOnchainOp {
-            priority_op: ChangePubKeyOnchain {
-                new_pubkey_hash,
-                eth_address,
-            },
-            account_id: if success == 1 {
-                Some(account_id)
-            } else if success == 0 {
-                None
-            } else {
-                failure::bail!("Change pubkey offchain, incorrect success value, should be 0 or 1")
-            },
-        })
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinOp {
     Noop(NoopOp),
@@ -621,7 +518,6 @@ pub enum FranklinOp {
     Transfer(Box<TransferOp>),
     FullExit(Box<FullExitOp>),
     ChangePubKeyOffchain(Box<ChangePubKeyOffchainOp>),
-    ChangePubKeyOnchain(Box<ChangePubkeyOnchainOp>),
 }
 
 impl FranklinOp {
@@ -635,7 +531,6 @@ impl FranklinOp {
             FranklinOp::Transfer(_) => TransferOp::CHUNKS,
             FranklinOp::FullExit(_) => FullExitOp::CHUNKS,
             FranklinOp::ChangePubKeyOffchain(_) => ChangePubKeyOffchainOp::CHUNKS,
-            FranklinOp::ChangePubKeyOnchain(_) => ChangePubkeyOnchainOp::CHUNKS,
         }
     }
 
@@ -649,7 +544,13 @@ impl FranklinOp {
             FranklinOp::Transfer(op) => op.get_public_data(),
             FranklinOp::FullExit(op) => op.get_public_data(),
             FranklinOp::ChangePubKeyOffchain(op) => op.get_public_data(),
-            FranklinOp::ChangePubKeyOnchain(op) => op.get_public_data(),
+        }
+    }
+
+    pub fn eth_witness(&self) -> Vec<u8> {
+        match self {
+            FranklinOp::ChangePubKeyOffchain(op) => op.get_eth_witness(),
+            _ => Vec::new(),
         }
     }
 
@@ -678,9 +579,6 @@ impl FranklinOp {
             ChangePubKeyOffchainOp::OP_CODE => Ok(FranklinOp::ChangePubKeyOffchain(Box::new(
                 ChangePubKeyOffchainOp::from_public_data(&bytes)?,
             ))),
-            ChangePubkeyOnchainOp::OP_CODE => Ok(FranklinOp::ChangePubKeyOnchain(Box::new(
-                ChangePubkeyOnchainOp::from_public_data(&bytes)?,
-            ))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -695,7 +593,6 @@ impl FranklinOp {
             TransferOp::OP_CODE => Ok(TransferOp::CHUNKS * 8),
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS * 8),
             ChangePubKeyOffchainOp::OP_CODE => Ok(ChangePubKeyOffchainOp::CHUNKS * 8),
-            ChangePubkeyOnchainOp::OP_CODE => Ok(ChangePubkeyOnchainOp::CHUNKS * 8),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }
@@ -717,9 +614,6 @@ impl FranklinOp {
         match self {
             FranklinOp::Deposit(op) => Ok(FranklinPriorityOp::Deposit(op.priority_op.clone())),
             FranklinOp::FullExit(op) => Ok(FranklinPriorityOp::FullExit(op.priority_op.clone())),
-            FranklinOp::ChangePubKeyOnchain(op) => Ok(FranklinPriorityOp::ChangePubKeyOnchain(
-                op.priority_op.clone(),
-            )),
             _ => Err(format_err!("Wrong operation type")),
         }
     }

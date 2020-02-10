@@ -44,7 +44,6 @@ pub fn noop_operation(
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
-        eth_signature_data: ETHSignatureData::init_empty(),
 
         args: OperationArguments {
             eth_address: Some(Fr::zero()),
