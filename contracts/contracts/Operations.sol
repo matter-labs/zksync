@@ -65,8 +65,8 @@ library Operations {
 
     // FullExit pubdata
 
-    struct FullExitPubdata {
-        uint24 accountId;
+    struct FullExit {
+        //uint24 accountId;
         bytes pubkeyHash;
         address owner;
         uint16 tokenId;
@@ -74,7 +74,7 @@ library Operations {
     }
 
     function readFullExitPubdata(bytes memory _data, uint _offset) internal pure
-        returns (FullExitPubdata memory parsed)
+        returns (FullExit memory parsed)
     {
         uint offset = _offset + ACCOUNT_ID_BYTES;                                   // accountId (ignored)
         (offset, parsed.pubkeyHash) = Bytes.read(_data, offset, PUBKEY_HASH_BYTES); // pubkeyHash
@@ -83,7 +83,7 @@ library Operations {
         (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);                   // nonce
     }
 
-    function writeFullExitPubdata(FullExitPubdata memory op) internal pure returns (bytes memory buf) {
+    function writeFullExitPubdata(FullExit memory op) internal pure returns (bytes memory buf) {
         buf = new bytes(ACCOUNT_ID_BYTES);                              // accountId (ignored)
         buf = Bytes.concat(buf, op.pubkeyHash);                         // pubkeyHash
         buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));    // owner
@@ -93,7 +93,7 @@ library Operations {
 
     // PartialExit pubdata
     
-    struct PartialExitPubdata {
+    struct PartialExit {
         //uint24 accountId;
         uint16 tokenId;
         uint128 amount;
@@ -102,7 +102,7 @@ library Operations {
     }
 
     function readPartialExitPubdata(bytes memory _data, uint _offset) internal pure
-        returns (PartialExitPubdata memory parsed)
+        returns (PartialExit memory parsed)
     {
         uint offset = _offset + ACCOUNT_ID_BYTES;                   // accountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
@@ -111,7 +111,7 @@ library Operations {
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
     }
 
-    function writePartialExitPubdata(PartialExitPubdata memory op) internal pure returns (bytes memory buf) {
+    function writePartialExitPubdata(PartialExit memory op) internal pure returns (bytes memory buf) {
         buf = new bytes(ACCOUNT_ID_BYTES);                              // accountId (ignored)
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt16(op.tokenId));   // tokenId
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt128(op.amount));   // amount

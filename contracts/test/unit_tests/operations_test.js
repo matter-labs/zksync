@@ -11,9 +11,15 @@ describe("Operations unit test", function () {
     });
 
     it("should convert Deposit pubdata", async () => {
-        let r = await testContract.testDeposit()
-        console.log(r)
-        //expect(r).equal("0x01020311121314")
+        await testContract.testDeposit()
+    });
+
+    it("should convert FullExit pubdata", async () => {
+        await testContract.testFullExit()
+    });
+
+    it("should convert PartialExit pubdata", async () => {
+        await testContract.testPartialExit()
     });
 
 });
