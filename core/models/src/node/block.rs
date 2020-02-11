@@ -84,12 +84,15 @@ impl Block {
     }
 
     fn get_noops(&self) -> usize {
-        let used_chunks = self.block_transactions.iter().fold(0, |mut chunks, i| {
-            chunks
-                + i.get_executed_op()
+        let used_chunks = self
+            .block_transactions
+            .iter()
+            .map(|op| {
+                op.get_executed_op()
                     .map(|op| op.chunks())
                     .unwrap_or_default()
-        });
+            })
+            .sum::<usize>();
 
         block_size_chunks() - used_chunks
     }

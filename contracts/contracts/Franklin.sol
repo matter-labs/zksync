@@ -113,6 +113,12 @@ contract Franklin {
         bytes franklinAddress
     );
 
+    event FactAuth(
+        address sender,
+        uint32 nonce,
+        bytes fact
+    );
+
     /// @notice Event emitted when blocks are reverted
     event BlocksReverted(
         uint32 indexed totalBlocksVerified,
@@ -969,5 +975,7 @@ contract Franklin {
         require(authFacts[msg.sender][_nonce].length == 0, "ahf11"); // ahf11 - auth fact for nonce should be empty
 
         authFacts[msg.sender][_nonce] = _fact;
+
+        emit FactAuth(msg.sender, _nonce, _fact);
     }
 }
