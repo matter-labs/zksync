@@ -2,8 +2,8 @@ use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
 use log::trace;
 use models::node::operations::{
-    ChangePubKeyOffchainOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp,
-    TransferToNewOp, WithdrawOp,
+    ChangePubKeyOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp,
+    WithdrawOp,
 };
 use models::node::tx::ChangePubKey;
 use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
@@ -288,7 +288,7 @@ impl PlasmaState {
             tx.eth_signature.is_none() || tx.verify_eth_signature() == Some(account.address),
             "ChangePubKey signature is incorrect"
         );
-        let change_pk_op = ChangePubKeyOffchainOp { tx, account_id };
+        let change_pk_op = ChangePubKeyOp { tx, account_id };
 
         let (fee, updates) = self.apply_change_pubkey_op(&change_pk_op)?;
         Ok(OpSuccess {
@@ -522,7 +522,7 @@ impl PlasmaState {
 
     pub fn apply_change_pubkey_op(
         &mut self,
-        op: &ChangePubKeyOffchainOp,
+        op: &ChangePubKeyOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
         let mut updates = Vec::new();
         let mut account = self.get_account(op.account_id).unwrap();

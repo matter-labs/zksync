@@ -371,12 +371,12 @@ impl CloseOp {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ChangePubKeyOffchainOp {
+pub struct ChangePubKeyOp {
     pub tx: ChangePubKey,
     pub account_id: AccountId,
 }
 
-impl ChangePubKeyOffchainOp {
+impl ChangePubKeyOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x07;
 
@@ -439,7 +439,7 @@ impl ChangePubKeyOffchainOp {
         let nonce = bytes_slice_to_uint32(&bytes[offset..offset + len])
             .ok_or_else(|| format_err!("Change pubkey offchain, fail to get nonce"))?;
 
-        Ok(ChangePubKeyOffchainOp {
+        Ok(ChangePubKeyOp {
             tx: ChangePubKey {
                 account,
                 new_pk_hash,
@@ -517,7 +517,7 @@ pub enum FranklinOp {
     Close(Box<CloseOp>),
     Transfer(Box<TransferOp>),
     FullExit(Box<FullExitOp>),
-    ChangePubKeyOffchain(Box<ChangePubKeyOffchainOp>),
+    ChangePubKeyOffchain(Box<ChangePubKeyOp>),
 }
 
 impl FranklinOp {
@@ -530,7 +530,7 @@ impl FranklinOp {
             FranklinOp::Close(_) => CloseOp::CHUNKS,
             FranklinOp::Transfer(_) => TransferOp::CHUNKS,
             FranklinOp::FullExit(_) => FullExitOp::CHUNKS,
-            FranklinOp::ChangePubKeyOffchain(_) => ChangePubKeyOffchainOp::CHUNKS,
+            FranklinOp::ChangePubKeyOffchain(_) => ChangePubKeyOp::CHUNKS,
         }
     }
 
@@ -576,8 +576,8 @@ impl FranklinOp {
             FullExitOp::OP_CODE => Ok(FranklinOp::FullExit(Box::new(
                 FullExitOp::from_public_data(&bytes)?,
             ))),
-            ChangePubKeyOffchainOp::OP_CODE => Ok(FranklinOp::ChangePubKeyOffchain(Box::new(
-                ChangePubKeyOffchainOp::from_public_data(&bytes)?,
+            ChangePubKeyOp::OP_CODE => Ok(FranklinOp::ChangePubKeyOffchain(Box::new(
+                ChangePubKeyOp::from_public_data(&bytes)?,
             ))),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
@@ -592,7 +592,7 @@ impl FranklinOp {
             CloseOp::OP_CODE => Ok(CloseOp::CHUNKS * 8),
             TransferOp::OP_CODE => Ok(TransferOp::CHUNKS * 8),
             FullExitOp::OP_CODE => Ok(FullExitOp::CHUNKS * 8),
-            ChangePubKeyOffchainOp::OP_CODE => Ok(ChangePubKeyOffchainOp::CHUNKS * 8),
+            ChangePubKeyOp::OP_CODE => Ok(ChangePubKeyOp::CHUNKS * 8),
             _ => Err(format_err!("Wrong operation type: {}", &op_type)),
         }
     }

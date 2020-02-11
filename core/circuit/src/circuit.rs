@@ -17,7 +17,7 @@ use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
-use models::node::operations::{ChangePubKeyOffchainOp, NoopOp};
+use models::node::operations::{ChangePubKeyOp, NoopOp};
 use models::node::{CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp};
 use models::params as franklin_constants;
 
@@ -1136,9 +1136,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
                                                                 // NOTE: nonce if verified implicitly here. Current account nonce goes to pubdata and to contract.
-        pubdata_bits.extend(cur.account.nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
+        pubdata_bits.extend(op_data.pub_nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.resize(
-            ChangePubKeyOffchainOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
+            ChangePubKeyOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -1155,7 +1155,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            ChangePubKeyOffchainOp::CHUNKS,
+            ChangePubKeyOp::CHUNKS,
         )?;
 
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
@@ -1169,7 +1169,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_change_pubkey_offchain = Boolean::from(Expression::equals(
             cs.namespace(|| "is_change_pubkey_offchain"),
             &chunk_data.tx_type.get_number(),
-            Expression::u64::<CS>(u64::from(ChangePubKeyOffchainOp::OP_CODE)),
+            Expression::u64::<CS>(u64::from(ChangePubKeyOp::OP_CODE)),
         )?);
         is_valid_flags.push(is_change_pubkey_offchain);
 
@@ -1184,10 +1184,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
 
-        let is_valid_first = Boolean::and(
-            cs.namespace(|| "is valid and first"),
-            &tx_valid,
-            &is_first_chunk,
+        let is_pub_nonce_valid = CircuitElement::equals(
+            cs.namespace(|| "is_pub_nonce_valid"),
+            &cur.account.nonce,
+            &op_data.pub_nonce,
+        )?;
+        let is_valid_first = multi_and(
+            cs.namespace(|| "is_valid_first"),
+            &[tx_valid.clone(), is_first_chunk, is_pub_nonce_valid],
         )?;
 
         // update pub_key
@@ -1971,10 +1975,7 @@ fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     points.push(get_xy(WithdrawOp::OP_CODE, WithdrawOp::CHUNKS));
     points.push(get_xy(TransferToNewOp::OP_CODE, TransferToNewOp::CHUNKS));
     points.push(get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS));
-    points.push(get_xy(
-        ChangePubKeyOffchainOp::OP_CODE,
-        ChangePubKeyOffchainOp::CHUNKS,
-    ));
+    points.push(get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS));
 
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);

@@ -97,7 +97,7 @@ impl RollupOpsBlock {
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use bigdecimal::BigDecimal;
-    use models::node::operations::ChangePubKeyOffchainOp;
+    use models::node::operations::ChangePubKeyOp;
     use models::node::tx::{ChangePubKey, TxSignature};
     use models::node::{
         Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
@@ -262,10 +262,7 @@ mod test {
             nonce: 3,
             eth_signature: None,
         };
-        let op1 = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOffchainOp {
-            tx,
-            account_id: 11,
-        }));
+        let op1 = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp { tx, account_id: 11 }));
         let pub_data1 = op1.public_data();
         let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")

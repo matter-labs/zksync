@@ -9,7 +9,7 @@ use crypto::{digest::Digest, sha2::Sha256};
 
 use super::account::PubKeyHash;
 use super::Engine;
-use crate::node::operations::ChangePubKeyOffchainOp;
+use crate::node::operations::ChangePubKeyOp;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
 use ethsign::{SecretKey, Signature as ETHSignature};
@@ -308,7 +308,7 @@ impl FranklinTx {
             FranklinTx::Transfer(_) => TransferOp::CHUNKS,
             FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
-            FranklinTx::ChangePubKey(_) => ChangePubKeyOffchainOp::CHUNKS,
+            FranklinTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
         }
     }
 
