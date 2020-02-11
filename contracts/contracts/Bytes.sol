@@ -3,36 +3,26 @@ pragma solidity 0.5.16;
 
 library Bytes {
 
-    // Compies uint16 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'.
     function toBytesFromUInt16(uint16 self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 240), 2);
     }
 
-    // Compies uint24 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'.
     function toBytesFromUInt24(uint24 self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 232), 3);
     }
 
-    // Compies uint32 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'.
     function toBytesFromUInt32(uint32 self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 224), 4);
     }
 
-    // Compies uint128 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'.
     function toBytesFromUInt128(uint128 self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 128), 16);
     }
 
     // Copies 'len' bytes from 'self' into a new 'bytes memory', starting at index '0'.
-    // Returns the newly created 'bytes memory'
-    // The returned bytes will be of length 'len'.
+    // Returns the newly created 'bytes memory'. The returned bytes will be of length 'len'.
     function toBytesFromBytes32(bytes32 self, uint8 len) internal pure returns (bytes memory bts) {
-        require(len <= 32, "bt211"); // bt211 - wrong bytes length from 32
-
+        require(len <= 32, "bt211");
         bts = new bytes(len);
         // Even though the bytes will allocate a full word, we don't want
         // any potential garbage bytes in there.
@@ -43,61 +33,45 @@ library Bytes {
     }
 
     // Copies 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'
-    // The returned bytes will be of length '20'.
+    // Returns the newly created 'bytes memory'. The returned bytes will be of length '20'.
     function toBytesFromAddress(address self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 96), 20);
     }
 
-    // Compies bytes 'self' into a new 'address'.
-    // Returns the newly created 'address'.
-    function bytesToAddress(bytes memory self)
-        internal
-        pure
-        returns (address addr)
-    {
-        require(self.length >= 20, "bbs11"); // bbs11 - wrong bytes length to address
-
+    function bytesToAddress(bytes memory self) internal pure returns (address addr) {
+        require(self.length >= 20, "bbs11");
         assembly {
             addr := div(mload(add(add(self, 0x20), 0)), 0x1000000000000000000000000)
         }
     }
 
-    // Compies bytes 'self' into a new 'uint16'.
-    // Returns the newly created 'uint16'.
-    function bytesToUInt16(bytes memory self)
-        internal
-        pure
-        returns (uint16)
-    {
-        require(
-            self.length >= 2,
-            "bb611"
-        ); // bb611 - wrong bytes length to 16
-        uint16 tempUint;
-
+    function bytesToUInt16(bytes memory self) internal pure returns (uint16 r) {
+        require(self.length >= 2, "bb611");
         assembly {
-            tempUint := mload(add(add(self, 0x2), 0))
+            r := mload(add(add(self, 0x2), 0))
         }
-
-        return tempUint;
     }
 
-    // Compies bytes 'self' into a new 'uint128'.
-    // Returns the newly created 'uint128'.
-    function bytesToUInt128(bytes memory self)
-        internal
-        pure
-        returns (uint128)
-    {
-        require(self.length >= 16, "bb811"); // bb811 - wrong bytes length to 128
-
-        uint128 tempUint;
+    function bytesToUInt24(bytes memory self) internal pure returns (uint24 r) {
+        require(self.length >= 3, "bb411");
         assembly {
-            tempUint := mload(add(add(self, 0x10), 0))
+            r := mload(add(add(self, 0x3), 0))
         }
+    }
 
-        return tempUint;
+    function bytesToUInt32(bytes memory self) internal pure returns (uint32 r) {
+        require(self.length >= 4, "bb411");
+        assembly {
+            r := mload(add(add(self, 0x4), 0))
+        }
+    }
+
+    function bytesToUInt128(bytes memory self) internal pure returns (uint128 r)
+    {
+        require(self.length >= 16, "bb811");
+        assembly {
+            r := mload(add(add(self, 0x10), 0))
+        }
     }
 
     // Original source code: https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol#L228
@@ -168,9 +142,36 @@ library Bytes {
         return tempBytes;
     }
 
+    /// Reads byte stream
+    /// @return new_offset - offset + amount of bytes read
+    /// @return data - actually read data
     function read(bytes memory _data, uint _offset, uint _length) internal pure returns (uint new_offset, bytes memory data) {
         data = slice(_data, _offset, _length);
         new_offset = _offset + _length;
+    }
+
+    function readUInt16(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint16 r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 2);
+        r = bytesToUInt16(buf);
+    }
+
+    function readUInt32(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint32 r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 4);
+        r = bytesToUInt32(buf);
+    }
+
+    function readUInt128(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint128 r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 16);
+        r = bytesToUInt128(buf);
+    }
+
+    function readAddress(bytes memory _data, uint _offset) internal pure returns (uint new_offset, address r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 20);
+        r = bytesToAddress(buf);
     }
 
     // Original source code: https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol#L13
@@ -179,13 +180,8 @@ library Bytes {
     function concat(
         bytes memory _preBytes,
         bytes memory _postBytes
-    )
-        internal
-        pure
-        returns (bytes memory)
-    {
+    ) internal pure returns (bytes memory) {
         bytes memory tempBytes;
-
         assembly {
             // Get a location of some free memory and store it in tempBytes as
             // Solidity does for memory variables.
@@ -250,54 +246,7 @@ library Bytes {
               not(31) // Round down to the nearest 32 bytes.
             ))
         }
-
         return tempBytes;
-    }
-
-    // Copy `_src` buffer into the `_dst` buffer starting at position `_dst_offset`
-    // Returns shifted offset.
-    function memcpy(
-        bytes memory _dst,
-        uint         _dst_offset,
-        bytes memory _src
-    )
-        internal
-        pure
-        returns (uint new_offset)
-    {
-        require(_dst.length >= _dst_offset + _src.length, "bwe01"); // bwe01 - not enough space in buffer
-        require(_dst_offset % 0x20 == 0, "bwe02"); // bwe02 - offset must be a multiple of 32
-
-        assembly {
-
-            // Store the length of the source bytes array at the beginning of
-            // the memory for tempBytes.
-            let length := mload(_src)
-
-            // Maintain a memory counter for the current write location in the
-            // temp bytes array by adding the 32 bytes for the array length to
-            // the starting location.
-            let mc := add(_dst, 0x20)
-            // Stop copying when the memory counter reaches the length of the
-            // first bytes array.
-            let end := add(mc, length)
-
-            for {
-                // Initialize a copy counter to the start of the _preBytes data,
-                // 32 bytes into its memory.
-                let cc := add(_src, 0x20)
-            } lt(mc, end) {
-                // Increase both counters by 32 bytes each iteration.
-                mc := add(mc, 0x20)
-                cc := add(cc, 0x20)
-            } {
-                // Write the _preBytes data into the tempBytes memory 32 bytes
-                // at a time.
-                mstore(mc, mload(cc))
-            }
-        }
-
-        return _dst_offset + _src.length;
     }
 
 }

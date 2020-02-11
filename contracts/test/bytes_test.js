@@ -24,7 +24,7 @@ async function deployBytesTestContract() {
 }
 
 async function getCallRevertReason(f) {
-    let revertReason = null
+    let revertReason = "VM did not revert"
     try {
         let r = await f()
     } catch(e) {
@@ -42,10 +42,14 @@ describe("Bytes unit test", function () {
         bytesTestContract = await deployBytesTestContract()
     });
 
+    // concat
+
     it("should concatenate bytes", async () => {
         let r = await bytesTestContract.concat("0x010203", "0x11121314")
         expect(r).equal("0x01020311121314")
     });
+
+    // read 
 
     it("should read bytes", async () => {
         let r = await bytesTestContract.read("0x0102030405060708", 4, 2)
@@ -54,7 +58,12 @@ describe("Bytes unit test", function () {
     });
 
     it("should fail to read bytes beyond range", async () => {
-        let revertReason = await getCallRevertReason( () => bytesTestContract.read("0x0102030405060708", 8, 2, {}) )
+        let revertReason = await getCallRevertReason( () => bytesTestContract.read("0x0102030405060708", 8, 2) )
+        expect(revertReason).equal("bse11")
+    });
+
+    it("should fail to read too many bytes", async () => {
+        let revertReason = await getCallRevertReason( () => bytesTestContract.read("0x0102030405060708", 4, 5) )
         expect(revertReason).equal("bse11")
     });
 
