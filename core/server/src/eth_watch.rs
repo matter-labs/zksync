@@ -1,30 +1,53 @@
 // Built-in deps
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::sync::mpsc::sync_channel;
-use std::sync::{Arc, RwLock};
 use std::time::Duration;
 // External uses
 use failure::format_err;
-use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on};
-use web3::contract::Contract;
+use futures::{
+    channel::{mpsc, oneshot},
+    compat::Future01CompatExt,
+    SinkExt, StreamExt,
+};
+use web3::contract::{Contract, Options};
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, H160};
 use web3::{Transport, Web3};
 // Workspace deps
-use models::abi::{governance_contract, priority_queue_contract};
-use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
-use models::node::{PriorityOp, TokenId};
+use models::abi::{governance_contract, priority_queue_contract, zksync_contract};
+use models::config_options::ConfigurationOptions;
+use models::node::{Nonce, PriorityOp, PubKeyHash, TokenId};
 use models::params::PRIORITY_EXPIRATION;
 use models::TokenAddedEvent;
 use storage::ConnectionPool;
+use tokio::{runtime::Runtime, time};
+use web3::transports::EventLoopHandle;
+
+pub enum EthWatchRequest {
+    PollETHNode,
+    IsPubkeyChangeAuthorized {
+        address: Address,
+        nonce: Nonce,
+        pubkey_hash: PubKeyHash,
+        resp: oneshot::Sender<bool>,
+    },
+    GetPriorityQueueOps {
+        op_start_id: u64,
+        max_chunks: usize,
+        resp: oneshot::Sender<Vec<PriorityOp>>,
+    },
+}
 
 pub struct EthWatch<T: Transport> {
     gov_contract: (ethabi::Contract, Contract<T>),
     priority_queue_contract: (ethabi::Contract, Contract<T>),
+    zksync_contract: (ethabi::Contract, Contract<T>),
     processed_block: u64,
-    eth_state: Arc<RwLock<ETHState>>,
+    eth_state: ETHState,
     web3: Web3<T>,
+    _web3_event_loop_handle: EventLoopHandle,
     db_pool: ConnectionPool,
+
+    eth_watch_req: mpsc::Receiver<EthWatchRequest>,
 }
 
 #[derive(Debug)]
@@ -42,9 +65,12 @@ impl ETHState {
 impl<T: Transport> EthWatch<T> {
     pub fn new(
         web3: Web3<T>,
+        web3_event_loop_handle: EventLoopHandle,
         db_pool: ConnectionPool,
         governance_addr: H160,
         priority_queue_address: H160,
+        zksync_contract_addr: H160,
+        eth_watch_req: mpsc::Receiver<EthWatchRequest>,
     ) -> Self {
         let gov_contract = {
             (
@@ -64,16 +90,26 @@ impl<T: Transport> EthWatch<T> {
             )
         };
 
+        let zksync_contract = {
+            (
+                zksync_contract(),
+                Contract::new(web3.eth(), zksync_contract_addr, zksync_contract()),
+            )
+        };
+
         Self {
             gov_contract,
             priority_queue_contract,
+            zksync_contract,
             processed_block: 0,
-            eth_state: Arc::new(RwLock::new(ETHState {
+            eth_state: ETHState {
                 tokens: HashMap::new(),
                 priority_queue: HashMap::new(),
-            })),
+            },
             web3,
+            _web3_event_loop_handle: web3_event_loop_handle,
             db_pool,
+            eth_watch_req,
         }
     }
 
@@ -92,14 +128,18 @@ impl<T: Transport> EthWatch<T> {
             .build()
     }
 
-    fn get_new_token_events(
+    async fn get_new_token_events(
         &self,
         from: BlockNumber,
         to: BlockNumber,
     ) -> Result<Vec<TokenAddedEvent>, failure::Error> {
         let filter = self.get_new_token_event_filter(from, to);
 
-        block_on(self.web3.eth().logs(filter).compat())?
+        self.web3
+            .eth()
+            .logs(filter)
+            .compat()
+            .await?
             .into_iter()
             .map(|event| {
                 TokenAddedEvent::try_from(event).map_err(|e| {
@@ -124,13 +164,17 @@ impl<T: Transport> EthWatch<T> {
             .build()
     }
 
-    fn get_priority_op_events(
+    async fn get_priority_op_events(
         &self,
         from: BlockNumber,
         to: BlockNumber,
     ) -> Result<Vec<PriorityOp>, failure::Error> {
         let filter = self.get_priority_op_event_filter(from, to);
-        block_on(self.web3.eth().logs(filter).compat())?
+        self.web3
+            .eth()
+            .logs(filter)
+            .compat()
+            .await?
             .into_iter()
             .map(|event| {
                 PriorityOp::try_from(event).map_err(|e| {
@@ -140,18 +184,17 @@ impl<T: Transport> EthWatch<T> {
             .collect()
     }
 
-    fn restore_state_from_eth(&mut self, block: u64) {
-        let mut eth_state = self.eth_state.write().expect("ETH state lock");
-
+    async fn restore_state_from_eth(&mut self, block: u64) {
         // restore priority queue
         let prior_queue_events = self
             .get_priority_op_events(
                 BlockNumber::Number(block.saturating_sub(PRIORITY_EXPIRATION)),
                 BlockNumber::Number(block),
             )
+            .await
             .expect("Failed to restore priority queue events from ETH");
         for priority_op in prior_queue_events.into_iter() {
-            eth_state
+            self.eth_state
                 .priority_queue
                 .insert(priority_op.serial_id, priority_op);
         }
@@ -159,49 +202,53 @@ impl<T: Transport> EthWatch<T> {
         // restore token list from governance contract
         let new_tokens = self
             .get_new_token_events(BlockNumber::Earliest, BlockNumber::Number(block))
+            .await
             .expect("Failed to restore token list from ETH");
         for token in new_tokens.into_iter() {
-            eth_state.add_new_token(token.id as TokenId, token.address)
+            self.eth_state
+                .add_new_token(token.id as TokenId, token.address)
         }
 
-        trace!("ETH state: {:#?}", *eth_state);
+        trace!("ETH state: {:#?}", self.eth_state);
     }
 
-    fn process_new_blocks(&mut self, last_block: u64) -> Result<(), failure::Error> {
+    async fn process_new_blocks(&mut self, last_block: u64) -> Result<(), failure::Error> {
         debug_assert!(self.processed_block < last_block);
 
-        let new_tokens = self.get_new_token_events(
-            BlockNumber::Number(self.processed_block + 1),
-            BlockNumber::Number(last_block),
-        )?;
-        let priority_op_events = self.get_priority_op_events(
-            BlockNumber::Number(self.processed_block + 1),
-            BlockNumber::Number(last_block),
-        )?;
+        let new_tokens = self
+            .get_new_token_events(
+                BlockNumber::Number(self.processed_block + 1),
+                BlockNumber::Number(last_block),
+            )
+            .await?;
+        let priority_op_events = self
+            .get_priority_op_events(
+                BlockNumber::Number(self.processed_block + 1),
+                BlockNumber::Number(last_block),
+            )
+            .await?;
 
-        let mut eth_state = self.eth_state.write().expect("ETH state lock");
         for priority_op in priority_op_events.into_iter() {
             debug!("New priority op: {:?}", priority_op);
-            eth_state
+            self.eth_state
                 .priority_queue
                 .insert(priority_op.serial_id, priority_op);
         }
         for token in new_tokens.into_iter() {
             debug!("New token added: {:?}", token);
-            eth_state.add_new_token(token.id as TokenId, token.address);
+            self.eth_state
+                .add_new_token(token.id as TokenId, token.address);
         }
         self.processed_block = last_block;
 
-        // TODO: check if op was executed. decide best way.
         Ok(())
     }
 
     fn commit_state(&self) {
-        let eth_state = self.eth_state.read().expect("eth state read lock");
         self.db_pool
             .access_storage()
             .map(|storage| {
-                for (id, address) in &eth_state.tokens {
+                for (id, address) in &self.eth_state.tokens {
                     if let Err(e) = storage.store_token(*id, &format!("0x{:x}", address), None) {
                         warn!("Failed to add token to db: {:?}", e);
                     }
@@ -210,31 +257,97 @@ impl<T: Transport> EthWatch<T> {
             .unwrap_or_default();
     }
 
-    pub fn get_shared_eth_state(&self) -> Arc<RwLock<ETHState>> {
-        self.eth_state.clone()
+    fn get_priority_requests(&self, first_serial_id: u64, max_chunks: usize) -> Vec<PriorityOp> {
+        let mut res = Vec::new();
+
+        let mut used_chunks = 0;
+        let mut current_priority_op = first_serial_id;
+
+        while let Some(op) = self.eth_state.priority_queue.get(&current_priority_op) {
+            if used_chunks + op.data.chunks() <= max_chunks {
+                res.push(op.clone());
+                used_chunks += op.data.chunks();
+                current_priority_op += 1;
+            } else {
+                break;
+            }
+        }
+
+        res
     }
 
-    pub fn run(mut self) {
-        let block = block_on(self.web3.eth().block_number().compat())
+    async fn is_new_pubkey_hash_authorized(
+        &self,
+        address: Address,
+        nonce: Nonce,
+        pub_key_hash: &PubKeyHash,
+    ) -> Result<bool, failure::Error> {
+        let auth_fact: Vec<u8> = self
+            .zksync_contract
+            .1
+            .query(
+                "authFacts",
+                (address, u64::from(nonce)),
+                None,
+                Options::default(),
+                None,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))?;
+        Ok(auth_fact.as_slice() == &pub_key_hash.data[..])
+    }
+
+    pub async fn run(mut self) {
+        let block = self
+            .web3
+            .eth()
+            .block_number()
+            .compat()
+            .await
             .expect("Block number")
             .as_u64();
         self.processed_block = block;
-        self.restore_state_from_eth(block);
+        self.restore_state_from_eth(block).await;
 
-        loop {
-            std::thread::sleep(Duration::from_secs(1));
-            let last_block_number = block_on(self.web3.eth().block_number().compat());
-            let block = if let Ok(block) = last_block_number {
-                block.as_u64()
-            } else {
-                continue;
-            };
+        while let Some(request) = self.eth_watch_req.next().await {
+            match request {
+                EthWatchRequest::PollETHNode => {
+                    let last_block_number = self.web3.eth().block_number().compat().await;
+                    let block = if let Ok(block) = last_block_number {
+                        block.as_u64()
+                    } else {
+                        continue;
+                    };
 
-            if block > self.processed_block {
-                self.process_new_blocks(block)
-                    .map_err(|e| warn!("Failed to process new blocks {}", e))
-                    .unwrap_or_default();
-                self.commit_state();
+                    if block > self.processed_block {
+                        self.process_new_blocks(block)
+                            .await
+                            .map_err(|e| warn!("Failed to process new blocks {}", e))
+                            .unwrap_or_default();
+                        self.commit_state();
+                    }
+                }
+                EthWatchRequest::GetPriorityQueueOps {
+                    op_start_id,
+                    max_chunks,
+                    resp,
+                } => {
+                    resp.send(self.get_priority_requests(op_start_id, max_chunks))
+                        .unwrap_or_default();
+                }
+                EthWatchRequest::IsPubkeyChangeAuthorized {
+                    address,
+                    nonce,
+                    pubkey_hash,
+                    resp,
+                } => {
+                    let authorized = self
+                        .is_new_pubkey_hash_authorized(address, nonce, &pubkey_hash)
+                        .await
+                        .unwrap_or_default();
+                    resp.send(authorized).unwrap_or_default();
+                }
             }
         }
     }
@@ -242,28 +355,36 @@ impl<T: Transport> EthWatch<T> {
 
 pub fn start_eth_watch(
     pool: ConnectionPool,
-    panic_notify: mpsc::Sender<bool>,
     config_options: ConfigurationOptions,
-) -> Arc<RwLock<ETHState>> {
-    let (sender, receiver) = sync_channel(1);
+    eth_req_sender: mpsc::Sender<EthWatchRequest>,
+    eth_req_receiver: mpsc::Receiver<EthWatchRequest>,
+    runtime: &Runtime,
+) {
+    let (web3_event_loop_handle, transport) =
+        web3::transports::Http::new(&config_options.web3_url).unwrap();
+    let web3 = web3::Web3::new(transport);
 
-    std::thread::Builder::new()
-        .name("eth_watch".to_string())
-        .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
-            let (_eloop, transport) =
-                web3::transports::Http::new(&config_options.web3_url).unwrap();
-            let web3 = web3::Web3::new(transport);
-            let eth_watch = EthWatch::new(
-                web3,
-                pool,
-                config_options.governance_eth_addr,
-                config_options.priority_queue_eth_addr,
-            );
-            sender.send(eth_watch.get_shared_eth_state()).unwrap();
-            eth_watch.run();
-        })
-        .expect("Eth watcher thread");
+    let eth_watch = EthWatch::new(
+        web3,
+        web3_event_loop_handle,
+        pool,
+        config_options.governance_eth_addr,
+        config_options.priority_queue_eth_addr,
+        config_options.contract_eth_addr,
+        eth_req_receiver,
+    );
+    runtime.spawn(eth_watch.run());
 
-    receiver.recv().unwrap()
+    runtime.spawn(async move {
+        let mut timer = time::interval(Duration::from_secs(5));
+
+        loop {
+            timer.tick().await;
+            eth_req_sender
+                .clone()
+                .send(EthWatchRequest::PollETHNode)
+                .await
+                .expect("ETH watch receiver dropped");
+        }
+    });
 }

@@ -1,5 +1,5 @@
 use bigdecimal::BigDecimal;
-use models::node::tx::{ChangePubKeyOffchain, PackedEthSignature, TxSignature};
+use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
     priv_key_from_fs, Address, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
@@ -120,22 +120,30 @@ impl ZksyncAccount {
         &self,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> ChangePubKeyOffchain {
+        auth_onchain: bool,
+    ) -> ChangePubKey {
         let nonce = nonce.unwrap_or_else(|| *self.nonce.borrow());
-        let sign_bytes = ChangePubKeyOffchain::get_eth_signed_data(nonce, &self.pubkey_hash);
-        let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
-            .expect("Signature should succeed");
-        let change_pubkey = ChangePubKeyOffchain {
+        let eth_signature = if auth_onchain {
+            None
+        } else {
+            let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash);
+            let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
+                .expect("Signature should succeed");
+            Some(eth_signature)
+        };
+        let change_pubkey = ChangePubKey {
             account: self.address,
             new_pk_hash: self.pubkey_hash.clone(),
             nonce,
             eth_signature,
         };
-        assert_eq!(
-            change_pubkey.verify_eth_signature(),
-            Some(self.address),
-            "eth signature is incorrect"
-        );
+
+        if !auth_onchain {
+            assert!(
+                change_pubkey.verify_eth_signature() == Some(self.address),
+                "eth signature is incorrect"
+            );
+        }
 
         if increment_nonce {
             *self.nonce.borrow_mut() += 1;

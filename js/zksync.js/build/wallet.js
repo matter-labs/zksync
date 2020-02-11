@@ -157,10 +157,53 @@ var Wallet = /** @class */ (function () {
             });
         });
     };
-    Wallet.prototype.setCurrentPubkeyWithZksyncTx = function (nonce) {
+    Wallet.prototype.setCurrentPubkeyWithZksyncTx = function (nonce, onchainAuth) {
+        if (nonce === void 0) { nonce = "committed"; }
+        if (onchainAuth === void 0) { onchainAuth = false; }
+        return __awaiter(this, void 0, void 0, function () {
+            var currentPubKeyHash, newPubKeyHash, numNonce, newPkHash, message, ethSignature, _a, txData, transactionHash;
+            return __generator(this, function (_b) {
+                switch (_b.label) {
+                    case 0: return [4 /*yield*/, this.getCurrentPubKeyHash()];
+                    case 1:
+                        currentPubKeyHash = _b.sent();
+                        newPubKeyHash = this.signer.pubKeyHash();
+                        if (currentPubKeyHash == newPubKeyHash) {
+                            throw new Error("Current PubKeyHash is the same as new");
+                        }
+                        return [4 /*yield*/, this.getNonce(nonce)];
+                    case 2:
+                        numNonce = _b.sent();
+                        newPkHash = signer_1.serializeAddress(newPubKeyHash);
+                        message = Buffer.concat([signer_1.serializeNonce(numNonce), newPkHash]);
+                        if (!onchainAuth) return [3 /*break*/, 3];
+                        _a = null;
+                        return [3 /*break*/, 5];
+                    case 3: return [4 /*yield*/, this.ethSigner.signMessage(message)];
+                    case 4:
+                        _a = _b.sent();
+                        _b.label = 5;
+                    case 5:
+                        ethSignature = _a;
+                        txData = {
+                            type: "ChangePubKey",
+                            account: this.address(),
+                            newPkHash: this.signer.pubKeyHash(),
+                            nonce: numNonce,
+                            ethSignature: ethSignature
+                        };
+                        return [4 /*yield*/, this.provider.submitTx(txData)];
+                    case 6:
+                        transactionHash = _b.sent();
+                        return [2 /*return*/, new Transaction(txData, transactionHash, this.provider)];
+                }
+            });
+        });
+    };
+    Wallet.prototype.authChangePubkey = function (nonce) {
         if (nonce === void 0) { nonce = "committed"; }
         return __awaiter(this, void 0, void 0, function () {
-            var currentPubKeyHash, newPubKeyHash, numNonce, newPkHash, message, ethSignature, txData, transactionHash;
+            var currentPubKeyHash, newPubKeyHash, numNonce, mainZkSyncContract, ethTransaction;
             return __generator(this, function (_a) {
                 switch (_a.label) {
                     case 0: return [4 /*yield*/, this.getCurrentPubKeyHash()];
@@ -173,53 +216,13 @@ var Wallet = /** @class */ (function () {
                         return [4 /*yield*/, this.getNonce(nonce)];
                     case 2:
                         numNonce = _a.sent();
-                        newPkHash = signer_1.serializeAddress(newPubKeyHash);
-                        message = Buffer.concat([signer_1.serializeNonce(numNonce), newPkHash]);
-                        return [4 /*yield*/, this.ethSigner.signMessage(message)];
-                    case 3:
-                        ethSignature = _a.sent();
-                        txData = {
-                            type: "ChangePubKeyOffchain",
-                            account: this.address(),
-                            newPkHash: this.signer.pubKeyHash(),
-                            nonce: numNonce,
-                            ethSignature: ethSignature
-                        };
-                        return [4 /*yield*/, this.provider.submitTx(txData)];
-                    case 4:
-                        transactionHash = _a.sent();
-                        return [2 /*return*/, new Transaction(txData, transactionHash, this.provider)];
-                }
-            });
-        });
-    };
-    Wallet.prototype.setCurrentPubkeyWithEthereumTx = function () {
-        return __awaiter(this, void 0, void 0, function () {
-            var currentPubKeyHash, newPubKeyHash, gasPrice, maxFeeInETHToken, mainZkSyncContract, ethTransaction;
-            return __generator(this, function (_a) {
-                switch (_a.label) {
-                    case 0: return [4 /*yield*/, this.getCurrentPubKeyHash()];
-                    case 1:
-                        currentPubKeyHash = _a.sent();
-                        newPubKeyHash = this.signer.pubKeyHash();
-                        if (currentPubKeyHash == newPubKeyHash) {
-                            throw new Error("Current PubKeyHash is the same as new");
-                        }
-                        return [4 /*yield*/, this.ethSigner.provider.getGasPrice()];
-                    case 2:
-                        gasPrice = _a.sent();
-                        return [4 /*yield*/, this.ethProxy.estimateEmergencyWithdrawFeeInETHToken(gasPrice)];
-                    case 3:
-                        maxFeeInETHToken = _a.sent();
                         mainZkSyncContract = new ethers_1.Contract(this.ethProxy.contractAddress.mainContract, utils_1.SYNC_MAIN_CONTRACT_INTERFACE, this.ethSigner);
-                        return [4 /*yield*/, mainZkSyncContract.changePubKeyHash(newPubKeyHash.replace("sync:", "0x"), {
-                                gasLimit: ethers_1.utils.bigNumberify("200000"),
-                                value: maxFeeInETHToken,
-                                gasPrice: gasPrice
+                        return [4 /*yield*/, mainZkSyncContract.authFact(newPubKeyHash.replace("sync:", "0x"), numNonce, {
+                                gasLimit: ethers_1.utils.bigNumberify("200000")
                             })];
-                    case 4:
+                    case 3:
                         ethTransaction = _a.sent();
-                        return [2 /*return*/, new ETHOperation(ethTransaction, this.provider)];
+                        return [2 /*return*/, ethTransaction];
                 }
             });
         });

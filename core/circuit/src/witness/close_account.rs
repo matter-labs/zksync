@@ -165,7 +165,6 @@ pub fn calculate_close_account_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: close_account_witness.args.clone(),
         lhs: close_account_witness.before.clone(),

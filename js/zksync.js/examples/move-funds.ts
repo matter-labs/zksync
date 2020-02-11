@@ -96,7 +96,13 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
             "Unlocking account with onchain tx: ",
             syncWallet.address()
         );
-        const unlockAccountHandle = await syncWallet.setCurrentPubkeyWithEthereumTx();
+        try {
+            await (await syncWallet.authChangePubkey()).wait();
+        } catch (e) {}
+        const unlockAccountHandle = await syncWallet.setCurrentPubkeyWithZksyncTx(
+            "committed",
+            true
+        );
         await unlockAccountHandle.awaitReceipt();
         console.log("Account unlocked");
     } else {

@@ -198,7 +198,6 @@ pub fn calculate_full_exit_operations_from_witness(
         lhs: full_exit_witness.before.clone(),
         rhs: full_exit_witness.before.clone(),
         signature_data: empty_sig_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
     });
 
     for (i, pubdata_chunk) in pubdata_chunks.iter().cloned().enumerate().take(6).skip(1) {
@@ -215,7 +214,6 @@ pub fn calculate_full_exit_operations_from_witness(
             lhs: full_exit_witness.after.clone(),
             rhs: full_exit_witness.after.clone(),
             signature_data: empty_sig_data.clone(),
-            eth_signature_data: ETHSignatureData::init_empty(),
         });
     }
 

@@ -102,9 +102,6 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub pub_nonce: CircuitElement<E>,
     pub a: CircuitElement<E>,
     pub b: CircuitElement<E>,
-    pub eth_signature_r: CircuitElement<E>,
-    pub eth_signature_s: CircuitElement<E>,
-    pub eth_signature_v: CircuitElement<E>,
 }
 
 impl<E: JubjubEngine> AllocatedOperationData<E> {
@@ -202,20 +199,6 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             franklin_constants::BALANCE_BIT_WIDTH,
         )?;
 
-        let eth_signature_r = CircuitElement::from_witness_be_bits(
-            cs.namespace(|| "eth_signature_r"),
-            &op.eth_signature_data.r,
-        )?;
-        let eth_signature_s = CircuitElement::from_witness_be_bits(
-            cs.namespace(|| "eth_signature_s"),
-            &op.eth_signature_data.s,
-        )?;
-        let eth_signature_v = CircuitElement::from_fe_strict(
-            cs.namespace(|| "eth_sign_v"),
-            || op.eth_signature_data.v.grab(),
-            franklin_constants::ETH_SIGNATURE_V_BIT_WIDTH,
-        )?;
-
         Ok(AllocatedOperationData {
             eth_address,
             pub_nonce,
@@ -230,9 +213,6 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
             new_pubkey_hash,
             a,
             b,
-            eth_signature_r,
-            eth_signature_s,
-            eth_signature_v,
         })
     }
 }

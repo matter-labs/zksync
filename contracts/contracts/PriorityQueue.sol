@@ -209,13 +209,6 @@ contract PriorityQueue {
             cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, 0, comparePubdataLen);
             cmpOpCommittedBytes = Bytes.slice(_pubData, 0, comparePubdataLen);
 
-        } else if (_opType == CHANGE_PUBKEY_PRIORITY) {
-            uint comparePubdataLen = PUBKEY_HASH_BYTES + ETH_ADDR_BYTES;
-
-            cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, 0, comparePubdataLen);
-            // we don't know account id and success flag when we create priority operation that why
-            // we ignore this field from pubdata (using offset)
-            cmpOpCommittedBytes = Bytes.slice(_pubData, ACC_NUM_BYTES + SUCCESS_FLAG_BYTES, comparePubdataLen);
         } else {
             revert("pid11");
             // pid11 - wrong operation

@@ -15,6 +15,25 @@
       "type": "function"
     },
     {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_number",
+          "type": "uint64"
+        }
+      ],
+      "name": "deletePriorityRequestsAndPopOutstandingDeposits",
+      "outputs": [
+        {
+          "name": "depositsPubData",
+          "type": "bytes"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "constant": true,
       "inputs": [],
       "name": "totalCommittedPriorityRequests",
@@ -177,20 +196,6 @@
         {
           "name": "",
           "type": "bool"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "getOutstandingDeposits",
-      "outputs": [
-        {
-          "name": "depositsPubData",
-          "type": "bytes"
         }
       ],
       "payable": false,
