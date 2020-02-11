@@ -5,8 +5,8 @@ import "../Bytes.sol";
 
 contract BytesTest {
 
-    function test(bytes calldata a, bytes calldata b) external pure {
-        
+    function testConcat(bytes calldata a, bytes calldata b) external pure returns (bytes memory) {
+        return Bytes.concat(a, b);
     }
 }
 

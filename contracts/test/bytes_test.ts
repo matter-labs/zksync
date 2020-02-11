@@ -1,7 +1,7 @@
 import { ethers } from "ethers";
 
 import { expect, use } from "chai";
-import { solidity, deployContract } from "ethereum-waffle";
+import { createMockProvider, getWallets, solidity, deployContract } from "ethereum-waffle";
 import { bigNumberify, parseEther, hexlify, formatEther } from "ethers/utils";
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
@@ -11,11 +11,11 @@ use(solidity);
 
 export async function deployBytesTestContract() {
     try {
-        return await deployContract(wallet, require('../build/VerifierTest'), [], {
+        return await deployContract(wallet, require('../build/BytesTest'), [], {
             gasLimit: 2000000,
-        });
+        })
     } catch (err) {
-        console.log("BytesTest deploy error:" + err);
+        console.log("BytesTest deploy error:" + err)
     }
 }
 
@@ -24,33 +24,15 @@ describe("Bytes unit test", function () {
 
     let bytesTestContract: any;
     beforeEach(async () => {
-        console.log("---\n");
-        bytesTestContract = await deployBytesTestContract();
+        console.log("---\n")
+        bytesTestContract = await deployBytesTestContract()
     });
 
     it("should bla-bla", async () => {
         console.log("\n - Bytes test started");
 
-        // // Commit block with eth deposit
-        // const depositBlockPublicData = createDepositPublicData(0, hexlify(depositAmount), franklinAddress);
-        // const feeAccount = 22;
-        // const root = "0000000000000000000000000000000000000000000000000000000000000000";
-        // let commitment = "0xc456a531f6b89e6c0bf3a381b03961725895447203ec77cb0a2afd95e78217dd";
-        // await postBlockCommit(
-        //     provider,
-        //     wallet,
-        //     franklinDeployedContract,
-        //     1,
-        //     feeAccount,
-        //     root,
-        //     depositBlockPublicData,
-        //     1,
-        //     1,
-        //     commitment,
-        //     null,
-        // );
-
-        // expect(await priorityQueueDeployedContract.totalOpenPriorityRequests()).equal(0);
+        let r = await bytesTestContract.testConcat("0x010203", "0x11121314", {});
+        expect(r).equal("0x01020311121314");
 
         console.log(" + Bytes test passed")
     });

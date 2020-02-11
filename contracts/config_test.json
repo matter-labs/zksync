@@ -1,0 +1,4 @@
+{
+    "sourcesPath": "./contracts/test",
+    "targetPath": "./build"
+}
