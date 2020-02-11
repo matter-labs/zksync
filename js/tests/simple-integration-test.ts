@@ -113,7 +113,8 @@ async function testWithdraw(contract: Contract, ethProxy: ETHProxy, ethWallet: e
 async function testChangePubkeyOnchain(syncWallet: Wallet) {
     if (! await syncWallet.isCurrentPubkeySet()) {
         const startTime = new Date().getTime();
-        const changePubkeyHandle = await syncWallet.setCurrentPubkeyWithEthereumTx();
+        await (await syncWallet.authChangePubkey("committed")).wait();
+        const changePubkeyHandle = await syncWallet.setCurrentPubkeyWithZksyncTx("committed", true);
         console.log(`Change pubkey onchain posted: ${(new Date().getTime()) - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey onchain committed: ${(new Date().getTime()) - startTime} ms`);

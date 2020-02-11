@@ -126,7 +126,8 @@ export class Wallet {
     }
 
     async setCurrentPubkeyWithZksyncTx(
-        nonce: Nonce = "committed", onchainAuth = false,
+        nonce: Nonce = "committed",
+        onchainAuth = false
     ): Promise<Transaction> {
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
@@ -138,7 +139,9 @@ export class Wallet {
         const numNonce = await this.getNonce(nonce);
         const newPkHash = serializeAddress(newPubKeyHash);
         const message = Buffer.concat([serializeNonce(numNonce), newPkHash]);
-        const ethSignature = onchainAuth ? null : await this.ethSigner.signMessage(message);
+        const ethSignature = onchainAuth
+            ? null
+            : await this.ethSigner.signMessage(message);
 
         const txData = {
             type: "ChangePubKey",
@@ -154,7 +157,7 @@ export class Wallet {
 
     async authChangePubkey(
         nonce: Nonce = "committed"
-    ): Promise<ContractTransaction>{
+    ): Promise<ContractTransaction> {
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
 
@@ -174,7 +177,7 @@ export class Wallet {
             newPubKeyHash.replace("sync:", "0x"),
             numNonce,
             {
-                gasLimit: utils.bigNumberify("200000"),
+                gasLimit: utils.bigNumberify("200000")
             }
         );
 

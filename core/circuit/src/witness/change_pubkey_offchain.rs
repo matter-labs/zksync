@@ -199,7 +199,7 @@ mod test {
         )]);
 
         let change_pkhash_op = ChangePubKeyOp {
-            tx: zksync_account.create_change_pubkey_tx(None, true),
+            tx: zksync_account.create_change_pubkey_tx(None, true, false),
             account_id: change_pkhash_to_account_id,
         };
 

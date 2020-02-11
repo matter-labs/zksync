@@ -134,6 +134,28 @@ impl<T: Transport> AccountSet<T> {
             .expect("FullExit eth call failed")
     }
 
+    fn change_pubkey_with_onchain_auth(
+        &self,
+        eth_account: ETHAccountId,
+        zksync_signer: ZKSyncAccountId,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> FranklinTx {
+        let zksync_account = &self.zksync_accounts[zksync_signer.0];
+        let auth_nonce = nonce.unwrap_or_else(|| zksync_account.nonce());
+
+        let eth_account = &self.eth_accounts[eth_account.0];
+        let tx_receipt =
+            block_on(eth_account.auth_fact(&zksync_account.pubkey_hash.data, auth_nonce))
+                .expect("Auth pubkey fail");
+        assert_eq!(tx_receipt.status, Some(U64::from(1)), "Auth pubkey fail");
+        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
+            nonce,
+            increment_nonce,
+            true,
+        )))
+    }
+
     fn change_pubkey_with_tx(
         &self,
         zksync_signer: ZKSyncAccountId,
@@ -141,9 +163,11 @@ impl<T: Transport> AccountSet<T> {
         increment_nonce: bool,
     ) -> FranklinTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
-        FranklinTx::ChangePubKey(Box::new(
-            zksync_account.create_change_pubkey_tx(nonce, increment_nonce),
-        ))
+        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
+            nonce,
+            increment_nonce,
+            false,
+        )))
     }
 }
 
@@ -300,7 +324,7 @@ pub fn perform_basic_tests() {
         // test transfers
         test_setup.start_block();
 
-        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+        test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
 
         //should be executed as a transfer
         test_setup.transfer(
@@ -554,6 +578,18 @@ impl TestSetup {
         let tx = self
             .accounts
             .change_pubkey_with_tx(zksync_signer, None, true);
+
+        self.execute_tx(tx);
+    }
+
+    fn change_pubkey_with_onchain_auth(
+        &mut self,
+        eth_account: ETHAccountId,
+        zksync_signer: ZKSyncAccountId,
+    ) {
+        let tx =
+            self.accounts
+                .change_pubkey_with_onchain_auth(eth_account, zksync_signer, None, true);
 
         self.execute_tx(tx);
     }

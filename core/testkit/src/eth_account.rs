@@ -5,7 +5,7 @@ use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
-use models::node::{AccountId, Address, PriorityOp};
+use models::node::{AccountId, Address, Nonce, PriorityOp};
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
@@ -345,5 +345,32 @@ impl<T: Transport> EthereumAccount<T> {
             .compat()
             .await
             .map_err(|e| format_err!("Complete withdrawals confirm err: {}", e))?)
+    }
+
+    pub async fn auth_fact(
+        &self,
+        fact: &[u8],
+        nonce: Nonce,
+    ) -> Result<TransactionReceipt, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "authFact",
+                (fact.to_vec(), u64::from(nonce)),
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("AuthFact send err: {}", e))?;
+        Ok(self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("AuthFact confirm err: {}", e))?)
     }
 }
