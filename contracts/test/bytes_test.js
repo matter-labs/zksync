@@ -23,6 +23,16 @@ async function deployBytesTestContract() {
     }
 }
 
+async function getRevertReason(f) {
+    let revertReason = null
+    try {
+        let r = await f()
+    } catch(e) {
+        revertReason = e.results[e.hashes[0]].reason
+    } 
+    return revertReason
+}
+
 describe("Bytes unit test", function () {
     this.timeout(50000);
 
@@ -39,8 +49,13 @@ describe("Bytes unit test", function () {
 
     it("should read bytes", async () => {
         let r = await bytesTestContract.read("0x0102030405060708", 4, 2)
-        //expect(r).equal("0x01020311121314");
-        console.log(r)
+        expect(r.data).equal("0x0506")
+        expect(r.new_offset).equal(bigNumberify(6))
+    });
+
+    it("should fail to read bytes beyond range", async () => {
+        let revertReason = await getRevertReason( () => bytesTestContract.read("0x0102030405060708", 8, 2, {}) )
+        expect(revertReason).equal("bse11")
     });
 
 });
