@@ -207,13 +207,12 @@ contract Franklin {
     /// @param _governanceAddress The address of Governance contract
     /// @param _verifierAddress The address of Verifier contract
     /// @param _priorityQueueAddress The address of Priority Queue contract
-    /// @param _genesisAccAddress The address of single account, that exists in genesis block
     /// @param _genesisRoot Genesis blocks (first block) root
     constructor(
         address _governanceAddress,
         address _verifierAddress,
         address _priorityQueueAddress,
-        address _genesisAccAddress,
+        address, // FIXME: remove _genesisAccAddress
         bytes32 _genesisRoot
     ) public {
         verifier = Verifier(_verifierAddress);
