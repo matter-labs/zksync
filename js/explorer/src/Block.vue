@@ -183,11 +183,11 @@ export default {
 
                 const from_target = from_explorer_link.startsWith('/')
                     ? ''
-                    : `_target="_blank" rel="noopener noreferrer"`;
+                    : `target="_blank" rel="noopener noreferrer"`;
 
                 const to_target = to_explorer_link.startsWith('/')
                     ? ''
-                    : `_target="_blank" rel="noopener noreferrer"`;
+                    : `target="_blank" rel="noopener noreferrer"`;
 
                 return {
                     type: `<b>${type}</b>`,
