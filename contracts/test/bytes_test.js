@@ -1,8 +1,7 @@
-import { ethers } from "ethers";
-
-import { expect, use } from "chai";
-import { createMockProvider, getWallets, solidity, deployContract } from "ethereum-waffle";
-import { bigNumberify, parseEther, hexlify, formatEther } from "ethers/utils";
+const ethers = require("ethers")
+const { expect, use } = require("chai")
+const { createMockProvider, getWallets, solidity, deployContract } = require("ethereum-waffle");
+const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
 
 // For: geth
 // const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
@@ -14,7 +13,7 @@ const [wallet]  = getWallets(provider);
 
 use(solidity);
 
-export async function deployBytesTestContract() {
+async function deployBytesTestContract() {
     try {
         return await deployContract(wallet, require('../build/BytesTest'), [], {
             gasLimit: 2000000,
@@ -27,19 +26,21 @@ export async function deployBytesTestContract() {
 describe("Bytes unit test", function () {
     this.timeout(50000);
 
-    let bytesTestContract: any;
-    beforeEach(async () => {
+    let bytesTestContract
+    before(async () => {
         console.log("---\n")
         bytesTestContract = await deployBytesTestContract()
     });
 
-    it("should bla-bla", async () => {
-        console.log("\n - Bytes test started");
+    it("should concatenate bytes", async () => {
+        let r = await bytesTestContract.concat("0x010203", "0x11121314")
+        expect(r).equal("0x01020311121314")
+    });
 
-        let r = await bytesTestContract.testConcat("0x010203", "0x11121314", {});
-        expect(r).equal("0x01020311121314");
-
-        console.log(" + Bytes test passed")
+    it("should read bytes", async () => {
+        let r = await bytesTestContract.read("0x0102030405060708", 4, 2)
+        //expect(r).equal("0x01020311121314");
+        console.log(r)
     });
 
 });
