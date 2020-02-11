@@ -23,7 +23,7 @@ async function deployBytesTestContract() {
     }
 }
 
-async function getRevertReason(f) {
+async function getCallRevertReason(f) {
     let revertReason = null
     try {
         let r = await f()
@@ -54,7 +54,7 @@ describe("Bytes unit test", function () {
     });
 
     it("should fail to read bytes beyond range", async () => {
-        let revertReason = await getRevertReason( () => bytesTestContract.read("0x0102030405060708", 8, 2, {}) )
+        let revertReason = await getCallRevertReason( () => bytesTestContract.read("0x0102030405060708", 8, 2, {}) )
         expect(revertReason).equal("bse11")
     });
 
