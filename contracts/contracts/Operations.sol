@@ -40,7 +40,7 @@ library Operations {
 
     // Deposit pubdata
 
-    struct DepositPubdata {
+    struct Deposit {
         // uint24 accountId
         uint16 tokenId;
         uint128 amount; 
@@ -48,7 +48,7 @@ library Operations {
     }
 
     function readDepositPubdata(bytes memory _data, uint _offset) internal pure
-        returns (DepositPubdata memory parsed)
+        returns (Deposit memory parsed)
     {
         uint offset = _offset + ACCOUNT_ID_BYTES;                   // accountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
@@ -56,7 +56,7 @@ library Operations {
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
     }
 
-    function writeDepositPubdata(DepositPubdata memory deposit) internal pure returns (bytes memory buf) {
+    function writeDepositPubdata(Deposit memory deposit) internal pure returns (bytes memory buf) {
         buf = new bytes(ACCOUNT_ID_BYTES);                                  // accountId (ignored)
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt16(deposit.tokenId));  // tokenId
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt128(deposit.amount));  // amount
