@@ -70,7 +70,7 @@ export async function postEthDeposit(
     const tx = await franklinDeployedContract.depositETH(
         depositAmount,
         franklinAddressBinary,
-        { value: txValue, gasLimit: bigNumberify("8000000") },
+        { value: txValue, gasLimit: bigNumberify("6000000") },
     );
 
     if (!revertCode) {

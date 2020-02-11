@@ -9,7 +9,7 @@ const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils
 
 // For: ganache
 const provider = createMockProvider();
-const [wallet]  = getWallets(provider);
+const [wallet, exitWallet]  = getWallets(provider);
 
 use(solidity);
 
@@ -36,6 +36,7 @@ async function getCallRevertReason(f) {
 module.exports = {
     provider,
     wallet,
+    exitWallet,
     deployTestContract,
     getCallRevertReason
 }

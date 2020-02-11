@@ -28,6 +28,7 @@
   "scripts": {
     "build": "waffle config.json && waffle config_flat.json",
     "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
+    "itest": "yarn build && mocha -r ts-node/register test/integration_geth.ts",
     "unit-test": "waffle config_test.json && mocha test/unit_tests/**/*.js",
     "deploy": "yarn build && ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-test-no-build": "ts-node scripts/testnet-deploy.ts --deploy --test",

@@ -1,4 +1,5 @@
 {
     "sourcesPath": "./flat",
-    "targetPath": "./flat_build"
+    "targetPath": "./flat_build",
+    "compiler": "native"
 }
