@@ -103,8 +103,8 @@ export async function deployGovernance(
         let governance = await deployContract(wallet, governanceCode, constructorArgs, {
             gasLimit: 3000000,
         });
-        //console.log(`GOVERNANCE_GENESIS_TX_HASH=${governance.deployTransaction.hash}`);
-        //console.log(`GOVERNANCE_ADDR=${governance.address}`);
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${governance.deployTransaction.hash}`);
+        console.log(`GOVERNANCE_ADDR=${governance.address}`);
 
         return governance;
     } catch (err) {
@@ -121,7 +121,7 @@ export async function deployPriorityQueue(
         let priorityQueue = await deployContract(wallet, priorityQueueCode, constructorArgs, {
             gasLimit: 5000000,
         });
-        //console.log(`PRIORITY_QUEUE_ADDR=${priorityQueue.address}`);
+        console.log(`PRIORITY_QUEUE_ADDR=${priorityQueue.address}`);
 
         return priorityQueue;
     } catch (err) {
@@ -138,7 +138,7 @@ export async function deployVerifier(
         let verifier = await deployContract(wallet, verifierCode, constructorArgs, {
             gasLimit: 2000000,
         });
-        //console.log(`VERIFIER_ADDR=${verifier.address}`);
+        console.log(`VERIFIER_ADDR=${verifier.address}`);
 
         return verifier;
     } catch (err) {
@@ -167,8 +167,8 @@ export async function deployFranklin(
             {
                 gasLimit: 6600000,
             });
-        //console.log(`CONTRACT_GENESIS_TX_HASH=${contract.deployTransaction.hash}`);
-        //console.log(`CONTRACT_ADDR=${contract.address}`);
+        console.log(`CONTRACT_GENESIS_TX_HASH=${contract.deployTransaction.hash}`);
+        console.log(`CONTRACT_ADDR=${contract.address}`);
 
         const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);
         const setAddressTx = await priorityQueueContract.setFranklinAddress(contract.address, { gasLimit: 1000000 })
@@ -200,7 +200,7 @@ export async function addTestERC20Token(wallet, governance) {
     try {
         let erc20 = await deployContract(wallet, ERC20MintableContract, []);
         await erc20.mint(wallet.address, parseEther("3000000000"));
-        //console.log("TEST_ERC20=" + erc20.address);
+        console.log("TEST_ERC20=" + erc20.address);
         await (await governance.addToken(erc20.address)).wait();
         return erc20;
     } catch (err) {
