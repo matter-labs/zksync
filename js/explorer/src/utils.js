@@ -10,7 +10,7 @@ export function isReadablyPrintable(tokenName) {
 
 /**
  * If amount >= 1.0, we leave up to 3 digits after comma.
- * If it's less, we leave up to 3 the the most significant 
+ * If it's less, we leave up to 3 the most significant 
  * digits of the fraction part of the amount.
  * 
  * examples:
@@ -28,7 +28,7 @@ export function readableEther(wei) {
 
 export function shortenHash(str, fallback) {
     try {
-        return `${str.slice(0, 8)}..${str.slice(-8)}`;
+        return `${str.slice(0, 12)}..${str.slice(-10)}`;
     } catch (e) {
         return fallback || 'unknown';
     }
