@@ -29,3 +29,7 @@ futures = "0.3"
 failure = "0.1"
 
 bigdecimal = { version = "0.1.0", features = ["serde"]}
+
+reqwest = "0.9.22"
+
+futures01 = { package = "futures", version = "0.1" }
