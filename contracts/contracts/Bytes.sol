@@ -1,5 +1,6 @@
 pragma solidity 0.5.10;
 
+
 library Bytes {
 
     // Compies uint16 'self' into a new 'bytes memory'.
@@ -30,10 +31,8 @@ library Bytes {
     // Returns the newly created 'bytes memory'
     // The returned bytes will be of length 'len'.
     function toBytesFromBytes32(bytes32 self, uint8 len) internal pure returns (bytes memory bts) {
-        require(
-            len <= 32,
-            "bt211"
-        ); // bt211 - wrong bytes length from 32
+        require(len <= 32, "bt211"); // bt211 - wrong bytes length from 32
+
         bts = new bytes(len);
         // Even though the bytes will allocate a full word, we don't want
         // any potential garbage bytes in there.
@@ -57,10 +56,7 @@ library Bytes {
         pure
         returns (address addr)
     {
-        require(
-            self.length >= 20,
-            "bbs11"
-        ); // bbs11 - wrong bytes length to address
+        require(self.length >= 20, "bbs11"); // bbs11 - wrong bytes length to address
 
         assembly {
             addr := div(mload(add(add(self, 0x20), 0)), 0x1000000000000000000000000)
@@ -94,12 +90,9 @@ library Bytes {
         pure
         returns (uint128)
     {
-        require(
-            self.length >= 16,
-            "bb811"
-        ); // bb811 - wrong bytes length to 128
-        uint128 tempUint;
+        require(self.length >= 16, "bb811"); // bb811 - wrong bytes length to 128
 
+        uint128 tempUint;
         assembly {
             tempUint := mload(add(add(self, 0x10), 0))
         }
@@ -119,10 +112,7 @@ library Bytes {
         pure
         returns (bytes memory)
     {
-        require(
-            _bytes.length >= (_start + _length),
-            "bse11"
-        ); // bse11 - bytes length is less then start byte + length bytes
+        require(_bytes.length >= (_start + _length), "bse11"); // bse11 - bytes length is less then start byte + length bytes
 
         bytes memory tempBytes;
 
@@ -176,6 +166,11 @@ library Bytes {
         }
 
         return tempBytes;
+    }
+
+    function read(bytes memory _data, uint _offset, uint _length) internal pure returns (uint new_offset, bytes memory data) {
+        data = slice(_data, _offset, _length);
+        new_offset = _offset + _length;
     }
 
     // Original source code: https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol#L13
@@ -257,6 +252,52 @@ library Bytes {
         }
 
         return tempBytes;
+    }
+
+    // Copy `_src` buffer into the `_dst` buffer starting at position `_dst_offset`
+    // Returns shifted offset.
+    function memcpy(
+        bytes memory _dst,
+        uint         _dst_offset,
+        bytes memory _src
+    )
+        internal
+        pure
+        returns (uint new_offset)
+    {
+        require(_dst.length >= _dst_offset + _src.length, "bwe01"); // bwe01 - not enough space in buffer
+        require(_dst_offset % 0x20 == 0, "bwe02"); // bwe02 - offset must be a multiple of 32
+
+        assembly {
+
+            // Store the length of the source bytes array at the beginning of
+            // the memory for tempBytes.
+            let length := mload(_src)
+
+            // Maintain a memory counter for the current write location in the
+            // temp bytes array by adding the 32 bytes for the array length to
+            // the starting location.
+            let mc := add(_dst, 0x20)
+            // Stop copying when the memory counter reaches the length of the
+            // first bytes array.
+            let end := add(mc, length)
+
+            for {
+                // Initialize a copy counter to the start of the _preBytes data,
+                // 32 bytes into its memory.
+                let cc := add(_src, 0x20)
+            } lt(mc, end) {
+                // Increase both counters by 32 bytes each iteration.
+                mc := add(mc, 0x20)
+                cc := add(cc, 0x20)
+            } {
+                // Write the _preBytes data into the tempBytes memory 32 bytes
+                // at a time.
+                mstore(mc, mload(cc))
+            }
+        }
+
+        return _dst_offset + _src.length;
     }
 
 }
