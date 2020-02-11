@@ -48,7 +48,7 @@ pub struct ApiClient {
     publish_url: String,
     stopped_url: String,
     worker: String,
-    req_server_timeout: u64,
+    req_server_timeout: time::Duration,
 }
 
 impl ApiClient {
@@ -70,9 +70,7 @@ impl ApiClient {
     }
 
     pub fn register_prover(&self) -> Result<i32, failure::Error> {
-        let mut client_builder = reqwest::ClientBuilder::new();
-        client_builder = client_builder.timeout(time::Duration::from_secs(self.req_server_timeout));
-        let client = client_builder.build().expect("failed to create client");
+        let client = self.get_client()?;
         let res = client
             .post(&self.register_url)
             .json(&client::ProverReq {
@@ -88,9 +86,7 @@ impl ApiClient {
     }
 
     pub fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
-        let mut client_builder = reqwest::ClientBuilder::new();
-        client_builder = client_builder.timeout(time::Duration::from_secs(self.req_server_timeout));
-        let client = client_builder.build().expect("failed to create client");
+        let client = self.get_client()?;
         client
             .post(&self.stopped_url)
             .json(&prover_run_id)
@@ -98,13 +94,18 @@ impl ApiClient {
             .map_err(|e| format_err!("prover stopped request failed: {}", e))?;
         Ok(())
     }
+
+    fn get_client(&self) -> Result<reqwest::Client, failure::Error> {
+        reqwest::ClientBuilder::new()
+            .timeout(self.req_server_timeout)
+            .build()
+            .map_err(|e| format_err!("failed to create reqwest client: {}", e))
+    }
 }
 
 impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
-        let mut client_builder = reqwest::ClientBuilder::new();
-        client_builder = client_builder.timeout(time::Duration::from_secs(self.req_server_timeout));
-        let client = client_builder.build().expect("failed to create client");
+        let client = self.get_client()?;
         let mut res = client
             .get(&self.block_to_prove_url)
             .json(&client::ProverReq {
@@ -124,9 +125,7 @@ impl crate::ApiClient for ApiClient {
     }
 
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
-        let mut client_builder = reqwest::ClientBuilder::new();
-        client_builder = client_builder.timeout(time::Duration::from_secs(self.req_server_timeout));
-        let client = client_builder.build().expect("failed to create client");
+        let client = self.get_client()?;
         let res = client
             .post(&self.working_on_url)
             .json(&client::WorkingOnReq {
@@ -145,9 +144,7 @@ impl crate::ApiClient for ApiClient {
         block: i64,
         timeout: time::Duration,
     ) -> Result<ProverData, failure::Error> {
-        let mut client_builder = reqwest::ClientBuilder::new();
-        client_builder = client_builder.timeout(time::Duration::from_secs(self.req_server_timeout));
-        let client = client_builder.build().expect("failed to create client");
+        let client = self.get_client()?;
         let now = time::Instant::now();
         while now.elapsed() < timeout {
             let mut res = client
@@ -163,7 +160,7 @@ impl crate::ApiClient for ApiClient {
             if let Some(res) = res {
                 return Ok(res);
             }
-            thread::sleep(time::Duration::from_secs(self.req_server_timeout));
+            thread::sleep(self.req_server_timeout);
         }
 
         failure::bail!("timeout")
@@ -183,9 +180,7 @@ impl crate::ApiClient for ApiClient {
 
         let encoded = encode_proof(&full_proof);
 
-        let mut client_builder = reqwest::ClientBuilder::new();
-        client_builder = client_builder.timeout(time::Duration::from_secs(self.req_server_timeout));
-        let client = client_builder.build().expect("failed to create client");
+        let client = self.get_client()?;
         let res = client
             .post(&self.publish_url)
             .json(&client::PublishReq {
