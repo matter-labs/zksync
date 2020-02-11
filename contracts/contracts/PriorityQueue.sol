@@ -139,10 +139,7 @@ contract PriorityQueue {
     /// @return validators fee
     function collectValidatorsFeeAndDeleteRequests(uint64 _number) external returns (uint256) {
         requireFranklin();
-        require(
-            _number <= totalOpenPriorityRequests,
-            "pcs21"
-        ); // pcs21 - number is heigher than total priority requests number
+        require(_number <= totalOpenPriorityRequests, "pcs21"); // number is heigher than total priority requests number
 
         uint256 totalFee = 0;
         for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + _number; i++) {
@@ -162,10 +159,7 @@ contract PriorityQueue {
     /// @return concated deposits public data for limited number of deposits so as not to go beyond the block gas limit in the caller function
     function deletePriorityRequestsAndPopOutstandingDeposits(uint64 _number) external returns (bytes memory depositsPubData) {
         requireFranklin();
-        require(
-            totalOpenPriorityRequests > 0,
-            "pgs11"
-        ); // pgs11 - no one priority request left
+        require(totalOpenPriorityRequests > 0, "pgs11"); // no one priority request left
         uint64 toProcess = totalOpenPriorityRequests < _number ? totalOpenPriorityRequests : _number;
         for (uint64 i = 0; i < toProcess; i++) {
             uint64 id = firstPriorityRequestId + i;
@@ -194,7 +188,7 @@ contract PriorityQueue {
             priorityPubData = Bytes.slice(priorityRequests[_priorityRequestId].pubData, 0, ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES);
             onchainPubData = Bytes.slice(_pubData, 0, ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES);
         } else {
-            revert("pid11"); // pid11 - wrong operation
+            revert("pid11"); // wrong operation
         }
         return (priorityPubData.length > 0) &&
             (keccak256(onchainPubData) == keccak256(priorityPubData));
@@ -203,10 +197,7 @@ contract PriorityQueue {
     /// @notice Checks if provided number is less than uncommitted requests count
     /// @param _number Number of requests
     function validateNumberOfRequests(uint64 _number) external view {
-        require(
-            _number <= totalOpenPriorityRequests-totalCommittedPriorityRequests,
-            "pvs11"
-        ); // pvs11 - too much priority requests
+        require(_number <= totalOpenPriorityRequests-totalCommittedPriorityRequests, "pvs11"); // too much priority requests
     }
 
     /// @notice Increases committed requests count by provided number
@@ -234,9 +225,6 @@ contract PriorityQueue {
 
     /// @notice Check if the sender is rollup contract
     function requireFranklin() internal view {
-        require(
-            msg.sender == franklinAddress,
-            "prn11"
-        ); // prn11 - only by franklin
+        require(msg.sender == franklinAddress, "prn11"); // only by zksync
     }
 }
