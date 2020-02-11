@@ -4,8 +4,13 @@ import { expect, use } from "chai";
 import { createMockProvider, getWallets, solidity, deployContract } from "ethereum-waffle";
 import { bigNumberify, parseEther, hexlify, formatEther } from "ethers/utils";
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const wallet: any = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// For: geth
+// const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+// const wallet: any = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+
+// For: ganache
+const provider = createMockProvider();
+const [wallet]  = getWallets(provider);
 
 use(solidity);
 
