@@ -4,6 +4,7 @@
 !docker/prover/prover-entry.sh
 !docker/nginx/nginx.conf
 !bin/.load_keys
+!contracts/build
 !js/client/index.html
 !js/client/dist
 !js/explorer/index.html
