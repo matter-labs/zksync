@@ -98,7 +98,7 @@ mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use bigdecimal::BigDecimal;
     use models::node::operations::ChangePubKeyOffchainOp;
-    use models::node::tx::{ChangePubKeyOffchain, TxSignature};
+    use models::node::tx::{ChangePubKey, TxSignature};
     use models::node::{
         Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
         TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
@@ -255,7 +255,7 @@ mod test {
 
     #[test]
     fn test_change_pubkey_offchain() {
-        let tx = ChangePubKeyOffchain {
+        let tx = ChangePubKey {
             account: "7777777777777777777777777777777777777777".parse().unwrap(),
             new_pk_hash: PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")
                 .unwrap(),

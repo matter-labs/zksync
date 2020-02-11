@@ -141,7 +141,7 @@ impl<T: Transport> AccountSet<T> {
         increment_nonce: bool,
     ) -> FranklinTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
-        FranklinTx::ChangePubKeyOffchain(Box::new(
+        FranklinTx::ChangePubKey(Box::new(
             zksync_account.create_change_pubkey_tx(nonce, increment_nonce),
         ))
     }

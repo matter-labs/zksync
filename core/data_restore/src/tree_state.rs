@@ -232,7 +232,7 @@ impl TreeState {
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
 
-                    let tx = FranklinTx::ChangePubKeyOffchain(Box::new(op.tx.clone()));
+                    let tx = FranklinTx::ChangePubKey(Box::new(op.tx.clone()));
                     let (fee, updates) = self
                         .state
                         .apply_change_pubkey_op(&op)

@@ -200,14 +200,14 @@ impl Close {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ChangePubKeyOffchain {
+pub struct ChangePubKey {
     pub account: Address,
     pub new_pk_hash: PubKeyHash,
     pub nonce: Nonce,
     pub eth_signature: Option<PackedEthSignature>,
 }
 
-impl ChangePubKeyOffchain {
+impl ChangePubKey {
     const TX_TYPE: u8 = 7;
 
     /// GetBytes for this transaction is used for hashing.
@@ -248,7 +248,7 @@ pub enum FranklinTx {
     Transfer(Box<Transfer>),
     Withdraw(Box<Withdraw>),
     Close(Box<Close>),
-    ChangePubKeyOffchain(Box<ChangePubKeyOffchain>),
+    ChangePubKey(Box<ChangePubKey>),
 }
 
 impl FranklinTx {
@@ -257,7 +257,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
-            FranklinTx::ChangePubKeyOffchain(tx) => tx.get_bytes(),
+            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
         };
 
         let mut hasher = Sha256::new();
@@ -272,7 +272,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.from,
             FranklinTx::Withdraw(tx) => tx.from,
             FranklinTx::Close(tx) => tx.account,
-            FranklinTx::ChangePubKeyOffchain(tx) => tx.account,
+            FranklinTx::ChangePubKey(tx) => tx.account,
         }
     }
 
@@ -281,7 +281,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.nonce,
             FranklinTx::Withdraw(tx) => tx.nonce,
             FranklinTx::Close(tx) => tx.nonce,
-            FranklinTx::ChangePubKeyOffchain(tx) => tx.nonce,
+            FranklinTx::ChangePubKey(tx) => tx.nonce,
         }
     }
 
@@ -290,7 +290,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.check_correctness(),
             FranklinTx::Withdraw(tx) => tx.check_correctness(),
             FranklinTx::Close(tx) => tx.check_correctness(),
-            FranklinTx::ChangePubKeyOffchain(tx) => tx.check_correctness(),
+            FranklinTx::ChangePubKey(tx) => tx.check_correctness(),
         }
     }
 
@@ -299,7 +299,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
-            FranklinTx::ChangePubKeyOffchain(tx) => tx.get_bytes(),
+            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
         }
     }
 
@@ -308,7 +308,7 @@ impl FranklinTx {
             FranklinTx::Transfer(_) => TransferOp::CHUNKS,
             FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
-            FranklinTx::ChangePubKeyOffchain(_) => ChangePubKeyOffchainOp::CHUNKS,
+            FranklinTx::ChangePubKey(_) => ChangePubKeyOffchainOp::CHUNKS,
         }
     }
 

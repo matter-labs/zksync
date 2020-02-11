@@ -5,7 +5,7 @@ use models::node::operations::{
     ChangePubKeyOffchainOp, CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp,
     TransferToNewOp, WithdrawOp,
 };
-use models::node::tx::ChangePubKeyOffchain;
+use models::node::tx::ChangePubKey;
 use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
@@ -100,7 +100,7 @@ impl PlasmaState {
             FranklinTx::Transfer(tx) => self.apply_transfer(*tx),
             FranklinTx::Withdraw(tx) => self.apply_withdraw(*tx),
             FranklinTx::Close(tx) => self.apply_close(*tx),
-            FranklinTx::ChangePubKeyOffchain(tx) => self.apply_change_pubkey(*tx),
+            FranklinTx::ChangePubKey(tx) => self.apply_change_pubkey(*tx),
         }
     }
 
@@ -280,12 +280,12 @@ impl PlasmaState {
         // })
     }
 
-    fn apply_change_pubkey(&mut self, tx: ChangePubKeyOffchain) -> Result<OpSuccess, Error> {
+    fn apply_change_pubkey(&mut self, tx: ChangePubKey) -> Result<OpSuccess, Error> {
         let (account_id, account) = self
             .get_account_by_address(&tx.account)
             .ok_or_else(|| format_err!("Account does not exist"))?;
         ensure!(
-            tx.verify_eth_signature() == Some(account.address),
+            tx.eth_signature.is_none() || tx.verify_eth_signature() == Some(account.address),
             "ChangePubKey signature is incorrect"
         );
         let change_pk_op = ChangePubKeyOffchainOp { tx, account_id };

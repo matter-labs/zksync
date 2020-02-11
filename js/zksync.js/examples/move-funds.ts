@@ -1,7 +1,7 @@
 import * as zksync from "../src/index";
-import { Contract, ethers, utils } from "ethers";
-import { formatEther, parseEther } from "ethers/utils";
-import { emergencyWithdraw } from "../src/index";
+import {Contract, ethers, utils} from "ethers";
+import {formatEther, parseEther} from "ethers/utils";
+import {emergencyWithdraw} from "../src/index";
 
 const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
@@ -96,7 +96,12 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
             "Unlocking account with onchain tx: ",
             syncWallet.address()
         );
-        const unlockAccountHandle = await syncWallet.setCurrentPubkeyWithEthereumTx();
+        try {
+            await (await syncWallet.authChangePubkey()).wait();
+        } catch (e) {
+
+        }
+        const unlockAccountHandle = await syncWallet.setCurrentPubkeyWithZksyncTx("committed", true);
         await unlockAccountHandle.awaitReceipt();
         console.log("Account unlocked");
     } else {

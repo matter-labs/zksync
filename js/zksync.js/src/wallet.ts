@@ -126,7 +126,7 @@ export class Wallet {
     }
 
     async setCurrentPubkeyWithZksyncTx(
-        nonce: Nonce = "committed"
+        nonce: Nonce = "committed", onchainAuth = false,
     ): Promise<Transaction> {
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
@@ -138,10 +138,10 @@ export class Wallet {
         const numNonce = await this.getNonce(nonce);
         const newPkHash = serializeAddress(newPubKeyHash);
         const message = Buffer.concat([serializeNonce(numNonce), newPkHash]);
-        const ethSignature = await this.ethSigner.signMessage(message);
+        const ethSignature = onchainAuth ? null : await this.ethSigner.signMessage(message);
 
         const txData = {
-            type: "ChangePubKeyOffchain",
+            type: "ChangePubKey",
             account: this.address(),
             newPkHash: this.signer.pubKeyHash(),
             nonce: numNonce,
@@ -152,7 +152,9 @@ export class Wallet {
         return new Transaction(txData, transactionHash, this.provider);
     }
 
-    async setCurrentPubkeyWithEthereumTx(): Promise<ETHOperation> {
+    async authChangePubkey(
+        nonce: Nonce = "committed"
+    ): Promise<ContractTransaction>{
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
 
@@ -160,11 +162,7 @@ export class Wallet {
             throw new Error("Current PubKeyHash is the same as new");
         }
 
-        const gasPrice = await this.ethSigner.provider.getGasPrice();
-
-        const maxFeeInETHToken = await this.ethProxy.estimateEmergencyWithdrawFeeInETHToken(
-            gasPrice
-        );
+        const numNonce = await this.getNonce(nonce);
 
         const mainZkSyncContract = new Contract(
             this.ethProxy.contractAddress.mainContract,
@@ -172,16 +170,15 @@ export class Wallet {
             this.ethSigner
         );
 
-        const ethTransaction = await mainZkSyncContract.changePubKeyHash(
+        const ethTransaction = await mainZkSyncContract.authFact(
             newPubKeyHash.replace("sync:", "0x"),
+            numNonce,
             {
                 gasLimit: utils.bigNumberify("200000"),
-                value: maxFeeInETHToken,
-                gasPrice
             }
         );
 
-        return new ETHOperation(ethTransaction, this.provider);
+        return ethTransaction;
     }
 
     async getCurrentPubKeyHash(): Promise<PubKeyHash> {

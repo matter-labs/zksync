@@ -1,7 +1,7 @@
 use super::tx::TxSignature;
 use super::AccountId;
 use super::FranklinTx;
-use crate::node::tx::ChangePubKeyOffchain;
+use crate::node::tx::ChangePubKey;
 use crate::node::{
     pack_fee_amount, pack_token_amount, unpack_fee_amount, unpack_token_amount, Close, Deposit,
     FranklinPriorityOp, FullExit, PubKeyHash, Transfer, Withdraw,
@@ -372,7 +372,7 @@ impl CloseOp {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChangePubKeyOffchainOp {
-    pub tx: ChangePubKeyOffchain,
+    pub tx: ChangePubKey,
     pub account_id: AccountId,
 }
 
@@ -440,7 +440,7 @@ impl ChangePubKeyOffchainOp {
             .ok_or_else(|| format_err!("Change pubkey offchain, fail to get nonce"))?;
 
         Ok(ChangePubKeyOffchainOp {
-            tx: ChangePubKeyOffchain {
+            tx: ChangePubKey {
                 account,
                 new_pk_hash,
                 nonce,
@@ -604,7 +604,7 @@ impl FranklinOp {
             FranklinOp::Withdraw(op) => Ok(FranklinTx::Withdraw(Box::new(op.tx.clone()))),
             FranklinOp::Close(op) => Ok(FranklinTx::Close(Box::new(op.tx.clone()))),
             FranklinOp::ChangePubKeyOffchain(op) => {
-                Ok(FranklinTx::ChangePubKeyOffchain(Box::new(op.tx.clone())))
+                Ok(FranklinTx::ChangePubKey(Box::new(op.tx.clone())))
             }
             _ => Err(format_err!("Wrong tx type")),
         }
