@@ -1,4 +1,5 @@
 {
     "sourcesPath": "./contracts/test",
-    "targetPath": "./build"
+    "targetPath": "./build",
+    "compiler": "native"
 }
