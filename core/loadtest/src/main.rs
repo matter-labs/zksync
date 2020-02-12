@@ -1,6 +1,9 @@
 use bigdecimal::BigDecimal;
+use futures::compat::Future01CompatExt;
 use futures::executor::block_on;
 use futures::future::try_join_all;
+use futures::join;
+use log::{debug, info};
 use models::config_options::ConfigurationOptions;
 use models::node::tx::FranklinTx;
 use serde::Deserialize;
@@ -8,11 +11,14 @@ use serde::Serialize;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::time::Duration;
 use testkit::eth_account::{parse_ether, EthereumAccount};
 use testkit::zksync_account::ZksyncAccount;
+use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::types::{H160, H256};
 
+// TODO: remove this
 const N_ACC: usize = 10;
 
 #[derive(Deserialize, Debug)]
@@ -27,37 +33,37 @@ struct TestAccount {
 }
 
 fn main() {
+    let _runtime = Runtime::new().unwrap();
     let config = ConfigurationOptions::from_env();
     let filepath = env::args().nth(1).expect("account.json path not given");
     let input_accs = read_accounts(filepath);
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
     let test_accounts = construct_test_accounts(input_accs, transport, &config);
-    let deposit_amount = parse_ether("1.0").expect("failed to parse ETH");
+    let deposit_amount = parse_ether("1.0").expect("failed to parse");
+    let transfer_amount = parse_ether("0.2").expect("failed to parse");
+    let withdraw_amount = parse_ether("0.5").expect("failed to parse");
+    info!("Inital depsoits");
     block_on(do_deposits(&test_accounts[..], deposit_amount.clone()));
-    block_on(do_transfers(&test_accounts[..], deposit_amount));
-    println!("End");
-}
-
-async fn do_deposits(test_accounts: &[TestAccount], deposit_amount: BigDecimal) {
-    try_join_all(
-        test_accounts
-            .iter()
-            .map(|test_acc| deposit_single(&test_acc, deposit_amount.clone()))
-            .collect::<Vec<_>>(),
-    )
-    .await
-    .expect("failed to deposit");
-}
-
-async fn deposit_single(
-    test_acc: &TestAccount,
-    deposit_amount: BigDecimal,
-) -> Result<(), failure::Error> {
-    test_acc
-        .eth_acc
-        .deposit_eth(deposit_amount, &test_acc.zk_acc.address)
-        .await?;
-    Ok(())
+    info!("done.");
+    info!("Simultaneous deposits, transfers and withdraws");
+    block_on(async {
+        join!(
+            do_deposits(&test_accounts[..], withdraw_amount.clone()),
+            do_deposits(&test_accounts[..], withdraw_amount.clone()),
+            do_transfers(&test_accounts[..], transfer_amount.clone()),
+            do_transfers(&test_accounts[..], transfer_amount.clone()),
+            do_transfers(&test_accounts[..], transfer_amount.clone()),
+            do_transfers(&test_accounts[..], transfer_amount.clone()),
+            do_transfers(&test_accounts[..], transfer_amount.clone()),
+            do_withdraws(&test_accounts[..], withdraw_amount.clone()),
+            do_withdraws(&test_accounts[..], withdraw_amount.clone()),
+        )
+    });
+    info!("done.");
+    info!("Final withdraws");
+    block_on(do_withdraws(&test_accounts[..], deposit_amount));
+    info!("done.");
+    info!("End");
 }
 
 fn read_accounts(filepath: String) -> [AccountInfo; N_ACC] {
@@ -96,6 +102,28 @@ fn construct_test_accounts(
         .collect()
 }
 
+async fn do_deposits(test_accounts: &[TestAccount], deposit_amount: BigDecimal) {
+    try_join_all(
+        test_accounts
+            .iter()
+            .map(|test_acc| deposit_single(&test_acc, deposit_amount.clone()))
+            .collect::<Vec<_>>(),
+    )
+    .await
+    .expect("failed to deposit");
+}
+
+async fn deposit_single(
+    test_acc: &TestAccount,
+    deposit_amount: BigDecimal,
+) -> Result<(), failure::Error> {
+    test_acc
+        .eth_acc
+        .deposit_eth(deposit_amount, &test_acc.zk_acc.address)
+        .await?;
+    Ok(())
+}
+
 async fn do_transfers(test_accounts: &[TestAccount], deposit_amount: BigDecimal) {
     try_join_all(
         test_accounts
@@ -128,6 +156,27 @@ struct SubmitTxMsg {
     params: Vec<FranklinTx>,
 }
 
+async fn do_withdraws(test_accounts: &[TestAccount], deposit_amount: BigDecimal) {
+    try_join_all(
+        test_accounts
+            .iter()
+            .map(|test_acc| {
+                let tx = FranklinTx::Withdraw(test_acc.zk_acc.sign_withdraw(
+                    0, // ETH
+                    deposit_amount.clone(),
+                    BigDecimal::from(0),
+                    &test_acc.eth_acc.address,
+                    None,
+                    true,
+                ));
+                send_tx(tx)
+            })
+            .collect::<Vec<_>>(),
+    )
+    .await
+    .expect("failed to do withdraws");
+}
+
 impl SubmitTxMsg {
     fn new(tx: FranklinTx) -> Self {
         Self {
@@ -142,16 +191,56 @@ impl SubmitTxMsg {
 async fn send_tx(tx: FranklinTx) -> Result<(), failure::Error> {
     let msg = SubmitTxMsg::new(tx);
 
-    // TODO: make it async
-    let client = reqwest::Client::new();
+    let mut builder = reqwest::r#async::ClientBuilder::new();
+    builder = builder.timeout(Duration::from_secs(30));
+    builder = builder.connect_timeout(Duration::from_secs(30));
+    let client = builder.build().expect("send_tx");
     let mut res = client
         .post("http://localhost:3030")
         .json(&msg)
         .send()
+        .compat()
+        .await
         .expect("failed to submit tx");
     if res.status() != reqwest::StatusCode::OK {
         failure::bail!("non-ok response: {}", res.status());
     }
-    println!("sent tx: {}", res.text().unwrap());
+    debug!("sent tx: {}", res.text().compat().await.unwrap());
     Ok(())
+}
+
+// TODO: Use below code for final assertions.
+
+#[derive(Serialize)]
+struct GetAccountStateMsg {
+    id: String,
+    method: String,
+    jsonrpc: String,
+    params: Vec<String>,
+}
+
+impl GetAccountStateMsg {
+    fn new(addr: &str) -> Self {
+        Self {
+            id: "2".to_owned(),
+            method: "account_info".to_owned(),
+            jsonrpc: "2.0".to_owned(),
+            params: vec![addr.to_owned()],
+        }
+    }
+}
+
+fn get_account_state(addr: &str) -> server::api_server::rpc_server::AccountInfoResp {
+    let msg = GetAccountStateMsg::new(addr);
+
+    let client = reqwest::Client::new();
+    let mut resp = client
+        .post("http://localhost:3030")
+        .json(&msg)
+        .send()
+        .expect("failed to send request");
+    if resp.status() != reqwest::StatusCode::OK {
+        panic!("non-ok response: {}", resp.status());
+    }
+    resp.json().unwrap()
 }
