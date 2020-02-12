@@ -8,7 +8,7 @@ use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use log::{debug, error, info};
 use signal_hook::iterator::Signals;
 // Workspace deps
-use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_HEARTBEAT_INTERVAL};
+use models::node::config::{PROVER_HEARTBEAT_INTERVAL};
 use models::node::Engine;
 use prover::client;
 use prover::{start, BabyProver};
@@ -36,13 +36,11 @@ fn main() {
     let jubjub_params = AltJubjubBn256::new();
     let circuit_params = read_from_key_dir(key_dir);
     let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
-    let prover_timeout = time::Duration::from_secs(PROVER_GONE_TIMEOUT as u64);
     let worker = BabyProver::new(
         circuit_params,
         jubjub_params,
         api_client,
         heartbeat_interval,
-        prover_timeout,
         stop_signal,
     );
     // Register prover

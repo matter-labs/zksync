@@ -167,7 +167,6 @@ impl crate::ApiClient for ApiClient {
     fn prover_data(
         &self,
         block: i64,
-        _timeout: time::Duration,
     ) -> Result<ProverData, failure::Error> {
         let client = self.get_client()?;
         let mut op = || -> Result<ProverData, backoff::Error<failure::Error>> {

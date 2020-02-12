@@ -17,7 +17,6 @@ pub struct BabyProver<C: ApiClient> {
     jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
     api_client: C,
     heartbeat_interval: time::Duration,
-    get_prover_data_timeout: time::Duration,
     stop_signal: Arc<AtomicBool>,
 }
 
@@ -27,7 +26,6 @@ pub trait ApiClient {
     fn prover_data(
         &self,
         block: i64,
-        timeout: time::Duration,
     ) -> Result<prover_data::ProverData, failure::Error>;
     fn publish(
         &self,
@@ -80,7 +78,6 @@ impl<C: ApiClient> BabyProver<C> {
         jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
         api_client: C,
         heartbeat_interval: time::Duration,
-        get_prover_data_timeout: time::Duration,
         stop_signal: Arc<AtomicBool>,
     ) -> Self {
         BabyProver {
@@ -88,7 +85,6 @@ impl<C: ApiClient> BabyProver<C> {
             jubjub_params,
             api_client,
             heartbeat_interval,
-            get_prover_data_timeout,
             stop_signal,
         }
     }
@@ -145,7 +141,7 @@ impl<C: ApiClient> BabyProver<C> {
         }
         let prover_data = self
             .api_client
-            .prover_data(block, self.get_prover_data_timeout)
+            .prover_data(block)
             .map_err(|err| {
                 BabyProverError::Api(format!(
                     "could not get prover data for block {}: {}",
