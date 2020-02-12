@@ -1,6 +1,6 @@
 {
-    "sourcesPath": "./flat",
-    "targetPath": "./flat_build",
+    "sourcesPath": "./contracts",
+    "targetPath": "./build",
     "compilerOptions": {
         "optimizer": {
             "enabled": true,

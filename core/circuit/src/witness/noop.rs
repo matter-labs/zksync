@@ -46,7 +46,7 @@ pub fn noop_operation(
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
 
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            eth_address: Some(Fr::zero()),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
             fee: Some(Fr::zero()),
@@ -62,6 +62,7 @@ pub fn noop_operation(
                 account_witness: AccountWitness {
                     nonce: Some(acc.nonce),
                     pub_key_hash: Some(acc.pub_key_hash),
+                    address: Some(acc.address),
                 },
                 account_path: audit_account.clone(),
                 balance_value: Some(balance_value),
@@ -75,6 +76,7 @@ pub fn noop_operation(
                 account_witness: AccountWitness {
                     nonce: Some(acc.nonce),
                     pub_key_hash: Some(acc.pub_key_hash),
+                    address: Some(acc.address),
                 },
                 account_path: audit_account,
                 balance_value: Some(balance_value),
@@ -109,7 +111,7 @@ mod test {
 
     #[test]
     #[ignore]
-    fn test_noop_franklin() {
+    fn test_noop() {
         let params = &AltJubjubBn256::new();
         let p_g = FixedGenerators::SpendingKeyGenerator;
         let validator_address_number = 7;
@@ -137,6 +139,7 @@ mod test {
             subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
+            address: Fr::zero(),
         };
 
         let mut validator_balances = vec![];
@@ -167,6 +170,7 @@ mod test {
             subtree: sender_balance_tree,
             nonce: Fr::zero(),
             pub_key_hash: sender_pub_key_hash,
+            address: Fr::zero(),
         };
 
         tree.insert(account_address, sender_leaf_initial);

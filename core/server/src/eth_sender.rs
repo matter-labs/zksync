@@ -388,6 +388,14 @@ impl<T: Transport> ETHSender<T> {
                     hex::encode(&public_data)
                 );
 
+                let witness_data = op.block.get_eth_witness_data();
+                debug!(
+                    "witness_data for block {}: {}, {:?}",
+                    op.block.block_number,
+                    hex::encode(&witness_data.0),
+                    &witness_data.1
+                );
+
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
                 block_on(self.eth_client.sign_call_tx(
                     "commitBlock",
@@ -396,6 +404,8 @@ impl<T: Transport> ETHSender<T> {
                         u64::from(op.block.fee_account),
                         root,
                         public_data,
+                        witness_data.0,
+                        witness_data.1,
                     ),
                     tx_options,
                 ))

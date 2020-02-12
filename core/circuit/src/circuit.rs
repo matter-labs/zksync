@@ -4,9 +4,7 @@ use crate::allocated_structures::*;
 use crate::element::CircuitElement;
 use crate::operation::Operation;
 use crate::signature::*;
-use crate::utils::{
-    allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element, reverse_bytes,
-};
+use crate::utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element};
 use bellman::{Circuit, ConstraintSystem, SynthesisError};
 use ff::{Field, PrimeField};
 use franklin_crypto::circuit::boolean::Boolean;
@@ -19,9 +17,11 @@ use franklin_crypto::circuit::pedersen_hash;
 use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
 use franklin_crypto::circuit::Assignment;
 use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+use models::node::operations::{ChangePubKeyOp, NoopOp};
+use models::node::{CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp};
 use models::params as franklin_constants;
 
-const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 7;
+const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
 #[derive(Clone)]
 pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub params: &'a E::Params,
@@ -56,7 +56,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         )?;
         let mut prev = PreviousData {
             op_data: AllocatedOperationData {
-                ethereum_key: zero_circuit_element.clone(),
+                eth_address: zero_circuit_element.clone(),
                 new_pubkey_hash: zero_circuit_element.clone(),
                 pub_nonce: zero_circuit_element.clone(),
                 amount_packed: zero_circuit_element.clone(),
@@ -133,7 +133,6 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         // Main cycle that processes operations:
         for (i, operation) in self.operations.iter().enumerate() {
-            debug!("operation number {} processing started \n", i);
             let cs = &mut cs.namespace(|| format!("chunk number {}", i));
 
             let (next_chunk, chunk_data) = self.verify_correct_chunking(
@@ -221,6 +220,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         );
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
+        operator_account_data.extend(validator_account.address.get_bits_le());
         operator_account_data.extend(old_operator_balance_root_bits);
 
         let root_from_operator = allocate_merkle_root(
@@ -265,6 +265,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
+        operator_account_data.extend(validator_account.address.get_bits_le());
         operator_account_data.extend(new_operator_balance_root_bits);
 
         let root_from_operator_after_fees = allocate_merkle_root(
@@ -279,6 +280,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             cs.namespace(|| "final_root"),
             root_from_operator_after_fees,
         )?;
+
         {
             // Now it's time to pack the initial SHA256 hash due to Ethereum BE encoding
             // and start rolling the hash
@@ -444,6 +446,12 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                     &second.account.pub_key_hash,
                     &is_left,
                 )?,
+                address: CircuitElement::conditionally_select(
+                    cs.namespace(|| "chosen address"),
+                    &first.account.address,
+                    &second.account.address,
+                    &is_left,
+                )?,
             },
             account_audit_path: select_vec_ifeq(
                 cs.namespace(|| "account_audit_path"),
@@ -563,9 +571,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 &prev.op_data.fee_packed,
             )?);
             is_op_data_correct_flags.push(CircuitElement::equals(
-                cs.namespace(|| "is ethereum_key equal to previous"),
-                &op_data.ethereum_key,
-                &prev.op_data.ethereum_key,
+                cs.namespace(|| "is eth_address equal to previous"),
+                &op_data.eth_address,
+                &prev.op_data.eth_address,
             )?);
             is_op_data_correct_flags.push(CircuitElement::equals(
                 cs.namespace(|| "is new_pubkey_hash equal to previous"),
@@ -685,9 +693,14 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &mut cur,
             &chunk_data,
             &op_data,
-            &signer_key,
             &ext_pubdata_chunk,
-            &signature_data,
+        )?);
+        op_flags.push(self.change_pubkey_offchain(
+            cs.namespace(|| "change_pubkey_offchain"),
+            &mut cur,
+            &chunk_data,
+            &op_data,
+            &ext_pubdata_chunk,
         )?);
         op_flags.push(self.noop(cs.namespace(|| "noop"), &chunk_data, &ext_pubdata_chunk)?);
 
@@ -746,10 +759,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
-        pubdata_bits.extend(op_data.ethereum_key.get_bits_be()); //ETHEREUM_KEY=160
-                                                                 //        assert_eq!(pubdata_bits.len(), 30 * 8);
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_ADDRESS=160
+                                                                //        assert_eq!(pubdata_bits.len(), 30 * 8);
         pubdata_bits.resize(
-            6 * franklin_constants::CHUNK_BIT_WIDTH,
+            WithdrawOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -758,8 +771,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut serialized_tx_bits = vec![];
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(cur.account.pub_key_hash.get_bits_be());
-        serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
+        serialized_tx_bits.extend(cur.account.address.get_bits_be());
+        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
@@ -769,7 +782,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            6,
+            WithdrawOp::CHUNKS,
         )?;
 
         //TODO: this flag is used too often, we better compute it above
@@ -790,7 +803,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_withdraw = Boolean::from(Expression::equals(
             cs.namespace(|| "is_withdraw"),
             &chunk_data.tx_type.get_number(),
-            Expression::u64::<CS>(3), //withdraw tx code
+            Expression::u64::<CS>(u64::from(WithdrawOp::OP_CODE)),
         )?);
         base_valid_flags.push(is_withdraw);
 
@@ -892,9 +905,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         cur: &mut AllocatedOperationBranch<E>,
         chunk_data: &AllocatedChunkData<E>,
         op_data: &AllocatedOperationData<E>,
-        signer_key: &AllocatedSignerPubkey<E>,
         ext_pubdata_chunk: &AllocatedNum<E>,
-        signature: &AllocatedSignatureData<E>,
     ) -> Result<Boolean, SynthesisError> {
         // Execute first chunk
 
@@ -906,46 +917,17 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?);
 
         // MUST be true for all chunks
-        let is_signature_witness_correct = {
-            let correct_in_first_chunk = {
-                // construct signature message
-                let mut serialized_tx_bits = vec![];
-                serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-                serialized_tx_bits.extend(cur.account_address.get_bits_be());
-                serialized_tx_bits.extend(signer_key.pubkey.get_external_packing());
-                serialized_tx_bits.extend(op_data.ethereum_key.get_bits_be());
-                serialized_tx_bits.extend(cur.token.get_bits_be());
-                serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
-
-                verify_signature_message_construction(
-                    cs.namespace(|| "is_serialized_op_withess_correct"),
-                    serialized_tx_bits,
-                    &op_data,
-                )?
-            };
-
-            multi_or(
-                cs.namespace(|| "sig is valid or not first chunk"),
-                &[correct_in_first_chunk, is_first_chunk.clone().not()],
-            )?
-        };
-
-        // MUST be true for all chunks
         let is_pubdata_chunk_correct = {
             //construct pubdata
             let pubdata_bits = {
                 let mut pub_data = Vec::new();
                 pub_data.extend(chunk_data.tx_type.get_bits_be()); //1
                 pub_data.extend(cur.account_address.get_bits_be()); //3
-                pub_data.extend(signer_key.pubkey.get_external_packing());
-                pub_data.extend(op_data.ethereum_key.get_bits_be()); //20
+                pub_data.extend(op_data.eth_address.get_bits_be()); //20
                 pub_data.extend(cur.token.get_bits_be()); // 2
-                pub_data.extend(op_data.pub_nonce.get_bits_be()); // 4
-                pub_data.extend(signature.get_packed_r());
-                pub_data.extend(reverse_bytes(&signature.sig_s_bits.clone()));
                 pub_data.extend(op_data.full_amount.get_bits_be());
                 pub_data.resize(
-                    18 * franklin_constants::CHUNK_BIT_WIDTH,
+                    FullExitOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
                     Boolean::constant(false),
                 );
                 pub_data
@@ -955,7 +937,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
                 cs.namespace(|| "select_pubdata_chunk"),
                 &pubdata_bits,
                 &chunk_data.chunk_number,
-                18,
+                FullExitOp::CHUNKS,
             )?;
 
             Boolean::from(Expression::equals(
@@ -977,55 +959,20 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             let is_full_exit = Boolean::from(Expression::equals(
                 cs.namespace(|| "is_full_exit"),
                 &chunk_data.tx_type.get_number(),
-                Expression::u64::<CS>(6), //full_exit tx code
+                Expression::u64::<CS>(u64::from(FullExitOp::OP_CODE)), //full_exit tx code
             )?);
 
             base_valid_flags.push(is_full_exit);
             multi_and(cs.namespace(|| "valid base full_exit"), &base_valid_flags)?
         };
 
-        // SHOULD be true for successful exit-- true if signature is verified for the given account
-        let is_signed_correctly = {
-            let is_signer_valid = CircuitElement::equals(
-                cs.namespace(|| "signer_key_correct"),
-                &signer_key.pubkey.get_hash(),
-                &cur.account.pub_key_hash,
-            )?;
-            debug!(
-                "is_signature_witness_correct {:?}",
-                is_signature_witness_correct.get_value()
-            );
-            debug!("is_signer_valid {:?}", is_signer_valid.get_value());
-            debug!(
-                "signature.is_verified. {:?}",
-                signature.is_verified.get_value()
-            );
-
-            multi_and(
-                cs.namespace(|| "is_signed_correctly"),
-                &[
-                    is_signature_witness_correct,
-                    is_signer_valid,
-                    signature.is_verified.clone(),
-                ],
-            )?
-        };
-
-        // SHOULD be true for successful exit
-        let is_nonce_correct = CircuitElement::equals(
-            cs.namespace(|| "is_nonce_correct"),
-            &cur.account.nonce,
-            &op_data.pub_nonce,
-        )?;
-
         // SHOULD be true for successful exit
         // otherwise it is impossible to decide from pub data if nonce should be updated
-        let is_balance_not_zero = Boolean::from(Expression::equals(
-            cs.namespace(|| "is_balance_not_zero"),
-            &cur.balance.get_number(),
-            Expression::constant::<CS>(E::Fr::zero()),
-        )?)
-        .not();
+        let is_address_correct = CircuitElement::equals(
+            cs.namespace(|| "is_address_correct"),
+            &cur.account.address,
+            &op_data.eth_address,
+        )?;
 
         // MUST be true for correct op. First chunk is correct and tree update can be executed.
         let first_chunk_valid = {
@@ -1042,12 +989,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         // Full exit was a success, update account is the first chunk.
         let success_account_update = multi_and(
             cs.namespace(|| "success_account_update"),
-            &[
-                first_chunk_valid.clone(),
-                is_signed_correctly,
-                is_nonce_correct,
-                is_balance_not_zero,
-            ],
+            &[first_chunk_valid.clone(), is_address_correct],
         )?;
 
         //mutate current branch if it is first chunk of a successful withdraw transaction
@@ -1055,14 +997,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "mutated balance"),
             Expression::constant::<CS>(E::Fr::zero()),
             &cur.balance,
-            &success_account_update,
-        )?;
-
-        //mutate current branch if it is first chunk of a successful withdraw transaction
-        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
-            cs.namespace(|| "update cur nonce"),
-            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1),
-            &cur.account.nonce,
             &success_account_update,
         )?;
 
@@ -1097,9 +1031,9 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
-        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //NEW_PUBKEY_HASH_WIDTH=216
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.resize(
-            6 * franklin_constants::CHUNK_BIT_WIDTH, //TODO: move to constant
+            DepositOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH, //TODO: move to constant
             Boolean::constant(false),
         );
 
@@ -1116,7 +1050,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            6,
+            DepositOp::CHUNKS,
         )?;
 
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
@@ -1130,15 +1064,15 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_deposit = Boolean::from(Expression::equals(
             cs.namespace(|| "is_deposit"),
             &chunk_data.tx_type.get_number(),
-            Expression::u64::<CS>(1), //TODO: move to constants
+            Expression::u64::<CS>(u64::from(DepositOp::OP_CODE)),
         )?);
         is_valid_flags.push(is_deposit);
 
-        // verify if new pubkey is equal to previous one (if existed)
+        // verify if address is to previous one (if existed)
         let is_pub_equal_to_previous = CircuitElement::equals(
-            cs.namespace(|| "is_pub_equal_to_previous"),
-            &op_data.new_pubkey_hash,
-            &cur.account.pub_key_hash,
+            cs.namespace(|| "is_address_equal_to_previous"),
+            &op_data.eth_address,
+            &cur.account.address,
         )?;
 
         //keys are same or account is empty
@@ -1178,12 +1112,104 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         // update pub_key
-        cur.account.pub_key_hash = CircuitElement::conditionally_select(
+        cur.account.address = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),
+            &op_data.eth_address,
+            &cur.account.address,
+            &is_valid_first,
+        )?;
+        Ok(tx_valid)
+    }
+
+    fn change_pubkey_offchain<CS: ConstraintSystem<E>>(
+        &self,
+        mut cs: CS,
+        cur: &mut AllocatedOperationBranch<E>,
+        chunk_data: &AllocatedChunkData<E>,
+        op_data: &AllocatedOperationData<E>,
+        ext_pubdata_chunk: &AllocatedNum<E>,
+    ) -> Result<Boolean, SynthesisError> {
+        //construct pubdata
+        let mut pubdata_bits = vec![];
+        pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
+        pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
+                                                                // NOTE: nonce if verified implicitly here. Current account nonce goes to pubdata and to contract.
+        pubdata_bits.extend(op_data.pub_nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
+        pubdata_bits.resize(
+            ChangePubKeyOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
+            Boolean::constant(false),
+        );
+
+        //useful below
+        let is_first_chunk = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_first_chunk"),
+            &chunk_data.chunk_number,
+            Expression::constant::<CS>(E::Fr::zero()),
+        )?);
+
+        let mut is_valid_flags = vec![];
+
+        let pubdata_chunk = select_pubdata_chunk(
+            cs.namespace(|| "select_pubdata_chunk"),
+            &pubdata_bits,
+            &chunk_data.chunk_number,
+            ChangePubKeyOp::CHUNKS,
+        )?;
+
+        let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_pubdata_equal"),
+            &pubdata_chunk,
+            ext_pubdata_chunk,
+        )?);
+        is_valid_flags.push(is_pubdata_chunk_correct);
+
+        // verify correct tx_code
+        let is_change_pubkey_offchain = Boolean::from(Expression::equals(
+            cs.namespace(|| "is_change_pubkey_offchain"),
+            &chunk_data.tx_type.get_number(),
+            Expression::u64::<CS>(u64::from(ChangePubKeyOp::OP_CODE)),
+        )?);
+        is_valid_flags.push(is_change_pubkey_offchain);
+
+        // verify if address is to previous one (if existed)
+        let is_address_correct = CircuitElement::equals(
+            cs.namespace(|| "is_address_correct"),
+            &op_data.eth_address,
+            &cur.account.address,
+        )?;
+
+        is_valid_flags.push(is_address_correct);
+
+        let tx_valid = multi_and(cs.namespace(|| "is_tx_valid"), &is_valid_flags)?;
+
+        let is_pub_nonce_valid = CircuitElement::equals(
+            cs.namespace(|| "is_pub_nonce_valid"),
+            &cur.account.nonce,
+            &op_data.pub_nonce,
+        )?;
+        let is_valid_first = multi_and(
+            cs.namespace(|| "is_valid_first"),
+            &[tx_valid.clone(), is_first_chunk, is_pub_nonce_valid],
+        )?;
+
+        // update pub_key
+        cur.account.pub_key_hash = CircuitElement::conditionally_select(
+            cs.namespace(|| "mutated_pubkey_hash"),
             &op_data.new_pubkey_hash,
             &cur.account.pub_key_hash,
             &is_valid_first,
         )?;
+
+        //update nonce
+        cur.account.nonce = CircuitElement::conditionally_select_with_number_strict(
+            cs.namespace(|| "update cur nonce"),
+            Expression::from(&cur.account.nonce.get_number()) + Expression::u64::<CS>(1),
+            &cur.account.nonce,
+            &is_valid_first,
+        )?;
+
         Ok(tx_valid)
     }
 
@@ -1345,24 +1371,24 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(lhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(cur.token.get_bits_be()); //16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
-        pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //160
+        pubdata_bits.extend(op_data.eth_address.get_bits_be()); //160
         pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
         pubdata_bits.resize(
-            5 * franklin_constants::CHUNK_BIT_WIDTH,
+            TransferToNewOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
         // construct signature message preimage (serialized_tx)
         let mut serialized_tx_bits = vec![];
         let tx_code = CircuitElement::from_fe_strict(
-            cs.namespace(|| "5_ce"),
-            || Ok(E::Fr::from_str("5").unwrap()),
+            cs.namespace(|| "transfer_to_new_code_ce"),
+            || Ok(E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap()),
             8,
-        )?; //we use here transfer tx_code=5 to allow user sign message without knowing whether it is transfer_to_new or transfer
+        )?; //we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
         serialized_tx_bits.extend(tx_code.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.pub_key_hash.get_bits_be());
-        serialized_tx_bits.extend(op_data.new_pubkey_hash.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
@@ -1372,7 +1398,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            5,
+            TransferToNewOp::CHUNKS,
         )?;
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
             cs.namespace(|| "is_pubdata_correct"),
@@ -1386,7 +1412,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_transfer = Boolean::from(Expression::equals(
             cs.namespace(|| "is_transfer"),
             &chunk_data.tx_type.get_number(),
-            Expression::u64::<CS>(2),
+            Expression::u64::<CS>(u64::from(TransferToNewOp::OP_CODE)),
         )?);
         lhs_valid_flags.push(is_transfer.clone());
 
@@ -1510,10 +1536,10 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         cur.balance
             .enforce_length(cs.namespace(|| "mutated balance is still correct length"))?; // TODO: this is actually redundant, cause they are both enforced to be of appropriate length
 
-        cur.account.pub_key_hash = CircuitElement::conditionally_select(
+        cur.account.address = CircuitElement::conditionally_select(
             cs.namespace(|| "mutated_pubkey"),
-            &op_data.new_pubkey_hash,
-            &cur.account.pub_key_hash,
+            &op_data.eth_address,
+            &cur.account.address,
             &rhs_valid,
         )?;
 
@@ -1556,7 +1582,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
 
         pubdata_bits.resize(
-            2 * franklin_constants::CHUNK_BIT_WIDTH,
+            TransferOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -1565,8 +1591,8 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut serialized_tx_bits = vec![];
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
-        serialized_tx_bits.extend(lhs.account.pub_key_hash.get_bits_be());
-        serialized_tx_bits.extend(rhs.account.pub_key_hash.get_bits_be());
+        serialized_tx_bits.extend(lhs.account.address.get_bits_be());
+        serialized_tx_bits.extend(rhs.account.address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
@@ -1576,7 +1602,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "select_pubdata_chunk"),
             &pubdata_bits,
             &chunk_data.chunk_number,
-            2,
+            TransferOp::CHUNKS,
         )?;
         let is_pubdata_chunk_correct = Boolean::from(Expression::equals(
             cs.namespace(|| "is_pubdata_correct"),
@@ -1589,7 +1615,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let is_transfer = Boolean::from(Expression::equals(
             cs.namespace(|| "is_transfer"),
             &chunk_data.tx_type.get_number(),
-            Expression::u64::<CS>(5), // transfer tx_type
+            Expression::u64::<CS>(u64::from(TransferOp::OP_CODE)), // transfer tx_type
         )?);
 
         let mut lhs_valid_flags = vec![];
@@ -1634,6 +1660,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
         lhs_valid_flags.push(is_serialized_tx_correct);
 
+        // TODO: add flag for is account address is correct(!)
         let is_signer_valid = CircuitElement::equals(
             cs.namespace(|| "signer_key_correct"),
             &signer_key.pubkey.get_hash(),
@@ -1725,6 +1752,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         let mut account_data = vec![];
         account_data.extend(branch.account.nonce.get_bits_le());
         account_data.extend(branch.account.pub_key_hash.get_bits_le());
+        account_data.extend(branch.account.address.get_bits_le());
 
         let account_data_packed =
             pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
@@ -1932,39 +1960,22 @@ fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintS
 fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
     use franklin_crypto::interpolation::interpolate;
 
+    let get_xy = |op_type: u8, op_chunks: usize| {
+        let x = E::Fr::from_str(&op_type.to_string()).unwrap();
+        let y = E::Fr::from_str(&(op_chunks - 1).to_string()).unwrap();
+        (x, y)
+    };
+
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
-    for i in &[0, 4] {
-        //noop, increment_nonce, withdraw, close_account, escalation
-        let x = E::Fr::from_str(&i.to_string()).unwrap();
-        let y = E::Fr::zero();
-        points.push((x, y));
-    }
 
-    for i in &[5] {
-        //transfer,
-        let x = E::Fr::from_str(&i.to_string()).unwrap();
-        let y = E::Fr::from_str("1").unwrap();
-        points.push((x, y));
-    }
-    for i in &[1, 3] {
-        //deposit, withdraw
-        let x = E::Fr::from_str(&i.to_string()).unwrap();
-        let y = E::Fr::from_str("5").unwrap();
-        points.push((x, y));
-    }
-
-    for i in &[2] {
-        //transfer_to_new
-        let x = E::Fr::from_str(&i.to_string()).unwrap();
-        let y = E::Fr::from_str("4").unwrap();
-        points.push((x, y));
-    }
-    for i in &[6] {
-        //full_exit
-        let x = E::Fr::from_str(&i.to_string()).unwrap();
-        let y = E::Fr::from_str("17").unwrap();
-        points.push((x, y));
-    }
+    points.push(get_xy(NoopOp::OP_CODE, NoopOp::CHUNKS));
+    points.push(get_xy(CloseOp::OP_CODE, CloseOp::CHUNKS));
+    points.push(get_xy(TransferOp::OP_CODE, TransferOp::CHUNKS));
+    points.push(get_xy(DepositOp::OP_CODE, DepositOp::CHUNKS));
+    points.push(get_xy(WithdrawOp::OP_CODE, WithdrawOp::CHUNKS));
+    points.push(get_xy(TransferToNewOp::OP_CODE, TransferToNewOp::CHUNKS));
+    points.push(get_xy(FullExitOp::OP_CODE, FullExitOp::CHUNKS));
+    points.push(get_xy(ChangePubKeyOp::OP_CODE, ChangePubKeyOp::CHUNKS));
 
     let interpolation = interpolate::<E>(&points[..]).expect("must interpolate");
     assert_eq!(interpolation.len(), DIFFERENT_TRANSACTIONS_TYPE_NUMBER);

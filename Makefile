@@ -17,6 +17,7 @@ init:
 yarn:
 	@cd js/client && yarn
 	@cd js/explorer && yarn
+	@cd js/zksync.js && yarn
 	@cd contracts && yarn
 	@cd js/tests && yarn
 
@@ -157,10 +158,10 @@ flatten: prepare-contracts
 	$(call flatten_file,Verifier.sol)
 
 gen-keys-if-not-present:
-	test -f keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
+	test -f ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
 
 prepare-contracts:
-	@cp keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 
@@ -188,7 +189,7 @@ price:
 	@node contracts/scripts/check-price.js
 
 circuit-tests:
-	cargo test --no-fail-fast --release -p circuit -- --ignored --test-threads=1
+	cargo test --no-fail-fast --release -p circuit -- --ignored --test-threads 1
 
 prover-tests:
 	f cargo test -p prover --release -- --ignored

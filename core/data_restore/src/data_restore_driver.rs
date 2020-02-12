@@ -145,7 +145,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             .expect("Cant get genesis account address");
 
         let account_update = AccountUpdate::Create {
-            address: genesis_account.address.clone(),
+            address: genesis_account.address,
             nonce: genesis_account.nonce,
         };
 

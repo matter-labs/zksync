@@ -1,7 +1,7 @@
 use crate::rollup_ops::RollupOpsBlock;
 use bigdecimal::BigDecimal;
 use failure::format_err;
-use models::node::account::{Account, AccountAddress};
+use models::node::account::Account;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::operations::FranklinOp;
 use models::node::priority_ops::FranklinPriorityOp;
@@ -9,6 +9,7 @@ use models::node::priority_ops::PriorityOp;
 use models::node::tx::FranklinTx;
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
 use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
+use web3::types::Address;
 
 /// Rollup accounts states
 pub struct TreeState {
@@ -17,7 +18,7 @@ pub struct TreeState {
     /// Current unprocessed priority op number
     pub current_unprocessed_priority_op: u64,
     /// The last fee account address
-    pub last_fee_account_address: AccountAddress,
+    pub last_fee_account_address: Address,
 }
 
 impl Default for TreeState {
@@ -32,7 +33,7 @@ impl TreeState {
         Self {
             state: PlasmaState::empty(),
             current_unprocessed_priority_op: 0,
-            last_fee_account_address: AccountAddress::default(),
+            last_fee_account_address: Address::default(),
         }
     }
 
@@ -100,12 +101,21 @@ impl TreeState {
                     let from = self
                         .state
                         .get_account(op.from)
-                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("TransferToNew fail: Nonexistent account"))?;
                     op.tx.from = from.address;
                     op.tx.nonce = from.nonce;
+                    let tx = FranklinTx::Transfer(Box::new(op.tx.clone()));
 
-                    let tx = FranklinTx::Transfer(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone());
+                    let (fee, updates) = self
+                        .state
+                        .apply_transfer_to_new_op(&op)
+                        .map_err(|e| format_err!("TransferToNew fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::TransferToNew(op),
+                    };
+
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
@@ -120,12 +130,20 @@ impl TreeState {
                     let account = self
                         .state
                         .get_account(op.account_id)
-                        .ok_or_else(|| format_err!("Nonexistent account"))?;
-                    op.tx.account = account.address;
+                        .ok_or_else(|| format_err!("Withdraw fail: Nonexistent account"))?;
+                    op.tx.from = account.address;
                     op.tx.nonce = account.nonce;
 
-                    let tx = FranklinTx::Withdraw(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone());
+                    let tx = FranklinTx::Withdraw(Box::new(op.tx.clone()));
+                    let (fee, updates) = self
+                        .state
+                        .apply_withdraw_op(&op)
+                        .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::Withdraw(op),
+                    };
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
@@ -140,12 +158,20 @@ impl TreeState {
                     let account = self
                         .state
                         .get_account(op.account_id)
-                        .ok_or_else(|| format_err!("Nonexistent account"))?;
+                        .ok_or_else(|| format_err!("Close fail: Nonexistent account"))?;
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
 
-                    let tx = FranklinTx::Close(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone());
+                    let tx = FranklinTx::Close(Box::new(op.tx.clone()));
+                    let (fee, updates) = self
+                        .state
+                        .apply_close_op(&op)
+                        .map_err(|e| format_err!("Close fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::Close(op),
+                    };
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
@@ -168,8 +194,16 @@ impl TreeState {
                     op.tx.to = to.address;
                     op.tx.nonce = from.nonce;
 
-                    let tx = FranklinTx::Transfer(op.tx);
-                    let tx_result = self.state.execute_tx(tx.clone());
+                    let tx = FranklinTx::Transfer(Box::new(op.tx.clone()));
+                    let (fee, updates) = self
+                        .state
+                        .apply_transfer_op(&op)
+                        .map_err(|e| format_err!("Withdraw fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::Transfer(op),
+                    };
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
@@ -179,8 +213,7 @@ impl TreeState {
                         &mut ops,
                     );
                 }
-                FranklinOp::FullExit(mut op) => {
-                    op.priority_op.nonce -= 1;
+                FranklinOp::FullExit(op) => {
                     let priority_op = FranklinPriorityOp::FullExit(op.priority_op);
                     let op_result = self.state.execute_priority_op(priority_op.clone());
                     current_op_block_index = self.update_from_priority_operation(
@@ -192,7 +225,33 @@ impl TreeState {
                         &mut ops,
                     );
                 }
-                _ => {}
+                FranklinOp::ChangePubKeyOffchain(mut op) => {
+                    let account = self.state.get_account(op.account_id).ok_or_else(|| {
+                        format_err!("ChangePubKeyOffChain fail: Nonexistent account")
+                    })?;
+                    op.tx.account = account.address;
+                    op.tx.nonce = account.nonce;
+
+                    let tx = FranklinTx::ChangePubKey(Box::new(op.tx.clone()));
+                    let (fee, updates) = self
+                        .state
+                        .apply_change_pubkey_op(&op)
+                        .map_err(|e| format_err!("ChangePubKeyOffChain fail: {}", e))?;
+                    let tx_result = OpSuccess {
+                        fee: Some(fee),
+                        updates,
+                        executed_op: FranklinOp::ChangePubKeyOffchain(op),
+                    };
+                    current_op_block_index = self.update_from_tx(
+                        tx,
+                        tx_result,
+                        &mut fees,
+                        &mut accounts_updated,
+                        current_op_block_index,
+                        &mut ops,
+                    );
+                }
+                FranklinOp::Noop(_) => {}
             }
         }
 
@@ -279,45 +338,32 @@ impl TreeState {
     fn update_from_tx(
         &mut self,
         tx: FranklinTx,
-        tx_result: Result<OpSuccess, failure::Error>,
+        tx_result: OpSuccess,
         fees: &mut Vec<CollectedFee>,
         accounts_updated: &mut AccountUpdates,
         current_op_block_index: u32,
         ops: &mut Vec<ExecutedOperations>,
     ) -> u32 {
-        match tx_result {
-            Ok(OpSuccess {
-                fee,
-                mut updates,
-                executed_op,
-            }) => {
-                accounts_updated.append(&mut updates);
-                if let Some(fee) = fee {
-                    fees.push(fee);
-                }
-                let block_index = current_op_block_index;
-                let exec_result = ExecutedTx {
-                    tx,
-                    success: true,
-                    op: Some(executed_op),
-                    fail_reason: None,
-                    block_index: Some(block_index),
-                };
-                ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
-                current_op_block_index + 1
-            }
-            Err(e) => {
-                let exec_result = ExecutedTx {
-                    tx,
-                    success: false,
-                    op: None,
-                    fail_reason: Some(e.to_string()),
-                    block_index: None,
-                };
-                ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
-                current_op_block_index
-            }
+        let OpSuccess {
+            fee,
+            mut updates,
+            executed_op,
+        } = tx_result;
+
+        accounts_updated.append(&mut updates);
+        if let Some(fee) = fee {
+            fees.push(fee);
         }
+        let block_index = current_op_block_index;
+        let exec_result = ExecutedTx {
+            tx,
+            success: true,
+            op: Some(executed_op),
+            fail_reason: None,
+            block_index: Some(block_index),
+        };
+        ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
+        current_op_block_index + 1
     }
 
     /// Returns map of Franklin accounts ids and their descriptions
@@ -331,7 +377,7 @@ impl TreeState {
     }
 
     /// Returns Franklin Account id and description by its address
-    pub fn get_account_by_address(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
+    pub fn get_account_by_address(&self, address: &Address) -> Option<(AccountId, Account)> {
         self.state.get_account_by_address(address)
     }
 
@@ -348,18 +394,16 @@ mod test {
     use bigdecimal::BigDecimal;
     use models::node::tx::TxSignature;
     use models::node::{
-        AccountAddress, Deposit, DepositOp, FranklinOp, Transfer, TransferOp, TransferToNewOp,
-        Withdraw, WithdrawOp,
+        Deposit, DepositOp, FranklinOp, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
 
     #[test]
     fn test_update_tree_with_one_tx_per_block() {
         let tx1 = Deposit {
-            sender: [9u8; 20].into(),
+            from: [7u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(1000),
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
+            to: [7u8; 20].into(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op: tx1,
@@ -375,9 +419,8 @@ mod test {
         };
 
         let tx2 = Withdraw {
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
-            eth_address: [9u8; 20].into(),
+            from: [7u8; 20].into(),
+            to: [7u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(1),
@@ -398,9 +441,8 @@ mod test {
         };
 
         let tx3 = Transfer {
-            from: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
-            to: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
+            from: [7u8; 20].into(),
+            to: [8u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(1),
@@ -422,9 +464,8 @@ mod test {
         };
 
         let tx4 = Transfer {
-            from: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
-                .unwrap(),
-            to: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777").unwrap(),
+            from: [8u8; 20].into(),
+            to: [7u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(19),
             fee: BigDecimal::from(1),
@@ -479,28 +520,21 @@ mod test {
         assert_eq!(tree.get_accounts().len(), 2);
 
         let zero_acc = tree.get_account(0).expect("Cant get 0 account");
-        assert_eq!(
-            zero_acc.address,
-            AccountAddress::from_hex("sync:7777777777777777777777777777777777777777").unwrap()
-        );
+        assert_eq!(zero_acc.address, [7u8; 20].into());
         assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
 
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
-        assert_eq!(
-            first_acc.address,
-            AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap()
-        );
+        assert_eq!(first_acc.address, [8u8; 20].into());
         assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }
 
     #[test]
     fn test_update_tree_with_multiple_txs_per_block() {
         let tx1 = Deposit {
-            sender: [9u8; 20].into(),
+            from: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(1000),
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
+            to: [7u8; 20].into(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op: tx1,
@@ -509,9 +543,8 @@ mod test {
         let pub_data1 = op1.public_data();
 
         let tx2 = Withdraw {
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
-            eth_address: [9u8; 20].into(),
+            from: [7u8; 20].into(),
+            to: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(1),
@@ -525,9 +558,8 @@ mod test {
         let pub_data2 = op2.public_data();
 
         let tx3 = Transfer {
-            from: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
-            to: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
+            from: [7u8; 20].into(),
+            to: [8u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(1),
@@ -542,9 +574,8 @@ mod test {
         let pub_data3 = op3.public_data();
 
         let tx4 = Transfer {
-            from: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
-                .unwrap(),
-            to: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777").unwrap(),
+            from: [8u8; 20].into(),
+            to: [7u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(19),
             fee: BigDecimal::from(1),
@@ -579,17 +610,11 @@ mod test {
         assert_eq!(tree.get_accounts().len(), 2);
 
         let zero_acc = tree.get_account(0).expect("Cant get 0 account");
-        assert_eq!(
-            zero_acc.address,
-            AccountAddress::from_hex("sync:7777777777777777777777777777777777777777").unwrap()
-        );
+        assert_eq!(zero_acc.address, [7u8; 20].into());
         assert_eq!(zero_acc.get_balance(1), BigDecimal::from(980));
 
         let first_acc = tree.get_account(1).expect("Cant get 0 account");
-        assert_eq!(
-            first_acc.address,
-            AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap()
-        );
+        assert_eq!(first_acc.address, [8u8; 20].into());
         assert_eq!(first_acc.get_balance(1), BigDecimal::from(0));
     }
 }
