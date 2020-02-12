@@ -364,6 +364,24 @@
       "constant": false,
       "inputs": [
         {
+          "name": "_fact",
+          "type": "bytes"
+        },
+        {
+          "name": "_nonce",
+          "type": "uint32"
+        }
+      ],
+      "name": "authPubkeyHash",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
           "name": "_amount",
           "type": "uint128"
         }
@@ -436,24 +454,6 @@
       ],
       "payable": false,
       "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
-          "name": "_fact",
-          "type": "bytes"
-        },
-        {
-          "name": "_nonce",
-          "type": "uint32"
-        }
-      ],
-      "name": "authFact",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

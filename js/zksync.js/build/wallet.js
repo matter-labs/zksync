@@ -217,7 +217,7 @@ var Wallet = /** @class */ (function () {
                     case 2:
                         numNonce = _a.sent();
                         mainZkSyncContract = new ethers_1.Contract(this.ethProxy.contractAddress.mainContract, utils_1.SYNC_MAIN_CONTRACT_INTERFACE, this.ethSigner);
-                        return [4 /*yield*/, mainZkSyncContract.authFact(newPubKeyHash.replace("sync:", "0x"), numNonce, {
+                        return [4 /*yield*/, mainZkSyncContract.authPubkeyHash(newPubKeyHash.replace("sync:", "0x"), numNonce, {
                                 gasLimit: ethers_1.utils.bigNumberify("200000")
                             })];
                     case 3:

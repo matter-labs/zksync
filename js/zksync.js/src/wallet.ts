@@ -173,7 +173,7 @@ export class Wallet {
             this.ethSigner
         );
 
-        const ethTransaction = await mainZkSyncContract.authFact(
+        const ethTransaction = await mainZkSyncContract.authPubkeyHash(
             newPubKeyHash.replace("sync:", "0x"),
             numNonce,
             {

@@ -965,13 +965,8 @@ contract Franklin {
         exited[_owner][_tokenId] == false;
     }
 
-    function isPackableToFr(bytes memory _data) internal pure returns (bool) {
-        // safe bound
-        return _data.length <= 31;
-    }
-
-    function authFact(bytes calldata _fact, uint32 _nonce) external {
-        require(isPackableToFr(_fact), "ahf10"); // ahf10 - auth fact should be packable to fr.
+    function authPubkeyHash(bytes calldata _fact, uint32 _nonce) external {
+        require(_fact.length == PUBKEY_HASH_BYTES, "ahf10"); // ahf10 - PubKeyHash should be 20 bytes.
         require(authFacts[msg.sender][_nonce].length == 0, "ahf11"); // ahf11 - auth fact for nonce should be empty
 
         authFacts[msg.sender][_nonce] = _fact;
