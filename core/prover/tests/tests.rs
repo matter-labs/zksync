@@ -325,10 +325,7 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
         Ok(())
     }
 
-    fn prover_data(
-        &self,
-        _block: i64,
-    ) -> Result<prover::prover_data::ProverData, failure::Error> {
+    fn prover_data(&self, _block: i64) -> Result<prover::prover_data::ProverData, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if (*block_to_prove).is_some() {
             let v = (self.prover_data_fn)();
