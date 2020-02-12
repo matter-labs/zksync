@@ -5,6 +5,8 @@ use std::{thread, time};
 use bellman::groth16;
 use failure::format_err;
 use serde::{Deserialize, Serialize};
+use log::{info};
+use backoff;
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
@@ -70,19 +72,31 @@ impl ApiClient {
     }
 
     pub fn register_prover(&self) -> Result<i32, failure::Error> {
-        let client = self.get_client()?;
-        let res = client
-            .post(&self.register_url)
-            .json(&client::ProverReq {
-                name: self.worker.clone(),
-            })
-            .send();
-        let mut res = res.map_err(|e| format_err!("register request failed: {}", e))?;
-        let text = res
-            .text()
-            .map_err(|e| format_err!("failed to read register response: {}", e))?;
+        let mut op = || -> Result<i32, backoff::Error<failure::Error>> {
+            info!("Registering prover...");
+            let client = self.get_client()?;
+            let res = client
+                .post(&self.register_url)
+                .json(&client::ProverReq {
+                    name: self.worker.clone(),
+                })
+                .send();
 
-        i32::from_str(&text).map_err(|e| format_err!("failed to parse register prover id: {}", e))
+            let mut res = res
+                .map_err(|e| format_err!("register request failed: {}", e))?;
+            let text = res
+                .text()
+                .map_err(|e| format_err!("failed to read register response: {}", e))?;
+    
+            Ok(i32::from_str(&text)
+                .map_err(|e| format_err!("failed to parse register prover id: {}", e))?)
+        };
+
+        use backoff::Operation;
+        let mut backoff = backoff::ExponentialBackoff::default();
+        
+        op.retry(&mut backoff)
+            .map_err(|e| format_err!("{}", e))
     }
 
     pub fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
