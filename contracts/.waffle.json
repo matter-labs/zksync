@@ -1,5 +1,6 @@
 {
     "sourcesPath": "./contracts",
     "targetPath": "./build",
-    "compiler": "native"
+    "compiler": "dockerized-solc",
+    "docker-tag": "0.5.16"
 }
