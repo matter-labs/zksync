@@ -8,7 +8,7 @@ use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use log::{debug, error, info};
 use signal_hook::iterator::Signals;
 // Workspace deps
-use models::node::config::{PROVER_HEARTBEAT_INTERVAL};
+use models::node::config::PROVER_HEARTBEAT_INTERVAL;
 use models::node::Engine;
 use prover::client;
 use prover::{start, BabyProver};

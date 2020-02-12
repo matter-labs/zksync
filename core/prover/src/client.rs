@@ -1,13 +1,13 @@
 // Built-in deps
 use std::str::FromStr;
-use std::{time};
+use std::time;
 // External deps
-use bellman::groth16;
-use failure::format_err;
-use serde::{Deserialize, Serialize};
-use log::{info};
 use backoff;
 use backoff::Operation;
+use bellman::groth16;
+use failure::format_err;
+use log::info;
+use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
@@ -83,12 +83,11 @@ impl ApiClient {
                 })
                 .send();
 
-            let mut res = res
-                .map_err(|e| format_err!("register request failed: {}", e))?;
+            let mut res = res.map_err(|e| format_err!("register request failed: {}", e))?;
             let text = res
                 .text()
                 .map_err(|e| format_err!("failed to read register response: {}", e))?;
-    
+
             Ok(i32::from_str(&text)
                 .map_err(|e| format_err!("failed to parse register prover id: {}", e))?)
         };
@@ -152,9 +151,10 @@ impl crate::ApiClient for ApiClient {
                 .send()
                 .map_err(|e| format_err!("failed to send working on request: {}", e))?;
             if res.status() != reqwest::StatusCode::OK {
-                Err(backoff::Error::Transient(
-                    format_err!("working on request failed with status: {}", res.status())
-                ))
+                Err(backoff::Error::Transient(format_err!(
+                    "working on request failed with status: {}",
+                    res.status()
+                )))
             } else {
                 Ok(())
             }
@@ -164,10 +164,7 @@ impl crate::ApiClient for ApiClient {
             .map_err(|e| format_err!("Timeout: {}", e))
     }
 
-    fn prover_data(
-        &self,
-        block: i64,
-    ) -> Result<ProverData, failure::Error> {
+    fn prover_data(&self, block: i64) -> Result<ProverData, failure::Error> {
         let client = self.get_client()?;
         let mut op = || -> Result<ProverData, backoff::Error<failure::Error>> {
             let mut res = client
@@ -212,9 +209,10 @@ impl crate::ApiClient for ApiClient {
                 .send()
                 .map_err(|e| format_err!("failed to send publish request: {}", e))?;
             if res.status() != reqwest::StatusCode::OK {
-                Err(backoff::Error::Transient(
-                    format_err!("publish request failed with status: {}", res.status())
-                ))
+                Err(backoff::Error::Transient(format_err!(
+                    "publish request failed with status: {}",
+                    res.status()
+                )))
             } else {
                 Ok(())
             }

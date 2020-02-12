@@ -23,10 +23,7 @@ pub struct BabyProver<C: ApiClient> {
 pub trait ApiClient {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error>;
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error>;
-    fn prover_data(
-        &self,
-        block: i64,
-    ) -> Result<prover_data::ProverData, failure::Error>;
+    fn prover_data(&self, block: i64) -> Result<prover_data::ProverData, failure::Error>;
     fn publish(
         &self,
         block: i64,
@@ -139,15 +136,12 @@ impl<C: ApiClient> BabyProver<C> {
         if job_id == 0 {
             return Ok(());
         }
-        let prover_data = self
-            .api_client
-            .prover_data(block)
-            .map_err(|err| {
-                BabyProverError::Api(format!(
-                    "could not get prover data for block {}: {}",
-                    block, err
-                ))
-            })?;
+        let prover_data = self.api_client.prover_data(block).map_err(|err| {
+            BabyProverError::Api(format!(
+                "could not get prover data for block {}: {}",
+                block, err
+            ))
+        })?;
         info!("starting to compute proof for block {}", block);
 
         let instance = circuit::circuit::FranklinCircuit {
