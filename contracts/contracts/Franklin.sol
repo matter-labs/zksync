@@ -658,7 +658,7 @@ contract Franklin {
             return (CHANGE_PUBKEY_BYTES, 0, 0);
         }
 
-        revert("fpp14"); // fpp14 - unsupported op
+        revert("fpp14"); // unsupported op
     }
     
     /// @notice Creates block commitment from its data
