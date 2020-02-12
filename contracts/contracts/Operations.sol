@@ -16,7 +16,8 @@ library Operations {
         PartialExit,
         CloseAccount,
         Transfer,
-        FullExit
+        FullExit,
+        ChangePubKey
     }
 
     // Byte lengths
@@ -45,15 +46,18 @@ library Operations {
     // Deposit pubdata
 
     struct Deposit {
-        // uint24 accountId
+        // uint24 accountId -- ignored at serialization
         uint16 tokenId;
         uint128 amount; 
-        // -- address owner;
-        bytes pubkeyHash;
+        address owner;
     }
 
-    uint constant PACKED_DEPOSIT_PUBDATA_BYTES = 
-        ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES;
+    uint public constant PACKED_DEPOSIT_PUBDATA_BYTES = 
+        ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + ADDRESS_BYTES;
+
+    function PackedDepositPubdataBytes() internal pure returns (uint) {
+        return PACKED_DEPOSIT_PUBDATA_BYTES;
+    }
 
     /// Deserialize deposit pubdata
     function readDepositPubdata(bytes memory _data, uint _offset) internal pure
@@ -62,8 +66,7 @@ library Operations {
         uint offset = _offset + ACCOUNT_ID_BYTES;                   // accountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
-        //(offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
-        (offset, parsed.pubkeyHash) = Bytes.read(_data, offset, PUBKEY_HASH_BYTES); // pubkey hash
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
         new_offset = _offset + PACKED_DEPOSIT_PUBDATA_BYTES;
     }
 
@@ -72,16 +75,11 @@ library Operations {
         buf = new bytes(ACCOUNT_ID_BYTES);                             // accountId (ignored)
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt16(op.tokenId));  // tokenId
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt128(op.amount));  // amount
-        //buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));   // owner
-        buf = Bytes.concat(buf, op.pubkeyHash);                        // pubkey hash
+        buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));   // owner
     }
 
     /// @notice Check that deposit pubdata from request and block matches
     function depositPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
-        
-        //require(_lhs.length >= PACKED_DEPOSIT_PUBDATA_BYTES, "x1");
-        //require(_rhs.length >= 48, "x2");
-
         // We must ignore `accountId` because it is present in block pubdata but not in priority queue
         bytes memory lhs_trimmed = Bytes.slice(_lhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
         bytes memory rhs_trimmed = Bytes.slice(_rhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
@@ -92,37 +90,32 @@ library Operations {
 
     struct FullExit {
         uint24 accountId;
-        bytes pubkey;
         address owner;
         uint16 tokenId;
-        uint32 nonce; 
-        //bytes[64] signature (NOTE: to be removed soon by dvush anyway)
         uint128 amount;
     }
 
-    uint constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
-        ACCOUNT_ID_BYTES + PUBKEY_BYTES + ADDRESS_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + AMOUNT_BYTES;
+    uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
+        ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
+
+    function PackedFullExitPubdataBytes() internal pure returns (uint) {
+        return PACKED_FULL_EXIT_PUBDATA_BYTES;
+    }
 
     function readFullExitPubdata(bytes memory _data, uint _offset) internal pure
         returns (FullExit memory parsed)
     {
         uint offset = _offset;
         (offset, parsed.accountId) = Bytes.readUInt24(_data, offset);      // accountId
-        (offset, parsed.pubkey) = Bytes.read(_data, offset, PUBKEY_BYTES); // pubkey
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);         // owner
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);        // tokenId
-        (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);          // nonce
-        offset += SIGNATURE_BYTES;                                         // signature (ignored)
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset);        // amount
     }
 
     function writeFullExitPubdata(FullExit memory op) internal pure returns (bytes memory buf) {
         buf = Bytes.toBytesFromUInt24(op.accountId);                    // accountId
-        buf = Bytes.concat(buf, op.pubkey);                             // pubkey
         buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));    // owner
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt16(op.tokenId));   // tokenId
-        buf = Bytes.concat(buf, Bytes.toBytesFromUInt32(op.nonce));     // nonce
-        buf = Bytes.concat(buf, new bytes(SIGNATURE_BYTES));            // signature (ignored)
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt128(op.amount));   // amount
     }
 

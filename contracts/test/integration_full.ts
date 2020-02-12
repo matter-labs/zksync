@@ -178,9 +178,6 @@ describe("INTEGRATION", function () {
             pubkey,
             tokenAddr,
             signature,
-            nonce,
-            value,
-            null,
         );
 
         console.log("Full exit requested");
@@ -350,9 +347,6 @@ describe("INTEGRATION", function () {
             pubkey,
             tokenAddr,
             signature,
-            nonce,
-            value,
-            null,
         );
 
         console.log("Full exit requested");

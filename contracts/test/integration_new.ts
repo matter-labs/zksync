@@ -29,9 +29,13 @@ import {
 
 use(solidity);
 
+// geth version
+
 // const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 // const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 // const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+
+// ganache version
 
 const provider = createMockProvider();
 const [wallet, exitWallet]  = getWallets(provider);
@@ -205,9 +209,6 @@ describe("Integration test", async function () {
             pubkey,
             tokenAddr,
             signature,
-            nonce,
-            value,
-            null,
         );
 
         //console.log("Full exit requested");

@@ -226,12 +226,7 @@ export async function postBlockCommit(
         const commitedEvent1 = commitEvents[0];
 
         if (!triggerExodus) {
-
             expect(commitedEvent1.args.blockNumber).equal(blockNumber);
-
-            const afterOnchainOps = await franklinDeployedContract.totalOnchainOps();
-            expect(afterOnchainOps - beforeOnchainOps).equal(onchainOperationsNumber);
-
             expect((await franklinDeployedContract.blocks(blockNumber)).onchainOperations).equal(onchainOperationsNumber);
             expect((await franklinDeployedContract.blocks(blockNumber)).priorityOperations).equal(priorityOperationsNumber);
             //FIXME: why is this failing on ganache?
