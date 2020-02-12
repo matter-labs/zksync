@@ -111,7 +111,7 @@ fn api_client_simple_simulation() {
     assert!(to_prove.is_none());
 
     let prover_data = client
-        .prover_data(block, time::Duration::from_secs(30 * 60))
+        .prover_data(block)
         .expect("failed to get prover data");
     assert_eq!(prover_data.old_root, wanted_prover_data.old_root);
     assert_eq!(prover_data.new_root, wanted_prover_data.new_root);

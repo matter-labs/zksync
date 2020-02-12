@@ -177,7 +177,7 @@ impl crate::ApiClient for ApiClient {
                 .map_err(|e| format_err!("failed to read prover data response: {}", e))?;
             let res: Option<ProverData> = serde_json::from_str(&text)
                 .map_err(|e| format_err!("failed to parse prover data response: {}", e))?;
-            Ok(res.ok_or(format_err!("couldn't get ProverData"))?)
+            Ok(res.ok_or_else(|| format_err!("couldn't get ProverData"))?)
         };
 
         op.retry(&mut backoff::ExponentialBackoff::default())

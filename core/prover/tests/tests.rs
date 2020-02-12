@@ -38,7 +38,6 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
                 prover_data_fn: || None,
             },
             time::Duration::from_millis(100),
-            time::Duration::from_secs(1),
             stop_signal_ar,
         );
         let (tx, rx) = mpsc::channel();
@@ -98,7 +97,6 @@ fn prover_proves_a_block_and_publishes_result() {
                 publishes_tx: Arc::new(Mutex::new(proof_tx)),
                 prover_data_fn: move || Some(prover_data.clone()),
             },
-            time::Duration::from_secs(1),
             time::Duration::from_secs(1),
             stop_signal_ar,
         );
@@ -330,7 +328,6 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
     fn prover_data(
         &self,
         _block: i64,
-        _timeout: time::Duration,
     ) -> Result<prover::prover_data::ProverData, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if (*block_to_prove).is_some() {
