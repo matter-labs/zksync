@@ -1,6 +1,7 @@
 pragma solidity 0.5.16;
 
 import "./Bytes.sol";
+import "./Operations.sol";
 import "./Governance.sol";
 
 /// @title Priority Queue Contract
@@ -18,30 +19,6 @@ contract PriorityQueue {
 
     /// @notice Full exit operation number
     uint8 constant FULL_EXIT_OP = 6;
-
-    /// @notice Token id bytes length
-    uint8 constant TOKEN_BYTES = 2;
-
-    /// @notice Token amount bytes length
-    uint8 constant AMOUNT_BYTES = 16;
-
-    /// @notice Ethereum address bytes length
-    uint8 constant ETH_ADDR_BYTES = 20;
-
-    /// @notice Rollup account id bytes length
-    uint8 constant ACC_NUM_BYTES = 3;
-
-    /// @notice Rollup nonce bytes length
-    uint8 constant NONCE_BYTES = 4;
-
-    /// @notice Franklin chain address length
-    uint8 constant PUBKEY_HASH_BYTES = 20;
-
-    /// @notice Signature (for example full exit signature) length
-    uint8 constant SIGNATURE_BYTES = 64;
-
-    /// @notice Public key length
-    uint8 constant PUBKEY_BYTES = 32;
 
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
     uint256 constant PRIORITY_EXPIRATION = 4 * 60 * 24; // One day
@@ -182,32 +159,15 @@ contract PriorityQueue {
         uint8 priorReqType = priorityRequests[_priorityRequestId].opType;
         bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
 
-        require(priorReqType == _opType, "pid10"); // pid10 - incorrect priority op type
-
-        bytes memory cmpPriorityQueueBytes;
-        bytes memory cmpOpCommittedBytes;
+        require(priorReqType == _opType, "pid10"); // incorrect priority op type
+        
         if (_opType == DEPOSIT_OP) {
-            // we don't know account if of the receiver when we create priority queue request
-            // that's why we ignore it here
-            uint comparePubdataLen = TOKEN_BYTES + AMOUNT_BYTES + ETH_ADDR_BYTES;
-
-            // deposit pubdata contains ETH address of the sender, that is why we have `ETH_ADDR_BYTES` as an offset
-            cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, ETH_ADDR_BYTES, comparePubdataLen);
-            cmpOpCommittedBytes = Bytes.slice(_pubData, 0, comparePubdataLen);
-
+            return Operations.depositPubdataMatch(priorReqPubdata, _pubData);
         } else if (_opType == FULL_EXIT_OP) {
-            // we don't know full exit amount when we create full exit request, that why full amount is ignored here
-            uint comparePubdataLen = ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES;
-
-            cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, 0, comparePubdataLen);
-            cmpOpCommittedBytes = Bytes.slice(_pubData, 0, comparePubdataLen);
-
+            return Operations.fullExitPubdataMatch(priorReqPubdata, _pubData);
         } else {
-            revert("pid11");
-            // pid11 - wrong operation
+            revert("pid11"); // invalid or non-priority operation
         }
-        return (cmpPriorityQueueBytes.length > 0) &&
-        (keccak256(cmpOpCommittedBytes) == keccak256(cmpPriorityQueueBytes));
     }
 
     /// @notice Checks if provided number is less than uncommitted requests count

@@ -6,6 +6,7 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./PriorityQueue.sol";
 import "./Bytes.sol";
+import "./Operations.sol";
 
 /// @title Franklin Contract
 /// @author Matter Labs
@@ -19,26 +20,26 @@ contract Franklin {
     /// @notice Priority Queue contract. Contains priority requests list
     PriorityQueue internal priorityQueue;
 
-    /// @notice Token id bytes lengths
-    uint8 constant TOKEN_BYTES = 2;
+    // /// @notice Token id bytes lengths
+    // uint8 constant TOKEN_BYTES = 2;
 
-    /// @notice Token amount bytes lengths
-    uint8 constant AMOUNT_BYTES = 16;
+    // /// @notice Token amount bytes lengths
+    // uint8 constant AMOUNT_BYTES = 16;
 
-    /// @notice Address bytes lengths
-    uint8 constant ETH_ADDR_BYTES = 20;
+    // /// @notice Address bytes lengths
+    // uint8 constant ETH_ADDR_BYTES = 20;
 
     /// @notice Franklin chain address length
     uint8 constant PUBKEY_HASH_BYTES = 20;
 
-    /// @notice Fee bytes lengths
-    uint8 constant FEE_BYTES = 2;
+    // /// @notice Fee bytes lengths
+    // uint8 constant FEE_BYTES = 2;
 
-    /// @notice Franklin account id bytes lengths
-    uint8 constant ACC_NUM_BYTES = 3;
+    // /// @notice Franklin account id bytes lengths
+    // uint8 constant ACC_NUM_BYTES = 3;
 
-    /// @notice Franklin nonce bytes lengths
-    uint8 constant NONCE_BYTES = 4;
+    // /// @notice Franklin nonce bytes lengths
+    // uint8 constant NONCE_BYTES = 4;
 
     /// @notice Signature (for example full exit signature) bytes length
     uint8 constant SIGNATURE_BYTES = 64;
@@ -64,25 +65,12 @@ contract Franklin {
     /// @notice Max number of unverified blocks. To make sure that all reverted blocks can be copied under block gas limit!
     uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
 
-    /// @notice Noop operation length
     uint256 constant NOOP_BYTES = 1 * 8;
-    
-    /// @notice Deposit operation length
     uint256 constant DEPOSIT_BYTES = 6 * 8;
-    
-    /// @notice Transfer to new operation length
     uint256 constant TRANSFER_TO_NEW_BYTES = 5 * 8;
-    
-    /// @notice Withdraw operation length
     uint256 constant PARTIAL_EXIT_BYTES = 6 * 8;
-    
-    /// @notice Close operation length
     uint256 constant CLOSE_ACCOUNT_BYTES = 1 * 8;
-    
-    /// @notice Transfer operation length
     uint256 constant TRANSFER_BYTES = 2 * 8;
-    
-    /// @notice Full exit operation length
     uint256 constant FULL_EXIT_BYTES = 18 * 8;
 
     /// @notice Event emitted when a block is committed
@@ -156,22 +144,23 @@ contract Franklin {
     /// @notice Blocks by Franklin block id
     mapping(uint32 => Block) public blocks;
 
-    /// @notice Types of franklin operations in blocks
-    enum OpType {
-        Noop,
-        Deposit,
-        TransferToNew,
-        PartialExit,
-        CloseAccount,
-        Transfer,
-        FullExit
-    }
+    // /// @notice Types of franklin operations in blocks
+    // enum OpType {
+    //     Noop,
+    //     Deposit,
+    //     TransferToNew,
+    //     PartialExit,
+    //     CloseAccount,
+    //     Transfer,
+    //     FullExit
+    // }
 
     /// @notice Onchain operations - operations processed inside rollup blocks
     /// @member opType Onchain operation type
+    /// @member amount Amount used in the operation
     /// @member pubData Operation pubdata
     struct OnchainOperation {
-        OpType opType;
+        Operations.OpType opType;
         bytes pubData;
     }
 
@@ -282,20 +271,11 @@ contract Franklin {
         require(_number > 0, "frс12"); // frс12 - provided zero number of requests
 
         bytes memory depositsPubData = priorityQueue.deletePriorityRequestsAndPopOutstandingDeposits(_number);
-        uint64 i = 0;
-        while (i < depositsPubData.length) {
-            bytes memory owner = Bytes.slice(depositsPubData, i, ETH_ADDR_BYTES);
-            i += ETH_ADDR_BYTES;
-
-            bytes memory token = Bytes.slice(depositsPubData, i, TOKEN_BYTES);
-            i += TOKEN_BYTES;
-
-            bytes memory amount = Bytes.slice(depositsPubData, i, AMOUNT_BYTES);
-            i += AMOUNT_BYTES;
-
-            i += PUBKEY_HASH_BYTES;
-
-            balancesToWithdraw[Bytes.bytesToAddress(owner)][Bytes.bytesToUInt16(token)] += Bytes.bytesToUInt128(amount);
+        uint offset = 0;
+        while (offset < depositsPubData.length) {
+            Operations.Deposit memory op;
+            (offset, op) = Operations.readDepositPubdata(depositsPubData, offset);
+            balancesToWithdraw[op.owner][op.tokenId] += op.amount;
         }
     }
 
@@ -418,14 +398,16 @@ contract Franklin {
         require(_pubKey.length == PUBKEY_BYTES, "fft13"); // wrong pubkey length
 
         // Priority Queue request
-        bytes memory pubData = Bytes.toBytesFromUInt24(_accountId); // franklin id
-        pubData = Bytes.concat(pubData, _pubKey); // account id
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt32(_nonce)); // nonce
-        pubData = Bytes.concat(pubData, _signature); // signature
-
-        priorityQueue.addPriorityRequest(uint8(OpType.FullExit), fee, pubData);
+        Operations.FullExit memory op = Operations.FullExit({
+            accountId:  _accountId,
+            pubkey:     _pubKey,
+            owner:      msg.sender,
+            tokenId:    tokenId,
+            nonce:      _nonce,
+            amount:     0 // unknown at this point
+        });
+        bytes memory pubData = Operations.writeFullExitPubdata(op);
+        priorityQueue.addPriorityRequest(uint8(Operations.OpType.FullExit), fee, pubData);
         
         if (msg.value != fee) {
             msg.sender.transfer(msg.value-fee);
@@ -443,15 +425,17 @@ contract Franklin {
         uint256 _fee,
         bytes memory _franklinAddr
     ) internal {
-        require( _franklinAddr.length == PUBKEY_HASH_BYTES, "frd11"); // wrong franklin address hash
+        require(_franklinAddr.length == PUBKEY_HASH_BYTES, "frd11"); // wrong franklin address hash
         
         // Priority Queue request
-        bytes memory pubData = Bytes.toBytesFromAddress(msg.sender); // sender
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(_token)); // token id
-        pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt128(_amount)); // amount
-        pubData = Bytes.concat(pubData, _franklinAddr); // franklin address
-
-        priorityQueue.addPriorityRequest(uint8(OpType.Deposit), _fee, pubData);
+        Operations.Deposit memory op = Operations.Deposit({
+            owner:      msg.sender,
+            tokenId:    _token,
+            amount:     _amount,
+            pubkeyHash: _franklinAddr
+        });
+        bytes memory pubData = Operations.writeDepositPubdata(op);
+        priorityQueue.addPriorityRequest(uint8(Operations.OpType.Deposit), _fee, pubData);
 
         emit OnchainDeposit(
             msg.sender,
@@ -576,45 +560,39 @@ contract Franklin {
     ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint64 priorityCount) {
         uint256 opDataPointer = _currentPointer + 1; // operation type byte
 
-        if (_opType == uint8(OpType.Noop)) return (NOOP_BYTES, 0, 0);
-        if (_opType == uint8(OpType.TransferToNew)) return (TRANSFER_TO_NEW_BYTES, 0, 0);
-        if (_opType == uint8(OpType.Transfer)) return (TRANSFER_BYTES, 0, 0);
-        if (_opType == uint8(OpType.CloseAccount)) return (CLOSE_ACCOUNT_BYTES, 0, 0);
+        if (_opType == uint8(Operations.OpType.Noop)) return (NOOP_BYTES, 0, 0);
+        if (_opType == uint8(Operations.OpType.TransferToNew)) return (TRANSFER_TO_NEW_BYTES, 0, 0);
+        if (_opType == uint8(Operations.OpType.Transfer)) return (TRANSFER_BYTES, 0, 0);
+        if (_opType == uint8(Operations.OpType.CloseAccount)) return (CLOSE_ACCOUNT_BYTES, 0, 0);
 
-        if (_opType == uint8(OpType.Deposit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES);
-            require(pubData.length == TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES, "fpp11"); // fpp11 - wrong deposit length
+        if (_opType == uint8(Operations.OpType.Deposit)) {
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, DEPOSIT_BYTES);
             onchainOps[_currentOnchainOp] = OnchainOperation(
-                OpType.Deposit,
+                Operations.OpType.Deposit,
                 pubData
             );
             return (DEPOSIT_BYTES, 1, 1);
         }
 
-        if (_opType == uint8(OpType.PartialExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer + ACC_NUM_BYTES, TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES);
-            require(pubData.length == TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + ETH_ADDR_BYTES, "fpp12"); // fpp12 - wrong partial exit length
+        if (_opType == uint8(Operations.OpType.PartialExit)) {
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, PARTIAL_EXIT_BYTES);
             onchainOps[_currentOnchainOp] = OnchainOperation(
-                OpType.PartialExit,
+                Operations.OpType.PartialExit,
                 pubData
             );
             return (PARTIAL_EXIT_BYTES, 1, 0);
         }
 
-        if (_opType == uint8(OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + AMOUNT_BYTES);
-            require(
-                pubData.length == ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + AMOUNT_BYTES,
-                "fpp13"
-            ); // fpp13 - wrong full exit length
+        if (_opType == uint8(Operations.OpType.FullExit)) {
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, FULL_EXIT_BYTES);
             onchainOps[_currentOnchainOp] = OnchainOperation(
-                OpType.FullExit,
+                Operations.OpType.FullExit,
                 pubData
             );
             return (FULL_EXIT_BYTES, 1, 1);
         }
 
-        revert("fpp14"); // fpp14 - unsupported op
+        revert("fpp14"); // unsupported op
     }
     
     /// @notice Creates block commitment from its data
@@ -659,8 +637,8 @@ contract Franklin {
         
         uint64 counter = 0;
         for (uint64 current = start; current < end; ++current) {
-            if (onchainOps[current].opType == OpType.FullExit || onchainOps[current].opType == OpType.Deposit) {
-                OnchainOperation memory op = onchainOps[current];
+            if (onchainOps[current].opType == Operations.OpType.FullExit || onchainOps[current].opType == Operations.OpType.Deposit) {
+                OnchainOperation storage op = onchainOps[current];
                 require(priorityQueue.isPriorityOpValid(uint8(op.opType), op.pubData, counter), "fvs11"); // priority operation is not valid
                 counter++;
             }
@@ -723,45 +701,15 @@ contract Franklin {
         uint64 end = start + blocks[_blockNumber].onchainOperations;
         for (uint64 current = start; current < end; ++current) {
             OnchainOperation memory op = onchainOps[current];
-            if (op.opType == OpType.PartialExit) {
+            if (op.opType == Operations.OpType.PartialExit) {
                 // partial exit was successful, accrue balance
-                bytes memory tokenBytes = new bytes(TOKEN_BYTES);
-                for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-                    tokenBytes[i] = op.pubData[i];
-                }
-                uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
-
-                bytes memory amountBytes = new bytes(AMOUNT_BYTES);
-                for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
-                    amountBytes[i] = op.pubData[TOKEN_BYTES + i];
-                }
-                uint128 amount = Bytes.bytesToUInt128(amountBytes);
-
-                bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
-                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                    ethAddress[i] = op.pubData[TOKEN_BYTES + AMOUNT_BYTES + FEE_BYTES + i];
-                }
-                storeWithdrawalAsPending(Bytes.bytesToAddress(ethAddress), tokenId, amount);
+                Operations.PartialExit memory data = Operations.readPartialExitPubdata(op.pubData, 0);
+                storeWithdrawalAsPending(data.owner, data.tokenId, data.amount);
             }
-            if (op.opType == OpType.FullExit) {
+            if (op.opType == Operations.OpType.FullExit) {
                 // full exit was successful, accrue balance
-                bytes memory tokenBytes = new bytes(TOKEN_BYTES);
-                for (uint8 i = 0; i < TOKEN_BYTES; ++i) {
-                    tokenBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + i];
-                }
-                uint16 tokenId = Bytes.bytesToUInt16(tokenBytes);
-
-                bytes memory amountBytes = new bytes(AMOUNT_BYTES);
-                for (uint256 i = 0; i < AMOUNT_BYTES; ++i) {
-                    amountBytes[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + i];
-                }
-                uint128 amount = Bytes.bytesToUInt128(amountBytes);
-
-                bytes memory ethAddress = new bytes(ETH_ADDR_BYTES);
-                for (uint256 i = 0; i < ETH_ADDR_BYTES; ++i) {
-                    ethAddress[i] = op.pubData[ACC_NUM_BYTES + PUBKEY_BYTES + i];
-                }
-                storeWithdrawalAsPending(Bytes.bytesToAddress(ethAddress), tokenId, amount);
+                Operations.FullExit memory data = Operations.readFullExitPubdata(op.pubData, 0);
+                storeWithdrawalAsPending(data.owner, data.tokenId, data.amount);
             }
             delete onchainOps[current];
         }

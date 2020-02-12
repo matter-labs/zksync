@@ -16,7 +16,7 @@ use(solidity);
 async function deployTestContract(file) {
     try {
         return await deployContract(wallet, require(file), [], {
-            gasLimit: 2000000,
+            gasLimit: 6000000,
         })
     } catch (err) {
         console.log('Error deploying', file, ': ', err)

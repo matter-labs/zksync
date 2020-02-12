@@ -86,7 +86,7 @@ library Bytes {
         pure
         returns (bytes memory)
     {
-        require(_bytes.length >= (_start + _length), "bse11"); // bse11 - bytes length is less then start byte + length bytes
+        require(_bytes.length >= (_start + _length), "bse11"); // bytes length is less then start byte + length bytes
 
         bytes memory tempBytes;
 
@@ -154,6 +154,12 @@ library Bytes {
         bytes memory buf;
         (new_offset, buf) = read(_data, _offset, 2);
         r = bytesToUInt16(buf);
+    }
+
+    function readUInt24(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint24 r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 3);
+        r = bytesToUInt24(buf);
     }
 
     function readUInt32(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint32 r) {

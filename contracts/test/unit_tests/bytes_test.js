@@ -7,7 +7,6 @@ describe("Bytes unit test", function () {
 
     let bytesTestContract
     before(async () => {
-        console.log("---\n")
         bytesTestContract = await deployTestContract('../../build/BytesTest')
     });
 
@@ -34,6 +33,15 @@ describe("Bytes unit test", function () {
     it("should fail to read too many bytes", async () => {
         let revertReason = await getCallRevertReason( () => bytesTestContract.read("0x0102030405060708", 4, 5) )
         expect(revertReason).equal("bse11")
+    });
+
+    // types
+
+    it("should convert uint24", async () => {
+        const x = 0x010203;
+        let r = await bytesTestContract.testUInt24(x)
+        expect(x).equal(r.r)
+        expect(r.offset).equal(3)
     });
 
 });
