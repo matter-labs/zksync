@@ -168,34 +168,6 @@ contract PriorityQueue {
         } else {
             revert("pid11"); // invalid or non-priority operation
         }
-
-        // TODO: review
-        // require(priorReqType == _opType, "pid10"); // pid10 - incorrect priority op type
-
-        // bytes memory cmpPriorityQueueBytes;
-        // bytes memory cmpOpCommittedBytes;
-        // if (_opType == DEPOSIT_OP) {
-        //     // we don't know account if of the receiver when we create priority queue request
-        //     // that's why we ignore it here
-        //     uint comparePubdataLen = TOKEN_BYTES + AMOUNT_BYTES + ETH_ADDR_BYTES;
-
-        //     // deposit pubdata contains ETH address of the sender, that is why we have `ETH_ADDR_BYTES` as an offset
-        //     cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, ETH_ADDR_BYTES, comparePubdataLen);
-        //     cmpOpCommittedBytes = Bytes.slice(_pubData, 0, comparePubdataLen);
-
-        // } else if (_opType == FULL_EXIT_OP) {
-        //     // we don't know full exit amount when we create full exit request, that why full amount is ignored here
-        //     uint comparePubdataLen = ACC_NUM_BYTES + ETH_ADDR_BYTES + TOKEN_BYTES;
-
-        //     cmpPriorityQueueBytes = Bytes.slice(priorReqPubdata, 0, comparePubdataLen);
-        //     cmpOpCommittedBytes = Bytes.slice(_pubData, 0, comparePubdataLen);
-
-        // } else {
-        //     revert("pid11");
-        //     // pid11 - wrong operation
-        // }
-        // return (cmpPriorityQueueBytes.length > 0) &&
-        // (keccak256(cmpOpCommittedBytes) == keccak256(cmpPriorityQueueBytes));
     }
 
     /// @notice Checks if provided number is less than uncommitted requests count

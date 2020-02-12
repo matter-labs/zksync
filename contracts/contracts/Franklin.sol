@@ -158,19 +158,6 @@ contract Franklin {
     /// @notice Blocks by Franklin block id
     mapping(uint32 => Block) public blocks;
 
-    // TODO: review
-    // /// @notice Types of franklin operations in blocks
-    // enum OpType {
-    //     Noop,
-    //     Deposit,
-    //     TransferToNew,
-    //     PartialExit,
-    //     CloseAccount,
-    //     Transfer,
-    //     FullExit,
-    //     ChangePubKey
-    // }
-
     /// @notice Onchain operations - operations processed inside rollup blocks
     /// @member opType Onchain operation type
     /// @member amount Amount used in the operation
@@ -410,29 +397,17 @@ contract Franklin {
         
         require(msg.value >= fee, "fft11"); // Not enough ETH provided to pay the fee
         requireActive();
-        require(_signature.length == SIGNATURE_BYTES, "fft12"); // wrong signature length
-        require(_pubKey.length == PUBKEY_BYTES, "fft13"); // wrong pubkey length
 
         // Priority Queue request
         Operations.FullExit memory op = Operations.FullExit({
             accountId:  _accountId,
-            pubkey:     _pubKey,
             owner:      msg.sender,
             tokenId:    tokenId,
-            nonce:      _nonce,
             amount:     0 // unknown at this point
         });
         bytes memory pubData = Operations.writeFullExitPubdata(op);
         priorityQueue.addPriorityRequest(uint8(Operations.OpType.FullExit), fee, pubData);
 
-        // TODO: review
-        // // Priority Queue request
-        // bytes memory pubData = Bytes.toBytesFromUInt24(_accountId); // franklin id
-        // pubData = Bytes.concat(pubData, Bytes.toBytesFromAddress(msg.sender)); // eth address
-        // pubData = Bytes.concat(pubData, Bytes.toBytesFromUInt16(tokenId)); // token id
-
-        priorityQueue.addPriorityRequest(uint8(OpType.FullExit), fee, pubData);
-        
         if (msg.value != fee) {
             msg.sender.transfer(msg.value-fee);
         }
@@ -453,10 +428,9 @@ contract Franklin {
         
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
-            //owner:      msg.sender,
+            owner:      msg.sender,
             tokenId:    _token,
-            amount:     _amount,
-            pubkeyHash: _franklinAddr
+            amount:     _amount
         });
         bytes memory pubData = Operations.writeDepositPubdata(op);
         priorityQueue.addPriorityRequest(uint8(Operations.OpType.Deposit), _fee, pubData);
@@ -662,7 +636,7 @@ contract Franklin {
         }
 
         // TODO: review
-        if (_opType == uint8(OpType.ChangePubKey)) {
+        if (_opType == uint8(Operations.OpType.ChangePubKey)) {
             // uint256 offset = opDataPointer + ACC_NUM_BYTES;
 
             // bytes memory newPubKeyHash = Bytes.slice(_publicData, offset, PUBKEY_HASH_BYTES);
@@ -870,17 +844,17 @@ contract Franklin {
         uint128 _amount,
         uint256[8] calldata _proof
     ) external {
-        require(exodusMode, "fet11"); // fet11 - must be in exodus mode
-        require(exited[_owner][_tokenId] == false, "fet12"); // fet12 - already exited
-        require(verifier.verifyExitProof(_tokenId, _owner, _amount, _proof), "fet13"); // fet13 - verification failed
+        require(exodusMode, "fet11"); // must be in exodus mode
+        require(exited[_owner][_tokenId] == false, "fet12"); // already exited
+        require(verifier.verifyExitProof(_tokenId, _owner, _amount, _proof), "fet13"); // verification failed
 
         balancesToWithdraw[_owner][_tokenId] += _amount;
         exited[_owner][_tokenId] == false;
     }
 
     function authPubkeyHash(bytes calldata _fact, uint32 _nonce) external {
-        require(_fact.length == PUBKEY_HASH_BYTES, "ahf10"); // ahf10 - PubKeyHash should be 20 bytes.
-        require(authFacts[msg.sender][_nonce].length == 0, "ahf11"); // ahf11 - auth fact for nonce should be empty
+        require(_fact.length == PUBKEY_HASH_BYTES, "ahf10"); // PubKeyHash should be 20 bytes.
+        require(authFacts[msg.sender][_nonce].length == 0, "ahf11"); // auth fact for nonce should be empty
 
         authFacts[msg.sender][_nonce] = _fact;
 

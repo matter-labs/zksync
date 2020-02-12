@@ -61,7 +61,7 @@ export async function cancelOustandingDepositsForExodus(
     } else {
         const tx = await franklinDeployedContract.cancelOutstandingDepositsForExodusMode(
             expectedToCancel,
-            {gasLimit: bigNumberify("8000000")},
+            {gasLimit: bigNumberify("6000000")},
         );
         const receipt = await tx.wait()
             .catch(() => {
@@ -98,7 +98,7 @@ export async function postEthDeposit(
     const tx = await franklinDeployedContract.depositETH(
         depositAmount,
         franklinAddressBinary,
-        {value: txValue, gasLimit: bigNumberify("8000000")},
+        {value: txValue, gasLimit: bigNumberify("6000000")},
     );
 
     if (!revertCode) {
@@ -159,7 +159,7 @@ export async function postErc20Deposit(
         token.address,
         depositAmount,
         franklinAddressBinary,
-        {value: txValue, gasLimit: bigNumberify("8000000")},
+        {value: txValue, gasLimit: bigNumberify("6000000")},
     );
 
     if (!revertCode) {

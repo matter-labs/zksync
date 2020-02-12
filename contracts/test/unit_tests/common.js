@@ -4,11 +4,14 @@ const { createMockProvider, getWallets, solidity, deployContract } = require("et
 const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
 
 // For: geth
+
 // const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-// const wallet: any = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
 
 // For: ganache
-const provider = createMockProvider();
+
+const provider = createMockProvider() //{gasLimit: 7000000, gasPrice: 2000000000});
 const [wallet, exitWallet]  = getWallets(provider);
 
 use(solidity);
@@ -16,7 +19,7 @@ use(solidity);
 async function deployTestContract(file) {
     try {
         return await deployContract(wallet, require(file), [], {
-            gasLimit: 6600000,
+            gasLimit: 6000000,
         })
     } catch (err) {
         console.log('Error deploying', file, ': ', err)
@@ -28,7 +31,7 @@ async function getCallRevertReason(f) {
     try {
         let r = await f()
     } catch(e) {
-        revertReason = e.results[e.hashes[0]].reason
+        revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason
     } 
     return revertReason
 }
