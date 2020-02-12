@@ -20,26 +20,8 @@ contract Franklin {
     /// @notice Priority Queue contract. Contains priority requests list
     PriorityQueue internal priorityQueue;
 
-    // /// @notice Token id bytes lengths
-    // uint8 constant TOKEN_BYTES = 2;
-
-    // /// @notice Token amount bytes lengths
-    // uint8 constant AMOUNT_BYTES = 16;
-
-    // /// @notice Address bytes lengths
-    // uint8 constant ETH_ADDR_BYTES = 20;
-
     /// @notice Franklin chain address length
     uint8 constant PUBKEY_HASH_BYTES = 20;
-
-    // /// @notice Fee bytes lengths
-    // uint8 constant FEE_BYTES = 2;
-
-    // /// @notice Franklin account id bytes lengths
-    // uint8 constant ACC_NUM_BYTES = 3;
-
-    // /// @notice Franklin nonce bytes lengths
-    // uint8 constant NONCE_BYTES = 4;
 
     /// @notice Public key bytes length
     uint8 constant PUBKEY_BYTES = 32;
