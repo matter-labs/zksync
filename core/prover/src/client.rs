@@ -1,12 +1,13 @@
 // Built-in deps
 use std::str::FromStr;
-use std::{thread, time};
+use std::{time};
 // External deps
 use bellman::groth16;
 use failure::format_err;
 use serde::{Deserialize, Serialize};
 use log::{info};
 use backoff;
+use backoff::Operation;
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
@@ -92,11 +93,8 @@ impl ApiClient {
                 .map_err(|e| format_err!("failed to parse register prover id: {}", e))?)
         };
 
-        use backoff::Operation;
-        let mut backoff = backoff::ExponentialBackoff::default();
-        
-        op.retry(&mut backoff)
-            .map_err(|e| format_err!("{}", e))
+        op.retry(&mut backoff::ExponentialBackoff::default())
+            .map_err(|e| format_err!("Timeout: {}", e))
     }
 
     pub fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
@@ -119,48 +117,60 @@ impl ApiClient {
 
 impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
-        let client = self.get_client()?;
-        let mut res = client
-            .get(&self.block_to_prove_url)
-            .json(&client::ProverReq {
-                name: self.worker.clone(),
-            })
-            .send()
-            .map_err(|e| format_err!("block to prove request failed: {}", e))?;
-        let text = res
-            .text()
-            .map_err(|e| format_err!("failed to read block to prove response: {}", e))?;
-        let res: client::BlockToProveRes = serde_json::from_str(&text)
-            .map_err(|e| format_err!("failed to parse block to prove response: {}", e))?;
-        if res.block != 0 {
-            return Ok(Some((res.block, res.prover_run_id)));
-        }
-        Ok(None)
+        let mut op = || -> Result<Option<(i64, i32)>, backoff::Error<failure::Error>> {
+            let client = self.get_client()?;
+            let mut res = client
+                .get(&self.block_to_prove_url)
+                .json(&client::ProverReq {
+                    name: self.worker.clone(),
+                })
+                .send()
+                .map_err(|e| format_err!("block to prove request failed: {}", e))?;
+            let text = res
+                .text()
+                .map_err(|e| format_err!("failed to read block to prove response: {}", e))?;
+            let res: client::BlockToProveRes = serde_json::from_str(&text)
+                .map_err(|e| format_err!("failed to parse block to prove response: {}", e))?;
+            if res.block != 0 {
+                return Ok(Some((res.block, res.prover_run_id)));
+            }
+            Ok(None)
+        };
+
+        op.retry(&mut backoff::ExponentialBackoff::default())
+            .map_err(|e| format_err!("Timeout: {}", e))
     }
 
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
-        let client = self.get_client()?;
-        let res = client
-            .post(&self.working_on_url)
-            .json(&client::WorkingOnReq {
-                prover_run_id: job_id,
-            })
-            .send()
-            .map_err(|e| format_err!("failed to send working on request: {}", e))?;
-        if res.status() != reqwest::StatusCode::OK {
-            failure::bail!("working on request failed with status: {}", res.status())
-        }
-        Ok(())
+        let mut op = || -> Result<(), backoff::Error<failure::Error>> {
+            let client = self.get_client()?;
+            let res = client
+                .post(&self.working_on_url)
+                .json(&client::WorkingOnReq {
+                    prover_run_id: job_id,
+                })
+                .send()
+                .map_err(|e| format_err!("failed to send working on request: {}", e))?;
+            if res.status() != reqwest::StatusCode::OK {
+                Err(backoff::Error::Transient(
+                    format_err!("working on request failed with status: {}", res.status())
+                ))
+            } else {
+                Ok(())
+            }
+        };
+
+        op.retry(&mut backoff::ExponentialBackoff::default())
+            .map_err(|e| format_err!("Timeout: {}", e))
     }
 
     fn prover_data(
         &self,
         block: i64,
-        timeout: time::Duration,
+        _timeout: time::Duration,
     ) -> Result<ProverData, failure::Error> {
         let client = self.get_client()?;
-        let now = time::Instant::now();
-        while now.elapsed() < timeout {
+        let mut op = || -> Result<ProverData, backoff::Error<failure::Error>> {
             let mut res = client
                 .get(&self.prover_data_url)
                 .json(&block)
@@ -171,13 +181,11 @@ impl crate::ApiClient for ApiClient {
                 .map_err(|e| format_err!("failed to read prover data response: {}", e))?;
             let res: Option<ProverData> = serde_json::from_str(&text)
                 .map_err(|e| format_err!("failed to parse prover data response: {}", e))?;
-            if let Some(res) = res {
-                return Ok(res);
-            }
-            thread::sleep(self.req_server_timeout);
-        }
+            Ok(res.ok_or(format_err!("couldn't get ProverData"))?)
+        };
 
-        failure::bail!("timeout")
+        op.retry(&mut backoff::ExponentialBackoff::default())
+            .map_err(|e| format_err!("Timeout: {}", e))
     }
 
     fn publish(
@@ -186,28 +194,35 @@ impl crate::ApiClient for ApiClient {
         proof: groth16::Proof<models::node::Engine>,
         public_data_commitment: models::node::Fr,
     ) -> Result<(), failure::Error> {
-        let full_proof = FullBabyProof {
-            proof,
-            inputs: [public_data_commitment],
-            public_data: vec![0 as u8; 10],
+        let mut op = || -> Result<(), backoff::Error<failure::Error>> {
+            let full_proof = FullBabyProof {
+                proof: proof.clone(),
+                inputs: [public_data_commitment],
+                public_data: vec![0 as u8; 10],
+            };
+
+            let encoded = encode_proof(&full_proof);
+
+            let client = self.get_client()?;
+            let res = client
+                .post(&self.publish_url)
+                .json(&client::PublishReq {
+                    block: block as u32,
+                    proof: encoded,
+                })
+                .send()
+                .map_err(|e| format_err!("failed to send publish request: {}", e))?;
+            if res.status() != reqwest::StatusCode::OK {
+                Err(backoff::Error::Transient(
+                    format_err!("publish request failed with status: {}", res.status())
+                ))
+            } else {
+                Ok(())
+            }
         };
 
-        let encoded = encode_proof(&full_proof);
-
-        let client = self.get_client()?;
-        let res = client
-            .post(&self.publish_url)
-            .json(&client::PublishReq {
-                block: block as u32,
-                proof: encoded,
-            })
-            .send()
-            .map_err(|e| format_err!("failed to send publish request: {}", e))?;
-        if res.status() != reqwest::StatusCode::OK {
-            failure::bail!("publish request failed with status: {}", res.status())
-        }
-
-        Ok(())
+        op.retry(&mut backoff::ExponentialBackoff::default())
+            .map_err(|e| format_err!("Timeout: {}", e))
     }
 }
 
