@@ -184,8 +184,6 @@ export async function postBlockCommit(
     );
     if (!revertCode) {
         
-        const beforeOnchainOps = await franklinDeployedContract.totalOnchainOps();
-
         const commitReceipt = await tx.wait();
         const commitEvents = commitReceipt.events;
 
@@ -193,12 +191,11 @@ export async function postBlockCommit(
 
         expect(commitedEvent1.blockNumber).equal(blockNumber);
 
-        const afterOnchainOps = await franklinDeployedContract.totalOnchainOps();
-        // FIXME: ganache? expect(afterOnchainOps - beforeOnchainOps).equal(onchainOperationsNumber);
-
         expect((await franklinDeployedContract.blocks(blockNumber)).onchainOperations).equal(onchainOperationsNumber);
         expect((await franklinDeployedContract.blocks(blockNumber)).priorityOperations).equal(priorityOperationsNumber);
-        //FIXME: expect((await franklinDeployedContract.blocks(blockNumber)).commitment).equal(commitment);
+
+        expect((await franklinDeployedContract.blocks(blockNumber)).commitment).equal(commitment);
+
         expect((await franklinDeployedContract.blocks(blockNumber)).stateRoot).equal("0x" + newRoot);
         expect((await franklinDeployedContract.blocks(blockNumber)).validator).equal(wallet.address);
 
