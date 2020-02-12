@@ -15,7 +15,7 @@ use super::operations::{DepositOp, FullExitOp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
-    pub from: Address,
+    //pub from: Address,
     pub token: TokenId,
     pub amount: BigDecimal,
     pub to: Address,
@@ -62,7 +62,7 @@ impl FranklinPriorityOp {
                     (u128_to_bigdecimal(amount), left)
                 };
 
-                // pubkey_hash
+                // account
                 let (account, pub_data_left) = {
                     let (account, left) = pub_data_left.split_at(FR_ADDRESS_LEN);
                     (Address::from_slice(account), left)
@@ -74,7 +74,6 @@ impl FranklinPriorityOp {
                 );
 
                 Ok(Self::Deposit(Deposit {
-                    from: sender,
                     token,
                     amount,
                     to: account,
@@ -88,13 +87,6 @@ impl FranklinPriorityOp {
                     (bytes_slice_to_uint32(account_id).unwrap(), left)
                 };
 
-                // pubkey -- TODO: rename??!
-                let (packed_pubkey, pub_data_left) = {
-                    let (packed_pubkey, left) =
-                        pub_data_left.split_at(SUBTREE_HASH_WIDTH_PADDED / 8);
-                    (Box::new(packed_pubkey.try_into().unwrap()), left)
-                };
-
                 // owner
                 let (eth_address, pub_data_left) = {
                     let (eth_address, left) = pub_data_left.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
@@ -105,26 +97,6 @@ impl FranklinPriorityOp {
                 let (token, pub_data_left) = {
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u16::from_be_bytes(token.try_into().unwrap()), left)
-                };
-
-                // nonce
-                let (nonce, pub_data_left) = {
-                    let (nonce, left) = pub_data_left.split_at(NONCE_BIT_WIDTH / 8);
-                    (u32::from_be_bytes(nonce.try_into().unwrap()), left)
-                };
-
-                // sig_r
-                let (signature_r, pub_data_left) = {
-                    let (signature_r, left) =
-                        pub_data_left.split_at(SIGNATURE_R_BIT_WIDTH_PADDED / 8);
-                    (Box::new(signature_r.try_into().unwrap()), left)
-                };
-
-                // sig_s
-                let (signature_s, pub_data_left) = {
-                    let (signature_s, left) =
-                        pub_data_left.split_at(SIGNATURE_S_BIT_WIDTH_PADDED / 8);
-                    (Box::new(signature_s.try_into().unwrap()), left)
                 };
 
                 // amount
