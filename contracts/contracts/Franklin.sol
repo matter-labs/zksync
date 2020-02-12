@@ -275,16 +275,14 @@ contract Franklin {
     /// @param _number Supposed number of requests to look at
     function cancelOutstandingDepositsForExodusMode(uint64 _number) external {
         require(exodusMode, "frc11");
-        require(_number > 0, "frс12"); // frс12 - provided zero number of requests
+        require(_number > 0, "frс12"); // provided zero number of requests
 
         bytes memory depositsPubData = priorityQueue.deletePriorityRequestsAndPopOutstandingDeposits(_number);
         uint offset = 0;
         while (offset < depositsPubData.length) {
             Operations.Deposit memory op;
             (offset, op) = Operations.readDepositPubdata(depositsPubData, offset);
-
-            // TODO: FIXME: uncomment this once owner is available!!!!!!
-            //balancesToWithdraw[op.owner][op.tokenId] += op.amount;
+            balancesToWithdraw[op.owner][op.tokenId] += op.amount;
         }
     }
 
@@ -635,26 +633,15 @@ contract Franklin {
             return (FULL_EXIT_BYTES, 1, 1);
         }
 
-        // TODO: review
         if (_opType == uint8(Operations.OpType.ChangePubKey)) {
-            // uint256 offset = opDataPointer + ACC_NUM_BYTES;
-
-            // bytes memory newPubKeyHash = Bytes.slice(_publicData, offset, PUBKEY_HASH_BYTES);
-            // offset += PUBKEY_HASH_BYTES;
-
-            // address ethAddress = Bytes.bytesToAddress(Bytes.slice(_publicData, offset, ETH_ADDR_BYTES));
-            // offset += ETH_ADDR_BYTES;
-
-            // uint32 nonce = Bytes.bytesToUInt32(Bytes.slice(_publicData, offset, NONCE_BYTES));
-            // offset += NONCE_BYTES;
-
-            // if (_currentEthWitness.length > 0) {
-            //     require(verifyChangePubkeySignature(_currentEthWitness, newPubKeyHash, nonce, ethAddress), "fpp15");
-            //     // fpp15 - failed to verify change pubkey hash signature
-            // } else {
-            //     require(keccak256(authFacts[ethAddress][nonce]) == keccak256(newPubKeyHash), "fpp16");
-            //     // fpp16 - new pub key hash is not authenticated properly
-            // }
+            Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, opDataPointer);
+            if (_currentEthWitness.length > 0) {
+                bool valid = verifyChangePubkeySignature(_currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
+                require(valid, "fpp15"); // failed to verify change pubkey hash signature
+            } else {
+                bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
+                require(valid, "fpp16"); // new pub key hash is not authenticated properly
+            }
             return (CHANGE_PUBKEY_BYTES, 0, 0);
         }
 

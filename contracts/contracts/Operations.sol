@@ -155,4 +155,22 @@ library Operations {
         buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));    // owner
     }
 
+    // ChangePubKey
+
+    struct ChangePubKey {
+        uint24 accountId;
+        bytes pubKeyHash;
+        address owner;
+        uint32 nonce;
+    }
+
+    function readChangePubKeyPubdata(bytes memory _data, uint _offset) internal pure
+        returns (ChangePubKey memory parsed)
+    {
+        uint offset = _offset + ACCOUNT_ID_BYTES;                                    // accountId (ignored)
+        (offset, parsed.pubKeyHash) = Bytes.read(_data, offset, PUBKEY_HASH_BYTES);  // pubKeyHash
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset);                   // owner
+        (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);                    // nonce
+    }
+
 }
