@@ -72,6 +72,14 @@ impl ApiClient {
         }
     }
 
+    fn get_backoff() -> backoff::ExponentialBackoff {
+        let mut backoff = backoff::ExponentialBackoff::default();
+        backoff.initial_interval = time::Duration::from_secs(2);
+        backoff.multiplier = 2.0;
+        // backoff.max_elapsed_time = Some(time::Duration::from_secs(30));
+        backoff
+    }
+
     pub fn register_prover(&self) -> Result<i32, failure::Error> {
         let mut op = || -> Result<i32, backoff::Error<failure::Error>> {
             info!("Registering prover...");
@@ -92,7 +100,7 @@ impl ApiClient {
                 .map_err(|e| format_err!("failed to parse register prover id: {}", e))?)
         };
 
-        op.retry(&mut backoff::ExponentialBackoff::default())
+        op.retry(&mut Self::get_backoff())
             .map_err(|e| format_err!("Timeout: {}", e))
     }
 
@@ -136,7 +144,7 @@ impl crate::ApiClient for ApiClient {
             Ok(None)
         };
 
-        op.retry(&mut backoff::ExponentialBackoff::default())
+        op.retry(&mut Self::get_backoff())
             .map_err(|e| format_err!("Timeout: {}", e))
     }
 
@@ -160,7 +168,7 @@ impl crate::ApiClient for ApiClient {
             }
         };
 
-        op.retry(&mut backoff::ExponentialBackoff::default())
+        op.retry(&mut Self::get_backoff())
             .map_err(|e| format_err!("Timeout: {}", e))
     }
 
@@ -180,7 +188,7 @@ impl crate::ApiClient for ApiClient {
             Ok(res.ok_or_else(|| format_err!("couldn't get ProverData"))?)
         };
 
-        op.retry(&mut backoff::ExponentialBackoff::default())
+        op.retry(&mut Self::get_backoff())
             .map_err(|e| format_err!("Timeout: {}", e))
     }
 
@@ -218,7 +226,7 @@ impl crate::ApiClient for ApiClient {
             }
         };
 
-        op.retry(&mut backoff::ExponentialBackoff::default())
+        op.retry(&mut Self::get_backoff())
             .map_err(|e| format_err!("Timeout: {}", e))
     }
 }
