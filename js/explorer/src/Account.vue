@@ -109,6 +109,11 @@ export default {
         intervalHandle: null,
         client: null,
     }),
+    watch: {
+        async currentPage() {
+            await this.update();
+        }
+    },
     async created() {
         this.client = await clientPromise;
 
@@ -202,7 +207,7 @@ export default {
             return this.transactions
                 .map(tx => {
                     let TxnHash = `<code>
-                        <a href="/transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
+                        <a href="${this.routerBase}transactions/${tx.data.hash}" target="_blank" rel="noopener noreferrer">
                             ${shortenHash(tx.data.hash, 'unknown! hash')}
                         </a>
                     </code>`;                    
