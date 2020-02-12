@@ -6,7 +6,7 @@ clone:
 volumes:
   - name: cache
     host:
-      path: /tmp/cache
+      path: /drone-cache
 services:
   - name: geth
     image: matterlabs/geth:latest
@@ -119,7 +119,7 @@ clone:
 volumes:
   - name: cache
     host:
-      path: /tmp/cache
+      path: /drone-cache
   - name: docker-sock
     host:
       path: /var/run/docker.sock
