@@ -8,6 +8,7 @@ table! {
         new_balance -> Numeric,
         old_nonce -> Int8,
         new_nonce -> Int8,
+        update_order_id -> Int4,
     }
 }
 
@@ -18,6 +19,20 @@ table! {
         block_number -> Int8,
         address -> Bytea,
         nonce -> Int8,
+        update_order_id -> Int4,
+    }
+}
+
+table! {
+    account_pubkey_updates (pubkey_update_id) {
+        pubkey_update_id -> Int4,
+        update_order_id -> Int4,
+        account_id -> Int8,
+        block_number -> Int8,
+        old_pubkey_hash -> Bytea,
+        new_pubkey_hash -> Bytea,
+        old_nonce -> Int8,
+        new_nonce -> Int8,
     }
 }
 
@@ -27,6 +42,7 @@ table! {
         last_block -> Int8,
         nonce -> Int8,
         address -> Bytea,
+        pubkey_hash -> Bytea,
     }
 }
 
@@ -112,15 +128,6 @@ table! {
 }
 
 table! {
-    rollup_ops (id) {
-        id -> Int4,
-        block_num -> Int8,
-        operation -> Jsonb,
-        fee_account -> Int8,
-    }
-}
-
-table! {
     mempool (hash) {
         hash -> Bytea,
         primary_account_address -> Bytea,
@@ -166,6 +173,15 @@ table! {
 }
 
 table! {
+    rollup_ops (id) {
+        id -> Int4,
+        block_num -> Int8,
+        operation -> Jsonb,
+        fee_account -> Int8,
+    }
+}
+
+table! {
     server_config (id) {
         id -> Bool,
         contract_addr -> Nullable<Text>,
@@ -197,6 +213,7 @@ joinable!(executed_transactions -> mempool (tx_hash));
 allow_tables_to_appear_in_same_query!(
     account_balance_updates,
     account_creates,
+    account_pubkey_updates,
     accounts,
     active_provers,
     balances,
@@ -206,12 +223,12 @@ allow_tables_to_appear_in_same_query!(
     events_state,
     executed_priority_operations,
     executed_transactions,
-    rollup_ops,
     mempool,
     op_config,
     operations,
     proofs,
     prover_runs,
+    rollup_ops,
     server_config,
     storage_state_update,
     tokens,

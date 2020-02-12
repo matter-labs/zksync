@@ -14,19 +14,19 @@
 //! Communication with db:
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
-use crate::eth_watch::ETHState;
+use crate::eth_watch::EthWatchRequest;
 use failure::Fail;
 use futures::channel::{mpsc, oneshot};
-use futures::StreamExt;
+use futures::{SinkExt, StreamExt};
 use models::node::{
-    AccountAddress, AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp,
-    TransferOp, TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TransferOp,
+    TransferToNewOp,
 };
 use models::params::block_size_chunks;
 use std::collections::{HashMap, VecDeque};
-use std::sync::{Arc, RwLock};
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;
+use web3::types::Address;
 
 // TODO: temporary limit
 const MAX_NUMBER_OF_WITHDRAWS: usize = 4;
@@ -35,10 +35,10 @@ const MAX_NUMBER_OF_WITHDRAWS: usize = 4;
 pub enum TxAddError {
     #[fail(display = "Tx nonce is too low.")]
     NonceMismatch,
-    #[fail(display = "Tx signature is incorrect.")]
-    InvalidSignature,
     #[fail(display = "Tx is incorrect")]
     IncorrectTx,
+    #[fail(display = "Change pubkey tx is not authorized onchain")]
+    ChangePkNotAuthorized,
     #[fail(display = "Internal error")]
     Other,
 }
@@ -73,8 +73,8 @@ pub enum MempoolRequest {
 
 struct MempoolState {
     // account and last committed nonce
-    account_nonces: HashMap<AccountAddress, Nonce>,
-    account_ids: HashMap<AccountId, AccountAddress>,
+    account_nonces: HashMap<Address, Nonce>,
+    account_ids: HashMap<AccountId, Address>,
     ready_txs: VecDeque<FranklinTx>,
 }
 
@@ -113,15 +113,11 @@ impl MempoolState {
         }
     }
 
-    fn nonce(&self, address: &AccountAddress) -> Nonce {
+    fn nonce(&self, address: &Address) -> Nonce {
         *self.account_nonces.get(address).unwrap_or(&0)
     }
 
     fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
-        if !tx.check_signature() {
-            return Err(TxAddError::InvalidSignature);
-        }
-
         if !tx.check_correctness() {
             return Err(TxAddError::IncorrectTx);
         }
@@ -137,22 +133,47 @@ impl MempoolState {
 
 struct Mempool {
     mempool_state: MempoolState,
-    eth_state: Arc<RwLock<ETHState>>,
     requests: mpsc::Receiver<MempoolRequest>,
+    eth_watch_req: mpsc::Sender<EthWatchRequest>,
 }
 
 impl Mempool {
+    async fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+        if let FranklinTx::ChangePubKey(change_pk) = &tx {
+            if change_pk.eth_signature.is_none() {
+                let eth_watch_resp = oneshot::channel();
+                self.eth_watch_req
+                    .clone()
+                    .send(EthWatchRequest::IsPubkeyChangeAuthorized {
+                        address: change_pk.account,
+                        nonce: change_pk.nonce,
+                        pubkey_hash: change_pk.new_pk_hash.clone(),
+                        resp: eth_watch_resp.0,
+                    })
+                    .await
+                    .expect("ETH watch req receiver dropped");
+
+                let is_authorized = eth_watch_resp.1.await.expect("Err response from eth watch");
+                if !is_authorized {
+                    return Err(TxAddError::ChangePkNotAuthorized);
+                }
+            }
+        }
+
+        self.mempool_state.add_tx(tx)
+    }
+
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolRequest::NewTx(tx, resp) => {
-                    let tx_add_result = self.mempool_state.add_tx(*tx);
+                    let tx_add_result = self.add_tx(*tx).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
                     block
                         .response_sender
-                        .send(self.propose_new_block(block.last_priority_op_number))
+                        .send(self.propose_new_block(block.last_priority_op_number).await)
                         .expect("mempool proposed block response send failed");
                 }
                 MempoolRequest::UpdateNonces(updates) => {
@@ -175,6 +196,15 @@ impl Mempool {
                                     }
                                 }
                             }
+                            AccountUpdate::ChangePubKeyHash { new_nonce, .. } => {
+                                if let Some(address) = self.mempool_state.account_ids.get(&id) {
+                                    if let Some(nonce) =
+                                        self.mempool_state.account_nonces.get_mut(address)
+                                    {
+                                        *nonce = new_nonce;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -182,8 +212,10 @@ impl Mempool {
         }
     }
 
-    fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
-        let (chunks_left, priority_ops) = self.select_priority_ops(current_unprocessed_priority_op);
+    async fn propose_new_block(&mut self, current_unprocessed_priority_op: u64) -> ProposedBlock {
+        let (chunks_left, priority_ops) = self
+            .select_priority_ops(current_unprocessed_priority_op)
+            .await;
         let (_chunks_left, txs) = self.prepare_tx_for_block(chunks_left);
         trace!("Proposed priority ops for block: {:#?}", priority_ops);
         trace!("Proposed txs for block: {:#?}", txs);
@@ -191,28 +223,31 @@ impl Mempool {
     }
 
     /// Returns: chunks left, ops selected
-    fn select_priority_ops(
+    async fn select_priority_ops(
         &self,
         current_unprocessed_priority_op: u64,
     ) -> (usize, Vec<PriorityOp>) {
-        let eth_state = self.eth_state.read().expect("eth state read");
+        let eth_watch_resp = oneshot::channel();
+        self.eth_watch_req
+            .clone()
+            .send(EthWatchRequest::GetPriorityQueueOps {
+                op_start_id: current_unprocessed_priority_op,
+                max_chunks: block_size_chunks(),
+                resp: eth_watch_resp.0,
+            })
+            .await
+            .expect("ETH watch req receiver dropped");
 
-        let mut selected_ops = Vec::new();
-        let mut chunks_left = block_size_chunks();
-        let mut unprocessed_op = current_unprocessed_priority_op;
+        let priority_ops = eth_watch_resp.1.await.expect("Err response from eth watch");
 
-        while let Some(op) = eth_state.priority_queue.get(&unprocessed_op) {
-            if chunks_left < op.data.chunks() {
-                break;
-            }
-
-            selected_ops.push(op.clone());
-
-            unprocessed_op += 1;
-            chunks_left -= op.data.chunks();
-        }
-
-        (chunks_left, selected_ops)
+        (
+            block_size_chunks()
+                - priority_ops
+                    .iter()
+                    .map(|op| op.data.chunks())
+                    .sum::<usize>(),
+            priority_ops,
+        )
     }
 
     fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<FranklinTx>) {
@@ -247,16 +282,16 @@ impl Mempool {
 }
 
 pub fn run_mempool_task(
-    eth_state: Arc<RwLock<ETHState>>,
     db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
+    eth_watch_req: mpsc::Sender<EthWatchRequest>,
     runtime: &Runtime,
 ) {
     let mempool_state = MempoolState::restore_from_db(&db_pool);
     let mempool = Mempool {
         mempool_state,
-        eth_state,
         requests,
+        eth_watch_req,
     };
     runtime.spawn(mempool.run());
 }

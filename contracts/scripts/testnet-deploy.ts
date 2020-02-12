@@ -103,11 +103,6 @@ async function main() {
         const erc20 = await addTestERC20Token(wallet, governance);
         await mintTestERC20Token(testWallet, erc20);
 
-        await wallet.sendTransaction({
-            to: testWallet.address,
-            value: ethers.utils.parseEther('10'),
-        }).catch(console.log);
-
         if (args.publish) {
             try {
                 if (process.env.ETH_NETWORK === 'localhost') {

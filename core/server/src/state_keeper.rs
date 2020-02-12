@@ -10,13 +10,13 @@ use crate::mempool::ProposedBlock;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
-    Account, AccountAddress, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber,
-    PriorityOp,
+    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
 };
 use models::params::block_size_chunks;
 use models::{ActionType, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
+use web3::types::Address;
 
 pub enum ExecutedOpId {
     Transaction(TxHash),
@@ -24,10 +24,7 @@ pub enum ExecutedOpId {
 }
 
 pub enum StateKeeperRequest {
-    GetAccount(
-        AccountAddress,
-        oneshot::Sender<Option<(AccountId, Account)>>,
-    ),
+    GetAccount(Address, oneshot::Sender<Option<(AccountId, Account)>>),
     GetLastUnprocessedPriorityOp(oneshot::Sender<u64>),
     ExecuteMiniBlock(ProposedBlock),
     GetExecutedInPendingBlock(ExecutedOpId, oneshot::Sender<Option<(BlockNumber, bool)>>),
@@ -110,10 +107,11 @@ impl PlasmaStateInitParams {
             .unwrap_or_default();
 
         info!(
-            "Restored committed state from db, committed: {}, verified: {}, elapsed time: {} ms",
+            "Restored committed state from db, committed: {}, verified: {}, unprocessed priority op: {}, elapsed time: {} ms",
             last_committed,
             last_verified,
-            timer.elapsed().as_millis()
+            unprocessed_priority_op,
+            timer.elapsed().as_millis(),
         );
 
         Self {
@@ -127,7 +125,7 @@ impl PlasmaStateInitParams {
 impl PlasmaStateKeeper {
     pub fn new(
         initial_state: PlasmaStateInitParams,
-        fee_account_address: AccountAddress,
+        fee_account_address: Address,
         rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
@@ -154,7 +152,7 @@ impl PlasmaStateKeeper {
         keeper
     }
 
-    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &AccountAddress) {
+    pub fn create_genesis_block(pool: ConnectionPool, fee_account_address: &Address) {
         let storage = pool
             .access_storage()
             .expect("db connection failed for statekeeper");
@@ -166,9 +164,9 @@ impl PlasmaStateKeeper {
             "db should be empty"
         );
         let mut fee_account = Account::default();
-        fee_account.address = fee_account_address.clone();
+        fee_account.address = *fee_account_address;
         let db_account_update = AccountUpdate::Create {
-            address: fee_account_address.clone(),
+            address: *fee_account_address,
             nonce: fee_account.nonce,
         };
         accounts.insert(0, fee_account);
@@ -433,7 +431,7 @@ impl PlasmaStateKeeper {
         None
     }
 
-    fn account(&self, address: &AccountAddress) -> Option<(AccountId, Account)> {
+    fn account(&self, address: &Address) -> Option<(AccountId, Account)> {
         self.state.get_account_by_address(address)
     }
 }
