@@ -21,11 +21,15 @@ library Operations {
 
     // Byte lengths
 
-    /// @notice Public key
+    uint8 constant TOKEN_BYTES = 2;
+
     uint8 constant PUBKEY_BYTES = 32;
 
-    /// @notice Public key
+    uint8 constant NONCE_BYTES = 4;
+
     uint8 constant PUBKEY_HASH_BYTES = 20;
+
+    uint8 constant ADDRESS_BYTES = 20;
 
     /// @notice Packed fee bytes lengths
     uint8 constant FEE_BYTES = 2;
@@ -33,7 +37,6 @@ library Operations {
     /// @notice zkSync account id bytes lengths
     uint8 constant ACCOUNT_ID_BYTES = 3;
 
-    /// @notice Token amount bytes lengths
     uint8 constant AMOUNT_BYTES = 16;
 
     /// @notice Signature (for example full exit signature) bytes length
@@ -45,9 +48,12 @@ library Operations {
         // uint24 accountId
         uint16 tokenId;
         uint128 amount; 
-        address owner;
+        // -- address owner;
         bytes pubkeyHash;
     }
+
+    uint constant PACKED_DEPOSIT_PUBDATA_BYTES = 
+        ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + PUBKEY_HASH_BYTES;
 
     /// Deserialize deposit pubdata
     function readDepositPubdata(bytes memory _data, uint _offset) internal pure
@@ -56,9 +62,9 @@ library Operations {
         uint offset = _offset + ACCOUNT_ID_BYTES;                   // accountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
-        (offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
+        //(offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
         (offset, parsed.pubkeyHash) = Bytes.read(_data, offset, PUBKEY_HASH_BYTES); // pubkey hash
-        new_offset = _offset + ACCOUNT_ID_BYTES + 2 + 16 + 20 + PUBKEY_HASH_BYTES;
+        new_offset = _offset + PACKED_DEPOSIT_PUBDATA_BYTES;
     }
 
     /// Serialize deposit pubdata
@@ -66,15 +72,19 @@ library Operations {
         buf = new bytes(ACCOUNT_ID_BYTES);                             // accountId (ignored)
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt16(op.tokenId));  // tokenId
         buf = Bytes.concat(buf, Bytes.toBytesFromUInt128(op.amount));  // amount
-        buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));   // owner
+        //buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));   // owner
         buf = Bytes.concat(buf, op.pubkeyHash);                        // pubkey hash
     }
 
     /// @notice Check that deposit pubdata from request and block matches
     function depositPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
+        
+        //require(_lhs.length >= PACKED_DEPOSIT_PUBDATA_BYTES, "x1");
+        //require(_rhs.length >= 48, "x2");
+
         // We must ignore `accountId` because it is present in block pubdata but not in priority queue
-        bytes memory lhs_trimmed = Bytes.slice(_lhs, ACCOUNT_ID_BYTES, _lhs.length - ACCOUNT_ID_BYTES);
-        bytes memory rhs_trimmed = Bytes.slice(_rhs, ACCOUNT_ID_BYTES, _rhs.length - ACCOUNT_ID_BYTES);
+        bytes memory lhs_trimmed = Bytes.slice(_lhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
+        bytes memory rhs_trimmed = Bytes.slice(_rhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
         return keccak256(lhs_trimmed) == keccak256(rhs_trimmed);
     }
 
@@ -89,6 +99,9 @@ library Operations {
         //bytes[64] signature (NOTE: to be removed soon by dvush anyway)
         uint128 amount;
     }
+
+    uint constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
+        ACCOUNT_ID_BYTES + PUBKEY_BYTES + ADDRESS_BYTES + TOKEN_BYTES + NONCE_BYTES + SIGNATURE_BYTES + AMOUNT_BYTES;
 
     function readFullExitPubdata(bytes memory _data, uint _offset) internal pure
         returns (FullExit memory parsed)
@@ -116,8 +129,8 @@ library Operations {
     /// @notice Check that full exit pubdata from request and block matches
     function fullExitPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
         // We must ignore `amount` because it is present in block pubdata but not in priority queue
-        bytes memory lhs_trimmed = Bytes.slice(_lhs, 0, _lhs.length - AMOUNT_BYTES);
-        bytes memory rhs_trimmed = Bytes.slice(_rhs, 0, _rhs.length - AMOUNT_BYTES);
+        bytes memory lhs_trimmed = Bytes.slice(_lhs, 0, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
+        bytes memory rhs_trimmed = Bytes.slice(_rhs, 0, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
         return keccak256(lhs_trimmed) == keccak256(rhs_trimmed);
     }
 

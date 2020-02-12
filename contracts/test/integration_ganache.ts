@@ -29,8 +29,13 @@ import {
 
 use(solidity);
 
+// const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+// const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+
 const provider = createMockProvider();
 const [wallet, exitWallet]  = getWallets(provider);
+
 const franklinAddress = "0809101112131415161718192021222334252627";
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 
@@ -291,6 +296,8 @@ describe("Integration test", async function () {
         //console.log("Requested deposit");
     })
 
+    // unused for now
+
     // it("should commit deposit", async () => {
 
     //     // Commit block with eth deposit
@@ -312,11 +319,9 @@ describe("Integration test", async function () {
     //         null,
     //     );
 
-    // //     console.log("Deposit committed");
-
     // })
 
-    it("ERC20 deposit, part exit, full exit, commit, verify, withdraw", async () => {
+    //it("ERC20 deposit, part exit, full exit, commit, verify, withdraw", async () => {
 
     //     // Commit block with eth partial exit.
     //     const exitValue = 2;
@@ -434,5 +439,5 @@ describe("Integration test", async function () {
     //     console.log("Full exit verified");
 
     //     console.log(" + ERC20 Integration passed");
-    });
+    //});
 });

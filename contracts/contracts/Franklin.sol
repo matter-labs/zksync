@@ -275,7 +275,9 @@ contract Franklin {
         while (offset < depositsPubData.length) {
             Operations.Deposit memory op;
             (offset, op) = Operations.readDepositPubdata(depositsPubData, offset);
-            balancesToWithdraw[op.owner][op.tokenId] += op.amount;
+
+            // TODO: FIXME: uncomment this once owner is available!!!!!!
+            //balancesToWithdraw[op.owner][op.tokenId] += op.amount;
         }
     }
 
@@ -429,7 +431,7 @@ contract Franklin {
         
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
-            owner:      msg.sender,
+            //owner:      msg.sender,
             tokenId:    _token,
             amount:     _amount,
             pubkeyHash: _franklinAddr
@@ -566,7 +568,7 @@ contract Franklin {
         if (_opType == uint8(Operations.OpType.CloseAccount)) return (CLOSE_ACCOUNT_BYTES, 0, 0);
 
         if (_opType == uint8(Operations.OpType.Deposit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, DEPOSIT_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, DEPOSIT_BYTES - 1);
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 Operations.OpType.Deposit,
                 pubData
@@ -575,7 +577,7 @@ contract Franklin {
         }
 
         if (_opType == uint8(Operations.OpType.PartialExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, PARTIAL_EXIT_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, PARTIAL_EXIT_BYTES - 1);
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 Operations.OpType.PartialExit,
                 pubData
@@ -584,7 +586,7 @@ contract Franklin {
         }
 
         if (_opType == uint8(Operations.OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, FULL_EXIT_BYTES);
+            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, FULL_EXIT_BYTES - 1);
             onchainOps[_currentOnchainOp] = OnchainOperation(
                 Operations.OpType.FullExit,
                 pubData

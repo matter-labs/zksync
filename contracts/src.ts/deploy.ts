@@ -165,7 +165,7 @@ export async function deployFranklin(
             franklinCode,
             constructorArgs,
             {
-                gasLimit: 6600000,
+                gasLimit: 6700000,
             });
         console.log(`CONTRACT_GENESIS_TX_HASH=${contract.deployTransaction.hash}`);
         console.log(`CONTRACT_ADDR=${contract.address}`);

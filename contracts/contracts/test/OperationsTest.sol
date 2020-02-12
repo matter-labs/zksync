@@ -13,7 +13,7 @@ contract OperationsTest {
         Operations.Deposit memory x = Operations.Deposit({
             tokenId: 0x0102,
             amount: 0x101112131415161718191a1b1c1d1e1f,
-            owner: 0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
+            //owner: 0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
             pubkeyHash: pubkey
         });
 
@@ -23,7 +23,7 @@ contract OperationsTest {
         require(offset == pubdata.length, "incorrect offset");
         require(x.tokenId == r.tokenId, "tokenId mismatch");
         require(x.amount == r.amount,   "amount mismatch");
-        require(x.owner == r.owner,     "owner mismatch");
+        //require(x.owner == r.owner,     "owner mismatch");
         require(keccak256(x.pubkeyHash) == keccak256(pubkey), "pubkey hash mismatch");
     }
 
@@ -34,7 +34,7 @@ contract OperationsTest {
         Operations.Deposit memory x = Operations.Deposit({
             tokenId: 0x0102,
             amount: 0x101112131415161718191a1b1c1d1e1f,
-            owner: 0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
+            //owner: 0x823B747710C5bC9b8A47243f2c3d1805F1aA00c5,
             pubkeyHash: pubkey
         });
         bytes memory onchain = Operations.writeDepositPubdata(x);
