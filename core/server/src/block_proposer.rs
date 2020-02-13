@@ -19,7 +19,6 @@ fn create_mempool_req(
     chunks: usize,
 ) -> (MempoolRequest, oneshot::Receiver<ProposedBlock>) {
     let (response_sender, receiver) = oneshot::channel();
-
     (
         MempoolRequest::GetBlock(GetBlockRequest {
             last_priority_op_number,

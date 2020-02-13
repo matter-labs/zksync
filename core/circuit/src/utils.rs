@@ -5,7 +5,7 @@ use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use crate::franklin_crypto::circuit::num::{AllocatedNum, Num};
 use crate::franklin_crypto::circuit::Assignment;
 use crate::franklin_crypto::eddsa::Signature;
-use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey};
+use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
 use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
 use crate::operation::SignatureData;
@@ -23,20 +23,19 @@ pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
             acc
         })
 }
-pub fn sign_pedersen<R, E>(
+pub fn sign_pedersen<E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,
     params: &E::Params,
-    rng: &mut R,
 ) -> SignatureData
 where
-    R: crate::rand::Rng,
     E: JubjubEngine,
 {
     let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
 
-    let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
+    let seed = Seed::deterministic_seed(&private_key, &message_bytes);
+    let signature = private_key.musig_pedersen_sign(&message_bytes, &seed, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let _is_valid_signature =
@@ -81,7 +80,7 @@ where
         franklin_constants::FR_BIT_WIDTH_PADDED
     );
 
-    let sig_s_bits = signature_s_be_bits.clone();
+    let sig_s_bits = signature_s_be_bits;
     let sig_s_bits = reverse_bytes(&sig_s_bits);
 
     SignatureData {
@@ -90,15 +89,13 @@ where
     }
 }
 
-pub fn sign_sha<R, E>(
+pub fn sign_sha<E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,
     params: &E::Params,
-    rng: &mut R,
 ) -> Option<TransactionSignature<E>>
 where
-    R: crate::rand::Rng,
     E: JubjubEngine,
 {
     let raw_data: Vec<bool> = msg_data.to_vec();
@@ -116,7 +113,8 @@ where
         message_bytes.push(byte);
     }
 
-    let signature = private_key.musig_sha256_sign(&message_bytes, rng, p_g, params);
+    let seed = Seed::deterministic_seed(&private_key, &message_bytes);
+    let signature = private_key.musig_sha256_sign(&message_bytes, &seed, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let is_valid_signature =

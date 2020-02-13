@@ -419,7 +419,7 @@ mod tests {
 
     type TestSMT = SparseMerkleTree<TestLeaf, u64, TestHasher>;
 
-    use crate::rand::{thread_rng, Rand};
+    use crypto_exports::rand::{thread_rng, Rand};
 
     #[test]
     fn test_batching_tree_insert1() {

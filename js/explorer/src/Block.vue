@@ -50,10 +50,6 @@ function formatToken(amount, token) {
     return readableEther(amount);
 }
 
-function defaultTokenSymbol(tokenId) {
-    return `erc20_${tokenId}`;
-}
-
 function formatDate(date) {
     if (date == null) return '';
     return date.toString().split('T')[0] + " " + date.toString().split('T')[1].split('.')[0];
@@ -153,7 +149,7 @@ export default {
                         from_onchain_icon  = `<span class="onchain_icon">onchain</span>`;
                         to_onchain_icon    = '';
                         token              = tx.priority_op.data.token;
-                        token              = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
+                        token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.priority_op.data.amount, token)} ${token}`;
                         fee                = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
                         break;
@@ -165,7 +161,7 @@ export default {
                         from_onchain_icon  = '';
                         to_onchain_icon    = '';
                         token              = tx.tx.token;
-                        token              = tokens[token].symbol;
+                        token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.tx.amount, token)} ${token}`;
                         fee                = `${formatToken(tx.tx.fee, token)} ${token}`;
                         break;
@@ -177,7 +173,7 @@ export default {
                         from_onchain_icon  = '';
                         to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
                         token              = tx.tx.token;
-                        token              = tokens[token].symbol ? tokens[token].symbol : defaultTokenSymbol(token);
+                        token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.tx.amount, token)} ${token}`;
                         fee                = `${formatToken(tx.tx.fee, token)} ${token}`;
                         break;
@@ -187,11 +183,11 @@ export default {
 
                 const from_target = from_explorer_link.startsWith('/')
                     ? ''
-                    : `_target="_blank" rel="noopener noreferrer"`;
+                    : `target="_blank" rel="noopener noreferrer"`;
 
                 const to_target = to_explorer_link.startsWith('/')
                     ? ''
-                    : `_target="_blank" rel="noopener noreferrer"`;
+                    : `target="_blank" rel="noopener noreferrer"`;
 
                 return {
                     type: `<b>${type}</b>`,

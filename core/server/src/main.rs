@@ -40,7 +40,7 @@ fn main() {
     if cli.is_present("genesis") {
         info!("Generating genesis block.");
         PlasmaStateKeeper::create_genesis_block(
-            connection_pool.clone(),
+            connection_pool,
             &config_opts.operator_franklin_addr,
         );
         return;
@@ -83,10 +83,13 @@ fn main() {
         .expect("Error setting Ctrl-C handler");
     }
 
-    let shared_eth_state = start_eth_watch(
+    let (eth_watch_req_sender, eth_watch_req_receiver) = mpsc::channel(256);
+    start_eth_watch(
         connection_pool.clone(),
-        stop_signal_sender.clone(),
         config_opts.clone(),
+        eth_watch_req_sender.clone(),
+        eth_watch_req_receiver,
+        &main_runtime,
     );
 
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
@@ -95,7 +98,7 @@ fn main() {
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     let state_keeper = PlasmaStateKeeper::new(
         PlasmaStateInitParams::restore_from_db(connection_pool.clone()),
-        config_opts.operator_franklin_addr.clone(),
+        config_opts.operator_franklin_addr,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
@@ -134,13 +137,13 @@ fn main() {
         config_opts.prover_server_address,
         Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
         Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
-        stop_signal_sender.clone(),
+        stop_signal_sender,
     );
 
     run_mempool_task(
-        shared_eth_state,
-        connection_pool.clone(),
+        connection_pool,
         mempool_request_receiver,
+        eth_watch_req_sender,
         &main_runtime,
     );
     run_block_proposer_task(

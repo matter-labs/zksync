@@ -12,7 +12,7 @@ use futures::{
 };
 use models::config_options::ConfigurationOptions;
 use models::node::{
-    Account, AccountAddress, AccountId, AccountMap, FranklinTx, Nonce, PriorityOp, TokenId,
+    Account, AccountId, AccountMap, Address, FranklinTx, Nonce, PriorityOp, TokenId,
 };
 use models::CommitRequest;
 use server::mempool::ProposedBlock;
@@ -24,7 +24,7 @@ use std::thread::JoinHandle;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 use web3::transports::Http;
-use web3::types::{Address, U64};
+use web3::types::U64;
 use web3::Transport;
 
 use crypto_exports::franklin_crypto;
@@ -86,14 +86,14 @@ impl<T: Transport> AccountSet<T> {
         let from = &self.zksync_accounts[from.0];
         let to = &self.zksync_accounts[to.0];
 
-        FranklinTx::Transfer(from.sign_transfer(
+        FranklinTx::Transfer(Box::new(from.sign_transfer(
             token_id.0,
             amount,
             fee,
             &to.address,
             nonce,
             increment_nonce,
-        ))
+        )))
     }
 
     /// Create withdraw from zksync account to eth account
@@ -113,14 +113,14 @@ impl<T: Transport> AccountSet<T> {
         let from = &self.zksync_accounts[from.0];
         let to = &self.eth_accounts[to.0];
 
-        FranklinTx::Withdraw(from.sign_withdraw(
+        FranklinTx::Withdraw(Box::new(from.sign_withdraw(
             token_id.0,
             amount,
             fee,
             &to.address,
             nonce,
             increment_nonce,
-        ))
+        )))
     }
 
     /// Create full exit from zksync account to eth account
@@ -130,38 +130,52 @@ impl<T: Transport> AccountSet<T> {
     fn full_exit(
         &self,
         post_by: ETHAccountId,
-        from: ZKSyncAccountId,
-        token: TokenId,
         token_address: Address,
         account_id: AccountId,
+    ) -> PriorityOp {
+        block_on(self.eth_accounts[post_by.0].full_exit(account_id, token_address))
+            .expect("FullExit eth call failed")
+    }
+
+    fn change_pubkey_with_onchain_auth(
+        &self,
+        eth_account: ETHAccountId,
+        zksync_signer: ZKSyncAccountId,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> PriorityOp {
-        let eth_address = self.eth_accounts[post_by.0].address;
-        let signed_full_exit = self.zksync_accounts[from.0].sign_full_exit(
-            account_id,
-            eth_address,
-            token,
+    ) -> FranklinTx {
+        let zksync_account = &self.zksync_accounts[zksync_signer.0];
+        let auth_nonce = nonce.unwrap_or_else(|| zksync_account.nonce());
+
+        let eth_account = &self.eth_accounts[eth_account.0];
+        let tx_receipt =
+            block_on(eth_account.auth_fact(&zksync_account.pubkey_hash.data, auth_nonce))
+                .expect("Auth pubkey fail");
+        assert_eq!(tx_receipt.status, Some(U64::from(1)), "Auth pubkey fail");
+        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
             nonce,
             increment_nonce,
-        );
+            true,
+        )))
+    }
 
-        let mut sign = Vec::new();
-        sign.extend_from_slice(signed_full_exit.signature_r.as_ref());
-        sign.extend_from_slice(signed_full_exit.signature_s.as_ref());
-        block_on(self.eth_accounts[post_by.0].full_exit(
-            account_id,
-            signed_full_exit.packed_pubkey.as_ref(),
-            token_address,
-            &sign,
-            signed_full_exit.nonce,
-        ))
-        .expect("FullExit eth call failed")
+    fn change_pubkey_with_tx(
+        &self,
+        zksync_signer: ZKSyncAccountId,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> FranklinTx {
+        let zksync_account = &self.zksync_accounts[zksync_signer.0];
+        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
+            nonce,
+            increment_nonce,
+            false,
+        )))
     }
 }
 
 /// Initialize plasma state with one account - fee account.
-fn genesis_state(fee_account_address: &AccountAddress) -> PlasmaStateInitParams {
+fn genesis_state(fee_account_address: &Address) -> PlasmaStateInitParams {
     let mut accounts = AccountMap::default();
     let operator_account = Account::default_with_address(fee_account_address);
     accounts.insert(0, operator_account);
@@ -175,11 +189,11 @@ fn genesis_state(fee_account_address: &AccountAddress) -> PlasmaStateInitParams 
 
 async fn state_keeper_get_account(
     mut sender: mpsc::Sender<StateKeeperRequest>,
-    address: &AccountAddress,
+    address: &Address,
 ) -> Option<(AccountId, Account)> {
     let resp = oneshot::channel();
     sender
-        .send(StateKeeperRequest::GetAccount(address.clone(), resp.0))
+        .send(StateKeeperRequest::GetAccount(*address, resp.0))
         .await
         .expect("sk request send");
     resp.1.await.expect("sk account resp recv")
@@ -192,7 +206,7 @@ struct StateKeeperChannels {
 
 // Thread join handle and stop channel sender.
 fn spawn_state_keeper(
-    fee_account: &AccountAddress,
+    fee_account: &Address,
 ) -> (JoinHandle<()>, oneshot::Sender<()>, StateKeeperChannels) {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
     let (state_keeper_req_sender, state_keeper_req_receiver) = mpsc::channel(256);
@@ -200,7 +214,7 @@ fn spawn_state_keeper(
 
     let state_keeper = PlasmaStateKeeper::new(
         genesis_state(fee_account),
-        fee_account.clone(),
+        *fee_account,
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
@@ -263,16 +277,26 @@ pub fn perform_basic_tests() {
                 &config,
             )
         })
-        .collect();
+        .collect::<Vec<_>>();
+
+    let zksync_accounts = {
+        let mut zksync_accounts = Vec::new();
+        zksync_accounts.push(fee_account);
+        zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
+            let rng_zksync_key = ZksyncAccount::rand().private_key;
+            ZksyncAccount::new(
+                rng_zksync_key,
+                0,
+                eth_account.address,
+                eth_account.private_key,
+            )
+        }));
+        zksync_accounts
+    };
 
     let accounts = AccountSet {
         eth_accounts,
-        zksync_accounts: vec![
-            fee_account,
-            ZksyncAccount::rand(),
-            ZksyncAccount::rand(),
-            ZksyncAccount::rand(),
-        ],
+        zksync_accounts,
         fee_account_id: ZKSyncAccountId(0),
     };
 
@@ -302,6 +326,9 @@ pub fn perform_basic_tests() {
 
         // test transfers
         test_setup.start_block();
+
+        test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
+
         //should be executed as a transfer
         test_setup.transfer(
             ZKSyncAccountId(1),
@@ -332,6 +359,8 @@ pub fn perform_basic_tests() {
             &deposit_amount / &BigDecimal::from(4),
         );
 
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
+
         test_setup.withdraw(
             ZKSyncAccountId(2),
             ETHAccountId(0),
@@ -345,7 +374,7 @@ pub fn perform_basic_tests() {
         println!("Transfer test success, token_id: {}", token);
 
         test_setup.start_block();
-        test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(0), Token(token));
+        test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
         test_setup
             .execute_commit_and_verify_block()
             .expect("Block execution failed");
@@ -544,16 +573,28 @@ impl TestSetup {
                 .insert((post_by, 0), eth_balance);
         }
 
-        let full_exit = self.accounts.full_exit(
-            post_by,
-            from,
-            token.0,
-            token_address,
-            account_id,
-            None,
-            true,
-        );
+        let full_exit = self.accounts.full_exit(post_by, token_address, account_id);
         self.execute_priority_op(full_exit);
+    }
+
+    fn change_pubkey_with_tx(&mut self, zksync_signer: ZKSyncAccountId) {
+        let tx = self
+            .accounts
+            .change_pubkey_with_tx(zksync_signer, None, true);
+
+        self.execute_tx(tx);
+    }
+
+    fn change_pubkey_with_onchain_auth(
+        &mut self,
+        eth_account: ETHAccountId,
+        zksync_signer: ZKSyncAccountId,
+    ) {
+        let tx =
+            self.accounts
+                .change_pubkey_with_onchain_auth(eth_account, zksync_signer, None, true);
+
+        self.execute_tx(tx);
     }
 
     pub fn transfer(

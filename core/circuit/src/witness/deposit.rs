@@ -5,7 +5,9 @@ use crate::operation::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
+use models::circuit::utils::{
+    append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
+};
 use models::node::DepositOp;
 use models::params as franklin_constants;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
@@ -14,7 +16,7 @@ pub struct DepositData {
     pub amount: u128,
     pub token: u32,
     pub account_address: u32,
-    pub new_pub_key_hash: Fr,
+    pub address: Fr,
 }
 pub struct DepositWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -51,13 +53,15 @@ impl<E: JubjubEngine> DepositWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.new_pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
         //        assert_eq!(pubdata_bits.len(), 37 * 8);
         pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
+
+    // CLARIFY: What? Why?
     pub fn get_sig_bits(&self) -> Vec<bool> {
         let mut sig_bits = vec![];
         append_be_fixed_width(
@@ -93,12 +97,11 @@ pub fn apply_deposit_tx(
     tree: &mut CircuitAccountTree,
     deposit: &DepositOp,
 ) -> DepositWitness<Bn256> {
-    let alt_new_pubkey_hash = deposit.priority_op.account.to_fr();
     let deposit_data = DepositData {
         amount: deposit.priority_op.amount.to_string().parse().unwrap(),
         token: u32::from(deposit.priority_op.token),
         account_address: deposit.account_id,
-        new_pub_key_hash: alt_new_pubkey_hash,
+        address: eth_address_to_fr(&deposit.priority_op.to),
     };
     apply_deposit(tree, &deposit_data)
 }
@@ -129,11 +132,8 @@ pub fn apply_deposit(
             deposit.account_address,
             deposit.token,
             |acc| {
-                assert!(
-                    (acc.pub_key_hash == deposit.new_pub_key_hash)
-                        || (acc.pub_key_hash == Fr::zero())
-                );
-                acc.pub_key_hash = deposit.new_pub_key_hash;
+                assert!((acc.address == deposit.address) || (acc.address == Fr::zero()));
+                acc.address = deposit.address;
             },
             |bal| bal.value.add_assign(&amount_as_field_element),
         );
@@ -165,14 +165,14 @@ pub fn apply_deposit(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            eth_address: Some(deposit.address),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_as_field_element),
             fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
             pub_nonce: Some(Fr::zero()),
-            new_pub_key_hash: Some(deposit.new_pub_key_hash),
+            new_pub_key_hash: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
@@ -186,7 +186,7 @@ pub fn calculate_deposit_operations_from_witness(
     second_sig_msg: &Fr,
     third_sig_msg: &Fr,
     signature_data: &SignatureData,
-    signer_pub_key_packed: &[Option<bool>],
+    signer_pub_key_packed: &[Option<bool>], // WHY? What signer?
 ) -> Vec<Operation<Bn256>> {
     let pubdata_chunks: Vec<_> = deposit_witness
         .get_pubdata()
@@ -310,22 +310,34 @@ mod test {
 
     #[test]
     #[ignore]
-    fn test_deposit_franklin_in_empty_leaf() {
+    fn test_deposit_in_empty_leaf() {
         let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(Vec::new());
 
         let empty_account_id = 1;
+        let empty_account_address = [7u8; 20].into();
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                sender: Address::zero(),
+                from: Address::zero(),
                 token: 0,
                 amount: BigDecimal::from(1),
-                account: AccountAddress::from_hex("sync:1111111111111111111111111111111111111111")
-                    .unwrap(),
+                to: empty_account_address,
             },
             account_id: empty_account_id,
         };
 
+        println!(
+            "node root hash before deposit: {:?}",
+            plasma_state.root_hash()
+        );
         plasma_state.apply_deposit_op(&deposit_op);
+        println!(
+            "node root hash after deposit: {:?}",
+            plasma_state.root_hash()
+        );
+        println!(
+            "node pub data: {}",
+            hex::encode(&deposit_op.get_public_data())
+        );
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
         let deposit_operations = calculate_deposit_operations_from_witness(
@@ -358,10 +370,10 @@ mod test {
 
     #[test]
     #[ignore]
-    fn test_deposit_franklin_existing_account() {
+    fn test_deposit_existing_account() {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
-            AccountAddress::from_hex("sync:1111111111111111111111111111111111111111").unwrap();
+            "1111111111111111111111111111111111111111".parse().unwrap();
         let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
             deposit_to_account_id,
             Account::default_with_address(&deposit_to_account_address),
@@ -369,15 +381,17 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                sender: Address::zero(),
+                from: Address::zero(),
                 token: 0,
                 amount: BigDecimal::from(1),
-                account: deposit_to_account_address,
+                to: deposit_to_account_address,
             },
             account_id: deposit_to_account_id,
         };
 
+        println!("node root hash before op: {:?}", plasma_state.root_hash());
         plasma_state.apply_deposit_op(&deposit_op);
+        println!("node root hash after op: {:?}", plasma_state.root_hash());
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
         let deposit_operations = calculate_deposit_operations_from_witness(
@@ -471,7 +485,7 @@ mod test {
         c.clone().synthesize(&mut transpiler).unwrap();
 
         println!("Done transpiling");
-    
+
         let hints = transpiler.into_hints();
 
         use crate::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
@@ -559,7 +573,7 @@ mod test {
         c.clone().synthesize(&mut transpiler).unwrap();
 
         println!("Done transpiling");
-    
+
         let hints = transpiler.into_hints();
 
         let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);

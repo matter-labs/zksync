@@ -133,7 +133,7 @@ pub fn test_operation_and_wanted_prover_data(
     // Fee account
     let mut accounts = models::node::AccountMap::default();
     let mut validator_account = models::node::Account::default();
-    validator_account.address = validator_test_account.address.clone();
+    validator_account.address = validator_test_account.address;
     let validator_account_id: u32 = 0;
     accounts.insert(validator_account_id, validator_account.clone());
 
@@ -148,10 +148,10 @@ pub fn test_operation_and_wanted_prover_data(
     );
     let initial_root = circuit_tree.root_hash();
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
-        sender: web3::types::Address::zero(),
+        from: web3::types::Address::zero(),
         token: 0,
         amount: bigdecimal::BigDecimal::from(10),
-        account: validator_test_account.address.clone(),
+        to: validator_test_account.address,
     });
     let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
     let mut fees = Vec::new();

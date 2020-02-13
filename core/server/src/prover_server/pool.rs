@@ -8,9 +8,16 @@ use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use log::info;
 // Workspace deps
 use circuit::operation::SignatureData;
+use circuit::witness::change_pubkey_offchain::{
+    apply_change_pubkey_offchain_tx, calculate_change_pubkey_offchain_from_witness,
+};
+use circuit::witness::full_exit::{
+    apply_full_exit_tx, calculate_full_exit_operations_from_witness,
+};
 use circuit::witness::utils::prepare_sig_data;
 use models::merkle_tree::PedersenHasher;
 use models::node::{Engine, Fr};
+use models::primitives::pack_bits_into_bytes_in_order;
 use prover::prover_data::ProverData;
 
 pub struct ProversDataPool {
@@ -342,58 +349,24 @@ fn build_prover_data(
                 operations.extend(close_account_operations);
                 pub_data.extend(close_account_witness.get_pubdata());
             }
-            models::node::FranklinOp::FullExit(full_exit) => {
-                let is_full_exit_success = full_exit.withdraw_amount.is_some();
-                let full_exit_witness = circuit::witness::full_exit::apply_full_exit_tx(
-                    &mut accounts_tree,
-                    &full_exit,
-                    is_full_exit_success,
-                );
-
-                let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(
-                    full_exit.priority_op.signature_r.as_ref(),
-                )
-                .iter()
-                .map(|x| Some(*x))
-                .collect();
-                let s_bits: Vec<_> = models::primitives::bytes_into_be_bits(
-                    full_exit.priority_op.signature_s.as_ref(),
-                )
-                .iter()
-                .map(|x| Some(*x))
-                .collect();
-                let signature = SignatureData {
-                    r_packed: r_bits,
-                    s: s_bits,
-                };
-                let sig_bits: Vec<bool> =
-                    models::primitives::bytes_into_be_bits(&full_exit.priority_op.get_bytes());
-
-                let (first_sig_msg, second_sig_msg, third_sig_msg) =
-                    circuit::witness::utils::generate_sig_witness(&sig_bits, &phasher, &params);
-                let signer_packed_key_bytes = full_exit.priority_op.packed_pubkey.to_vec();
-                let signer_packed_key_bits: Vec<_> =
-                    models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
-                        .iter()
-                        .map(|x| Some(*x))
-                        .collect();
-
+            models::node::FranklinOp::FullExit(full_exit_op) => {
+                let success = full_exit_op.withdraw_amount.is_some();
+                let full_exit_witness =
+                    apply_full_exit_tx(&mut accounts_tree, &full_exit_op, success);
                 let full_exit_operations =
-                    circuit::witness::full_exit::calculate_full_exit_operations_from_witness(
-                        &full_exit_witness,
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature,
-                        &signer_packed_key_bits,
-                    );
+                    calculate_full_exit_operations_from_witness(&full_exit_witness);
                 operations.extend(full_exit_operations);
-                pub_data.extend(full_exit_witness.get_pubdata(
-                    &signature,
-                    &models::primitives::bytes_into_be_bits(&signer_packed_key_bytes),
-                ));
+                pub_data.extend(full_exit_witness.get_pubdata());
             }
-            _ => {}
+            models::node::FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
+                let change_pkhash_witness =
+                    apply_change_pubkey_offchain_tx(&mut accounts_tree, &change_pkhash_op);
+                let change_pkhash_operations =
+                    calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
+                operations.extend(change_pkhash_operations);
+                pub_data.extend(change_pkhash_witness.get_pubdata());
+            }
+            models::node::FranklinOp::Noop(_) => {} // Noops are handled below
         }
     }
     if operations.len() < models::params::block_size_chunks() {
@@ -414,6 +387,11 @@ fn build_prover_data(
     }
     assert_eq!(pub_data.len(), 64 * models::params::block_size_chunks());
     assert_eq!(operations.len(), models::params::block_size_chunks());
+
+    debug!(
+        "Prover pubdata: {}",
+        hex::encode(pack_bits_into_bytes_in_order(pub_data.clone()))
+    );
 
     let validator_acc = match accounts_tree.get(commit_operation.block.fee_account as u32) {
         Some(v) => v,

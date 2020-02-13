@@ -70,7 +70,7 @@ where
     struct Wrapper(#[serde(with = "OperationDef")] Operation<Engine>);
 
     let v = Vec::deserialize(deserializer)?;
-    Ok(v.into_iter().map(|Wrapper(a)| a.clone()).collect())
+    Ok(v.into_iter().map(|Wrapper(a)| a).collect())
 }
 
 #[derive(Serialize, Deserialize)]
@@ -86,6 +86,7 @@ struct AccountWitnessDef {
         deserialize_with = "optional_fr_de"
     )]
     pub pub_key_hash: Option<Fr>,
+    pub address: Option<Fr>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -174,7 +175,7 @@ pub struct OperationArgumentsDef {
         serialize_with = "optional_fr_ser",
         deserialize_with = "optional_fr_de"
     )]
-    pub ethereum_key: Option<Fr>,
+    pub eth_address: Option<Fr>,
     #[serde(
         serialize_with = "optional_fr_ser",
         deserialize_with = "optional_fr_de"

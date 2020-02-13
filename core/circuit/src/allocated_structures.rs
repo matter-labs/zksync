@@ -98,7 +98,7 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub second_sig_msg: CircuitElement<E>,
     pub third_sig_msg: CircuitElement<E>,
     pub new_pubkey_hash: CircuitElement<E>,
-    pub ethereum_key: CircuitElement<E>,
+    pub eth_address: CircuitElement<E>,
     pub pub_nonce: CircuitElement<E>,
     pub a: CircuitElement<E>,
     pub b: CircuitElement<E>,
@@ -107,9 +107,9 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
 impl<E: JubjubEngine> AllocatedOperationData<E> {
     pub fn empty_from_zero(zero_element: AllocatedNum<E>) -> Result<Self, SynthesisError>
     {
-        let ethereum_key = CircuitElement::unsafe_empty_of_some_length(
+        let eth_address = CircuitElement::unsafe_empty_of_some_length(
             zero_element.clone(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
 
         let full_amount = CircuitElement::unsafe_empty_of_some_length(
@@ -174,7 +174,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         );
 
         Ok(AllocatedOperationData {
-            ethereum_key,
+            eth_address,
             pub_nonce,
             amount_packed,
             fee_packed,
@@ -195,10 +195,10 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         op: &Operation<E>,
         _params: &E::Params, //TODO: probably move out
     ) -> Result<AllocatedOperationData<E>, SynthesisError> {
-        let ethereum_key = CircuitElement::from_fe_with_known_length(
-            cs.namespace(|| "ethereum_key"),
-            || op.args.ethereum_key.grab(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+        let eth_address = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "eth_address"),
+            || op.args.eth_address.grab(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         )?;
 
         let full_amount = CircuitElement::from_fe_with_known_length(
@@ -285,7 +285,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         )?;
 
         Ok(AllocatedOperationData {
-            ethereum_key,
+            eth_address,
             pub_nonce,
             amount_packed,
             fee_packed,

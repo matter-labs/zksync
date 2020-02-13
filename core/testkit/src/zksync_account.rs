@@ -1,35 +1,59 @@
 use bigdecimal::BigDecimal;
-use crate::franklin_crypto::jubjub::FixedGenerators;
-use models::node::tx::{PackedPublicKey, TxSignature};
+use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
-    priv_key_from_fs, AccountAddress, AccountId, FullExit, Nonce, PrivateKey, PublicKey, TokenId,
-    Transfer, Withdraw,
+    priv_key_from_fs, Address, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
-use models::params::JUBJUB_PARAMS;
 use rand::{thread_rng, Rng};
 use std::cell::RefCell;
-use std::convert::TryInto;
-use web3::types::Address;
+use web3::types::H256;
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZksyncAccount {
     pub private_key: PrivateKey,
-    pub address: AccountAddress,
+    pub pubkey_hash: PubKeyHash,
+    pub address: Address,
+    pub eth_private_key: H256,
     nonce: RefCell<Nonce>,
 }
 
 impl ZksyncAccount {
+    /// Note: probably not secure, use for testing.
     pub fn rand() -> Self {
         let rng = &mut thread_rng();
 
         let pk = priv_key_from_fs(rng.gen());
-        Self::new(pk, 0)
+        let (eth_pk, eth_address) = {
+            let eth_pk = rng.gen::<[u8; 32]>().into();
+            let eth_address;
+            loop {
+                if let Ok(address) = PackedEthSignature::address_from_private_key(&eth_pk) {
+                    eth_address = address;
+                    break;
+                }
+            }
+            (eth_pk, eth_address)
+        };
+        Self::new(pk, 0, eth_address, eth_pk)
     }
 
-    pub fn new(private_key: PrivateKey, nonce: Nonce) -> Self {
+    pub fn new(
+        private_key: PrivateKey,
+        nonce: Nonce,
+        address: Address,
+        eth_private_key: H256,
+    ) -> Self {
+        let pubkey_hash = PubKeyHash::from_privkey(&private_key);
+        assert_eq!(
+            address,
+            PackedEthSignature::address_from_private_key(&eth_private_key)
+                .expect("private key is incorrect"),
+            "address should correspond to private key"
+        );
         Self {
-            address: AccountAddress::from_privkey(&private_key),
+            address,
             private_key,
+            pubkey_hash,
+            eth_private_key,
             nonce: RefCell::new(nonce),
         }
     }
@@ -43,13 +67,13 @@ impl ZksyncAccount {
         token_id: TokenId,
         amount: BigDecimal,
         fee: BigDecimal,
-        to: &AccountAddress,
+        to: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> Transfer {
         let mut transfer = Transfer {
-            from: self.address.clone(),
-            to: to.clone(),
+            from: self.address,
+            to: *to,
             token: token_id,
             amount,
             fee,
@@ -75,8 +99,8 @@ impl ZksyncAccount {
         increment_nonce: bool,
     ) -> Withdraw {
         let mut withdraw = Withdraw {
-            account: self.address.clone(),
-            eth_address: *eth_address,
+            from: self.address,
+            to: *eth_address,
             token: token_id,
             amount,
             fee,
@@ -92,48 +116,39 @@ impl ZksyncAccount {
         withdraw
     }
 
-    pub fn sign_full_exit(
+    pub fn create_change_pubkey_tx(
         &self,
-        account_id: AccountId,
-        eth_address: Address,
-        token: TokenId,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> FullExit {
-        let pub_key = PackedPublicKey(PublicKey::from_private(
-            &self.private_key,
-            FixedGenerators::SpendingKeyGenerator,
-            &JUBJUB_PARAMS,
-        ));
-
-        let mut full_exit = FullExit {
-            account_id,
-            packed_pubkey: Box::new(
-                pub_key
-                    .serialize_packed()
-                    .expect("pk serialize")
-                    .as_slice()
-                    .try_into()
-                    .unwrap(),
-            ),
-            eth_address,
-            token,
-            nonce: nonce.unwrap_or_else(|| *self.nonce.borrow()),
-            signature_r: Box::new([0u8; 32]),
-            signature_s: Box::new([0u8; 32]),
+        auth_onchain: bool,
+    ) -> ChangePubKey {
+        let nonce = nonce.unwrap_or_else(|| *self.nonce.borrow());
+        let eth_signature = if auth_onchain {
+            None
+        } else {
+            let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash);
+            let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
+                .expect("Signature should succeed");
+            Some(eth_signature)
+        };
+        let change_pubkey = ChangePubKey {
+            account: self.address,
+            new_pk_hash: self.pubkey_hash.clone(),
+            nonce,
+            eth_signature,
         };
 
-        let signature_bytes =
-            TxSignature::sign_musig_pedersen(&self.private_key, &full_exit.get_bytes())
-                .signature
-                .serialize_packed()
-                .expect("signature serialize");
-        full_exit.signature_r = Box::new(signature_bytes[0..32].try_into().unwrap());
-        full_exit.signature_s = Box::new(signature_bytes[32..].try_into().unwrap());
+        if !auth_onchain {
+            assert!(
+                change_pubkey.verify_eth_signature() == Some(self.address),
+                "eth signature is incorrect"
+            );
+        }
 
         if increment_nonce {
             *self.nonce.borrow_mut() += 1;
         }
-        full_exit
+
+        change_pubkey
     }
 }

@@ -4,7 +4,9 @@ use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField};
 use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
 
 use crate::merkle_tree::hasher::Hasher;
+use crate::node::Fr;
 use crate::franklin_crypto::eddsa::PublicKey;
+use web3::types::Address;
 
 fn pub_key_hash_bits<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
@@ -98,7 +100,7 @@ pub fn append_le_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, widt
     token_bits.reverse();
     // token_bits.truncate(width);
     token_bits.resize(width, false);
-    content.extend(token_bits.clone());
+    content.extend(token_bits);
 }
 
 pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, width: usize) {
@@ -106,7 +108,7 @@ pub fn append_be_fixed_width<P: PrimeField>(content: &mut Vec<bool>, x: &P, widt
     token_bits.reverse();
     token_bits.resize(width, false);
     token_bits.reverse();
-    content.extend(token_bits.clone());
+    content.extend(token_bits);
 }
 
 pub fn encode_fs_into_fr<E: JubjubEngine>(input: E::Fs) -> E::Fr {
@@ -121,4 +123,8 @@ pub fn encode_fr_into_fs<E: JubjubEngine>(input: E::Fr) -> E::Fs {
     fr_le_bits.reverse();
 
     le_bit_vector_into_field_element::<E::Fs>(&fr_le_bits)
+}
+
+pub fn eth_address_to_fr(address: &Address) -> Fr {
+    Fr::from_hex(&format!("{:x}", address)).unwrap()
 }

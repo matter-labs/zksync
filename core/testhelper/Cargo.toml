@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 models = { path = "../models", version = "0.0.1" }
 crypto_exports = {path = "../crypto_exports"}
+web3 = "0.8.0"

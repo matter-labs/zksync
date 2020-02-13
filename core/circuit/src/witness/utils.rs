@@ -45,7 +45,7 @@ pub fn generate_dummy_sig_data(
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
-    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
+    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
     (
         signature_data,
@@ -80,7 +80,6 @@ pub fn generate_sig_data(
     private_key: &PrivateKey<Bn256>,
     params: &AltJubjubBn256,
 ) -> (SignatureData, Fr, Fr, Fr) {
-    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
     assert!(sig_bits_to_hash.len() <= franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
@@ -107,7 +106,7 @@ pub fn generate_sig_data(
         "inside generation: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits))
     );
-    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params, rng);
+    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
 
     (
@@ -252,10 +251,7 @@ pub fn apply_leaf_operation<
 
     //applying deposit
     let mut account = tree.remove(account_address).unwrap_or(default_account);
-    let account_witness_before = AccountWitness {
-        nonce: Some(account.nonce),
-        pub_key_hash: Some(account.pub_key_hash),
-    };
+    let account_witness_before = AccountWitness::from_circuit_account(&account);
     let mut balance = account
         .subtree
         .remove(token)
@@ -263,14 +259,11 @@ pub fn apply_leaf_operation<
     let balance_before = balance.value;
     fb(&mut balance);
     let balance_after = balance.value;
-    account.subtree.insert(token, balance.clone());
+    account.subtree.insert(token, balance);
 
     fa(&mut account);
 
-    let account_witness_after = AccountWitness {
-        nonce: Some(account.nonce),
-        pub_key_hash: Some(account.pub_key_hash),
-    };
+    let account_witness_after = AccountWitness::from_circuit_account(&account);
     tree.insert(account_address, account);
     (
         account_witness_before,
@@ -290,10 +283,7 @@ pub fn apply_fee(
     let mut validator_leaf = tree
         .remove(validator_address)
         .expect("validator_leaf is empty");
-    let validator_account_witness = AccountWitness {
-        nonce: Some(validator_leaf.nonce),
-        pub_key_hash: Some(validator_leaf.pub_key_hash),
-    };
+    let validator_account_witness = AccountWitness::from_circuit_account(&validator_leaf);
 
     let mut balance = validator_leaf.subtree.remove(token).unwrap_or_default();
     balance.value.add_assign(&fee_fe);

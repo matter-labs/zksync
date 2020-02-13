@@ -31,7 +31,7 @@ pub fn make_franklin_key() {
         key_file_path
     };
     let contract_file_path = {
-        let mut contract_file_path = out_dir.clone();
+        let mut contract_file_path = out_dir;
         contract_file_path.push(CONTRACT_FILENAME);
         contract_file_path
     };
@@ -106,7 +106,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
             fee: None,
             pub_nonce: None,
             new_pub_key_hash: None,
-            ethereum_key: None,
+            eth_address: None,
         },
         lhs: OperationBranch {
             address: None,
@@ -115,6 +115,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
                 account_witness: AccountWitness {
                     nonce: None,
                     pub_key_hash: None,
+                    address: None,
                 },
                 account_path: vec![None; params::account_tree_depth()],
                 balance_value: None,
@@ -128,6 +129,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
                 account_witness: AccountWitness {
                     nonce: None,
                     pub_key_hash: None,
+                    address: None,
                 },
                 account_path: vec![None; params::account_tree_depth()],
                 balance_value: None,
@@ -150,6 +152,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
         validator_account: AccountWitness {
             nonce: None,
             pub_key_hash: None,
+            address: None,
         },
     };
 

@@ -7,8 +7,8 @@
             :selected.sync="token">
         </TokenSelector>
         <div>
-            Amount <span v-if="maxAmountVisible">(<span v-if="tokenReadablyPrintable">in {{ token }} coins, </span>max {{ displayableBalancesDict[token] }} {{ token }})</span>:
-            <b-form-input autocomplete="off" v-model="amountSelected" class="mb-2"></b-form-input>
+            Amount <span v-if="maxAmountVisible">(<span v-if="tokenReadablyPrintable">in {{ token }} coins, </span>max {{ formattedBalancesDict[token] }} {{ token }})</span>:
+            <b-form-input autocomplete="off" type="number" step="any" v-model="amountSelected" class="mb-2"></b-form-input>
             <div v-if="feeNeeded">
                 Fee:
                 <FeeSelector 
@@ -18,7 +18,7 @@
                 </FeeSelector>
             </div>
             <div v-else>
-                The fee is <b>ETH</b> {{ depositFee }}. The change will be put on your ZK Sync account.
+                The fee is <b>ETH</b> {{ depositFee }}. The change will be put on your zkSync account.
             </div>
             <p v-if="alertVisible"> {{ alertText }} </p>
             <b-button class="w-50 mt-3" variant="primary" @click='buttonClicked'> {{ buttonText }} </b-button>
@@ -54,6 +54,7 @@ export default {
 
         maxAmountVisible: false,
         balancesDict: {},
+        formattedBalancesDict: {},
         displayableBalancesDict: {},
         alertVisible: false,
         alertText: '',
@@ -87,11 +88,15 @@ export default {
             if (this.balances) {
                 this.tokensForTokenSelector = this.balances.map(b => b.tokenName);
 
-                this.balancesDict = this.balances
-                    .reduce((acc, bal) => {
-                        acc[bal.tokenName] = bal.amount;
-                        return acc;
-                    }, {});
+                const balancesDict = {};
+                const formattedBalancesDict = {};
+                for (const { tokenName, amount } of this.balances) {
+                    balancesDict[tokenName] = amount;
+                    formattedBalancesDict[tokenName] = utils.formatEther(amount);
+                }
+                this.balancesDict = balancesDict;
+                this.formattedBalancesDict = formattedBalancesDict;
+                
                 this.displayableBalancesDict = getDisplayableBalanceDict(this.balancesDict);
             }
         },

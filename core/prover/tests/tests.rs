@@ -117,7 +117,7 @@ fn prover_proves_a_block_and_publishes_result() {
     stop_signal.store(true, Ordering::SeqCst);
     println!("verifying proof...");
     let verify_result =
-        franklin_crypto::bellman::groth16::verify_proof(&verify_key, &proof.clone(), &[public_data_commitment]);
+        franklin_crypto::bellman::groth16::verify_proof(&verify_key, &proof, &[public_data_commitment]);
     assert!(!verify_result.is_err());
     assert!(verify_result.unwrap(), "invalid proof");
 }
@@ -129,14 +129,14 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
 
     let validator_test_account = TestAccount::new();
     println!(
-        "validator account address: {}",
-        validator_test_account.address.to_hex()
+        "validator account address: {:x}",
+        validator_test_account.address
     );
 
     // Fee account
     let mut accounts = models::node::AccountMap::default();
     let mut validator_account = models::node::Account::default();
-    validator_account.address = validator_test_account.address.clone();
+    validator_account.address = validator_test_account.address;
     let validator_account_id: u32 = 0;
     accounts.insert(validator_account_id, validator_account.clone());
 
@@ -145,15 +145,15 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
     println!("Genesis block root hash: {}", genesis_root_hash);
     circuit_tree.insert(
         0,
-        models::circuit::account::CircuitAccount::from(validator_account.clone()),
+        models::circuit::account::CircuitAccount::from(validator_account),
     );
     assert_eq!(circuit_tree.root_hash(), genesis_root_hash);
 
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
-        sender: web3::types::Address::zero(),
+        from: web3::types::Address::zero(),
         token: 0,
         amount: bigdecimal::BigDecimal::from(10),
-        account: validator_test_account.address.clone(),
+        to: validator_test_account.address,
     });
     let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
     let mut fees = Vec::new();
@@ -285,13 +285,14 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
 fn read_circuit_parameters() -> franklin_crypto::bellman::groth16::Parameters<models::node::Engine> {
     let out_dir = {
         let mut out_dir = path::PathBuf::new();
-        out_dir.push(&env::var("KEY_DIR").expect("KEY_DIR not set"));
+        out_dir.push(&env::var("ZKSYNC_HOME").expect("ZKSYNC_HOME is not set"));
+        out_dir.push(&env::var("KEY_DIR").expect("KEY_DIR is not set"));
         out_dir.push(&format!("{}", models::params::block_size_chunks()));
         out_dir.push(&format!("{}", models::params::account_tree_depth()));
         out_dir
     };
     let key_file_path = {
-        let mut key_file_path = out_dir.clone();
+        let mut key_file_path = out_dir;
         key_file_path.push(models::params::KEY_FILENAME);
         key_file_path
     };

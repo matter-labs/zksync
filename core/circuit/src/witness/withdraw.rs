@@ -8,7 +8,9 @@ use crate::operation::SignatureData;
 use crate::franklin_crypto::circuit::float_point::convert_to_float;
 use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
+use models::circuit::utils::{
+    append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
+};
 
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
@@ -20,7 +22,7 @@ pub struct WithdrawData {
     pub fee: u128,
     pub token: u32,
     pub account_address: u32,
-    pub ethereum_key: Fr,
+    pub eth_address: Fr,
 }
 pub struct WithdrawWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -63,8 +65,8 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
         pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
@@ -83,8 +85,8 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -118,7 +120,7 @@ pub fn apply_withdraw_tx(
         fee: big_decimal_to_u128(&withdraw.tx.fee),
         token: u32::from(withdraw.tx.token),
         account_address: withdraw.account_id,
-        ethereum_key: Fr::from_hex(&format!("{:x}", &withdraw.tx.eth_address)).unwrap(),
+        eth_address: eth_address_to_fr(&withdraw.tx.to),
     };
     // le_bit_vector_into_field_element()
     apply_withdraw(tree, &withdraw_data)
@@ -210,7 +212,7 @@ pub fn apply_withdraw(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(withdraw.ethereum_key),
+            eth_address: Some(withdraw.eth_address),
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
@@ -350,10 +352,11 @@ mod test {
         
         let zksync_account = ZksyncAccount::rand();
         let account_id = 1;
-        let account_address = zksync_account.address.clone();
+        let account_address = zksync_account.address;
         let account = {
             let mut account = Account::default_with_address(&account_address);
             account.add_balance(0, &BigDecimal::from(10));
+            account.pub_key_hash = zksync_account.pubkey_hash.clone();
             account
         };
 
@@ -372,10 +375,17 @@ mod test {
             account_id,
         };
 
+        println!("node root hash before op: {:?}", plasma_state.root_hash());
         let (fee, _) = plasma_state
             .apply_withdraw_op(&withdraw_op)
             .expect("transfer should be success");
+        println!("node root hash after op: {:?}", plasma_state.root_hash());
         plasma_state.collect_fee(&[fee.clone()], witness_accum.fee_account_id);
+        println!("node root hash after fee: {:?}", plasma_state.root_hash());
+        println!(
+            "node withdraw tx bytes: {}",
+            hex::encode(&withdraw_op.tx.get_bytes())
+        );
 
         let withdraw_witness = apply_withdraw_tx(&mut witness_accum.account_tree, &withdraw_op);
         let sign_packed = withdraw_op

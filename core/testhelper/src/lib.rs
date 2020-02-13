@@ -7,7 +7,7 @@ use crate::rand::Rng;
 pub struct TestAccount {
     pub private_key: franklin_crypto::eddsa::PrivateKey<franklin_crypto::bellman::pairing::bn256::Bn256>,
     pub public_key: franklin_crypto::eddsa::PublicKey<franklin_crypto::bellman::pairing::bn256::Bn256>,
-    pub address: models::node::account::AccountAddress,
+    pub address: web3::types::Address,
 }
 
 // TODO: move to helper crate
@@ -22,7 +22,7 @@ impl TestAccount {
             p_g,
             jubjub_params,
         );
-        let address = models::node::account::AccountAddress::from_pubkey(&public_key);
+        let address = rng.gen::<[u8; 20]>().into();
         let public_key = franklin_crypto::eddsa::PublicKey::<franklin_crypto::bellman::pairing::bn256::Bn256>::from_private(
             &private_key,
             p_g,

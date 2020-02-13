@@ -7,11 +7,11 @@
     "@types/node": "^12.12.14",
     "array-flat-polyfill": "^1.0.1",
     "cli-progress": "^3.5.0",
-    "ethers": "^4.0.33",
+    "ethers": "^4.0.43",
     "openzeppelin-solidity": "^2.4.0",
     "ts-node": "^8.5.4",
     "typescript": "^3.7.4",
-    "zksync": "^0.3.10"
+    "zksync": "../zksync.js"
   },
   "scripts": {
     "simple": "f ts-node simple-integration-test.ts",

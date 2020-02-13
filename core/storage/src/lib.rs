@@ -23,12 +23,9 @@ use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
     AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
 };
-use models::{
-    Action, ActionType, EncodedProof, Operation, TokenAddedEvent, ACTION_COMMIT, ACTION_VERIFY,
-};
+use models::{Action, ActionType, EncodedProof, Operation, TokenAddedEvent};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
-use std::convert::TryInto;
 use std::time;
 use web3::types::H256;
 
@@ -46,8 +43,10 @@ use std::env;
 use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
 
 use itertools::Itertools;
-use models::node::AccountAddress;
+use models::node::PubKeyHash;
+use std::cmp::Ordering;
 use std::collections::HashMap;
+use web3::types::Address;
 
 use crypto_exports::franklin_crypto;
 use crypto_exports::rand;
@@ -90,6 +89,7 @@ struct StorageAccount {
     pub last_block: i64,
     pub nonce: i64,
     pub address: Vec<u8>,
+    pub pubkey_hash: Vec<u8>,
 }
 
 #[derive(Identifiable, Insertable, QueryableByName, Queryable, Associations)]
@@ -115,6 +115,7 @@ pub struct Token {
 #[derive(Debug, Insertable)]
 #[table_name = "account_balance_updates"]
 struct StorageAccountUpdateInsert {
+    pub update_order_id: i32,
     pub account_id: i64,
     pub block_number: i64,
     pub coin_id: i32,
@@ -135,6 +136,32 @@ struct StorageAccountUpdate {
     pub new_balance: BigDecimal,
     pub old_nonce: i64,
     pub new_nonce: i64,
+    pub update_order_id: i32,
+}
+
+#[derive(Debug, Insertable)]
+#[table_name = "account_pubkey_updates"]
+struct StorageAccountPubkeyUpdateInsert {
+    pub update_order_id: i32,
+    pub account_id: i64,
+    pub block_number: i64,
+    pub old_pubkey_hash: Vec<u8>,
+    pub new_pubkey_hash: Vec<u8>,
+    pub old_nonce: i64,
+    pub new_nonce: i64,
+}
+
+#[derive(Debug, Queryable, QueryableByName)]
+#[table_name = "account_pubkey_updates"]
+struct StorageAccountPubkeyUpdate {
+    pubkey_update_id: i32,
+    pub update_order_id: i32,
+    pub account_id: i64,
+    pub block_number: i64,
+    pub old_pubkey_hash: Vec<u8>,
+    pub new_pubkey_hash: Vec<u8>,
+    pub old_nonce: i64,
+    pub new_nonce: i64,
 }
 
 #[derive(Debug, Insertable, Queryable, QueryableByName)]
@@ -145,6 +172,7 @@ struct StorageAccountCreation {
     block_number: i64,
     address: Vec<u8>,
     nonce: i64,
+    update_order_id: i32,
 }
 
 #[derive(Debug, Insertable)]
@@ -318,6 +346,7 @@ enum StorageAccountDiff {
     BalanceUpdate(StorageAccountUpdate),
     Create(StorageAccountCreation),
     Delete(StorageAccountCreation),
+    ChangePubKey(StorageAccountPubkeyUpdate),
 }
 
 impl From<StorageAccountUpdate> for StorageAccountDiff {
@@ -336,6 +365,12 @@ impl From<StorageAccountCreation> for StorageAccountDiff {
     }
 }
 
+impl From<StorageAccountPubkeyUpdate> for StorageAccountDiff {
+    fn from(update: StorageAccountPubkeyUpdate) -> Self {
+        StorageAccountDiff::ChangePubKey(update)
+    }
+}
+
 impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
     fn into(self) -> (u32, AccountUpdate) {
         match self {
@@ -351,18 +386,25 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
                 upd.account_id as u32,
                 AccountUpdate::Create {
                     nonce: upd.nonce as u32,
-                    address: AccountAddress {
-                        data: upd.address.as_slice().try_into().unwrap(),
-                    },
+                    address: Address::from_slice(&upd.address.as_slice()),
                 },
             ),
             StorageAccountDiff::Delete(upd) => (
                 upd.account_id as u32,
                 AccountUpdate::Delete {
                     nonce: upd.nonce as u32,
-                    address: AccountAddress {
-                        data: upd.address.as_slice().try_into().unwrap(),
-                    },
+                    address: Address::from_slice(&upd.address.as_slice()),
+                },
+            ),
+            StorageAccountDiff::ChangePubKey(upd) => (
+                upd.account_id as u32,
+                AccountUpdate::ChangePubKeyHash {
+                    old_nonce: upd.old_nonce as u32,
+                    new_nonce: upd.new_nonce as u32,
+                    old_pub_key_hash: PubKeyHash::from_bytes(&upd.old_pubkey_hash)
+                        .expect("PubkeyHash update from db deserialzie"),
+                    new_pub_key_hash: PubKeyHash::from_bytes(&upd.new_pubkey_hash)
+                        .expect("PubkeyHash update from db deserialzie"),
                 },
             ),
         }
@@ -370,26 +412,29 @@ impl Into<(u32, AccountUpdate)> for StorageAccountDiff {
 }
 
 impl StorageAccountDiff {
-    fn nonce(&self) -> i64 {
+    fn update_order_id(&self) -> i32 {
         *match self {
-            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate { old_nonce, .. }) => old_nonce,
-            StorageAccountDiff::Create(StorageAccountCreation { nonce, .. }) => nonce,
-            StorageAccountDiff::Delete(StorageAccountCreation { nonce, .. }) => nonce,
+            StorageAccountDiff::BalanceUpdate(StorageAccountUpdate {
+                update_order_id, ..
+            }) => update_order_id,
+            StorageAccountDiff::Create(StorageAccountCreation {
+                update_order_id, ..
+            }) => update_order_id,
+            StorageAccountDiff::Delete(StorageAccountCreation {
+                update_order_id, ..
+            }) => update_order_id,
+            StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate {
+                update_order_id,
+                ..
+            }) => update_order_id,
         }
     }
 
-    fn cmp_nonce(&self, other: &Self) -> std::cmp::Ordering {
-        let type_cmp_number = |diff: &StorageAccountDiff| -> u32 {
-            match diff {
-                StorageAccountDiff::Create(..) => 0,
-                StorageAccountDiff::BalanceUpdate(..) => 1,
-                StorageAccountDiff::Delete(..) => 2,
-            }
-        };
-
-        self.nonce()
-            .cmp(&other.nonce())
-            .then(type_cmp_number(self).cmp(&type_cmp_number(other)))
+    /// Compares updates by `block number` then by `update_order_id(number within block)`.
+    fn cmp_order(&self, other: &Self) -> Ordering {
+        self.block_number()
+            .cmp(&other.block_number())
+            .then(self.update_order_id().cmp(&other.update_order_id()))
     }
 
     fn block_number(&self) -> i64 {
@@ -399,6 +444,9 @@ impl StorageAccountDiff {
             }
             StorageAccountDiff::Create(StorageAccountCreation { block_number, .. }) => block_number,
             StorageAccountDiff::Delete(StorageAccountCreation { block_number, .. }) => block_number,
+            StorageAccountDiff::ChangePubKey(StorageAccountPubkeyUpdate {
+                block_number, ..
+            }) => block_number,
         }
     }
 }
@@ -710,9 +758,9 @@ fn restore_account(
         account.set_balance(b.coin_id as TokenId, b.balance);
     }
     account.nonce = stored_account.nonce as u32;
-    account.address = AccountAddress {
-        data: stored_account.address.as_slice().try_into().unwrap(),
-    };
+    account.address = Address::from_slice(&stored_account.address);
+    account.pub_key_hash = PubKeyHash::from_bytes(&stored_account.pubkey_hash)
+        .expect("db stored pubkey hash deserialize");
     (stored_account.id as u32, account)
 }
 
@@ -802,7 +850,7 @@ impl StorageProcessor {
                     diesel::insert_into(mempool::table)
                         .values(&InsertTx {
                             hash: tx.tx.hash().as_ref().to_vec(),
-                            primary_account_address: tx.tx.account().data.to_vec(),
+                            primary_account_address: tx.tx.account().as_bytes().to_vec(),
                             nonce: tx.tx.nonce() as i64,
                             tx: serde_json::to_value(&tx.tx).unwrap_or_default(),
                         })
@@ -991,7 +1039,7 @@ impl StorageProcessor {
 
     pub fn get_account_transactions_history(
         &self,
-        address: &AccountAddress,
+        address: &PubKeyHash,
         offset: i64,
         limit: i64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
@@ -1073,7 +1121,7 @@ impl StorageProcessor {
 
     pub fn get_account_transactions(
         &self,
-        address: &AccountAddress,
+        address: &PubKeyHash,
     ) -> QueryResult<Vec<AccountTransaction>> {
         let all_txs: Vec<_> = mempool::table
             .filter(mempool::primary_account_address.eq(address.data.to_vec()))
@@ -1231,7 +1279,7 @@ impl StorageProcessor {
         accounts_updated: &[(u32, AccountUpdate)],
     ) -> QueryResult<()> {
         self.conn().transaction(|| {
-            for (id, upd) in accounts_updated.iter() {
+            for (update_order_id, (id, upd)) in accounts_updated.iter().enumerate() {
                 debug!(
                     "Committing state update for account {} in block {}",
                     id, block_number
@@ -1240,10 +1288,11 @@ impl StorageProcessor {
                     AccountUpdate::Create { ref address, nonce } => {
                         diesel::insert_into(account_creates::table)
                             .values(&StorageAccountCreation {
+                                update_order_id: update_order_id as i32,
                                 account_id: i64::from(*id),
                                 is_create: true,
                                 block_number: i64::from(block_number),
-                                address: address.data.to_vec(),
+                                address: address.as_bytes().to_vec(),
                                 nonce: i64::from(nonce),
                             })
                             .execute(self.conn())?;
@@ -1251,10 +1300,11 @@ impl StorageProcessor {
                     AccountUpdate::Delete { ref address, nonce } => {
                         diesel::insert_into(account_creates::table)
                             .values(&StorageAccountCreation {
+                                update_order_id: update_order_id as i32,
                                 account_id: i64::from(*id),
                                 is_create: false,
                                 block_number: i64::from(block_number),
-                                address: address.data.to_vec(),
+                                address: address.as_bytes().to_vec(),
                                 nonce: i64::from(nonce),
                             })
                             .execute(self.conn())?;
@@ -1266,11 +1316,30 @@ impl StorageProcessor {
                     } => {
                         diesel::insert_into(account_balance_updates::table)
                             .values(&StorageAccountUpdateInsert {
+                                update_order_id: update_order_id as i32,
                                 account_id: i64::from(*id),
                                 block_number: i64::from(block_number),
                                 coin_id: i32::from(token),
                                 old_balance: old_balance.clone(),
                                 new_balance: new_balance.clone(),
+                                old_nonce: i64::from(old_nonce),
+                                new_nonce: i64::from(new_nonce),
+                            })
+                            .execute(self.conn())?;
+                    }
+                    AccountUpdate::ChangePubKeyHash {
+                        ref old_pub_key_hash,
+                        ref new_pub_key_hash,
+                        old_nonce,
+                        new_nonce,
+                    } => {
+                        diesel::insert_into(account_pubkey_updates::table)
+                            .values(&StorageAccountPubkeyUpdateInsert {
+                                update_order_id: update_order_id as i32,
+                                account_id: i64::from(*id),
+                                block_number: i64::from(block_number),
+                                old_pubkey_hash: old_pub_key_hash.data.to_vec(),
+                                new_pubkey_hash: new_pub_key_hash.data.to_vec(),
                                 old_nonce: i64::from(old_nonce),
                                 new_nonce: i64::from(new_nonce),
                             })
@@ -1293,6 +1362,10 @@ impl StorageProcessor {
                 .filter(account_creates::block_number.eq(&(i64::from(block_number))))
                 .load::<StorageAccountCreation>(self.conn())?;
 
+            let account_change_pubkey_diff = account_pubkey_updates::table
+                .filter(account_pubkey_updates::block_number.eq(&(i64::from(block_number))))
+                .load::<StorageAccountPubkeyUpdate>(self.conn())?;
+
             let account_updates: Vec<StorageAccountDiff> = {
                 let mut account_diff = Vec::new();
                 account_diff.extend(
@@ -1305,7 +1378,12 @@ impl StorageProcessor {
                         .into_iter()
                         .map(StorageAccountDiff::from),
                 );
-                account_diff.sort_by(|l, r| l.cmp_nonce(r));
+                account_diff.extend(
+                    account_change_pubkey_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
+                account_diff.sort_by(StorageAccountDiff::cmp_order);
                 account_diff
             };
 
@@ -1340,14 +1418,23 @@ impl StorageProcessor {
                             last_block: upd.block_number,
                             nonce: upd.nonce,
                             address: upd.address,
+                            pubkey_hash: PubKeyHash::default().data.to_vec(),
                         };
                         insert_into(accounts::table)
                             .values(&storage_account)
                             .execute(self.conn())?;
                     }
-
                     StorageAccountDiff::Delete(upd) => {
                         delete(accounts::table.filter(accounts::id.eq(upd.account_id)))
+                            .execute(self.conn())?;
+                    }
+                    StorageAccountDiff::ChangePubKey(upd) => {
+                        update(accounts::table.filter(accounts::id.eq(upd.account_id)))
+                            .set((
+                                accounts::last_block.eq(upd.block_number),
+                                accounts::nonce.eq(upd.new_nonce),
+                                accounts::pubkey_hash.eq(upd.new_pubkey_hash),
+                            ))
                             .execute(self.conn())?;
                     }
                 }
@@ -1360,11 +1447,15 @@ impl StorageProcessor {
     pub fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
         self.conn().transaction(|| {
             let (verif_block, mut accounts) = self.load_verified_state()?;
+            debug!(
+                "Verified state block: {}, accounts: {:#?}",
+                verif_block, accounts
+            );
 
             // Fetch updates from blocks: verif_block +/- 1, ... , block
             if let Some((block, state_diff)) = self.load_state_diff(verif_block, block)? {
                 debug!("Loaded state diff: {:#?}", state_diff);
-                apply_updates(&mut accounts, state_diff.clone());
+                apply_updates(&mut accounts, state_diff);
                 Ok((block, accounts))
             } else {
                 Ok((verif_block, accounts))
@@ -1374,15 +1465,12 @@ impl StorageProcessor {
 
     pub fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
         self.conn().transaction(|| {
+            let last_block = self.get_last_verified_block()?;
+
             let accounts: Vec<StorageAccount> = accounts::table.load(self.conn())?;
             let balances: Vec<Vec<StorageBalance>> = StorageBalance::belonging_to(&accounts)
                 .load(self.conn())?
                 .grouped_by(&accounts);
-            let last_block = accounts
-                .iter()
-                .map(|a| a.last_block as u32)
-                .max()
-                .unwrap_or(0);
 
             let account_map: AccountMap = accounts
                 .into_iter()
@@ -1437,6 +1525,13 @@ impl StorageProcessor {
                         .and(account_creates::block_number.le(&(i64::from(end_block)))),
                 )
                 .load::<StorageAccountCreation>(self.conn())?;
+            let account_pubkey_diff = account_pubkey_updates::table
+                .filter(
+                    account_pubkey_updates::block_number
+                        .gt(&(i64::from(start_block)))
+                        .and(account_pubkey_updates::block_number.le(&(i64::from(end_block)))),
+                )
+                .load::<StorageAccountPubkeyUpdate>(self.conn())?;
 
             debug!(
                 "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
@@ -1460,12 +1555,17 @@ impl StorageProcessor {
                         .into_iter()
                         .map(StorageAccountDiff::from),
                 );
+                account_diff.extend(
+                    account_pubkey_diff
+                        .into_iter()
+                        .map(StorageAccountDiff::from),
+                );
                 let last_block = account_diff
                     .iter()
                     .map(|acc| acc.block_number())
                     .max()
                     .unwrap_or(0);
-                account_diff.sort_by(|l, r| l.cmp_nonce(r));
+                account_diff.sort_by(StorageAccountDiff::cmp_order);
                 (
                     account_diff
                         .into_iter()
@@ -1787,12 +1887,9 @@ impl StorageProcessor {
     }
 
     // Verified, commited states.
-    pub fn account_state_by_address(
-        &self,
-        address: &AccountAddress,
-    ) -> QueryResult<StoredAccountState> {
+    pub fn account_state_by_address(&self, address: &Address) -> QueryResult<StoredAccountState> {
         let account_create_record = account_creates::table
-            .filter(account_creates::address.eq(address.data.to_vec()))
+            .filter(account_creates::address.eq(address.as_bytes().to_vec()))
             .filter(account_creates::is_create.eq(true))
             .order(account_creates::block_number.desc())
             .first::<StorageAccountCreation>(self.conn())
@@ -1898,7 +1995,7 @@ impl StorageProcessor {
                         .into_iter()
                         .map(StorageAccountDiff::from),
                 );
-                account_diff.sort_by(|l, r| l.cmp_nonce(r));
+                account_diff.sort_by(StorageAccountDiff::cmp_order);
                 account_diff
                     .into_iter()
                     .map(|upd| upd.into())
@@ -1944,7 +2041,7 @@ impl StorageProcessor {
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
-            .filter(action_type.eq(ACTION_COMMIT))
+            .filter(action_type.eq(&ActionType::COMMIT.to_string()))
             .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
@@ -1953,7 +2050,7 @@ impl StorageProcessor {
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
-            .filter(action_type.eq(ACTION_VERIFY))
+            .filter(action_type.eq(&ActionType::VERIFY.to_string()))
             .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
@@ -2271,34 +2368,52 @@ impl StorageProcessor {
 
 #[cfg(test)]
 /// This tests require empty DB setup and ignored by default
-/// use `franklin db-test-reset`/`franklin db-test` script to run them
+/// use `zksync db-test-no-reset`/`franklin db-test` script to run them
 mod test {
     use super::*;
     use diesel::Connection;
+    use models::primitives::u128_to_bigdecimal;
+    use crypto_exports::rand::prelude::*;
 
-    fn acc_create_updates(
-        id: u32,
-        balance: u32,
-        nonce: u32,
+    fn acc_create_random_updates<R: Rng>(
+        rng: &mut R,
     ) -> impl Iterator<Item = (u32, AccountUpdate)> {
-        let mut a = models::node::account::Account::default();
-        a.nonce = nonce;
-        let old_balance = a.get_balance(0).clone();
-        a.set_balance(0, BigDecimal::from(balance));
-        let new_balance = a.get_balance(0).clone();
+        let id: u32 = rng.gen();
+        let balance: u128 = rng.gen();
+        let nonce: u32 = rng.gen();
+        let pub_key_hash = PubKeyHash { data: rng.gen() };
+        let address: Address = rng.gen::<[u8; 20]>().into();
+
+        let mut a = models::node::account::Account::default_with_address(&address);
+        let old_nonce = nonce;
+        a.nonce = old_nonce + 2;
+        a.pub_key_hash = pub_key_hash;
+
+        let old_balance = a.get_balance(0);
+        a.set_balance(0, u128_to_bigdecimal(balance));
+        let new_balance = a.get_balance(0);
         vec![
             (
                 id,
                 AccountUpdate::Create {
-                    nonce: a.nonce,
+                    nonce: old_nonce,
                     address: a.address,
                 },
             ),
             (
                 id,
+                AccountUpdate::ChangePubKeyHash {
+                    old_nonce,
+                    old_pub_key_hash: PubKeyHash::default(),
+                    new_nonce: old_nonce + 1,
+                    new_pub_key_hash: a.pub_key_hash,
+                },
+            ),
+            (
+                id,
                 AccountUpdate::UpdateBalance {
-                    old_nonce: a.nonce,
-                    new_nonce: a.nonce,
+                    old_nonce: old_nonce + 1,
+                    new_nonce: old_nonce + 2,
                     balance_update: (0, old_balance, new_balance),
                 },
             ),
@@ -2314,6 +2429,8 @@ mod test {
     fn test_commit_rewind() {
         let _ = env_logger::try_init();
 
+        let mut rng = StdRng::seed_from_u64(0x1234);
+
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();
         conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
@@ -2322,9 +2439,9 @@ mod test {
             let mut accounts = AccountMap::default();
             let updates = {
                 let mut updates = Vec::new();
-                updates.extend(acc_create_updates(1, 1, 2));
-                updates.extend(acc_create_updates(2, 2, 4));
-                updates.extend(acc_create_updates(3, 3, 8));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
                 updates
             };
             apply_updates(&mut accounts, updates.clone());
@@ -2335,9 +2452,9 @@ mod test {
             let mut accounts = accounts_block_1.clone();
             let updates = {
                 let mut updates = Vec::new();
-                updates.extend(acc_create_updates(4, 1, 2));
-                updates.extend(acc_create_updates(5, 2, 4));
-                updates.extend(acc_create_updates(6, 3, 8));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
                 updates
             };
             apply_updates(&mut accounts, updates.clone());
@@ -2347,53 +2464,82 @@ mod test {
             let mut accounts = accounts_block_2.clone();
             let updates = {
                 let mut updates = Vec::new();
-                updates.extend(acc_create_updates(7, 1, 2));
-                updates.extend(acc_create_updates(8, 2, 4));
-                updates.extend(acc_create_updates(9, 3, 8));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
+                updates.extend(acc_create_random_updates(&mut rng));
                 updates
             };
             apply_updates(&mut accounts, updates.clone());
             (accounts, updates)
         };
 
-        conn.commit_state_update(1, &updates_block_1).unwrap();
-        conn.commit_state_update(2, &updates_block_2).unwrap();
-        conn.commit_state_update(3, &updates_block_3).unwrap();
+        let get_operation = |block_number, action, accounts_updated| -> Operation {
+            Operation {
+                id: None,
+                action,
+                block: Block {
+                    block_number,
+                    new_root_hash: Fr::default(),
+                    fee_account: 0,
+                    block_transactions: Vec::new(),
+                    processed_priority_ops: (0, 0),
+                },
+                accounts_updated,
+            }
+        };
+
+        conn.execute_operation(&get_operation(1, Action::Commit, updates_block_1))
+            .expect("Commit block 1");
+        conn.execute_operation(&get_operation(2, Action::Commit, updates_block_2))
+            .expect("Commit block 2");
+        conn.execute_operation(&get_operation(3, Action::Commit, updates_block_3))
+            .expect("Commit block 3");
 
         let (block, state) = conn.load_committed_state(Some(1)).unwrap();
-        assert_eq!(block, 1);
-        assert_eq!(state, accounts_block_1);
+        assert_eq!((block, &state), (1, &accounts_block_1));
 
         let (block, state) = conn.load_committed_state(Some(2)).unwrap();
-        assert_eq!(block, 2);
-        assert_eq!(state, accounts_block_2);
+        assert_eq!((block, &state), (2, &accounts_block_2));
 
         let (block, state) = conn.load_committed_state(Some(3)).unwrap();
-        assert_eq!(block, 3);
-        assert_eq!(state, accounts_block_3);
+        assert_eq!((block, &state), (3, &accounts_block_3));
 
-        conn.apply_state_update(1).unwrap();
-        conn.apply_state_update(2).unwrap();
+        conn.store_proof(1, &Default::default())
+            .expect("Store proof block 1");
+        conn.execute_operation(&get_operation(
+            1,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            Vec::new(),
+        ))
+        .expect("Verify block 1");
+        conn.store_proof(2, &Default::default())
+            .expect("Store proof block 2");
+        conn.execute_operation(&get_operation(
+            2,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            Vec::new(),
+        ))
+        .expect("Verify block 2");
 
         let (block, state) = conn.load_committed_state(Some(1)).unwrap();
-        assert_eq!(block, 1);
-        assert_eq!(state, accounts_block_1);
+        assert_eq!((block, &state), (1, &accounts_block_1));
 
         let (block, state) = conn.load_committed_state(Some(2)).unwrap();
-        assert_eq!(block, 2);
-        assert_eq!(state, accounts_block_2);
+        assert_eq!((block, &state), (2, &accounts_block_2));
 
         let (block, state) = conn.load_committed_state(Some(3)).unwrap();
-        assert_eq!(block, 3);
-        assert_eq!(state, accounts_block_3);
+        assert_eq!((block, &state), (3, &accounts_block_3));
 
         let (block, state) = conn.load_committed_state(None).unwrap();
-        assert_eq!(block, 3);
-        assert_eq!(state, accounts_block_3);
+        assert_eq!((block, &state), (3, &accounts_block_3));
     }
 
     #[test]
-    #[cfg_attr(not(feature = "db_test"), ignore)]
+    #[ignore]
     // TODO: Implement
     fn test_eth_sender_storage() {}
 
@@ -2411,45 +2557,5 @@ mod test {
 
         let loaded = conn.load_proof(1).expect("must load proof");
         assert_eq!(loaded, proof);
-    }
-
-    #[test]
-    #[cfg_attr(not(feature = "db_test"), ignore)]
-    fn test_store_proof_reqs() {
-        let pool = ConnectionPool::new();
-        let conn = pool.access_storage().unwrap();
-        conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
-
-        conn.execute_operation(&dummy_op(Action::Commit, 1))
-            .unwrap();
-
-        let pending = conn.load_unverified_commits().unwrap();
-        assert_eq!(pending.len(), 1);
-
-        conn.execute_operation(&dummy_op(
-            Action::Verify {
-                proof: Box::new(EncodedProof::default()),
-            },
-            1,
-        ))
-        .unwrap();
-
-        let pending = conn.load_unverified_commits().unwrap();
-        assert_eq!(pending.len(), 0);
-    }
-
-    fn dummy_op(action: Action, block_number: BlockNumber) -> Operation {
-        Operation {
-            id: None,
-            action,
-            block: Block {
-                block_number,
-                new_root_hash: Fr::default(),
-                fee_account: 0,
-                block_transactions: Vec::new(),
-                processed_priority_ops: (0, 0),
-            },
-            accounts_updated: AccountUpdates::default(),
-        }
     }
 }

@@ -97,23 +97,20 @@ impl RollupOpsBlock {
 mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use bigdecimal::BigDecimal;
-    use models::node::tx::TxSignature;
+    use models::node::operations::ChangePubKeyOp;
+    use models::node::tx::{ChangePubKey, TxSignature};
     use models::node::{
-        AccountAddress, Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp,
-        Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
-    };
-    use models::params::{
-        SIGNATURE_R_BIT_WIDTH_PADDED, SIGNATURE_S_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED,
+        Close, CloseOp, Deposit, DepositOp, FranklinOp, FullExit, FullExitOp, PubKeyHash, Transfer,
+        TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
 
     #[test]
     fn test_deposit() {
         let priority_op = Deposit {
-            sender: [9u8; 20].into(),
+            from: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(10),
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
+            to: "7777777777777777777777777777777777777777".parse().unwrap(),
         };
         let op1 = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op,
@@ -131,9 +128,8 @@ mod test {
     #[test]
     fn test_part_exit() {
         let tx = Withdraw {
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
-            eth_address: [9u8; 20].into(),
+            from: "7777777777777777777777777777777777777777".parse().unwrap(),
+            to: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(10),
@@ -152,17 +148,10 @@ mod test {
 
     #[test]
     fn test_successfull_full_exit() {
-        let packed_pubkey = Box::new([7u8; SUBTREE_HASH_WIDTH_PADDED / 8]);
-        let signature_r = Box::new([8u8; SIGNATURE_R_BIT_WIDTH_PADDED / 8]);
-        let signature_s = Box::new([9u8; SIGNATURE_S_BIT_WIDTH_PADDED / 8]);
         let priority_op = FullExit {
             account_id: 11,
-            packed_pubkey,
             eth_address: [9u8; 20].into(),
             token: 1,
-            nonce: 3,
-            signature_r,
-            signature_s,
         };
         let op1 = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
@@ -179,17 +168,10 @@ mod test {
 
     #[test]
     fn test_failed_full_exit() {
-        let packed_pubkey = Box::new([7u8; SUBTREE_HASH_WIDTH_PADDED / 8]);
-        let signature_r = Box::new([8u8; SIGNATURE_R_BIT_WIDTH_PADDED / 8]);
-        let signature_s = Box::new([9u8; SIGNATURE_S_BIT_WIDTH_PADDED / 8]);
         let priority_op = FullExit {
             account_id: 11,
-            packed_pubkey,
             eth_address: [9u8; 20].into(),
             token: 1,
-            nonce: 3,
-            signature_r,
-            signature_s,
         };
         let op1 = FranklinOp::FullExit(Box::new(FullExitOp {
             priority_op,
@@ -207,9 +189,8 @@ mod test {
     #[test]
     fn test_transfer_to_new() {
         let tx = Transfer {
-            from: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
-            to: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
+            from: "7777777777777777777777777777777777777777".parse().unwrap(),
+            to: "8888888888888888888888888888888888888888".parse().unwrap(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(10),
@@ -233,9 +214,8 @@ mod test {
     #[test]
     fn test_transfer() {
         let tx = Transfer {
-            from: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
-            to: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888").unwrap(),
+            from: "7777777777777777777777777777777777777777".parse().unwrap(),
+            to: "8888888888888888888888888888888888888888".parse().unwrap(),
             token: 1,
             amount: BigDecimal::from(20),
             fee: BigDecimal::from(10),
@@ -259,12 +239,30 @@ mod test {
     #[test]
     fn test_close() {
         let tx = Close {
-            account: AccountAddress::from_hex("sync:7777777777777777777777777777777777777777")
-                .unwrap(),
+            account: "7777777777777777777777777777777777777777".parse().unwrap(),
             nonce: 3,
             signature: TxSignature::default(),
         };
         let op1 = FranklinOp::Close(Box::new(CloseOp { tx, account_id: 11 }));
+        let pub_data1 = op1.public_data();
+        let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
+            .expect("cant get ops from data")
+            .pop()
+            .expect("empty ops array");
+        let pub_data2 = op2.public_data();
+        assert_eq!(pub_data1, pub_data2);
+    }
+
+    #[test]
+    fn test_change_pubkey_offchain() {
+        let tx = ChangePubKey {
+            account: "7777777777777777777777777777777777777777".parse().unwrap(),
+            new_pk_hash: PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")
+                .unwrap(),
+            nonce: 3,
+            eth_signature: None,
+        };
+        let op1 = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp { tx, account_id: 11 }));
         let pub_data1 = op1.public_data();
         let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
             .expect("cant get ops from data")

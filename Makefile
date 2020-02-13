@@ -1,7 +1,7 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
-export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(ZKSYNC_ENV)
-export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(ZKSYNC_ENV)
-export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(ZKSYNC_ENV)
+export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
+export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
+export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
@@ -17,6 +17,7 @@ init:
 yarn:
 	@cd js/client && yarn
 	@cd js/explorer && yarn
+	@cd js/zksync.js && yarn
 	@cd contracts && yarn
 	@cd js/tests && yarn
 
@@ -33,10 +34,10 @@ confirm_action:
 sql = psql "$(DATABASE_URL)" -c 
 
 db-test:
-	@bin/db-test
+	@bin/db-test.sh reset
 
-db-test-reset:
-	@bin/db-test reset
+db-test-no-reset:
+	@bin/db-test.sh no-reset
 
 db-setup:
 	@bin/db-setup
@@ -157,17 +158,10 @@ flatten: prepare-contracts
 	$(call flatten_file,Verifier.sol)
 
 gen-keys-if-not-present:
-	# TODO: change compile-time contract reads in abi.rs
-	@mkdir -p contracts/build
-	@touch contracts/build/Franklin.json
-	@touch contracts/build/Governance.json
-	@touch contracts/build/PriorityQueue.json
-	@touch contracts/build/IERC20.json
-	
-	test -f keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
+	test -f ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
 
 prepare-contracts:
-	@cp keys/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 
@@ -187,7 +181,10 @@ price:
 	@node contracts/scripts/check-price.js
 
 circuit-tests:
-	cargo test --no-fail-fast --release -p circuit -- --ignored
+	cargo test --no-fail-fast --release -p circuit -- --ignored --test-threads 1
+
+prover-tests:
+	f cargo test -p prover --release -- --ignored
 
 # Loadtest
 

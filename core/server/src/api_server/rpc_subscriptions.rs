@@ -13,11 +13,11 @@ use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
 use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
-use models::node::AccountAddress;
 use models::{ActionType, Operation};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use storage::ConnectionPool;
+use web3::types::Address;
 
 #[rpc]
 pub trait RpcPubSub {
@@ -68,7 +68,7 @@ pub trait RpcPubSub {
         &self,
         meta: Self::Metadata,
         subscriber: Subscriber<ResponseAccountState>,
-        addr: AccountAddress,
+        addr: Address,
         action_type: ActionType,
     );
     #[pubsub(subscription = "account", unsubscribe, name = "account_unsubscribe")]
@@ -143,7 +143,7 @@ impl RpcPubSub for RpcSubApp {
         &self,
         _meta: Self::Metadata,
         subscriber: Subscriber<ResponseAccountState>,
-        address: AccountAddress,
+        address: Address,
         action: ActionType,
     ) {
         self.event_sub_sender
@@ -202,7 +202,7 @@ pub fn start_ws_server(
         op_recv,
         event_sub_receiver,
         executed_tx_receiver,
-        state_keeper_request_sender.clone(),
+        state_keeper_request_sender,
         panic_notify.clone(),
     );
 

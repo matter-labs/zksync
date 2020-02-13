@@ -60,15 +60,15 @@ pub const SUBTREE_HASH_WIDTH_PADDED: usize = 256;
 pub const BALANCE_BIT_WIDTH: usize = 128;
 
 pub const NEW_PUBKEY_HASH_WIDTH: usize = FR_ADDRESS_LEN * 8;
+pub const ADDRESS_WIDTH: usize = FR_ADDRESS_LEN * 8;
 /// Nonce bit width
 pub const NONCE_BIT_WIDTH: usize = 32;
-//
 //
 pub const CHUNK_BIT_WIDTH: usize = 64;
 
 pub const MAX_CIRCUIT_PEDERSEN_HASH_BITS: usize = 736;
 
-pub const ETHEREUM_KEY_BIT_WIDTH: usize = 160;
+pub const ETH_ADDRESS_BIT_WIDTH: usize = 160;
 /// Block number bit width
 pub const BLOCK_NUMBER_BIT_WIDTH: usize = 32;
 

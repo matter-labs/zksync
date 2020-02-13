@@ -6,7 +6,7 @@ use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::circuit::test::TestConstraintSystem;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
-use models::node::{Account, AccountAddress, AccountId, BlockNumber, Engine, Fr};
+use models::node::{Account, AccountId, Address, BlockNumber, Engine, Fr};
 use models::primitives::big_decimal_to_u128;
 use plasma::state::{CollectedFee, PlasmaState};
 
@@ -162,7 +162,7 @@ pub fn test_genesis_plasma_state(
     let fee_account_id = 0;
     let validator_account = vec![(
         fee_account_id,
-        Account::default_with_address(&AccountAddress::default()),
+        Account::default_with_address(&Address::default()),
     )]
     .into_iter()
     .chain(accounts.into_iter())

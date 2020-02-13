@@ -14,8 +14,8 @@ pub mod serialization;
 
 // TODO: refactor, find new home for all this stuff
 
-use crypto_exports::franklin_crypto;
-use crypto_exports::rand;
+pub use crypto_exports::franklin_crypto;
+pub use crypto_exports::rand;
 
 use crate::node::block::Block;
 use crate::node::AccountUpdates;

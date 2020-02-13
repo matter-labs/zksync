@@ -28,10 +28,15 @@ export class Client {
         const tokensPromise = syncProvider.getTokens()
             .then(tokens => {
                 return Object.values(tokens)
-                    .map(token => ({
-                        ...token,
-                        symbol: token.symbol || `${token.id.toString().padStart(3, '0')}`,
-                    }))
+                    .map(token => {
+                        const symbol = token.symbol || `${token.id.toString().padStart(3, '0')}`;
+                        const syncSymbol = `zk${symbol}`;
+                        return {
+                            ...token,
+                            symbol,
+                            syncSymbol,
+                        };
+                    })
                     .sort((a, b) => a.id - b.id);
             });
         
@@ -116,12 +121,12 @@ export class Client {
                 return { 
                     tokenId,
                     balance: readableEther(balance),
-                    tokenName: tokensInfoList[tokenId].symbol,
+                    tokenName: tokensInfoList[tokenId].syncSymbol,
                 };
             });
     }
     async tokenNameFromId(tokenId) {
-        return (await this.tokensPromise)[tokenId].symbol;
+        return (await this.tokensPromise)[tokenId].syncSymbol;
     }
 
     async transactionsAsRenderableList(address, offset, limit) {
