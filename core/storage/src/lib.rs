@@ -49,6 +49,9 @@ use itertools::Itertools;
 use models::node::AccountAddress;
 use std::collections::HashMap;
 
+use crypto_exports::franklin_crypto;
+use crypto_exports::rand;
+
 #[derive(Clone)]
 pub struct ConnectionPool {
     pool: Pool<ConnectionManager<PgConnection>>,

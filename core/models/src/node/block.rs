@@ -3,7 +3,7 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::params::block_size_chunks;
-use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
+use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use web3::types::H256;
 use crate::serialization::*;
 

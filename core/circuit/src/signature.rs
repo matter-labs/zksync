@@ -2,15 +2,15 @@ use crate::allocated_structures::*;
 use crate::element::{CircuitElement, CircuitPubkey};
 use crate::operation::SignatureData;
 use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
-use franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-use franklin_crypto::bellman::pairing::ff::PrimeField;
-use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
-use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
-use franklin_crypto::circuit::ecc;
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
+use crate::franklin_crypto::circuit::baby_eddsa::EddsaSignature;
+use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
+use crate::franklin_crypto::circuit::ecc;
 
-use franklin_crypto::circuit::expression::Expression;
-use franklin_crypto::circuit::pedersen_hash;
-use franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::circuit::expression::Expression;
+use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::params as franklin_constants;
 
 pub struct AllocatedSignatureData<E: JubjubEngine> {

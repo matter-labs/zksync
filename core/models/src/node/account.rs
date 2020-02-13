@@ -6,7 +6,7 @@ use std::convert::TryInto;
 
 use bigdecimal::BigDecimal;
 use failure::ensure;
-use franklin_crypto::bellman::pairing::ff::PrimeField;
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::Engine;
@@ -17,8 +17,8 @@ use crate::circuit::utils::pub_key_hash_bytes;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::node::PrivateKey;
 use crate::params::JUBJUB_PARAMS;
-use franklin_crypto::eddsa::PublicKey;
-use franklin_crypto::jubjub::FixedGenerators;
+use crate::franklin_crypto::eddsa::PublicKey;
+use crate::franklin_crypto::jubjub::FixedGenerators;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct AccountAddress {

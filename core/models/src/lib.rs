@@ -14,6 +14,9 @@ pub mod serialization;
 
 // TODO: refactor, find new home for all this stuff
 
+use crypto_exports::franklin_crypto;
+use crypto_exports::rand;
+
 use crate::node::block::Block;
 use crate::node::AccountUpdates;
 use crate::node::BlockNumber;
@@ -24,7 +27,7 @@ use std::convert::TryFrom;
 use web3::types::{Address, Log, U256};
 
 pub fn to_hex<F: franklin_crypto::bellman::pairing::ff::PrimeField>(value: &F) -> String {
-    use franklin_crypto::bellman::pairing::ff::PrimeFieldRepr;
+    use crate::franklin_crypto::bellman::pairing::ff::PrimeFieldRepr;
 
     let mut buf: Vec<u8> = vec![];
     value.into_repr().write_be(&mut buf).unwrap();
@@ -32,7 +35,7 @@ pub fn to_hex<F: franklin_crypto::bellman::pairing::ff::PrimeField>(value: &F) -
 }
 
 pub fn from_hex<F: franklin_crypto::bellman::pairing::ff::PrimeField>(value: &str) -> Result<F, String> {
-    use franklin_crypto::bellman::pairing::ff::PrimeFieldRepr;
+    use crate::franklin_crypto::bellman::pairing::ff::PrimeFieldRepr;
     
     let value = if value.starts_with("0x") { &value[2..] } else { value };
     if value.len() % 2 != 0 {return Err(format!("hex length must be even for full byte encoding: {}", value))}

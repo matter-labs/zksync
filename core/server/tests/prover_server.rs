@@ -2,7 +2,7 @@
 use std::str::FromStr;
 use std::{net, thread, time};
 // External deps
-use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use futures::channel::mpsc;
 // Workspace deps
 use prover::client;

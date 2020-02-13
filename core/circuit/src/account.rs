@@ -1,7 +1,7 @@
 // External deps
-use franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-use franklin_crypto::circuit::Assignment;
-use franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
+use crate::franklin_crypto::circuit::Assignment;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 // Workspace deps
 use crate::element::CircuitElement;
 

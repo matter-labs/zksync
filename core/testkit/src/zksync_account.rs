@@ -1,5 +1,5 @@
 use bigdecimal::BigDecimal;
-use franklin_crypto::jubjub::FixedGenerators;
+use crate::franklin_crypto::jubjub::FixedGenerators;
 use models::node::tx::{PackedPublicKey, TxSignature};
 use models::node::{
     priv_key_from_fs, AccountAddress, AccountId, FullExit, Nonce, PrivateKey, PublicKey, TokenId,

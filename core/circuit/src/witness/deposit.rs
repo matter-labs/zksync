@@ -2,13 +2,13 @@ use super::utils::*;
 
 use crate::operation::SignatureData;
 use crate::operation::*;
-use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-use franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::DepositOp;
 use models::params as franklin_constants;
-use franklin_crypto::bellman::pairing::bn256::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 
 pub struct DepositData {
     pub amount: u128,
@@ -303,10 +303,10 @@ mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
-    use franklin_crypto::bellman::pairing::ff::Field;
+    use crate::franklin_crypto::bellman::pairing::ff::Field;
     use models::node::{Account, AccountAddress, Address, Deposit};
-    use franklin_crypto::bellman::plonk::polynomials::Polynomial;
-    use franklin_crypto::bellman::plonk::commitments::transcript::Blake2sTranscript;
+    use crate::franklin_crypto::bellman::plonk::polynomials::Polynomial;
+    use crate::franklin_crypto::bellman::plonk::commitments::transcript::Blake2sTranscript;
 
     #[test]
     #[ignore]
@@ -457,12 +457,12 @@ mod test {
             "root hash in state keeper and witness generation code mismatch"
         );
 
-        use franklin_crypto::bellman::plonk::adaptor::alternative::*;
-        use franklin_crypto::bellman::plonk::plonk::generator::*;
-        use franklin_crypto::bellman::plonk::plonk::prover::*;
-        use franklin_crypto::bellman::pairing::bn256::Bn256;
+        use crate::franklin_crypto::bellman::plonk::adaptor::alternative::*;
+        use crate::franklin_crypto::bellman::plonk::plonk::generator::*;
+        use crate::franklin_crypto::bellman::plonk::plonk::prover::*;
+        use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 
-        use franklin_crypto::bellman::Circuit;
+        use crate::franklin_crypto::bellman::Circuit;
 
         let mut transpiler = Transpiler::new();
 
@@ -474,7 +474,7 @@ mod test {
     
         let hints = transpiler.into_hints();
 
-        use franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
+        use crate::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
 
         let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
 
@@ -545,12 +545,12 @@ mod test {
             "root hash in state keeper and witness generation code mismatch"
         );
 
-        use franklin_crypto::bellman::plonk::better_cs::adaptor::*;
-        use franklin_crypto::bellman::plonk::better_cs::test_assembly::*;
-        use franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
-        use franklin_crypto::bellman::pairing::bn256::Bn256;
+        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
+        use crate::franklin_crypto::bellman::plonk::better_cs::test_assembly::*;
+        use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
+        use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 
-        use franklin_crypto::bellman::Circuit;
+        use crate::franklin_crypto::bellman::Circuit;
 
         let mut transpiler = Transpiler::new();
 
@@ -574,27 +574,27 @@ mod test {
         assert!(assembly.is_satisfied(false));
     }
 
-    // use franklin_crypto::bellman::plonk::cs::*;
-    // use franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::BitReversedOmegas;
-    // use franklin_crypto::bellman::SynthesisError;
-    // use franklin_crypto::bellman::plonk::*;
-    // use franklin_crypto::bellman::plonk::plonk::generator::*;
+    // use crate::franklin_crypto::bellman::plonk::cs::*;
+    // use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::BitReversedOmegas;
+    // use crate::franklin_crypto::bellman::SynthesisError;
+    // use crate::franklin_crypto::bellman::plonk::*;
+    // use crate::franklin_crypto::bellman::plonk::plonk::generator::*;
 
-    // use franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
-    // use franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::CTPrecomputations;
-    // use franklin_crypto::bellman::plonk::commitments::transparent::fri::coset_combining_fri::precomputation::*;
+    // use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
+    // use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::CTPrecomputations;
+    // use crate::franklin_crypto::bellman::plonk::commitments::transparent::fri::coset_combining_fri::precomputation::*;
 
-    // use franklin_crypto::bellman::pairing::ff::{PrimeField};
+    // use crate::franklin_crypto::bellman::pairing::ff::{PrimeField};
 
-    // use franklin_crypto::bellman::plonk::adaptor::alternative::*;
-    // use franklin_crypto::bellman::plonk::plonk::generator::*;
-    // use franklin_crypto::bellman::plonk::plonk::prover::*;
-    // use franklin_crypto::bellman::pairing::bn256::Bn256;
-    // use franklin_crypto::bellman::pairing::Engine;
+    // use crate::franklin_crypto::bellman::plonk::adaptor::alternative::*;
+    // use crate::franklin_crypto::bellman::plonk::plonk::generator::*;
+    // use crate::franklin_crypto::bellman::plonk::plonk::prover::*;
+    // use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
+    // use crate::franklin_crypto::bellman::pairing::Engine;
 
-    // use franklin_crypto::bellman::Circuit;
+    // use crate::franklin_crypto::bellman::Circuit;
 
-    // use franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
+    // use crate::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
     // use models::params;
 
     // use crate::witness;
@@ -603,11 +603,11 @@ mod test {
     // #[test]
     // #[ignore]
     // fn test_deposit_franklin_existing_account_1() {
-    //     use franklin_crypto::bellman::pairing::Engine;
-    //     use franklin_crypto::bellman::pairing::{CurveProjective, CurveAffine};
-    //     use franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
-    //     use franklin_crypto::bellman::plonk::utils::*;
-    //     use franklin_crypto::bellman::multicore::Worker;
+    //     use crate::franklin_crypto::bellman::pairing::Engine;
+    //     use crate::franklin_crypto::bellman::pairing::{CurveProjective, CurveAffine};
+    //     use crate::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
+    //     use crate::franklin_crypto::bellman::plonk::utils::*;
+    //     use crate::franklin_crypto::bellman::multicore::Worker;
     //     // use crate::plonk::tester::*;
 
 
@@ -650,13 +650,13 @@ mod test {
 
     //     use rand::{Rng, SeedableRng, XorShiftRng};
     //     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-    //     use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+    //     use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
     //     let params = &AltJubjubBn256::new();
     //     for _ in 0..params::block_size_chunks() - DepositOp::CHUNKS{
     //         println!("add nooop");
 
     //         let validator_address_number = 0;
-    //         use franklin_crypto::eddsa::{PrivateKey, PublicKey};
+    //         use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey};
 
     //         use models::merkle_tree::PedersenHasher;
     //         let sender_sk = PrivateKey::<Bn256>(rng.gen());
@@ -691,11 +691,11 @@ mod test {
     //         "root hash in state keeper and witness generation code mismatch"
     //     );
 
-    //     use franklin_crypto::bellman::plonk::adaptor::alternative::*;
-    //     use franklin_crypto::bellman::plonk::plonk::generator::*;
-    //     use franklin_crypto::bellman::plonk::plonk::prover::*;
+    //     use crate::franklin_crypto::bellman::plonk::adaptor::alternative::*;
+    //     use crate::franklin_crypto::bellman::plonk::plonk::generator::*;
+    //     use crate::franklin_crypto::bellman::plonk::plonk::prover::*;
 
-    //     use franklin_crypto::bellman::Circuit;
+    //     use crate::franklin_crypto::bellman::Circuit;
 
     //     let mut transpiler = Transpiler::new();
 
@@ -709,7 +709,7 @@ mod test {
 
     //     println!("hints size : {}", hints.len());
 
-    //     use franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
+    //     use crate::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
 
     //     let adapted_curcuit1 = AdaptorCircuit::new(c.clone(), &hints);
     //     let adapted_curcuit2 = AdaptorCircuit::new(c.clone(), &hints);
@@ -731,8 +731,8 @@ mod test {
     //     type Transcr = Blake2sTranscript<Fr>;
     //     type Eng = Bn256;
 
-    //     use franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
-    //     use franklin_crypto::bellman::plonk::commitments::transparent::fri::coset_combining_fri::precomputation::*;
+    //     use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
+    //     use crate::franklin_crypto::bellman::plonk::commitments::transparent::fri::coset_combining_fri::precomputation::*;
 
     //     let mut sizes: Vec<usize> = vec![gates];
 
@@ -742,7 +742,7 @@ mod test {
 
     //     println!("Making bases");
     //     let bases = {
-    //         use franklin_crypto::bellman::pairing::Wnaf;
+    //         use crate::franklin_crypto::bellman::pairing::Wnaf;
     //         let tau = Fr::from_str("42").unwrap();
     //         let powers_of_tau = vec![Fr::one(); max_size.next_power_of_two()];
     //         let mut powers_of_tau = Polynomial::<Fr, _>::from_coeffs(powers_of_tau).unwrap();
@@ -817,7 +817,7 @@ mod test {
 
     //     // start work for groth16
 
-    //     use franklin_crypto::bellman::groth16::{
+    //     use crate::franklin_crypto::bellman::groth16::{
     //         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof
     //     };
 

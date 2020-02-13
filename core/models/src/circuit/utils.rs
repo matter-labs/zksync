@@ -1,10 +1,10 @@
 use crate::params;
 
-use franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField};
-use franklin_crypto::alt_babyjubjub::JubjubEngine;
+use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField};
+use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
 
 use crate::merkle_tree::hasher::Hasher;
-use franklin_crypto::eddsa::PublicKey;
+use crate::franklin_crypto::eddsa::PublicKey;
 
 fn pub_key_hash_bits<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,

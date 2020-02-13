@@ -7,18 +7,18 @@ use crate::signature::*;
 use crate::utils::{
     allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element, reverse_bytes,
 };
-use franklin_crypto::bellman::{Circuit, ConstraintSystem, SynthesisError};
-use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-use franklin_crypto::circuit::boolean::Boolean;
-use franklin_crypto::circuit::ecc;
-use franklin_crypto::circuit::sha256;
+use crate::franklin_crypto::bellman::{Circuit, ConstraintSystem, SynthesisError};
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::circuit::boolean::Boolean;
+use crate::franklin_crypto::circuit::ecc;
+use crate::franklin_crypto::circuit::sha256;
 
-use franklin_crypto::circuit::expression::Expression;
-use franklin_crypto::circuit::num::AllocatedNum;
-use franklin_crypto::circuit::pedersen_hash;
-use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
-use franklin_crypto::circuit::Assignment;
-use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+use crate::franklin_crypto::circuit::expression::Expression;
+use crate::franklin_crypto::circuit::num::AllocatedNum;
+use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
+use crate::franklin_crypto::circuit::Assignment;
+use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use models::params as franklin_constants;
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 7;
@@ -648,7 +648,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "balance-fee bits"),
             franklin_constants::BALANCE_BIT_WIDTH
         )?;
-        // diff_a_b_bits.truncate(franklin_constants::BALANCE_BIT_WIDTH); //TODO: can be made inside helpers
+
         let diff_a_b_bits_repacked = Expression::from_le_bits::<CS>(&diff_a_b_bits);
 
         let is_a_geq_b = Boolean::from(Expression::equals(
@@ -1973,7 +1973,7 @@ fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintS
 }
 
 fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
-    use franklin_crypto::interpolation::interpolate;
+    use crate::franklin_crypto::interpolation::interpolate;
 
     let mut points: Vec<(E::Fr, E::Fr)> = vec![];
     for i in &[0, 4] {

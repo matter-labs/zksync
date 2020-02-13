@@ -13,12 +13,12 @@ use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
 use ethsign::Signature as ETHSignature;
 use failure::{ensure, format_err};
-use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use franklin_crypto::alt_babyjubjub::fs::FsRepr;
-use franklin_crypto::alt_babyjubjub::JubjubEngine;
-use franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
-use franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
-use franklin_crypto::jubjub::FixedGenerators;
+use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
+use crate::franklin_crypto::alt_babyjubjub::fs::FsRepr;
+use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
+use crate::franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
+use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Signature};
+use crate::franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
 use std::str::FromStr;
@@ -332,7 +332,7 @@ impl TxSignature {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let signature = pk.musig_pedersen_sign(
             &hashed_msg,
-            &mut rand::thread_rng(),
+            &mut crate::rand::thread_rng(),
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );
@@ -351,7 +351,7 @@ impl TxSignature {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let signature = pk.musig_sha256_sign(
             &hashed_msg,
-            &mut rand::thread_rng(),
+            &mut crate::rand::thread_rng(),
             FixedGenerators::SpendingKeyGenerator,
             &JUBJUB_PARAMS,
         );
@@ -556,7 +556,7 @@ impl<'de> Deserialize<'de> for PackedEthSignature {
 #[cfg(test)]
 mod test {
     use super::*;
-    use rand::{Rng, SeedableRng, XorShiftRng};
+    use crate::rand::{Rng, SeedableRng, XorShiftRng};
 
     fn gen_pk_and_msg() -> (PrivateKey<Engine>, Vec<Vec<u8>>) {
         let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);

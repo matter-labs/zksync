@@ -1,12 +1,12 @@
 use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
-use franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-use franklin_crypto::circuit::boolean::Boolean;
-use franklin_crypto::bellman::pairing::ff::PrimeField;
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
+use crate::franklin_crypto::circuit::boolean::Boolean;
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 
-use franklin_crypto::circuit::expression::Expression;
-use franklin_crypto::circuit::num::AllocatedNum;
-use franklin_crypto::circuit::pedersen_hash;
-use franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::circuit::expression::Expression;
+use crate::franklin_crypto::circuit::num::AllocatedNum;
+use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::params as franklin_constants;
 
 #[derive(Clone)]

@@ -27,6 +27,9 @@ use web3::transports::Http;
 use web3::types::{Address, U64};
 use web3::Transport;
 
+use crypto_exports::franklin_crypto;
+use crypto_exports::rand;
+
 pub mod eth_account;
 pub mod external_commands;
 pub mod zksync_account;

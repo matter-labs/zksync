@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{env, fs, io, path, thread, time};
 // External deps
-use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 // Workspace deps
 use prover;
 use testhelper::TestAccount;

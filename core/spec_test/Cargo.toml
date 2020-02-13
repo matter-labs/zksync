@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 models = { path = "../models", version = "0.0.1" }
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
+crypto_exports = {path = "../crypto_exports"}
 
 log = "0.4"
 env_logger = "0.6"

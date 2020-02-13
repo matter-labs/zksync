@@ -1,4 +1,7 @@
-use rand::Rng;
+use crypto_exports::franklin_crypto;
+use crypto_exports::rand;
+
+use crate::rand::Rng;
 
 /// TestAccount is an account with random generated keys and address.
 pub struct TestAccount {

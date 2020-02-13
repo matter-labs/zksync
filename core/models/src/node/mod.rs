@@ -2,11 +2,11 @@ use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use super::params;
 use super::primitives::{pack_as_float, u128_to_bigdecimal, unpack_float};
 use bigdecimal::BigDecimal;
-use franklin_crypto::{
+use crate::franklin_crypto::{
     eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
     jubjub::JubjubEngine,
 };
-use franklin_crypto::bellman::pairing::bn256;
+use crate::franklin_crypto::bellman::pairing::bn256;
 
 pub mod account;
 pub mod block;

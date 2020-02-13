@@ -5,6 +5,9 @@ use models::node::AccountAddress;
 use models::node::FullExit;
 use serde::{Deserialize, Serialize};
 
+use crypto_exports::franklin_crypto;
+use crypto_exports::rand;
+
 #[derive(Deserialize)]
 struct PubkeyPoint {
     pub_key: PackedPublicKey,

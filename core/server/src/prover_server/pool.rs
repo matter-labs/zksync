@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::{thread, time};
 // External
-use franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use log::info;
 // Workspace deps
 use circuit::operation::SignatureData;

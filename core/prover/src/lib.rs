@@ -6,11 +6,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::{fmt, thread, time};
 // External deps
-use franklin_crypto::bellman::groth16;
-use franklin_crypto::bellman::pairing::ff::PrimeField;
+use crate::franklin_crypto::bellman::groth16;
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use log::{error, info, trace};
 // Workspace deps
 use models::node::Engine;
+
+use crypto_exports::franklin_crypto;
+use crypto_exports::rand;
 
 pub struct BabyProver<C: ApiClient> {
     circuit_params: groth16::Parameters<Engine>,
