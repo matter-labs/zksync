@@ -41,4 +41,13 @@ contract Events {
 
     /// @notice Exodus mode entered event
     event ExodusMode();
+
+    /// @notice New priority request event. Emitted when a request is placed into mapping
+    event NewPriorityRequest(
+        uint64 serialId,
+        uint8 opType,
+        bytes pubData,
+        uint256 expirationBlock,
+        uint256 fee
+    );
 }

@@ -48,4 +48,7 @@ contract Config {
     /// @notice ChangePubKey operation length
     uint256 constant CHANGE_PUBKEY_BYTES = 6 * 8;
 
+    /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
+    uint256 constant PRIORITY_EXPIRATION = 4 * 60 * 24; // One day
+
 }

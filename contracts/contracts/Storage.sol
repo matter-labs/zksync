@@ -17,9 +17,6 @@ contract Storage {
     /// @notice Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
     Governance internal governance;
 
-    /// @notice Priority Queue contract. Contains priority requests list
-    PriorityQueue internal priorityQueue;
-
     /// @notice Root-chain balances (per owner and token id) to withdraw
     mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
 
@@ -85,5 +82,32 @@ contract Storage {
 
     /// @notice User authenticated facts for some nonce.
     mapping(address => mapping(uint32 => bytes)) public authFacts;
+
+        /// @notice Priority Operation container
+    /// @member opType Priority operation type
+    /// @member pubData Priority operation public data
+    /// @member expirationBlock Expiration block number (ETH block) for this request (must be satisfied before)
+    /// @member fee Validators fee
+    struct PriorityOperation {
+        Operations.OpType opType;
+        bytes pubData;
+        uint256 expirationBlock;
+        uint256 fee;
+    }
+
+    /// @notice Priority Requests mapping (request id - operation)
+    /// @dev Contains op type, pubdata, fee and expiration block of unsatisfied requests.
+    /// @dev Numbers are in order of requests receiving
+    mapping(uint64 => PriorityOperation) public priorityRequests;
+
+    /// @notice First open priority request id
+    uint64 public firstPriorityRequestId;
+
+    /// @notice Total number of requests
+    uint64 public totalOpenPriorityRequests;
+
+    /// @notice Total number of committed requests.
+    /// @dev Used in checks: if the request matches the operation on Rollup contract and if provided number of requests is not too big
+    uint64 public totalCommittedPriorityRequests;
 
 }

@@ -4,8 +4,7 @@ import "./Bytes.sol";
 import "./Operations.sol";
 import "./Governance.sol";
 
-/// @title Priority Queue Contract
-/// @author Matter Labs
+// FIXME: remove from tests and delete
 contract PriorityQueue {
 
     /// @notice Rollup contract address

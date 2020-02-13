@@ -32,19 +32,17 @@ contract Franklin is Storage, Config, Events {
     /// @notice Constructs Franklin contract
     /// @param _governanceAddress The address of Governance contract
     /// @param _verifierAddress The address of Verifier contract
-    /// @param _priorityQueueAddress The address of Priority Queue contract
     /// _genesisAccAddress The address of single account, that exists in genesis block
     /// @param _genesisRoot Genesis blocks (first block) root
     constructor(
         address _governanceAddress,
         address _verifierAddress,
-        address _priorityQueueAddress,
+        address, // FIXME: remove _priorityQueueAddress in tests
         address, // FIXME: remove _genesisAccAddress
         bytes32 _genesisRoot
     ) public {
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
-        priorityQueue = PriorityQueue(_priorityQueueAddress);
 
         blocks[0].stateRoot = _genesisRoot;
     }
@@ -91,30 +89,25 @@ contract Franklin is Storage, Config, Events {
         }
     }
 
-    /// @notice Collects fees from provided requests number for the block validator, store it on her
-    /// @notice balance to withdraw in Ether and delete this requests
-    /// @param _number The number of requests
-    /// @param _validator The address to pay fees
-    function collectValidatorsFeeAndDeleteRequests(uint64 _number, address _validator) internal {
-        uint256 totalFee = priorityQueue.collectValidatorsFeeAndDeleteRequests(_number);
-        balancesToWithdraw[_validator][0] += uint128(totalFee);
-    }
-
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
     /// @dev WARNING: Only for Exodus mode
     /// @dev Canceling may take several separate transactions to be completed
-    /// @param _number Supposed number of requests to look at
-    function cancelOutstandingDepositsForExodusMode(uint64 _number) external {
-        require(exodusMode, "frc11");
-        require(_number > 0, "frс12"); // provided zero number of requests
-
-        bytes memory depositsPubData = priorityQueue.deletePriorityRequestsAndPopOutstandingDeposits(_number);
-        uint offset = 0;
-        while (offset < depositsPubData.length) {
-            Operations.Deposit memory op;
-            (offset, op) = Operations.readDepositPubdata(depositsPubData, offset);
-            balancesToWithdraw[op.owner][op.tokenId] += op.amount;
+    /// @param _requests number of requests to process
+    function cancelOutstandingDepositsForExodusMode(uint64 _requests) external {
+        require(exodusMode, "coe01");
+        require(_requests > 0, "coe02"); // provided zero number of requests
+        require(totalOpenPriorityRequests > 0, "coe03"); // no one priority request left
+        uint64 toProcess = totalOpenPriorityRequests < _requests ? totalOpenPriorityRequests : _requests;
+        for (uint64 i = 0; i < toProcess; i++) {
+            uint64 id = firstPriorityRequestId + i;
+            if (priorityRequests[id].opType == Operations.OpType.Deposit) {
+                ( , Operations.Deposit memory op) = Operations.readDepositPubdata(priorityRequests[id].pubData, 0);
+                balancesToWithdraw[op.owner][op.tokenId] += op.amount;
+            }
+            delete priorityRequests[id];
         }
+        firstPriorityRequestId += toProcess;
+        totalOpenPriorityRequests -= toProcess;
     }
 
     // function scheduleMigration(address _migrateTo, uint32 _migrateByBlock) external {
@@ -235,7 +228,7 @@ contract Franklin is Storage, Config, Events {
             amount:     0 // unknown at this point
         });
         bytes memory pubData = Operations.writeFullExitPubdata(op);
-        priorityQueue.addPriorityRequest(uint8(Operations.OpType.FullExit), fee, pubData);
+        addPriorityRequest(Operations.OpType.FullExit, fee, pubData);
 
         if (msg.value != fee) {
             msg.sender.transfer(msg.value-fee);
@@ -262,7 +255,7 @@ contract Franklin is Storage, Config, Events {
             amount:     _amount
         });
         bytes memory pubData = Operations.writeDepositPubdata(op);
-        priorityQueue.addPriorityRequest(uint8(Operations.OpType.Deposit), _fee, pubData);
+        addPriorityRequest(Operations.OpType.Deposit, _fee, pubData);
 
         emit OnchainDeposit(
             msg.sender,
@@ -325,7 +318,7 @@ contract Franklin is Storage, Config, Events {
 
             totalBlocksCommitted += 1;
 
-            priorityQueue.increaseCommittedRequestsNumber(priorityNumber);
+            totalCommittedPriorityRequests += priorityNumber;
 
             emit BlockCommitted(_blockNumber);
         }
@@ -514,8 +507,7 @@ contract Franklin is Storage, Config, Events {
     /// @param _totalProcessed How many ops are procceeded
     /// @param _number Priority ops number
     function verifyPriorityOperations(uint64 _startId, uint64 _totalProcessed, uint64 _number) internal view {
-        priorityQueue.validateNumberOfRequests(_number);
-        
+        require(_number <= totalOpenPriorityRequests-totalCommittedPriorityRequests, "fvs11"); // too many priority requests
         uint64 start = _startId;
         uint64 end = start + _totalProcessed;
         
@@ -523,7 +515,21 @@ contract Franklin is Storage, Config, Events {
         for (uint64 current = start; current < end; ++current) {
             if (onchainOps[current].opType == Operations.OpType.FullExit || onchainOps[current].opType == Operations.OpType.Deposit) {
                 OnchainOperation storage op = onchainOps[current];
-                require(priorityQueue.isPriorityOpValid(uint8(op.opType), op.pubData, counter), "fvs11"); // priority operation is not valid
+
+                uint64 _priorityRequestId = counter + firstPriorityRequestId + totalCommittedPriorityRequests;
+                Operations.OpType priorReqType = priorityRequests[_priorityRequestId].opType;
+                bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
+
+                require(priorReqType == op.opType, "fvs12"); // incorrect priority op type
+                
+                if (op.opType == Operations.OpType.Deposit) {
+                    require(Operations.depositPubdataMatch(priorReqPubdata, op.pubData), "fvs13");
+                } else if (op.opType == Operations.OpType.FullExit) {
+                    require(Operations.fullExitPubdataMatch(priorReqPubdata, op.pubData), "fvs14");
+                } else {
+                    revert("fvs15"); // invalid or non-priority operation
+                }
+
                 counter++;
             }
         }
@@ -629,7 +635,7 @@ contract Franklin is Storage, Config, Events {
     function revertBlock(Block memory _reverted) internal {
         require(_reverted.committedAtBlock > 0, "frk11"); // block not found
         revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
-        priorityQueue.decreaseCommittedRequestsNumber(_reverted.priorityOperations);
+        totalCommittedPriorityRequests -= _reverted.priorityOperations;
     }
 
     /// @notice Checks that current state not is exodus mode
@@ -642,7 +648,9 @@ contract Franklin is Storage, Config, Events {
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
     function triggerExodusIfNeeded() internal returns (bool) {
-        if (priorityQueue.triggerExodusIfNeeded()) {
+        bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
+            priorityRequests[firstPriorityRequestId].expirationBlock != 0;
+        if (trigger) {
             exodusMode = true;
             emit ExodusMode();
             return true;
@@ -678,4 +686,58 @@ contract Franklin is Storage, Config, Events {
 
         emit FactAuth(msg.sender, _nonce, _fact);
     }
+
+    // Priority queue
+
+        /// @notice Saves priority request in storage
+    /// @dev Calculates expiration block for request, store this request and emit NewPriorityRequest event
+    /// @param _opType Rollup operation type
+    /// @param _fee Validators' fee
+    /// @param _pubData Operation pubdata
+    function addPriorityRequest(
+        Operations.OpType _opType,
+        uint256 _fee,
+        bytes memory _pubData
+    ) internal {
+        // Expiration block is: current block number + priority expiration delta
+        uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
+
+        priorityRequests[firstPriorityRequestId+totalOpenPriorityRequests] = PriorityOperation({
+            opType: _opType,
+            pubData: _pubData,
+            expirationBlock: expirationBlock,
+            fee: _fee
+        });
+
+        emit NewPriorityRequest(
+            firstPriorityRequestId+totalOpenPriorityRequests,
+            uint8(_opType),
+            _pubData,
+            expirationBlock,
+            _fee
+        );
+
+        totalOpenPriorityRequests++;
+    }
+
+    /// @notice Collects fees from provided requests number for the block validator, store it on her
+    /// @notice balance to withdraw in Ether and delete this requests
+    /// @param _number The number of requests
+    /// @param _validator The address to pay fees
+    /// @return validators fee
+    function collectValidatorsFeeAndDeleteRequests(uint64 _number, address _validator) internal {
+        require(_number <= totalOpenPriorityRequests, "pcs21"); // number is heigher than total priority requests number
+
+        uint256 totalFee = 0;
+        for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + _number; i++) {
+            totalFee += priorityRequests[i].fee;
+            delete priorityRequests[i];
+        }
+        totalOpenPriorityRequests -= _number;
+        firstPriorityRequestId += _number;
+        totalCommittedPriorityRequests -= _number;
+
+        balancesToWithdraw[_validator][0] += uint128(totalFee);
+    }
+
 }
