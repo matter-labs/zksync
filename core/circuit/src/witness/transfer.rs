@@ -289,7 +289,7 @@ pub fn apply_transfer(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            eth_address: Some(Fr::zero()),
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
@@ -355,24 +355,24 @@ mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
-    use models::node::{Account, AccountAddress};
+    use models::node::Account;
     use testkit::zksync_account::ZksyncAccount;
 
     #[test]
     #[ignore]
-    fn test_transfer() {
+    fn test_transfer_success() {
         let from_zksync_account = ZksyncAccount::rand();
         let from_account_id = 1;
-        let from_account_address = from_zksync_account.address.clone();
+        let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
             account.add_balance(0, &BigDecimal::from(10));
+            account.pub_key_hash = from_zksync_account.pubkey_hash.clone();
             account
         };
 
         let to_account_id = 2;
-        let to_account_address =
-            AccountAddress::from_hex("sync:2222222222222222222222222222222222222222").unwrap();
+        let to_account_address = "2222222222222222222222222222222222222222".parse().unwrap();
         let to_account = Account::default_with_address(&to_account_address);
 
         let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![

@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Redeploy current contracts
+# NOTE: this script does not build contracts, to build them use `zksync redeploy`
+
 . .setup_env
 
 # // TODO key generation
@@ -10,9 +13,8 @@
 # cp -f $KEY_DIR/*.sol contracts/contracts/keys/
 
 echo "redeploying for the db $DATABASE_URL"
-zksync flatten;
 cd contracts;
-yarn deploy | tee ../deploy.log;
+yarn deploy-no-build | tee ../deploy.log;
 cd ..;
 
 CONTRACT_GENESIS_TX_HASH_NEW_VALUE=`grep "CONTRACT_GENESIS_TX_HASH" deploy.log`

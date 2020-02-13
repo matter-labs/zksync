@@ -1,4 +1,4 @@
-import { ethers, utils } from "ethers";
+import {ethers, utils} from "ethers";
 import {
     depositFromETH,
     ETHProxy,
@@ -79,7 +79,7 @@ const FEE_DIVISOR = 50;
                 console.log(`Failed transfer: ${promise.reason}`);
             }
         }
-        
+
         // Transfers
         let promises = [];
 
@@ -122,11 +122,8 @@ const FEE_DIVISOR = 50;
 })();
 
 async function createRandomZKSyncWallet(ethWallet: ethers.Wallet, provider: Provider, ethProxy: ETHProxy) {
-    const random = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-    const seedHex = (await ethWallet.signMessage(random)).substr(2);
-    const seed = Buffer.from(seedHex, "hex");
-    const signer = Signer.fromSeed(seed);
-    const wallet = new Wallet(signer);
+    const newEthersWallet = ethers.Wallet.createRandom();
+    const wallet = await Wallet.fromEthSigner(newEthersWallet);
     wallet.connect(provider, ethProxy);
     return wallet;
 }
@@ -136,7 +133,7 @@ async function deposit(ethWallet: ethers.Wallet, syncWallet: Wallet, tokens: typ
         for (const token of tokens) {
             const depositHandle = await depositFromETH({
                 depositFrom: ethWallet,
-                depositTo:  syncWallet,
+                depositTo: syncWallet,
                 token,
                 amount,
             });
@@ -158,6 +155,9 @@ async function transfer1to1(fromWallet: Wallet, toWallet: Wallet, tokens: types.
 
         if (toWallet.address() !== fromWallet.address()) {
             for (const token of tokens) {
+                if (!await fromWallet.isCurrentPubkeySet()) {
+                    await (await fromWallet.setCurrentPubkeyWithZksyncTx()).awaitReceipt();
+                }
                 const tx = await fromWallet.syncTransfer({
                     to: toWallet.address(),
                     token,
@@ -184,6 +184,9 @@ async function transfer1toAll(fromWallet: Wallet, toWallets: Wallet[], tokens: t
         for (const wallet of toWallets) {
             if (wallet.address() !== fromWallet.address()) {
                 for (const token of tokens) {
+                    if (!await fromWallet.isCurrentPubkeySet()) {
+                        await (await fromWallet.setCurrentPubkeyWithZksyncTx()).awaitReceipt();
+                    }
                     const tx = await fromWallet.syncTransfer({
                         to: wallet.address(),
                         token,
@@ -228,10 +231,10 @@ async function withdraw(syncWallet: Wallet, ethWallet: ethers.Wallet, tokens: ty
 function reflect(promise) {
     return promise.then(
         (result) => {
-            return { status: "fulfilled", value: result };
+            return {status: "fulfilled", value: result};
         },
         (error) => {
-            return { status: "rejected", reason: error };
+            return {status: "rejected", reason: error};
         },
     );
 }

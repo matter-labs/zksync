@@ -87,6 +87,20 @@
       "type": "function"
     },
     {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_number",
+          "type": "uint64"
+        }
+      ],
+      "name": "cancelOutstandingDepositsForExodusMode",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "constant": true,
       "inputs": [
         {
@@ -103,6 +117,20 @@
         {
           "name": "",
           "type": "bool"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
+      "name": "numberOfPendingWithdrawals",
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint32"
         }
       ],
       "payable": false,
@@ -159,30 +187,34 @@
       "constant": false,
       "inputs": [
         {
-          "name": "_accountId",
+          "name": "_blockNumber",
+          "type": "uint32"
+        },
+        {
+          "name": "_feeAccount",
           "type": "uint24"
         },
         {
-          "name": "_pubKey",
+          "name": "_newRoot",
+          "type": "bytes32"
+        },
+        {
+          "name": "_publicData",
           "type": "bytes"
         },
         {
-          "name": "_token",
-          "type": "address"
-        },
-        {
-          "name": "_signature",
+          "name": "_ethWitness",
           "type": "bytes"
         },
         {
-          "name": "_nonce",
-          "type": "uint32"
+          "name": "_ethWitnessSizes",
+          "type": "uint64[]"
         }
       ],
-      "name": "fullExit",
+      "name": "commitBlock",
       "outputs": [],
-      "payable": true,
-      "stateMutability": "payable",
+      "payable": false,
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -272,23 +304,75 @@
       "constant": false,
       "inputs": [
         {
-          "name": "_blockNumber",
+          "name": "_n",
           "type": "uint32"
+        }
+      ],
+      "name": "completeWithdrawals",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "name": "",
+          "type": "address"
         },
         {
-          "name": "_feeAccount",
-          "type": "uint24"
-        },
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "authFacts",
+      "outputs": [
         {
-          "name": "_newRoot",
-          "type": "bytes32"
-        },
-        {
-          "name": "_publicData",
+          "name": "",
           "type": "bytes"
         }
       ],
-      "name": "commitBlock",
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "name": "pendingWithdrawals",
+      "outputs": [
+        {
+          "name": "to",
+          "type": "address"
+        },
+        {
+          "name": "tokenId",
+          "type": "uint16"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_fact",
+          "type": "bytes"
+        },
+        {
+          "name": "_nonce",
+          "type": "uint32"
+        }
+      ],
+      "name": "authPubkeyHash",
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",
@@ -329,6 +413,38 @@
     {
       "constant": true,
       "inputs": [],
+      "name": "firstPendingWithdrawalIndex",
+      "outputs": [
+        {
+          "name": "",
+          "type": "uint32"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_accountId",
+          "type": "uint24"
+        },
+        {
+          "name": "_token",
+          "type": "address"
+        }
+      ],
+      "name": "fullExit",
+      "outputs": [],
+      "payable": true,
+      "stateMutability": "payable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [],
       "name": "totalBlocksCommitted",
       "outputs": [
         {
@@ -355,7 +471,7 @@
           "type": "address"
         },
         {
-          "name": "_genesisAccAddress",
+          "name": "",
           "type": "address"
         },
         {
@@ -443,6 +559,28 @@
         }
       ],
       "name": "OnchainDeposit",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "name": "sender",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "name": "nonce",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "name": "fact",
+          "type": "bytes"
+        }
+      ],
+      "name": "FactAuth",
       "type": "event"
     },
     {

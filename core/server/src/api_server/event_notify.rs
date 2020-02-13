@@ -17,14 +17,11 @@ use jsonrpc_pubsub::{
 use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::BlockNumber;
-use models::{
-    node::block::ExecutedOperations,
-    node::{AccountAddress, AccountId},
-    ActionType, Operation,
-};
+use models::{node::block::ExecutedOperations, node::AccountId, ActionType, Operation};
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use storage::ConnectionPool;
+use web3::types::Address;
 
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
 const TX_SUB_PREFIX: &str = "txsub";
@@ -43,7 +40,7 @@ pub enum EventSubscribeRequest {
         subscriber: Subscriber<ETHOpInfoResp>,
     },
     Account {
-        address: AccountAddress,
+        address: Address,
         action: ActionType,
         subscriber: Subscriber<ResponseAccountState>,
     },
@@ -359,7 +356,7 @@ impl OperationNotifier {
 
     fn handle_account_update_sub(
         &mut self,
-        address: AccountAddress,
+        address: Address,
         action: ActionType,
         sub: Subscriber<ResponseAccountState>,
     ) -> Result<(), failure::Error> {
@@ -373,9 +370,9 @@ impl OperationNotifier {
         };
 
         let sub_id = SubscriptionId::String(format!(
-            "{}/{}/{}/{}",
+            "{}/{:x}/{}/{}",
             ACCOUNT_SUB_PREFIX,
-            address.to_hex(),
+            address,
             action.to_string(),
             rand::random::<u64>()
         ));

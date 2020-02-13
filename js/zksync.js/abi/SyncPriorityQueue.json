@@ -15,6 +15,25 @@
       "type": "function"
     },
     {
+      "constant": false,
+      "inputs": [
+        {
+          "name": "_number",
+          "type": "uint64"
+        }
+      ],
+      "name": "deletePriorityRequestsAndPopOutstandingDeposits",
+      "outputs": [
+        {
+          "name": "depositsPubData",
+          "type": "bytes"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "constant": true,
       "inputs": [],
       "name": "totalCommittedPriorityRequests",
@@ -127,20 +146,6 @@
       "constant": false,
       "inputs": [
         {
-          "name": "_franklinAddress",
-          "type": "address"
-        }
-      ],
-      "name": "changeFranklinAddress",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
           "name": "_number",
           "type": "uint64"
         }
@@ -198,17 +203,17 @@
       "type": "function"
     },
     {
-      "constant": true,
-      "inputs": [],
-      "name": "getOutstandingDeposits",
-      "outputs": [
+      "constant": false,
+      "inputs": [
         {
-          "name": "depositsPubData",
-          "type": "bytes"
+          "name": "_franklinAddress",
+          "type": "address"
         }
       ],
+      "name": "setFranklinAddress",
+      "outputs": [],
       "payable": false,
-      "stateMutability": "view",
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -228,7 +233,7 @@
     {
       "inputs": [
         {
-          "name": "_ownerAddress",
+          "name": "_governanceAddress",
           "type": "address"
         }
       ],

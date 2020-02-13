@@ -2,7 +2,7 @@ import {ethers} from "ethers";
 import {Wallet} from "zksync";
 
 (async () => {
-    const num_test_wallets = 1;
+    const num_test_wallets = 5;
     const baseWalletPath = "m/44'/60'/0'/0/";
 
     const walletKeys = [];

@@ -12,6 +12,7 @@ pub struct CircuitAccount<E: JubjubEngine> {
     pub subtree: SparseMerkleTree<Balance<E>, E::Fr, PedersenHasher<E>>,
     pub nonce: E::Fr,
     pub pub_key_hash: E::Fr,
+    pub address: E::Fr,
 }
 
 impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
@@ -22,6 +23,9 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         leaf_content.extend(
             self.pub_key_hash
                 .get_bits_le_fixed(params::NEW_PUBKEY_HASH_WIDTH), //160
+        );
+        leaf_content.extend(
+            self.address.get_bits_le_fixed(params::ADDRESS_WIDTH), //160
         );
 
         let mut root_hash_bits = self
@@ -56,6 +60,7 @@ impl std::default::Default for CircuitAccount<Bn256> {
         Self {
             nonce: Fr::zero(),
             pub_key_hash: Fr::zero(),
+            address: Fr::zero(),
             subtree: SparseMerkleTree::new(params::BALANCE_TREE_DEPTH as u32),
         }
     }
