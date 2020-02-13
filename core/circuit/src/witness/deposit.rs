@@ -304,7 +304,7 @@ mod test {
     use crate::franklin_crypto::bellman::pairing::ff::Field;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
-    use models::node::{Account, Address, Deposit};
+    use models::node::{Account, Deposit};
 
     #[test]
     #[ignore]
@@ -419,7 +419,7 @@ mod test {
     }
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_transpile_deposit_franklin_existing_account() {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
@@ -431,7 +431,6 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                from: Address::zero(),
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: deposit_to_account_address,
@@ -507,7 +506,7 @@ mod test {
     }
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_new_transpile_deposit_franklin_existing_account() {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
@@ -519,7 +518,6 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                from: Address::zero(),
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: deposit_to_account_address,
@@ -583,256 +581,4 @@ mod test {
         println!("Check if satisfied");
         assert!(assembly.is_satisfied(false));
     }
-
-    // use crate::franklin_crypto::bellman::plonk::cs::*;
-    // use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::BitReversedOmegas;
-    // use crate::franklin_crypto::bellman::SynthesisError;
-    // use crate::franklin_crypto::bellman::plonk::*;
-    // use crate::franklin_crypto::bellman::plonk::plonk::generator::*;
-
-    // use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
-    // use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::CTPrecomputations;
-    // use crate::franklin_crypto::bellman::plonk::commitments::transparent::fri::coset_combining_fri::precomputation::*;
-
-    // use crate::franklin_crypto::bellman::pairing::ff::{PrimeField};
-
-    // use crate::franklin_crypto::bellman::plonk::adaptor::alternative::*;
-    // use crate::franklin_crypto::bellman::plonk::plonk::generator::*;
-    // use crate::franklin_crypto::bellman::plonk::plonk::prover::*;
-    // use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
-    // use crate::franklin_crypto::bellman::pairing::Engine;
-
-    // use crate::franklin_crypto::bellman::Circuit;
-
-    // use crate::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
-    // use models::params;
-
-    // use crate::witness;
-    // use std::time::Instant;
-
-    // #[test]
-    // #[ignore]
-    // fn test_deposit_franklin_existing_account_1() {
-    //     use crate::franklin_crypto::bellman::pairing::Engine;
-    //     use crate::franklin_crypto::bellman::pairing::{CurveProjective, CurveAffine};
-    //     use crate::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
-    //     use crate::franklin_crypto::bellman::plonk::utils::*;
-    //     use crate::franklin_crypto::bellman::multicore::Worker;
-    //     // use crate::plonk::tester::*;
-
-    //     let deposit_to_account_id = 1;
-    //     let deposit_to_account_address =
-    //         AccountAddress::from_hex("sync:1111111111111111111111111111111111111111").unwrap();
-    //     let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
-    //         deposit_to_account_id,
-    //         Account::default_with_address(&deposit_to_account_address),
-    //     )]);
-
-    //     let deposit_op = DepositOp {
-    //         priority_op: Deposit {
-    //             sender: Address::zero(),
-    //             token: 0,
-    //             amount: BigDecimal::from(1),
-    //             account: deposit_to_account_address,
-    //         },
-    //         account_id: deposit_to_account_id,
-    //     };
-
-    //     plasma_state.apply_deposit_op(&deposit_op);
-
-    //     let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-    //     let deposit_operations = calculate_deposit_operations_from_witness(
-    //         &deposit_witness,
-    //         &Fr::zero(),
-    //         &Fr::zero(),
-    //         &Fr::zero(),
-    //         &SignatureData {
-    //             r_packed: vec![Some(false); 256],
-    //             s: vec![Some(false); 256],
-    //         },
-    //         &[Some(false); 256], //doesn't matter for deposit
-    //     );
-    //     let pub_data_from_witness = deposit_witness.get_pubdata();
-
-    //     witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
-
-    //     use rand::{Rng, SeedableRng, XorShiftRng};
-    //     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-    //     use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    //     let params = &AltJubjubBn256::new();
-    //     for _ in 0..params::block_size_chunks() - DepositOp::CHUNKS{
-    //         println!("add nooop");
-
-    //         let validator_address_number = 0;
-    //         use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey};
-
-    //         use models::merkle_tree::PedersenHasher;
-    //         let sender_sk = PrivateKey::<Bn256>(rng.gen());
-    //         let phasher = PedersenHasher::<Bn256>::default();
-    //         let sig_bits_to_hash = vec![false; 1]; //just a trash for consistency
-    //         let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
-    //             generate_sig_data(&sig_bits_to_hash, &phasher, &sender_sk, params);
-
-    //         // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-
-    //         let operation = witness::noop::noop_operation(
-    //             &witness_accum.account_tree,
-    //             validator_address_number,
-    //             &first_sig_part,
-    //             &second_sig_part,
-    //             &third_sig_part,
-    //             &signature_data,
-    //             &[Some(false); 256],
-    //         );
-
-    //         witness_accum.add_operation_with_pubdata(vec![operation], vec![false; 64]);
-    //     }
-
-    //     witness_accum.collect_fees(&Vec::new());
-    //     witness_accum.calculate_pubdata_commitment();
-
-    //     assert_eq!(
-    //         plasma_state.root_hash(),
-    //         witness_accum
-    //             .root_after_fees
-    //             .expect("witness accum after root hash empty"),
-    //         "root hash in state keeper and witness generation code mismatch"
-    //     );
-
-    //     use crate::franklin_crypto::bellman::plonk::adaptor::alternative::*;
-    //     use crate::franklin_crypto::bellman::plonk::plonk::generator::*;
-    //     use crate::franklin_crypto::bellman::plonk::plonk::prover::*;
-
-    //     use crate::franklin_crypto::bellman::Circuit;
-
-    //     let mut transpiler = Transpiler::new();
-
-    //     let mut c = witness_accum.into_circuit_instance();
-
-    //     c.clone().synthesize(&mut transpiler).unwrap();
-
-    //     println!("Done transpiling");
-
-    //     let hints = transpiler.into_hints();
-
-    //     println!("hints size : {}", hints.len());
-
-    //     use crate::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
-
-    //     let adapted_curcuit1 = AdaptorCircuit::new(c.clone(), &hints);
-    //     let adapted_curcuit2 = AdaptorCircuit::new(c.clone(), &hints);
-    //     let adapted_curcuit3 = AdaptorCircuit::new(c.clone(), &hints);
-
-    //     let mut assembly = GeneratorAssembly::<Bn256>::new();
-    //     adapted_curcuit1.synthesize(&mut assembly).unwrap();
-    //     assembly.finalize();
-
-    //     println!("Transpiled into {} gates", assembly.num_gates());
-
-    //     let gates = assembly.num_gates();
-
-    //     assert!(gates<(1<<26));
-
-    //     type Transcr = Blake2sTranscript<Fr>;
-    //     type Eng = Bn256;
-
-    //     use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
-    //     use crate::franklin_crypto::bellman::plonk::commitments::transparent::fri::coset_combining_fri::precomputation::*;
-
-    //     let mut sizes: Vec<usize> = vec![gates];
-
-    //     let max_size = *sizes.last().unwrap();
-
-    //     let worker = Worker::new();
-
-    //     println!("Making bases");
-    //     let bases = {
-    //         use crate::franklin_crypto::bellman::pairing::Wnaf;
-    //         let tau = Fr::from_str("42").unwrap();
-    //         let powers_of_tau = vec![Fr::one(); max_size.next_power_of_two()];
-    //         let mut powers_of_tau = Polynomial::<Fr, _>::from_coeffs(powers_of_tau).unwrap();
-
-    //         powers_of_tau.distribute_powers(&worker, tau);
-
-    //         let powers_of_tau = powers_of_tau.into_coeffs();
-
-    //         // Compute G1 window table
-    //         let mut g1_wnaf = Wnaf::new();
-    //         let g1 = <Eng as Engine>::G1::one();
-    //         let g1_wnaf = g1_wnaf.base(g1, max_size.next_power_of_two());
-
-    //         let mut bases = vec![g1; max_size.next_power_of_two()];
-
-    //         // Compute the H query with multiple threads
-    //         worker.scope(bases.len(), |scope, chunk| {
-    //             for (h, p) in bases.chunks_mut(chunk).zip(powers_of_tau.chunks(chunk))
-    //                 {
-    //                     let mut g1_wnaf = g1_wnaf.shared();
-    //                     scope.spawn(move |_| {
-    //                         // Set values of the H query to g1^{(tau^i * t(tau)) / delta}
-    //                         for (h, p) in h.iter_mut().zip(p.iter())
-    //                             {
-    //                                 // Exponentiate
-    //                                 *h = g1_wnaf.scalar(p.into_repr());
-    //                             }
-
-    //                         // Batch normalize
-    //                         <<Eng as Engine>::G1 as CurveProjective>::batch_normalization(h);
-    //                     });
-    //                 }
-    //         });
-
-    //         bases.iter().map(|el| el.into_affine()).collect::<Vec<_>>()
-    //     };
-    //     println!("Done making bases");
-
-    //     for size in sizes.into_iter() {
-    //         println!("Working for size {}", size);
-
-    //         let omegas_bitreversed = BitReversedOmegas::<Fr>::new_for_domain_size(size.next_power_of_two());
-    //         let omegas_inv_bitreversed = <OmegasInvBitreversed::<Fr> as CTPrecomputations::<Fr>>::new_for_domain_size(size.next_power_of_two());
-
-    //         println!("Start setup and precomputations");
-    //         let (_, setup_precomp) = setup_with_precomputations::<Eng, _, _>(
-    //             &adapted_curcuit2,
-    //             &omegas_bitreversed,
-    //             &bases[0..size.next_power_of_two()]
-    //         ).unwrap();
-
-    //         let mut prover = ProvingAssembly::<Eng>::new();
-    //         adapted_curcuit3.synthesize(&mut prover).unwrap();
-    //         prover.finalize();
-
-    //         println!("End setup and precomputations");
-
-    //         println!("Start proving");
-
-    //         let start = Instant::now();
-
-    //         let _ = prover.prove_with_setup_precomputed::<_, _, Transcr>(
-    //             &setup_precomp,
-    //             &worker,
-    //             &omegas_bitreversed,
-    //             &omegas_inv_bitreversed,
-    //             &bases[0..size.next_power_of_two()]
-    //         ).unwrap();
-
-    //         println!("Proving taken {:?} for size {}", start.elapsed(), size);
-    //     }
-
-    //     // start work for groth16
-
-    //     use crate::franklin_crypto::bellman::groth16::{
-    //         create_random_proof, generate_random_parameters, prepare_verifying_key, verify_proof
-    //     };
-
-    //     use rand::thread_rng;
-    //     let rng = &mut thread_rng();
-    //     let params = generate_random_parameters(c.clone(), rng).unwrap();
-    //     let pvk = prepare_verifying_key(&params.vk);
-
-    //     let start = Instant::now();
-    //     let proof = create_random_proof(c.clone(), &params, rng).unwrap();
-    //     println!("Groth16 Proving taken {:?}", start.elapsed());
-    // }
 }
