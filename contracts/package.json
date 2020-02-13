@@ -29,7 +29,7 @@
   "scripts": {
     "build": "waffle .waffle.json && waffle .waffle.config_flat.json",
     "test": "waffle .waffle.json && mocha -r ts-node/register test/**/*.ts",
-    "itest": "waffle .waffle.json && mocha -r ts-node/register test/unit_tests/**/*.js test/integration_new.ts",
+    "itest": "waffle .waffle.json && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
     "unit-test": "waffle .waffle.json && mocha test/unit_tests/**/*.js",
     "deploy": "yarn build && ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-no-build": "ts-node scripts/testnet-deploy.ts --deploy --publish",
