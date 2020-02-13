@@ -1,13 +1,13 @@
 use super::utils::*;
-use crate::operation::SignatureData;
-use crate::operation::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::circuit::float_point::convert_to_float;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::operation::SignatureData;
+use crate::operation::*;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::params as franklin_constants;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
 
 use models::node::TransferOp;
 use models::primitives::big_decimal_to_u128;
@@ -361,7 +361,6 @@ mod test {
     #[test]
     #[ignore]
     fn test_transfer_success() {
-
         let from_zksync_account = ZksyncAccount::rand();
         let from_account_id = 1;
         let from_account_address = from_zksync_account.address;

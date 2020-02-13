@@ -2,14 +2,14 @@ use crate::account::AccountContent;
 use crate::account::AccountWitness;
 use crate::allocated_structures::*;
 use crate::element::CircuitElement;
-use crate::operation::Operation;
-use crate::signature::*;
-use crate::utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element};
-use crate::franklin_crypto::bellman::{Circuit, ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::bellman::{Circuit, ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::boolean::Boolean;
 use crate::franklin_crypto::circuit::ecc;
 use crate::franklin_crypto::circuit::sha256;
+use crate::operation::Operation;
+use crate::signature::*;
+use crate::utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element};
 
 use crate::franklin_crypto::circuit::expression::Expression;
 use crate::franklin_crypto::circuit::num::AllocatedNum;
@@ -67,12 +67,9 @@ struct PreviousData<E: JubjubEngine> {
 // Implementation of our circuit:
 impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
-        let zero = AllocatedNum::alloc(
-            cs.namespace(|| "allocate element equal to zero"),
-            || {
-                Ok(E::Fr::zero())
-            }
-        )?;
+        let zero = AllocatedNum::alloc(cs.namespace(|| "allocate element equal to zero"), || {
+            Ok(E::Fr::zero())
+        })?;
 
         zero.assert_zero(cs.namespace(|| "enforce zero on the zero element"))?;
 
@@ -89,14 +86,11 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             })?;
         public_data_commitment.inputize(cs.namespace(|| "inputize pub_data"))?;
 
-        let validator_address_padded =
-            CircuitElement::from_fe_with_known_length(
-                cs.namespace(|| "validator_address"),
-                || {
-                    self.validator_address.grab()
-                },
-                franklin_constants::ACCOUNT_ID_BIT_WIDTH
-            )?;
+        let validator_address_padded = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "validator_address"),
+            || self.validator_address.grab(),
+            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+        )?;
 
         let validator_address_bits = validator_address_padded.get_bits_le();
         assert!(validator_address_bits.len() == franklin_constants::ACCOUNT_ID_BIT_WIDTH);
@@ -305,12 +299,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             let mut initial_hash_data: Vec<Boolean> = vec![];
 
-            let block_number =
-                CircuitElement::from_fe_with_known_length(cs.namespace(|| "block_number"),
-                || {
-                    self.block_number.grab()
-                },
-                franklin_constants::BLOCK_NUMBER_BIT_WIDTH
+            let block_number = CircuitElement::from_fe_with_known_length(
+                cs.namespace(|| "block_number"),
+                || self.block_number.grab(),
+                franklin_constants::BLOCK_NUMBER_BIT_WIDTH,
             )?;
 
             initial_hash_data.extend(block_number.into_padded_be_bits(256));
@@ -530,11 +522,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             self.params,
         )?;
 
-        Ok((
-            merkle_root,
-            is_account_empty,
-            subtree_root,
-        ))
+        Ok((merkle_root, is_account_empty, subtree_root))
     }
 
     fn execute_op<CS: ConstraintSystem<E>>(
@@ -650,7 +638,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let diff_a_b_bits = diff_a_b.into_bits_le_fixed(
             cs.namespace(|| "balance-fee bits"),
-            franklin_constants::BALANCE_BIT_WIDTH
+            franklin_constants::BALANCE_BIT_WIDTH,
         )?;
 
         let diff_a_b_bits_repacked = Expression::from_le_bits::<CS>(&diff_a_b_bits);
@@ -1793,7 +1781,11 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?;
 
         // this is safe and just allows the convention. TODO: may be cut to Fr width only?
-        account_data.extend(balance_root.clone().into_padded_le_bits(franklin_constants::FR_BIT_WIDTH_PADDED)); // !!!!!
+        account_data.extend(
+            balance_root
+                .clone()
+                .into_padded_le_bits(franklin_constants::FR_BIT_WIDTH_PADDED),
+        ); // !!!!!
         assert_eq!(account_data.len(), franklin_constants::LEAF_DATA_BIT_WIDTH);
 
         Ok((account_data, Boolean::from(is_account_empty), balance_root))
@@ -1957,7 +1949,7 @@ fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintS
         let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
         let fee_bits = fee.into_bits_le_fixed(
             cs.namespace(|| "fee_bits"),
-            franklin_constants::BALANCE_BIT_WIDTH
+            franklin_constants::BALANCE_BIT_WIDTH,
         )?;
         // fee_bits.truncate(franklin_constants::BALANCE_BIT_WIDTH);
         let temp = pedersen_hash::pedersen_hash(

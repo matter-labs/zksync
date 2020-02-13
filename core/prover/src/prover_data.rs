@@ -12,25 +12,13 @@ use models::serialization::*;
 /// ProverData is data prover needs to calculate proof of the given block.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProverData {
-    #[serde(
-        serialize_with = "fr_ser",
-        deserialize_with = "fr_de"
-    )]
+    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
     pub public_data_commitment: Fr,
-    #[serde(
-        serialize_with = "fr_ser",
-        deserialize_with = "fr_de"
-    )]
+    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
     pub old_root: Fr,
-    #[serde(
-        serialize_with = "fr_ser",
-        deserialize_with = "fr_de"
-    )]
+    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
     pub new_root: Fr,
-    #[serde(
-        serialize_with = "fr_ser",
-        deserialize_with = "fr_de"
-    )]
+    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
     pub validator_address: Fr,
     #[serde(
         serialize_with = "vec_optional_fr_ser",
@@ -86,6 +74,10 @@ struct AccountWitnessDef {
         deserialize_with = "optional_fr_de"
     )]
     pub pub_key_hash: Option<Fr>,
+    #[serde(
+        serialize_with = "optional_fr_ser",
+        deserialize_with = "optional_fr_de"
+    )]
     pub address: Option<Fr>,
 }
 

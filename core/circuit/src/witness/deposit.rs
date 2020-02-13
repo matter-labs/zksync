@@ -1,16 +1,16 @@
 use super::utils::*;
 
-use crate::operation::SignatureData;
-use crate::operation::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::operation::SignatureData;
+use crate::operation::*;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
 use models::node::DepositOp;
 use models::params as franklin_constants;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
 
 pub struct DepositData {
     pub amount: u128,
@@ -301,12 +301,10 @@ pub fn calculate_deposit_operations_from_witness(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::franklin_crypto::bellman::pairing::ff::Field;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
-    use crate::franklin_crypto::bellman::pairing::ff::Field;
-    use models::node::{Account, AccountAddress, Address, Deposit};
-    use crate::franklin_crypto::bellman::plonk::polynomials::Polynomial;
-    use crate::franklin_crypto::bellman::plonk::commitments::transcript::Blake2sTranscript;
+    use models::node::{Account, Address, Deposit};
 
     #[test]
     #[ignore]
@@ -427,7 +425,7 @@ mod test {
     fn test_transpile_deposit_franklin_existing_account() {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
-            AccountAddress::from_hex("sync:1111111111111111111111111111111111111111").unwrap();
+            "1111111111111111111111111111111111111111".parse().unwrap();
         let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
             deposit_to_account_id,
             Account::default_with_address(&deposit_to_account_address),
@@ -435,10 +433,10 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                sender: Address::zero(),
+                from: Address::zero(),
                 token: 0,
                 amount: BigDecimal::from(1),
-                account: deposit_to_account_address,
+                to: deposit_to_account_address,
             },
             account_id: deposit_to_account_id,
         };
@@ -471,10 +469,10 @@ mod test {
             "root hash in state keeper and witness generation code mismatch"
         );
 
+        use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
         use crate::franklin_crypto::bellman::plonk::adaptor::alternative::*;
         use crate::franklin_crypto::bellman::plonk::plonk::generator::*;
         use crate::franklin_crypto::bellman::plonk::plonk::prover::*;
-        use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 
         use crate::franklin_crypto::bellman::Circuit;
 
@@ -515,7 +513,7 @@ mod test {
     fn test_new_transpile_deposit_franklin_existing_account() {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
-            AccountAddress::from_hex("sync:1111111111111111111111111111111111111111").unwrap();
+            "1111111111111111111111111111111111111111".parse().unwrap();
         let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
             deposit_to_account_id,
             Account::default_with_address(&deposit_to_account_address),
@@ -523,10 +521,10 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                sender: Address::zero(),
+                from: Address::zero(),
                 token: 0,
                 amount: BigDecimal::from(1),
-                account: deposit_to_account_address,
+                to: deposit_to_account_address,
             },
             account_id: deposit_to_account_id,
         };
@@ -559,10 +557,10 @@ mod test {
             "root hash in state keeper and witness generation code mismatch"
         );
 
-        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
-        use crate::franklin_crypto::bellman::plonk::better_cs::test_assembly::*;
-        use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
         use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
+        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
+        use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
+        use crate::franklin_crypto::bellman::plonk::better_cs::test_assembly::*;
 
         use crate::franklin_crypto::bellman::Circuit;
 
@@ -623,8 +621,6 @@ mod test {
     //     use crate::franklin_crypto::bellman::plonk::utils::*;
     //     use crate::franklin_crypto::bellman::multicore::Worker;
     //     // use crate::plonk::tester::*;
-
-
 
     //     let deposit_to_account_id = 1;
     //     let deposit_to_account_address =
@@ -738,9 +734,6 @@ mod test {
     //     let gates = assembly.num_gates();
 
     //     assert!(gates<(1<<26));
-
-
-
 
     //     type Transcr = Blake2sTranscript<Fr>;
     //     type Eng = Bn256;

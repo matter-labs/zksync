@@ -1,7 +1,7 @@
-use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::boolean::Boolean;
-use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
+use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
 
 use crate::franklin_crypto::circuit::expression::Expression;
 use crate::franklin_crypto::circuit::num::AllocatedNum;
@@ -22,7 +22,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
         CircuitElement {
             number: zero_num,
             bits_le: bits,
-            length: length,
+            length,
         }
     }
 
@@ -55,7 +55,10 @@ impl<E: JubjubEngine> CircuitElement<E> {
         }
     }
 
-    pub fn from_fe_with_known_length<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
+    pub fn from_fe_with_known_length<
+        CS: ConstraintSystem<E>,
+        F: FnOnce() -> Result<E::Fr, SynthesisError>,
+    >(
         mut cs: CS,
         field_element: F,
         max_length: usize,
@@ -63,7 +66,11 @@ impl<E: JubjubEngine> CircuitElement<E> {
         assert!(max_length <= E::Fr::NUM_BITS as usize);
         let number =
             AllocatedNum::alloc(cs.namespace(|| "number from field element"), field_element)?;
-        CircuitElement::from_number_with_known_length(cs.namespace(|| "circuit_element"), number, max_length)
+        CircuitElement::from_number_with_known_length(
+            cs.namespace(|| "circuit_element"),
+            number,
+            max_length,
+        )
     }
 
     pub fn from_fe<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
@@ -343,10 +350,7 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
             .get_x()
             .into_bits_le(cs.namespace(|| "hash into_bits"))?;
         hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
-        let element = CircuitElement::from_le_bits(
-            cs.namespace(|| "repack_hash"), 
-            hash_bits
-        )?;
+        let element = CircuitElement::from_le_bits(cs.namespace(|| "repack_hash"), hash_bits)?;
 
         Ok(CircuitPubkey {
             x: x_ce,

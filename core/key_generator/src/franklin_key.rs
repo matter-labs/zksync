@@ -2,12 +2,12 @@
 use std::path::PathBuf;
 // External deps
 use crate::franklin_crypto::bellman::groth16::generate_random_parameters;
-use circuit::account::AccountWitness;
-use circuit::circuit::FranklinCircuit;
-use circuit::operation::*;
 use crate::franklin_crypto::bellman::groth16::Parameters;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::rand::OsRng;
+use circuit::account::AccountWitness;
+use circuit::circuit::FranklinCircuit;
+use circuit::operation::*;
 use time::PreciseTime;
 // Workspace deps
 use crate::vk_contract_generator::generate_vk_contract;
@@ -62,8 +62,9 @@ pub fn make_franklin_key() {
 
     let f_r = File::open(&key_file_path).expect("Unable to open file");
     let mut r = BufReader::new(f_r);
-    let circuit_params = crate::franklin_crypto::bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
-        .expect("Unable to read proving key");
+    let circuit_params =
+        crate::franklin_crypto::bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
+            .expect("Unable to read proving key");
 
     let contract_content = generate_vk_contract(
         &circuit_params.vk,

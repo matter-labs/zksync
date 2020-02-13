@@ -1,12 +1,9 @@
+use super::node::Fr;
+use super::{fe_from_hex, fe_to_hex};
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
-use super::{from_hex, to_hex};
-use super::node::{Fr};
 
-pub fn optional_fr_ser<S: Serializer>(
-    value: &Option<Fr>,
-    ser: S,
-) -> Result<S::Ok, S::Error> {
-    let v = value.map(|a| to_hex(&a));
+pub fn optional_fr_ser<S: Serializer>(value: &Option<Fr>, ser: S) -> Result<S::Ok, S::Error> {
+    let v = value.map(|a| fe_to_hex(&a));
 
     Option::serialize(&v, ser)
 }
@@ -18,18 +15,15 @@ where
     let s: Option<String> = Option::deserialize(deserializer)?;
 
     if let Some(a) = s {
-        let v = from_hex(&a).map_err(|e| de::Error::custom(e))?;
+        let v = fe_from_hex(&a).map_err(de::Error::custom)?;
         Ok(Some(v))
     } else {
         Ok(None)
     }
 }
 
-pub fn fr_ser<S: Serializer>(
-    value: &Fr,
-    ser: S,
-) -> Result<S::Ok, S::Error> {
-    let v = to_hex(value);
+pub fn fr_ser<S: Serializer>(value: &Fr, ser: S) -> Result<S::Ok, S::Error> {
+    let v = fe_to_hex(value);
 
     String::serialize(&v, ser)
 }
@@ -40,7 +34,7 @@ where
 {
     let s: String = String::deserialize(deserializer)?;
 
-    let v = from_hex(&s).map_err(|e| de::Error::custom(e))?;
+    let v = fe_from_hex(&s).map_err(de::Error::custom)?;
     Ok(v)
 }
 
@@ -50,7 +44,7 @@ pub fn vec_optional_fr_ser<S: Serializer>(
 ) -> Result<S::Ok, S::Error> {
     let mut res = Vec::with_capacity(operations.len());
     for value in operations.iter() {
-        let v = value.map(|a| to_hex(&a));
+        let v = value.map(|a| fe_to_hex(&a));
         res.push(v);
     }
     Vec::serialize(&res, ser)
@@ -64,7 +58,7 @@ where
     let mut res = Vec::with_capacity(str_vec.len());
     for s in str_vec.into_iter() {
         if let Some(a) = s {
-            let v = from_hex(&a).map_err(|e| de::Error::custom(e))?;
+            let v = fe_from_hex(&a).map_err(de::Error::custom)?;
             res.push(Some(v));
         } else {
             res.push(None);

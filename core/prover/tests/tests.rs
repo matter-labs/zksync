@@ -3,7 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{env, fs, io, path, thread, time};
 // External deps
-use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crypto_exports::franklin_crypto;
+use crypto_exports::pairing::ff::{Field, PrimeField};
 // Workspace deps
 use prover;
 use testhelper::TestAccount;
@@ -116,8 +117,11 @@ fn prover_proves_a_block_and_publishes_result() {
         .expect("didn't receive proof");
     stop_signal.store(true, Ordering::SeqCst);
     println!("verifying proof...");
-    let verify_result =
-        franklin_crypto::bellman::groth16::verify_proof(&verify_key, &proof, &[public_data_commitment]);
+    let verify_result = franklin_crypto::bellman::groth16::verify_proof(
+        &verify_key,
+        &proof,
+        &[public_data_commitment],
+    );
     assert!(!verify_result.is_err());
     assert!(verify_result.unwrap(), "invalid proof");
 }
@@ -282,7 +286,8 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
     }
 }
 
-fn read_circuit_parameters() -> franklin_crypto::bellman::groth16::Parameters<models::node::Engine> {
+fn read_circuit_parameters() -> franklin_crypto::bellman::groth16::Parameters<models::node::Engine>
+{
     let out_dir = {
         let mut out_dir = path::PathBuf::new();
         out_dir.push(&env::var("ZKSYNC_HOME").expect("ZKSYNC_HOME is not set"));
@@ -306,7 +311,8 @@ fn read_circuit_parameters() -> franklin_crypto::bellman::groth16::Parameters<mo
 struct MockApiClient<F: Fn() -> Option<prover::prover_data::ProverData>> {
     block_to_prove: Mutex<Option<(i64, i32)>>,
     heartbeats_tx: Arc<Mutex<mpsc::Sender<()>>>,
-    publishes_tx: Arc<Mutex<mpsc::Sender<franklin_crypto::bellman::groth16::Proof<models::node::Engine>>>>,
+    publishes_tx:
+        Arc<Mutex<mpsc::Sender<franklin_crypto::bellman::groth16::Proof<models::node::Engine>>>>,
     prover_data_fn: F,
 }
 

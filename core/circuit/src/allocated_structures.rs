@@ -1,10 +1,10 @@
 use crate::account;
 use crate::account::AccountContent;
 use crate::element::CircuitElement;
-use crate::operation::{Operation, OperationBranch};
-use crate::utils;
 use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::float_point::parse_with_exponent_le;
+use crate::operation::{Operation, OperationBranch};
+use crate::utils;
 use models::params as franklin_constants;
 
 use crate::franklin_crypto::circuit::boolean::Boolean;
@@ -105,8 +105,7 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
 }
 
 impl<E: JubjubEngine> AllocatedOperationData<E> {
-    pub fn empty_from_zero(zero_element: AllocatedNum<E>) -> Result<Self, SynthesisError>
-    {
+    pub fn empty_from_zero(zero_element: AllocatedNum<E>) -> Result<Self, SynthesisError> {
         let eth_address = CircuitElement::unsafe_empty_of_some_length(
             zero_element.clone(),
             franklin_constants::ETH_ADDRESS_BIT_WIDTH,
@@ -169,7 +168,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         );
 
         let b = CircuitElement::unsafe_empty_of_some_length(
-            zero_element.clone(),
+            zero_element,
             franklin_constants::BALANCE_BIT_WIDTH,
         );
 

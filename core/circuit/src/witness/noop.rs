@@ -93,8 +93,8 @@ mod test {
     use crate::circuit::FranklinCircuit;
     use crate::franklin_crypto::bellman::Circuit;
 
-    use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
     use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+    use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
     use crate::franklin_crypto::circuit::test::*;
     use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey};

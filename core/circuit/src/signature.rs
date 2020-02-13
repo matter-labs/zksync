@@ -1,12 +1,12 @@
 use crate::allocated_structures::*;
 use crate::element::{CircuitElement, CircuitPubkey};
-use crate::operation::SignatureData;
-use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::baby_eddsa::EddsaSignature;
 use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use crate::franklin_crypto::circuit::ecc;
+use crate::operation::SignatureData;
+use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
 
 use crate::franklin_crypto::circuit::expression::Expression;
 use crate::franklin_crypto::circuit::pedersen_hash;
@@ -72,7 +72,7 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
         r_recovered.get_y().clone(),
         &params,
     )?;
-    
+
     Ok(AllocatedSignerPubkey {
         pubkey,
         point: r_recovered,
@@ -114,11 +114,10 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
     let witness_length = signature_data_s.len();
     let start_of_s = witness_length - (E::Fr::NUM_BITS as usize);
 
-    let signature_s =
-        CircuitElement::from_witness_be_bits(
-            cs.namespace(|| "signature_s"), 
-            &signature_data_s[start_of_s..]
-        )?;
+    let signature_s = CircuitElement::from_witness_be_bits(
+        cs.namespace(|| "signature_s"),
+        &signature_data_s[start_of_s..],
+    )?;
 
     let (r_recovered, is_sig_r_correct) = ecc::EdwardsPoint::recover_from_y_unchecked(
         cs.namespace(|| "recover_from_y_unchecked"),
@@ -185,7 +184,7 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         "signer_key.is_correctly_unpacked={:?}",
         signer_key.is_correctly_unpacked.get_value()
     );
-    
+
     let is_signature_correctly_verified = multi_and(
         cs.namespace(|| "is_signature_correctly_verified"),
         &[

@@ -1,5 +1,5 @@
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField};
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 
 use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
 use crate::franklin_crypto::circuit::num::{AllocatedNum, Num};

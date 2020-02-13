@@ -2,10 +2,10 @@ use super::FranklinOp;
 use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
-use crate::params::block_size_chunks;
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use web3::types::H256;
+use crate::params::block_size_chunks;
 use crate::serialization::*;
+use web3::types::H256;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ExecutedTx {
@@ -49,14 +49,10 @@ impl ExecutedOperations {
     }
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block {
     pub block_number: BlockNumber,
-    #[serde(
-        serialize_with = "fr_ser",
-        deserialize_with = "fr_de"
-    )]
+    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
     pub new_root_hash: Fr,
     pub fee_account: AccountId,
     pub block_transactions: Vec<ExecutedOperations>,

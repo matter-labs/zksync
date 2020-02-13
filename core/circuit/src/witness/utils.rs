@@ -1,24 +1,24 @@
 use crate::account::*;
 
-use crate::operation::SignatureData;
-use crate::utils::*;
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
+use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::Field;
 use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField, PrimeFieldRepr};
-use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use crate::franklin_crypto::eddsa::PrivateKey;
 use crate::franklin_crypto::eddsa::PublicKey;
 use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::operation::SignatureData;
+use crate::rand::{Rng, SeedableRng, XorShiftRng};
+use crate::utils::*;
+use crypto::digest::Digest;
+use crypto::sha2::Sha256;
 use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
 use models::circuit::utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element};
 use models::merkle_tree::hasher::Hasher;
 use models::merkle_tree::PedersenHasher;
 use models::node::tx::PackedPublicKey;
 use models::params as franklin_constants;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
-use crate::rand::{Rng, SeedableRng, XorShiftRng};
 
 pub fn generate_dummy_sig_data(
     bits: &[bool],

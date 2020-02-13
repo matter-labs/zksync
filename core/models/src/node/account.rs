@@ -4,9 +4,9 @@ use crate::primitives::GetBits;
 use std::collections::HashMap;
 use std::convert::TryInto;
 
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use bigdecimal::BigDecimal;
 use failure::ensure;
-use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::Engine;
@@ -14,11 +14,11 @@ use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use crate::circuit::account::{Balance, CircuitAccount};
 use crate::circuit::utils::{eth_address_to_fr, pub_key_hash_bytes};
+use crate::franklin_crypto::eddsa::PublicKey;
+use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::node::PrivateKey;
 use crate::params::JUBJUB_PARAMS;
-use crate::franklin_crypto::eddsa::PublicKey;
-use crate::franklin_crypto::jubjub::FixedGenerators;
 use web3::types::Address;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]

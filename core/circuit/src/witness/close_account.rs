@@ -2,14 +2,14 @@ use super::utils::*;
 
 use crate::operation::*;
 
-use crate::operation::SignatureData;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::operation::SignatureData;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::operations::CloseOp;
 use models::params as franklin_constants;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
 
 pub struct CloseAccountData {
     pub account_address: u32,

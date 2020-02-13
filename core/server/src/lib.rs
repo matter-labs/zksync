@@ -15,4 +15,3 @@ pub mod prover_server;
 pub mod state_keeper;
 
 use crypto_exports::franklin_crypto;
-use crypto_exports::rand;

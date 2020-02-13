@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="plonk"}
-rand = "0.7"
+rand = "0.4"

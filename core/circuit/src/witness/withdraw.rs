@@ -4,18 +4,18 @@ use crate::operation::*;
 
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
-use crate::operation::SignatureData;
 use crate::franklin_crypto::circuit::float_point::convert_to_float;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::operation::SignatureData;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
 
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
 use models::primitives::big_decimal_to_u128;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
 
 pub struct WithdrawData {
     pub amount: u128,
@@ -349,7 +349,7 @@ mod test {
     #[ignore]
     fn test_withdraw() {
         use testkit::zksync_account::ZksyncAccount;
-        
+
         let zksync_account = ZksyncAccount::rand();
         let account_id = 1;
         let account_address = zksync_account.address;

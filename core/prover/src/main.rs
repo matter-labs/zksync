@@ -3,8 +3,8 @@ use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::{env, thread, time};
 // External deps
-use crate::franklin_crypto::bellman::groth16;
-use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crypto_exports::franklin_crypto::bellman::groth16;
 use log::{debug, error, info};
 use signal_hook::iterator::Signals;
 // Workspace deps

@@ -17,12 +17,12 @@ use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use diesel::dsl::*;
 use failure::bail;
-use models::{from_hex, to_hex};
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::{
     apply_updates, reverse_updates, tx::FranklinTx, Account, AccountId, AccountMap, AccountUpdate,
     AccountUpdates, BlockNumber, Fr, FranklinOp, PriorityOp, TokenId,
 };
+use models::{fe_from_hex, fe_to_hex};
 use models::{Action, ActionType, EncodedProof, Operation, TokenAddedEvent};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
@@ -47,9 +47,6 @@ use models::node::PubKeyHash;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use web3::types::Address;
-
-use crypto_exports::franklin_crypto;
-use crypto_exports::rand;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
@@ -823,7 +820,7 @@ impl StorageProcessor {
         self.conn().transaction(|| {
             self.save_block_transactions(block)?;
 
-            let h = to_hex(&block.new_root_hash);
+            let h = fe_to_hex(&block.new_root_hash);
 
             let new_block = StorageBlock {
                 number: i64::from(block.block_number),
@@ -1193,11 +1190,12 @@ impl StorageProcessor {
 
         let block_transactions = self.get_block_executed_ops(block)?;
 
-        let new_root_hash: Fr = from_hex(&format!("0x{}", &stored_block.root_hash[8..])).expect("Unparsable root hash");
+        let new_root_hash: Fr = fe_from_hex(&format!("0x{}", &stored_block.root_hash[8..]))
+            .expect("Unparsable root hash");
 
         Ok(Some(Block {
             block_number: block,
-            new_root_hash: new_root_hash,
+            new_root_hash,
             fee_account: stored_block.fee_account_id as AccountId,
             block_transactions,
             processed_priority_ops: (
@@ -2371,15 +2369,15 @@ impl StorageProcessor {
 /// use `zksync db-test-no-reset`/`franklin db-test` script to run them
 mod test {
     use super::*;
+    use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
     use diesel::Connection;
     use models::primitives::u128_to_bigdecimal;
-    use crypto_exports::rand::prelude::*;
 
     fn acc_create_random_updates<R: Rng>(
         rng: &mut R,
     ) -> impl Iterator<Item = (u32, AccountUpdate)> {
         let id: u32 = rng.gen();
-        let balance: u128 = rng.gen();
+        let balance = u128::from(rng.gen::<u64>());
         let nonce: u32 = rng.gen();
         let pub_key_hash = PubKeyHash { data: rng.gen() };
         let address: Address = rng.gen::<[u8; 20]>().into();
@@ -2429,7 +2427,7 @@ mod test {
     fn test_commit_rewind() {
         let _ = env_logger::try_init();
 
-        let mut rng = StdRng::seed_from_u64(0x1234);
+        let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
 
         let pool = ConnectionPool::new();
         let conn = pool.access_storage().unwrap();

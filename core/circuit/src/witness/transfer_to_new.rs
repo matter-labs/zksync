@@ -1,16 +1,16 @@
 use super::utils::*;
-use crate::operation::SignatureData;
-use crate::operation::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::circuit::float_point::convert_to_float;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::operation::SignatureData;
+use crate::operation::*;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
 use models::node::TransferToNewOp;
 use models::params as franklin_constants;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
 
 pub struct TransferToNewData {
     pub amount: u128,

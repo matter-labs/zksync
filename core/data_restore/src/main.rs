@@ -16,9 +16,6 @@ use models::config_options::ConfigurationOptions;
 use storage::ConnectionPool;
 use web3::transports::Http;
 
-use crypto_exports::franklin_crypto;
-use crypto_exports::rand;
-
 const ETH_BLOCKS_STEP: u64 = 1;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
