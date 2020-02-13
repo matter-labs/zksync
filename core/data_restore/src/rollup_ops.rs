@@ -107,7 +107,6 @@ mod test {
     #[test]
     fn test_deposit() {
         let priority_op = Deposit {
-            from: [9u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(10),
             to: "7777777777777777777777777777777777777777".parse().unwrap(),

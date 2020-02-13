@@ -15,7 +15,7 @@ use super::operations::{DepositOp, FullExitOp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
-    pub from: Address,
+    //pub from: Address,
     pub token: TokenId,
     pub amount: BigDecimal,
     pub to: Address,
@@ -40,53 +40,69 @@ impl FranklinPriorityOp {
         pub_data: &[u8],
         op_type_id: u8,
     ) -> Result<Self, failure::Error> {
+        // see contracts/contracts/Operations.sol
         match op_type_id {
             DepositOp::OP_CODE => {
-                let (sender, pub_data_left) = {
-                    let (sender, left) = pub_data.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
-                    (Address::from_slice(sender), left)
-                };
+                let pub_data_left = pub_data;
+
+                // account_id
+                let (_, pub_data_left) = pub_data_left.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
+
+                // token
                 let (token, pub_data_left) = {
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u16::from_be_bytes(token.try_into().unwrap()), left)
                 };
+
+                // amount
                 let (amount, pub_data_left) = {
                     let (amount, left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
                     let amount = u128::from_be_bytes(amount.try_into().unwrap());
                     (u128_to_bigdecimal(amount), left)
                 };
+
+                // account
                 let (account, pub_data_left) = {
                     let (account, left) = pub_data_left.split_at(FR_ADDRESS_LEN);
                     (Address::from_slice(account), left)
                 };
+
                 ensure!(
                     pub_data_left.is_empty(),
                     "DepositOp parse failed: input too big"
                 );
+
                 Ok(Self::Deposit(Deposit {
-                    from: sender,
                     token,
                     amount,
                     to: account,
                 }))
             }
             FullExitOp::OP_CODE => {
+                // account_id
                 let (account_id, pub_data_left) = {
                     let (account_id, left) = pub_data.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
                     (bytes_slice_to_uint32(account_id).unwrap(), left)
                 };
+
+                // owner
                 let (eth_address, pub_data_left) = {
                     let (eth_address, left) = pub_data_left.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
                     (Address::from_slice(eth_address), left)
                 };
+
+                // token
                 let (token, pub_data_left) = {
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u16::from_be_bytes(token.try_into().unwrap()), left)
                 };
+
+                // amount
                 ensure!(
-                    pub_data_left.is_empty(),
+                    pub_data_left.len() == BALANCE_BIT_WIDTH / 8,
                     "FullExitOp parse failed: input too big"
                 );
+
                 Ok(Self::FullExit(FullExit {
                     account_id,
                     eth_address,

@@ -92,7 +92,7 @@ pub const FR_BIT_WIDTH: usize = 254;
 pub const FR_BIT_WIDTH_PADDED: usize = 256;
 
 pub const LEAF_DATA_BIT_WIDTH: usize =
-    NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED;
+    NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED + ETH_ADDRESS_BIT_WIDTH;
 
 /// Number of supported tokens.
 pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
