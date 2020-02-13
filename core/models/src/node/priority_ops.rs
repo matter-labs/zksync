@@ -68,7 +68,7 @@ impl FranklinPriorityOp {
                 };
 
                 ensure!(
-                    pub_data_left.len() == 0,
+                    pub_data_left.is_empty(),
                     "DepositOp parse failed: input too big"
                 );
 
