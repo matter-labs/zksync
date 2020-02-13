@@ -82,7 +82,8 @@ contract Governance {
     /// @return tokens id
     function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
         uint16 tokenId = tokenIds[_tokenAddr];
-        require(tokenAddresses[tokenId] == _tokenAddr, "gvs11"); // gvs11 - unknown ERC20 token address
+        require(_tokenAddr != address(0), "gvs11"); // 0 is not a valid token
+        require(tokenAddresses[tokenId] == _tokenAddr, "gvs12"); // unknown ERC20 token address
         return tokenId;
     }
 

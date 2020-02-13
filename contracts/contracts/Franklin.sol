@@ -89,15 +89,19 @@ contract Franklin is Storage, Config, Events {
         }
     }
 
+    function minU64(uint64 a, uint64 b) internal pure returns (uint64) {
+        return a < b ? a : b;
+    }
+
     /// @notice Accrues users balances from deposit priority requests in Exodus mode
     /// @dev WARNING: Only for Exodus mode
     /// @dev Canceling may take several separate transactions to be completed
     /// @param _requests number of requests to process
     function cancelOutstandingDepositsForExodusMode(uint64 _requests) external {
-        require(exodusMode, "coe01");
+        require(exodusMode, "coe01"); // exodus mode not active
         require(_requests > 0, "coe02"); // provided zero number of requests
-        require(totalOpenPriorityRequests > 0, "coe03"); // no one priority request left
-        uint64 toProcess = totalOpenPriorityRequests < _requests ? totalOpenPriorityRequests : _requests;
+        require(totalOpenPriorityRequests > 0, "coe03"); // no priority requests left
+        uint64 toProcess = minU64(totalOpenPriorityRequests, _requests);
         for (uint64 i = 0; i < toProcess; i++) {
             uint64 id = firstPriorityRequestId + i;
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
@@ -144,12 +148,16 @@ contract Franklin is Storage, Config, Events {
 
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
-        uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
+        uint fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
 
         require(msg.value >= fee + _amount, "fdh11"); // Not enough ETH provided
 
         if (msg.value != fee + _amount) {
-            msg.sender.transfer(msg.value-(fee + _amount));
+            uint refund = msg.value-(fee + _amount);
+
+            // Doublecheck to never refund more than received!
+            require(refund < msg.value, "fdh12");
+            msg.sender.transfer(refund);
         }
 
         registerDeposit(0, _amount, fee, _franklinAddr);
@@ -180,13 +188,13 @@ contract Franklin is Storage, Config, Events {
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(_token);
 
-        require(msg.value >= fee, "fd011"); // Not enough ETH provided to pay the fee
         require(IERC20(_token).transferFrom(msg.sender, address(this), _amount), "fd012"); // token transfer failed deposit
 
         registerDeposit(tokenId, _amount, fee, _franklinAddr);
 
+        require(msg.value >= fee, "fd011"); // Not enough ETH provided to pay the fee
         if (msg.value != fee) {
-            msg.sender.transfer(msg.value-fee);
+            msg.sender.transfer(msg.value - fee);
         }
     }
 
@@ -206,6 +214,8 @@ contract Franklin is Storage, Config, Events {
         uint24 _accountId,
         address _token
     ) external payable {
+        requireActive();
+
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_FULL_EXIT_GAS * tx.gasprice;
@@ -217,9 +227,6 @@ contract Franklin is Storage, Config, Events {
             tokenId = governance.validateTokenAddress(_token);
         }
         
-        require(msg.value >= fee, "fft11"); // Not enough ETH provided to pay the fee
-        requireActive();
-
         // Priority Queue request
         Operations.FullExit memory op = Operations.FullExit({
             accountId:  _accountId,
@@ -230,7 +237,8 @@ contract Franklin is Storage, Config, Events {
         bytes memory pubData = Operations.writeFullExitPubdata(op);
         addPriorityRequest(Operations.OpType.FullExit, fee, pubData);
 
-        if (msg.value != fee) {
+        require(msg.value >= fee, "fft11"); // Not enough ETH provided to pay the fee
+        if (msg.value != fee) {            
             msg.sender.transfer(msg.value-fee);
         }
     }
@@ -271,9 +279,7 @@ contract Franklin is Storage, Config, Events {
     /// @param _amount - token amount
     function registerSingleWithdrawal(uint16 _token, uint128 _amount) internal {
         require(balancesToWithdraw[msg.sender][_token] >= _amount, "frw11"); // insufficient balance withdraw
-
         balancesToWithdraw[msg.sender][_token] -= _amount;
-
         emit OnchainWithdrawal(
             msg.sender,
             _token,
@@ -367,10 +373,7 @@ contract Franklin is Storage, Config, Events {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
 
         uint64 currentOnchainOp = totalOnchainOps;
-
         uint256 currentPointer = 0;
-
-        // (current element, offset)
         uint64[2] memory currentEthWitness;
 
         while (currentPointer < _publicData.length) {
@@ -498,7 +501,6 @@ contract Franklin is Storage, Config, Events {
                 _publicData
             )
         );
-
         return hash;
     }
 
