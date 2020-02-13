@@ -67,11 +67,7 @@ impl DepositOp {
         );
 
         Ok(Self {
-            priority_op: Deposit {
-                token,
-                amount,
-                to,
-            },
+            priority_op: Deposit { token, amount, to },
             account_id,
         })
     }

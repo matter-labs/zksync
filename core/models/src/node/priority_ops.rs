@@ -40,7 +40,6 @@ impl FranklinPriorityOp {
         pub_data: &[u8],
         op_type_id: u8,
     ) -> Result<Self, failure::Error> {
-
         // see contracts/contracts/Operations.sol
         match op_type_id {
             DepositOp::OP_CODE => {
@@ -80,7 +79,6 @@ impl FranklinPriorityOp {
                 }))
             }
             FullExitOp::OP_CODE => {
-
                 // account_id
                 let (account_id, pub_data_left) = {
                     let (account_id, left) = pub_data.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
