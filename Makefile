@@ -165,6 +165,9 @@ prepare-contracts:
 
 # testing
 
+ci-check:
+	@ci-check.sh
+	
 loadtest: confirm_action
 	@bin/loadtest.sh
 
