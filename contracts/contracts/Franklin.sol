@@ -247,18 +247,19 @@ contract Franklin is Storage, Config, Events {
     /// @param _token Token by id
     /// @param _amount Token amount
     /// @param _fee Validator fee
-    /// @param _franklinAddr Receiver
+    /// @param _owner Receiver
     function registerDeposit(
         uint16 _token,
         uint128 _amount,
         uint256 _fee,
-        bytes memory _franklinAddr
+        bytes memory _owner
     ) internal {
-        require(_franklinAddr.length == PUBKEY_HASH_BYTES, "frd11"); // wrong franklin address hash
+        // TODO: replace zksync owner type to address everywhere
+        require(_owner.length == ADDRESS_BYTES, "frd11"); // wrong zksync addr length
         
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
-            owner:      msg.sender,
+            owner:      Bytes.bytesToAddress(_owner),
             tokenId:    _token,
             amount:     _amount
         });
@@ -270,7 +271,7 @@ contract Franklin is Storage, Config, Events {
             _token,
             _amount,
             _fee,
-            _franklinAddr
+            _owner
         );
     }
 

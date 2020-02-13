@@ -20,11 +20,12 @@ contract Events {
 
     /// @notice Event emitted when user send a transaction to deposit her funds
     event OnchainDeposit(
-        address indexed owner,
+        // TODO: index sender or owner?
+        address indexed sender,
         uint16 tokenId,
         uint128 amount,
         uint256 fee,
-        bytes franklinAddress
+        bytes owner
     );
 
     event FactAuth(
