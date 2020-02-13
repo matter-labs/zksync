@@ -1,6 +1,7 @@
 import { utils } from "ethers";
 
 export type Address = string;
+export type PubKeyHash = string;
 
 // ETH or ERC20 address
 export type Token = "ETH" | string;
@@ -15,12 +16,14 @@ export interface AccountState {
             [token: string]: utils.BigNumberish;
         };
         nonce: number;
+        pubKeyHash: PubKeyHash;
     };
     verified: {
         balances: {
             [token: string]: utils.BigNumberish;
         };
         nonce: number;
+        pubKeyHash: PubKeyHash;
     };
 }
 
@@ -42,8 +45,8 @@ export interface Transfer {
 
 export interface Withdraw {
     type: "Withdraw";
-    account: Address;
-    ethAddress: string;
+    from: Address;
+    to: Address;
     token: number;
     amount: utils.BigNumberish;
     fee: utils.BigNumberish;

@@ -1,10 +1,7 @@
-use super::tx::{PackedPublicKey, PackedSignature, TxSignature};
-use super::{AccountAddress, TokenId};
-use super::{AccountId, Nonce};
+use super::AccountId;
+use super::TokenId;
 use crate::params::{
-    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETHEREUM_KEY_BIT_WIDTH, FR_ADDRESS_LEN,
-    NONCE_BIT_WIDTH, SIGNATURE_R_BIT_WIDTH_PADDED, SIGNATURE_S_BIT_WIDTH_PADDED,
-    SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
 use crate::primitives::{bytes_slice_to_uint32, u128_to_bigdecimal};
 use bigdecimal::BigDecimal;
@@ -18,65 +15,17 @@ use super::operations::{DepositOp, FullExitOp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
-    pub sender: Address,
+    pub from: Address,
     pub token: TokenId,
     pub amount: BigDecimal,
-    pub account: AccountAddress,
+    pub to: Address,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FullExit {
     pub account_id: AccountId,
-    pub packed_pubkey: Box<[u8; SUBTREE_HASH_WIDTH_PADDED / 8]>,
     pub eth_address: Address,
     pub token: TokenId,
-    pub nonce: Nonce,
-    pub signature_r: Box<[u8; SIGNATURE_R_BIT_WIDTH_PADDED / 8]>,
-    pub signature_s: Box<[u8; SIGNATURE_S_BIT_WIDTH_PADDED / 8]>,
-}
-
-impl FullExit {
-    const TX_TYPE: u8 = 6;
-
-    pub fn get_bytes(&self) -> Vec<u8> {
-        let mut out = Vec::new();
-        out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
-        out.extend_from_slice(self.packed_pubkey.as_ref());
-        out.extend_from_slice(&self.eth_address.as_bytes());
-        out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&self.nonce.to_be_bytes());
-        out
-    }
-
-    pub fn verify_signature(&self) -> Option<AccountAddress> {
-        let mut sign = Vec::with_capacity(64);
-        sign.extend_from_slice(self.signature_r.as_ref());
-        sign.extend_from_slice(self.signature_s.as_ref());
-
-        let sign = if let Ok(sign) = PackedSignature::deserialize_packed(&sign) {
-            sign
-        } else {
-            return None;
-        };
-
-        let pub_key =
-            if let Ok(pub_key) = PackedPublicKey::deserialize_packed(self.packed_pubkey.as_ref()) {
-                pub_key
-            } else {
-                return None;
-            };
-
-        let restored_signature = TxSignature {
-            pub_key,
-            signature: sign,
-        };
-
-        restored_signature
-            .verify_musig_pedersen(&self.get_bytes())
-            .as_ref()
-            .map(AccountAddress::from_pubkey)
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,7 +43,7 @@ impl FranklinPriorityOp {
         match op_type_id {
             DepositOp::OP_CODE => {
                 let (sender, pub_data_left) = {
-                    let (sender, left) = pub_data.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
+                    let (sender, left) = pub_data.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
                     (Address::from_slice(sender), left)
                 };
                 let (token, pub_data_left) = {
@@ -108,17 +57,17 @@ impl FranklinPriorityOp {
                 };
                 let (account, pub_data_left) = {
                     let (account, left) = pub_data_left.split_at(FR_ADDRESS_LEN);
-                    (AccountAddress::from_bytes(account)?, left)
+                    (Address::from_slice(account), left)
                 };
                 ensure!(
                     pub_data_left.is_empty(),
                     "DepositOp parse failed: input too big"
                 );
                 Ok(Self::Deposit(Deposit {
-                    sender,
+                    from: sender,
                     token,
                     amount,
-                    account,
+                    to: account,
                 }))
             }
             FullExitOp::OP_CODE => {
@@ -126,32 +75,13 @@ impl FranklinPriorityOp {
                     let (account_id, left) = pub_data.split_at(ACCOUNT_ID_BIT_WIDTH / 8);
                     (bytes_slice_to_uint32(account_id).unwrap(), left)
                 };
-                let (packed_pubkey, pub_data_left) = {
-                    let (packed_pubkey, left) =
-                        pub_data_left.split_at(SUBTREE_HASH_WIDTH_PADDED / 8);
-                    (Box::new(packed_pubkey.try_into().unwrap()), left)
-                };
                 let (eth_address, pub_data_left) = {
-                    let (eth_address, left) = pub_data_left.split_at(ETHEREUM_KEY_BIT_WIDTH / 8);
+                    let (eth_address, left) = pub_data_left.split_at(ETH_ADDRESS_BIT_WIDTH / 8);
                     (Address::from_slice(eth_address), left)
                 };
                 let (token, pub_data_left) = {
                     let (token, left) = pub_data_left.split_at(TOKEN_BIT_WIDTH / 8);
                     (u16::from_be_bytes(token.try_into().unwrap()), left)
-                };
-                let (nonce, pub_data_left) = {
-                    let (nonce, left) = pub_data_left.split_at(NONCE_BIT_WIDTH / 8);
-                    (u32::from_be_bytes(nonce.try_into().unwrap()), left)
-                };
-                let (signature_r, pub_data_left) = {
-                    let (signature_r, left) =
-                        pub_data_left.split_at(SIGNATURE_R_BIT_WIDTH_PADDED / 8);
-                    (Box::new(signature_r.try_into().unwrap()), left)
-                };
-                let (signature_s, pub_data_left) = {
-                    let (signature_s, left) =
-                        pub_data_left.split_at(SIGNATURE_S_BIT_WIDTH_PADDED / 8);
-                    (Box::new(signature_s.try_into().unwrap()), left)
                 };
                 ensure!(
                     pub_data_left.is_empty(),
@@ -159,12 +89,8 @@ impl FranklinPriorityOp {
                 );
                 Ok(Self::FullExit(FullExit {
                     account_id,
-                    packed_pubkey,
                     eth_address,
                     token,
-                    nonce,
-                    signature_r,
-                    signature_s,
                 }))
             }
             _ => {

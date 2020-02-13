@@ -11,12 +11,12 @@ var Signer = /** @class */ (function () {
         this.privateKey = privKey;
         this.publicKey = crypto_1.privateKeyToPublicKey(this.privateKey);
     }
-    Signer.prototype.address = function () {
+    Signer.prototype.pubKeyHash = function () {
         return "sync:" + crypto_1.pubkeyToAddress(this.publicKey).toString("hex");
     };
     Signer.prototype.signSyncTransfer = function (transfer) {
         var type = Buffer.from([5]); // tx type
-        var from = serializeAddress(this.address());
+        var from = serializeAddress(transfer.from);
         var to = serializeAddress(transfer.to);
         var token = serializeTokenId(transfer.tokenId);
         var amount = serializeAmountPacked(transfer.amount);
@@ -34,7 +34,7 @@ var Signer = /** @class */ (function () {
         var signature = crypto_1.signTransactionBytes(this.privateKey, msgBytes);
         return {
             type: "Transfer",
-            from: this.address(),
+            from: transfer.from,
             to: transfer.to,
             token: transfer.tokenId,
             amount: ethers_1.utils.bigNumberify(transfer.amount).toString(),
@@ -45,7 +45,7 @@ var Signer = /** @class */ (function () {
     };
     Signer.prototype.signSyncWithdraw = function (withdraw) {
         var typeBytes = Buffer.from([3]);
-        var accountBytes = serializeAddress(this.address());
+        var accountBytes = serializeAddress(withdraw.from);
         var ethAddressBytes = serializeAddress(withdraw.ethAddress);
         var tokenIdBytes = serializeTokenId(withdraw.tokenId);
         var amountBytes = serializeAmountFull(withdraw.amount);
@@ -63,8 +63,8 @@ var Signer = /** @class */ (function () {
         var signature = crypto_1.signTransactionBytes(this.privateKey, msgBytes);
         return {
             type: "Withdraw",
-            account: this.address(),
-            ethAddress: withdraw.ethAddress,
+            from: withdraw.from,
+            to: withdraw.ethAddress,
             token: withdraw.tokenId,
             amount: ethers_1.utils.bigNumberify(withdraw.amount).toString(),
             fee: ethers_1.utils.bigNumberify(withdraw.fee).toString(),
@@ -74,33 +74,16 @@ var Signer = /** @class */ (function () {
     };
     Signer.prototype.signSyncCloseAccount = function (close) {
         var type = Buffer.from([4]);
-        var account = serializeAddress(this.address());
+        var account = serializeAddress(this.pubKeyHash());
         var nonce = serializeNonce(close.nonce);
         var msg = Buffer.concat([type, account, nonce]);
         var signature = crypto_1.signTransactionBytes(this.privateKey, msg);
         return {
             type: "Close",
-            account: this.address(),
+            account: this.pubKeyHash(),
             nonce: close.nonce,
             signature: signature
         };
-    };
-    Signer.prototype.syncEmergencyWithdrawSignature = function (emergencyWithdraw) {
-        var type = Buffer.from([6]);
-        var packed_pubkey = crypto_1.serializePointPacked(this.publicKey);
-        var account_id = serializeAccountId(emergencyWithdraw.accountId);
-        var eth_address = serializeAddress(emergencyWithdraw.ethAddress);
-        var token = serializeTokenId(emergencyWithdraw.tokenId);
-        var nonce = serializeNonce(emergencyWithdraw.nonce);
-        var msg = Buffer.concat([
-            type,
-            account_id,
-            packed_pubkey,
-            eth_address,
-            token,
-            nonce
-        ]);
-        return Buffer.from(crypto_1.signTransactionBytes(this.privateKey, msg).signature, "hex");
     };
     Signer.fromPrivateKey = function (pk) {
         return new Signer(pk);
@@ -127,6 +110,7 @@ function serializeAddress(address) {
     }
     return addressBytes;
 }
+exports.serializeAddress = serializeAddress;
 function serializeAccountId(accountId) {
     if (accountId < 0) {
         throw new Error("Negative account id");
@@ -170,3 +154,4 @@ function serializeNonce(nonce) {
     buff.writeUInt32BE(nonce, 0);
     return buff;
 }
+exports.serializeNonce = serializeNonce;

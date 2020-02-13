@@ -7,11 +7,12 @@ use crate::node::{
 use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
 
-use super::account::AccountAddress;
+use super::account::PubKeyHash;
 use super::Engine;
+use crate::node::operations::ChangePubKeyOp;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
-use ethsign::Signature as ETHSignature;
+use ethsign::{SecretKey, Signature as ETHSignature};
 use failure::{ensure, format_err};
 use ff::{PrimeField, PrimeFieldRepr};
 use franklin_crypto::alt_babyjubjub::fs::FsRepr;
@@ -22,7 +23,7 @@ use franklin_crypto::jubjub::FixedGenerators;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
 use std::str::FromStr;
-use web3::types::Address;
+use web3::types::{Address, H256};
 
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct TxHash {
@@ -80,18 +81,11 @@ impl<'de> Deserialize<'de> for TxHash {
 
 /// Signed by user.
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub enum TxType {
-    Transfer,
-    Withdraw,
-    Close,
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transfer {
-    pub from: AccountAddress,
-    pub to: AccountAddress,
+    pub from: Address,
+    pub to: Address,
     pub token: TokenId,
     pub amount: BigDecimal,
     pub fee: BigDecimal,
@@ -105,8 +99,8 @@ impl Transfer {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.from.data);
-        out.extend_from_slice(&self.to.data);
+        out.extend_from_slice(&self.from.as_bytes());
+        out.extend_from_slice(&self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&pack_token_amount(&self.amount));
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -118,13 +112,14 @@ impl Transfer {
         self.from != self.to
             && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee)
+            && self.verify_signature().is_some()
     }
 
-    pub fn verify_signature(&self) -> bool {
+    pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
-            AccountAddress::from_pubkey(&pub_key) == self.from
+            Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
-            false
+            None
         }
     }
 }
@@ -132,8 +127,8 @@ impl Transfer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Withdraw {
-    pub account: AccountAddress,
-    pub eth_address: Address,
+    pub from: Address,
+    pub to: Address,
     pub token: TokenId,
     pub amount: BigDecimal,
     pub fee: BigDecimal,
@@ -147,8 +142,8 @@ impl Withdraw {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account.data);
-        out.extend_from_slice(self.eth_address.as_bytes());
+        out.extend_from_slice(&self.from.as_bytes());
+        out.extend_from_slice(self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
         out.extend_from_slice(&big_decimal_to_u128(&self.amount).to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
@@ -157,14 +152,16 @@ impl Withdraw {
     }
 
     pub fn check_correctness(&self) -> bool {
-        is_fee_amount_packable(&self.fee) && self.amount <= u128_to_bigdecimal(u128::max_value())
+        is_fee_amount_packable(&self.fee)
+            && self.amount <= u128_to_bigdecimal(u128::max_value())
+            && self.verify_signature().is_some()
     }
 
-    pub fn verify_signature(&self) -> bool {
+    pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
-            AccountAddress::from_pubkey(&pub_key) == self.account
+            Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
-            false
+            None
         }
     }
 }
@@ -172,7 +169,7 @@ impl Withdraw {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Close {
-    pub account: AccountAddress,
+    pub account: Address,
     pub nonce: Nonce,
     pub signature: TxSignature,
 }
@@ -183,26 +180,75 @@ impl Close {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
-        out.extend_from_slice(&self.account.data);
+        out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
 
-    pub fn verify_signature(&self) -> bool {
+    pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
-            AccountAddress::from_pubkey(&pub_key) == self.account
+            Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
-            false
+            None
         }
+    }
+
+    pub fn check_correctness(&self) -> bool {
+        self.verify_signature().is_some()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangePubKey {
+    pub account: Address,
+    pub new_pk_hash: PubKeyHash,
+    pub nonce: Nonce,
+    pub eth_signature: Option<PackedEthSignature>,
+}
+
+impl ChangePubKey {
+    const TX_TYPE: u8 = 7;
+
+    /// GetBytes for this transaction is used for hashing.
+    pub fn get_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account.as_bytes());
+        out.extend_from_slice(&self.new_pk_hash.data);
+        out.extend_from_slice(&self.nonce.to_be_bytes());
+        if let Some(sign) = &self.eth_signature {
+            out.extend_from_slice(&sign.serialize_packed())
+        }
+        out
+    }
+
+    pub fn get_eth_signed_data(nonce: Nonce, new_pubkey_hash: &PubKeyHash) -> Vec<u8> {
+        let mut eth_signed_msg = Vec::with_capacity(24);
+        eth_signed_msg.extend_from_slice(&nonce.to_be_bytes());
+        eth_signed_msg.extend_from_slice(&new_pubkey_hash.data);
+        eth_signed_msg
+    }
+
+    pub fn verify_eth_signature(&self) -> Option<Address> {
+        self.eth_signature.as_ref().and_then(|sign| {
+            sign.signature_recover_signer(&Self::get_eth_signed_data(self.nonce, &self.new_pk_hash))
+                .ok()
+        })
+    }
+
+    pub fn check_correctness(&self) -> bool {
+        self.eth_signature.is_none() || self.verify_eth_signature() == Some(self.account)
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum FranklinTx {
-    Transfer(Transfer),
-    Withdraw(Withdraw),
-    Close(Close),
+    Transfer(Box<Transfer>),
+    Withdraw(Box<Withdraw>),
+    Close(Box<Close>),
+    ChangePubKey(Box<ChangePubKey>),
 }
 
 impl FranklinTx {
@@ -211,6 +257,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
+            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
         };
 
         let mut hasher = Sha256::new();
@@ -220,11 +267,12 @@ impl FranklinTx {
         TxHash { data: out }
     }
 
-    pub fn account(&self) -> AccountAddress {
+    pub fn account(&self) -> Address {
         match self {
-            FranklinTx::Transfer(tx) => tx.from.clone(),
-            FranklinTx::Withdraw(tx) => tx.account.clone(),
-            FranklinTx::Close(tx) => tx.account.clone(),
+            FranklinTx::Transfer(tx) => tx.from,
+            FranklinTx::Withdraw(tx) => tx.from,
+            FranklinTx::Close(tx) => tx.account,
+            FranklinTx::ChangePubKey(tx) => tx.account,
         }
     }
 
@@ -233,6 +281,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.nonce,
             FranklinTx::Withdraw(tx) => tx.nonce,
             FranklinTx::Close(tx) => tx.nonce,
+            FranklinTx::ChangePubKey(tx) => tx.nonce,
         }
     }
 
@@ -240,15 +289,8 @@ impl FranklinTx {
         match self {
             FranklinTx::Transfer(tx) => tx.check_correctness(),
             FranklinTx::Withdraw(tx) => tx.check_correctness(),
-            FranklinTx::Close(_) => true,
-        }
-    }
-
-    pub fn check_signature(&self) -> bool {
-        match self {
-            FranklinTx::Transfer(tx) => tx.verify_signature(),
-            FranklinTx::Withdraw(tx) => tx.verify_signature(),
-            FranklinTx::Close(tx) => tx.verify_signature(),
+            FranklinTx::Close(tx) => tx.check_correctness(),
+            FranklinTx::ChangePubKey(tx) => tx.check_correctness(),
         }
     }
 
@@ -257,6 +299,7 @@ impl FranklinTx {
             FranklinTx::Transfer(tx) => tx.get_bytes(),
             FranklinTx::Withdraw(tx) => tx.get_bytes(),
             FranklinTx::Close(tx) => tx.get_bytes(),
+            FranklinTx::ChangePubKey(tx) => tx.get_bytes(),
         }
     }
 
@@ -265,6 +308,7 @@ impl FranklinTx {
             FranklinTx::Transfer(_) => TransferOp::CHUNKS,
             FranklinTx::Withdraw(_) => WithdrawOp::CHUNKS,
             FranklinTx::Close(_) => CloseOp::CHUNKS,
+            FranklinTx::ChangePubKey(_) => ChangePubKeyOp::CHUNKS,
         }
     }
 
@@ -507,25 +551,48 @@ impl PackedEthSignature {
         }))
     }
 
+    fn message_to_signed_bytes(msg: &[u8]) -> Vec<u8> {
+        let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
+        let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
+        bytes.extend_from_slice(prefix.as_bytes());
+        bytes.extend_from_slice(msg);
+        tiny_keccak::keccak256(&bytes).to_vec()
+    }
+
     /// Checks signature and returns ethereum address of the signer.
     /// message should be the same message that was passed to `eth.sign`(or similar) method
-    /// as argument (no hashing and prefixes required).
+    /// as argument. No hashing and prefixes required.
     pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, failure::Error> {
         let mut signature = self.0.clone();
-        // workaround around ethsign library limitations
+        // workaround for ethsign library limitations
         signature.v = signature
             .v
             .checked_sub(27)
             .ok_or_else(|| format_err!("signature v should be 27 + recovery_id"))?;
-
-        let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
-        let mut bytes = Vec::new();
-        bytes.extend_from_slice(prefix.as_bytes());
-        bytes.extend_from_slice(msg);
-        let final_message = tiny_keccak::keccak256(&bytes);
-
-        let pk = signature.recover(&final_message)?;
+        let signed_bytes = Self::message_to_signed_bytes(msg);
+        let pk = signature.recover(&signed_bytes)?;
         Ok(Address::from_slice(pk.address()))
+    }
+
+    /// Signs message using ethereum private key, results are identical to signature created
+    /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
+    pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, failure::Error> {
+        let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
+        let signed_bytes = Self::message_to_signed_bytes(msg);
+        let mut signed_message = secret_key.sign(&signed_bytes)?;
+        // workaround for ethsign library limitations
+        signed_message.v = signed_message
+            .v
+            .checked_add(27)
+            .ok_or_else(|| format_err!("failed to add 27 to signature v"))?;
+        Ok(PackedEthSignature(signed_message))
+    }
+
+    /// Get Ethereum address from private key,
+    /// TODO: refactor eth signing with utils to other module.
+    pub fn address_from_private_key(private_key: &H256) -> Result<Address, failure::Error> {
+        let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
+        Ok(Address::from_slice(secret_key.public().address()))
     }
 }
 
@@ -621,7 +688,7 @@ mod test {
     }
 
     #[test]
-    fn test_ethereum_signature_with_serialization() {
+    fn test_ethereum_signature_verify_with_serialization() {
         let address: Address = "52312AD6f01657413b2eaE9287f6B9ADaD93D5FE".parse().unwrap();
         let message = "hello world";
 
@@ -654,7 +721,7 @@ mod test {
     }
 
     #[test]
-    fn test_ethereum_signature_examples() {
+    fn test_ethereum_signature_verify_examples() {
         // signatures created using geth
         // e.g. in geth console: eth.sign(eth.accounts[0], "0x")
         let examples = vec![
@@ -676,6 +743,31 @@ mod test {
                 .signature_recover_signer(&msg)
                 .expect("signature verification");
             assert_eq!(address, signer_address, "signer address mismatch");
+        }
+    }
+
+    #[test]
+    fn test_ethereum_signature_sign() {
+        // data generated with `ethers.js`
+        let private_key = "0b43c0f5b5a13a7047408d1f8c8ad32ba5879902ea6212184e0a5d1157281d76"
+            .parse()
+            .unwrap();
+
+        let examples = vec![
+            (b"hello world".to_vec(), "12c24491eefbac7e80f4d3f0400cd804667dab026fda1bc8bfe86650d872ba4215b0a0e297c48a54d9020daa3130222dadcb8f5ffdafc4b9293c3ef818b322b01c"),
+            // empty message
+            (Vec::new(), "8b7385c7bb8913b9fd176247efab0ccc72e3197abe8e2d4c6596ba58a32a91675f66e80560a5f1a42bd50d58da055630ac6c18875e5ba14a362e87e903f083941c"),
+            // v = 27(others v = 28)
+            (vec![0x12, 0x32, 0x12, 0x42], "463d955775a407eadfdb22437d53df42460977bf1c02cf830b579b6bd0000ff366e819af75fb7140e8797d56580acfcac0ad3567bbdeca118a5f5d37f09753f11b")
+        ];
+        for (msg, correct_signature) in examples {
+            println!("message: 0x{}", hex::encode(&msg));
+            let correct_signature = hex::decode(correct_signature).unwrap();
+            let signature = PackedEthSignature::sign(&private_key, &msg)
+                .expect("sign verify")
+                .serialize_packed()
+                .to_vec();
+            assert_eq!(signature, correct_signature, "signature is incorrect");
         }
     }
 }

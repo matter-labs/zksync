@@ -128,7 +128,7 @@ pub fn apply_close_account(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            eth_address: Some(Fr::zero()),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
             pub_nonce: Some(Fr::zero()),

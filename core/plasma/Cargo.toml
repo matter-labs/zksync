@@ -14,4 +14,5 @@ bigdecimal = { version = "0.1.0", features = ["serde"]}
 log = "0.4"
 failure = "0.1"
 ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
+web3 = "0.8.0"
 
