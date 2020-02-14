@@ -1762,7 +1762,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             self.params,
         )?;
 
-        debug!("balance root: {}", balance_root.get_value().unwrap());
+//        debug!("balance root: {}", balance_root.get_value().unwrap());
         let balance_root =
             CircuitElement::from_number(cs.namespace(|| "subtree_root_ce"), balance_root)?;
 
