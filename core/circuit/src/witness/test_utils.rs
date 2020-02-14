@@ -1,11 +1,13 @@
 use crate::account::AccountWitness;
 use crate::circuit::FranklinCircuit;
+use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::bellman::Circuit;
 use crate::franklin_crypto::circuit::test::TestConstraintSystem;
 use crate::operation::Operation;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
+use models::merkle_tree::PedersenHasher;
 use models::node::{Account, AccountId, Address, BlockNumber, Engine, Fr};
 use models::primitives::big_decimal_to_u128;
 use plasma::state::{CollectedFee, PlasmaState};
@@ -55,6 +57,28 @@ impl WitnessAccumulator {
     pub fn add_operation_with_pubdata(&mut self, ops: Vec<Operation<Engine>>, pubdata: Vec<bool>) {
         self.operations.extend(ops.into_iter());
         self.pubdata.extend(pubdata.into_iter());
+    }
+
+    /// Add noops if pubdata isn't of right size
+    pub fn extend_pubdata_with_noops(
+        &mut self,
+        phasher: &PedersenHasher<Engine>,
+        params: &AltJubjubBn256,
+    ) {
+        for _ in 0..models::params::block_size_chunks() - self.operations.len() {
+            let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _sender_x, _sender_y) =
+                crate::witness::utils::generate_dummy_sig_data(&[false], &phasher, &params);
+            self.operations.push(crate::witness::noop::noop_operation(
+                &self.account_tree,
+                self.fee_account_id,
+                &first_sig_msg,
+                &second_sig_msg,
+                &third_sig_msg,
+                &signature,
+                &[Some(false); 256],
+            ));
+            self.pubdata.extend(vec![false; 64]);
+        }
     }
 
     /// After operations are added, collect fees.

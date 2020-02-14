@@ -28,6 +28,9 @@ yarn:
 confirm_action:
 	@bin/.confirm_action
 
+rust-checks:
+	cargo fmt -- --check
+	cargo clippy --tests --benches -- -D warnings
 
 # Database tools
 
