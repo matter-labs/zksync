@@ -304,7 +304,7 @@ mod test {
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
     use ff::Field;
-    use models::node::{Account, Address, Deposit};
+    use models::node::{Account, Deposit};
 
     #[test]
     #[ignore]
@@ -315,7 +315,7 @@ mod test {
         let empty_account_address = [7u8; 20].into();
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                from: Address::zero(),
+                from: empty_account_address,
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: empty_account_address,
@@ -379,7 +379,7 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                from: Address::zero(),
+                from: deposit_to_account_address,
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: deposit_to_account_address,

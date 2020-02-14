@@ -337,7 +337,7 @@ function depositFromETH(deposit) {
                 case 4:
                     mainZkSyncContract = new ethers_1.Contract(deposit.depositTo.provider.contractAddress.mainContract, utils_1.SYNC_MAIN_CONTRACT_INTERFACE, deposit.depositFrom);
                     if (!(deposit.token == "ETH")) return [3 /*break*/, 6];
-                    return [4 /*yield*/, mainZkSyncContract.depositETH(deposit.amount, deposit.depositTo.address().replace("sync:", "0x"), {
+                    return [4 /*yield*/, mainZkSyncContract.depositETH(deposit.amount, deposit.depositTo.address(), {
                             value: ethers_1.utils.bigNumberify(deposit.amount).add(maxFeeInETHToken),
                             gasLimit: ethers_1.utils.bigNumberify("200000"),
                             gasPrice: gasPrice
@@ -350,7 +350,7 @@ function depositFromETH(deposit) {
                     return [4 /*yield*/, erc20contract.approve(deposit.depositTo.provider.contractAddress.mainContract, deposit.amount)];
                 case 7:
                     approveTx = _a.sent();
-                    return [4 /*yield*/, mainZkSyncContract.depositERC20(deposit.token, deposit.amount, deposit.depositTo.address().replace("sync:", "0x"), {
+                    return [4 /*yield*/, mainZkSyncContract.depositERC20(deposit.token, deposit.amount, deposit.depositTo.address(), {
                             gasLimit: ethers_1.utils.bigNumberify("250000"),
                             value: maxFeeInETHToken,
                             nonce: approveTx.nonce + 1,
@@ -457,8 +457,8 @@ var ETHOperation = /** @class */ (function () {
                         txReceipt = _b.sent();
                         for (_i = 0, _a = txReceipt.logs; _i < _a.length; _i++) {
                             log = _a[_i];
-                            priorityQueueLog = utils_1.SYNC_PRIOR_QUEUE_INTERFACE.parseLog(log);
-                            if (priorityQueueLog) {
+                            priorityQueueLog = utils_1.SYNC_MAIN_CONTRACT_INTERFACE.parseLog(log);
+                            if (priorityQueueLog && priorityQueueLog.values.serialId != null) {
                                 this.priorityOpId = priorityQueueLog.values.serialId;
                             }
                         }

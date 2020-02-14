@@ -1,4 +1,4 @@
-pragma solidity 0.5.10;
+pragma solidity 0.5.16;
 
 /// @title Governance Contract
 /// @author Matter Labs
@@ -43,10 +43,7 @@ contract Governance {
     /// @param _token Token address
     function addToken(address _token) external {
         requireGovernor(msg.sender);
-        require(
-            tokenIds[_token] == 0,
-            "gan11"
-        ); // gan11 - token exists
+        require(tokenIds[_token] == 0, "gan11"); // token exists
         tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;
@@ -64,19 +61,13 @@ contract Governance {
     /// @notice Check if specified address is is governor
     /// @param _address Address to check
     function requireGovernor(address _address) public view {
-        require(
-            _address == networkGovernor,
-            "grr11"
-        ); // grr11 - only by governor
+        require(_address == networkGovernor, "grr11"); // only by governor
     }
 
     /// @notice Checks if validator is active
     /// @param _address Validator address
     function requireActiveValidator(address _address) external view {
-        require(
-            validators[_address],
-            "grr21"
-        ); // grr21 - validator is not active
+        require(validators[_address], "grr21"); // validator is not active
     }
 
     /// @notice Validate token id (must be less than total tokens amount)
@@ -91,10 +82,8 @@ contract Governance {
     /// @return tokens id
     function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
         uint16 tokenId = tokenIds[_tokenAddr];
-        require(
-            tokenAddresses[tokenId] == _tokenAddr,
-            "gvs11"
-        ); // gvs11 - unknown ERC20 token address
+        require(_tokenAddr != address(0), "gvs11"); // 0 is not a valid token
+        require(tokenAddresses[tokenId] == _tokenAddr, "gvs12"); // unknown ERC20 token address
         return tokenId;
     }
 

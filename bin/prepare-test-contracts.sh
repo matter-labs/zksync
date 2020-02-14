@@ -10,13 +10,15 @@ OUT_DIR=./contracts/contracts/generated
 rm -rf $OUT_DIR
 mkdir -p $OUT_DIR
 cp $IN_DIR/Governance.sol $OUT_DIR/GovernanceTest.sol
-cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTest.sol
 cp $IN_DIR/PriorityQueue.sol $OUT_DIR/PriorityQueueTest.sol
 cp $IN_DIR/Verifier.sol $OUT_DIR/VerifierTest.sol
+cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTest.sol
+cp $IN_DIR/Storage.sol $OUT_DIR/StorageTest.sol
 
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
 ssed 's/Franklin/FranklinTest/' -i $OUT_DIR/*.sol
+ssed 's/Storage/StorageTest/' -i $OUT_DIR/*.sol
 ssed 's/PriorityQueue/PriorityQueueTest/' -i $OUT_DIR/*.sol
 ssed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
 # Workaround -> priority queue has FranklinTest in method names.

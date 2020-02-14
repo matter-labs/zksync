@@ -13,7 +13,7 @@ import {
     verifierTestContractCode,
 } from "../src.ts/deploy";
 import {expect, use} from "chai";
-import {solidity} from "ethereum-waffle";
+const { createMockProvider, getWallets, solidity } = require("ethereum-waffle");
 import {bigNumberify, hexlify, parseEther} from "ethers/utils";
 import {
     cancelOustandingDepositsForExodus, CHUNKS_SIZE,
@@ -34,9 +34,17 @@ import {
 
 use(solidity);
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
-const exitWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// For: geth
+
+// const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+// const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+
+// For: ganache
+
+const provider = createMockProvider() //{gasLimit: 7000000, gasPrice: 2000000000});
+const [wallet, exitWallet]  = getWallets(provider);
+
 const franklinAddress = "0809101112131415161718192021222334252627";
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 const PRIORITY_QUEUE_EXIRATION = 16;

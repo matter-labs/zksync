@@ -165,11 +165,22 @@ prepare-contracts:
 
 # testing
 
+ci-check:
+	@ci-check.sh
+	
 loadtest: confirm_action
 	@bin/loadtest.sh
 
 integration-testkit: build-contracts
 	cargo run --bin testkit --release
+
+itest: # contracts simple integration tests
+	@bin/prepare-test-contracts.sh
+	@cd contracts && yarn itest
+
+utest: # contracts unit tests
+	@bin/prepare-test-contracts.sh
+	@cd contracts && yarn unit-test
 
 integration-simple:
 	@cd js/tests && yarn && yarn simple
