@@ -2,14 +2,14 @@ use super::utils::*;
 
 use crate::operation::*;
 
-use ff::{Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
 use crate::account::AccountWitness;
 use crate::operation::SignatureData;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::le_bit_vector_into_field_element;
 
-use pairing::bn256::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 
 pub fn noop_operation(
     tree: &CircuitAccountTree,
@@ -91,21 +91,21 @@ mod test {
     use crate::witness::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
-    use bellman::Circuit;
+    use crate::franklin_crypto::bellman::Circuit;
 
-    use ff::{Field, PrimeField};
-    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+    use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+    use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
-    use franklin_crypto::circuit::test::*;
-    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-    use franklin_crypto::jubjub::FixedGenerators;
+    use crate::franklin_crypto::circuit::test::*;
+    use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey};
+    use crate::franklin_crypto::jubjub::FixedGenerators;
     use models::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use models::circuit::utils::*;
     use models::params as franklin_constants;
 
-    use rand::{Rng, SeedableRng, XorShiftRng};
+    use crate::rand::{Rng, SeedableRng, XorShiftRng};
 
     use models::merkle_tree::PedersenHasher;
 

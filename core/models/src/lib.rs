@@ -10,17 +10,47 @@ pub mod merkle_tree;
 pub mod node;
 pub mod params;
 pub mod primitives;
+pub mod serialization;
 
 // TODO: refactor, find new home for all this stuff
+
+pub use crypto_exports::franklin_crypto;
+pub use crypto_exports::rand;
 
 use crate::node::block::Block;
 use crate::node::AccountUpdates;
 use crate::node::BlockNumber;
 use ethabi::{decode, ParamType};
 use failure::format_err;
+use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use serde_bytes;
 use std::convert::TryFrom;
 use web3::types::{Address, Log, U256};
+
+/// Returns hex representation of the field element without `0x` prefix.
+pub fn fe_to_hex<F: PrimeField>(value: &F) -> String {
+    let mut buf: Vec<u8> = Vec::with_capacity(32);
+    value.into_repr().write_be(&mut buf).unwrap();
+    hex::encode(&buf)
+}
+
+pub fn fe_from_hex<F: PrimeField>(value: &str) -> Result<F, failure::Error> {
+    let value = if value.starts_with("0x") {
+        &value[2..]
+    } else {
+        value
+    };
+
+    let mut buf = hex::decode(&value)
+        .map_err(|e| format_err!("could not decode hex: {}, reason: {}", value, e))?;
+    buf.reverse();
+    let mut repr = F::Repr::default();
+    buf.resize(repr.as_ref().len() * 8, 0);
+    repr.read_le(&buf[..])
+        .map_err(|e| format_err!("could not read {}: {}", value, e))?;
+    F::from_repr(repr)
+        .map_err(|e| format_err!("could not convert into prime field: {}: {}", value, e))
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TxMeta {

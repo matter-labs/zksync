@@ -2,7 +2,8 @@
 use std::str::FromStr;
 use std::{net, thread, time};
 // External deps
-use ff::{Field, PrimeField};
+use crypto_exports::franklin_crypto;
+use crypto_exports::pairing::ff::{Field, PrimeField};
 use futures::channel::mpsc;
 // Workspace deps
 use prover::client;

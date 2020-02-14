@@ -2,7 +2,7 @@
 use std::str::FromStr;
 use std::{thread, time};
 // External deps
-use bellman::groth16;
+use crate::franklin_crypto::{self, bellman::groth16};
 use failure::format_err;
 use serde::{Deserialize, Serialize};
 // Workspace deps
@@ -33,7 +33,7 @@ pub struct PublishReq {
 
 #[derive(Debug)]
 pub struct FullBabyProof {
-    proof: bellman::groth16::Proof<models::node::Engine>,
+    proof: franklin_crypto::bellman::groth16::Proof<models::node::Engine>,
     inputs: [models::node::Fr; 1],
     public_data: Vec<u8>,
 }

@@ -1,7 +1,7 @@
 // Library to generate a EVM verifier contract
 
-use bellman::groth16;
-use pairing::{CurveAffine, Engine};
+use crate::franklin_crypto::bellman::groth16;
+use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
 
 fn unpack_g1<E: Engine>(point: &E::G1Affine) -> Vec<String> {
     let uncompressed = point.into_uncompressed();
