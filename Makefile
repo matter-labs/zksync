@@ -174,7 +174,7 @@ loadtest: confirm_action
 
 integration-testkit: build-contracts
 	cargo run --bin testkit --release
-	cargo run --bin exodus --release
+	cargo run --bin exodus_test --release
 
 itest: # contracts simple integration tests
 	@bin/prepare-test-contracts.sh

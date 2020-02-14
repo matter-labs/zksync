@@ -2,7 +2,6 @@ use crate::allocated_structures::*;
 use crate::circuit::check_account_data;
 use crate::element::CircuitElement;
 use crate::operation::{OperationBranch, OperationBranchWitness};
-use crate::utils::pack_bits_to_element;
 use crate::witness::utils::{apply_leaf_operation, get_audits};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
@@ -55,7 +54,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
             self.params,
         )?;
 
-        // ensure root hash of state before applying operation is correct
+        // ensure root hash of state is correct
         cs.enforce(
             || "account audit data corresponds to the root hash",
             |lc| lc + state_root.get_variable(),
@@ -77,7 +76,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
             hash_block.reverse();
             hash_block.truncate(E::Fr::CAPACITY as usize);
 
-            let final_hash = pack_bits_to_element(cs.namespace(|| "final_hash"), &hash_block)?;
+            let final_hash =
+                AllocatedNum::pack_bits_to_element(cs.namespace(|| "final_hash"), &hash_block)?;
 
             cs.enforce(
                 || "enforce external data hash equality",
