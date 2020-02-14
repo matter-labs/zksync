@@ -206,35 +206,15 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
         );
 
         let deposit_operations =
-            circuit::witness::deposit::calculate_deposit_operations_from_witness(
-                &deposit_witness,
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &circuit::operation::SignatureData {
-                    r_packed: vec![Some(false); 256],
-                    s: vec![Some(false); 256],
-                },
-                &[Some(false); 256],
-            );
+            circuit::witness::deposit::calculate_deposit_operations_from_witness(&deposit_witness);
         operations.extend(deposit_operations);
         pub_data.extend(deposit_witness.get_pubdata());
     }
 
-    let phaser = models::merkle_tree::PedersenHasher::<models::node::Engine>::default();
-    let jubjub_params = &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     for _ in 0..models::params::block_size_chunks() - operations.len() {
-        let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _a, _b) =
-            circuit::witness::utils::generate_dummy_sig_data(&[false], &phaser, &jubjub_params);
-
         operations.push(circuit::witness::noop::noop_operation(
             &circuit_tree,
             block.fee_account,
-            &first_sig_msg,
-            &second_sig_msg,
-            &third_sig_msg,
-            &signature,
-            &[Some(false); 256],
         ));
         pub_data.extend(vec![false; 64]);
     }
