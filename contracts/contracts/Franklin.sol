@@ -143,7 +143,7 @@ contract Franklin is Storage, Config, Events {
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
     /// @param _amount Amount to deposit (if user specified msg.value more than this amount + fee - she will recieve difference)
     /// @param _franklinAddr The receiver Layer 2 address
-    function depositETH(uint128 _amount, bytes calldata _franklinAddr) external payable {
+    function depositETH(uint128 _amount, address _franklinAddr) external payable {
         requireActive();
 
         // Fee is:
@@ -177,7 +177,7 @@ contract Franklin is Storage, Config, Events {
     function depositERC20(
         address _token,
         uint128 _amount,
-        bytes calldata _franklinAddr
+        address _franklinAddr
     ) external payable {
         requireActive();
 
@@ -252,14 +252,12 @@ contract Franklin is Storage, Config, Events {
         uint16 _token,
         uint128 _amount,
         uint256 _fee,
-        bytes memory _owner
+        address _owner
     ) internal {
-        // TODO: replace zksync owner type to address everywhere
-        require(_owner.length == ADDRESS_BYTES, "frd11"); // wrong zksync addr length
-        
+
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
-            owner:      Bytes.bytesToAddress(_owner),
+            owner:      _owner,
             tokenId:    _token,
             amount:     _amount
         });
@@ -713,6 +711,7 @@ contract Franklin is Storage, Config, Events {
         });
 
         emit NewPriorityRequest(
+            msg.sender,
             firstPriorityRequestId+totalOpenPriorityRequests,
             uint8(_opType),
             _pubData,

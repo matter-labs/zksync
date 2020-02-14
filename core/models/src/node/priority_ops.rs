@@ -15,7 +15,7 @@ use super::operations::{DepositOp, FullExitOp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deposit {
-    //pub from: Address,
+    pub from: Address,
     pub token: TokenId,
     pub amount: BigDecimal,
     pub to: Address,
@@ -39,6 +39,7 @@ impl FranklinPriorityOp {
     pub fn parse_from_priority_queue_logs(
         pub_data: &[u8],
         op_type_id: u8,
+        sender: Address,
     ) -> Result<Self, failure::Error> {
         // see contracts/contracts/Operations.sol
         match op_type_id {
@@ -73,6 +74,7 @@ impl FranklinPriorityOp {
                 );
 
                 Ok(Self::Deposit(Deposit {
+                    from: sender,
                     token,
                     amount,
                     to: account,
@@ -138,6 +140,7 @@ impl TryFrom<Log> for PriorityOp {
     fn try_from(event: Log) -> Result<PriorityOp, failure::Error> {
         let mut dec_ev = decode(
             &[
+                ParamType::Address,
                 ParamType::Uint(64),  // Serial id
                 ParamType::Uint(8),   // OpType
                 ParamType::Bytes,     // Pubdata
@@ -148,6 +151,7 @@ impl TryFrom<Log> for PriorityOp {
         )
         .map_err(|e| format_err!("Event data decode: {:?}", e))?;
 
+        let sender = dec_ev.remove(0).to_address().unwrap();
         Ok(PriorityOp {
             serial_id: dec_ev
                 .remove(0)
@@ -163,7 +167,7 @@ impl TryFrom<Log> for PriorityOp {
                     .map(|ui| U256::as_u32(ui) as u8)
                     .unwrap();
                 let op_pubdata = dec_ev.remove(0).to_bytes().unwrap();
-                FranklinPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type)
+                FranklinPriorityOp::parse_from_priority_queue_logs(&op_pubdata, op_type, sender)
                     .expect("Failed to parse priority op data")
             },
             deadline_block: dec_ev

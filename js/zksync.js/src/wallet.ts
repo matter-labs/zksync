@@ -273,7 +273,7 @@ export async function depositFromETH(deposit: {
     if (deposit.token == "ETH") {
         ethTransaction = await mainZkSyncContract.depositETH(
             deposit.amount,
-            deposit.depositTo.address().replace("sync:", "0x"),
+            deposit.depositTo.address(),
             {
                 value: utils.bigNumberify(deposit.amount).add(maxFeeInETHToken),
                 gasLimit: utils.bigNumberify("200000"),
@@ -294,7 +294,7 @@ export async function depositFromETH(deposit: {
         ethTransaction = await mainZkSyncContract.depositERC20(
             deposit.token,
             deposit.amount,
-            deposit.depositTo.address().replace("sync:", "0x"),
+            deposit.depositTo.address(),
             {
                 gasLimit: utils.bigNumberify("250000"),
                 value: maxFeeInETHToken,
@@ -391,8 +391,8 @@ class ETHOperation {
 
         const txReceipt = await this.ethTx.wait();
         for (const log of txReceipt.logs) {
-            const priorityQueueLog = SYNC_PRIOR_QUEUE_INTERFACE.parseLog(log);
-            if (priorityQueueLog) {
+            const priorityQueueLog = SYNC_MAIN_CONTRACT_INTERFACE.parseLog(log);
+            if (priorityQueueLog && priorityQueueLog.values.serialId != null) {
                 this.priorityOpId = priorityQueueLog.values.serialId;
             }
         }
