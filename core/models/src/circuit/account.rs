@@ -36,8 +36,7 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
 
         leaf_content.extend(root_hash_bits);
 
-        assert!(leaf_content.len() == params::LEAF_DATA_BIT_WIDTH);
-
+        assert_eq!(leaf_content.len(), params::LEAF_DATA_BIT_WIDTH);
         leaf_content
     }
 }

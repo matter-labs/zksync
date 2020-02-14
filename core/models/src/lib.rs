@@ -27,6 +27,7 @@ use serde_bytes;
 use std::convert::TryFrom;
 use web3::types::{Address, Log, U256};
 
+/// Returns hex representation of the field element without `0x` prefix.
 pub fn fe_to_hex<F: PrimeField>(value: &F) -> String {
     let mut buf: Vec<u8> = Vec::with_capacity(32);
     value.into_repr().write_be(&mut buf).unwrap();

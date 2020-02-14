@@ -820,11 +820,9 @@ impl StorageProcessor {
         self.conn().transaction(|| {
             self.save_block_transactions(block)?;
 
-            let h = fe_to_hex(&block.new_root_hash);
-
             let new_block = StorageBlock {
                 number: i64::from(block.block_number),
-                root_hash: format!("sync-bl:{}", &h),
+                root_hash: format!("sync-bl:{}", fe_to_hex(&block.new_root_hash)),
                 fee_account_id: i64::from(block.fee_account),
                 unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
                 unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
@@ -1190,7 +1188,8 @@ impl StorageProcessor {
 
         let block_transactions = self.get_block_executed_ops(block)?;
 
-        let new_root_hash: Fr = fe_from_hex(&format!("0x{}", &stored_block.root_hash[8..]))
+        assert!(stored_block.root_hash.starts_with("sync-bl:"));
+        let new_root_hash = fe_from_hex::<Fr>(&format!("0x{}", &stored_block.root_hash[8..]))
             .expect("Unparsable root hash");
 
         Ok(Some(Block {

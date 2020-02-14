@@ -10,7 +10,7 @@ authors = [
 
 [dependencies]
 models = { path = "../models", version = "0.0.1" }
-crypto_exports = {path = "../crypto_exports"}
+crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 rust-crypto = "0.2"
 hex = "0.3.2"
 num-traits = "0.2"

@@ -99,16 +99,12 @@ pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
 static mut BLOCK_SIZE_CHUNKS_VALUE: usize = 0;
-// static mut BLOCK_SIZE_CHUNKS_VALUE: usize = 5;
 /// block_size_chunks.
 /// Value must be specified as environment variable at compile time under `BLOCK_SIZE_CHUNKS` key.
 pub fn block_size_chunks() -> usize {
     // use of mutable static is unsafe as it can be mutated by multiple threads.
     // using `unsafe` block as there's no risk of data race, the worst that can
     // happen is we read and set environment value multuple times, which is ok.
-
-    // unsafe { BLOCK_SIZE_CHUNKS_VALUE }
-
     unsafe {
         if BLOCK_SIZE_CHUNKS_VALUE == 0 {
             let value: &'static str = env!("BLOCK_SIZE_CHUNKS");

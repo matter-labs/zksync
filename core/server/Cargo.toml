@@ -11,7 +11,7 @@ storage = { path = "../storage", version = "0.0.1" }
 prover = { path = "../prover", version = "0.0.1" }
 circuit = { path = "../circuit", version = "0.1.1"}
 
-crypto_exports = {path = "../crypto_exports"}
+crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
 hex = "0.3.2"
 ethabi = "8.0.0"

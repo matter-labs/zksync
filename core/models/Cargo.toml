@@ -5,7 +5,7 @@ edition = "2018"
 
 [dependencies]
 bigdecimal = { version = "0.1.0", features = ["serde"]}
-crypto_exports = {path = "../crypto_exports"}
+crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
 ethabi = "8.0.0"
 web3 = "0.8.0"

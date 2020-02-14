@@ -13,6 +13,6 @@ models = { path = "../models", version = "0.0.1" }
 bigdecimal = { version = "0.1.0", features = ["serde"]}
 log = "0.4"
 failure = "0.1"
-crypto_exports = {path = "../crypto_exports"}
+crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 web3 = "0.8.0"
 
