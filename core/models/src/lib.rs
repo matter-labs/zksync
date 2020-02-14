@@ -10,6 +10,7 @@ pub mod merkle_tree;
 pub mod node;
 pub mod params;
 pub mod primitives;
+pub mod prover_utils;
 pub mod serialization;
 
 // TODO: refactor, find new home for all this stuff

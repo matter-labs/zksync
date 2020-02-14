@@ -4,16 +4,7 @@
     "compilerOptions": {
         "optimizer": {
             "enabled": true,
-            "runs": 200,
-            "details": {
-                "peephole": true,
-                "jumpdestRemover": true,
-                "orderLiterals": true,
-                "deduplicate": true,
-                "cse": true,
-                "constantOptimizer": true,
-                "yul": false
-            }
+            "runs": 200
         }
     }
 }

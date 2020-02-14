@@ -6,6 +6,7 @@ edition = "2018"
 
 [dependencies]
 server = { path = "../server", version = "0.0.1" }
+prover = { path = "../prover", version = "0.0.1" }
 models = { path = "../models", version = "0.0.1" }
 storage = { path = "../storage", version = "0.0.1" }
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
@@ -15,6 +16,7 @@ eth_client = { path = "../eth_client", version = "0.1.0"  }
 tokio = { version = "0.2", features = ["full"] }
 futures = { version = "0.3", features = ["compat"] }
 log = "0.4"
+env_logger = "0.6"
 bigdecimal = { version = "0.1.0", features = ["serde"]}
 web3 = "0.8.0"
 ethabi = "8.0.0"

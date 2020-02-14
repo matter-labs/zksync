@@ -162,6 +162,7 @@ gen-keys-if-not-present:
 
 prepare-contracts:
 	@cp ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKeyExit.sol contracts/contracts/VerificationKeyExit.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 
@@ -173,6 +174,7 @@ loadtest: confirm_action
 
 integration-testkit: build-contracts
 	cargo run --bin testkit --release
+	cargo run --bin exodus_test --release
 
 itest: # contracts simple integration tests
 	@bin/prepare-test-contracts.sh

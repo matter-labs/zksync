@@ -57,6 +57,10 @@ impl<T: Transport> ETHClient<T> {
             .await
     }
 
+    pub async fn block_number(&self) -> Result<U256, Error> {
+        self.web3.eth().block_number().compat().await
+    }
+
     pub async fn pending_nonce(&self) -> Result<U256, Error> {
         self.web3
             .eth()

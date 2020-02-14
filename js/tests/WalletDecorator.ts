@@ -88,16 +88,21 @@ export class WalletDecorator {
         };
     }
 
-    static async revertReason(txHash) {
-        const tx = await ethersProvider.getTransaction(txHash);
-        if (tx == null) {
-            return 'tx null';
-        }
-        if (tx.blockNumber == null) {
-            return 'tx blocknumberless';
-        }
-        const code = await ethersProvider.call(tx, tx.blockNumber);
+    static async revertReason(hash) {
+        const tx = await ethersProvider.getTransaction(hash);
 
+        if (!tx) {
+            return "tx not found";
+        }
+        
+        const receipt = await ethersProvider.getTransactionReceipt(hash);
+    
+        if (receipt.status) {
+            return "tx success";
+        } 
+        
+        const code = await ethersProvider.call(tx, tx.blockNumber);
+    
         if (code == '0x') {
             return 'empty revert reason';
         }

@@ -464,11 +464,16 @@ pub fn bytes32_from_slice(bytes: &[u8]) -> Option<[u8; 32]> {
     Some(array)
 }
 
-#[test]
-fn test_bit_iterator_e() {
-    let test_vector = [0xa953_d79b_83f6_ab59, 0x6dea_2059_e200_bd39];
-    let mut reference: Vec<bool> = BitIterator::new(&test_vector).collect();
-    reference.reverse();
-    let out: Vec<bool> = BitIteratorLe::new(&test_vector).collect();
-    assert_eq!(reference, out);
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_bit_iterator_e() {
+        let test_vector = [0xa953_d79b_83f6_ab59, 0x6dea_2059_e200_bd39];
+        let mut reference: Vec<bool> = BitIterator::new(&test_vector).collect();
+        reference.reverse();
+        let out: Vec<bool> = BitIteratorLe::new(&test_vector).collect();
+        assert_eq!(reference, out);
+    }
 }
