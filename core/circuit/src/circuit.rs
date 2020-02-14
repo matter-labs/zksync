@@ -1764,17 +1764,24 @@ pub fn check_account_data<E: JubjubEngine, CS: ConstraintSystem<E>>(
     ))
 }
 
-/// Idea is that account tree state will be extended in the future, so for current balance tree we
-/// append emtpy root hash of the future tree before hashing.
+/// Account tree state will be extended in the future, so for current balance tree we
+/// append emtpy hash to reserve place for the future tree before hashing.
 pub fn calc_account_state_tree_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
-    padded_balance_root: &CircuitElement<E>,
+    balance_root: &CircuitElement<E>,
     params: &E::Params,
 ) -> Result<CircuitElement<E>, SynthesisError> {
-    let mut state_tree_root_input = padded_balance_root.get_bits_le();
+    let mut state_tree_root_input = balance_root
+        .clone()
+        .into_padded_le_bits(FR_BIT_WIDTH_PADDED);
 
     // Pad with empty hash for future account sub tree extension.
-    state_tree_root_input.resize(FR_BIT_WIDTH_PADDED * 2, Boolean::constant(false));
+    state_tree_root_input.extend(vec![Boolean::constant(false); FR_BIT_WIDTH_PADDED]);
+    assert_eq!(
+        state_tree_root_input.len(),
+        FR_BIT_WIDTH_PADDED * 2,
+        "State tree root input should contain 2 padded hashes of the subtrees"
+    );
 
     let state_tree_root = pedersen_hash::pedersen_hash(
         cs.namespace(|| "hash state root and balance root"),
@@ -1816,16 +1823,23 @@ pub fn allocate_account_leaf_bits<E: JubjubEngine, CS: ConstraintSystem<E>>(
         &account_data_packed,
         Expression::constant::<CS>(E::Fr::zero()),
     )?;
-    let subtree_root =
+    let balance_subtree_root =
         CircuitElement::from_number(cs.namespace(|| "balance_subtree_root_ce"), balance_root)?;
-    let state_tree_root =
-        calc_account_state_tree_root(cs.namespace(|| "state_tree_root"), &subtree_root, params)?;
+    let state_tree_root = calc_account_state_tree_root(
+        cs.namespace(|| "state_tree_root"),
+        &balance_subtree_root,
+        params,
+    )?;
 
     // this is safe and just allows the convention. TODO: may be cut to Fr width only?
     account_data
         .extend(state_tree_root.into_padded_le_bits(franklin_constants::FR_BIT_WIDTH_PADDED)); // !!!!!
 
-    Ok((account_data, Boolean::from(is_account_empty), subtree_root))
+    Ok((
+        account_data,
+        Boolean::from(is_account_empty),
+        balance_subtree_root,
+    ))
 }
 
 pub fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
