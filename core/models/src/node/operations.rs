@@ -66,8 +66,15 @@ impl DepositOp {
             &bytes[account_address_offset..account_address_offset + FR_ADDRESS_LEN],
         );
 
+        let from = Address::default(); // unknown from pubdata.
+
         Ok(Self {
-            priority_op: Deposit { token, amount, to },
+            priority_op: Deposit {
+                from,
+                token,
+                amount,
+                to,
+            },
             account_id,
         })
     }

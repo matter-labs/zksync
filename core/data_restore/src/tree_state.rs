@@ -400,6 +400,7 @@ mod test {
     #[test]
     fn test_update_tree_with_one_tx_per_block() {
         let tx1 = Deposit {
+            from: [1u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(1000),
             to: [7u8; 20].into(),
@@ -530,6 +531,7 @@ mod test {
     #[test]
     fn test_update_tree_with_multiple_txs_per_block() {
         let tx1 = Deposit {
+            from: [1u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(1000),
             to: [7u8; 20].into(),

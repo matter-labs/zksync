@@ -5,7 +5,10 @@ pragma solidity 0.5.16;
 /// @author Matter Labs
 contract Config {
 
-    /// @notice Franklin chain address length
+    /// @notice zkSync address length
+    uint8 constant ADDRESS_BYTES = 20;
+
+    // TODO: check everywhere!
     uint8 constant PUBKEY_HASH_BYTES = 20;
 
     /// @notice Public key bytes length

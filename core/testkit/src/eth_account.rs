@@ -125,7 +125,7 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "depositETH",
-                (big_dec_to_u256(amount.clone()), to.as_bytes().to_vec()),
+                (big_dec_to_u256(amount.clone()), *to),
                 Options::with(|opt| {
                     opt.value = Some(big_dec_to_u256(amount.clone() + priority_op_fee()))
                 }),
@@ -236,11 +236,7 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "depositERC20",
-                (
-                    token_contract,
-                    big_dec_to_u256(amount.clone()),
-                    to.as_bytes().to_vec(),
-                ),
+                (token_contract, big_dec_to_u256(amount.clone()), *to),
                 Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
             )
             .await

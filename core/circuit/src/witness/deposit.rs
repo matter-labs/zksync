@@ -315,6 +315,7 @@ mod test {
         let empty_account_address = [7u8; 20].into();
         let deposit_op = DepositOp {
             priority_op: Deposit {
+                from: empty_account_address,
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: empty_account_address,
@@ -378,6 +379,7 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
+                from: deposit_to_account_address,
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: deposit_to_account_address,
@@ -431,6 +433,7 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
+                from: deposit_to_account_address,
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: deposit_to_account_address,
@@ -518,6 +521,7 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
+                from: deposit_to_account_address,
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: deposit_to_account_address,

@@ -20,11 +20,11 @@ contract Events {
 
     /// @notice Event emitted when user send a transaction to deposit her funds
     event OnchainDeposit(
-        address indexed owner,
+        address sender,
         uint16 tokenId,
         uint128 amount,
         uint256 fee,
-        bytes franklinAddress
+        address indexed owner
     );
 
     event FactAuth(
@@ -44,6 +44,7 @@ contract Events {
 
     /// @notice New priority request event. Emitted when a request is placed into mapping
     event NewPriorityRequest(
+        address sender,
         uint64 serialId,
         uint8 opType,
         bytes pubData,

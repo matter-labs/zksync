@@ -143,7 +143,7 @@ contract Franklin is Storage, Config, Events {
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
     /// @param _amount Amount to deposit (if user specified msg.value more than this amount + fee - she will recieve difference)
     /// @param _franklinAddr The receiver Layer 2 address
-    function depositETH(uint128 _amount, bytes calldata _franklinAddr) external payable {
+    function depositETH(uint128 _amount, address _franklinAddr) external payable {
         requireActive();
 
         // Fee is:
@@ -177,7 +177,7 @@ contract Franklin is Storage, Config, Events {
     function depositERC20(
         address _token,
         uint128 _amount,
-        bytes calldata _franklinAddr
+        address _franklinAddr
     ) external payable {
         requireActive();
 
@@ -247,18 +247,17 @@ contract Franklin is Storage, Config, Events {
     /// @param _token Token by id
     /// @param _amount Token amount
     /// @param _fee Validator fee
-    /// @param _franklinAddr Receiver
+    /// @param _owner Receiver
     function registerDeposit(
         uint16 _token,
         uint128 _amount,
         uint256 _fee,
-        bytes memory _franklinAddr
+        address _owner
     ) internal {
-        require(_franklinAddr.length == PUBKEY_HASH_BYTES, "frd11"); // wrong franklin address hash
-        
+
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
-            owner:      msg.sender,
+            owner:      _owner,
             tokenId:    _token,
             amount:     _amount
         });
@@ -270,7 +269,7 @@ contract Franklin is Storage, Config, Events {
             _token,
             _amount,
             _fee,
-            _franklinAddr
+            _owner
         );
     }
 
@@ -712,6 +711,7 @@ contract Franklin is Storage, Config, Events {
         });
 
         emit NewPriorityRequest(
+            msg.sender,
             firstPriorityRequestId+totalOpenPriorityRequests,
             uint8(_opType),
             _pubData,
