@@ -30,6 +30,7 @@ pub mod eth_account;
 pub mod external_commands;
 pub mod zksync_account;
 use models::EncodedProof;
+use web3::types::U64;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ETHAccountId(pub usize);
@@ -133,6 +134,28 @@ impl<T: Transport> AccountSet<T> {
             .expect("FullExit eth call failed")
     }
 
+    fn change_pubkey_with_onchain_auth(
+        &self,
+        eth_account: ETHAccountId,
+        zksync_signer: ZKSyncAccountId,
+        nonce: Option<Nonce>,
+        increment_nonce: bool,
+    ) -> FranklinTx {
+        let zksync_account = &self.zksync_accounts[zksync_signer.0];
+        let auth_nonce = nonce.unwrap_or_else(|| zksync_account.nonce());
+
+        let eth_account = &self.eth_accounts[eth_account.0];
+        let tx_receipt =
+            block_on(eth_account.auth_fact(&zksync_account.pubkey_hash.data, auth_nonce))
+                .expect("Auth pubkey fail");
+        assert_eq!(tx_receipt.status, Some(U64::from(1)), "Auth pubkey fail");
+        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
+            nonce,
+            increment_nonce,
+            true,
+        )))
+    }
+
     fn change_pubkey_with_tx(
         &self,
         zksync_signer: ZKSyncAccountId,
@@ -140,21 +163,11 @@ impl<T: Transport> AccountSet<T> {
         increment_nonce: bool,
     ) -> FranklinTx {
         let zksync_account = &self.zksync_accounts[zksync_signer.0];
-        FranklinTx::ChangePubKeyOffchain(Box::new(
-            zksync_account.create_change_pubkey_tx(nonce, increment_nonce),
-        ))
-    }
-
-    fn change_pubkey_with_priority_op(
-        &self,
-        eth_signer: ETHAccountId,
-        zksync_signer: ZKSyncAccountId,
-    ) -> PriorityOp {
-        block_on(
-            self.eth_accounts[eth_signer.0]
-                .change_pubkey_priority_op(&self.zksync_accounts[zksync_signer.0].pubkey_hash),
-        )
-        .expect("ChangePubKeyHash priority op should not fail")
+        FranklinTx::ChangePubKey(Box::new(zksync_account.create_change_pubkey_tx(
+            nonce,
+            increment_nonce,
+            false,
+        )))
     }
 }
 
@@ -289,6 +302,19 @@ pub fn perform_basic_tests() {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     for token in 0..=1 {
+        // test deposit to other account
+        test_setup.start_block();
+        test_setup.deposit(
+            ETHAccountId(0),
+            ZKSyncAccountId(2),
+            Token(token),
+            deposit_amount.clone(),
+        );
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Deposit to other account test success, token_id: {}", token);
+
         // test two deposits
         test_setup.start_block();
         test_setup.deposit(
@@ -311,7 +337,7 @@ pub fn perform_basic_tests() {
         // test transfers
         test_setup.start_block();
 
-        test_setup.change_pubkey_with_tx(ZKSyncAccountId(1));
+        test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
 
         //should be executed as a transfer
         test_setup.transfer(
@@ -343,7 +369,7 @@ pub fn perform_basic_tests() {
             &deposit_amount / &BigDecimal::from(4),
         );
 
-        test_setup.change_pubkey_with_priority_op(ETHAccountId(1), ZKSyncAccountId(2));
+        test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
 
         test_setup.withdraw(
             ZKSyncAccountId(2),
@@ -581,16 +607,16 @@ impl TestSetup {
         self.execute_tx(tx);
     }
 
-    fn change_pubkey_with_priority_op(
+    fn change_pubkey_with_onchain_auth(
         &mut self,
-        eth_signer: ETHAccountId,
+        eth_account: ETHAccountId,
         zksync_signer: ZKSyncAccountId,
     ) {
-        let op = self
-            .accounts
-            .change_pubkey_with_priority_op(eth_signer, zksync_signer);
+        let tx =
+            self.accounts
+                .change_pubkey_with_onchain_auth(eth_account, zksync_signer, None, true);
 
-        self.execute_priority_op(op);
+        self.execute_tx(tx);
     }
 
     pub fn transfer(

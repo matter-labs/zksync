@@ -1,14 +1,13 @@
 // Built-in deps
 use std::path::PathBuf;
 // External deps
-use bellman;
-use bellman::groth16::generate_random_parameters;
+use crate::franklin_crypto::bellman::groth16::generate_random_parameters;
+use crate::franklin_crypto::bellman::groth16::Parameters;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
+use crate::rand::OsRng;
 use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
 use circuit::operation::*;
-use franklin_crypto::bellman::groth16::Parameters;
-use pairing::bn256::*;
-use rand::OsRng;
 // Workspace deps
 use crate::vk_contract_generator::generate_vk_contract;
 use circuit::exit_circuit::ZksyncExitCircuit;
@@ -56,8 +55,9 @@ fn generate_and_write_parameters<F: Fn() -> Parameters<Bn256>>(
 
     let f_r = File::open(&key_file_path).expect("Unable to open file");
     let mut r = BufReader::new(f_r);
-    let circuit_params = bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
-        .expect("Unable to read proving key");
+    let circuit_params =
+        crate::franklin_crypto::bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
+            .expect("Unable to read proving key");
 
     let contract_content = generate_vk_contract(
         &circuit_params.vk,
@@ -144,11 +144,6 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
             r_packed: vec![None; params::FR_BIT_WIDTH_PADDED],
             s: vec![None; params::FR_BIT_WIDTH_PADDED],
         },
-        eth_signature_data: ETHSignatureData {
-            r: vec![None; 256],
-            s: vec![None; 256],
-            v: None,
-        },
         args: OperationArguments {
             a: None,
             b: None,
@@ -157,7 +152,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
             fee: None,
             pub_nonce: None,
             new_pub_key_hash: None,
-            ethereum_key: None,
+            eth_address: None,
         },
         lhs: OperationBranch {
             address: None,

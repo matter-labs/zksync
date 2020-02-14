@@ -1,7 +1,7 @@
 // External deps
-use bellman::{ConstraintSystem, SynthesisError};
-use franklin_crypto::circuit::Assignment;
-use franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
+use crate::franklin_crypto::circuit::Assignment;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 // Workspace deps
 use crate::element::CircuitElement;
 use models::circuit::account::CircuitAccount;
@@ -34,22 +34,22 @@ impl<E: JubjubEngine> AccountContent<E> {
         mut cs: CS,
         witness: &AccountWitness<E>,
     ) -> Result<Self, SynthesisError> {
-        let nonce = CircuitElement::from_fe_strict(
+        let nonce = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "nonce"),
             || Ok(witness.nonce.grab()?),
             models::params::NONCE_BIT_WIDTH,
         )?;
 
-        let pub_key_hash = CircuitElement::from_fe_strict(
+        let pub_key_hash = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "pub_key_hash"),
             || witness.pub_key_hash.grab(),
             models::params::NEW_PUBKEY_HASH_WIDTH,
         )?;
 
-        let address = CircuitElement::from_fe_strict(
+        let address = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "address"),
             || witness.address.grab(),
-            models::params::ETHEREUM_KEY_BIT_WIDTH,
+            models::params::ETH_ADDRESS_BIT_WIDTH,
         )?;
 
         Ok(Self {

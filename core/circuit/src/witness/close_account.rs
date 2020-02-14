@@ -2,14 +2,14 @@ use super::utils::*;
 
 use crate::operation::*;
 
+use crate::franklin_crypto::bellman::pairing::bn256::*;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::operation::SignatureData;
-use ff::{Field, PrimeField};
-use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::node::operations::CloseOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
 
 pub struct CloseAccountData {
     pub account_address: u32,
@@ -128,7 +128,7 @@ pub fn apply_close_account(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            eth_address: Some(Fr::zero()),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
             pub_nonce: Some(Fr::zero()),
@@ -165,7 +165,6 @@ pub fn calculate_close_account_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: close_account_witness.args.clone(),
         lhs: close_account_witness.before.clone(),
@@ -187,11 +186,11 @@ pub fn calculate_close_account_operations_from_witness(
 //
 //    use crate::circuit::FranklinCircuit;
 //    use bellman::Circuit;
-//    use ff::{Field, PrimeField};
-//    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-//    use franklin_crypto::circuit::test::*;
-//    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-//    use franklin_crypto::jubjub::FixedGenerators;
+//    use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+//    use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+//    use crate::franklin_crypto::circuit::test::*;
+//    use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey};
+//    use crate::franklin_crypto::jubjub::FixedGenerators;
 //    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
 //    use models::circuit::utils::*;
 //    use models::node::tx::PackedPublicKey;

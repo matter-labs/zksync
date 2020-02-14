@@ -1,39 +1,28 @@
 pragma solidity 0.5.16;
 
+
 library Bytes {
 
-    // Compies uint16 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'.
     function toBytesFromUInt16(uint16 self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 240), 2);
     }
 
-    // Compies uint24 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'.
     function toBytesFromUInt24(uint24 self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 232), 3);
     }
 
-    // Compies uint32 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'.
     function toBytesFromUInt32(uint32 self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 224), 4);
     }
 
-    // Compies uint128 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'.
     function toBytesFromUInt128(uint128 self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 128), 16);
     }
 
     // Copies 'len' bytes from 'self' into a new 'bytes memory', starting at index '0'.
-    // Returns the newly created 'bytes memory'
-    // The returned bytes will be of length 'len'.
+    // Returns the newly created 'bytes memory'. The returned bytes will be of length 'len'.
     function toBytesFromBytes32(bytes32 self, uint8 len) internal pure returns (bytes memory bts) {
-        require(
-            len <= 32,
-            "bt211"
-        ); // bt211 - wrong bytes length from 32
+        require(len <= 32, "bt211");
         bts = new bytes(len);
         // Even though the bytes will allocate a full word, we don't want
         // any potential garbage bytes in there.
@@ -44,67 +33,45 @@ library Bytes {
     }
 
     // Copies 'self' into a new 'bytes memory'.
-    // Returns the newly created 'bytes memory'
-    // The returned bytes will be of length '20'.
+    // Returns the newly created 'bytes memory'. The returned bytes will be of length '20'.
     function toBytesFromAddress(address self) internal pure returns (bytes memory bts) {
         bts = toBytesFromBytes32(bytes32(uint(self) << 96), 20);
     }
 
-    // Compies bytes 'self' into a new 'address'.
-    // Returns the newly created 'address'.
-    function bytesToAddress(bytes memory self)
-        internal
-        pure
-        returns (address addr)
-    {
-        require(
-            self.length >= 20,
-            "bbs11"
-        ); // bbs11 - wrong bytes length to address
-
+    function bytesToAddress(bytes memory self) internal pure returns (address addr) {
+        require(self.length >= 20, "bbs11");
         assembly {
             addr := div(mload(add(add(self, 0x20), 0)), 0x1000000000000000000000000)
         }
     }
 
-    // Compies bytes 'self' into a new 'uint16'.
-    // Returns the newly created 'uint16'.
-    function bytesToUInt16(bytes memory self)
-        internal
-        pure
-        returns (uint16)
-    {
-        require(
-            self.length >= 2,
-            "bb611"
-        ); // bb611 - wrong bytes length to 16
-        uint16 tempUint;
-
+    function bytesToUInt16(bytes memory self) internal pure returns (uint16 r) {
+        require(self.length >= 2, "bb611");
         assembly {
-            tempUint := mload(add(add(self, 0x2), 0))
+            r := mload(add(add(self, 0x2), 0))
         }
-
-        return tempUint;
     }
 
-    // Compies bytes 'self' into a new 'uint128'.
-    // Returns the newly created 'uint128'.
-    function bytesToUInt128(bytes memory self)
-        internal
-        pure
-        returns (uint128)
-    {
-        require(
-            self.length >= 16,
-            "bb811"
-        ); // bb811 - wrong bytes length to 128
-        uint128 tempUint;
-
+    function bytesToUInt24(bytes memory self) internal pure returns (uint24 r) {
+        require(self.length >= 3, "bb411");
         assembly {
-            tempUint := mload(add(add(self, 0x10), 0))
+            r := mload(add(add(self, 0x3), 0))
         }
+    }
 
-        return tempUint;
+    function bytesToUInt32(bytes memory self) internal pure returns (uint32 r) {
+        require(self.length >= 4, "bb411");
+        assembly {
+            r := mload(add(add(self, 0x4), 0))
+        }
+    }
+
+    function bytesToUInt128(bytes memory self) internal pure returns (uint128 r)
+    {
+        require(self.length >= 16, "bb811");
+        assembly {
+            r := mload(add(add(self, 0x10), 0))
+        }
     }
 
     function bytesToBytes32(bytes memory  _input) internal pure returns (bytes32 _output) {
@@ -125,10 +92,7 @@ library Bytes {
         pure
         returns (bytes memory)
     {
-        require(
-            _bytes.length >= (_start + _length),
-            "bse11"
-        ); // bse11 - bytes length is less then start byte + length bytes
+        require(_bytes.length >= (_start + _length), "bse11"); // bytes length is less then start byte + length bytes
 
         bytes memory tempBytes;
 
@@ -184,19 +148,52 @@ library Bytes {
         return tempBytes;
     }
 
+    /// Reads byte stream
+    /// @return new_offset - offset + amount of bytes read
+    /// @return data - actually read data
+    function read(bytes memory _data, uint _offset, uint _length) internal pure returns (uint new_offset, bytes memory data) {
+        data = slice(_data, _offset, _length);
+        new_offset = _offset + _length;
+    }
+
+    function readUInt16(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint16 r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 2);
+        r = bytesToUInt16(buf);
+    }
+
+    function readUInt24(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint24 r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 3);
+        r = bytesToUInt24(buf);
+    }
+
+    function readUInt32(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint32 r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 4);
+        r = bytesToUInt32(buf);
+    }
+
+    function readUInt128(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint128 r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 16);
+        r = bytesToUInt128(buf);
+    }
+
+    function readAddress(bytes memory _data, uint _offset) internal pure returns (uint new_offset, address r) {
+        bytes memory buf;
+        (new_offset, buf) = read(_data, _offset, 20);
+        r = bytesToAddress(buf);
+    }
+
     // Original source code: https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol#L13
     // Concatenate bytes arrays in memory
     // Returns the newly created 'bytes memory'.
     function concat(
         bytes memory _preBytes,
         bytes memory _postBytes
-    )
-        internal
-        pure
-        returns (bytes memory)
-    {
+    ) internal pure returns (bytes memory) {
         bytes memory tempBytes;
-
         assembly {
             // Get a location of some free memory and store it in tempBytes as
             // Solidity does for memory variables.
@@ -261,7 +258,6 @@ library Bytes {
               not(31) // Round down to the nearest 32 bytes.
             ))
         }
-
         return tempBytes;
     }
 

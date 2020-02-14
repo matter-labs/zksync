@@ -26,8 +26,8 @@ export declare class Wallet {
     }): Promise<Transaction>;
     close(nonce?: Nonce): Promise<Transaction>;
     isCurrentPubkeySet(): Promise<boolean>;
-    setCurrentPubkeyWithZksyncTx(nonce?: Nonce): Promise<Transaction>;
-    setCurrentPubkeyWithEthereumTx(): Promise<ETHOperation>;
+    setCurrentPubkeyWithZksyncTx(nonce?: Nonce, onchainAuth?: boolean): Promise<Transaction>;
+    authChangePubkey(nonce?: Nonce): Promise<ContractTransaction>;
     getCurrentPubKeyHash(): Promise<PubKeyHash>;
     getNonce(nonce?: Nonce): Promise<number>;
     address(): Address;

@@ -1,233 +1,9 @@
 {
   "interface": [
     {
-      "constant": false,
       "inputs": [
         {
-          "name": "_number",
-          "type": "uint64"
-        }
-      ],
-      "name": "decreaseCommittedRequestsNumber",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "totalCommittedPriorityRequests",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
-          "name": "_number",
-          "type": "uint64"
-        }
-      ],
-      "name": "increaseCommittedRequestsNumber",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "firstPriorityRequestId",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "triggerExodusIfNeeded",
-      "outputs": [
-        {
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
-          "name": "_opType",
-          "type": "uint8"
-        },
-        {
-          "name": "_fee",
-          "type": "uint256"
-        },
-        {
-          "name": "_pubData",
-          "type": "bytes"
-        }
-      ],
-      "name": "addPriorityRequest",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "name": "priorityRequests",
-      "outputs": [
-        {
-          "name": "opType",
-          "type": "uint8"
-        },
-        {
-          "name": "pubData",
-          "type": "bytes"
-        },
-        {
-          "name": "expirationBlock",
-          "type": "uint256"
-        },
-        {
-          "name": "fee",
-          "type": "uint256"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
-          "name": "_number",
-          "type": "uint64"
-        }
-      ],
-      "name": "collectValidatorsFeeAndDeleteRequests",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint256"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "totalOpenPriorityRequests",
-      "outputs": [
-        {
-          "name": "",
-          "type": "uint64"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [
-        {
-          "name": "_opType",
-          "type": "uint8"
-        },
-        {
-          "name": "_pubData",
-          "type": "bytes"
-        },
-        {
-          "name": "_id",
-          "type": "uint64"
-        }
-      ],
-      "name": "isPriorityOpValid",
-      "outputs": [
-        {
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "getOutstandingDeposits",
-      "outputs": [
-        {
-          "name": "depositsPubData",
-          "type": "bytes"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": false,
-      "inputs": [
-        {
-          "name": "_franklinAddress",
-          "type": "address"
-        }
-      ],
-      "name": "setFranklinAddress",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [
-        {
-          "name": "_number",
-          "type": "uint64"
-        }
-      ],
-      "name": "validateNumberOfRequests",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "inputs": [
-        {
+          "internalType": "address",
           "name": "_governanceAddress",
           "type": "address"
         }
@@ -237,36 +13,19 @@
       "type": "constructor"
     },
     {
-      "anonymous": false,
+      "constant": false,
       "inputs": [
         {
-          "indexed": false,
-          "name": "serialId",
-          "type": "uint64"
-        },
-        {
-          "indexed": false,
-          "name": "opType",
-          "type": "uint8"
-        },
-        {
-          "indexed": false,
-          "name": "pubData",
-          "type": "bytes"
-        },
-        {
-          "indexed": false,
-          "name": "expirationBlock",
-          "type": "uint256"
-        },
-        {
-          "indexed": false,
-          "name": "fee",
-          "type": "uint256"
+          "internalType": "address",
+          "name": "_franklinAddress",
+          "type": "address"
         }
       ],
-      "name": "NewPriorityRequest",
-      "type": "event"
+      "name": "setFranklinAddress",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
     }
   ]
 }

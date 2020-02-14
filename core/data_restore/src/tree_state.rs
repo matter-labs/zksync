@@ -232,7 +232,7 @@ impl TreeState {
                     op.tx.account = account.address;
                     op.tx.nonce = account.nonce;
 
-                    let tx = FranklinTx::ChangePubKeyOffchain(Box::new(op.tx.clone()));
+                    let tx = FranklinTx::ChangePubKey(Box::new(op.tx.clone()));
                     let (fee, updates) = self
                         .state
                         .apply_change_pubkey_op(&op)
@@ -245,18 +245,6 @@ impl TreeState {
                     current_op_block_index = self.update_from_tx(
                         tx,
                         tx_result,
-                        &mut fees,
-                        &mut accounts_updated,
-                        current_op_block_index,
-                        &mut ops,
-                    );
-                }
-                FranklinOp::ChangePubKeyOnchain(op) => {
-                    let priority_op = FranklinPriorityOp::ChangePubKeyOnchain(op.priority_op);
-                    let op_result = self.state.execute_priority_op(priority_op.clone());
-                    current_op_block_index = self.update_from_priority_operation(
-                        priority_op,
-                        op_result,
                         &mut fees,
                         &mut accounts_updated,
                         current_op_block_index,
@@ -412,7 +400,7 @@ mod test {
     #[test]
     fn test_update_tree_with_one_tx_per_block() {
         let tx1 = Deposit {
-            from: [7u8; 20].into(),
+            from: [1u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(1000),
             to: [7u8; 20].into(),
@@ -543,7 +531,7 @@ mod test {
     #[test]
     fn test_update_tree_with_multiple_txs_per_block() {
         let tx1 = Deposit {
-            from: [9u8; 20].into(),
+            from: [1u8; 20].into(),
             token: 1,
             amount: BigDecimal::from(1000),
             to: [7u8; 20].into(),

@@ -1,12 +1,12 @@
 use crate::params;
 
-use ff::{Field, PrimeField, PrimeFieldRepr};
-use franklin_crypto::alt_babyjubjub::JubjubEngine;
+use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField, PrimeFieldRepr};
 
+use crate::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
 use crate::merkle_tree::hasher::Hasher;
 use crate::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use crate::primitives::{GetBits, GetBitsFixed};
-use pairing::bn256::{Bn256, Fr};
 
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
 pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, PedersenHasher<Bn256>>;
@@ -51,9 +51,10 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
         state_tree_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false);
 
         leaf_content.extend(state_tree_hash_bits.into_iter());
-        assert!(
-            leaf_content.len() < params::MAX_CIRCUIT_PEDERSEN_HASH_BITS,
-            "Account bit serialization is too big and can't be hashed in the circuit"
+        assert_eq!(
+            leaf_content.len(),
+            params::LEAF_DATA_BIT_WIDTH,
+            "Account bit width mismatch"
         );
         leaf_content
     }

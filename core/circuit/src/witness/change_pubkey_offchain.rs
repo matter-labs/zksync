@@ -1,23 +1,21 @@
 use super::utils::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use crate::utils::convert_eth_signature_to_representation;
-use ff::{Field, PrimeField};
-use franklin_crypto::jubjub::JubjubEngine;
+use crypto_exports::ff::{Field, PrimeField};
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
-use models::node::operations::ChangePubKeyOffchainOp;
-use models::node::Engine;
+use models::node::operations::ChangePubKeyOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
 
 pub struct ChangePubkeyOffChainData {
     pub account_id: u32,
     pub address: Fr,
     pub new_pubkey_hash: Fr,
-    pub eth_signature_data: ETHSignatureData<Engine>,
+    pub nonce: Fr,
 }
 pub struct ChangePubkeyOffChainWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -26,8 +24,8 @@ pub struct ChangePubkeyOffChainWitness<E: JubjubEngine> {
     pub before_root: Option<E::Fr>,
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
-    pub eth_signature_data: ETHSignatureData<E>,
 }
+
 impl<E: JubjubEngine> ChangePubkeyOffChainWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
@@ -43,44 +41,38 @@ impl<E: JubjubEngine> ChangePubkeyOffChainWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.before.witness.account_witness.nonce.unwrap(),
-            franklin_constants::NONCE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut pubdata_bits,
             &self.args.new_pub_key_hash.unwrap(),
             franklin_constants::NEW_PUBKEY_HASH_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
-
-        pubdata_bits.extend(self.eth_signature_data.r.iter().map(|x| x.unwrap()));
-        pubdata_bits.extend(self.eth_signature_data.s.iter().map(|x| x.unwrap()));
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.eth_signature_data.v.unwrap(),
-            franklin_constants::ETH_SIGNATURE_V_BIT_WIDTH,
+            &self.before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
         );
 
-        pubdata_bits.resize(15 * franklin_constants::CHUNK_BIT_WIDTH, false);
+        assert!(pubdata_bits.len() <= ChangePubKeyOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH);
+        pubdata_bits.resize(
+            ChangePubKeyOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
+            false,
+        );
         pubdata_bits
     }
 }
 
 pub fn apply_change_pubkey_offchain_tx(
     tree: &mut CircuitAccountTree,
-    change_pubkey_offchain: &ChangePubKeyOffchainOp,
+    change_pubkey_offchain: &ChangePubKeyOp,
 ) -> ChangePubkeyOffChainWitness<Bn256> {
     let change_pubkey_data = ChangePubkeyOffChainData {
         account_id: change_pubkey_offchain.account_id,
         address: eth_address_to_fr(&change_pubkey_offchain.tx.account),
         new_pubkey_hash: change_pubkey_offchain.tx.new_pk_hash.to_fr(),
-        eth_signature_data: convert_eth_signature_to_representation(
-            &change_pubkey_offchain.tx.eth_signature,
-        ),
+        nonce: Fr::from_str(&change_pubkey_offchain.tx.nonce.to_string()).unwrap(),
     };
 
     apply_change_pubkey_offchain(tree, change_pubkey_data)
@@ -147,19 +139,18 @@ pub fn apply_change_pubkey_offchain(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(change_pubkey_offcahin.address),
+            eth_address: Some(change_pubkey_offcahin.address),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(Fr::zero()),
             fee: Some(Fr::zero()),
             a: Some(a),
             b: Some(b),
-            pub_nonce: Some(Fr::zero()),
+            pub_nonce: Some(change_pubkey_offcahin.nonce),
             new_pub_key_hash: Some(change_pubkey_offcahin.new_pubkey_hash),
         },
         before_root: Some(before_root),
         after_root: Some(after_root),
         tx_type: Some(Fr::from_str("7").unwrap()),
-        eth_signature_data: change_pubkey_offcahin.eth_signature_data,
     }
 }
 
@@ -181,7 +172,6 @@ pub fn calculate_change_pubkey_offchain_from_witness(
             third_sig_msg: Some(Fr::zero()),
             signature_data: SignatureData::init_empty(),
             signer_pub_key_packed: vec![Some(false); 256],
-            eth_signature_data: change_pubkey_offchain_witness.eth_signature_data.clone(),
             args: change_pubkey_offchain_witness.args.clone(),
             lhs: change_pubkey_offchain_witness.before.clone(),
             rhs: change_pubkey_offchain_witness.after.clone(),
@@ -208,8 +198,8 @@ mod test {
             Account::default_with_address(&change_pkhash_to_account_address),
         )]);
 
-        let change_pkhash_op = ChangePubKeyOffchainOp {
-            tx: zksync_account.create_change_pubkey_tx(None, true),
+        let change_pkhash_op = ChangePubKeyOp {
+            tx: zksync_account.create_change_pubkey_tx(None, true, false),
             account_id: change_pkhash_to_account_id,
         };
 

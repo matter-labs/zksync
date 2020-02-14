@@ -262,6 +262,7 @@ impl Rpc for RpcApp {
                     TxAddError::NonceMismatch => 101,
                     TxAddError::IncorrectTx => 103,
                     TxAddError::Other => 104,
+                    TxAddError::ChangePkNotAuthorized => 105,
                 };
                 Error {
                     code: code.into(),

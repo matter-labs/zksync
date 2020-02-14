@@ -84,19 +84,19 @@ fn trigger_exodus(
 
 fn cancel_outstanding_deposits(
     test_setup: &TestSetup,
-    deposit_account: ETHAccountId,
+    deposit_receiver_account: ETHAccountId,
     deposit_token: Token,
     deposit_amount: &BigDecimal,
     call_cancel_account: ETHAccountId,
 ) {
     info!("Canceling outstangind deposits");
     let balance_to_withdraw_before =
-        test_setup.get_balance_to_withdraw(deposit_account, deposit_token);
+        test_setup.get_balance_to_withdraw(deposit_receiver_account, deposit_token);
 
     test_setup.cancel_outstanding_deposits(call_cancel_account);
 
     let balance_to_withdraw_after =
-        test_setup.get_balance_to_withdraw(deposit_account, deposit_token);
+        test_setup.get_balance_to_withdraw(deposit_receiver_account, deposit_token);
 
     assert_eq!(
         balance_to_withdraw_before + deposit_amount,
@@ -351,7 +351,7 @@ fn exit_test() {
     let expire_count_start_block = commit_deposit_to_expire(
         &mut test_setup,
         ETHAccountId(0),
-        ZKSyncAccountId(0),
+        ZKSyncAccountId(1),
         Token(0),
         &deposit_amount,
     );

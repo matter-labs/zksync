@@ -1,13 +1,13 @@
 use super::utils::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::circuit::float_point::convert_to_float;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use ff::{Field, PrimeField};
-use franklin_crypto::circuit::float_point::convert_to_float;
-use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
 use models::params as franklin_constants;
-use pairing::bn256::*;
 
 use models::node::TransferOp;
 use models::primitives::big_decimal_to_u128;
@@ -289,7 +289,7 @@ pub fn apply_transfer(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            eth_address: Some(Fr::zero()),
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
@@ -328,7 +328,6 @@ pub fn calculate_transfer_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_before.clone(),
@@ -344,7 +343,6 @@ pub fn calculate_transfer_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_intermediate.clone(),

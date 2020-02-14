@@ -1,11 +1,11 @@
+use crate::franklin_crypto::bellman::groth16::{
+    create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
+};
+use crate::franklin_crypto::bellman::{Circuit, SynthesisError};
 use crate::node::{Engine, Fr};
 use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum};
 use crate::EncodedProof;
-use franklin_crypto::bellman::groth16::{
-    create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
-};
-use franklin_crypto::bellman::{Circuit, SynthesisError};
-use rand::thread_rng;
+use crypto_exports::rand::thread_rng;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;

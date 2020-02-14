@@ -1,7 +1,7 @@
 // External
-use ff::Field;
-use franklin_crypto::jubjub::JubjubEngine;
-use franklin_crypto::jubjub::{edwards, Unknown};
+use crate::franklin_crypto::bellman::pairing::ff::Field;
+use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Serialize};
 // Workspace
 use crate::account::AccountWitness;
@@ -34,7 +34,6 @@ pub struct Operation<E: JubjubEngine> {
     pub second_sig_msg: Option<E::Fr>,
     pub third_sig_msg: Option<E::Fr>,
     pub signature_data: SignatureData,
-    pub eth_signature_data: ETHSignatureData<E>,
     pub args: OperationArguments<E>,
     pub lhs: OperationBranch<E>,
     pub rhs: OperationBranch<E>,
@@ -48,7 +47,7 @@ pub struct OperationArguments<E: JubjubEngine> {
     pub full_amount: Option<E::Fr>,
     pub fee: Option<E::Fr>,
     pub new_pub_key_hash: Option<E::Fr>,
-    pub ethereum_key: Option<E::Fr>,
+    pub eth_address: Option<E::Fr>,
     pub pub_nonce: Option<E::Fr>,
 }
 
@@ -80,23 +79,6 @@ impl SignatureData {
         SignatureData {
             r_packed: vec![Some(false); 256],
             s: vec![Some(false); 256],
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct ETHSignatureData<E: JubjubEngine> {
-    pub r: Vec<Option<bool>>,
-    pub s: Vec<Option<bool>>,
-    pub v: Option<E::Fr>,
-}
-
-impl<E: JubjubEngine> ETHSignatureData<E> {
-    pub fn init_empty() -> Self {
-        ETHSignatureData {
-            r: vec![Some(false); 256],
-            s: vec![Some(false); 256],
-            v: Some(E::Fr::zero()),
         }
     }
 }

@@ -2,27 +2,27 @@ use super::utils::*;
 
 use crate::operation::*;
 
-use ff::{Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
+use crate::franklin_crypto::circuit::float_point::convert_to_float;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::operation::SignatureData;
-use franklin_crypto::circuit::float_point::convert_to_float;
-use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
 
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
 use models::primitives::big_decimal_to_u128;
-use pairing::bn256::*;
 
 pub struct WithdrawData {
     pub amount: u128,
     pub fee: u128,
     pub token: u32,
     pub account_address: u32,
-    pub ethereum_key: Fr,
+    pub eth_address: Fr,
 }
 pub struct WithdrawWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -65,8 +65,8 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
         pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
@@ -85,8 +85,8 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
         );
         append_be_fixed_width(
             &mut sig_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut sig_bits,
@@ -120,7 +120,7 @@ pub fn apply_withdraw_tx(
         fee: big_decimal_to_u128(&withdraw.tx.fee),
         token: u32::from(withdraw.tx.token),
         account_address: withdraw.account_id,
-        ethereum_key: eth_address_to_fr(&withdraw.tx.to),
+        eth_address: eth_address_to_fr(&withdraw.tx.to),
     };
     // le_bit_vector_into_field_element()
     apply_withdraw(tree, &withdraw_data)
@@ -212,7 +212,7 @@ pub fn apply_withdraw(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(withdraw.ethereum_key),
+            eth_address: Some(withdraw.eth_address),
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
@@ -249,7 +249,6 @@ pub fn calculate_withdraw_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.before.clone(),
@@ -265,7 +264,6 @@ pub fn calculate_withdraw_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
@@ -281,7 +279,6 @@ pub fn calculate_withdraw_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
@@ -297,7 +294,6 @@ pub fn calculate_withdraw_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
@@ -312,7 +308,6 @@ pub fn calculate_withdraw_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
@@ -327,7 +322,6 @@ pub fn calculate_withdraw_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: withdraw_witness.args.clone(),
         lhs: withdraw_witness.after.clone(),
@@ -349,12 +343,13 @@ mod test {
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
     use models::node::Account;
-    use testkit::zksync_account::ZksyncAccount;
     use web3::types::Address;
 
     #[test]
     #[ignore]
     fn test_withdraw() {
+        use testkit::zksync_account::ZksyncAccount;
+
         let zksync_account = ZksyncAccount::rand();
         let account_id = 1;
         let account_address = zksync_account.address;

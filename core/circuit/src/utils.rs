@@ -1,17 +1,16 @@
-use bellman::{ConstraintSystem, SynthesisError};
-use ff::{BitIterator, Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField};
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 
-use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
-use franklin_crypto::circuit::num::{AllocatedNum, Num};
-use franklin_crypto::circuit::Assignment;
-use franklin_crypto::eddsa::Signature;
-use franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
-use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
+use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
+use crate::franklin_crypto::circuit::num::{AllocatedNum, Num};
+use crate::franklin_crypto::circuit::Assignment;
+use crate::franklin_crypto::eddsa::Signature;
+use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
+use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
+use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
-use crate::operation::{ETHSignatureData, SignatureData};
 use models::circuit::utils::le_bit_vector_into_field_element;
-use models::node::tx::PackedEthSignature;
 use models::params as franklin_constants;
 use models::primitives::*;
 
@@ -87,28 +86,6 @@ where
     SignatureData {
         r_packed: sig_r_packed_bits.iter().map(|x| Some(*x)).collect(),
         s: sig_s_bits.iter().map(|x| Some(*x)).collect(),
-    }
-}
-
-pub fn convert_eth_signature_to_representation<E>(
-    signature: &PackedEthSignature,
-) -> ETHSignatureData<E>
-where
-    E: JubjubEngine,
-{
-    let mut signature_r_be_bits: Vec<bool> = bytes_into_be_bits(&signature.0.r);
-    signature_r_be_bits.reverse();
-    signature_r_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-    signature_r_be_bits.reverse();
-    let mut signature_s_be_bits: Vec<bool> = bytes_into_be_bits(&signature.0.s);
-    signature_s_be_bits.reverse();
-    signature_s_be_bits.resize(franklin_constants::FR_BIT_WIDTH_PADDED, false);
-    signature_s_be_bits.reverse();
-
-    ETHSignatureData {
-        r: signature_r_be_bits.iter().map(|x| Some(*x)).collect(),
-        s: signature_s_be_bits.iter().map(|x| Some(*x)).collect(),
-        v: Some(E::Fr::from_str(&signature.0.v.to_string()).unwrap()),
     }
 }
 
@@ -295,4 +272,19 @@ pub fn append_packed_public_key(
     assert_eq!(1, x_bits.len());
     content.extend(y_bits);
     content.extend(x_bits);
+}
+
+pub fn print_boolean_vec(bits: &[Boolean]) {
+    let mut bytes = vec![];
+    for slice in bits.chunks(8) {
+        let mut b = 0u8;
+        for (i, bit) in slice.iter().enumerate() {
+            if bit.get_value().unwrap() {
+                b |= 1u8 << (7 - i);
+            }
+        }
+        bytes.push(b);
+    }
+
+    println!("Hex: {}", hex::encode(&bytes));
 }

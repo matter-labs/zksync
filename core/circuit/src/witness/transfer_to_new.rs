@@ -1,16 +1,16 @@
 use super::utils::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::circuit::float_point::convert_to_float;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use ff::{Field, PrimeField};
-use franklin_crypto::circuit::float_point::convert_to_float;
-use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
 use models::node::TransferToNewOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
 
 pub struct TransferToNewData {
     pub amount: u128,
@@ -62,8 +62,8 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -323,7 +323,7 @@ pub fn apply_transfer_to_new(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(transfer_to_new.new_address),
+            eth_address: Some(transfer_to_new.new_address),
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
@@ -362,7 +362,6 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_before.clone(),
@@ -378,7 +377,6 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_intermediate.clone(),
@@ -394,7 +392,6 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_after.clone(),
@@ -410,7 +407,6 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_after.clone(),
@@ -426,7 +422,6 @@ pub fn calculate_transfer_to_new_operations_from_witness(
         second_sig_msg: Some(*second_sig_msg),
         third_sig_msg: Some(*third_sig_msg),
         signature_data: signature_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
         args: transfer_witness.args.clone(),
         lhs: transfer_witness.from_after.clone(),

@@ -2,8 +2,8 @@
 
 use bigdecimal::BigDecimal;
 use circuit::exit_circuit::create_exit_circuit_with_public_input;
+use crypto_exports::bellman::groth16::Parameters;
 use failure::{ensure, format_err};
-use franklin_crypto::bellman::groth16::Parameters;
 use log::info;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;

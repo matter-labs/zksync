@@ -6,14 +6,14 @@ use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
-use models::node::{AccountId, PriorityOp, PubKeyHash, TokenId};
+use models::node::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 use models::primitives::big_decimal_to_u128;
 use models::EncodedProof;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
 use web3::contract::{Contract, Options};
-use web3::types::{Address, TransactionReceipt, H256, U128, U256, U64};
+use web3::types::{TransactionReceipt, H256, U128, U256, U64};
 use web3::Transport;
 
 const WEB3_POLL_INTERVAL: Duration = Duration::from_millis(50);
@@ -248,7 +248,7 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "depositETH",
-                (big_dec_to_u256(amount.clone()), to.as_bytes().to_vec()),
+                (big_dec_to_u256(amount.clone()), *to),
                 Options::with(|opt| {
                     opt.value = Some(big_dec_to_u256(amount.clone() + priority_op_fee()))
                 }),
@@ -372,11 +372,7 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "depositERC20",
-                (
-                    token_contract,
-                    big_dec_to_u256(amount.clone()),
-                    to.as_bytes().to_vec(),
-                ),
+                (token_contract, big_dec_to_u256(amount.clone()), *to),
                 Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
             )
             .await
@@ -399,6 +395,7 @@ impl<T: Transport> EthereumAccount<T> {
     }
 
     pub async fn commit_block(&self, block: &Block) -> Result<ETHExecResult, failure::Error> {
+        let witness_data = block.get_eth_witness_data();
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
@@ -408,6 +405,8 @@ impl<T: Transport> EthereumAccount<T> {
                     u64::from(block.fee_account),
                     block.get_eth_encoded_root(),
                     block.get_eth_public_data(),
+                    witness_data.0,
+                    witness_data.1,
                 ),
                 Options::default(),
             )
@@ -488,6 +487,33 @@ impl<T: Transport> EthereumAccount<T> {
 
     pub async fn eth_block_number(&self) -> Result<u64, failure::Error> {
         Ok(self.main_contract_eth_client.block_number().await?.as_u64())
+    }
+
+    pub async fn auth_fact(
+        &self,
+        fact: &[u8],
+        nonce: Nonce,
+    ) -> Result<TransactionReceipt, failure::Error> {
+        let signed_tx = self
+            .main_contract_eth_client
+            .sign_call_tx(
+                "authPubkeyHash",
+                (fact.to_vec(), u64::from(nonce)),
+                Options::default(),
+            )
+            .await
+            .map_err(|e| format_err!("AuthFact send err: {}", e))?;
+        Ok(self
+            .main_contract_eth_client
+            .web3
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                Duration::from_millis(500),
+                1,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("AuthFact confirm err: {}", e))?)
     }
 }
 

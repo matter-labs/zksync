@@ -2,7 +2,8 @@
 
 . .setup_env
 
-
+# HACK: We need to rebuild sources in case hardcoded values changed that might affect the keys
+touch core/models/src/lib.rs
 
 mkdir -p $ZKSYNC_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH
 cargo run --bin key_generator --release

@@ -1,25 +1,24 @@
 use crate::allocated_structures::*;
+use crate::circuit::check_account_data;
 use crate::element::CircuitElement;
 use crate::operation::{OperationBranch, OperationBranchWitness};
-use crate::utils::pack_bits_to_element;
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use ff::PrimeFieldRepr;
-use ff::{Field, PrimeField};
-use franklin_crypto::circuit::boolean::Boolean;
-use franklin_crypto::circuit::sha256;
-
-use crate::circuit::check_account_data;
 use crate::witness::utils::{apply_leaf_operation, get_audits};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
-use franklin_crypto::circuit::num::AllocatedNum;
-use franklin_crypto::circuit::Assignment;
-use franklin_crypto::jubjub::JubjubEngine;
+use crypto_exports::franklin_crypto::{
+    bellman::{
+        pairing::ff::{Field, PrimeField, PrimeFieldRepr},
+        Circuit, ConstraintSystem, SynthesisError,
+    },
+    circuit::{boolean::Boolean, num::AllocatedNum, sha256, Assignment},
+    jubjub::JubjubEngine,
+};
 use models::circuit::utils::{append_be_fixed_width, be_bit_vector_into_bytes};
 use models::circuit::CircuitAccountTree;
 use models::node::{AccountId, Engine, Fr, TokenId};
 use models::params::{
-    ADDRESS_WIDTH, BALANCE_BIT_WIDTH, SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
+    ADDRESS_WIDTH, BALANCE_BIT_WIDTH, FR_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED,
+    TOKEN_BIT_WIDTH,
 };
 
 #[derive(Clone)]
@@ -55,7 +54,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
             self.params,
         )?;
 
-        // ensure root hash of state before applying operation is correct
+        // ensure root hash of state is correct
         cs.enforce(
             || "account audit data corresponds to the root hash",
             |lc| lc + state_root.get_variable(),
@@ -65,8 +64,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
         {
             let mut initial_hash_data: Vec<Boolean> = vec![];
             let root_hash_ce =
-                CircuitElement::from_number_padded(cs.namespace(|| "root_hash_ce"), root_hash)?;
-            initial_hash_data.extend(root_hash_ce.get_bits_be());
+                CircuitElement::from_number(cs.namespace(|| "root_hash_ce"), root_hash)?;
+            initial_hash_data.extend(root_hash_ce.into_padded_be_bits(FR_BIT_WIDTH_PADDED));
             initial_hash_data.extend(branch.account.address.get_bits_be());
             initial_hash_data.extend(branch.token.get_bits_be());
             initial_hash_data.extend(branch.balance.get_bits_be());
@@ -77,7 +76,8 @@ impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
             hash_block.reverse();
             hash_block.truncate(E::Fr::CAPACITY as usize);
 
-            let final_hash = pack_bits_to_element(cs.namespace(|| "final_hash"), &hash_block)?;
+            let final_hash =
+                AllocatedNum::pack_bits_to_element(cs.namespace(|| "final_hash"), &hash_block)?;
 
             cs.enforce(
                 || "enforce external data hash equality",
@@ -160,7 +160,7 @@ pub fn create_exit_circuit_with_public_input(
 mod test {
     use super::*;
     use bigdecimal::BigDecimal;
-    use franklin_crypto::circuit::test::TestConstraintSystem;
+    use crypto_exports::franklin_crypto::circuit::test::TestConstraintSystem;
     use models::circuit::account::CircuitAccount;
     use models::circuit::CircuitAccountTree;
     use models::node::Account;

@@ -3,16 +3,13 @@ use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::{thread, time};
 // External
-use ff::{Field, PrimeField};
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use log::info;
 // Workspace deps
 use circuit::operation::SignatureData;
 use circuit::witness::change_pubkey_offchain::{
     apply_change_pubkey_offchain_tx, calculate_change_pubkey_offchain_from_witness,
-};
-use circuit::witness::change_pubkey_onchain::{
-    apply_change_pubkey_onchain_tx, calculate_change_pubkey_operations_from_witness,
 };
 use circuit::witness::full_exit::{
     apply_full_exit_tx, calculate_full_exit_operations_from_witness,
@@ -366,14 +363,6 @@ fn build_prover_data(
                     apply_change_pubkey_offchain_tx(&mut accounts_tree, &change_pkhash_op);
                 let change_pkhash_operations =
                     calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
-                operations.extend(change_pkhash_operations);
-                pub_data.extend(change_pkhash_witness.get_pubdata());
-            }
-            models::node::FranklinOp::ChangePubKeyOnchain(change_pkhash_op) => {
-                let change_pkhash_witness =
-                    apply_change_pubkey_onchain_tx(&mut accounts_tree, &change_pkhash_op);
-                let change_pkhash_operations =
-                    calculate_change_pubkey_operations_from_witness(&change_pkhash_witness);
                 operations.extend(change_pkhash_operations);
                 pub_data.extend(change_pkhash_witness.get_pubdata());
             }

@@ -13,16 +13,16 @@ import {
     verifierTestContractCode,
 } from "../src.ts/deploy";
 import {expect, use} from "chai";
-import {solidity} from "ethereum-waffle";
+const { createMockProvider, getWallets, solidity } = require("ethereum-waffle");
 import {bigNumberify, hexlify, parseEther} from "ethers/utils";
 import {
-    cancelOustandingDepositsForExodus,
+    cancelOustandingDepositsForExodus, CHUNKS_SIZE,
     createDepositPublicData,
     createNoopPublicData,
     createWrongDepositPublicData,
     createWrongNoopPublicData,
     createWrongOperationPublicData,
-    hex_to_ascii,
+    hex_to_ascii, OPERATIONS,
     postBlockCommit,
     postBlockVerify,
     postErc20Deposit,
@@ -34,9 +34,17 @@ import {
 
 use(solidity);
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
-const exitWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// For: geth
+
+// const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+// const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+
+// For: ganache
+
+const provider = createMockProvider() //{gasLimit: 7000000, gasPrice: 2000000000});
+const [wallet, exitWallet]  = getWallets(provider);
+
 const franklinAddress = "0809101112131415161718192021222334252627";
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 const PRIORITY_QUEUE_EXIRATION = 16;
@@ -645,5 +653,41 @@ describe("PLANNED FAILS", function () {
 
         expect(reason1.substring(0, 5)).equal("pcs11");
         console.log(" + Set franklin address twice will not work passed");
+    });
+
+    it("Commit block small priority op chunk", async () => {
+        const shortendPubdataPriorityOps = [];
+
+        const shortDepositPubdata = Buffer.alloc((OPERATIONS.deposit.chunks - 1) * CHUNKS_SIZE, 0);
+        shortDepositPubdata[0] = OPERATIONS.deposit.id; // set correct op type
+        shortendPubdataPriorityOps.push(shortDepositPubdata);
+
+        const shortFullExitPubdata = Buffer.alloc((OPERATIONS.fullExit.chunks - 1) * CHUNKS_SIZE, 0);
+        shortFullExitPubdata[0] = OPERATIONS.fullExit.id; // set correct op type
+        shortendPubdataPriorityOps.push(shortFullExitPubdata);
+
+        const shortChangePubkeyOnchainPubdata = Buffer.alloc((OPERATIONS.changePubkeyOnchain.chunks - 1) * CHUNKS_SIZE, 0);
+        shortChangePubkeyOnchainPubdata[0] = OPERATIONS.changePubkeyOnchain.id; // set correct op type
+        shortendPubdataPriorityOps.push(shortChangePubkeyOnchainPubdata);
+
+        const shortWithdrawPubdata = Buffer.alloc((OPERATIONS.withdraw.chunks - 1) * CHUNKS_SIZE, 0);
+        shortWithdrawPubdata[0] = OPERATIONS.withdraw.id; // set correct op type
+        shortendPubdataPriorityOps.push(shortWithdrawPubdata);
+
+        for (const shortPubdata of shortendPubdataPriorityOps) {
+            await postBlockCommit(
+                provider,
+                wallet,
+                franklinDeployedContract,
+                1,
+                22,
+                "0000000000000000000000000000000000000000000000000000000000000000",
+                shortPubdata,
+                null,
+                null,
+                null,
+                "bse11",
+            );
+        }
     });
 });

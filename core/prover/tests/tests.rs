@@ -3,7 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{env, fs, io, path, thread, time};
 // External deps
-use ff::{Field, PrimeField};
+use crypto_exports::franklin_crypto::{self, bellman};
+use crypto_exports::pairing::ff::{Field, PrimeField};
 // Workspace deps
 use prover;
 use testhelper::TestAccount;
@@ -150,7 +151,7 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
     assert_eq!(circuit_tree.root_hash(), genesis_root_hash);
 
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
-        from: web3::types::Address::zero(),
+        from: validator_test_account.address,
         token: 0,
         amount: bigdecimal::BigDecimal::from(10),
         to: validator_test_account.address,

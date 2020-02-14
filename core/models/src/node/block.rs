@@ -2,8 +2,9 @@ use super::FranklinOp;
 use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
+use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::params::block_size_chunks;
-use ff::{PrimeField, PrimeFieldRepr};
+use crate::serialization::*;
 use web3::types::H256;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -30,23 +31,28 @@ pub enum ExecutedOperations {
 }
 
 impl ExecutedOperations {
-    fn get_eth_public_data(&self) -> Vec<u8> {
+    pub fn get_executed_op(&self) -> Option<&FranklinOp> {
         match self {
-            ExecutedOperations::Tx(exec_tx) => {
-                if let Some(op) = &exec_tx.op {
-                    op.public_data()
-                } else {
-                    Vec::new()
-                }
-            }
-            ExecutedOperations::PriorityOp(exec_op) => exec_op.op.public_data(),
+            ExecutedOperations::Tx(exec_tx) => exec_tx.op.as_ref(),
+            ExecutedOperations::PriorityOp(exec_op) => Some(&exec_op.op),
         }
+    }
+
+    pub fn get_eth_public_data(&self) -> Vec<u8> {
+        self.get_executed_op()
+            .map(|op| op.public_data())
+            .unwrap_or_default()
+    }
+
+    pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
+        self.get_executed_op().map(|op| op.eth_witness())
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block {
     pub block_number: BlockNumber,
+    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
     pub new_root_hash: Fr,
     pub fee_account: AccountId,
     pub block_transactions: Vec<ExecutedOperations>,
@@ -77,6 +83,40 @@ impl Block {
         executed_tx_pub_data.resize(block_size_chunks() * 8, 0x00);
 
         executed_tx_pub_data
+    }
+
+    fn get_noops(&self) -> usize {
+        let used_chunks = self
+            .block_transactions
+            .iter()
+            .map(|op| {
+                op.get_executed_op()
+                    .map(|op| op.chunks())
+                    .unwrap_or_default()
+            })
+            .sum::<usize>();
+
+        block_size_chunks() - used_chunks
+    }
+
+    /// Returns eth_witness data and bytes used by each of the operations
+    pub fn get_eth_witness_data(&self) -> (Vec<u8>, Vec<u64>) {
+        let (eth_witness, mut used_bytes) = self.block_transactions.iter().fold(
+            (Vec::new(), Vec::new()),
+            |(mut eth_witness, mut used_bytes), op| {
+                if let Some(witness_bytes) = op.get_eth_witness_bytes() {
+                    used_bytes.push(witness_bytes.len() as u64);
+                    eth_witness.extend(witness_bytes.into_iter());
+                }
+                (eth_witness, used_bytes)
+            },
+        );
+
+        for _ in 0..self.get_noops() {
+            used_bytes.push(0);
+        }
+
+        (eth_witness, used_bytes)
     }
 
     pub fn number_of_processed_prior_ops(&self) -> u64 {

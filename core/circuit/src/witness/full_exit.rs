@@ -1,20 +1,20 @@
 use super::utils::*;
 
+use crate::franklin_crypto::bellman::pairing::bn256::*;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use ff::{Field, PrimeField};
-use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
 use models::node::FullExitOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
 pub struct FullExitData {
     pub token: u32,
     pub account_address: u32,
-    pub ethereum_key: Fr,
+    pub eth_address: Fr,
 }
 pub struct FullExitWitness<E: JubjubEngine> {
     pub before: OperationBranch<E>,
@@ -39,8 +39,8 @@ impl<E: JubjubEngine> FullExitWitness<E> {
         );
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.ethereum_key.unwrap(),
-            franklin_constants::ETHEREUM_KEY_BIT_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -66,7 +66,7 @@ pub fn apply_full_exit_tx(
     let full_exit = FullExitData {
         token: u32::from(full_exit.priority_op.token),
         account_address: full_exit.priority_op.account_id,
-        ethereum_key: eth_address_to_fr(&full_exit.priority_op.eth_address),
+        eth_address: eth_address_to_fr(&full_exit.priority_op.eth_address),
     };
 
     // le_bit_vector_into_field_element()
@@ -156,7 +156,7 @@ pub fn apply_full_exit(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(full_exit.ethereum_key),
+            eth_address: Some(full_exit.eth_address),
             amount_packed: Some(Fr::zero()),
             full_amount: Some(amount_to_exit),
             fee: Some(Fr::zero()),
@@ -198,7 +198,6 @@ pub fn calculate_full_exit_operations_from_witness(
         lhs: full_exit_witness.before.clone(),
         rhs: full_exit_witness.before.clone(),
         signature_data: empty_sig_data.clone(),
-        eth_signature_data: ETHSignatureData::init_empty(),
     });
 
     for (i, pubdata_chunk) in pubdata_chunks.iter().cloned().enumerate().take(6).skip(1) {
@@ -215,7 +214,6 @@ pub fn calculate_full_exit_operations_from_witness(
             lhs: full_exit_witness.after.clone(),
             rhs: full_exit_witness.after.clone(),
             signature_data: empty_sig_data.clone(),
-            eth_signature_data: ETHSignatureData::init_empty(),
         });
     }
 

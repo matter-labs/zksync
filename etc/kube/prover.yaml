@@ -19,7 +19,7 @@ spec:
           path: /home/docker
       containers:
       - name: ${ZKSYNC_ENV}-prover
-        image: matterlabs/prover:${ZKSYNC_ENV}
+        image: matterlabs/prover:${IMAGE_TAG}
         imagePullPolicy: Always
         volumeMounts:
         - name: keys-dir
@@ -36,8 +36,6 @@ spec:
           value: "${TX_BATCH_SIZE}"
         - name: MAX_OUTSTANDING_TXS
           value: "${MAX_OUTSTANDING_TXS}"
-        - name: PROVER_DATABASE_URL
-          value: "${PROVER_DATABASE_URL}"
         - name: DB_POOL_SIZE
           value: "${DB_POOL_SIZE}"
         - name: ACCOUNT_TREE_DEPTH
