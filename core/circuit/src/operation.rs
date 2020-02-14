@@ -1,7 +1,7 @@
 // External
-use ff::Field;
-use franklin_crypto::jubjub::JubjubEngine;
-use franklin_crypto::jubjub::{edwards, Unknown};
+use crate::franklin_crypto::bellman::pairing::ff::Field;
+use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Serialize};
 // Workspace
 use crate::account::AccountWitness;

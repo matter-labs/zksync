@@ -1,12 +1,12 @@
-use bellman::{ConstraintSystem, SynthesisError};
-use ff::{BitIterator, Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField};
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 
-use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
-use franklin_crypto::circuit::num::{AllocatedNum, Num};
-use franklin_crypto::circuit::Assignment;
-use franklin_crypto::eddsa::Signature;
-use franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
-use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
+use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
+use crate::franklin_crypto::circuit::num::{AllocatedNum, Num};
+use crate::franklin_crypto::circuit::Assignment;
+use crate::franklin_crypto::eddsa::Signature;
+use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
+use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
 use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
@@ -272,4 +272,19 @@ pub fn append_packed_public_key(
     assert_eq!(1, x_bits.len());
     content.extend(y_bits);
     content.extend(x_bits);
+}
+
+pub fn print_boolean_vec(bits: &[Boolean]) {
+    let mut bytes = vec![];
+    for slice in bits.chunks(8) {
+        let mut b = 0u8;
+        for (i, bit) in slice.iter().enumerate() {
+            if bit.get_value().unwrap() {
+                b |= 1u8 << (7 - i);
+            }
+        }
+        bytes.push(b);
+    }
+
+    println!("Hex: {}", hex::encode(&bytes));
 }

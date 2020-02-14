@@ -302,6 +302,19 @@ pub fn perform_basic_tests() {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     for token in 0..=1 {
+        // test deposit to other account
+        test_setup.start_block();
+        test_setup.deposit(
+            ETHAccountId(0),
+            ZKSyncAccountId(2),
+            Token(token),
+            deposit_amount.clone(),
+        );
+        test_setup
+            .execute_commit_and_verify_block()
+            .expect("Block execution failed");
+        println!("Deposit to other account test success, token_id: {}", token);
+
         // test two deposits
         test_setup.start_block();
         test_setup.deposit(

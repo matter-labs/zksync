@@ -1,11 +1,11 @@
 use crate::params;
 
-use ff::{Field, PrimeField, PrimeFieldRepr};
-use franklin_crypto::alt_babyjubjub::JubjubEngine;
+use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField, PrimeFieldRepr};
 
+use crate::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
 use crate::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use crate::primitives::{GetBits, GetBitsFixed};
-use pairing::bn256::{Bn256, Fr};
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
 pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, PedersenHasher<Bn256>>;
 pub struct CircuitAccount<E: JubjubEngine> {
@@ -36,6 +36,7 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
 
         leaf_content.extend(root_hash_bits);
 
+        assert_eq!(leaf_content.len(), params::LEAF_DATA_BIT_WIDTH);
         leaf_content
     }
 }

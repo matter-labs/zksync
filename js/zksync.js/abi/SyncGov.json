@@ -1,74 +1,41 @@
 {
   "interface": [
     {
-      "constant": true,
       "inputs": [
         {
-          "name": "",
-          "type": "uint16"
-        }
-      ],
-      "name": "tokenAddresses",
-      "outputs": [
-        {
-          "name": "",
+          "internalType": "address",
+          "name": "_networkGovernor",
           "type": "address"
         }
       ],
       "payable": false,
-      "stateMutability": "view",
-      "type": "function"
+      "stateMutability": "nonpayable",
+      "type": "constructor"
     },
     {
-      "constant": false,
+      "anonymous": false,
       "inputs": [
         {
-          "name": "_validator",
+          "indexed": false,
+          "internalType": "address",
+          "name": "token",
           "type": "address"
         },
         {
-          "name": "_active",
-          "type": "bool"
-        }
-      ],
-      "name": "setValidator",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [
-        {
-          "name": "_address",
-          "type": "address"
-        }
-      ],
-      "name": "requireActiveValidator",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
-      "constant": true,
-      "inputs": [],
-      "name": "totalTokens",
-      "outputs": [
-        {
-          "name": "",
+          "indexed": false,
+          "internalType": "uint16",
+          "name": "tokenId",
           "type": "uint16"
         }
       ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
+      "name": "TokenAdded",
+      "type": "event"
     },
     {
       "constant": false,
       "inputs": [
         {
+          "internalType": "address",
           "name": "_token",
           "type": "address"
         }
@@ -80,28 +47,10 @@
       "type": "function"
     },
     {
-      "constant": true,
-      "inputs": [
-        {
-          "name": "_tokenId",
-          "type": "uint16"
-        }
-      ],
-      "name": "isValidTokenId",
-      "outputs": [
-        {
-          "name": "",
-          "type": "bool"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "view",
-      "type": "function"
-    },
-    {
       "constant": false,
       "inputs": [
         {
+          "internalType": "address",
           "name": "_newGovernor",
           "type": "address"
         }
@@ -116,15 +65,17 @@
       "constant": true,
       "inputs": [
         {
-          "name": "_tokenAddr",
-          "type": "address"
+          "internalType": "uint16",
+          "name": "_tokenId",
+          "type": "uint16"
         }
       ],
-      "name": "validateTokenAddress",
+      "name": "isValidTokenId",
       "outputs": [
         {
+          "internalType": "bool",
           "name": "",
-          "type": "uint16"
+          "type": "bool"
         }
       ],
       "payable": false,
@@ -137,6 +88,7 @@
       "name": "networkGovernor",
       "outputs": [
         {
+          "internalType": "address",
           "name": "",
           "type": "address"
         }
@@ -149,6 +101,22 @@
       "constant": true,
       "inputs": [
         {
+          "internalType": "address",
+          "name": "_address",
+          "type": "address"
+        }
+      ],
+      "name": "requireActiveValidator",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "internalType": "address",
           "name": "_address",
           "type": "address"
         }
@@ -160,18 +128,40 @@
       "type": "function"
     },
     {
+      "constant": false,
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_validator",
+          "type": "address"
+        },
+        {
+          "internalType": "bool",
+          "name": "_active",
+          "type": "bool"
+        }
+      ],
+      "name": "setValidator",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
       "constant": true,
       "inputs": [
         {
+          "internalType": "uint16",
           "name": "",
-          "type": "address"
+          "type": "uint16"
         }
       ],
-      "name": "validators",
+      "name": "tokenAddresses",
       "outputs": [
         {
+          "internalType": "address",
           "name": "",
-          "type": "bool"
+          "type": "address"
         }
       ],
       "payable": false,
@@ -182,6 +172,7 @@
       "constant": true,
       "inputs": [
         {
+          "internalType": "address",
           "name": "",
           "type": "address"
         }
@@ -189,6 +180,7 @@
       "name": "tokenIds",
       "outputs": [
         {
+          "internalType": "uint16",
           "name": "",
           "type": "uint16"
         }
@@ -198,32 +190,61 @@
       "type": "function"
     },
     {
-      "inputs": [
+      "constant": true,
+      "inputs": [],
+      "name": "totalTokens",
+      "outputs": [
         {
-          "name": "_networkGovernor",
-          "type": "address"
-        }
-      ],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "constructor"
-    },
-    {
-      "anonymous": false,
-      "inputs": [
-        {
-          "indexed": false,
-          "name": "token",
-          "type": "address"
-        },
-        {
-          "indexed": false,
-          "name": "tokenId",
+          "internalType": "uint16",
+          "name": "",
           "type": "uint16"
         }
       ],
-      "name": "TokenAdded",
-      "type": "event"
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_tokenAddr",
+          "type": "address"
+        }
+      ],
+      "name": "validateTokenAddress",
+      "outputs": [
+        {
+          "internalType": "uint16",
+          "name": "",
+          "type": "uint16"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
+        }
+      ],
+      "name": "validators",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
+      "type": "function"
     }
   ]
 }
