@@ -10,6 +10,7 @@ authors = [
 
 [dependencies]
 models = { path = "../models", version = "0.0.1" }
+plasma = { path = "../plasma", version = "0.1.1" }
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 rust-crypto = "0.2"
 hex = "0.3.2"
@@ -20,7 +21,6 @@ serde_derive = "1.0.90"
 serde_json = "1.0.0"
 
 [dev-dependencies]
-plasma = { path = "../plasma", version = "0.1.1" }
 bigdecimal = { version = "0.1.0", features = ["serde"]}
 testkit = { path = "../testkit", version = "0.1.0"}
 web3 = "0.8.0"
