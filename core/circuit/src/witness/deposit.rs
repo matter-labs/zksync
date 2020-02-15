@@ -186,7 +186,7 @@ pub fn calculate_deposit_operations_from_witness(
     let first_sig_msg = &Fr::zero();
     let second_sig_msg = &Fr::zero();
     let third_sig_msg = &Fr::zero();
-    let signature_data = &SignatureData::default();
+    let signature_data = &SignatureData::init_empty();
     let signer_pub_key_packed = &[Some(false); 256]; //doesn't matter for deposit
     let pubdata_chunks: Vec<_> = deposit_witness
         .get_pubdata()

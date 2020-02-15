@@ -170,7 +170,7 @@ pub fn calculate_change_pubkey_offchain_from_witness(
             first_sig_msg: Some(Fr::zero()),
             second_sig_msg: Some(Fr::zero()),
             third_sig_msg: Some(Fr::zero()),
-            signature_data: SignatureData::default(),
+            signature_data: SignatureData::init_empty(),
             signer_pub_key_packed: vec![Some(false); 256],
             args: change_pubkey_offchain_witness.args.clone(),
             lhs: change_pubkey_offchain_witness.before.clone(),

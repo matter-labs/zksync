@@ -30,8 +30,7 @@ confirm_action:
 
 rust-checks:
 	cargo fmt -- --check
-	@# bash has troubles with wildcards
-	zsh -c "touch core/**/*.rs"
+	@find core/ -type f -name "*.rs" -exec touch {} +
 	cargo clippy --tests --benches -- -D warnings
 
 # Database tools

@@ -12,7 +12,7 @@ use models::circuit::utils::le_bit_vector_into_field_element;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 
 pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256> {
-    let signature_data = SignatureData::default();
+    let signature_data = SignatureData::init_empty();
     let first_sig_msg = Fr::zero();
     let second_sig_msg = Fr::zero();
     let third_sig_msg = Fr::zero();

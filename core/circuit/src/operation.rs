@@ -5,7 +5,6 @@ use crate::franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Serialize};
 // Workspace
 use crate::account::AccountWitness;
-use std::default::Default;
 
 #[derive(Clone, Debug)]
 pub struct OperationBranchWitness<E: JubjubEngine> {
@@ -75,8 +74,8 @@ pub struct SignatureData {
     pub s: Vec<Option<bool>>,
 }
 
-impl Default for SignatureData {
-    fn default() -> Self {
+impl SignatureData {
+    pub fn init_empty() -> Self {
         Self {
             r_packed: vec![Some(false); 256],
             s: vec![Some(false); 256],
