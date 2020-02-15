@@ -177,7 +177,7 @@ impl OperationNotifier {
             ETHOP_SUB_PREFIX,
             serial_id,
             action.to_string(),
-            rand::random::<u64>()
+            crypto_exports::rand::random::<u64>()
         ));
 
         // Maybe it was executed already
@@ -285,7 +285,7 @@ impl OperationNotifier {
             TX_SUB_PREFIX,
             hash.to_string(),
             action.to_string(),
-            rand::random::<u64>()
+            crypto_exports::rand::random::<u64>()
         ));
 
         // Maybe tx was executed already.
@@ -374,7 +374,7 @@ impl OperationNotifier {
             ACCOUNT_SUB_PREFIX,
             address,
             action.to_string(),
-            rand::random::<u64>()
+            crypto_exports::rand::random::<u64>()
         ));
 
         let account_state = if let Some(account) = match action {

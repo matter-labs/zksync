@@ -3,7 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{env, fs, io, path, thread, time};
 // External deps
-use ff::{Field, PrimeField};
+use crypto_exports::franklin_crypto::{self, bellman};
+use crypto_exports::pairing::ff::{Field, PrimeField};
 // Workspace deps
 use prover;
 use testhelper::TestAccount;
@@ -148,7 +149,7 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
     assert_eq!(circuit_tree.root_hash(), genesis_root_hash);
 
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
-        from: web3::types::Address::zero(),
+        from: validator_test_account.address,
         token: 0,
         amount: bigdecimal::BigDecimal::from(10),
         to: validator_test_account.address,
@@ -203,35 +204,15 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
         );
 
         let deposit_operations =
-            circuit::witness::deposit::calculate_deposit_operations_from_witness(
-                &deposit_witness,
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &circuit::operation::SignatureData {
-                    r_packed: vec![Some(false); 256],
-                    s: vec![Some(false); 256],
-                },
-                &[Some(false); 256],
-            );
+            circuit::witness::deposit::calculate_deposit_operations_from_witness(&deposit_witness);
         operations.extend(deposit_operations);
         pub_data.extend(deposit_witness.get_pubdata());
     }
 
-    let phaser = models::merkle_tree::PedersenHasher::<models::node::Engine>::default();
-    let jubjub_params = &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     for _ in 0..models::params::block_size_chunks() - operations.len() {
-        let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _a, _b) =
-            circuit::witness::utils::generate_dummy_sig_data(&[false], &phaser, &jubjub_params);
-
         operations.push(circuit::witness::noop::noop_operation(
             &circuit_tree,
             block.fee_account,
-            &first_sig_msg,
-            &second_sig_msg,
-            &third_sig_msg,
-            &signature,
-            &[Some(false); 256],
         ));
         pub_data.extend(vec![false; 64]);
     }
@@ -340,7 +321,6 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
         &self,
         _block: i64,
         p: bellman::groth16::Proof<models::node::Engine>,
-        _public_data_commitment: models::node::Fr,
     ) -> Result<(), failure::Error> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();

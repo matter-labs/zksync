@@ -4,7 +4,7 @@ use std::time;
 // External deps
 use backoff;
 use backoff::Operation;
-use bellman::groth16;
+use crypto_exports::franklin_crypto::bellman::groth16;
 use failure::format_err;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -12,6 +12,7 @@ use serde::{Deserialize, Serialize};
 use crate::client;
 use crate::prover_data::ProverData;
 use models::config_options::ConfigurationOptions;
+use models::prover_utils::encode_proof;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {
@@ -33,13 +34,6 @@ pub struct WorkingOnReq {
 pub struct PublishReq {
     pub block: u32,
     pub proof: models::EncodedProof,
-}
-
-#[derive(Debug)]
-pub struct FullBabyProof {
-    proof: bellman::groth16::Proof<models::node::Engine>,
-    inputs: [models::node::Fr; 1],
-    public_data: Vec<u8>,
 }
 
 #[derive(Debug)]
@@ -196,16 +190,9 @@ impl crate::ApiClient for ApiClient {
         &self,
         block: i64,
         proof: groth16::Proof<models::node::Engine>,
-        public_data_commitment: models::node::Fr,
     ) -> Result<(), failure::Error> {
         let mut op = || -> Result<(), backoff::Error<failure::Error>> {
-            let full_proof = FullBabyProof {
-                proof: proof.clone(),
-                inputs: [public_data_commitment],
-                public_data: vec![0 as u8; 10],
-            };
-
-            let encoded = encode_proof(&full_proof);
+            let encoded = encode_proof(&proof);
 
             let client = self.get_client()?;
             let res = client
@@ -229,20 +216,4 @@ impl crate::ApiClient for ApiClient {
         op.retry(&mut Self::get_backoff())
             .map_err(|e| format_err!("Timeout: {}", e))
     }
-}
-
-fn encode_proof(proof: &FullBabyProof) -> models::EncodedProof {
-    // proof
-    // pub a: E::G1Affine,
-    // pub b: E::G2Affine,
-    // pub c: E::G1Affine
-
-    let (a_x, a_y) = models::primitives::serialize_g1_for_ethereum(proof.proof.a);
-
-    let ((b_x_0, b_x_1), (b_y_0, b_y_1)) =
-        models::primitives::serialize_g2_for_ethereum(proof.proof.b);
-
-    let (c_x, c_y) = models::primitives::serialize_g1_for_ethereum(proof.proof.c);
-
-    [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y]
 }

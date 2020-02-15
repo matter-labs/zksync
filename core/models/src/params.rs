@@ -2,19 +2,22 @@
 use std::env;
 use std::str::FromStr;
 // External deps
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
 // Workspace deps
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::node::TokenId;
 
 static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 0;
+// static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 24;
 /// account_tree_depth.
 /// Value must be specified as environment variable at compile time under `ACCOUNT_TREE_DEPTH_VALUE` key.
 pub fn account_tree_depth() -> usize {
     // use of mutable static is unsafe as it can be mutated by multiple threads.
     // There's no risk of data race, the worst that can happen is that we parse
     // and set environment value multuple times, which is ok.
+    // unsafe { ACCOUNT_TREE_DEPTH_VALUE }
+
     unsafe {
         if ACCOUNT_TREE_DEPTH_VALUE == 0 {
             let value: &'static str = env!("ACCOUNT_TREE_DEPTH");
@@ -88,6 +91,9 @@ pub const SIGNATURE_R_BIT_WIDTH_PADDED: usize = 256;
 pub const FR_BIT_WIDTH: usize = 254;
 pub const FR_BIT_WIDTH_PADDED: usize = 256;
 
+pub const LEAF_DATA_BIT_WIDTH: usize =
+    NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED + ETH_ADDRESS_BIT_WIDTH;
+
 /// Number of supported tokens.
 pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
@@ -122,6 +128,7 @@ pub const PRIORITY_EXPIRATION: u64 = 250;
 pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const KEY_FILENAME: &str = "zksync_pk.key";
+pub const EXIT_KEY_FILENAME: &str = "zksync_exit_pk.key";
 
 pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 

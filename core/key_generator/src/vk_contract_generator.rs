@@ -1,7 +1,7 @@
 // Library to generate a EVM verifier contract
 
-use bellman::groth16;
-use pairing::{CurveAffine, Engine};
+use crate::franklin_crypto::bellman::groth16;
+use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
 
 fn unpack_g1<E: Engine>(point: &E::G1Affine) -> Vec<String> {
     let uncompressed = point.into_uncompressed();
@@ -68,7 +68,7 @@ pub fn generate_vk_contract<E: Engine>(
         r#"
 // This contract is generated programmatically
 
-pragma solidity 0.5.10;
+pragma solidity 0.5.16;
 
 
 // Hardcoded constants to avoid accessing store

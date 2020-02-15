@@ -2,13 +2,15 @@
 use std::convert::TryInto;
 use std::str::FromStr;
 // External deps
+use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
+use crate::franklin_crypto::bellman::pairing::ff::ScalarEngine;
+use crate::franklin_crypto::bellman::pairing::ff::{
+    BitIterator, Field, PrimeField, PrimeFieldRepr,
+};
+use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
+use crate::franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
 use bigdecimal::BigDecimal;
 use failure::bail;
-use ff::ScalarEngine;
-use ff::{BitIterator, Field, PrimeField, PrimeFieldRepr};
-use franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
-use pairing::bn256::Bn256;
-use pairing::{CurveAffine, Engine};
 use web3::types::U256;
 // Workspace deps
 use crate::circuit::utils::append_le_fixed_width;
@@ -181,7 +183,7 @@ pub fn pack_edwards_point<E: JubjubEngine>(
 
 #[test]
 fn test_get_bits() {
-    use pairing::bn256::Fr;
+    use crate::franklin_crypto::bellman::pairing::bn256::Fr;
 
     // 12 = b1100, 3 lowest bits in little endian encoding are: 0, 0, 1.
     let bits = Fr::from_str("12").unwrap().get_bits_le_fixed(3);
@@ -462,11 +464,16 @@ pub fn bytes32_from_slice(bytes: &[u8]) -> Option<[u8; 32]> {
     Some(array)
 }
 
-#[test]
-fn test_bit_iterator_e() {
-    let test_vector = [0xa953_d79b_83f6_ab59, 0x6dea_2059_e200_bd39];
-    let mut reference: Vec<bool> = BitIterator::new(&test_vector).collect();
-    reference.reverse();
-    let out: Vec<bool> = BitIteratorLe::new(&test_vector).collect();
-    assert_eq!(reference, out);
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_bit_iterator_e() {
+        let test_vector = [0xa953_d79b_83f6_ab59, 0x6dea_2059_e200_bd39];
+        let mut reference: Vec<bool> = BitIterator::new(&test_vector).collect();
+        reference.reverse();
+        let out: Vec<bool> = BitIteratorLe::new(&test_vector).collect();
+        assert_eq!(reference, out);
+    }
 }

@@ -2,24 +2,22 @@ use super::utils::*;
 
 use crate::operation::*;
 
-use ff::{Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
 use crate::account::AccountWitness;
 use crate::operation::SignatureData;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::le_bit_vector_into_field_element;
 
-use pairing::bn256::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
 
-pub fn noop_operation(
-    tree: &CircuitAccountTree,
-    acc_id: u32,
-    first_sig_msg: &Fr,
-    second_sig_msg: &Fr,
-    third_sig_msg: &Fr,
-    signature_data: &SignatureData,
-    signer_pub_key_packed: &[Option<bool>],
-) -> Operation<Bn256> {
+pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256> {
+    let signature_data = SignatureData::init_empty();
+    let first_sig_msg = Fr::zero();
+    let second_sig_msg = Fr::zero();
+    let third_sig_msg = Fr::zero();
+    let signer_pub_key_packed = [Some(false); 256];
+
     let acc = tree.get(acc_id).unwrap();
     let account_address_fe = Fr::from_str(&acc_id.to_string()).unwrap();
     let token_fe = Fr::zero();
@@ -39,10 +37,10 @@ pub fn noop_operation(
         tx_type: Some(Fr::from_str("0").unwrap()),
         chunk: Some(Fr::from_str("0").unwrap()),
         pubdata_chunk: Some(pubdata_chunks[0]),
-        first_sig_msg: Some(*first_sig_msg),
-        second_sig_msg: Some(*second_sig_msg),
-        third_sig_msg: Some(*third_sig_msg),
-        signature_data: signature_data.clone(),
+        first_sig_msg: Some(first_sig_msg),
+        second_sig_msg: Some(second_sig_msg),
+        third_sig_msg: Some(third_sig_msg),
+        signature_data,
         signer_pub_key_packed: signer_pub_key_packed.to_vec(),
 
         args: OperationArguments {
@@ -85,27 +83,28 @@ pub fn noop_operation(
         },
     }
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::witness::utils::public_data_commitment;
 
     use crate::circuit::FranklinCircuit;
-    use bellman::Circuit;
+    use crate::franklin_crypto::bellman::Circuit;
 
-    use ff::{Field, PrimeField};
-    use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+    use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+    use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
-    use franklin_crypto::circuit::test::*;
-    use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-    use franklin_crypto::jubjub::FixedGenerators;
+    use crate::franklin_crypto::circuit::test::*;
+    use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey};
+    use crate::franklin_crypto::jubjub::FixedGenerators;
     use models::circuit::account::{
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use models::circuit::utils::*;
     use models::params as franklin_constants;
 
-    use rand::{Rng, SeedableRng, XorShiftRng};
+    use crate::rand::{Rng, SeedableRng, XorShiftRng};
 
     use models::merkle_tree::PedersenHasher;
 
@@ -175,21 +174,7 @@ mod test {
 
         tree.insert(account_address, sender_leaf_initial);
 
-        let sig_bits_to_hash = vec![false; 1]; //just a trash for consistency
-        let (signature_data, first_sig_part, second_sig_part, third_sig_part) =
-            generate_sig_data(&sig_bits_to_hash, &phasher, &sender_sk, params);
-
-        // println!(" capacity {}",<Bn256 as JubjubEngine>::Fs::Capacity);
-
-        let operation = noop_operation(
-            &tree,
-            validator_address_number,
-            &first_sig_part,
-            &second_sig_part,
-            &third_sig_part,
-            &signature_data,
-            &[Some(false); 256],
-        );
+        let operation = noop_operation(&tree, validator_address_number);
         let (_, validator_account_witness) = apply_fee(&mut tree, validator_address_number, 0, 0);
         let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
 

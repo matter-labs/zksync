@@ -1,16 +1,16 @@
 use super::utils::*;
 
+use crate::franklin_crypto::bellman::pairing::bn256::*;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use ff::{Field, PrimeField};
-use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
     append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
 };
 use models::node::DepositOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
 
 pub struct DepositData {
     pub amount: u128,
@@ -182,12 +182,12 @@ pub fn apply_deposit(
 
 pub fn calculate_deposit_operations_from_witness(
     deposit_witness: &DepositWitness<Bn256>,
-    first_sig_msg: &Fr,
-    second_sig_msg: &Fr,
-    third_sig_msg: &Fr,
-    signature_data: &SignatureData,
-    signer_pub_key_packed: &[Option<bool>], // WHY? What signer?
 ) -> Vec<Operation<Bn256>> {
+    let first_sig_msg = &Fr::zero();
+    let second_sig_msg = &Fr::zero();
+    let third_sig_msg = &Fr::zero();
+    let signature_data = &SignatureData::init_empty();
+    let signer_pub_key_packed = &[Some(false); 256]; //doesn't matter for deposit
     let pubdata_chunks: Vec<_> = deposit_witness
         .get_pubdata()
         .chunks(64)
@@ -303,8 +303,7 @@ mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
-    use ff::Field;
-    use models::node::{Account, Address, Deposit};
+    use models::node::{Account, Deposit};
 
     #[test]
     #[ignore]
@@ -315,7 +314,7 @@ mod test {
         let empty_account_address = [7u8; 20].into();
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                from: Address::zero(),
+                from: empty_account_address,
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: empty_account_address,
@@ -338,17 +337,7 @@ mod test {
         );
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(
-            &deposit_witness,
-            &Fr::zero(),
-            &Fr::zero(),
-            &Fr::zero(),
-            &SignatureData {
-                r_packed: vec![Some(false); 256],
-                s: vec![Some(false); 256],
-            },
-            &[Some(false); 256], //doesn't matter for deposit
-        );
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
         witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
@@ -379,7 +368,7 @@ mod test {
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
-                from: Address::zero(),
+                from: deposit_to_account_address,
                 token: 0,
                 amount: BigDecimal::from(1),
                 to: deposit_to_account_address,
@@ -392,17 +381,7 @@ mod test {
         println!("node root hash after op: {:?}", plasma_state.root_hash());
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(
-            &deposit_witness,
-            &Fr::zero(),
-            &Fr::zero(),
-            &Fr::zero(),
-            &SignatureData {
-                r_packed: vec![Some(false); 256],
-                s: vec![Some(false); 256],
-            },
-            &[Some(false); 256], //doesn't matter for deposit
-        );
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
         witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
@@ -418,5 +397,151 @@ mod test {
         );
 
         check_circuit(witness_accum.into_circuit_instance());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_transpile_deposit_franklin_existing_account() {
+        let deposit_to_account_id = 1;
+        let deposit_to_account_address =
+            "1111111111111111111111111111111111111111".parse().unwrap();
+        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
+            deposit_to_account_id,
+            Account::default_with_address(&deposit_to_account_address),
+        )]);
+
+        let deposit_op = DepositOp {
+            priority_op: Deposit {
+                from: deposit_to_account_address,
+                token: 0,
+                amount: BigDecimal::from(1),
+                to: deposit_to_account_address,
+            },
+            account_id: deposit_to_account_id,
+        };
+
+        plasma_state.apply_deposit_op(&deposit_op);
+
+        let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+        let pub_data_from_witness = deposit_witness.get_pubdata();
+
+        witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+        witness_accum.collect_fees(&Vec::new());
+        witness_accum.calculate_pubdata_commitment();
+
+        assert_eq!(
+            plasma_state.root_hash(),
+            witness_accum
+                .root_after_fees
+                .expect("witness accum after root hash empty"),
+            "root hash in state keeper and witness generation code mismatch"
+        );
+
+        use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
+        use crate::franklin_crypto::bellman::plonk::adaptor::alternative::*;
+        use crate::franklin_crypto::bellman::plonk::plonk::generator::*;
+        use crate::franklin_crypto::bellman::plonk::plonk::prover::*;
+
+        use crate::franklin_crypto::bellman::Circuit;
+
+        let mut transpiler = Transpiler::new();
+
+        let c = witness_accum.into_circuit_instance();
+
+        c.clone().synthesize(&mut transpiler).unwrap();
+
+        println!("Done transpiling");
+
+        let hints = transpiler.into_hints();
+
+        use crate::franklin_crypto::bellman::plonk::cs::Circuit as PlonkCircuit;
+
+        let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
+
+        let mut assembly = GeneratorAssembly::<Bn256>::new();
+        adapted_curcuit.synthesize(&mut assembly).unwrap();
+        assembly.finalize();
+
+        println!("Transpiled into {} gates", assembly.num_gates());
+
+        println!("Trying to prove");
+
+        let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
+
+        let mut prover = ProvingAssembly::<Bn256>::new();
+        adapted_curcuit.synthesize(&mut prover).unwrap();
+        prover.finalize();
+
+        println!("Checking if is satisfied");
+        assert!(prover.is_satisfied());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_new_transpile_deposit_franklin_existing_account() {
+        let deposit_to_account_id = 1;
+        let deposit_to_account_address =
+            "1111111111111111111111111111111111111111".parse().unwrap();
+        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
+            deposit_to_account_id,
+            Account::default_with_address(&deposit_to_account_address),
+        )]);
+
+        let deposit_op = DepositOp {
+            priority_op: Deposit {
+                from: deposit_to_account_address,
+                token: 0,
+                amount: BigDecimal::from(1),
+                to: deposit_to_account_address,
+            },
+            account_id: deposit_to_account_id,
+        };
+
+        plasma_state.apply_deposit_op(&deposit_op);
+
+        let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+        let pub_data_from_witness = deposit_witness.get_pubdata();
+
+        witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+        witness_accum.collect_fees(&Vec::new());
+        witness_accum.calculate_pubdata_commitment();
+
+        assert_eq!(
+            plasma_state.root_hash(),
+            witness_accum
+                .root_after_fees
+                .expect("witness accum after root hash empty"),
+            "root hash in state keeper and witness generation code mismatch"
+        );
+
+        use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
+        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
+        use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
+        use crate::franklin_crypto::bellman::plonk::better_cs::test_assembly::*;
+
+        use crate::franklin_crypto::bellman::Circuit;
+
+        let mut transpiler = Transpiler::new();
+
+        let c = witness_accum.into_circuit_instance();
+
+        c.clone().synthesize(&mut transpiler).unwrap();
+
+        println!("Done transpiling");
+
+        let hints = transpiler.into_hints();
+
+        let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
+
+        let mut assembly = TestAssembly::<Bn256>::new();
+        adapted_curcuit.synthesize(&mut assembly).unwrap();
+        let num_gates = assembly.num_gates();
+
+        println!("Transpiled into {} gates", num_gates);
+
+        println!("Check if satisfied");
+        assert!(assembly.is_satisfied(false));
     }
 }

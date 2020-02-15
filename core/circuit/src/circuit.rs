@@ -2,27 +2,27 @@ use crate::account::AccountContent;
 use crate::account::AccountWitness;
 use crate::allocated_structures::*;
 use crate::element::CircuitElement;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::bellman::{Circuit, ConstraintSystem, SynthesisError};
+use crate::franklin_crypto::circuit::boolean::Boolean;
+use crate::franklin_crypto::circuit::ecc;
+use crate::franklin_crypto::circuit::sha256;
 use crate::operation::Operation;
 use crate::signature::*;
 use crate::utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element};
-use bellman::{Circuit, ConstraintSystem, SynthesisError};
-use ff::{Field, PrimeField};
-use franklin_crypto::circuit::boolean::Boolean;
-use franklin_crypto::circuit::ecc;
-use franklin_crypto::circuit::sha256;
 
-use franklin_crypto::circuit::expression::Expression;
-use franklin_crypto::circuit::num::AllocatedNum;
-use franklin_crypto::circuit::pedersen_hash;
-use franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
-use franklin_crypto::circuit::Assignment;
-use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+use crate::franklin_crypto::circuit::expression::Expression;
+use crate::franklin_crypto::circuit::num::AllocatedNum;
+use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
+use crate::franklin_crypto::circuit::Assignment;
+use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
 use models::node::operations::{ChangePubKeyOp, NoopOp};
 use models::node::{CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp};
 use models::params as franklin_constants;
+use models::params::FR_BIT_WIDTH_PADDED;
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
-#[derive(Clone)]
 pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub params: &'a E::Params,
     pub operation_batch_size: usize,
@@ -42,6 +42,25 @@ pub struct FranklinCircuit<'a, E: JubjubEngine> {
     pub validator_account: AccountWitness<E>,
 }
 
+impl<'a, E: JubjubEngine> std::clone::Clone for FranklinCircuit<'a, E> {
+    fn clone(&self) -> Self {
+        Self {
+            params: self.params,
+            operation_batch_size: self.operation_batch_size,
+            old_root: self.old_root,
+            new_root: self.new_root,
+            block_number: self.block_number,
+            validator_address: self.validator_address,
+            pub_data_commitment: self.pub_data_commitment,
+            operations: self.operations.clone(),
+
+            validator_balances: self.validator_balances.clone(),
+            validator_audit_path: self.validator_audit_path.clone(),
+            validator_account: self.validator_account.clone(),
+        }
+    }
+}
+
 struct PreviousData<E: JubjubEngine> {
     op_data: AllocatedOperationData<E>,
 }
@@ -49,27 +68,17 @@ struct PreviousData<E: JubjubEngine> {
 // Implementation of our circuit:
 impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
+        let zero = AllocatedNum::alloc(cs.namespace(|| "allocate element equal to zero"), || {
+            Ok(E::Fr::zero())
+        })?;
+
+        zero.assert_zero(cs.namespace(|| "enforce zero on the zero element"))?;
+
         // we only need this for consistency of first operation
-        let zero_circuit_element = CircuitElement::from_expression_padded(
-            cs.namespace(|| "zero_circuit_element"),
-            Expression::u64::<CS>(0),
-        )?;
+        let zero_circuit_element = CircuitElement::unsafe_empty_of_some_length(zero.clone(), 256);
+
         let mut prev = PreviousData {
-            op_data: AllocatedOperationData {
-                eth_address: zero_circuit_element.clone(),
-                new_pubkey_hash: zero_circuit_element.clone(),
-                pub_nonce: zero_circuit_element.clone(),
-                amount_packed: zero_circuit_element.clone(),
-                full_amount: zero_circuit_element.clone(),
-                fee_packed: zero_circuit_element.clone(),
-                fee: zero_circuit_element.clone(),
-                amount_unpacked: zero_circuit_element.clone(),
-                first_sig_msg: zero_circuit_element.clone(),
-                second_sig_msg: zero_circuit_element.clone(),
-                third_sig_msg: zero_circuit_element.clone(),
-                a: zero_circuit_element.clone(),
-                b: zero_circuit_element.clone(),
-            },
+            op_data: AllocatedOperationData::empty_from_zero(zero.clone())?,
         };
         // this is only public input to our circuit
         let public_data_commitment =
@@ -78,12 +87,15 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             })?;
         public_data_commitment.inputize(cs.namespace(|| "inputize pub_data"))?;
 
-        let validator_address_padded =
-            CircuitElement::from_fe_padded(cs.namespace(|| "validator_address"), || {
-                self.validator_address.grab()
-            })?;
-        let mut validator_address_bits = validator_address_padded.get_bits_le();
-        validator_address_bits.truncate(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
+        let validator_address_padded = CircuitElement::from_fe_with_known_length(
+            cs.namespace(|| "validator_address"),
+            || self.validator_address.grab(),
+            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+        )?;
+
+        let validator_address_bits = validator_address_padded.get_bits_le();
+        assert!(validator_address_bits.len() == franklin_constants::ACCOUNT_ID_BIT_WIDTH);
+        // validator_address_bits.truncate(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
 
         let mut validator_balances = allocate_numbers_vec(
             cs.namespace(|| "validator_balances"),
@@ -107,13 +119,14 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             cs.namespace(|| "validator account"),
             &self.validator_account,
         )?;
+
         let mut rolling_root =
             AllocatedNum::alloc(cs.namespace(|| "rolling_root"), || self.old_root.grab())?;
 
         let old_root =
-            CircuitElement::from_number_padded(cs.namespace(|| "old_root"), rolling_root.clone())?;
+            CircuitElement::from_number(cs.namespace(|| "old_root"), rolling_root.clone())?;
         // first chunk of block should always have number 0
-        let mut next_chunk_number = zero_circuit_element.get_number();
+        let mut next_chunk_number = zero;
 
         // declare vector of fees, that will be collected during block processing
         let mut fees = vec![];
@@ -143,7 +156,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             allocated_chunk_data = chunk_data;
             next_chunk_number = next_chunk;
-            let operation_pub_data_chunk = CircuitElement::from_fe_strict(
+            let operation_pub_data_chunk = CircuitElement::from_fe_with_known_length(
                 cs.namespace(|| "operation_pub_data_chunk"),
                 || operation.clone().pubdata_chunk.grab(),
                 franklin_constants::CHUNK_BIT_WIDTH,
@@ -162,8 +175,11 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &allocated_chunk_data,
             )?;
             // calculate root for given account data
-            let (state_root, is_account_empty, _subtree_root) = self
-                .check_account_data(cs.namespace(|| "calculate account root"), &current_branch)?;
+            let (state_root, is_account_empty, _subtree_root) = check_account_data(
+                cs.namespace(|| "calculate account root"),
+                &current_branch,
+                self.params,
+            )?;
 
             // ensure root hash of state before applying operation is correct
             cs.enforce(
@@ -185,9 +201,10 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
                 &mut fees,
                 &mut prev,
             )?;
-            let (new_state_root, _, _) = self.check_account_data(
+            let (new_state_root, _, _) = check_account_data(
                 cs.namespace(|| "calculate new account root"),
                 &current_branch,
+                self.params,
             )?;
 
             rolling_root = new_state_root;
@@ -212,16 +229,22 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         )?;
 
         let mut operator_account_data = vec![];
-        let mut old_operator_balance_root_bits = old_operator_balance_root
-            .into_bits_le(cs.namespace(|| "old_operator_balance_root_bits"))?;
-        old_operator_balance_root_bits.resize(
-            franklin_constants::FR_BIT_WIDTH_PADDED,
-            Boolean::constant(false),
-        );
+        let old_operator_state_root = {
+            let balance_root = CircuitElement::from_number(
+                cs.namespace(|| "old_operator_balance_root_ce"),
+                old_operator_balance_root,
+            )?;
+            calc_account_state_tree_root(
+                cs.namespace(|| "old_operator_state_root"),
+                &balance_root,
+                &self.params,
+            )?
+        };
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
         operator_account_data.extend(validator_account.address.get_bits_le());
-        operator_account_data.extend(old_operator_balance_root_bits);
+        operator_account_data
+            .extend(old_operator_state_root.into_padded_le_bits(FR_BIT_WIDTH_PADDED));
 
         let root_from_operator = allocate_merkle_root(
             cs.namespace(|| "root from operator_account"),
@@ -256,17 +279,22 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         )?;
 
         let mut operator_account_data = vec![];
-        let mut new_operator_balance_root_bits = new_operator_balance_root
-            .into_bits_le(cs.namespace(|| "new_operator_balance_root_bits"))?;
-        new_operator_balance_root_bits.resize(
-            franklin_constants::FR_BIT_WIDTH_PADDED,
-            Boolean::constant(false),
-        );
-
+        let new_operator_state_root = {
+            let balance_root = CircuitElement::from_number(
+                cs.namespace(|| "new_operator_balance_root_ce"),
+                new_operator_balance_root,
+            )?;
+            calc_account_state_tree_root(
+                cs.namespace(|| "new_operator_state_root"),
+                &balance_root,
+                &self.params,
+            )?
+        };
         operator_account_data.extend(validator_account.nonce.get_bits_le());
         operator_account_data.extend(validator_account.pub_key_hash.get_bits_le());
         operator_account_data.extend(validator_account.address.get_bits_le());
-        operator_account_data.extend(new_operator_balance_root_bits);
+        operator_account_data
+            .extend(new_operator_state_root.into_padded_le_bits(FR_BIT_WIDTH_PADDED));
 
         let root_from_operator_after_fees = allocate_merkle_root(
             cs.namespace(|| "root from operator_account after fees"),
@@ -276,7 +304,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             self.params,
         )?;
 
-        let final_root = CircuitElement::from_number_padded(
+        let final_root = CircuitElement::from_number(
             cs.namespace(|| "final_root"),
             root_from_operator_after_fees,
         )?;
@@ -287,13 +315,15 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             let mut initial_hash_data: Vec<Boolean> = vec![];
 
-            let block_number =
-                CircuitElement::from_fe_padded(cs.namespace(|| "block_number"), || {
-                    self.block_number.grab()
-                })?;
-            initial_hash_data.extend(block_number.get_bits_be());
+            let block_number = CircuitElement::from_fe_with_known_length(
+                cs.namespace(|| "block_number"),
+                || self.block_number.grab(),
+                franklin_constants::BLOCK_NUMBER_BIT_WIDTH,
+            )?;
 
-            initial_hash_data.extend(validator_address_padded.get_bits_be());
+            initial_hash_data.extend(block_number.into_padded_be_bits(256));
+
+            initial_hash_data.extend(validator_address_padded.into_padded_be_bits(256));
 
             assert_eq!(initial_hash_data.len(), 512);
 
@@ -304,13 +334,13 @@ impl<'a, E: JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(old_root.get_bits_be());
+            pack_bits.extend(old_root.into_padded_be_bits(256));
 
             hash_block = sha256::sha256(cs.namespace(|| "hash old_root"), &pack_bits)?;
 
             let mut pack_bits = vec![];
             pack_bits.extend(hash_block);
-            pack_bits.extend(final_root.get_bits_be());
+            pack_bits.extend(final_root.into_padded_be_bits(256));
 
             hash_block = sha256::sha256(cs.namespace(|| "hash with new_root"), &pack_bits)?;
 
@@ -343,7 +373,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         next_chunk_number: &AllocatedNum<E>,
         mut cs: CS,
     ) -> Result<(AllocatedNum<E>, AllocatedChunkData<E>), SynthesisError> {
-        let tx_type = CircuitElement::from_fe_strict(
+        let tx_type = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "tx_type"),
             || op.tx_type.grab(),
             franklin_constants::TX_TYPE_BIT_WIDTH,
@@ -488,30 +518,6 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         })
     }
 
-    fn check_account_data<CS: ConstraintSystem<E>>(
-        &self,
-        mut cs: CS,
-        cur: &AllocatedOperationBranch<E>,
-    ) -> Result<(AllocatedNum<E>, Boolean, CircuitElement<E>), SynthesisError> {
-        //first we prove calculate root of the subtree to obtain account_leaf_data:
-        let (cur_account_leaf_bits, is_account_empty, subtree_root) = self
-            .allocate_account_leaf_bits(
-                cs.namespace(|| "allocate current_account_leaf_hash"),
-                cur,
-            )?;
-        Ok((
-            allocate_merkle_root(
-                cs.namespace(|| "account_merkle_root"),
-                &cur_account_leaf_bits,
-                &cur.account_address.get_bits_le(),
-                &cur.account_audit_path,
-                self.params,
-            )?,
-            is_account_empty,
-            subtree_root,
-        ))
-    }
-
     fn execute_op<CS: ConstraintSystem<E>>(
         &self,
         mut cs: CS,
@@ -622,9 +628,13 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         let diff_a_b =
             Expression::from(&op_data.a.get_number()) - Expression::from(&op_data.b.get_number());
-        let mut diff_a_b_bits = diff_a_b.into_bits_le(cs.namespace(|| "balance-fee bits"))?;
-        diff_a_b_bits.truncate(franklin_constants::BALANCE_BIT_WIDTH); //TODO: can be made inside helpers
-        let diff_a_b_bits_repacked = Expression::le_bits::<CS>(&diff_a_b_bits);
+
+        let diff_a_b_bits = diff_a_b.into_bits_le_fixed(
+            cs.namespace(|| "balance-fee bits"),
+            franklin_constants::BALANCE_BIT_WIDTH,
+        )?;
+
+        let diff_a_b_bits_repacked = Expression::from_le_bits::<CS>(&diff_a_b_bits);
 
         let is_a_geq_b = Boolean::from(Expression::equals(
             cs.namespace(|| "is_a_geq_b: diff equal to repacked"),
@@ -1381,7 +1391,7 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
 
         // construct signature message preimage (serialized_tx)
         let mut serialized_tx_bits = vec![];
-        let tx_code = CircuitElement::from_fe_strict(
+        let tx_code = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "transfer_to_new_code_ce"),
             || Ok(E::Fr::from_str(&TransferOp::OP_CODE.to_string()).unwrap()),
             8,
@@ -1728,46 +1738,111 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
         )?
         .not())
     }
-
-    fn allocate_account_leaf_bits<CS: ConstraintSystem<E>>(
-        &self,
-        mut cs: CS,
-        branch: &AllocatedOperationBranch<E>,
-    ) -> Result<(Vec<Boolean>, Boolean, CircuitElement<E>), SynthesisError> {
-        //first we prove calculate root of the subtree to obtain account_leaf_data:
-
-        let balance_data = &branch.balance.get_bits_le();
-        let balance_root = allocate_merkle_root(
-            cs.namespace(|| "balance_subtree_root"),
-            balance_data,
-            &branch.token.get_bits_le(),
-            &branch.balance_audit_path,
-            self.params,
-        )?;
-
-        // debug!("balance root: {}", balance_root.get_value().unwrap());
-        let subtree_root =
-            CircuitElement::from_number_padded(cs.namespace(|| "subtree_root_ce"), balance_root)?;
-
-        let mut account_data = vec![];
-        account_data.extend(branch.account.nonce.get_bits_le());
-        account_data.extend(branch.account.pub_key_hash.get_bits_le());
-        account_data.extend(branch.account.address.get_bits_le());
-
-        let account_data_packed =
-            pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
-
-        let is_account_empty = Expression::equals(
-            cs.namespace(|| "is_account_empty"),
-            &account_data_packed,
-            Expression::constant::<CS>(E::Fr::zero()),
-        )?;
-        account_data.extend(subtree_root.get_bits_le());
-        Ok((account_data, Boolean::from(is_account_empty), subtree_root))
-    }
 }
 
-fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
+pub fn check_account_data<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    cur: &AllocatedOperationBranch<E>,
+    params: &E::Params,
+) -> Result<(AllocatedNum<E>, Boolean, CircuitElement<E>), SynthesisError> {
+    //first we prove calculate root of the subtree to obtain account_leaf_data:
+    let (cur_account_leaf_bits, is_account_empty, subtree_root) = allocate_account_leaf_bits(
+        cs.namespace(|| "allocate current_account_leaf_hash"),
+        cur,
+        params,
+    )?;
+    Ok((
+        allocate_merkle_root(
+            cs.namespace(|| "account_merkle_root"),
+            &cur_account_leaf_bits,
+            &cur.account_address.get_bits_le(),
+            &cur.account_audit_path,
+            params,
+        )?,
+        is_account_empty,
+        subtree_root,
+    ))
+}
+
+/// Account tree state will be extended in the future, so for current balance tree we
+/// append emtpy hash to reserve place for the future tree before hashing.
+pub fn calc_account_state_tree_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    balance_root: &CircuitElement<E>,
+    params: &E::Params,
+) -> Result<CircuitElement<E>, SynthesisError> {
+    let mut state_tree_root_input = balance_root
+        .clone()
+        .into_padded_le_bits(FR_BIT_WIDTH_PADDED);
+
+    // Pad with empty hash for future account sub tree extension.
+    state_tree_root_input.extend(vec![Boolean::constant(false); FR_BIT_WIDTH_PADDED]);
+    assert_eq!(
+        state_tree_root_input.len(),
+        FR_BIT_WIDTH_PADDED * 2,
+        "State tree root input should contain 2 padded hashes of the subtrees"
+    );
+
+    let state_tree_root = pedersen_hash::pedersen_hash(
+        cs.namespace(|| "hash state root and balance root"),
+        pedersen_hash::Personalization::NoteCommitment,
+        &state_tree_root_input,
+        params,
+    )?
+    .get_x()
+    .clone();
+    CircuitElement::from_number(cs.namespace(|| "total_subtree_root_ce"), state_tree_root)
+}
+
+pub fn allocate_account_leaf_bits<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    branch: &AllocatedOperationBranch<E>,
+    params: &E::Params,
+) -> Result<(Vec<Boolean>, Boolean, CircuitElement<E>), SynthesisError> {
+    //first we prove calculate root of the subtree to obtain account_leaf_data:
+
+    let balance_data = &branch.balance.get_bits_le();
+    let balance_root = allocate_merkle_root(
+        cs.namespace(|| "balance_subtree_root"),
+        balance_data,
+        &branch.token.get_bits_le(),
+        &branch.balance_audit_path,
+        params,
+    )?;
+
+    let mut account_data = vec![];
+    account_data.extend(branch.account.nonce.get_bits_le());
+    account_data.extend(branch.account.pub_key_hash.get_bits_le());
+    account_data.extend(branch.account.address.get_bits_le());
+
+    let account_data_packed =
+        pack_bits_to_element(cs.namespace(|| "account_data_packed"), &account_data)?;
+
+    let is_account_empty = Expression::equals(
+        cs.namespace(|| "is_account_empty"),
+        &account_data_packed,
+        Expression::constant::<CS>(E::Fr::zero()),
+    )?;
+    let balance_subtree_root =
+        CircuitElement::from_number(cs.namespace(|| "balance_subtree_root_ce"), balance_root)?;
+    let state_tree_root = calc_account_state_tree_root(
+        cs.namespace(|| "state_tree_root"),
+        &balance_subtree_root,
+        params,
+    )?;
+
+    // this is safe and just allows the convention. TODO: may be cut to Fr width only?
+    account_data
+        .extend(state_tree_root.into_padded_le_bits(franklin_constants::FR_BIT_WIDTH_PADDED)); // !!!!!
+
+    Ok((
+        account_data,
+        Boolean::from(is_account_empty),
+        balance_subtree_root,
+    ))
+}
+
+pub fn allocate_merkle_root<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     leaf_bits: &[Boolean],
     index: &[Boolean],
@@ -1922,8 +1997,11 @@ fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintS
     let mut fee_hashes = vec![];
     for (index, fee) in fees.iter().enumerate() {
         let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
-        let mut fee_bits = fee.into_bits_le(cs.namespace(|| "fee_bits"))?;
-        fee_bits.truncate(franklin_constants::BALANCE_BIT_WIDTH);
+        let fee_bits = fee.into_bits_le_fixed(
+            cs.namespace(|| "fee_bits"),
+            franklin_constants::BALANCE_BIT_WIDTH,
+        )?;
+        // fee_bits.truncate(franklin_constants::BALANCE_BIT_WIDTH);
         let temp = pedersen_hash::pedersen_hash(
             cs.namespace(|| "account leaf content hash"),
             pedersen_hash::Personalization::NoteCommitment,
@@ -1958,7 +2036,7 @@ fn calculate_root_from_full_representation_fees<E: JubjubEngine, CS: ConstraintS
 }
 
 fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
-    use franklin_crypto::interpolation::interpolate;
+    use crate::franklin_crypto::interpolation::interpolate;
 
     let get_xy = |op_type: u8, op_chunks: usize| {
         let x = E::Fr::from_str(&op_type.to_string()).unwrap();

@@ -1,4 +1,5 @@
 pub mod client;
+pub mod exit_proof;
 pub mod prover_data;
 
 // Built-in deps
@@ -6,11 +7,14 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::{fmt, thread, time};
 // External deps
-use bellman::groth16;
-use ff::PrimeField;
+use crate::franklin_crypto::bellman::groth16;
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use log::{error, info, trace};
 // Workspace deps
 use models::node::Engine;
+
+use crypto_exports::franklin_crypto;
+use crypto_exports::rand;
 
 pub struct BabyProver<C: ApiClient> {
     circuit_params: groth16::Parameters<Engine>,
@@ -28,7 +32,6 @@ pub trait ApiClient {
         &self,
         block: i64,
         p: groth16::Proof<models::node::Engine>,
-        public_data_commitment: models::node::Fr,
     ) -> Result<(), failure::Error>;
 }
 
@@ -158,16 +161,21 @@ impl<C: ApiClient> BabyProver<C> {
             validator_account: prover_data.validator_account,
         };
 
-        let p = bellman::groth16::create_random_proof(instance, &self.circuit_params, rng)
-            .map_err(|e| BabyProverError::Internal(format!("failed to create a proof: {}", e)))?;
+        let p = franklin_crypto::bellman::groth16::create_random_proof(
+            instance,
+            &self.circuit_params,
+            rng,
+        )
+        .map_err(|e| BabyProverError::Internal(format!("failed to create a proof: {}", e)))?;
 
-        let pvk = bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
+        let pvk = franklin_crypto::bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
 
-        let proof_verified =
-            bellman::groth16::verify_proof(&pvk, &p.clone(), &[prover_data.public_data_commitment])
-                .map_err(|e| {
-                    BabyProverError::Internal(format!("failed to verify created proof: {}", e))
-                })?;
+        let proof_verified = franklin_crypto::bellman::groth16::verify_proof(
+            &pvk,
+            &p.clone(),
+            &[prover_data.public_data_commitment],
+        )
+        .map_err(|e| BabyProverError::Internal(format!("failed to verify created proof: {}", e)))?;
         if !proof_verified {
             return Err(BabyProverError::Internal(
                 "created proof did not pass verification".to_owned(),
@@ -175,7 +183,7 @@ impl<C: ApiClient> BabyProver<C> {
         }
 
         self.api_client
-            .publish(block, p, prover_data.public_data_commitment)
+            .publish(block, p)
             .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
 
         info!("finished and published proof for block {}", block);

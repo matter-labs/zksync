@@ -11,11 +11,8 @@ storage = { path = "../storage", version = "0.0.1" }
 prover = { path = "../prover", version = "0.0.1" }
 circuit = { path = "../circuit", version = "0.1.1"}
 
-ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
-pairing = { package = "pairing_ce", version = "0.17.0" }
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
+crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
-rand = "0.4"
 hex = "0.3.2"
 ethabi = "8.0.0"
 web3 = "0.8.0"
