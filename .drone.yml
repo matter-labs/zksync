@@ -89,57 +89,20 @@ steps:
   depends_on:
   - prepare-ci-env
   - yarn
-- name: rust-format-checks
+- name: rust-checks-and-tests
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - cargo fmt -- --check
-  depends_on:
-  - rust-build
-  - run-genesis
-- name: rust-clippy-checks
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo clippy --tests --benches -- -D warnings
-  depends_on:
-  - rust-build
-  - run-genesis
-- name: unit-tests-rust
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo test
-  depends_on:
-  - rust-build
-  - run-genesis
-- name: circuit-tests-rust
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync circuit-tests
-  depends_on:
-  - rust-build
-  - run-genesis
-- name: with-db-tests-rust
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync db-test
   depends_on:
-  - run-genesis
   - rust-build
-  - db-setup
+  - run-genesis
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
@@ -175,11 +138,7 @@ steps:
       - ./keys
   depends_on:
      - redeploy-and-integration-testkit
-     - with-db-tests-rust
-     - unit-tests-rust
-     - circuit-tests-rust
-     - rust-clippy-checks
-     - rust-format-checks
+     - rust-checks-and-tests
 ---
 # This pipeline publishes images and updates stage
 kind: pipeline
