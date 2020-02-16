@@ -12,9 +12,9 @@ use std::fs::File;
 use std::io::prelude::*;
 use testkit::eth_account::{parse_ether, EthereumAccount};
 use testkit::zksync_account::ZksyncAccount;
-use tokio::runtime::Runtime;
 use web3::transports::Http;
 use web3::types::{H160, H256};
+use std::thread;
 
 // TODO: use dynamic size.
 const N_ACC: usize = 10;
@@ -32,35 +32,45 @@ struct TestAccount {
 
 fn main() {
     env_logger::init();
-    let _runtime = Runtime::new().unwrap();
     let config = ConfigurationOptions::from_env();
     let filepath = env::args().nth(1).expect("account.json path not given");
-    let input_accs = read_accounts(filepath);
+    let input_accs = read_accounts(filepath.clone());
+    let input_accs2 = read_accounts(filepath);
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
-    let test_accounts = construct_test_accounts(input_accs, transport, &config);
+    let test_accounts = construct_test_accounts(input_accs, transport.clone(), &config);
+    let test_accounts2 = construct_test_accounts(input_accs2, transport, &config);
     let deposit_amount = parse_ether("1.0").expect("failed to parse");
     let transfer_amount = parse_ether("0.1").expect("failed to parse");
     let withdraw_amount = parse_ether("0.2").expect("failed to parse");
     info!("Inital depsoits");
     block_on(do_deposits(&test_accounts[..], deposit_amount.clone()));
     info!("done.");
-    info!("Simultaneous tranfers and withdraws");
+    info!("Simultaneous deposits, tranfers and withdraws");
+    let h = thread::spawn(move || {
+        block_on(async {
+            join!(
+                // 5 tranfers for each account
+                do_transfers(&test_accounts2[..], transfer_amount.clone()),
+                do_transfers(&test_accounts2[..], transfer_amount.clone()),
+                do_transfers(&test_accounts2[..], transfer_amount.clone()),
+                do_transfers(&test_accounts2[..], transfer_amount.clone()),
+                do_transfers(&test_accounts2[..], transfer_amount.clone()),
+                // 2 withdraws for each account
+                do_withdraws(&test_accounts2[..], withdraw_amount.clone()),
+                do_withdraws(&test_accounts2[..], withdraw_amount.clone()),
+            )
+        });
+    });
     block_on(async {
         join!(
-            // 5 tranfers for each account
-            do_transfers(&test_accounts[..], transfer_amount.clone()),
-            do_transfers(&test_accounts[..], transfer_amount.clone()),
-            do_transfers(&test_accounts[..], transfer_amount.clone()),
-            do_transfers(&test_accounts[..], transfer_amount.clone()),
-            do_transfers(&test_accounts[..], transfer_amount.clone()),
-            // 2 withdraws for each account
-            do_withdraws(&test_accounts[..], withdraw_amount.clone()),
-            do_withdraws(&test_accounts[..], withdraw_amount.clone()),
+            do_deposits(&test_accounts[..], deposit_amount.clone()),
+            do_deposits(&test_accounts[..], deposit_amount.clone()),
         )
     });
     info!("done.");
+    h.join().unwrap();
     info!("Final withdraws");
-    let left_balance = parse_ether("0.6").expect("failed to parse");
+    let left_balance = parse_ether("2.6").expect("failed to parse");
     block_on(do_withdraws(&test_accounts[..], left_balance));
     info!("done.");
     info!("End");
@@ -134,14 +144,14 @@ async fn do_transfers(test_accounts: &[TestAccount], deposit_amount: BigDecimal)
             .map(|(i, _)| {
                 let from = &test_accounts[i];
                 let to = &test_accounts[(i + 1) % test_accounts.len()];
-                let tx = FranklinTx::Transfer(from.zk_acc.sign_transfer(
+                let tx = FranklinTx::Transfer(Box::new(from.zk_acc.sign_transfer(
                     0, // ETH
                     deposit_amount.clone(),
                     BigDecimal::from(0),
                     &to.zk_acc.address,
                     None,
                     true,
-                ));
+                )));
                 send_tx(tx)
             })
             .collect::<Vec<_>>(),
@@ -164,14 +174,14 @@ async fn do_withdraws(test_accounts: &[TestAccount], deposit_amount: BigDecimal)
         test_accounts
             .iter()
             .map(|test_acc| {
-                let tx = FranklinTx::Withdraw(test_acc.zk_acc.sign_withdraw(
+                let tx = FranklinTx::Withdraw(Box::new(test_acc.zk_acc.sign_withdraw(
                     0, // ETH
                     deposit_amount.clone(),
                     BigDecimal::from(0),
                     &test_acc.eth_acc.address,
                     None,
                     true,
-                ));
+                )));
                 send_tx(tx)
             })
             .collect::<Vec<_>>(),
