@@ -46,8 +46,6 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync env ci
   - zksync yarn
-  - zksync db-wait
-  - zksync db-setup
   depends_on:
   - prepare-ci-env
 - name: db-setup
