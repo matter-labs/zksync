@@ -29,19 +29,47 @@ steps:
       - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
-- name: init
+- name: prepare-ci-env
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - ci-prepare-env.sh
+  depends_on:
+  - restore-cache
+- name: yarn
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync env ci
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
   depends_on:
-  - restore-cache
+  - prepare-ci-env
+- name: db-setup
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync env ci
+  - zksync db-wait
+  - zksync db-setup
+  depends_on:
+  - prepare-ci-env
+- name: rust-build
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - f cargo build
+  depends_on:
+  - prepare-ci-env
 - name: build-contracts
   image: matterlabs/ci
   commands:
@@ -50,7 +78,8 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync build-contracts
   depends_on:
-  - init
+  - prepare-ci-env
+  - yarn
 - name: rust-format-checks
   image: matterlabs/ci
   commands:
@@ -59,7 +88,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - cargo fmt -- --check
   depends_on:
-  - init
+  - rust-build
 - name: rust-clippy-checks
   image: matterlabs/ci
   commands:
@@ -68,7 +97,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo clippy --tests --benches -- -D warnings
   depends_on:
-  - init
+  - rust-build
 - name: unit-tests-rust
   image: matterlabs/ci
   commands:
@@ -77,7 +106,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo test
   depends_on:
-  - init
+  - rust-build
 - name: circuit-tests-rust
   image: matterlabs/ci
   commands:
@@ -86,7 +115,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync circuit-tests
   depends_on:
-  - init
+  - rust-build
 - name: with-db-tests-rust
   image: matterlabs/ci
   commands:
@@ -95,8 +124,18 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync db-test
   depends_on:
-  - init
-- name: deploy-test
+  - rust-build
+  - db-setup
+- name: genesis
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync genesis
+  depends_on:
+  - rust-build
+- name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
@@ -106,7 +145,8 @@ steps:
   - zksync redeploy
   - zksync integration-testkit
   depends_on:
-  - init
+  - genesis
+  - build-contracts
 - name: contract-test
   image: matterlabs/ci
   commands:
@@ -130,8 +170,7 @@ steps:
       - ./target/cargo
       - ./keys
   depends_on:
-     - init
-     - deploy-test
+     - redeploy-and-integration-testkit
      - with-db-tests-rust
      - unit-tests-rust
      - circuit-tests-rust
