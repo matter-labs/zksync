@@ -67,7 +67,7 @@ fn create_get_vk_function(block_sizes: &[usize]) -> String {
     let mut vk_selector_ifs = block_sizes.iter().map(|size| {
         format!("if (_id == BLOCK_KEY_MASK | uint32({block_size})) {{ return getVkBlock{block_size}(); }}\n", block_size = size)
     }).collect::<Vec<_>>();
-    vk_selector_ifs.push("if (_id == EXIT_KEY_ID) {{ return getVkExit(); }}\n".to_string());
+    vk_selector_ifs.push("if (_id == EXIT_KEY_ID) { return getVkExit(); }\n".to_string());
 
     let mut vk_selector = String::new();
 

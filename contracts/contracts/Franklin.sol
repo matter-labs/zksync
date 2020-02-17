@@ -307,7 +307,7 @@ contract Franklin is Storage, Config, Events {
         if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
             require(totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS, "fck13"); // too many blocks committed
 
-            uint32 blockChunks = uint32(_publicData.length) / 8;
+            uint32 blockChunks = uint32(_publicData.length / 8);
             require(verifier.isBlockSizeSupported(blockChunks), "fck14");
 
             // Unpack onchain operations and store them.
