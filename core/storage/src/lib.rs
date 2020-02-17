@@ -2099,21 +2099,10 @@ impl StorageProcessor {
 
     pub fn register_prover(&self, worker_: &str) -> QueryResult<i32> {
         use crate::schema::active_provers::dsl::*;
-
-        let existing = active_provers
-            .filter(worker.eq(worker_))
-            .first::<ActiveProver>(self.conn())
-            .optional()?;
-
-        match existing {
-            Some(existing) => Ok(existing.id),
-            None => {
-                let inserted: ActiveProver = insert_into(active_provers)
-                    .values(&vec![(worker.eq(worker_.to_string()))])
-                    .get_result(self.conn())?;
-                Ok(inserted.id)
-            }
-        }
+        let inserted: ActiveProver = insert_into(active_provers)
+            .values(&vec![(worker.eq(worker_.to_string()))])
+            .get_result(self.conn())?;
+        Ok(inserted.id)
     }
 
     pub fn prover_by_id(&self, prover_id: i32) -> QueryResult<ActiveProver> {
