@@ -90,6 +90,7 @@ steps:
   - f cargo clippy --tests --benches -- -D warnings
   - f cargo test
   - zksync circuit-tests
+  - zksync prover-tests
   - zksync db-test
   depends_on:
   - run-genesis
