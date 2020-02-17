@@ -32,7 +32,7 @@ fn main() {
 
     // Create client
     let api_url = env::var("PROVER_SERVER_URL").expect("PROVER_SERVER_URL is missing");
-    let api_client = client::ApiClient::new(&api_url, &worker_name);
+    let api_client = client::ApiClient::new(&api_url, &worker_name, Some(stop_signal.clone()));
     // Create prover
     let jubjub_params = AltJubjubBn256::new();
     let circuit_params = read_from_key_dir(key_dir);
@@ -40,12 +40,12 @@ fn main() {
     let worker = BabyProver::new(
         circuit_params,
         jubjub_params,
-        api_client,
+        api_client.clone(),
         heartbeat_interval,
         stop_signal,
     );
     // Register prover
-    let prover_id = client::ApiClient::new(&api_url, &worker_name)
+    let prover_id = api_client
         .register_prover()
         .expect("failed to register prover");
     // Start prover
@@ -55,30 +55,30 @@ fn main() {
     });
 
     // Handle termination requests.
-    let prover_id_copy = prover_id;
-    let api_url_copy = api_url.clone();
-    let worker_name_copy = worker_name.clone();
-    thread::spawn(move || {
-        let signals = Signals::new(&[
-            signal_hook::SIGTERM,
-            signal_hook::SIGINT,
-            signal_hook::SIGQUIT,
-        ])
-        .expect("Signals::new() failed");
-        for _ in signals.forever() {
-            info!(
-                "Termination signal received. Prover will finish the job and shut down gracefully"
-            );
-            client::ApiClient::new(&api_url_copy, &worker_name_copy)
-                .prover_stopped(prover_id_copy)
-                .expect("failed to send prover stop request");
-        }
-    });
+    {
+        let prover_id = prover_id;
+        let api_client = api_client.clone();
+        thread::spawn(move || {
+            let signals = Signals::new(&[
+                signal_hook::SIGTERM,
+                signal_hook::SIGINT,
+                signal_hook::SIGQUIT,
+            ])
+            .expect("Signals::new() failed");
+            for _ in signals.forever() {
+                info!("Termination signal received. Prover will finish the job and shut down gracefully");
+                match api_client.prover_stopped(prover_id) {
+                    Ok(_) => {}
+                    Err(e) => error!("failed to send prover stop request: {}", e),
+                }
+            }
+        });
+    }
 
     // Handle prover exit errors.
     let err = exit_err_rx.recv();
     error!("prover exited with error: {:?}", err);
-    client::ApiClient::new(&api_url, &worker_name)
+    api_client
         .prover_stopped(prover_id)
         .expect("failed to send prover stop request");
 }

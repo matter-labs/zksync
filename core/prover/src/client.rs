@@ -1,10 +1,12 @@
 // Built-in deps
 use std::str::FromStr;
+use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
 use std::time;
 // External deps
 use backoff;
 use backoff::Operation;
 use crypto_exports::franklin_crypto::bellman::groth16;
+use failure::bail;
 use failure::format_err;
 use log::info;
 use serde::{Deserialize, Serialize};
@@ -36,7 +38,7 @@ pub struct PublishReq {
     pub proof: models::EncodedProof,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ApiClient {
     register_url: String,
     block_to_prove_url: String,
@@ -46,10 +48,11 @@ pub struct ApiClient {
     stopped_url: String,
     worker: String,
     req_server_timeout: time::Duration,
+    is_terminating_bool: Option<Arc<AtomicBool>>,
 }
 
 impl ApiClient {
-    pub fn new(base_url: &str, worker: &str) -> Self {
+    pub fn new(base_url: &str, worker: &str, is_terminating_bool: Option<Arc<AtomicBool>>) -> Self {
         let config_opts = ConfigurationOptions::from_env();
         if worker == "" {
             panic!("worker name cannot be empty")
@@ -63,19 +66,46 @@ impl ApiClient {
             stopped_url: format!("{}/stopped", base_url),
             worker: worker.to_string(),
             req_server_timeout: config_opts.req_server_timeout,
+            is_terminating_bool,
         }
+    }
+
+    fn is_terminating(&self) -> bool {
+        self.is_terminating_bool
+            .as_ref()
+            .map(|b| b.load(Ordering::SeqCst))
+            .unwrap_or(false)
+    }
+
+    fn with_retries<T>(
+        &self,
+        op: &dyn Fn() -> Result<T, failure::Error>,
+    ) -> Result<T, failure::Error> {
+        let mut with_checking = || -> Result<T, backoff::Error<failure::Error>> {
+            if self.is_terminating() {
+                op().map_err(backoff::Error::Permanent)
+            } else {
+                op().map_err(backoff::Error::Transient)
+            }
+        };
+
+        with_checking
+            .retry(&mut Self::get_backoff())
+            .map_err(|e| match e {
+                backoff::Error::Permanent(e) | backoff::Error::Transient(e) => e,
+            })
     }
 
     fn get_backoff() -> backoff::ExponentialBackoff {
         let mut backoff = backoff::ExponentialBackoff::default();
-        backoff.initial_interval = time::Duration::from_secs(2);
-        backoff.multiplier = 2.0;
+        backoff.initial_interval = time::Duration::from_secs(6);
+        backoff.multiplier = 1.2;
         // backoff.max_elapsed_time = Some(time::Duration::from_secs(30));
         backoff
     }
 
     pub fn register_prover(&self) -> Result<i32, failure::Error> {
-        let mut op = || -> Result<i32, backoff::Error<failure::Error>> {
+        let op = || -> Result<i32, failure::Error> {
             info!("Registering prover...");
             let client = self.get_client()?;
             let res = client
@@ -94,8 +124,7 @@ impl ApiClient {
                 .map_err(|e| format_err!("failed to parse register prover id: {}", e))?)
         };
 
-        op.retry(&mut Self::get_backoff())
-            .map_err(|e| format_err!("Timeout: {}", e))
+        Ok(self.with_retries(&op)?)
     }
 
     pub fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
@@ -118,7 +147,7 @@ impl ApiClient {
 
 impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
-        let mut op = || -> Result<Option<(i64, i32)>, backoff::Error<failure::Error>> {
+        let op = || -> Result<Option<(i64, i32)>, failure::Error> {
             let client = self.get_client()?;
             let mut res = client
                 .get(&self.block_to_prove_url)
@@ -138,12 +167,11 @@ impl crate::ApiClient for ApiClient {
             Ok(None)
         };
 
-        op.retry(&mut Self::get_backoff())
-            .map_err(|e| format_err!("Timeout: {}", e))
+        Ok(self.with_retries(&op)?)
     }
 
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
-        let mut op = || -> Result<(), backoff::Error<failure::Error>> {
+        let op = || -> Result<(), failure::Error> {
             let client = self.get_client()?;
             let res = client
                 .post(&self.working_on_url)
@@ -153,22 +181,18 @@ impl crate::ApiClient for ApiClient {
                 .send()
                 .map_err(|e| format_err!("failed to send working on request: {}", e))?;
             if res.status() != reqwest::StatusCode::OK {
-                Err(backoff::Error::Transient(format_err!(
-                    "working on request failed with status: {}",
-                    res.status()
-                )))
+                bail!("working on request failed with status: {}", res.status())
             } else {
                 Ok(())
             }
         };
 
-        op.retry(&mut Self::get_backoff())
-            .map_err(|e| format_err!("Timeout: {}", e))
+        Ok(self.with_retries(&op)?)
     }
 
     fn prover_data(&self, block: i64) -> Result<ProverData, failure::Error> {
         let client = self.get_client()?;
-        let mut op = || -> Result<ProverData, backoff::Error<failure::Error>> {
+        let op = || -> Result<ProverData, failure::Error> {
             let mut res = client
                 .get(&self.prover_data_url)
                 .json(&block)
@@ -182,8 +206,7 @@ impl crate::ApiClient for ApiClient {
             Ok(res.ok_or_else(|| format_err!("couldn't get ProverData"))?)
         };
 
-        op.retry(&mut Self::get_backoff())
-            .map_err(|e| format_err!("Timeout: {}", e))
+        Ok(self.with_retries(&op)?)
     }
 
     fn publish(
@@ -191,7 +214,7 @@ impl crate::ApiClient for ApiClient {
         block: i64,
         proof: groth16::Proof<models::node::Engine>,
     ) -> Result<(), failure::Error> {
-        let mut op = || -> Result<(), backoff::Error<failure::Error>> {
+        let op = || -> Result<(), failure::Error> {
             let encoded = encode_proof(&proof);
 
             let client = self.get_client()?;
@@ -204,16 +227,12 @@ impl crate::ApiClient for ApiClient {
                 .send()
                 .map_err(|e| format_err!("failed to send publish request: {}", e))?;
             if res.status() != reqwest::StatusCode::OK {
-                Err(backoff::Error::Transient(format_err!(
-                    "publish request failed with status: {}",
-                    res.status()
-                )))
+                bail!("publish request failed with status: {}", res.status());
             } else {
                 Ok(())
             }
         };
 
-        op.retry(&mut Self::get_backoff())
-            .map_err(|e| format_err!("Timeout: {}", e))
+        Ok(self.with_retries(&op)?)
     }
 }
