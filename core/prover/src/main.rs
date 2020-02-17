@@ -66,11 +66,13 @@ fn main() {
             ])
             .expect("Signals::new() failed");
             for _ in signals.forever() {
-                info!("Termination signal received. Prover will finish the job and shut down gracefully");
+                info!("Termination signal received.");
                 match api_client.prover_stopped(prover_id) {
                     Ok(_) => {}
                     Err(e) => error!("failed to send prover stop request: {}", e),
                 }
+
+                std::process::exit(0);
             }
         });
     }
