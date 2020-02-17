@@ -10,11 +10,13 @@ use serde::Serialize;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::sync::Mutex;
+use std::thread;
 use testkit::eth_account::{parse_ether, EthereumAccount};
 use testkit::zksync_account::ZksyncAccount;
 use web3::transports::Http;
+use web3::types::U256;
 use web3::types::{H160, H256};
-use std::thread;
 
 // TODO: use dynamic size.
 const N_ACC: usize = 10;
@@ -28,6 +30,7 @@ struct AccountInfo {
 struct TestAccount {
     zk_acc: ZksyncAccount,
     eth_acc: EthereumAccount<Http>,
+    eth_nonce: Mutex<U256>,
 }
 
 fn main() {
@@ -104,16 +107,24 @@ fn construct_test_accounts(
                 config.contract_eth_addr,
                 &config,
             );
-            TestAccount {
+            let mut ta = TestAccount {
                 zk_acc: ZksyncAccount::rand(),
                 eth_acc,
-            }
+                eth_nonce: Mutex::new(U256::from(0)),
+            };
+            update_eth_nonce(&mut ta);
+            ta
         })
         .collect()
 }
 
+fn update_eth_nonce(ta: &mut TestAccount) {
+    let mut nonce = ta.eth_nonce.lock().unwrap();
+    *nonce = block_on(ta.eth_acc.main_contract_eth_client.pending_nonce()).unwrap()
+}
+
 async fn do_deposits(test_accounts: &[TestAccount], deposit_amount: BigDecimal) {
-    trace!("start do_deposits");
+    info!("start do_deposits");
     try_join_all(
         test_accounts
             .iter()
@@ -122,16 +133,22 @@ async fn do_deposits(test_accounts: &[TestAccount], deposit_amount: BigDecimal) 
     )
     .await
     .expect("failed to deposit");
-    trace!("end do_deposits");
+    info!("end do_deposits");
 }
 
 async fn deposit_single(
     test_acc: &TestAccount,
     deposit_amount: BigDecimal,
 ) -> Result<(), failure::Error> {
+    let nonce = {
+        let mut nonce = test_acc.eth_nonce.lock().unwrap();
+        let v = *nonce;
+        *nonce = U256::from(v.as_u32() + 1);
+        U256::from(v.as_u32())
+    };
     test_acc
         .eth_acc
-        .deposit_eth(deposit_amount, &test_acc.zk_acc.address)
+        .deposit_eth(deposit_amount, &test_acc.zk_acc.address, Some(nonce))
         .await?;
     Ok(())
 }
