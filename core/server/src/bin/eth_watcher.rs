@@ -15,10 +15,10 @@ fn main() {
         [2..]
         .parse()
         .expect("Failed to parse GOVERNANCE_ADDR");
-    let priority_queue_address = std::env::var("PRIORITY_QUEUE_ADDR")
-        .expect("PRIORITY_QUEUE_ADDR env var not found")[2..]
-        .parse()
-        .expect("Failed to parse PRIORITY_QUEUE_ADDR");
+    // let priority_queue_address = std::env::var("PRIORITY_QUEUE_ADDR")
+    //     .expect("PRIORITY_QUEUE_ADDR env var not found")[2..]
+    //     .parse()
+    //     .expect("Failed to parse PRIORITY_QUEUE_ADDR");
     let contract_address = std::env::var("CONTRACT_ADDR").expect("CONTRACT_ADDR env var not found")
         [2..]
         .parse()
@@ -33,7 +33,7 @@ fn main() {
         web3_event_loop_handle,
         ConnectionPool::new(),
         governance_addr,
-        priority_queue_address,
+        //priority_queue_address,
         contract_address,
         eth_req_receiver,
     );

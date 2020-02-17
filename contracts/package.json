@@ -1,6 +1,7 @@
 {
   "name": "franklin-contracts",
   "version": "0.1.0",
+  "license": "MIT",
   "devDependencies": {
     "@types/argparse": "^1.0.36",
     "@types/chai": "^4.1.7",
@@ -8,8 +9,8 @@
     "argparse": "^1.0.10",
     "axios": "^0.19.0",
     "chai": "^4.2.0",
-    "ethereum-waffle": "^2.0.12",
-    "ethers": "^4.0.33",
+    "ethereum-waffle": "2.0.12",
+    "ethers": "4.0.33",
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
     "mocha": "^6.2.0",
@@ -26,8 +27,11 @@
     "zksync": "^0.3.9"
   },
   "scripts": {
-    "build": "waffle config.json && waffle config_flat.json",
-    "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
+    "build": "waffle .waffle.json && waffle .waffle.config_flat.json",
+    "test": "waffle .waffle.json && mocha -r ts-node/register test/**/*.ts",
+    "itest": "waffle .waffle.json && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
+    "unit-test": "waffle .waffle.json && mocha test/unit_tests/**/*.js",
+    "deploy": "yarn build && ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-no-build": "ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-test-no-build": "ts-node scripts/testnet-deploy.ts --deploy --test",
     "publish_source": "ts-node scripts/testnet-deploy.ts --publish",

@@ -1,0 +1,11 @@
+{
+    "sourcesPath": "./flat",
+    "targetPath": "./flat_build",
+    "compiler": "native",
+    "compilerOptions": {
+        "optimizer": {
+            "enabled": true,
+            "runs": 200
+        }
+    }
+}

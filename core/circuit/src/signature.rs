@@ -1,16 +1,16 @@
 use crate::allocated_structures::*;
 use crate::element::{CircuitElement, CircuitPubkey};
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
+use crate::franklin_crypto::circuit::baby_eddsa::EddsaSignature;
+use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
+use crate::franklin_crypto::circuit::ecc;
 use crate::operation::SignatureData;
 use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
-use bellman::{ConstraintSystem, SynthesisError};
-use ff::PrimeField;
-use franklin_crypto::circuit::baby_eddsa::EddsaSignature;
-use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
-use franklin_crypto::circuit::ecc;
 
-use franklin_crypto::circuit::expression::Expression;
-use franklin_crypto::circuit::pedersen_hash;
-use franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::circuit::expression::Expression;
+use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::params as franklin_constants;
 
 pub struct AllocatedSignatureData<E: JubjubEngine> {
@@ -47,9 +47,11 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
     let r_x_bit =
         AllocatedBit::alloc(cs.namespace(|| "r_x_bit"), packed_key_bits_correct_order[0])?;
 
+    let witness_length = packed_key.len();
+    let start_of_y = witness_length - (E::Fr::NUM_BITS as usize);
     let r_y = CircuitElement::from_witness_be_bits(
         cs.namespace(|| "signature_r_y from bits"),
-        &packed_key_bits_correct_order[1..],
+        &packed_key_bits_correct_order[start_of_y..],
     )?;
 
     let (r_recovered, is_r_correct) = ecc::EdwardsPoint::recover_from_y_unchecked(
@@ -70,6 +72,7 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
         r_recovered.get_y().clone(),
         &params,
     )?;
+
     Ok(AllocatedSignerPubkey {
         pubkey,
         point: r_recovered,
@@ -92,19 +95,30 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         signature_data.r_packed.len(),
         franklin_constants::FR_BIT_WIDTH_PADDED
     );
+
+    let witness_length = signature_data_r_packed.len();
     let r_x_bit = AllocatedBit::alloc(cs.namespace(|| "r_x_bit"), signature_data_r_packed[0])?;
+
+    let start_of_y = witness_length - (E::Fr::NUM_BITS as usize);
 
     let r_y = CircuitElement::from_witness_be_bits(
         cs.namespace(|| "signature_r_y from bits"),
-        &signature_data_r_packed[1..],
+        &signature_data_r_packed[start_of_y..],
     )?;
 
     assert_eq!(
         signature_data.s.len(),
         franklin_constants::FR_BIT_WIDTH_PADDED
     );
-    let signature_s =
-        CircuitElement::from_witness_be_bits(cs.namespace(|| "signature_s"), &signature_data_s)?;
+
+    let witness_length = signature_data_s.len();
+    let start_of_s = witness_length - (E::Fr::NUM_BITS as usize);
+
+    let signature_s = CircuitElement::from_witness_be_bits(
+        cs.namespace(|| "signature_s"),
+        &signature_data_s[start_of_s..],
+    )?;
+
     let (r_recovered, is_sig_r_correct) = ecc::EdwardsPoint::recover_from_y_unchecked(
         cs.namespace(|| "recover_from_y_unchecked"),
         &Boolean::from(r_x_bit.clone()),
@@ -132,6 +146,8 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         temp_bits
     };
 
+    assert!(serialized_tx_bits.len() == franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+
     // signature msg is the hash of serialized transaction
     let sig_msg = pedersen_hash::pedersen_hash(
         cs.namespace(|| "sig_msg"),
@@ -141,6 +157,7 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
     )?
     .get_x()
     .clone();
+
     let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
     sig_msg_bits.resize(256, Boolean::constant(false));
 
@@ -160,12 +177,14 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         params,
         generator,
     )?;
+
     debug!("is_sig_verified={:?}", is_sig_verified.get_value());
     debug!("is_sig_r_correct={:?}", is_sig_r_correct.get_value());
     debug!(
         "signer_key.is_correctly_unpacked={:?}",
         signer_key.is_correctly_unpacked.get_value()
     );
+
     let is_signature_correctly_verified = multi_and(
         cs.namespace(|| "is_signature_correctly_verified"),
         &[
@@ -179,8 +198,10 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         eddsa: signature,
         is_verified: is_signature_correctly_verified,
         sig_r_x_bit: Boolean::from(r_x_bit),
-        sig_r_y_bits: r_y.get_bits_be(),
-        sig_s_bits: signature_s.get_bits_be(),
+        sig_r_y_bits: r_y.into_padded_be_bits(franklin_constants::FR_BIT_WIDTH_PADDED - 1),
+        sig_s_bits: signature_s.into_padded_be_bits(franklin_constants::FR_BIT_WIDTH_PADDED),
+        // sig_r_y_bits: r_y.get_bits_be(),
+        // sig_s_bits: signature_s.get_bits_be(),
     })
 }
 pub fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSystem<E>>(

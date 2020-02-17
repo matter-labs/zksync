@@ -13,7 +13,7 @@ use web3::contract::{Contract, Options};
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, H160};
 use web3::{Transport, Web3};
 // Workspace deps
-use models::abi::{governance_contract, priority_queue_contract, zksync_contract};
+use models::abi::{governance_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::node::{Nonce, PriorityOp, PubKeyHash, TokenId};
 use models::params::PRIORITY_EXPIRATION;
@@ -39,7 +39,6 @@ pub enum EthWatchRequest {
 
 pub struct EthWatch<T: Transport> {
     gov_contract: (ethabi::Contract, Contract<T>),
-    priority_queue_contract: (ethabi::Contract, Contract<T>),
     zksync_contract: (ethabi::Contract, Contract<T>),
     processed_block: u64,
     eth_state: ETHState,
@@ -68,7 +67,6 @@ impl<T: Transport> EthWatch<T> {
         web3_event_loop_handle: EventLoopHandle,
         db_pool: ConnectionPool,
         governance_addr: H160,
-        priority_queue_address: H160,
         zksync_contract_addr: H160,
         eth_watch_req: mpsc::Receiver<EthWatchRequest>,
     ) -> Self {
@@ -76,17 +74,6 @@ impl<T: Transport> EthWatch<T> {
             (
                 governance_contract(),
                 Contract::new(web3.eth(), governance_addr, governance_contract()),
-            )
-        };
-
-        let priority_queue_contract = {
-            (
-                priority_queue_contract(),
-                Contract::new(
-                    web3.eth(),
-                    priority_queue_address,
-                    priority_queue_contract(),
-                ),
             )
         };
 
@@ -99,7 +86,6 @@ impl<T: Transport> EthWatch<T> {
 
         Self {
             gov_contract,
-            priority_queue_contract,
             zksync_contract,
             processed_block: 0,
             eth_state: ETHState {
@@ -151,13 +137,13 @@ impl<T: Transport> EthWatch<T> {
 
     fn get_priority_op_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
         let priority_op_event_topic = self
-            .priority_queue_contract
+            .zksync_contract
             .0
             .event("NewPriorityRequest")
             .expect("main contract abi error")
             .signature();
         FilterBuilder::default()
-            .address(vec![self.priority_queue_contract.1.address()])
+            .address(vec![self.zksync_contract.1.address()])
             .from_block(from)
             .to_block(to)
             .topics(Some(vec![priority_op_event_topic]), None, None, None)
@@ -369,7 +355,6 @@ pub fn start_eth_watch(
         web3_event_loop_handle,
         pool,
         config_options.governance_eth_addr,
-        config_options.priority_queue_eth_addr,
         config_options.contract_eth_addr,
         eth_req_receiver,
     );

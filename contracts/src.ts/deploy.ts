@@ -59,7 +59,7 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
         contractaddress,                                    // Contract Address starts with 0x...     
         sourceCode,                                         // Contract Source Code (Flattened if necessary)
         contractname,                                       // ContractName
-        compilerversion: 'v0.5.10+commit.5a6ea5b1',      // see http://etherscan.io/solcversions for list of support versions
+        compilerversion: 'v0.5.16+commit.9c3226ce',      // see http://etherscan.io/solcversions for list of support versions
         optimizationUsed: 0,                              // 0 = No Optimization, 1 = Optimization used
         runs: 200,                            // set to 200 as default unless otherwise         
         constructorArguements: constructorArguments         // if applicable. How nice, they have a typo in their api
@@ -165,7 +165,7 @@ export async function deployFranklin(
             franklinCode,
             constructorArgs,
             {
-                gasLimit: 6600000,
+                gasLimit: 6000000,
             });
         console.log(`CONTRACT_GENESIS_TX_HASH=${contract.deployTransaction.hash}`);
         console.log(`CONTRACT_ADDR=${contract.address}`);

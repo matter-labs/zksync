@@ -65,7 +65,8 @@ impl DepositOp {
         let to = Address::from_slice(
             &bytes[account_address_offset..account_address_offset + FR_ADDRESS_LEN],
         );
-        let from = Address::zero(); // In current circuit there is no sender in deposit pubdata
+
+        let from = Address::default(); // unknown from pubdata.
 
         Ok(Self {
             priority_op: Deposit {

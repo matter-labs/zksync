@@ -3,13 +3,14 @@ use std::sync::mpsc;
 use std::sync::{atomic::AtomicBool, Arc};
 use std::{env, thread, time};
 // External deps
-use bellman::groth16;
-use franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crypto_exports::franklin_crypto::bellman::groth16;
 use log::{debug, error, info};
 use signal_hook::iterator::Signals;
 // Workspace deps
 use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_HEARTBEAT_INTERVAL};
 use models::node::Engine;
+use models::prover_utils::read_circuit_proving_parameters;
 use prover::client;
 use prover::{start, BabyProver};
 
@@ -93,18 +94,6 @@ fn read_from_key_dir(key_dir: String) -> groth16::Parameters<Engine> {
         key_file_path.push(models::params::KEY_FILENAME);
         key_file_path
     };
-    debug!(
-        "Reading key from {}",
-        path.to_str().expect("failed to get keys location")
-    );
-    read_parameters(&path.to_str().expect("failed to get keys location"))
-}
-
-fn read_parameters(file_name: &str) -> groth16::Parameters<Engine> {
-    use std::fs::File;
-    use std::io::BufReader;
-
-    let f_r = File::open(file_name).expect("failed to open file");
-    let mut r = BufReader::new(f_r);
-    groth16::Parameters::<Engine>::read(&mut r, true).expect("failed to read circuit params")
+    debug!("Reading key from {}", path.to_string_lossy());
+    read_circuit_proving_parameters(&path).expect("Failed to read circuit parameters")
 }

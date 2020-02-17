@@ -14,4 +14,5 @@ members = [
     "core/testhelper",
     "core/testkit",
     "core/loadtest",
+    "core/crypto_exports"
 ]
