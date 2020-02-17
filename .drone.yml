@@ -59,8 +59,6 @@ steps:
   - zksync db-setup
   depends_on:
   - prepare-ci-env
-  depends_on:
-  - prepare-ci-env
 - name: run-genesis
   image: matterlabs/ci
   commands:
