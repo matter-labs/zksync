@@ -161,12 +161,12 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
     let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
     sig_msg_bits.resize(256, Boolean::constant(false));
 
-    // signature.verify_sha256_musig(
-    //     cs.namespace(|| "verify_sha"),
-    //     self.params,
-    //     &sig_msg_bits,
-    //     generator,
-    // )?;
+    //     signature.verify_sha256_musig(
+    //         cs.namespace(|| "verify_sha"),
+    //         self.params,
+    //         &sig_msg_bits,
+    //         generator,
+    //     )?;
 
     //TODO: put bits here
 

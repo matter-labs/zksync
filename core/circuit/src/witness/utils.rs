@@ -192,7 +192,7 @@ pub fn generate_dummy_sig_data(
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
-    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params);
+    let signature_data = sign_sha256(&sig_bits, &private_key, p_g, params);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
     (
         signature_data,
@@ -253,7 +253,7 @@ pub fn generate_sig_data(
         "inside generation: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits))
     );
-    let signature_data = sign_pedersen(&sig_bits, &private_key, p_g, params);
+    let signature_data = sign_sha256(&sig_bits, &private_key, p_g, params);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
 
     (
