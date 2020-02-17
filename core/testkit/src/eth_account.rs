@@ -134,7 +134,6 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .await
             .map_err(|e| format_err!("Deposit eth send err: {}", e))?;
-        println!("tx: {:?}", signed_tx);
         let receipt = self
             .main_contract_eth_client
             .web3
