@@ -1,6 +1,7 @@
 // Built-in deps
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::mpsc;
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::Arc;
 use std::{env, thread, time};
 // External deps
 use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
@@ -16,6 +17,7 @@ use prover::{start, BabyProver};
 
 fn main() {
     env_logger::init();
+    const ABSENT_PROVER_ID: i32 = -1;
 
     // handle ctrl+c
     let stop_signal = Arc::new(AtomicBool::new(false));
@@ -44,19 +46,12 @@ fn main() {
         heartbeat_interval,
         stop_signal,
     );
-    // Register prover
-    let prover_id = api_client
-        .register_prover()
-        .expect("failed to register prover");
-    // Start prover
-    let (exit_err_tx, exit_err_rx) = mpsc::channel();
-    thread::spawn(move || {
-        start(worker, exit_err_tx);
-    });
+
+    let prover_id_arc = Arc::new(AtomicI32::new(ABSENT_PROVER_ID));
 
     // Handle termination requests.
     {
-        let prover_id = prover_id;
+        let prover_id_arc = prover_id_arc.clone();
         let api_client = api_client.clone();
         thread::spawn(move || {
             let signals = Signals::new(&[
@@ -67,9 +62,12 @@ fn main() {
             .expect("Signals::new() failed");
             for _ in signals.forever() {
                 info!("Termination signal received.");
-                match api_client.prover_stopped(prover_id) {
-                    Ok(_) => {}
-                    Err(e) => error!("failed to send prover stop request: {}", e),
+                let prover_id = prover_id_arc.load(Ordering::SeqCst);
+                if prover_id != ABSENT_PROVER_ID {
+                    match api_client.prover_stopped(prover_id) {
+                        Ok(_) => {}
+                        Err(e) => error!("failed to send prover stop request: {}", e),
+                    }
                 }
 
                 std::process::exit(0);
@@ -77,12 +75,32 @@ fn main() {
         });
     }
 
+    // Register prover
+    prover_id_arc.store(
+        api_client
+            .register_prover()
+            .expect("failed to register prover"),
+        Ordering::SeqCst,
+    );
+
+    // Start prover
+    let (exit_err_tx, exit_err_rx) = mpsc::channel();
+    thread::spawn(move || {
+        start(worker, exit_err_tx);
+    });
+
     // Handle prover exit errors.
     let err = exit_err_rx.recv();
     error!("prover exited with error: {:?}", err);
-    api_client
-        .prover_stopped(prover_id)
-        .expect("failed to send prover stop request");
+    {
+        let prover_id = prover_id_arc.load(Ordering::SeqCst);
+        if prover_id != ABSENT_PROVER_ID {
+            match api_client.prover_stopped(prover_id) {
+                Ok(_) => {}
+                Err(e) => error!("failed to send prover stop request: {}", e),
+            }
+        }
+    }
 }
 
 fn read_from_key_dir(key_dir: String) -> groth16::Parameters<Engine> {
