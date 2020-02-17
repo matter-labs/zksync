@@ -29,19 +29,45 @@ steps:
       - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
-- name: init
+- name: prepare-ci-env
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - ci-prepare-env.sh
+  depends_on:
+  - restore-cache
+- name: yarn
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync env ci
   - zksync yarn
+  depends_on:
+  - prepare-ci-env
+- name: db-setup
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync env ci
   - zksync db-wait
   - zksync db-setup
   depends_on:
-  - restore-cache
+  - prepare-ci-env
+- name: run-genesis
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync genesis
+  depends_on:
+  - db-setup
 - name: build-contracts
   image: matterlabs/ci
   commands:
@@ -50,8 +76,9 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync build-contracts
   depends_on:
-  - init
-- name: rust-checks
+  - prepare-ci-env
+  - yarn
+- name: rust-checks-and-tests
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
@@ -59,31 +86,23 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - cargo fmt -- --check
   - f cargo clippy --tests --benches -- -D warnings
-  depends_on:
-  - build-contracts
-- name: rust-tests
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo test
   - zksync circuit-tests
   - zksync prover-tests
   - zksync db-test
   depends_on:
-  - rust-checks
-- name: deploy-test
+  - run-genesis
+- name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync genesis
   - zksync redeploy
   - zksync integration-testkit
   depends_on:
-  - rust-tests
+  - run-genesis
+  - build-contracts
 - name: contract-test
   image: matterlabs/ci
   commands:
@@ -107,8 +126,8 @@ steps:
       - ./target/cargo
       - ./keys
   depends_on:
-     - init
-     - rust-checks
+     - redeploy-and-integration-testkit
+     - rust-checks-and-tests
 ---
 # This pipeline publishes images and updates stage
 kind: pipeline
