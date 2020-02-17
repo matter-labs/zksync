@@ -59,13 +59,6 @@ steps:
   - zksync db-setup
   depends_on:
   - prepare-ci-env
-- name: rust-build
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - f cargo build
   depends_on:
   - prepare-ci-env
 - name: run-genesis
@@ -76,7 +69,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync genesis
   depends_on:
-  - rust-build
+  - db-setup
 - name: build-contracts
   image: matterlabs/ci
   commands:
@@ -99,7 +92,6 @@ steps:
   - zksync circuit-tests
   - zksync db-test
   depends_on:
-  - rust-build
   - run-genesis
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
