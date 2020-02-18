@@ -79,9 +79,13 @@ zksync server
 ```
 
 By default block chunk size set to `50`. For testing & development purposes you
-can change it to the smaller value (`18` should be enough).
+can change it to the smaller value.
 
-To do so, change the environment variable `BLOCK_SIZE_CHUNKS` value in `./etc/env/dev.env`.
+**Note:** Currently it's not recommended though. Lowering the block chunk size may
+break several tests, since some of them create big blocks.
+
+If you have to change the block chunk size anyway, you should change the environment
+variable `BLOCK_SIZE_CHUNKS` value in `./etc/env/dev.env`.
 
 After that you may need to invalidate `cargo` cache by touching the files of `models`:
 
