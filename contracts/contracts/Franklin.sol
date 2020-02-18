@@ -307,9 +307,6 @@ contract Franklin is Storage, Config, Events {
         if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
             require(totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS, "fck13"); // too many blocks committed
 
-            uint32 blockChunks = uint32(_publicData.length / 8);
-            require(verifier.isBlockSizeSupported(blockChunks), "fck14");
-
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
@@ -320,7 +317,7 @@ contract Franklin is Storage, Config, Events {
             // (their data is similar to data from priority requests mapping)
             verifyPriorityOperations(startId, totalProcessed, priorityNumber);
 
-            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _publicData, startId, totalProcessed, priorityNumber, blockChunks);
+            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _publicData, startId, totalProcessed, priorityNumber);
 
             totalOnchainOps = startId + totalProcessed;
 
@@ -341,9 +338,11 @@ contract Franklin is Storage, Config, Events {
         uint24 _feeAccount,
         bytes32 _newRoot,
         bytes memory _publicData,
-        uint64 _startId, uint64 _totalProcessed, uint64 _priorityNumber,
-        uint32 _chunks
+        uint64 _startId, uint64 _totalProcessed, uint64 _priorityNumber
     ) internal {
+        uint32 blockChunks = uint32(_publicData.length / 8);
+        require(verifier.isBlockSizeSupported(blockChunks), "ccb10");
+
         // Create block commitment for verification proof
         bytes32 commitment = createBlockCommitment(
             _blockNumber,
@@ -361,7 +360,7 @@ contract Franklin is Storage, Config, Events {
             _priorityNumber, // total number of priority onchain ops in block
             commitment, // blocks' commitment
             _newRoot, // new root
-            _chunks
+            blockChunks
         );
     }
 
