@@ -69,20 +69,16 @@ genesis: confirm_action
 
 # Frontend clients
 
-dist-config:
-	bin/.gen_js_config > js/client/src/env-config.js
-	bin/.gen_js_config > js/explorer/src/env-config.js
-
 client:
 	@cd js/client && yarn serve
 
-explorer: dist-config
+explorer:
 	@cd js/explorer && yarn serve
 
 dist-client:
 	@cd js/client && yarn build
 
-dist-explorer: dist-config
+dist-explorer:
 	@cd js/explorer && yarn build
 
 image-nginx: dist-client dist-explorer

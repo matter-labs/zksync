@@ -2,8 +2,8 @@ use crate::node::Address;
 use futures::{channel::mpsc, executor::block_on, SinkExt};
 use std::env;
 use std::net::SocketAddr;
+use std::time;
 use web3::types::{H160, H256};
-
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
 pub struct ThreadPanicNotify(pub mpsc::Sender<bool>);
 
@@ -33,6 +33,7 @@ pub struct ConfigurationOptions {
     pub gas_price_factor: usize,
     pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
+    pub req_server_timeout: time::Duration,
 }
 
 impl ConfigurationOptions {
@@ -85,6 +86,10 @@ impl ConfigurationOptions {
             prover_server_address: get_env("PROVER_SERVER_BIND")
                 .parse()
                 .expect("Failed to parse PROVER_SERVER_BIND bind address"),
+            req_server_timeout: get_env("REQ_SERVER_TIMEOUT")
+                .parse::<u64>()
+                .and_then(|d| Ok(time::Duration::from_secs(d)))
+                .expect("REQ_SERVER_TIMEOUT invalid value"),
         }
     }
 }
