@@ -11,8 +11,8 @@ describe("Ownable unit test", function () {
         testContract = await deployTestContract('../../build/OwnableTest')
     });
 
-    it("checking correctness of setting ownership in constructor", async () => {
-        expect(await testContract.getOwner()).to.equal(wallet.address)
+    it("checking correctness of setting mastership in constructor", async () => {
+        expect(await testContract.getMaster()).to.equal(wallet.address)
     });
 
 });

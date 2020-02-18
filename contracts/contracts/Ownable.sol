@@ -3,50 +3,50 @@ pragma solidity 0.5.16;
 /// @title Ownable Contract
 /// @author Matter Labs
 contract Ownable {
-    /// @notice Storage position of the owner address
-    bytes32 private constant ownerPosition = keccak256("owner");
+    /// @notice Storage position of the master address
+    bytes32 private constant masterPosition = keccak256("master");
 
     /// @notice Contract constructor
-    /// @dev Sets msg sender address as owner address
+    /// @dev Sets msg sender address as master address
     constructor() public {
-        setOwner(msg.sender);
+        setMaster(msg.sender);
     }
 
-    /// @notice Check if specified address is owner
+    /// @notice Check if specified address is master
     /// @param _address Address to check
-    function requireOwner(address _address) internal view {
+    function requireMaster(address _address) internal view {
         require(
-            _address == getOwner(),
+            _address == getMaster(),
             "oro11"
-        ); // oro11 - only by owner
+        ); // oro11 - only by master
     }
 
-    /// @notice Returns contract owner address
-    /// @return Owner address
-    function getOwner() public view returns (address owner) {
-        bytes32 position = ownerPosition;
+    /// @notice Returns contract master address
+    /// @return Master address
+    function getMaster() public view returns (address master) {
+        bytes32 position = masterPosition;
         assembly {
-            owner := sload(position)
+            master := sload(position)
         }
     }
 
-    /// @notice Sets new owner address
-    /// @param _newOwner New owner address
-    function setOwner(address _newOwner) internal {
-        bytes32 position = ownerPosition;
+    /// @notice Sets new master address
+    /// @param _newMaster New master address
+    function setMaster(address _newMaster) internal {
+        bytes32 position = masterPosition;
         assembly {
-            sstore(position, _newOwner)
+            sstore(position, _newMaster)
         }
     }
 
-    /// @notice Transfer ownership of the contract to new owner
-    /// @param _newOwner New owner address
-    function transferOwnership(address _newOwner) external {
-        requireOwner(msg.sender);
+    /// @notice Transfer mastership of the contract to new master
+    /// @param _newMaster New master address
+    function transferMastership(address _newMaster) external {
+        requireMaster(msg.sender);
         require(
-            _newOwner != address(0),
+            _newMaster != address(0),
             "otp11"
-        ); // otp11 - new owner can't be zero address
-        setOwner(_newOwner);
+        ); // otp11 - new master can't be zero address
+        setMaster(_newMaster);
     }
 }
