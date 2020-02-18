@@ -63,11 +63,16 @@ pub fn hardcode_vk<E: Engine>(vk: &groth16::VerifyingKey<E>) -> String {
     out
 }
 
-fn create_get_vk_function(block_sizes: &[usize]) -> String {
-    let mut vk_selector_ifs = block_sizes.iter().map(|size| {
-        format!("if (_id == BLOCK_KEY_MASK | uint32({block_size})) {{ return getVkBlock{block_size}(); }}\n", block_size = size)
-    }).collect::<Vec<_>>();
-    vk_selector_ifs.push("if (_id == EXIT_KEY_ID) { return getVkExit(); }\n".to_string());
+fn create_get_block_vk_function(block_sizes: &[usize]) -> String {
+    let vk_selector_ifs = block_sizes
+        .iter()
+        .map(|size| {
+            format!(
+                "if (_chunks == uint32({block_size})) {{ return getVkBlock{block_size}(); }}\n",
+                block_size = size
+            )
+        })
+        .collect::<Vec<_>>();
 
     let mut vk_selector = String::new();
 
@@ -79,10 +84,9 @@ fn create_get_vk_function(block_sizes: &[usize]) -> String {
     }
     format!(
         r#"
-    function getVk(uint32 _id) internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
+    function getVkBlock(uint32 _chunks) internal pure returns (uint256[14] memory vk, uint256[] memory gammaABC) {{
         {vk_selector}
-    }}
-"#,
+    }}"#,
         vk_selector = vk_selector
     )
 }
@@ -112,8 +116,7 @@ fn create_get_supported_block_sizes(block_sizes: &[usize]) -> String {
         r#"
     function isBlockSizeSupported(uint32 _size) public pure returns (bool) {{
         {if_block}
-    }}
-"#,
+    }}"#,
         if_block = result
     )
 }
@@ -132,19 +135,12 @@ pragma solidity 0.5.16;
 
 // Hardcoded constants to avoid accessing store
 contract {contract_name} {{
-    uint32 constant BLOCK_KEY_MASK = 0xbb000000;
-    uint32 constant EXIT_KEY_ID = 0xeeeeeeee;
-
     {vk_selector}
-
     {vk_functions}
-
     {supported_block_sizes}
-
-}}
-"#,
+}}"#,
         contract_name = contract_name,
-        vk_selector = create_get_vk_function(block_sizes),
+        vk_selector = create_get_block_vk_function(block_sizes),
         vk_functions = vk_functions,
         supported_block_sizes = create_get_supported_block_sizes(block_sizes),
     )
@@ -161,8 +157,7 @@ pub fn generate_vk_function<E: Engine>(
 
         {vk}
 
-    }}
-"#,
+    }}"#,
         vk = hardcode_vk(&vk),
         function_name = function_name,
     )

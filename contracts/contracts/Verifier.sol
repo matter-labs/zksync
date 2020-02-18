@@ -26,7 +26,7 @@ contract Verifier is VerificationKey {
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
-        (vk, gammaABC) = getVk(BLOCK_KEY_MASK | _chunks);
+        (vk, gammaABC) = getVkBlock(_chunks);
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(_commitment) & mask;
         return Verify(vk, gammaABC, _proof, inputs);
@@ -52,7 +52,7 @@ contract Verifier is VerificationKey {
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
-        (vk, gammaABC) = getVk(EXIT_KEY_ID);
+        (vk, gammaABC) = getVkExit();
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(hash) & mask;
         return Verify(vk, gammaABC, _proof, inputs);
