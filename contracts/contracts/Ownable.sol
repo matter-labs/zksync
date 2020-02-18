@@ -3,11 +3,11 @@ pragma solidity 0.5.16;
 /// @title Ownable Contract
 /// @author Matter Labs
 contract Ownable {
-    /// @notice Storage position of the master address
+    /// @notice Storage position of the masters address
     bytes32 private constant masterPosition = keccak256("master");
 
     /// @notice Contract constructor
-    /// @dev Sets msg sender address as master address
+    /// @dev Sets msg sender address as masters address
     constructor() public {
         setMaster(msg.sender);
     }
@@ -21,8 +21,8 @@ contract Ownable {
         ); // oro11 - only by master
     }
 
-    /// @notice Returns contract master address
-    /// @return Master address
+    /// @notice Returns contract masters address
+    /// @return Masters address
     function getMaster() public view returns (address master) {
         bytes32 position = masterPosition;
         assembly {
@@ -30,8 +30,8 @@ contract Ownable {
         }
     }
 
-    /// @notice Sets new master address
-    /// @param _newMaster New master address
+    /// @notice Sets new masters address
+    /// @param _newMaster New masters address
     function setMaster(address _newMaster) internal {
         bytes32 position = masterPosition;
         assembly {
@@ -40,13 +40,13 @@ contract Ownable {
     }
 
     /// @notice Transfer mastership of the contract to new master
-    /// @param _newMaster New master address
+    /// @param _newMaster New masters address
     function transferMastership(address _newMaster) external {
         requireMaster(msg.sender);
         require(
             _newMaster != address(0),
             "otp11"
-        ); // otp11 - new master can't be zero address
+        ); // otp11 - new masters address can't be zero address
         setMaster(_newMaster);
     }
 }
