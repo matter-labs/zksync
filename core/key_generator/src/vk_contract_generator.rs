@@ -2,7 +2,7 @@
 
 use crypto_exports::bellman::groth16;
 use crypto_exports::pairing::{CurveAffine, Engine};
-use models::params::block_size_chunks;
+use models::params::block_chunk_sizes;
 use models::prover_utils::{
     get_block_proof_key_and_vk_path, get_exodus_proof_key_and_vk_path, get_keys_root_dir,
 };
@@ -172,16 +172,22 @@ pub fn compose_verifer_keys_contract() {
     let mut contract_file_path = get_keys_root_dir();
     contract_file_path.push("VerificationKey.sol");
 
+    let mut vk_functions = Vec::new();
+
     let exit_key_vk = std::fs::read_to_string(get_exodus_proof_key_and_vk_path().1)
         .expect("Fail to read exit key vk");
-    let block_proof_vk = std::fs::read_to_string(get_block_proof_key_and_vk_path().1)
-        .expect("Fail to read block proof vk");
-    let vk_function = [exit_key_vk, block_proof_vk].concat();
+    vk_functions.push(exit_key_vk);
+
+    for block_size in block_chunk_sizes() {
+        let block_proof_vk = std::fs::read_to_string(get_block_proof_key_and_vk_path(block_size).1)
+            .expect("Fail to read block proof vk");
+        vk_functions.push(block_proof_vk);
+    }
 
     let contract_content = generate_vk_contract(
         "VerificationKey".to_string(),
-        vk_function,
-        &[block_size_chunks()],
+        vk_functions.concat(),
+        &block_chunk_sizes().as_slice(),
     );
 
     std::fs::write(contract_file_path, contract_content)

@@ -123,6 +123,11 @@ pub fn block_size_chunks() -> usize {
     }
 }
 
+pub fn block_chunk_sizes() -> Vec<usize> {
+    // TODO: jazzandrock read from env file
+    [10, 20, 50].to_vec()
+}
+
 /// Priority op should be executed for this number of eth blocks.
 pub const PRIORITY_EXPIRATION: u64 = 250;
 pub const FR_ADDRESS_LEN: usize = 20;

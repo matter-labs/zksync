@@ -61,17 +61,15 @@ fn generate_and_write_parameters<F: Fn() -> Parameters<Bn256>>(
 }
 
 pub fn make_block_proof_key() {
-    let (key_file_path, get_vk_file_path) = get_block_proof_key_and_vk_path();
-    generate_and_write_parameters(
-        key_file_path,
-        get_vk_file_path,
-        make_circuit_parameters,
-        &format!(
-            "{}Block{}",
-            CONTRACT_FUNCTION_NAME,
-            params::block_size_chunks()
-        ),
-    );
+    for block_size in params::block_chunk_sizes() {
+        let (key_file_path, get_vk_file_path) = get_block_proof_key_and_vk_path(block_size);
+        generate_and_write_parameters(
+            key_file_path,
+            get_vk_file_path,
+            || make_circuit_parameters(block_size),
+            &format!("{}Block{}", CONTRACT_FUNCTION_NAME, block_size,),
+        );
+    }
 }
 
 pub fn make_exodus_key() {
@@ -84,7 +82,7 @@ pub fn make_exodus_key() {
     );
 }
 
-pub fn make_circuit_parameters() -> Parameters<Bn256> {
+pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
     let params = &params::JUBJUB_PARAMS;
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
@@ -145,7 +143,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
 
     let instance_for_generation: FranklinCircuit<'_, Bn256> = FranklinCircuit {
         params,
-        operation_batch_size: params::block_size_chunks(),
+        operation_batch_size: block_size,
         old_root: None,
         new_root: None,
         validator_address: None,
@@ -153,7 +151,7 @@ pub fn make_circuit_parameters() -> Parameters<Bn256> {
         pub_data_commitment: None,
         validator_balances: vec![None; (1 << params::BALANCE_TREE_DEPTH) as usize],
         validator_audit_path: vec![None; params::account_tree_depth()],
-        operations: vec![empty_operation; params::block_size_chunks()],
+        operations: vec![empty_operation; block_size],
         validator_account: AccountWitness {
             nonce: None,
             pub_key_hash: None,
