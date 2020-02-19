@@ -25,7 +25,6 @@ Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md
 Setup:
 
 ```sh
-zksync dev-up
 zksync init
 ```
 
@@ -58,17 +57,6 @@ Switch between configurations:
 ```sh
 zksync env <ENV_NAME>
 ```
-
-## Monitoring & management:
-
-Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
-Geth:
-
-```sh
-geth attach $(bin/kube-geth-url)
-```
-
-NOTE: if you are resetting geth, each Metamask account must be manually reset via Settings > Advanced > Reset account.
 
 ## Build and run server + prover locally for development:
 
