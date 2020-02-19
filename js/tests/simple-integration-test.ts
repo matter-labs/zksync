@@ -1,5 +1,4 @@
 import {
-    depositFromETH,
     Wallet,
     Provider,
     ETHProxy, getDefaultProvider, types,
@@ -30,10 +29,9 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
     const balanceBeforeDep = await syncWallet.getBalance(token);
 
     const startTime = new Date().getTime();
-    const depositHandle = await depositFromETH(
+    const depositHandle = await depositWallet.depositToSyncFromEthereum(
         {
-            depositFrom: depositWallet.ethSigner,
-            depositTo: syncWallet,
+            depositTo: syncWallet.address(),
             token: token,
             amount,
         });
