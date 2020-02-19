@@ -22,7 +22,7 @@ use models::node::{
     AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TransferOp,
     TransferToNewOp,
 };
-use models::params::{block_chunk_sizes, block_size_chunks, max_block_chunk_size};
+use models::params::max_block_chunk_size;
 use std::collections::{HashMap, VecDeque};
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;

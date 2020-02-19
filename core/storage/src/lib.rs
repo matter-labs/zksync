@@ -497,6 +497,7 @@ struct StorageBlock {
     fee_account_id: i64,
     unprocessed_prior_op_before: i64,
     unprocessed_prior_op_after: i64,
+    block_size: i64,
 }
 
 impl StoredOperation {
@@ -826,6 +827,7 @@ impl StorageProcessor {
                 fee_account_id: i64::from(block.fee_account),
                 unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
                 unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
+                block_size: block.smallest_block_size() as i64,
             };
 
             diesel::insert_into(blocks::table)
