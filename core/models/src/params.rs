@@ -128,6 +128,10 @@ pub fn block_chunk_sizes() -> Vec<usize> {
     [10, 20, 50].to_vec()
 }
 
+pub fn max_block_chunk_size() -> usize {
+    block_chunk_sizes().last().cloned().unwrap()
+}
+
 /// Priority op should be executed for this number of eth blocks.
 pub const PRIORITY_EXPIRATION: u64 = 250;
 pub const FR_ADDRESS_LEN: usize = 20;

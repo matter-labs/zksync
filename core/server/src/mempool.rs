@@ -22,7 +22,7 @@ use models::node::{
     AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TransferOp,
     TransferToNewOp,
 };
-use models::params::block_size_chunks;
+use models::params::{block_chunk_sizes, block_size_chunks, max_block_chunk_size};
 use std::collections::{HashMap, VecDeque};
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;
@@ -222,7 +222,7 @@ impl Mempool {
         ProposedBlock { priority_ops, txs }
     }
 
-    /// Returns: chunks left, ops selected
+    /// Returns: chunks left from max amount of chunks, ops selected
     async fn select_priority_ops(
         &self,
         current_unprocessed_priority_op: u64,
@@ -232,7 +232,7 @@ impl Mempool {
             .clone()
             .send(EthWatchRequest::GetPriorityQueueOps {
                 op_start_id: current_unprocessed_priority_op,
-                max_chunks: block_size_chunks(),
+                max_chunks: max_block_chunk_size(),
                 resp: eth_watch_resp.0,
             })
             .await
@@ -241,7 +241,7 @@ impl Mempool {
         let priority_ops = eth_watch_resp.1.await.expect("Err response from eth watch");
 
         (
-            block_size_chunks()
+            max_block_chunk_size()
                 - priority_ops
                     .iter()
                     .map(|op| op.data.chunks())

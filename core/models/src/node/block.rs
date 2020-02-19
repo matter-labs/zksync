@@ -3,7 +3,7 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use crate::params::block_size_chunks;
+use crate::params::{block_chunk_sizes, block_size_chunks};
 use crate::serialization::*;
 use web3::types::H256;
 
@@ -46,6 +46,10 @@ impl ExecutedOperations {
 
     pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
         self.get_executed_op().map(|op| op.eth_witness())
+    }
+
+    pub fn chunks(&self) -> usize {
+        self.get_executed_op().map(|op| op.chunks()).unwrap_or(0)
     }
 }
 
@@ -121,5 +125,22 @@ impl Block {
 
     pub fn number_of_processed_prior_ops(&self) -> u64 {
         self.processed_priority_ops.1 - self.processed_priority_ops.0
+    }
+
+    pub fn chunks_used(&self) -> usize {
+        self.block_transactions
+            .iter()
+            .map(|tx| tx.chunks())
+            .sum::<usize>()
+    }
+
+    pub fn smallest_block_size(&self) -> usize {
+        let chunks_used = self.chunks_used();
+        for block_size in block_chunk_sizes() {
+            if block_size >= chunks_used {
+                return block_size;
+            }
+        }
+        panic!("There's no block of such size");
     }
 }

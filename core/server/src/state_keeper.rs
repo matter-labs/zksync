@@ -265,7 +265,7 @@ impl PlasmaStateKeeper {
         self.notify_executed_ops(&mut executed_ops).await;
     }
 
-    // None if there is no space in current block
+    // Err if there is no space in current block
     fn apply_priority_op(
         &mut self,
         priority_op: PriorityOp,
