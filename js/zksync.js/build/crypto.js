@@ -280,7 +280,7 @@ function serializePointPacked(point) {
 }
 exports.serializePointPacked = serializePointPacked;
 function signTransactionBytes(privKey, bytes) {
-    return musigPedersen(privKey, bytes);
+    return musigSHA256(privKey, bytes);
 }
 exports.signTransactionBytes = signTransactionBytes;
 function privateKeyFromSeed(seed) {
