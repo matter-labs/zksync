@@ -125,7 +125,12 @@ fn construct_test_accounts(
                 &config,
             );
             let mut ta = TestAccount {
-                zk_acc: ZksyncAccount::rand(),
+                zk_acc: ZksyncAccount::new(
+                    ZksyncAccount::rand().private_key,
+                    0,
+                    eth_acc.address,
+                    eth_acc.private_key,
+                ),
                 eth_acc,
                 eth_nonce: Mutex::new(U256::from(0)),
             };
@@ -167,20 +172,25 @@ async fn deposit_single(
         .eth_acc
         .deposit_eth(deposit_amount, &test_acc.zk_acc.address, Some(nonce))
         .await?;
-    let mut executed = false;
-    // 4 min wait
-    let n_checks = 4 * 10;
+    let mut verified = false;
+    // 5 min wait
+    let n_checks = 5 * 60;
     let check_period = std::time::Duration::from_secs(1);
     for _i in 0..n_checks {
-        let ret = ethop_info(po.serial_id).await?;
-        let obj = ret.result.as_object().unwrap();
-        executed = obj["executed"].as_bool().unwrap();
         thread::sleep(check_period);
-        if executed {
+        let ret = ethop_info(po.serial_id).await?;
+        println!("{:?}", ret);
+        let obj = ret.result.as_object().unwrap();
+        if !obj["block"].is_object() {
+            continue;
+        }
+        let block = obj["block"].as_object().unwrap();
+        if block["verified"].is_boolean() && block["verified"].as_bool().unwrap() {
+            verified = true;
             break;
         }
     }
-    if executed {
+    if verified {
         return Ok(());
     }
     failure::bail!("timeout")
@@ -258,7 +268,6 @@ async fn do_withdraws(test_accounts: &[TestAccount], deposit_amount: BigDecimal)
                     None,
                     true,
                 )));
-                println!("sending withdraw: {:?}", tx);
                 send_tx(tx)
             })
             .collect::<Vec<_>>(),
