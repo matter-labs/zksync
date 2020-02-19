@@ -26,7 +26,6 @@
     "chai": "^4.2.0",
     "mocha": "^6.2.0",
     "openzeppelin-solidity": "^2.3.0",
-    "prando": "^5.1.1",
     "prettier": "1.18.2",
     "ts-node": "^8.3.0",
     "tslint": "^6.0.0-beta0",
