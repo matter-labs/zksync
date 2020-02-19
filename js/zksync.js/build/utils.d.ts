@@ -1,6 +1,7 @@
 /// <reference types="node" />
 import BN = require("bn.js");
 import { utils } from "ethers";
+import { TokenAddress, TokenLike, Tokens } from "./types";
 export declare const IERC20_INTERFACE: utils.Interface;
 export declare const SYNC_MAIN_CONTRACT_INTERFACE: utils.Interface;
 export declare const SYNC_PRIOR_QUEUE_INTERFACE: utils.Interface;
@@ -26,3 +27,12 @@ export declare function closestPackableTransactionFee(fee: utils.BigNumberish): 
 export declare function buffer2bitsLE(buff: any): any[];
 export declare function buffer2bitsBE(buff: any): any[];
 export declare function sleep(ms: any): Promise<unknown>;
+export declare function isTokenETH(token: TokenLike): boolean;
+export declare class TokenSet {
+    private tokensBySymbol;
+    constructor(tokensBySymbol: Tokens);
+    private resolveTokenObject;
+    resolveTokenId(tokenLike: TokenLike): number;
+    resolveTokenAddress(tokenLike: TokenLike): TokenAddress;
+    resolveTokenSymbol(tokenLike: TokenLike): TokenAddress;
+}

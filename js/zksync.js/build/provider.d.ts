@@ -1,6 +1,6 @@
 import { AbstractJSONRPCTransport } from "./transport";
 import { utils, ethers } from "ethers";
-import { AccountState, Address, Token, TransactionReceipt, PriorityOperationReceipt, ContractAddress, Tokens } from "./types";
+import { AccountState, Address, TokenLike, TransactionReceipt, PriorityOperationReceipt, ContractAddress, Tokens, TokenAddress } from "./types";
 export declare function getDefaultProvider(network: "localhost" | "testnet", transport?: "WS" | "HTTP"): Promise<Provider>;
 export declare class Provider {
     transport: AbstractJSONRPCTransport;
@@ -24,7 +24,7 @@ export declare class ETHProxy {
     private governanceContract;
     private mainContract;
     constructor(ethersProvider: ethers.providers.Provider, contractAddress: ContractAddress);
-    resolveTokenId(token: Token): Promise<number>;
-    estimateDepositFeeInETHToken(token: Token, gasPrice?: utils.BigNumber): Promise<utils.BigNumber>;
+    resolveTokenId(token: TokenAddress): Promise<number>;
+    estimateDepositFeeInETHToken(token: TokenLike, gasPrice?: utils.BigNumber): Promise<utils.BigNumber>;
     estimateEmergencyWithdrawFeeInETHToken(gasPrice?: utils.BigNumber): Promise<utils.BigNumber>;
 }

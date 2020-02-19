@@ -295,7 +295,7 @@ var ETHProxy = /** @class */ (function () {
                         _b.label = 2;
                     case 2:
                         gasPrice = _a;
-                        multiplier = token == "ETH" ? 179000 : 214000;
+                        multiplier = utils_1.isTokenETH(token) ? 179000 : 214000;
                         return [2 /*return*/, gasPrice.mul(2 * multiplier)];
                 }
             });

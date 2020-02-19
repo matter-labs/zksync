@@ -1,7 +1,9 @@
 import { utils } from "ethers";
 export declare type Address = string;
 export declare type PubKeyHash = string;
-export declare type Token = "ETH" | string;
+export declare type TokenLike = TokenSymbol | TokenAddress;
+export declare type TokenSymbol = string;
+export declare type TokenAddress = string;
 export declare type Nonce = number | "committed";
 export interface AccountState {
     address: Address;
@@ -74,6 +76,6 @@ export interface Tokens {
     [token: string]: {
         address: string;
         id: number;
-        symbol?: string;
+        symbol: string;
     };
 }

@@ -2,7 +2,6 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 var BN = require("bn.js");
 var ethers_1 = require("ethers");
-var utils_1 = require("ethers/utils");
 exports.IERC20_INTERFACE = new ethers_1.utils.Interface(require("../abi/IERC20.json").interface);
 exports.SYNC_MAIN_CONTRACT_INTERFACE = new ethers_1.utils.Interface(require("../abi/SyncMain.json").interface);
 exports.SYNC_PRIOR_QUEUE_INTERFACE = new ethers_1.utils.Interface(require("../abi/SyncPriorityQueue.json").interface);
@@ -150,7 +149,7 @@ exports.packFeeChecked = packFeeChecked;
 function closestPackableTransactionAmount(amount) {
     var amountBN = new BN(ethers_1.utils.bigNumberify(amount).toString());
     var packedAmount = packAmount(amountBN);
-    return utils_1.bigNumberify(floatToInteger(packedAmount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10).toString());
+    return ethers_1.utils.bigNumberify(floatToInteger(packedAmount, AMOUNT_EXPONENT_BIT_WIDTH, AMOUNT_MANTISSA_BIT_WIDTH, 10).toString());
 }
 exports.closestPackableTransactionAmount = closestPackableTransactionAmount;
 /**
@@ -161,7 +160,7 @@ exports.closestPackableTransactionAmount = closestPackableTransactionAmount;
 function closestPackableTransactionFee(fee) {
     var feeBN = new BN(ethers_1.utils.bigNumberify(fee).toString());
     var packedFee = packFee(feeBN);
-    return utils_1.bigNumberify(floatToInteger(packedFee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10).toString());
+    return ethers_1.utils.bigNumberify(floatToInteger(packedFee, FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH, 10).toString());
 }
 exports.closestPackableTransactionFee = closestPackableTransactionFee;
 function buffer2bitsLE(buff) {
@@ -200,3 +199,38 @@ function sleep(ms) {
     return new Promise(function (resolve) { return setTimeout(resolve, ms); });
 }
 exports.sleep = sleep;
+function isTokenETH(token) {
+    return token === "ETH" || token === ethers_1.constants.AddressZero;
+}
+exports.isTokenETH = isTokenETH;
+var TokenSet = /** @class */ (function () {
+    // TODO: Replace with hardcoded list of tokens for final version this is temporary solution
+    //  so that we can get list of the supported from zksync node,
+    function TokenSet(tokensBySymbol) {
+        this.tokensBySymbol = tokensBySymbol;
+    }
+    TokenSet.prototype.resolveTokenObject = function (tokenLike) {
+        if (this.tokensBySymbol[tokenLike]) {
+            return this.tokensBySymbol[tokenLike];
+        }
+        for (var _i = 0, _a = Object.values(this.tokensBySymbol); _i < _a.length; _i++) {
+            var token = _a[_i];
+            if (token.address.toLocaleLowerCase() ==
+                tokenLike.toLocaleLowerCase()) {
+                return token;
+            }
+        }
+        throw new Error("Token " + tokenLike + " is not supported");
+    };
+    TokenSet.prototype.resolveTokenId = function (tokenLike) {
+        return this.resolveTokenObject(tokenLike).id;
+    };
+    TokenSet.prototype.resolveTokenAddress = function (tokenLike) {
+        return this.resolveTokenObject(tokenLike).address;
+    };
+    TokenSet.prototype.resolveTokenSymbol = function (tokenLike) {
+        return this.resolveTokenObject(tokenLike).symbol;
+    };
+    return TokenSet;
+}());
+exports.TokenSet = TokenSet;

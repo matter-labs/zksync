@@ -1,6 +1,6 @@
 import BN = require("bn.js");
-import { utils } from "ethers";
-import { bigNumberify } from "ethers/utils";
+import { utils, constants } from "ethers";
+import { TokenAddress, TokenLike, Tokens } from "./types";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -200,7 +200,7 @@ export function closestPackableTransactionAmount(
 ): utils.BigNumber {
     const amountBN = new BN(utils.bigNumberify(amount).toString());
     const packedAmount = packAmount(amountBN);
-    return bigNumberify(
+    return utils.bigNumberify(
         floatToInteger(
             packedAmount,
             AMOUNT_EXPONENT_BIT_WIDTH,
@@ -220,7 +220,7 @@ export function closestPackableTransactionFee(
 ): utils.BigNumber {
     const feeBN = new BN(utils.bigNumberify(fee).toString());
     const packedFee = packFee(feeBN);
-    return bigNumberify(
+    return utils.bigNumberify(
         floatToInteger(
             packedFee,
             FEE_EXPONENT_BIT_WIDTH,
@@ -264,4 +264,42 @@ export function buffer2bitsBE(buff) {
 
 export function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export function isTokenETH(token: TokenLike): boolean {
+    return token === "ETH" || token === constants.AddressZero;
+}
+
+export class TokenSet {
+    // TODO: Replace with hardcoded list of tokens for final version this is temporary solution
+    //  so that we can get list of the supported from zksync node,
+    constructor(private tokensBySymbol: Tokens) {}
+
+    private resolveTokenObject(tokenLike: TokenLike) {
+        if (this.tokensBySymbol[tokenLike]) {
+            return this.tokensBySymbol[tokenLike];
+        }
+
+        for (let token of Object.values(this.tokensBySymbol)) {
+            if (
+                token.address.toLocaleLowerCase() ==
+                tokenLike.toLocaleLowerCase()
+            ) {
+                return token;
+            }
+        }
+        throw new Error(`Token ${tokenLike} is not supported`);
+    }
+
+    public resolveTokenId(tokenLike: TokenLike): number {
+        return this.resolveTokenObject(tokenLike).id;
+    }
+
+    public resolveTokenAddress(tokenLike: TokenLike): TokenAddress {
+        return this.resolveTokenObject(tokenLike).address;
+    }
+
+    public resolveTokenSymbol(tokenLike: TokenLike): TokenAddress {
+        return this.resolveTokenObject(tokenLike).symbol;
+    }
 }

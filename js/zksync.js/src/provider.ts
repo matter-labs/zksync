@@ -7,13 +7,15 @@ import { utils, ethers, Contract } from "ethers";
 import {
     AccountState,
     Address,
-    Token,
+    TokenLike,
     TransactionReceipt,
     PriorityOperationReceipt,
     ContractAddress,
-    Tokens
+    Tokens,
+    TokenAddress
 } from "./types";
 import {
+    isTokenETH,
     sleep,
     SYNC_GOV_CONTRACT_INTERFACE,
     SYNC_MAIN_CONTRACT_INTERFACE
@@ -182,7 +184,7 @@ export class ETHProxy {
         );
     }
 
-    async resolveTokenId(token: Token): Promise<number> {
+    async resolveTokenId(token: TokenAddress): Promise<number> {
         if (token == "ETH") {
             return 0;
         } else {
@@ -195,11 +197,11 @@ export class ETHProxy {
     }
 
     async estimateDepositFeeInETHToken(
-        token: Token,
+        token: TokenLike,
         gasPrice?: utils.BigNumber
     ): Promise<utils.BigNumber> {
         gasPrice = gasPrice || (await this.ethersProvider.getGasPrice());
-        const multiplier = token == "ETH" ? 179000 : 214000;
+        const multiplier = isTokenETH(token) ? 179000 : 214000;
         return gasPrice.mul(2 * multiplier);
     }
 

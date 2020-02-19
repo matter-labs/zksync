@@ -1,25 +1,26 @@
 import { ContractTransaction, ethers, utils } from "ethers";
-import { ETHProxy, Provider } from "./provider";
+import { Provider } from "./provider";
 import { Signer } from "./signer";
-import { AccountState, Address, Token, Nonce, PriorityOperationReceipt, TransactionReceipt, PubKeyHash } from "./types";
+import { AccountState, Address, TokenLike, Nonce, PriorityOperationReceipt, TransactionReceipt, PubKeyHash } from "./types";
+import { TokenSet } from "./utils";
 export declare class Wallet {
     signer: Signer;
     ethSigner: ethers.Signer;
     cachedAddress: string;
+    tokensCache: TokenSet;
     provider: Provider;
-    ethProxy: ETHProxy;
     private constructor();
-    connect(provider: Provider, ethProxy: ETHProxy): this;
+    connect(provider: Provider): this;
     syncTransfer(transfer: {
         to: Address;
-        token: Token;
+        token: TokenLike;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction>;
     withdrawTo(withdraw: {
         ethAddress?: string;
-        token: Token;
+        token: TokenLike;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce?: Nonce;
@@ -31,25 +32,25 @@ export declare class Wallet {
     getCurrentPubKeyHash(): Promise<PubKeyHash>;
     getNonce(nonce?: Nonce): Promise<number>;
     address(): Address;
-    static fromEthSigner(ethWallet: ethers.Signer, provider?: Provider, ethProxy?: ETHProxy): Promise<Wallet>;
+    static fromEthSigner(ethWallet: ethers.Signer, provider: Provider): Promise<Wallet>;
     getAccountState(): Promise<AccountState>;
-    getBalance(token: Token, type?: "committed" | "verified"): Promise<utils.BigNumber>;
+    getBalance(token: TokenLike, type?: "committed" | "verified"): Promise<utils.BigNumber>;
+    getEthereumBalance(token: TokenLike): Promise<utils.BigNumber>;
 }
 export declare function depositFromETH(deposit: {
     depositFrom: ethers.Signer;
     depositTo: Wallet;
-    token: Token;
+    token: TokenLike;
     amount: utils.BigNumberish;
     maxFeeInETHToken?: utils.BigNumberish;
 }): Promise<ETHOperation>;
 export declare function emergencyWithdraw(withdraw: {
     withdrawFrom: Wallet;
-    token: Token;
+    token: TokenLike;
     maxFeeInETHToken?: utils.BigNumberish;
     accountId?: number;
     nonce?: Nonce;
 }): Promise<ETHOperation>;
-export declare function getEthereumBalance(ethSigner: ethers.Signer, token: Token): Promise<utils.BigNumber>;
 declare class ETHOperation {
     ethTx: ContractTransaction;
     zkSyncProvider: Provider;

@@ -3,8 +3,12 @@ import { utils } from "ethers";
 export type Address = string;
 export type PubKeyHash = string;
 
-// ETH or ERC20 address
-export type Token = "ETH" | string;
+// Symbol like "ETH" or "FAU" or token contract address(zero address is implied for "ETH").
+export type TokenLike = TokenSymbol | TokenAddress;
+// Token symbol (e.g. "ETH", "FAU", etc.)
+export type TokenSymbol = string;
+// Token address (e.g. 0xde..ad for ERC20, or 0x00.00 for "ETH")
+export type TokenAddress = string;
 
 export type Nonce = number | "committed";
 
@@ -88,6 +92,6 @@ export interface Tokens {
     [token: string]: {
         address: string;
         id: number;
-        symbol?: string;
+        symbol: string;
     };
 }

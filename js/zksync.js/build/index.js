@@ -11,7 +11,6 @@ var wallet_1 = require("./wallet");
 exports.Wallet = wallet_1.Wallet;
 exports.depositFromETH = wallet_1.depositFromETH;
 exports.emergencyWithdraw = wallet_1.emergencyWithdraw;
-exports.getEthereumBalance = wallet_1.getEthereumBalance;
 var provider_1 = require("./provider");
 exports.Provider = provider_1.Provider;
 exports.ETHProxy = provider_1.ETHProxy;
