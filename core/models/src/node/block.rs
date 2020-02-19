@@ -3,7 +3,7 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use crate::params::{block_chunk_sizes, block_size_chunks};
+use crate::params::{block_chunk_sizes};
 use crate::serialization::*;
 use web3::types::H256;
 
@@ -84,7 +84,7 @@ impl Block {
             });
 
         // Pad block with noops.
-        executed_tx_pub_data.resize(block_size_chunks() * 8, 0x00);
+        executed_tx_pub_data.resize(self.smallest_block_size() * 8, 0x00);
 
         executed_tx_pub_data
     }
@@ -100,7 +100,7 @@ impl Block {
             })
             .sum::<usize>();
 
-        block_size_chunks() - used_chunks
+        self.smallest_block_size() - used_chunks
     }
 
     /// Returns eth_witness data and bytes used by each of the operations
