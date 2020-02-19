@@ -22,7 +22,7 @@ pub fn account_tree_depth() -> usize {
         if ACCOUNT_TREE_DEPTH_VALUE == 0 {
             let value: &'static str = env!("ACCOUNT_TREE_DEPTH");
             ACCOUNT_TREE_DEPTH_VALUE =
-                usize::from_str_radix(value, 10).expect("account tree depth value is invalid");
+                usize::from_str(value).expect("account tree depth value is invalid");
             let runtime_value = env::var("ACCOUNT_TREE_DEPTH").expect("ACCOUNT_TREE_DEPTH missing");
             let runtime_value =
                 usize::from_str(&runtime_value).expect("ACCOUNT_TREE_DEPTH invalid");
@@ -109,7 +109,7 @@ pub fn block_size_chunks() -> usize {
         if BLOCK_SIZE_CHUNKS_VALUE == 0 {
             let value: &'static str = env!("BLOCK_SIZE_CHUNKS");
             BLOCK_SIZE_CHUNKS_VALUE =
-                usize::from_str_radix(value, 10).expect("block size chunks value is invalid");
+                usize::from_str(value).expect("block size chunks value is invalid");
             let runtime_value = env::var("BLOCK_SIZE_CHUNKS").expect("BLOCK_SIZE_CHUNKS missing");
             let runtime_value = usize::from_str(&runtime_value).expect("BLOCK_SIZE_CHUNKS invalid");
             if runtime_value != BLOCK_SIZE_CHUNKS_VALUE {

@@ -57,7 +57,6 @@ impl ProposedBlock {
 
 pub struct GetBlockRequest {
     pub last_priority_op_number: u64,
-    pub chunks: usize,
     pub response_sender: oneshot::Sender<ProposedBlock>,
 }
 

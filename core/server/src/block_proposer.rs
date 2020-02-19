@@ -10,19 +10,16 @@ use crate::state_keeper::StateKeeperRequest;
 use futures::channel::{mpsc, oneshot};
 use futures::SinkExt;
 use models::node::config::TX_MINIBATCH_CREATE_TIME;
-use models::params::block_size_chunks;
 use tokio::runtime::Runtime;
 use tokio::time;
 
 fn create_mempool_req(
     last_priority_op_number: u64,
-    chunks: usize,
 ) -> (MempoolRequest, oneshot::Receiver<ProposedBlock>) {
     let (response_sender, receiver) = oneshot::channel();
     (
         MempoolRequest::GetBlock(GetBlockRequest {
             last_priority_op_number,
-            chunks,
             response_sender,
         }),
         receiver,
@@ -38,8 +35,7 @@ struct BlockProposer {
 
 impl BlockProposer {
     async fn propose_new_block(&mut self) -> ProposedBlock {
-        let (mempool_req, resp) =
-            create_mempool_req(self.current_priority_op_number, block_size_chunks());
+        let (mempool_req, resp) = create_mempool_req(self.current_priority_op_number);
         self.mempool_requests
             .send(mempool_req)
             .await

@@ -175,6 +175,18 @@ export class WalletDecorator {
         this.ethNonce = await this.ethWallet.getTransactionCount();
     }
 
+    async setCurrentPubkeyWithZksyncTx() {
+        if (await this.syncWallet.isCurrentPubkeySet()) return;
+
+        const syncNonce = this.syncNonce++;
+
+        const startTime = new Date().getTime();
+        const changePubkeyHandle = await this.syncWallet.setCurrentPubkeyWithZksyncTx(syncNonce);
+        console.log(`Change pubkey offchain posted: ${(new Date().getTime()) - startTime} ms`);
+        await changePubkeyHandle.awaitReceipt();
+        console.log(`Change pubkey offchain committed: ${(new Date().getTime()) - startTime} ms`);
+    }
+
     async mainchainSendToMany(wallets, tokens, amounts) {
         const promises = [];
         for (const [wallet, token, amount] of utils.product(wallets, tokens, amounts)) {

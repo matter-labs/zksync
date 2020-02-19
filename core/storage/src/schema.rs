@@ -52,6 +52,7 @@ table! {
         worker -> Text,
         created_at -> Timestamp,
         stopped_at -> Nullable<Timestamp>,
+        block_size -> Int8,
     }
 }
 

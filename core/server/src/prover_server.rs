@@ -36,7 +36,7 @@ fn register(
     }
     let storage = data.access_storage()?;
     let id = storage
-        .register_prover(&r.name)
+        .register_prover(&r.name, r.block_size)
         .map_err(actix_web::error::ErrorInternalServerError)?;
     Ok(id.to_string())
 }

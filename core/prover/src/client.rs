@@ -19,6 +19,7 @@ use models::prover_utils::encode_proof;
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {
     pub name: String,
+    pub block_size: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -104,7 +105,7 @@ impl ApiClient {
         backoff
     }
 
-    pub fn register_prover(&self) -> Result<i32, failure::Error> {
+    pub fn register_prover(&self, block_size: usize) -> Result<i32, failure::Error> {
         let op = || -> Result<i32, failure::Error> {
             info!("Registering prover...");
             let client = self.get_client()?;
@@ -112,6 +113,7 @@ impl ApiClient {
                 .post(&self.register_url)
                 .json(&client::ProverReq {
                     name: self.worker.clone(),
+                    block_size,
                 })
                 .send();
 
@@ -146,13 +148,14 @@ impl ApiClient {
 }
 
 impl crate::ApiClient for ApiClient {
-    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
+    fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let op = || -> Result<Option<(i64, i32)>, failure::Error> {
             let client = self.get_client()?;
             let mut res = client
                 .get(&self.block_to_prove_url)
                 .json(&client::ProverReq {
                     name: self.worker.clone(),
+                    block_size,
                 })
                 .send()
                 .map_err(|e| format_err!("block to prove request failed: {}", e))?;

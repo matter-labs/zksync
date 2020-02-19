@@ -1,4 +1,5 @@
 // Built-in deps
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -9,10 +10,14 @@ use log::*;
 use signal_hook::iterator::Signals;
 // Workspace deps
 use models::node::config::PROVER_HEARTBEAT_INTERVAL;
-use prover::{client, read_circuit_params};
+use prover::{client, read_circuit_params_sized};
 use prover::{start, BabyProver};
 
 fn main() {
+    // TODO: jazzandrock read from env
+    let args = std::env::args().collect::<Vec<String>>();
+    let block_size = usize::from_str(args[1].as_ref()).unwrap();
+
     env_logger::init();
     const ABSENT_PROVER_ID: i32 = -1;
 
@@ -25,7 +30,11 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal))
         .expect("Error setting SIGQUIT handler");
 
-    let worker_name = env::var("POD_NAME").expect("POD_NAME is missing");
+    // TODO: jazzandrock maybbe create names from default name + block_size?
+    let worker_name = match args.get(2) {
+        Some(name) => name.clone(),
+        None => env::var("POD_NAME").expect("POD_NAME is missing"),
+    };
     info!("creating prover, worker name: {}", worker_name);
 
     // Create client
@@ -33,11 +42,12 @@ fn main() {
     let api_client = client::ApiClient::new(&api_url, &worker_name, Some(stop_signal.clone()));
     // Create prover
     let jubjub_params = AltJubjubBn256::new();
-    let circuit_params = read_circuit_params();
+    let circuit_params = read_circuit_params_sized(block_size);
     let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
     let worker = BabyProver::new(
         circuit_params,
         jubjub_params,
+        block_size,
         api_client.clone(),
         heartbeat_interval,
         stop_signal,
@@ -74,7 +84,7 @@ fn main() {
     // Register prover
     prover_id_arc.store(
         api_client
-            .register_prover()
+            .register_prover(block_size)
             .expect("failed to register prover"),
         Ordering::SeqCst,
     );

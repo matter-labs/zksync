@@ -162,6 +162,7 @@ fn build_prover_data(
     commit_operation: &models::Operation,
 ) -> Result<ProverData, String> {
     let block_number = commit_operation.block.block_number;
+    let block_size = commit_operation.block.smallest_block_size();
 
     info!("building prover data for block {}", &block_number);
 
@@ -383,14 +384,8 @@ fn build_prover_data(
 
     witness_accum.add_operation_with_pubdata(operations, pub_data);
     witness_accum.extend_pubdata_with_noops();
-    assert_eq!(
-        witness_accum.pubdata.len(),
-        64 * models::params::block_size_chunks()
-    );
-    assert_eq!(
-        witness_accum.operations.len(),
-        models::params::block_size_chunks()
-    );
+    assert_eq!(witness_accum.pubdata.len(), 64 * block_size);
+    assert_eq!(witness_accum.operations.len(), block_size);
 
     witness_accum.collect_fees(&fees);
     assert_eq!(

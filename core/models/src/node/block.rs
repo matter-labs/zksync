@@ -3,7 +3,7 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use crate::params::{block_chunk_sizes};
+use crate::params::block_chunk_sizes;
 use crate::serialization::*;
 use web3::types::H256;
 
@@ -136,6 +136,10 @@ impl Block {
 
     pub fn smallest_block_size(&self) -> usize {
         let chunks_used = self.chunks_used();
+        Self::smallest_block_size_for_chunks(chunks_used)
+    }
+
+    pub fn smallest_block_size_for_chunks(chunks_used: usize) -> usize {
         for block_size in block_chunk_sizes() {
             if block_size >= chunks_used {
                 return block_size;

@@ -19,6 +19,7 @@ use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
 use models::circuit::utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element};
 use models::merkle_tree::hasher::Hasher;
 use models::merkle_tree::PedersenHasher;
+use models::node::block::Block;
 use models::node::tx::PackedPublicKey;
 use models::node::{AccountId, BlockNumber, Engine, Fr};
 use models::params as franklin_constants;
@@ -74,7 +75,8 @@ impl WitnessBuilder {
 
     /// Add noops if pubdata isn't of right size
     pub fn extend_pubdata_with_noops(&mut self) {
-        for _ in 0..models::params::block_size_chunks() - self.operations.len() {
+        let chunks_used = self.operations.len();
+        for _ in 0..Block::smallest_block_size_for_chunks(chunks_used) - chunks_used {
             self.operations.push(crate::witness::noop::noop_operation(
                 &self.account_tree,
                 self.fee_account_id,

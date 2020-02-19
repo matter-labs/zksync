@@ -561,6 +561,7 @@ pub struct ActiveProver {
     pub worker: String,
     pub created_at: NaiveDateTime,
     pub stopped_at: Option<NaiveDateTime>,
+    pub block_size: i64,
 }
 
 #[derive(Debug, QueryableByName)]
@@ -2061,8 +2062,9 @@ impl StorageProcessor {
     ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
+            // TODO: jazzandrock rewrite in amore beautiful way
             let job: Option<BlockNumber> = diesel::sql_query(format!("
-                    SELECT min(block_number) as integer_value FROM operations o
+                with maybe_blocks as (SELECT * FROM operations o
                     WHERE action_type = 'COMMIT'
                     AND block_number >
                         (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
@@ -2070,8 +2072,11 @@ impl StorageProcessor {
                         (SELECT * FROM proofs WHERE block_number = o.block_number)
                     AND NOT EXISTS
                         (SELECT * FROM prover_runs 
-                            WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
-                ", prover_timeout.as_secs()))
+                            WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds'))
+                select min(block_number) as integer_value from maybe_blocks
+                inner join blocks on maybe_blocks.block_number = blocks.number
+                inner join active_provers on blocks.block_size = active_provers.block_size and active_provers.worker = '{}'
+                ", prover_timeout.as_secs(), worker_))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             if let Some(block_number_) = job {
@@ -2099,10 +2104,13 @@ impl StorageProcessor {
             .map(|_| ())
     }
 
-    pub fn register_prover(&self, worker_: &str) -> QueryResult<i32> {
+    pub fn register_prover(&self, worker_: &str, block_size_: usize) -> QueryResult<i32> {
         use crate::schema::active_provers::dsl::*;
         let inserted: ActiveProver = insert_into(active_provers)
-            .values(&vec![(worker.eq(worker_.to_string()))])
+            .values(&vec![(
+                worker.eq(worker_.to_string()),
+                block_size.eq(block_size_ as i64),
+            )])
             .get_result(self.conn())?;
         Ok(inserted.id)
     }
