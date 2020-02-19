@@ -137,7 +137,16 @@ sudo apt-get install libpq-dev
 
 You have to install `solc` v0.5.16. Instructions can be found at [readthedocs](https://solidity.readthedocs.io/en/v0.6.2/installing-solidity.html).
 
-The best option for mac is install via `homebrew`, for linux the simplest way is to use `snap`.
+The simplest option for linux is to use `snap`.
+
+For mac you can install it as follows:
+
+```sh
+brew update
+brew upgrade
+brew tap ethereum/ethereum
+brew install solidity@5
+```
 
 ## Environment
 
