@@ -23,7 +23,7 @@
     "sass-loader": "^8.0.0",
     "vue": "^2.6.10",
     "vue-router": "^3.0.3",
-    "zksync": "^0.3.9"
+    "zksync": "../zksync.js"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.11.0",

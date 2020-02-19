@@ -54,8 +54,7 @@ export default {
                 const ethProxy = new zksync.ETHProxy(ethersProvider, syncProvider.contractAddress);
                 
                 const signer = ethersProvider.getSigner();
-                const syncWallet = await zksync.Wallet.fromEthSigner(signer, syncProvider, ethProxy);
-
+                const syncWallet = await zksync.Wallet.fromEthSigner(signer, syncProvider);
                 window.ethProvider = ethersProvider;
                 window.ethSigner = signer;
                 window.syncWallet = syncWallet;
@@ -66,6 +65,11 @@ export default {
 
                 if (this.$parent.$router.currentRoute.path !== '/main') {
                     this.$parent.$router.push('/main');
+                }
+
+                if (!await syncWallet.isCurrentPubkeySet()) {
+                    const setPk = await syncWallet.setCurrentPubkeyWithZksyncTx();
+                    await setPk.awaitReceipt();
                 }
             } catch (e) {
                 this.$refs.alertLogin.display({

@@ -121,7 +121,7 @@ export class WalletDecorator {
                         ? 'ETH' 
                         : tokenInfo.address;
 
-                    return await zksync.getEthereumBalance(window.ethSigner, token);
+                    return await window.syncWallet.getEthereumBalance(token);
                 }
             )
         );
@@ -510,9 +510,8 @@ export class WalletDecorator {
             yield info(`Sending deposit...`);
 
             const maxFeeInETHToken = await this.getDepositFee(token);
-            const deposit = await zksync.depositFromETH({
-                depositFrom: window.ethSigner,
-                depositTo: window.syncWallet,
+            const deposit = await window.syncWallet.depositToSyncFromEthereum({
+                depositTo: window.syncWallet.address(),
                 maxFeeInETHToken,
                 token,
                 amount,
