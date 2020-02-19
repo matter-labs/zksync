@@ -18,7 +18,8 @@ import {
     isTokenETH,
     sleep,
     SYNC_GOV_CONTRACT_INTERFACE,
-    SYNC_MAIN_CONTRACT_INTERFACE
+    SYNC_MAIN_CONTRACT_INTERFACE,
+    TokenSet
 } from "./utils";
 
 export async function getDefaultProvider(
@@ -46,12 +47,14 @@ export async function getDefaultProvider(
 
 export class Provider {
     contractAddress: ContractAddress;
+    public tokenSet: TokenSet;
     private constructor(public transport: AbstractJSONRPCTransport) {}
 
     static async newWebsocketProvider(address: string): Promise<Provider> {
         const transport = await WSTransport.connect(address);
         const provider = new Provider(transport);
         provider.contractAddress = await provider.getContractAddress();
+        provider.tokenSet = new TokenSet(await provider.getTokens());
         return provider;
     }
 
@@ -61,6 +64,7 @@ export class Provider {
         const transport = new HTTPTransport(address);
         const provider = new Provider(transport);
         provider.contractAddress = await provider.getContractAddress();
+        provider.tokenSet = new TokenSet(await provider.getTokens());
         return provider;
     }
 

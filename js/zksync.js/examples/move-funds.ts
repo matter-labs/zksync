@@ -1,7 +1,6 @@
 import * as zksync from "../src/index";
 import { Contract, ethers, utils } from "ethers";
 import { formatEther, parseEther } from "ethers/utils";
-import { emergencyWithdraw } from "../src/index";
 
 const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
@@ -79,9 +78,8 @@ async function logETHBalance(
     await logETHBalance(syncWallet, depositToken);
     await logSyncBalance(syncWallet, depositToken, "verified");
 
-    const depositHandle = await zksync.depositFromETH({
-        depositFrom: ethWallet,
-        depositTo: syncWallet,
+    const depositHandle = await syncWallet.depositToSyncFromEthereum({
+        depositTo: syncWallet.address(),
         token: depositToken,
         amount: utils.parseEther(depositAmount)
     });
@@ -172,8 +170,7 @@ async function logETHBalance(
     await logSyncBalance(syncWallet2, depositToken, "committed");
 
     console.log(`FullExit of ${TOKEN} from: ${syncWallet2.address()}`);
-    const fullExitHandle = await emergencyWithdraw({
-        withdrawFrom: syncWallet2,
+    const fullExitHandle = await syncWallet2.emergencyWithdraw({
         token: TOKEN
     });
     const fullExitReceipt = await fullExitHandle.awaitReceipt();

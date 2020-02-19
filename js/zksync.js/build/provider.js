@@ -74,17 +74,22 @@ var Provider = /** @class */ (function () {
     }
     Provider.newWebsocketProvider = function (address) {
         return __awaiter(this, void 0, void 0, function () {
-            var transport, provider, _a;
-            return __generator(this, function (_b) {
-                switch (_b.label) {
+            var transport, provider, _a, _b, _c;
+            return __generator(this, function (_d) {
+                switch (_d.label) {
                     case 0: return [4 /*yield*/, transport_1.WSTransport.connect(address)];
                     case 1:
-                        transport = _b.sent();
+                        transport = _d.sent();
                         provider = new Provider(transport);
                         _a = provider;
                         return [4 /*yield*/, provider.getContractAddress()];
                     case 2:
-                        _a.contractAddress = _b.sent();
+                        _a.contractAddress = _d.sent();
+                        _b = provider;
+                        _c = utils_1.TokenSet.bind;
+                        return [4 /*yield*/, provider.getTokens()];
+                    case 3:
+                        _b.tokenSet = new (_c.apply(utils_1.TokenSet, [void 0, _d.sent()]))();
                         return [2 /*return*/, provider];
                 }
             });
@@ -93,16 +98,21 @@ var Provider = /** @class */ (function () {
     Provider.newHttpProvider = function (address) {
         if (address === void 0) { address = "http://127.0.0.1:3030"; }
         return __awaiter(this, void 0, void 0, function () {
-            var transport, provider, _a;
-            return __generator(this, function (_b) {
-                switch (_b.label) {
+            var transport, provider, _a, _b, _c;
+            return __generator(this, function (_d) {
+                switch (_d.label) {
                     case 0:
                         transport = new transport_1.HTTPTransport(address);
                         provider = new Provider(transport);
                         _a = provider;
                         return [4 /*yield*/, provider.getContractAddress()];
                     case 1:
-                        _a.contractAddress = _b.sent();
+                        _a.contractAddress = _d.sent();
+                        _b = provider;
+                        _c = utils_1.TokenSet.bind;
+                        return [4 /*yield*/, provider.getTokens()];
+                    case 2:
+                        _b.tokenSet = new (_c.apply(utils_1.TokenSet, [void 0, _d.sent()]))();
                         return [2 /*return*/, provider];
                 }
             });

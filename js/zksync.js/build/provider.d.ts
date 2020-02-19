@@ -1,10 +1,12 @@
 import { AbstractJSONRPCTransport } from "./transport";
 import { utils, ethers } from "ethers";
 import { AccountState, Address, TokenLike, TransactionReceipt, PriorityOperationReceipt, ContractAddress, Tokens, TokenAddress } from "./types";
+import { TokenSet } from "./utils";
 export declare function getDefaultProvider(network: "localhost" | "testnet", transport?: "WS" | "HTTP"): Promise<Provider>;
 export declare class Provider {
     transport: AbstractJSONRPCTransport;
     contractAddress: ContractAddress;
+    tokenSet: TokenSet;
     private constructor();
     static newWebsocketProvider(address: string): Promise<Provider>;
     static newHttpProvider(address?: string): Promise<Provider>;

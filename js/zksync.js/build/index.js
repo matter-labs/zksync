@@ -9,8 +9,6 @@ var __importStar = (this && this.__importStar) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 var wallet_1 = require("./wallet");
 exports.Wallet = wallet_1.Wallet;
-exports.depositFromETH = wallet_1.depositFromETH;
-exports.emergencyWithdraw = wallet_1.emergencyWithdraw;
 var provider_1 = require("./provider");
 exports.Provider = provider_1.Provider;
 exports.ETHProxy = provider_1.ETHProxy;
