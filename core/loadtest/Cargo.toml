@@ -39,3 +39,7 @@ server = { path = "../server", version = "0.0.1" }
 log = "0.4"
 
 env_logger = "0.6"
+
+rand = "0.4"
+
+jsonrpc-core = "14.0.3"

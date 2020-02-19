@@ -1,10 +1,13 @@
 use bigdecimal::BigDecimal;
 use futures::executor::block_on;
-use futures::future::try_join_all;
+use futures::future::{join_all, try_join_all};
 use futures::join;
+use jsonrpc_core::types::response::Success;
+use jsonrpc_core::types::Value;
 use log::{info, trace};
 use models::config_options::ConfigurationOptions;
 use models::node::tx::FranklinTx;
+use rand::Rng;
 use serde::Deserialize;
 use serde::Serialize;
 use std::env;
@@ -17,9 +20,6 @@ use testkit::zksync_account::ZksyncAccount;
 use web3::transports::Http;
 use web3::types::U256;
 use web3::types::{H160, H256};
-
-// TODO: use dynamic size.
-const N_ACC: usize = 10;
 
 #[derive(Deserialize, Debug)]
 struct AccountInfo {
@@ -35,6 +35,17 @@ struct TestAccount {
 
 fn main() {
     env_logger::init();
+
+    let deposit_initial = parse_ether("1.0").expect("failed to parse");
+    let n_transfers = 5;
+    let n_withdraws = 2;
+    let n_deposits = 2;
+    let deposit_from_amount = 0.1;
+    let deposit_to_amount = 1.0;
+    let transfer_from_amount = 0.01;
+    let transfer_to_amount = 0.1;
+    let withdraw_from_amount = 0.01;
+    let withdraw_to_amount = 0.2;
     let config = ConfigurationOptions::from_env();
     let filepath = env::args().nth(1).expect("account.json path not given");
     let input_accs = read_accounts(filepath.clone());
@@ -47,39 +58,40 @@ fn main() {
     let withdraw_amount = parse_ether("0.2").expect("failed to parse");
     info!("Inital depsoits");
     block_on(do_deposits(&test_accounts[..], deposit_amount.clone()));
-    info!("done.");
-    info!("Simultaneous deposits, tranfers and withdraws");
+    info!("done [Inital depsoits].");
     let h = thread::spawn(move || {
+        info!("Simultaneous transfers and withdraws");
         block_on(async {
             join!(
-                // 5 tranfers for each account
-                do_transfers(&test_accounts2[..], transfer_amount.clone()),
-                do_transfers(&test_accounts2[..], transfer_amount.clone()),
-                do_transfers(&test_accounts2[..], transfer_amount.clone()),
-                do_transfers(&test_accounts2[..], transfer_amount.clone()),
-                do_transfers(&test_accounts2[..], transfer_amount.clone()),
-                // 2 withdraws for each account
-                do_withdraws(&test_accounts2[..], withdraw_amount.clone()),
-                do_withdraws(&test_accounts2[..], withdraw_amount.clone()),
+                join_all((0..n_transfers).map(|_i| {
+                    let v = rand::thread_rng().gen_range(transfer_from_amount, transfer_to_amount);
+                    let v = parse_ether(&v.to_string()).expect("parse error");
+                    do_transfers(&test_accounts2[..], v)
+                })),
+                join_all((0..n_withdraws).map(|_i| {
+                    let v = rand::thread_rng().gen_range(withdraw_from_amount, withdraw_to_amount);
+                    let v = parse_ether(&v.to_string()).expect("parse error");
+                    do_withdraws(&test_accounts2[..], v)
+                }))
             )
         });
+        info!("done [Simultaneous transfers and withdraws].")
     });
+    info!("deposits");
     block_on(async {
-        join!(
-            do_deposits(&test_accounts[..], deposit_amount.clone()),
-            do_deposits(&test_accounts[..], deposit_amount.clone()),
-        )
+        join_all((0..n_deposits).map(|_i| {
+            let v = rand::thread_rng().gen_range(deposit_from_amount, deposit_to_amount);
+            let v = parse_ether(&v.to_string()).expect("parse error");
+            do_deposits(&test_accounts[..], v)
+        }))
     });
-    info!("done.");
+    info!("done [deposits].");
     h.join().unwrap();
-    info!("Final withdraws");
-    let left_balance = parse_ether("2.6").expect("failed to parse");
-    block_on(do_withdraws(&test_accounts[..], left_balance));
-    info!("done.");
-    info!("End");
+    // TODO: final checks
+    info!("loadtest completed.");
 }
 
-fn read_accounts(filepath: String) -> [AccountInfo; N_ACC] {
+fn read_accounts(filepath: String) -> Vec<AccountInfo> {
     let mut f = File::open(filepath).expect("no input file");
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)
@@ -88,7 +100,7 @@ fn read_accounts(filepath: String) -> [AccountInfo; N_ACC] {
 }
 
 fn construct_test_accounts(
-    input_accs: [AccountInfo; N_ACC],
+    input_accs: Vec<AccountInfo>,
     transport: Http,
     config: &ConfigurationOptions,
 ) -> Vec<TestAccount> {
@@ -124,7 +136,7 @@ fn update_eth_nonce(ta: &mut TestAccount) {
 }
 
 async fn do_deposits(test_accounts: &[TestAccount], deposit_amount: BigDecimal) {
-    info!("start do_deposits");
+    trace!("start do_deposits");
     try_join_all(
         test_accounts
             .iter()
@@ -133,7 +145,7 @@ async fn do_deposits(test_accounts: &[TestAccount], deposit_amount: BigDecimal) 
     )
     .await
     .expect("failed to deposit");
-    info!("end do_deposits");
+    trace!("end do_deposits");
 }
 
 async fn deposit_single(
@@ -146,11 +158,61 @@ async fn deposit_single(
         *nonce = U256::from(v.as_u32() + 1);
         U256::from(v.as_u32())
     };
-    test_acc
+    let po = test_acc
         .eth_acc
         .deposit_eth(deposit_amount, &test_acc.zk_acc.address, Some(nonce))
         .await?;
-    Ok(())
+    let mut executed = false;
+    // 4 min wait
+    let n_checks = 4 * 10;
+    let check_period = std::time::Duration::from_secs(1);
+    for _i in 0..n_checks {
+        let ret = ethop_info(po.serial_id).await?;
+        let obj = ret.result.as_object().unwrap();
+        executed = obj["executed"].as_bool().unwrap();
+        thread::sleep(check_period);
+        if executed {
+            break;
+        }
+    }
+    if executed {
+        return Ok(());
+    }
+    failure::bail!("timeout")
+}
+
+#[derive(Serialize)]
+struct EthopInfo {
+    id: String,
+    method: String,
+    jsonrpc: String,
+    params: Vec<u64>,
+}
+
+impl EthopInfo {
+    fn new(serial_id: u64) -> Self {
+        Self {
+            id: "3".to_owned(),
+            method: "ethop_info".to_owned(),
+            jsonrpc: "2.0".to_owned(),
+            params: vec![serial_id],
+        }
+    }
+}
+
+async fn ethop_info(serial_id: u64) -> Result<Success, failure::Error> {
+    let msg = EthopInfo::new(serial_id);
+
+    let client = reqwest::Client::new();
+    let mut res = client
+        .post("http://localhost:3030")
+        .json(&msg)
+        .send()
+        .expect("failed to send ethop_info");
+    if res.status() != reqwest::StatusCode::OK {
+        failure::bail!("non-ok response: {}", res.status());
+    }
+    Ok(res.json().unwrap())
 }
 
 async fn do_transfers(test_accounts: &[TestAccount], deposit_amount: BigDecimal) {
@@ -177,14 +239,6 @@ async fn do_transfers(test_accounts: &[TestAccount], deposit_amount: BigDecimal)
     .expect("failed to do transfers");
 }
 
-#[derive(Serialize)]
-struct SubmitTxMsg {
-    id: String,
-    method: String,
-    jsonrpc: String,
-    params: Vec<FranklinTx>,
-}
-
 async fn do_withdraws(test_accounts: &[TestAccount], deposit_amount: BigDecimal) {
     trace!("start do_withdraws");
     try_join_all(
@@ -206,6 +260,14 @@ async fn do_withdraws(test_accounts: &[TestAccount], deposit_amount: BigDecimal)
     .await
     .expect("failed to do withdraws");
     trace!("end do_withdraws");
+}
+
+#[derive(Serialize)]
+struct SubmitTxMsg {
+    id: String,
+    method: String,
+    jsonrpc: String,
+    params: Vec<FranklinTx>,
 }
 
 impl SubmitTxMsg {

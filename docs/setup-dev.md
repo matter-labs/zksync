@@ -38,6 +38,15 @@ rustc --version
 rustc 1.32.0-nightly (21f268495 2018-12-02)
 ```
 
+## Solidity compiler
+```
+brew update
+brew upgrade
+brew tap ethereum/ethereum
+brew install solidity
+brew linkapps solidity
+```
+
 # JQ
 
 jq is used to work with json when managing DigitalOcean.
