@@ -226,7 +226,7 @@ contract Franklin is Storage, Config, Events {
         } else {
             tokenId = governance.validateTokenAddress(_token);
         }
-        
+
         // Priority Queue request
         Operations.FullExit memory op = Operations.FullExit({
             accountId:  _accountId,
@@ -238,7 +238,7 @@ contract Franklin is Storage, Config, Events {
         addPriorityRequest(Operations.OpType.FullExit, fee, pubData);
 
         require(msg.value >= fee, "fft11"); // Not enough ETH provided to pay the fee
-        if (msg.value != fee) {            
+        if (msg.value != fee) {
             msg.sender.transfer(msg.value-fee);
         }
     }
@@ -522,7 +522,7 @@ contract Franklin is Storage, Config, Events {
                 bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
 
                 require(priorReqType == op.opType, "fvs12"); // incorrect priority op type
-                
+
                 if (op.opType == Operations.OpType.Deposit) {
                     require(Operations.depositPubdataMatch(priorReqPubdata, op.pubData), "fvs13");
                 } else if (op.opType == Operations.OpType.FullExit) {
@@ -648,7 +648,7 @@ contract Franklin is Storage, Config, Events {
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
-    function triggerExodusIfNeeded() internal returns (bool) {
+    function triggerExodusIfNeeded() public returns (bool) {
         bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
             priorityRequests[firstPriorityRequestId].expirationBlock != 0;
         if (trigger) {
@@ -663,20 +663,20 @@ contract Franklin is Storage, Config, Events {
     /// @notice Withdraws token from Franklin to root chain in case of exodus mode. User must provide proof that he owns funds
     /// @param _proof Proof
     /// @param _tokenId Verified token id
-    /// @param _owner Owner
     /// @param _amount Amount for owner
     function exit(
         uint16 _tokenId,
-        address _owner,
         uint128 _amount,
         uint256[8] calldata _proof
     ) external {
         require(exodusMode, "fet11"); // must be in exodus mode
-        require(exited[_owner][_tokenId] == false, "fet12"); // already exited
-        require(verifier.verifyExitProof(_tokenId, _owner, _amount, _proof), "fet13"); // verification failed
+        require(exited[msg.sender][_tokenId] == false, "fet12"); // already exited
+        require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
 
-        balancesToWithdraw[_owner][_tokenId] += _amount;
-        exited[_owner][_tokenId] == false;
+
+
+        balancesToWithdraw[msg.sender][_tokenId] += _amount;
+        exited[msg.sender][_tokenId] = true;
     }
 
     function authPubkeyHash(bytes calldata _fact, uint32 _nonce) external {

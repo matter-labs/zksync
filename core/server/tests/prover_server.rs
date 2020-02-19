@@ -2,10 +2,11 @@
 use std::str::FromStr;
 use std::{net, thread, time};
 // External deps
-use crypto_exports::franklin_crypto;
 use crypto_exports::pairing::ff::{Field, PrimeField};
 use futures::channel::mpsc;
 // Workspace deps
+use circuit::witness::deposit::apply_deposit_tx;
+use circuit::witness::deposit::calculate_deposit_operations_from_witness;
 use prover::client;
 use prover::ApiClient;
 use server::prover_server;
@@ -32,14 +33,14 @@ fn access_storage() -> storage::StorageProcessor {
 #[test]
 #[should_panic]
 fn client_with_empty_worker_name_panics() {
-    client::ApiClient::new("", "");
+    client::ApiClient::new("", "", None);
 }
 
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
+    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
     let id = client.register_prover().expect("failed to register");
     let storage = access_storage();
     storage
@@ -60,7 +61,7 @@ fn api_client_simple_simulation() {
 
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
+    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
 
     // call block_to_prove and check its none
     let to_prove = client
@@ -112,7 +113,7 @@ fn api_client_simple_simulation() {
     assert!(to_prove.is_none());
 
     let prover_data = client
-        .prover_data(block, time::Duration::from_secs(30 * 60))
+        .prover_data(block)
         .expect("failed to get prover data");
     assert_eq!(prover_data.old_root, wanted_prover_data.old_root);
     assert_eq!(prover_data.new_root, wanted_prover_data.new_root);
@@ -208,7 +209,7 @@ pub fn test_operation_and_wanted_prover_data(
     let mut operations = vec![];
 
     if let models::node::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
-        let deposit_witness = circuit::witness::deposit::apply_deposit_tx(
+        let deposit_witness = apply_deposit_tx(
             &mut circuit_tree,
             &models::node::operations::DepositOp {
                 priority_op: deposit_op,
@@ -216,36 +217,15 @@ pub fn test_operation_and_wanted_prover_data(
             },
         );
 
-        let deposit_operations =
-            circuit::witness::deposit::calculate_deposit_operations_from_witness(
-                &deposit_witness,
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &circuit::operation::SignatureData {
-                    r_packed: vec![Some(false); 256],
-                    s: vec![Some(false); 256],
-                },
-                &[Some(false); 256],
-            );
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
         operations.extend(deposit_operations);
         pub_data.extend(deposit_witness.get_pubdata());
     }
 
-    let phaser = models::merkle_tree::PedersenHasher::<models::node::Engine>::default();
-    let jubjub_params = &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     for _ in 0..models::params::block_size_chunks() - operations.len() {
-        let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _a, _b) =
-            circuit::witness::utils::generate_dummy_sig_data(&[false], &phaser, &jubjub_params);
-
         operations.push(circuit::witness::noop::noop_operation(
             &circuit_tree,
             block.fee_account,
-            &first_sig_msg,
-            &second_sig_msg,
-            &third_sig_msg,
-            &signature,
-            &[Some(false); 256],
         ));
         pub_data.extend(vec![false; 64]);
     }

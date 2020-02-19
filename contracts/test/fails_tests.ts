@@ -202,7 +202,39 @@ describe("PLANNED FAILS", function () {
 
     });
 
-    it("Enter Exodus Mode", async () => {
+    it("Enter Exodus Mode external caller", async () => {
+        const depositValue = parseEther("10");
+        const depositAmount = parseEther("9.996778");
+        const depositFee = parseEther("0.003222");
+        await postEthDeposit(
+            provider,
+            wallet,
+            franklinDeployedContract,
+            priorityQueueDeployedContract,
+            depositAmount,
+            depositFee,
+            franklinAddress,
+            depositValue,
+            null,
+        );
+        const blockNumberSinceLastDeposit = await provider.getBlockNumber();
+
+        let tx = await (await franklinDeployedContract.triggerExodusIfNeeded()).wait();
+        let isExodusTriggered = await franklinDeployedContract.exodusMode();
+        expect(tx.status, "Asking for exodus should succeed").eq(1);
+        expect(isExodusTriggered, "Exodus should not be triggered").eq(false);
+
+        while (await provider.getBlockNumber() - blockNumberSinceLastDeposit < PRIORITY_QUEUE_EXIRATION) {
+            await new Promise((r) => setTimeout(r, 300));
+        }
+
+        tx = await (await franklinDeployedContract.triggerExodusIfNeeded()).wait();
+        isExodusTriggered = await franklinDeployedContract.exodusMode();
+        expect(tx.status, "Asking for exodus should succeed").eq(1);
+        expect(isExodusTriggered, "Exodus should be triggered after priority expiration").eq(true);
+    });
+
+    it("Enter Exodus Mode with commit", async () => {
         console.log("\n - test Exodus Mode started");
 
         let depositsToCancel;

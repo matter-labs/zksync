@@ -1,4 +1,5 @@
 pub mod client;
+pub mod exit_proof;
 pub mod prover_data;
 
 // Built-in deps
@@ -20,23 +21,17 @@ pub struct BabyProver<C: ApiClient> {
     jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
     api_client: C,
     heartbeat_interval: time::Duration,
-    get_prover_data_timeout: time::Duration,
     stop_signal: Arc<AtomicBool>,
 }
 
 pub trait ApiClient {
     fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error>;
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error>;
-    fn prover_data(
-        &self,
-        block: i64,
-        timeout: time::Duration,
-    ) -> Result<prover_data::ProverData, failure::Error>;
+    fn prover_data(&self, block: i64) -> Result<prover_data::ProverData, failure::Error>;
     fn publish(
         &self,
         block: i64,
         p: groth16::Proof<models::node::Engine>,
-        public_data_commitment: models::node::Fr,
     ) -> Result<(), failure::Error>;
 }
 
@@ -83,7 +78,6 @@ impl<C: ApiClient> BabyProver<C> {
         jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
         api_client: C,
         heartbeat_interval: time::Duration,
-        get_prover_data_timeout: time::Duration,
         stop_signal: Arc<AtomicBool>,
     ) -> Self {
         BabyProver {
@@ -91,7 +85,6 @@ impl<C: ApiClient> BabyProver<C> {
             jubjub_params,
             api_client,
             heartbeat_interval,
-            get_prover_data_timeout,
             stop_signal,
         }
     }
@@ -146,15 +139,12 @@ impl<C: ApiClient> BabyProver<C> {
         if job_id == 0 {
             return Ok(());
         }
-        let prover_data = self
-            .api_client
-            .prover_data(block, self.get_prover_data_timeout)
-            .map_err(|err| {
-                BabyProverError::Api(format!(
-                    "could not get prover data for block {}: {}",
-                    block, err
-                ))
-            })?;
+        let prover_data = self.api_client.prover_data(block).map_err(|err| {
+            BabyProverError::Api(format!(
+                "could not get prover data for block {}: {}",
+                block, err
+            ))
+        })?;
         info!("starting to compute proof for block {}", block);
 
         let instance = circuit::circuit::FranklinCircuit {
@@ -193,7 +183,7 @@ impl<C: ApiClient> BabyProver<C> {
         }
 
         self.api_client
-            .publish(block, p, prover_data.public_data_commitment)
+            .publish(block, p)
             .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
 
         info!("finished and published proof for block {}", block);

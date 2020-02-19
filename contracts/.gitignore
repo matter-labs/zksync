@@ -3,4 +3,4 @@
 /flat
 /flat_build
 /contracts/generated
-/contracts/VerificationKey.sol
+/contracts/VerificationKey*.sol

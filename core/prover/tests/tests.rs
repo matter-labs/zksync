@@ -39,7 +39,6 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
                 prover_data_fn: || None,
             },
             time::Duration::from_millis(100),
-            time::Duration::from_secs(1),
             stop_signal_ar,
         );
         let (tx, rx) = mpsc::channel();
@@ -99,7 +98,6 @@ fn prover_proves_a_block_and_publishes_result() {
                 publishes_tx: Arc::new(Mutex::new(proof_tx)),
                 prover_data_fn: move || Some(prover_data.clone()),
             },
-            time::Duration::from_secs(1),
             time::Duration::from_secs(1),
             stop_signal_ar,
         );
@@ -206,35 +204,15 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
         );
 
         let deposit_operations =
-            circuit::witness::deposit::calculate_deposit_operations_from_witness(
-                &deposit_witness,
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &circuit::operation::SignatureData {
-                    r_packed: vec![Some(false); 256],
-                    s: vec![Some(false); 256],
-                },
-                &[Some(false); 256],
-            );
+            circuit::witness::deposit::calculate_deposit_operations_from_witness(&deposit_witness);
         operations.extend(deposit_operations);
         pub_data.extend(deposit_witness.get_pubdata());
     }
 
-    let phaser = models::merkle_tree::PedersenHasher::<models::node::Engine>::default();
-    let jubjub_params = &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     for _ in 0..models::params::block_size_chunks() - operations.len() {
-        let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _a, _b) =
-            circuit::witness::utils::generate_dummy_sig_data(&[false], &phaser, &jubjub_params);
-
         operations.push(circuit::witness::noop::noop_operation(
             &circuit_tree,
             block.fee_account,
-            &first_sig_msg,
-            &second_sig_msg,
-            &third_sig_msg,
-            &signature,
-            &[Some(false); 256],
         ));
         pub_data.extend(vec![false; 64]);
     }
@@ -328,11 +306,7 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
         Ok(())
     }
 
-    fn prover_data(
-        &self,
-        _block: i64,
-        _timeout: time::Duration,
-    ) -> Result<prover::prover_data::ProverData, failure::Error> {
+    fn prover_data(&self, _block: i64) -> Result<prover::prover_data::ProverData, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if (*block_to_prove).is_some() {
             let v = (self.prover_data_fn)();
@@ -347,7 +321,6 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
         &self,
         _block: i64,
         p: bellman::groth16::Proof<models::node::Engine>,
-        _public_data_commitment: models::node::Fr,
     ) -> Result<(), failure::Error> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();

@@ -182,12 +182,12 @@ pub fn apply_deposit(
 
 pub fn calculate_deposit_operations_from_witness(
     deposit_witness: &DepositWitness<Bn256>,
-    first_sig_msg: &Fr,
-    second_sig_msg: &Fr,
-    third_sig_msg: &Fr,
-    signature_data: &SignatureData,
-    signer_pub_key_packed: &[Option<bool>], // WHY? What signer?
 ) -> Vec<Operation<Bn256>> {
+    let first_sig_msg = &Fr::zero();
+    let second_sig_msg = &Fr::zero();
+    let third_sig_msg = &Fr::zero();
+    let signature_data = &SignatureData::init_empty();
+    let signer_pub_key_packed = &[Some(false); 256]; //doesn't matter for deposit
     let pubdata_chunks: Vec<_> = deposit_witness
         .get_pubdata()
         .chunks(64)
@@ -301,7 +301,6 @@ pub fn calculate_deposit_operations_from_witness(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::franklin_crypto::bellman::pairing::ff::Field;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
     use models::node::{Account, Deposit};
@@ -338,17 +337,7 @@ mod test {
         );
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(
-            &deposit_witness,
-            &Fr::zero(),
-            &Fr::zero(),
-            &Fr::zero(),
-            &SignatureData {
-                r_packed: vec![Some(false); 256],
-                s: vec![Some(false); 256],
-            },
-            &[Some(false); 256], //doesn't matter for deposit
-        );
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
         witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
@@ -392,17 +381,7 @@ mod test {
         println!("node root hash after op: {:?}", plasma_state.root_hash());
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(
-            &deposit_witness,
-            &Fr::zero(),
-            &Fr::zero(),
-            &Fr::zero(),
-            &SignatureData {
-                r_packed: vec![Some(false); 256],
-                s: vec![Some(false); 256],
-            },
-            &[Some(false); 256], //doesn't matter for deposit
-        );
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
         witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
@@ -444,17 +423,7 @@ mod test {
         plasma_state.apply_deposit_op(&deposit_op);
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(
-            &deposit_witness,
-            &Fr::zero(),
-            &Fr::zero(),
-            &Fr::zero(),
-            &SignatureData {
-                r_packed: vec![Some(false); 256],
-                s: vec![Some(false); 256],
-            },
-            &[Some(false); 256], //doesn't matter for deposit
-        );
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
         witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
@@ -532,17 +501,7 @@ mod test {
         plasma_state.apply_deposit_op(&deposit_op);
 
         let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(
-            &deposit_witness,
-            &Fr::zero(),
-            &Fr::zero(),
-            &Fr::zero(),
-            &SignatureData {
-                r_packed: vec![Some(false); 256],
-                s: vec![Some(false); 256],
-            },
-            &[Some(false); 256], //doesn't matter for deposit
-        );
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
         witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);

@@ -76,7 +76,7 @@ pub struct SignatureData {
 
 impl SignatureData {
     pub fn init_empty() -> Self {
-        SignatureData {
+        Self {
             r_packed: vec![Some(false); 256],
             s: vec![Some(false); 256],
         }

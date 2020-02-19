@@ -28,6 +28,10 @@ yarn:
 confirm_action:
 	@bin/.confirm_action
 
+rust-checks:
+	cargo fmt -- --check
+	@find core/ -type f -name "*.rs" -exec touch {} +
+	cargo clippy --tests --benches -- -D warnings
 
 # Database tools
 
@@ -65,20 +69,16 @@ genesis: confirm_action
 
 # Frontend clients
 
-dist-config:
-	bin/.gen_js_config > js/client/src/env-config.js
-	bin/.gen_js_config > js/explorer/src/env-config.js
-
 client:
 	@cd js/client && yarn serve
 
-explorer: dist-config
+explorer:
 	@cd js/explorer && yarn serve
 
 dist-client:
 	@cd js/client && yarn build
 
-dist-explorer: dist-config
+dist-explorer:
 	@cd js/explorer && yarn build
 
 image-nginx: dist-client dist-explorer
@@ -162,6 +162,7 @@ gen-keys-if-not-present:
 
 prepare-contracts:
 	@cp ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKeyExit.sol contracts/contracts/VerificationKeyExit.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 
@@ -173,6 +174,7 @@ loadtest: confirm_action
 
 integration-testkit: build-contracts
 	cargo run --bin testkit --release
+	cargo run --bin exodus_test --release
 
 itest: # contracts simple integration tests
 	@bin/prepare-test-contracts.sh
