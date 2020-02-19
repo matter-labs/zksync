@@ -33,14 +33,14 @@ fn access_storage() -> storage::StorageProcessor {
 #[test]
 #[should_panic]
 fn client_with_empty_worker_name_panics() {
-    client::ApiClient::new("", "");
+    client::ApiClient::new("", "", None);
 }
 
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
+    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
     let id = client.register_prover().expect("failed to register");
     let storage = access_storage();
     storage
@@ -61,7 +61,7 @@ fn api_client_simple_simulation() {
 
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
+    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
 
     // call block_to_prove and check its none
     let to_prove = client
@@ -113,7 +113,7 @@ fn api_client_simple_simulation() {
     assert!(to_prove.is_none());
 
     let prover_data = client
-        .prover_data(block, time::Duration::from_secs(30 * 60))
+        .prover_data(block)
         .expect("failed to get prover data");
     assert_eq!(prover_data.old_root, wanted_prover_data.old_root);
     assert_eq!(prover_data.new_root, wanted_prover_data.new_root);
