@@ -13,6 +13,7 @@ use serde::Serialize;
 use std::env;
 use std::fs::File;
 use std::io::prelude::*;
+use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
 use testkit::eth_account::{parse_ether, EthereumAccount};
@@ -51,8 +52,12 @@ fn main() {
     let input_accs = read_accounts(filepath.clone());
     let input_accs2 = read_accounts(filepath);
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
-    let test_accounts = construct_test_accounts(input_accs, transport.clone(), &config);
-    let test_accounts2 = construct_test_accounts(input_accs2, transport, &config);
+    let test_accounts = Arc::new(construct_test_accounts(
+        input_accs,
+        transport.clone(),
+        &config,
+    ));
+    let test_accounts2 = Arc::clone(&test_accounts);
     let deposit_amount = parse_ether("1.0").expect("failed to parse");
     let transfer_amount = parse_ether("0.1").expect("failed to parse");
     let withdraw_amount = parse_ether("0.2").expect("failed to parse");
@@ -253,6 +258,7 @@ async fn do_withdraws(test_accounts: &[TestAccount], deposit_amount: BigDecimal)
                     None,
                     true,
                 )));
+                println!("sending withdraw: {:?}", tx);
                 send_tx(tx)
             })
             .collect::<Vec<_>>(),
