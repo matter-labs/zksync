@@ -141,8 +141,8 @@ impl Block {
 
     pub fn smallest_block_size_for_chunks(chunks_used: usize) -> usize {
         for block_size in block_chunk_sizes() {
-            if block_size >= chunks_used {
-                return block_size;
+            if *block_size >= chunks_used {
+                return *block_size;
             }
         }
         panic!("There's no block of such size");

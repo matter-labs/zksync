@@ -98,34 +98,49 @@ pub const LEAF_DATA_BIT_WIDTH: usize =
 pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
-static mut BLOCK_SIZE_CHUNKS_VALUE: usize = 0;
+static mut TEST_BLOCK_SIZE_CHUNKS_VALUE: usize = 0;
 /// block_size_chunks.
 /// Value must be specified as environment variable at compile time under `BLOCK_SIZE_CHUNKS` key.
-pub fn block_size_chunks() -> usize {
+pub fn test_block_size_chunks() -> usize {
     // use of mutable static is unsafe as it can be mutated by multiple threads.
     // using `unsafe` block as there's no risk of data race, the worst that can
     // happen is we read and set environment value multuple times, which is ok.
     unsafe {
-        if BLOCK_SIZE_CHUNKS_VALUE == 0 {
-            let value: &'static str = env!("BLOCK_SIZE_CHUNKS");
-            BLOCK_SIZE_CHUNKS_VALUE =
+        if TEST_BLOCK_SIZE_CHUNKS_VALUE == 0 {
+            let value: &'static str = env!("TEST_BLOCK_SIZE_CHUNKS");
+            TEST_BLOCK_SIZE_CHUNKS_VALUE =
                 usize::from_str(value).expect("block size chunks value is invalid");
-            let runtime_value = env::var("BLOCK_SIZE_CHUNKS").expect("BLOCK_SIZE_CHUNKS missing");
-            let runtime_value = usize::from_str(&runtime_value).expect("BLOCK_SIZE_CHUNKS invalid");
-            if runtime_value != BLOCK_SIZE_CHUNKS_VALUE {
+            let runtime_value =
+                env::var("TEST_BLOCK_SIZE_CHUNKS").expect("TEST_BLOCK_SIZE_CHUNKS missing");
+            let runtime_value =
+                usize::from_str(&runtime_value).expect("TEST_BLOCK_SIZE_CHUNKS invalid");
+            if runtime_value != TEST_BLOCK_SIZE_CHUNKS_VALUE {
                 panic!(
-                    "BLOCK_SIZE_CHUNKS want runtime value: {}, got: {}",
-                    BLOCK_SIZE_CHUNKS_VALUE, runtime_value
+                    "TEST_BLOCK_SIZE_CHUNKS want runtime value: {}, got: {}",
+                    TEST_BLOCK_SIZE_CHUNKS_VALUE, runtime_value
                 );
             }
         }
-        BLOCK_SIZE_CHUNKS_VALUE
+        TEST_BLOCK_SIZE_CHUNKS_VALUE
     }
 }
 
-pub fn block_chunk_sizes() -> Vec<usize> {
-    // TODO: jazzandrock read from env file
-    [10, 20, 50].to_vec()
+static mut BLOCK_CHUNK_SIZES_VALUE: Vec<usize> = Vec::new();
+
+pub fn block_chunk_sizes() -> &'static [usize] {
+    // use of mutable static is unsafe as it can be mutated by multiple threads.
+    // using `unsafe` block as there's no risk of data race, the worst that can
+    // happen is we read and set environment value multuple times, which is ok.
+    unsafe {
+        if BLOCK_CHUNK_SIZES_VALUE.is_empty() {
+            let runtime_value = env::var("BLOCK_CHUNK_SIZES").expect("BLOCK_CHUNK_SIZES missing");
+            BLOCK_CHUNK_SIZES_VALUE = runtime_value
+                .split(',')
+                .map(|s| usize::from_str(s).unwrap())
+                .collect::<Vec<_>>();
+        }
+        BLOCK_CHUNK_SIZES_VALUE.as_slice()
+    }
 }
 
 pub fn max_block_chunk_size() -> usize {

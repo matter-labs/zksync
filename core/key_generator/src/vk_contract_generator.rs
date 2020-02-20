@@ -174,15 +174,16 @@ pub fn compose_verifer_keys_contract() {
     vk_functions.push(exit_key_vk);
 
     for block_size in block_chunk_sizes() {
-        let block_proof_vk = std::fs::read_to_string(get_block_proof_key_and_vk_path(block_size).1)
-            .expect("Fail to read block proof vk");
+        let block_proof_vk =
+            std::fs::read_to_string(get_block_proof_key_and_vk_path(*block_size).1)
+                .expect("Fail to read block proof vk");
         vk_functions.push(block_proof_vk);
     }
 
     let contract_content = generate_vk_contract(
         "VerificationKey".to_string(),
         vk_functions.concat(),
-        &block_chunk_sizes().as_slice(),
+        block_chunk_sizes(),
     );
 
     std::fs::write(contract_file_path, contract_content)

@@ -6,6 +6,7 @@ use std::{thread, time};
 use crypto_exports::franklin_crypto::{self, bellman};
 use crypto_exports::pairing::ff::{Field, PrimeField};
 // Workspace deps
+use models::params;
 use prover::read_circuit_params;
 use testhelper::TestAccount;
 
@@ -16,6 +17,8 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // - BabyProver sends `working_on` requests (heartbeat) over api client
     // - BabyProver stops running upon receiving data over stop channel
 
+    let block_size_chunks = params::test_block_size_chunks();
+
     // Create a channel to notify on provers exit.
     let (done_tx, done_rx) = mpsc::channel();
     // Create channel to notify test about heartbeat requests.
@@ -24,7 +27,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // Run prover in a separate thread.
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_signal_ar = Arc::clone(&stop_signal);
-    let circuit_parameters = read_circuit_params();
+    let circuit_parameters = read_circuit_params(block_size_chunks);
     let jubjub_params = franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     thread::spawn(move || {
         // Create channel for proofs, not using in this test.
@@ -32,6 +35,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         let p = prover::BabyProver::new(
             circuit_parameters,
             jubjub_params,
+            block_size_chunks,
             MockApiClient {
                 block_to_prove: Mutex::new(Some((1, 1))),
                 heartbeats_tx: Arc::new(Mutex::new(heartbeat_tx)),
@@ -76,7 +80,8 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
 #[cfg_attr(not(feature = "keys-required"), ignore)]
 fn prover_proves_a_block_and_publishes_result() {
     // Testing [black box] the actual proof calculation by mocking genesis and +1 block.
-    let circuit_params = read_circuit_params();
+    let block_size_chunks = params::test_block_size_chunks();
+    let circuit_params = read_circuit_params(block_size_chunks);
     let verify_key = bellman::groth16::prepare_verifying_key(&circuit_params.vk);
     let stop_signal = Arc::new(AtomicBool::new(false));
     let (proof_tx, proof_rx) = mpsc::channel();
@@ -92,6 +97,7 @@ fn prover_proves_a_block_and_publishes_result() {
         let p = prover::BabyProver::new(
             circuit_params,
             jubjub_params,
+            block_size_chunks,
             MockApiClient {
                 block_to_prove: Mutex::new(Some((1, 1))),
                 heartbeats_tx: Arc::new(Mutex::new(tx)),
@@ -209,21 +215,21 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
         pub_data.extend(deposit_witness.get_pubdata());
     }
 
-    for _ in 0..models::params::block_size_chunks() - operations.len() {
+    for _ in 0..params::test_block_size_chunks() - operations.len() {
         operations.push(circuit::witness::noop::noop_operation(
             &circuit_tree,
             block.fee_account,
         ));
         pub_data.extend(vec![false; 64]);
     }
-    assert_eq!(pub_data.len(), 64 * models::params::block_size_chunks());
-    assert_eq!(operations.len(), models::params::block_size_chunks());
+    assert_eq!(pub_data.len(), 64 * params::test_block_size_chunks());
+    assert_eq!(operations.len(), params::test_block_size_chunks());
 
     let validator_acc = circuit_tree
         .get(block.fee_account as u32)
         .expect("fee_account is not empty");
     let mut validator_balances = vec![];
-    for i in 0..1 << models::params::BALANCE_TREE_DEPTH {
+    for i in 0..1 << params::BALANCE_TREE_DEPTH {
         let balance_value = match validator_acc.subtree.get(i as u32) {
             None => models::node::Fr::zero(),
             Some(bal) => bal.value,
@@ -269,7 +275,7 @@ struct MockApiClient<F: Fn() -> Option<prover::prover_data::ProverData>> {
 }
 
 impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for MockApiClient<F> {
-    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
+    fn block_to_prove(&self, _block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         Ok(*block_to_prove)
     }

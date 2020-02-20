@@ -14,7 +14,6 @@ use log::*;
 use crypto_exports::franklin_crypto;
 use crypto_exports::rand;
 use models::node::Engine;
-use models::params;
 use models::prover_utils::{get_block_proof_key_and_vk_path, read_circuit_proving_parameters};
 
 pub struct BabyProver<C: ApiClient> {
@@ -224,11 +223,7 @@ impl<C: ApiClient> BabyProver<C> {
     }
 }
 
-pub fn read_circuit_params() -> groth16::Parameters<Engine> {
-    read_circuit_params_sized(params::block_size_chunks())
-}
-
-pub fn read_circuit_params_sized(block_size: usize) -> groth16::Parameters<Engine> {
+pub fn read_circuit_params(block_size: usize) -> groth16::Parameters<Engine> {
     let path = get_block_proof_key_and_vk_path(block_size).0;
     debug!("Reading key from {}", path.to_string_lossy());
     read_circuit_proving_parameters(&path).expect("Failed to read circuit parameters")

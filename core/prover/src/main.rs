@@ -10,13 +10,20 @@ use log::*;
 use signal_hook::iterator::Signals;
 // Workspace deps
 use models::node::config::PROVER_HEARTBEAT_INTERVAL;
-use prover::{client, read_circuit_params_sized};
+use prover::{client, read_circuit_params};
 use prover::{start, BabyProver};
 
 fn main() {
-    // TODO: jazzandrock read from env
     let args = std::env::args().collect::<Vec<String>>();
-    let block_size = usize::from_str(args[1].as_ref()).unwrap();
+
+    // TODO: jazzandrock read from env?
+    let block_size_chunks = {
+        let block_size_chunks = match args.get(1) {
+            Some(size) => size.clone(),
+            None => env::var("TEST_BLOCK_SIZE_CHUNKS").expect("TEST_BLOCK_SIZE_CHUNKS is missing"),
+        };
+        usize::from_str(&block_size_chunks).unwrap()
+    };
 
     env_logger::init();
     const ABSENT_PROVER_ID: i32 = -1;
@@ -30,7 +37,7 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal))
         .expect("Error setting SIGQUIT handler");
 
-    // TODO: jazzandrock maybbe create names from default name + block_size?
+    // TODO: jazzandrock maybe create names from default name + block_size?
     let worker_name = match args.get(2) {
         Some(name) => name.clone(),
         None => env::var("POD_NAME").expect("POD_NAME is missing"),
@@ -42,12 +49,12 @@ fn main() {
     let api_client = client::ApiClient::new(&api_url, &worker_name, Some(stop_signal.clone()));
     // Create prover
     let jubjub_params = AltJubjubBn256::new();
-    let circuit_params = read_circuit_params_sized(block_size);
+    let circuit_params = read_circuit_params(block_size_chunks);
     let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
     let worker = BabyProver::new(
         circuit_params,
         jubjub_params,
-        block_size,
+        block_size_chunks,
         api_client.clone(),
         heartbeat_interval,
         stop_signal,
@@ -84,7 +91,7 @@ fn main() {
     // Register prover
     prover_id_arc.store(
         api_client
-            .register_prover(block_size)
+            .register_prover(block_size_chunks)
             .expect("failed to register prover"),
         Ordering::SeqCst,
     );
