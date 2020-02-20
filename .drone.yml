@@ -184,8 +184,8 @@ steps:
   - zksync db-reset
   - zksync genesis
   - zksync redeploy
-  - f cargo build --release --bin prover
   - f cargo build --release --bin server
+  - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/generated/VerifierTest.sol
   depends_on:
   - yarn
 - name: start-server-detached
@@ -205,7 +205,7 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync prover
+  - zksync dummy-prover
   depends_on:
   - preparations-for-integration-simple
 - name: integration-simple
