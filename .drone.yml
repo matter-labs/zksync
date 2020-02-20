@@ -166,11 +166,12 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync db-setup
   - zksync build-contracts
+  - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/generated/VerifierTest.sol
   - zksync db-reset
   - zksync genesis
   - zksync redeploy
   - f cargo build --release --bin server
-  - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/generated/VerifierTest.sol
+  - f cargo build --release --bin dummy_prover
   depends_on:
   - yarn
 - name: start-server-detached
