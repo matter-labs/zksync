@@ -8,7 +8,7 @@ import {
 // HACK: using require as type system work-around
 const franklin_abi = require('../../contracts/build/Franklin.json');
 import { ethers, utils, Contract } from "ethers";
-import {parseEther} from "ethers/utils";
+import { parseEther } from "ethers/utils";
 
 
 let syncProvider: Provider;
@@ -170,7 +170,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
     const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
     console.log("Running integration test on the ", network, " network");
 
-    syncProvider = await getDefaultProvider(network);
+    syncProvider = await Provider.newHttpProvider(process.env.HTTP_RPC_API_ADDR);
 
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
     const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
@@ -181,7 +181,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
     ).connect(ethersProvider);
 
     const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
-    await (await ethWallet.sendTransaction({to: syncWalletSigner.address, value: parseEther("0.5")}));
+    await (await ethWallet.sendTransaction({ to: syncWalletSigner.address, value: parseEther("0.5") }));
     const syncWallet = await Wallet.fromEthSigner(
         syncWalletSigner,
         syncProvider,
@@ -195,7 +195,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
     );
 
     const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-    await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.5")}));
+    await (await ethWallet.sendTransaction({ to: ethWallet2.address, value: parseEther("0.5") }));
     const syncWallet2 = await Wallet.fromEthSigner(
         ethWallet2,
         syncProvider,
@@ -203,7 +203,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
     );
 
     const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
-    await (await ethWallet.sendTransaction({to: ethWallet3.address, value: parseEther("0.05")}));
+    await (await ethWallet.sendTransaction({ to: ethWallet3.address, value: parseEther("0.05") }));
     const syncWallet3 = await Wallet.fromEthSigner(
         ethWallet3,
         syncProvider,

@@ -184,6 +184,8 @@ steps:
   - zksync db-reset
   - zksync genesis
   - zksync redeploy
+  - f cargo build --release --bin prover
+  - f cargo build --release --bin server
   depends_on:
   - yarn
 - name: start-server-detached
