@@ -101,11 +101,8 @@ pub fn maintain(
         if has_capacity(&data) {
             take_next_commits(&conn_pool, &data).expect("failed to get next commit operations");
         }
-        if all_prepared(&data) {
-            thread::sleep(rounds_interval);
-        } else {
-            prepare_next(&conn_pool, &data).expect("failed to prepare prover data");
-        }
+        prepare_next(&conn_pool, &data).expect("failed to prepare prover data");
+        thread::sleep(rounds_interval);
     }
 }
 
@@ -136,17 +133,15 @@ fn take_next_commits(
     Ok(())
 }
 
-fn all_prepared(data: &Arc<RwLock<ProversDataPool>>) -> bool {
-    let d = data.read().expect("failed to acquire a lock");
-    d.all_prepared()
-}
-
 fn prepare_next(
     conn_pool: &storage::ConnectionPool,
     data: &Arc<RwLock<ProversDataPool>>,
 ) -> Result<(), String> {
     let op = {
         let mut d = data.write().expect("failed to acquire a lock");
+        if d.all_prepared() {
+            return Ok(());
+        }
         d.take_next_to_prove()?
     };
     let storage = conn_pool.access_storage().expect("failed to connect to db");

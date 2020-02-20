@@ -20,6 +20,9 @@ contract Config {
     /// @notice Success flag bytes length
     uint8 constant SUCCESS_FLAG_BYTES = 1;
 
+    /// @notice Max amount of tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
+    uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = (1 << 16) - 1;
+
     /// @notice Fee gas price for transactions
     uint256 constant FEE_GAS_PRICE_MULTIPLIER = 2; // 2 Gwei
 
