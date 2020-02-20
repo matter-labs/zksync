@@ -16,6 +16,7 @@ cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTest.sol
 cp $IN_DIR/Storage.sol $OUT_DIR/StorageTest.sol
 cp $IN_DIR/Config.sol $OUT_DIR/ConfigTest.sol
 cp $IN_DIR/Ownable.sol $OUT_DIR/OwnableTest.sol
+cp $IN_DIR/WaitUpgradeMode.sol $OUT_DIR/WaitUpgradeModeTest.sol
 
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
@@ -25,6 +26,7 @@ ssed 's/Config/ConfigTest/' -i $OUT_DIR/*.sol
 ssed 's/PriorityQueue/PriorityQueueTest/' -i $OUT_DIR/*.sol
 ssed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
 ssed 's/Ownable/OwnableTest/' -i $OUT_DIR/*.sol
+ssed 's/WaitUpgradeMode/WaitUpgradeModeTest/' -i $OUT_DIR/*.sol
 # Workaround -> priority queue has FranklinTest in method names.
 ssed 's/FranklinTest/Franklin/' -i $OUT_DIR/PriorityQueueTest.sol
 
@@ -35,11 +37,17 @@ ssed 's/FranklinTest/Franklin/' -i $OUT_DIR/PriorityQueueTest.sol
 set_constant() {
 	ssed -E "s/(.*constant $1)(.*)\;/\1 = $2\;/" -i $3
 }
+create_constant_getter() {
+	ssed -E "s/    (.*) (constant $1)(.*)\;(.*)/    \1 \2\3\;\4\n    function get_$1() external view returns (\1) {\n        return $1\;\n    }/" -i $2
+}
 
 # Change constants
 set_constant EXPECT_VERIFICATION_IN 8 $OUT_DIR/FranklinTest.sol
 set_constant MAX_UNVERIFIED_BLOCKS 4 $OUT_DIR/FranklinTest.sol
 set_constant PRIORITY_EXPIRATION 16 $OUT_DIR/ConfigTest.sol
+set_constant WAIT_UPGRADE_MODE_PERIOD 3 $OUT_DIR/WaitUpgradeModeTest.sol
+
+create_constant_getter WAIT_UPGRADE_MODE_PERIOD $OUT_DIR/WaitUpgradeModeTest.sol
 
 # Verify always true
 set_constant DUMMY_VERIFIER true $OUT_DIR/VerifierTest.sol

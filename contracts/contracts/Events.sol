@@ -52,3 +52,29 @@ contract Events {
         uint256 fee
     );
 }
+
+/// @title Upgrade mode events
+/// @author Matter Labs
+contract UpgradeModeEvents {
+
+    /// @notice Upgrade mode enter event
+    event UpgradeModeActivated(
+        uint64 version
+    );
+
+    /// @notice Upgrade mode cancel event
+    event UpgradeCanceled(
+        uint64 version
+    );
+
+    /// @notice Upgrade mode closed status event
+    event UpgradeModeClosedStatusActivated(
+        uint64 version
+    );
+
+    /// @notice Upgrade mode complete event
+    event UpgradeCompleted(
+        uint64 version
+    );
+
+}
