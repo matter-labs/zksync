@@ -9,6 +9,7 @@ python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE REST_API_ADDR=http
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE HTTP_RPC_API_ADDR=http://start-server-detached:3030
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE WS_API_ADDR=http://start-server-detached:3031
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE API_SERVER=http://start-server-detached:3000
+python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE PROVER_SERVER_URL=http://start-server-detached:8088
 
 zksync env ci
 zksync gen-keys-if-not-present
