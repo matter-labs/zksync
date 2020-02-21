@@ -11,7 +11,7 @@
     "openzeppelin-solidity": "^2.4.0",
     "ts-node": "^8.5.4",
     "typescript": "^3.7.4",
-    "zksync": "../zksync.js"
+    "zksync": "link:../zksync.js"
   },
   "scripts": {
     "simple": "f ts-node simple-integration-test.ts",
