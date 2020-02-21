@@ -8,7 +8,7 @@ use backoff::Operation;
 use crypto_exports::franklin_crypto::bellman::groth16;
 use failure::bail;
 use failure::format_err;
-use log::info;
+use log::*;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
@@ -84,9 +84,15 @@ impl ApiClient {
     ) -> Result<T, failure::Error> {
         let mut with_checking = || -> Result<T, backoff::Error<failure::Error>> {
             if self.is_terminating() {
-                op().map_err(backoff::Error::Permanent)
+                op().map_err(backoff::Error::Permanent).map_err(|e| {
+                    error!("Error: {}", e);
+                    e
+                })
             } else {
-                op().map_err(backoff::Error::Transient)
+                op().map_err(backoff::Error::Transient).map_err(|e| {
+                    error!("Error: {}", e);
+                    e
+                })
             }
         };
 
@@ -206,7 +212,7 @@ impl crate::ApiClient for ApiClient {
                 .map_err(|e| format_err!("failed to read prover data response: {}", e))?;
             let res: Option<ProverData> = serde_json::from_str(&text)
                 .map_err(|e| format_err!("failed to parse prover data response: {}", e))?;
-            Ok(res.ok_or_else(|| format_err!("couldn't get ProverData"))?)
+            Ok(res.ok_or_else(|| format_err!("couldn't get ProverData for block {}", block))?)
         };
 
         Ok(self.with_retries(&op)?)
@@ -230,7 +236,8 @@ impl crate::ApiClient for ApiClient {
                 .send()
                 .map_err(|e| format_err!("failed to send publish request: {}", e))?;
             if res.status() != reqwest::StatusCode::OK {
-                bail!("publish request failed with status: {}", res.status());
+                error!("publish request failed with status: {}", res.status());
+                Ok(())
             } else {
                 Ok(())
             }

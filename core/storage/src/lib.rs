@@ -1837,31 +1837,35 @@ impl StorageProcessor {
 
     pub fn load_unverified_commits_after_block(
         &self,
-        block: i64,
+        block_size: usize,
+        block: BlockNumber,
         limit: i64,
     ) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
             let ops: Vec<StoredOperation> = diesel::sql_query(format!(
                 "
-                SELECT * FROM operations
-                  WHERE action_type = 'COMMIT'
-                   AND block_number > (
-                     SELECT COALESCE(max(block_number), 0)
-                       FROM operations
-                       WHERE action_type = 'VERIFY'
-                   )
-                   AND block_number > {}
-                  LIMIT {}
-            ",
-                block, limit
+                WITH sized_operations AS (
+                    SELECT operations.* FROM operations
+                    LEFT JOIN blocks ON number = block_number
+                    LEFT JOIN proofs USING (block_number)
+                    WHERE proof IS NULL AND block_size = {}
+                )
+                SELECT * FROM sized_operations
+                WHERE action_type = 'COMMIT'
+                    AND block_number > (
+                        SELECT COALESCE(max(block_number), 0)
+                        FROM sized_operations
+                        WHERE action_type = 'VERIFY'
+                    )
+                    AND block_number > {}
+                ORDER BY block_number
+                LIMIT {}
+                ",
+                block_size, block, limit
             ))
             .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
-    }
-
-    pub fn load_unverified_commits(&self) -> QueryResult<Vec<Operation>> {
-        self.load_unverified_commits_after_block(0, 10e9 as i64)
     }
 
     fn get_account_and_last_block(

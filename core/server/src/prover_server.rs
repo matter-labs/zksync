@@ -10,6 +10,7 @@ use futures::channel::mpsc;
 use log::{error, info, trace};
 // Workspace deps
 use models::config_options::ThreadPanicNotify;
+use models::node::BlockNumber;
 use prover::client;
 
 struct AppState {
@@ -57,6 +58,10 @@ fn block_to_prove(
             actix_web::error::ErrorInternalServerError("storage layer error")
         })?;
     if let Some(prover_run) = ret {
+        info!(
+            "satisfied request block {} to prove from worker: {}",
+            prover_run.block_number, r.name
+        );
         Ok(HttpResponse::Ok().json(client::BlockToProveRes {
             prover_run_id: prover_run.id,
             block: prover_run.block_number,
@@ -71,14 +76,18 @@ fn block_to_prove(
 
 fn prover_data(
     data: web::Data<AppState>,
-    block: web::Json<i64>,
+    block: web::Json<BlockNumber>,
 ) -> actix_web::Result<HttpResponse> {
-    info!("requesting prover_data for block {}", *block);
+    trace!("requesting prover_data for block {}", *block);
     let data_pool = data
         .preparing_data_pool
         .read()
         .expect("failed to get read lock on data");
-    Ok(HttpResponse::Ok().json(data_pool.get(*block)))
+    let res = data_pool.get(*block);
+    if res.is_some() {
+        info!("Sent prover_data for block {}", *block);
+    }
+    Ok(HttpResponse::Ok().json(res))
 }
 
 fn working_on(
@@ -113,7 +122,7 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
                 .preparing_data_pool
                 .write()
                 .expect("failed to get write lock on data");
-            data_pool.clean_up(r.block as i64);
+            data_pool.clean_up(r.block);
             Ok(())
         }
         Err(e) => {
@@ -152,8 +161,8 @@ pub fn start_prover_server(
         .name("prover_server".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
-            let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new()));
-            let data_pool_copy = Arc::clone(&data_pool);
+            let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new(10)));
+            let data_pool_copy = data_pool.clone();
             let conn_pool_clone = connection_pool.clone();
             thread::Builder::new()
                 .name("prover_server_pool".to_string())
@@ -167,7 +176,7 @@ pub fn start_prover_server(
                     .wrap(actix_web::middleware::Logger::default())
                     .data(AppState {
                         connection_pool: connection_pool.clone(),
-                        preparing_data_pool: Arc::clone(&data_pool),
+                        preparing_data_pool: data_pool.clone(),
                         prover_timeout,
                     })
                     .route("/register", web::post().to(register))

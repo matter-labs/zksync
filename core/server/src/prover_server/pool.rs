@@ -1,5 +1,5 @@
 // Built-in
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
 use std::{thread, time};
 // External
@@ -26,68 +26,121 @@ use circuit::witness::withdraw::apply_withdraw_tx;
 use circuit::witness::withdraw::calculate_withdraw_operations_from_witness;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
-use models::node::{Fr, FranklinOp};
+use models::node::{BlockNumber, Fr, FranklinOp};
+use models::Operation;
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
 
+struct BlockSizedOperationsQueue {
+    operations: VecDeque<Operation>,
+    block_size: usize,
+}
+
+impl BlockSizedOperationsQueue {
+    fn new(block_size: usize) -> Self {
+        Self {
+            operations: VecDeque::new(),
+            block_size,
+        }
+    }
+
+    fn last_loaded(&self) -> BlockNumber {
+        self.operations
+            .iter()
+            .map(|op| op.block.block_number)
+            .max()
+            .unwrap_or(0)
+    }
+
+    fn take_next_commits_if_needed(
+        &mut self,
+        conn_pool: &storage::ConnectionPool,
+        limit: i64,
+    ) -> Result<(), String> {
+        if self.operations.len() < limit as usize {
+            let storage = conn_pool.access_storage().expect("failed to connect to db");
+            let ops = storage
+                .load_unverified_commits_after_block(self.block_size, self.last_loaded(), limit)
+                .map_err(|e| format!("failed to read commit operations: {}", e))?;
+
+            self.operations.extend(ops);
+            println!(
+                "Operations size {}: {:?}",
+                self.block_size,
+                self.operations
+                    .iter()
+                    .map(|op| op.block.block_number)
+                    .collect::<Vec<_>>()
+            );
+        }
+
+        Ok(())
+    }
+
+    fn prepare_next_if_any(
+        &mut self,
+        conn_pool: &storage::ConnectionPool,
+    ) -> Result<Option<(BlockNumber, ProverData)>, String> {
+        match self.operations.pop_front() {
+            Some(op) => {
+                let storage = conn_pool.access_storage().expect("failed to connect to db");
+                let pd = build_prover_data(&storage, &op)?;
+                Ok(Some((op.block.block_number, pd)))
+            }
+            None => Ok(None),
+        }
+    }
+}
+
 pub struct ProversDataPool {
-    last_prepared: i64,
-    last_loaded: i64,
     limit: i64,
-    operations: HashMap<i64, models::Operation>,
-    prepared: HashMap<i64, ProverData>,
+    op_queues: HashMap<usize, BlockSizedOperationsQueue>,
+    prepared: HashMap<BlockNumber, ProverData>,
 }
 
 impl ProversDataPool {
-    pub fn new() -> Self {
-        ProversDataPool {
-            last_prepared: 0,
-            last_loaded: 0,
-            limit: 10,
-            operations: HashMap::new(),
+    pub fn new(limit: i64) -> Self {
+        let mut res = Self {
+            limit,
+            op_queues: HashMap::new(),
             prepared: HashMap::new(),
+        };
+
+        for block_size in models::params::block_chunk_sizes() {
+            res.op_queues
+                .insert(*block_size, BlockSizedOperationsQueue::new(*block_size));
         }
+
+        res
     }
 
-    pub fn get(&self, block: i64) -> Option<&ProverData> {
+    pub fn get(&self, block: BlockNumber) -> Option<&ProverData> {
         self.prepared.get(&block)
     }
 
-    pub fn clean_up(&mut self, block: i64) {
+    pub fn clean_up(&mut self, block: BlockNumber) {
         self.prepared.remove(&block);
     }
 
-    fn has_capacity(&self) -> bool {
-        self.last_loaded - self.last_prepared + (self.prepared.len() as i64) < self.limit as i64
+    fn take_next_commits_if_needed(
+        &mut self,
+        conn_pool: &storage::ConnectionPool,
+    ) -> Result<(), String> {
+        for (_, queue) in self.op_queues.iter_mut() {
+            queue.take_next_commits_if_needed(conn_pool, self.limit)?;
+        }
+
+        Ok(())
     }
 
-    fn all_prepared(&self) -> bool {
-        self.last_loaded == self.last_prepared
-    }
-
-    fn store_to_prove(&mut self, op: models::Operation) {
-        let block = op.block.block_number as i64;
-        self.last_loaded = block;
-        self.operations.insert(block, op);
-    }
-
-    fn take_next_to_prove(&mut self) -> Result<models::Operation, String> {
-        if self.last_prepared == 0 {
-            // Pool restart or first ever take.
-            // Handling restart case by setting proper value for `last_prepared`.
-            let mut first_from_loaded = 0;
-            for key in self.operations.keys() {
-                if first_from_loaded == 0 || *key < first_from_loaded {
-                    first_from_loaded = *key;
-                }
+    fn prepare_next(&mut self, conn_pool: &storage::ConnectionPool) -> Result<(), String> {
+        for (_, queue) in self.op_queues.iter_mut() {
+            if let Some((block_number, pd)) = queue.prepare_next_if_any(conn_pool)? {
+                self.prepared.insert(block_number, pd);
             }
-            self.last_prepared = first_from_loaded - 1
         }
-        let next = self.last_prepared + 1;
-        match self.operations.remove(&next) {
-            Some(v) => Ok(v),
-            None => Err("data is inconsistent".to_owned()),
-        }
+
+        Ok(())
     }
 }
 
@@ -98,58 +151,17 @@ pub fn maintain(
 ) {
     info!("preparing prover data routine started");
     loop {
-        if has_capacity(&data) {
-            take_next_commits(&conn_pool, &data).expect("failed to get next commit operations");
-        }
-        prepare_next(&conn_pool, &data).expect("failed to prepare prover data");
+        let mut pool = data.write().expect("");
+        match pool.take_next_commits_if_needed(&conn_pool) {
+            Ok(_) => {}
+            Err(e) => error!("take_next_commits_if_needed {}", e),
+        };
+        match pool.prepare_next(&conn_pool) {
+            Ok(_) => {}
+            Err(e) => error!("prepare_next {}", e),
+        };
         thread::sleep(rounds_interval);
     }
-}
-
-fn has_capacity(data: &Arc<RwLock<ProversDataPool>>) -> bool {
-    let d = data.write().expect("failed to acquire a lock");
-    d.has_capacity()
-}
-
-fn take_next_commits(
-    conn_pool: &storage::ConnectionPool,
-    data: &Arc<RwLock<ProversDataPool>>,
-) -> Result<(), String> {
-    let ops = {
-        let d = data.write().expect("failed to acquire a lock");
-        let storage = conn_pool.access_storage().expect("failed to connect to db");
-        storage
-            .load_unverified_commits_after_block(d.last_loaded, d.limit)
-            .map_err(|e| format!("failed to read commit operations: {}", e))?
-    };
-
-    if !ops.is_empty() {
-        let mut d = data.write().expect("failed to acquire a lock");
-        for op in ops.into_iter() {
-            (*d).store_to_prove(op)
-        }
-    }
-
-    Ok(())
-}
-
-fn prepare_next(
-    conn_pool: &storage::ConnectionPool,
-    data: &Arc<RwLock<ProversDataPool>>,
-) -> Result<(), String> {
-    let op = {
-        let mut d = data.write().expect("failed to acquire a lock");
-        if d.all_prepared() {
-            return Ok(());
-        }
-        d.take_next_to_prove()?
-    };
-    let storage = conn_pool.access_storage().expect("failed to connect to db");
-    let pd = build_prover_data(&storage, &op)?;
-    let mut d = data.write().expect("failed to acquire a lock");
-    (*d).last_prepared += 1;
-    (*d).prepared.insert(op.block.block_number as i64, pd);
-    Ok(())
 }
 
 fn build_prover_data(
