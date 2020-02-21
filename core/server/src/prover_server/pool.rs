@@ -95,6 +95,7 @@ impl ProversDataPool {
 use futures::channel::mpsc;
 
 use models::config_options::ThreadPanicNotify;
+use models::node::{apply_updates, AccountMap};
 
 /// `ProverPoolMaintainer` is a helper structure that maintains the
 /// prover data pool.
@@ -113,6 +114,11 @@ pub struct ProverPoolMaintainer {
     data: Arc<RwLock<ProversDataPool>>,
     /// Routine refresh interval.
     rounds_interval: time::Duration,
+    /// Cached account state.
+    ///
+    /// This field is initialized at the first iteration of `maintain`
+    /// routine, and is updated by applying the state diff after that.
+    account_state: Option<(u32, AccountMap)>,
 }
 
 impl ProverPoolMaintainer {
@@ -126,6 +132,7 @@ impl ProverPoolMaintainer {
             conn_pool,
             data,
             rounds_interval,
+            account_state: None,
         }
     }
 
@@ -181,7 +188,7 @@ impl ProverPoolMaintainer {
         Ok(())
     }
 
-    fn prepare_next(&self) -> Result<(), String> {
+    fn prepare_next(&mut self) -> Result<(), String> {
         let op = {
             let mut data = self.data.write().expect("failed to acquire a lock");
             if data.all_prepared() {
@@ -193,14 +200,61 @@ impl ProverPoolMaintainer {
             .conn_pool
             .access_storage()
             .expect("failed to connect to db");
-        let pd = Self::build_prover_data(&storage, &op)?;
+        let pd = self.build_prover_data(&storage, &op)?;
         let mut data = self.data.write().expect("failed to acquire a lock");
         (*data).last_prepared += 1;
         (*data).prepared.insert(op.block.block_number as i64, pd);
         Ok(())
     }
 
+    /// Updates stored account state, obtaining the state for the requested block.
+    ///
+    /// This method updates the stored version of state with a diff, or initializes
+    /// the state if it was not initialized yet.
+    fn update_account_state(
+        &mut self,
+        storage: &storage::StorageProcessor,
+        new_block: u32,
+    ) -> Result<AccountMap, String> {
+        let state = match self.account_state {
+            Some((block, ref state)) => {
+                // State is initialized. We need to load diff (if any) and update
+                // the stored state.
+                let state_diff = storage
+                    .load_state_diff(block, Some(new_block))
+                    .map_err(|e| format!("failed to load committed state: {}", e))?;
+
+                if let Some((_, state_diff)) = state_diff {
+                    // Diff exists, update the state and return it.
+                    let mut new_state = state.clone();
+
+                    debug!("Loaded state diff: {:#?}", state_diff);
+                    apply_updates(&mut new_state, state_diff);
+
+                    self.account_state = Some((new_block, new_state.clone()));
+                    new_state
+                } else {
+                    // There is no diff, return the existing state.
+                    state.clone()
+                }
+            }
+            None => {
+                // State is not initialized, load it.
+                let (block, accounts) = storage
+                    .load_committed_state(Some(new_block))
+                    .map_err(|e| format!("failed to load committed state: {}", e))?;
+
+                self.account_state = Some((block, accounts.clone()));
+
+                accounts
+            }
+        };
+
+        Ok(state)
+    }
+
     fn build_prover_data(
+        &mut self,
         storage: &storage::StorageProcessor,
         commit_operation: &models::Operation,
     ) -> Result<ProverData, String> {
@@ -209,9 +263,8 @@ impl ProverPoolMaintainer {
         info!("building prover data for block {}", &block_number);
 
         let account_tree = {
-            let (_, accounts) = storage
-                .load_committed_state(Some(block_number - 1))
-                .map_err(|e| format!("failed to load commited state: {}", e))?;
+            let accounts = self.update_account_state(storage, block_number - 1)?;
+
             let mut account_tree =
                 CircuitAccountTree::new(models::params::account_tree_depth() as u32);
             for (account_id, account) in accounts {
