@@ -225,8 +225,8 @@ impl ProverPoolMaintainer {
                     // Diff exists, update the state and return it.
                     let mut new_state = state.clone();
 
-                    debug!("Loaded state diff: {:#?}", state_diff);
                     apply_updates(&mut new_state, state_diff);
+                    debug!("Prover state is updated ({} => {})", block, new_block);
 
                     self.account_state = Some((new_block, new_state.clone()));
                     new_state
@@ -240,6 +240,8 @@ impl ProverPoolMaintainer {
                 let (block, accounts) = storage
                     .load_committed_state(Some(new_block))
                     .map_err(|e| format!("failed to load committed state: {}", e))?;
+
+                debug!("Prover state is initialized");
 
                 self.account_state = Some((block, accounts.clone()));
 

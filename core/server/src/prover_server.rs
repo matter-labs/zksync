@@ -147,11 +147,10 @@ pub fn start_prover_server(
     rounds_interval: time::Duration,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    let panic_notify2 = panic_notify.clone();
     thread::Builder::new()
         .name("prover_server".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
+            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
             let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new()));
 
             // Start pool maintainer thread.
@@ -160,7 +159,7 @@ pub fn start_prover_server(
                 Arc::clone(&data_pool),
                 rounds_interval,
             );
-            pool_maintainer.start_maintain_routine(panic_notify2);
+            pool_maintainer.start_maintain_routine(panic_notify);
 
             // Start HTTP server.
             HttpServer::new(move || {
