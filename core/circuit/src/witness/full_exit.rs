@@ -79,7 +79,7 @@ pub fn apply_full_exit(
 ) -> FullExitWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
-    println!("Initial root = {}", before_root);
+    debug!("Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
         get_audits(tree, full_exit.account_address, full_exit.token);
 
@@ -127,7 +127,7 @@ pub fn apply_full_exit(
     };
 
     let after_root = tree.root_hash();
-    println!("After root = {}", after_root);
+    debug!("After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
         get_audits(tree, full_exit.account_address, full_exit.token);
 

@@ -76,7 +76,7 @@ pub fn apply_close_account(
 ) -> CloseAccountWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
-    println!("Initial root = {}", before_root);
+    debug!("Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
         get_audits(tree, close_account.account_address, 0);
 
@@ -102,7 +102,7 @@ pub fn apply_close_account(
         );
 
     let after_root = tree.root_hash();
-    println!("After root = {}", after_root);
+    debug!("After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
         get_audits(tree, close_account.account_address, 0);
 
