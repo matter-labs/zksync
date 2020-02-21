@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock};
 use std::{thread, time};
 // External
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
+use futures::channel::mpsc;
 use log::info;
 // Workspace deps
 use circuit::witness::change_pubkey_offchain::{
@@ -26,6 +27,8 @@ use circuit::witness::withdraw::apply_withdraw_tx;
 use circuit::witness::withdraw::calculate_withdraw_operations_from_witness;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
+use models::config_options::ThreadPanicNotify;
+use models::node::{apply_updates, AccountMap};
 use models::node::{Fr, FranklinOp};
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
@@ -90,12 +93,6 @@ impl ProversDataPool {
         }
     }
 }
-
-// todo move imports to appropriate place
-use futures::channel::mpsc;
-
-use models::config_options::ThreadPanicNotify;
-use models::node::{apply_updates, AccountMap};
 
 /// `ProverPoolMaintainer` is a helper structure that maintains the
 /// prover data pool.
