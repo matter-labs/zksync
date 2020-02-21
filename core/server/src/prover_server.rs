@@ -153,15 +153,16 @@ pub fn start_prover_server(
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
             let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new()));
-            let data_pool_copy = Arc::clone(&data_pool);
-            let conn_pool_clone = connection_pool.clone();
-            thread::Builder::new()
-                .name("prover_server_pool".to_string())
-                .spawn(move || {
-                    let _panic_sentinel = ThreadPanicNotify(panic_notify2);
-                    pool::maintain(conn_pool_clone, data_pool_copy, rounds_interval);
-                })
-                .expect("failed to start provers server");
+
+            // Start pool maintainer thread.
+            let pool_maintainer = pool::ProverPoolMaintainer::new(
+                connection_pool.clone(),
+                Arc::clone(&data_pool),
+                rounds_interval,
+            );
+            pool_maintainer.start_maintain_routine(panic_notify2);
+
+            // Start HTTP server.
             HttpServer::new(move || {
                 App::new()
                     .wrap(actix_web::middleware::Logger::default())
