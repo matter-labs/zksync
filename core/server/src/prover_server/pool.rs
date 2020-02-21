@@ -62,7 +62,7 @@ impl ProversDataPool {
     }
 
     fn all_prepared(&self) -> bool {
-        self.operations.len() == 0
+        self.operations.is_empty()
     }
 
     fn store_to_prove(&mut self, op: models::Operation) {
