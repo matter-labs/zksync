@@ -1,7 +1,7 @@
 use bigdecimal::BigDecimal;
 use futures::executor::block_on;
-use futures::future::{join_all, try_join_all};
-use futures::join;
+use futures::future::try_join_all;
+use futures::try_join;
 use jsonrpc_core::types::response::Success;
 use log::{info, trace};
 use models::config_options::ConfigurationOptions;
@@ -15,11 +15,11 @@ use std::io::prelude::*;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::thread;
-use testkit::eth_account::{parse_ether, EthereumAccount};
+use testkit::eth_account::EthereumAccount;
 use testkit::zksync_account::ZksyncAccount;
 use web3::transports::Http;
+use web3::types::U256;
 use web3::types::{H160, H256};
-use web3::types::{U256, U64};
 
 #[derive(Deserialize, Debug)]
 struct AccountInfo {
@@ -33,10 +33,23 @@ struct TestAccount {
     eth_nonce: Mutex<u32>,
 }
 
+struct TestContext {
+    deposit_initial: f64,
+    n_deposits: i32,
+    deposit_from_amount: f64,
+    deposit_to_amount: f64,
+    n_transfers: i32,
+    transfer_from_amount: f64,
+    transfer_to_amount: f64,
+    n_withdraws: i32,
+    withdraw_from_amount: f64,
+    withdraw_to_amount: f64,
+}
+
 fn main() {
     env_logger::init();
 
-    let deposit_initial = parse_ether("1.0").expect("failed to parse");
+    let deposit_initial = 1.0;
     let n_transfers = 5;
     let n_withdraws = 2;
     let n_deposits = 2;
@@ -49,46 +62,27 @@ fn main() {
     let config = ConfigurationOptions::from_env();
     let filepath = env::args().nth(1).expect("account.json path not given");
     let input_accs = read_accounts(filepath.clone());
-    let input_accs2 = read_accounts(filepath);
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
     let test_accounts = Arc::new(construct_test_accounts(
         input_accs,
         transport.clone(),
         &config,
     ));
-    update_eth_nonce(&test_accounts);
-    info!("Inital depsoits");
-    block_on(do_deposits(&test_accounts, deposit_initial.clone()));
-    unlock_accounts(&test_accounts);
-    let test_accounts2 = Arc::clone(&test_accounts);
-    info!("done [Inital depsoits].");
-    let h = thread::spawn(move || {
-        info!("Simultaneous transfers and withdraws");
-        block_on(async {
-            join!(
-                join_all((0..n_transfers).map(|_i| {
-                    let v = rand::thread_rng().gen_range(transfer_from_amount, transfer_to_amount);
-                    let v = parse_ether(&v.to_string()).expect("parse error");
-                    do_transfers(&test_accounts2, v)
-                })),
-                join_all((0..n_withdraws).map(|_i| {
-                    let v = rand::thread_rng().gen_range(withdraw_from_amount, withdraw_to_amount);
-                    let v = parse_ether(&v.to_string()).expect("parse error");
-                    do_withdraws(&test_accounts2, v)
-                }))
-            )
-        });
-        info!("done [Simultaneous transfers and withdraws].")
-    });
-    info!("deposits");
-    block_on(join_all((0..n_deposits).map(|_i| {
-        let v = rand::thread_rng().gen_range(deposit_from_amount, deposit_to_amount);
-        let v = parse_ether(&v.to_string()).expect("parse error");
-        do_deposits(&test_accounts, v)
-    })));
-    info!("done [deposits].");
-    h.join().unwrap();
-    // TODO: final checks
+    block_on(send_transactions(
+        &test_accounts,
+        TestContext {
+            deposit_initial,
+            n_deposits,
+            deposit_from_amount,
+            deposit_to_amount,
+            n_transfers,
+            transfer_from_amount,
+            transfer_to_amount,
+            n_withdraws,
+            withdraw_from_amount,
+            withdraw_to_amount,
+        },
+    ));
     info!("loadtest completed.");
 }
 
@@ -120,7 +114,7 @@ fn construct_test_accounts(
                 config.contract_eth_addr,
                 &config,
             );
-            let mut ta = TestAccount {
+            TestAccount {
                 zk_acc: ZksyncAccount::new(
                     ZksyncAccount::rand().private_key,
                     0,
@@ -129,45 +123,65 @@ fn construct_test_accounts(
                 ),
                 eth_acc,
                 eth_nonce: Mutex::new(0),
-            };
-            let nonce = ta.zk_acc.nonce();
-            ta
+            }
         })
         .collect()
 }
 
-fn update_eth_nonce(test_accounts: &Vec<TestAccount>) {
-    for ta in test_accounts.iter() {
-        let mut nonce = ta.eth_nonce.lock().unwrap();
-        let v = block_on(ta.eth_acc.main_contract_eth_client.pending_nonce()).unwrap();
-        *nonce = v.as_u32();
-    }
-}
-
-fn unlock_accounts(test_accounts: &Vec<TestAccount>) {
-    for test_acc in test_accounts.iter() {
-        change_pubkey(test_acc);
-    }
-}
-
-fn change_pubkey(ta: &TestAccount) {
-    block_on(send_tx(FranklinTx::ChangePubKey(Box::new(
-        ta.zk_acc.create_change_pubkey_tx(None, true, false),
-    ))))
-    .expect("send unlock tx failed");
-}
-
-async fn do_deposits(test_accounts: &Vec<TestAccount>, deposit_amount: BigDecimal) {
-    trace!("start do_deposits");
+async fn send_transactions(test_accounts: &Vec<TestAccount>, ctx: TestContext) {
     try_join_all(
         test_accounts
             .iter()
-            .map(|test_acc| deposit_single(&test_acc, deposit_amount.clone()))
+            .enumerate()
+            .map(|(i, _)| send_transactions_from_acc(i, &test_accounts, &ctx))
             .collect::<Vec<_>>(),
     )
     .await
-    .expect("failed to deposit");
-    trace!("end do_deposits");
+    .expect("[send_transactions]");
+}
+
+async fn send_transactions_from_acc(
+    index: usize,
+    test_accounts: &Vec<TestAccount>,
+    ctx: &TestContext,
+) -> Result<(), failure::Error> {
+    let test_acc = &test_accounts[index];
+    deposit_single(test_acc, BigDecimal::from(ctx.deposit_initial)).await?;
+    change_pubkey(test_acc).await?;
+    update_eth_nonce(test_acc).await?;
+    let futs_deposits = try_join_all((0..ctx.n_deposits).map(|_i| {
+        let amount = rand::thread_rng().gen_range(ctx.deposit_from_amount, ctx.deposit_to_amount);
+        deposit_single(test_acc, BigDecimal::from(amount))
+    }));
+    let futs_withdraws = try_join_all((0..ctx.n_withdraws).map(|_i| {
+        let amount = rand::thread_rng().gen_range(ctx.withdraw_from_amount, ctx.withdraw_to_amount);
+        withdraw_single(test_acc, BigDecimal::from(amount))
+    }));
+    let futs_transfers = try_join_all((0..ctx.n_transfers).map(|_i| {
+        let amount = rand::thread_rng().gen_range(ctx.transfer_from_amount, ctx.transfer_to_amount);
+        transfer_single(index, test_accounts, BigDecimal::from(amount))
+    }));
+    try_join!(futs_deposits, futs_withdraws, futs_transfers)?;
+    Ok(())
+}
+
+async fn update_eth_nonce(test_acc: &TestAccount) -> Result<(), failure::Error> {
+    let mut nonce = test_acc.eth_nonce.lock().unwrap();
+    let v = test_acc
+        .eth_acc
+        .main_contract_eth_client
+        .pending_nonce()
+        .await
+        .map_err(|e| failure::format_err!("update_eth_nonce: {}", e))?;
+    *nonce = v.as_u32();
+    Ok(())
+}
+
+async fn change_pubkey(ta: &TestAccount) -> Result<(), failure::Error> {
+    send_tx(FranklinTx::ChangePubKey(Box::new(
+        ta.zk_acc.create_change_pubkey_tx(None, true, false),
+    )))
+    .await
 }
 
 async fn deposit_single(
@@ -236,52 +250,35 @@ async fn ethop_info(serial_id: u64) -> Result<Success, failure::Error> {
     Ok(res.json().unwrap())
 }
 
-async fn do_transfers(test_accounts: &Vec<TestAccount>, deposit_amount: BigDecimal) {
-    let receiver = rand::thread_rng().gen_range(1, test_accounts.len());
-    try_join_all(
-        test_accounts
-            .iter()
-            .enumerate()
-            .map(|(i, _)| {
-                let from = &test_accounts[i];
-                let to = &test_accounts[(i + receiver) % test_accounts.len()];
-                let tx = FranklinTx::Transfer(Box::new(from.zk_acc.sign_transfer(
-                    0, // ETH
-                    deposit_amount.clone(),
-                    BigDecimal::from(0),
-                    &to.zk_acc.address,
-                    None,
-                    true,
-                )));
-                send_tx(tx)
-            })
-            .collect::<Vec<_>>(),
-    )
-    .await
-    .expect("failed to do transfers");
+async fn withdraw_single(test_acc: &TestAccount, amount: BigDecimal) -> Result<(), failure::Error> {
+    let tx = FranklinTx::Withdraw(Box::new(test_acc.zk_acc.sign_withdraw(
+        0, // ETH
+        BigDecimal::from(amount),
+        BigDecimal::from(0),
+        &test_acc.eth_acc.address,
+        None,
+        true,
+    )));
+    send_tx(tx).await
 }
 
-async fn do_withdraws(test_accounts: &Vec<TestAccount>, deposit_amount: BigDecimal) {
-    trace!("start do_withdraws");
-    try_join_all(
-        test_accounts
-            .iter()
-            .map(|test_acc| {
-                let tx = FranklinTx::Withdraw(Box::new(test_acc.zk_acc.sign_withdraw(
-                    0, // ETH
-                    deposit_amount.clone(),
-                    BigDecimal::from(0),
-                    &test_acc.eth_acc.address,
-                    None,
-                    true,
-                )));
-                send_tx(tx)
-            })
-            .collect::<Vec<_>>(),
-    )
-    .await
-    .expect("failed to do withdraws");
-    trace!("end do_withdraws");
+async fn transfer_single(
+    index_from: usize,
+    test_accounts: &Vec<TestAccount>,
+    amount: BigDecimal,
+) -> Result<(), failure::Error> {
+    let from = &test_accounts[index_from];
+    let step = rand::thread_rng().gen_range(1, test_accounts.len());
+    let to = &test_accounts[(index_from + step) % test_accounts.len()];
+    let tx = FranklinTx::Transfer(Box::new(from.zk_acc.sign_transfer(
+        0, // ETH
+        amount,
+        BigDecimal::from(0),
+        &to.zk_acc.address,
+        None,
+        true,
+    )));
+    send_tx(tx).await
 }
 
 #[derive(Serialize)]
