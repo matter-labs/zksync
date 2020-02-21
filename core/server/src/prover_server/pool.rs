@@ -145,7 +145,7 @@ impl ProverPoolMaintainer {
     }
 
     /// Updates the pool data in an infinite loop, awaiting `rounds_interval` time
-    /// before updates.
+    /// between updates.
     fn maintain(&mut self) {
         info!("preparing prover data routine started");
         loop {
