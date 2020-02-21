@@ -151,9 +151,11 @@ pub fn maintain(
 ) {
     info!("preparing prover data routine started");
     loop {
-        let mut pool = data.write().expect("");
-        pool.take_next_commits_if_needed(&conn_pool).expect("couldn't get next commits");
-        pool.prepare_next(&conn_pool).expect("couldn't prepare next commits");
+        let mut pool = data.write().expect("failed to get write lock on data");
+        pool.take_next_commits_if_needed(&conn_pool)
+            .expect("couldn't get next commits");
+        pool.prepare_next(&conn_pool)
+            .expect("couldn't prepare next commits");
         thread::sleep(rounds_interval);
     }
 }

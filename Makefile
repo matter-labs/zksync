@@ -105,7 +105,9 @@ dummy-prover:
 	cargo run --bin dummy_prover
 
 prover:
-	@cargo run --release --bin prover
+	@echo "Launching prover $(POD_NAME)$(TEST_BLOCK_SIZE_CHUNKS) of block size $(TEST_BLOCK_SIZE_CHUNKS)"
+	@echo "To customize, run 'f cargo run --release --bin prover'"
+	@cargo run --release --bin prover $(TEST_BLOCK_SIZE_CHUNKS) "$(POD_NAME)$(TEST_BLOCK_SIZE_CHUNKS)"
 
 server:
 	@cargo run --bin server --release
@@ -239,7 +241,7 @@ start-kube: apply-kubeconfig
 ifeq (dev,$(ZKSYNC_ENV))
 start: image-nginx image-rust start-local
 else
-start: apply-kubeconfig start-prover start-server start-nginx
+start: apply-kubeconfig start-provers start-server start-nginx
 endif
 
 ifeq (dev,$(ZKSYNC_ENV))
@@ -247,13 +249,13 @@ stop:
 else ifeq (ci,$(ZKSYNC_ENV))
 stop:
 else
-stop: confirm_action stop-prover stop-server stop-nginx
+stop: confirm_action stop-provers stop-server stop-nginx
 endif
 
 restart: stop start
 
-start-prover:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --replicas=1
+start-provers:
+	@bin/scale-provers 1
 
 start-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --replicas=1
@@ -261,8 +263,8 @@ start-nginx:
 start-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=1
 
-stop-prover:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --replicas=0
+stop-provers:
+	@bin/scale-provers 0
 
 stop-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=0

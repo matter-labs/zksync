@@ -132,9 +132,7 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
             } else {
                 "storage layer error"
             };
-            Err(actix_web::error::ErrorInternalServerError(
-                message
-            ))
+            Err(actix_web::error::ErrorInternalServerError(message))
         }
     }
 }

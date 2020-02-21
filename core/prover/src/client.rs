@@ -240,7 +240,11 @@ impl crate::ApiClient for ApiClient {
                         if message == "duplicate key" {
                             warn!("proof for block {} already exists", block);
                         } else {
-                            bail!("publish request failed with status: {} and message: {}", res.status(), message);
+                            bail!(
+                                "publish request failed with status: {} and message: {}",
+                                res.status(),
+                                message
+                            );
                         }
                     }
                     Err(_) => {
