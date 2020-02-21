@@ -62,7 +62,7 @@ impl ProversDataPool {
     }
 
     fn all_prepared(&self) -> bool {
-        self.last_loaded == self.last_prepared
+        self.operations.len() == 0
     }
 
     fn store_to_prove(&mut self, op: models::Operation) {
@@ -72,19 +72,13 @@ impl ProversDataPool {
     }
 
     fn take_next_to_prove(&mut self) -> Result<models::Operation, String> {
-        if self.last_prepared == 0 {
-            // Pool restart or first ever take.
-            // Handling restart case by setting proper value for `last_prepared`.
-            let mut first_from_loaded = 0;
-            for key in self.operations.keys() {
-                if first_from_loaded == 0 || *key < first_from_loaded {
-                    first_from_loaded = *key;
-                }
+        let mut first_from_loaded = 0;
+        for key in self.operations.keys() {
+            if first_from_loaded == 0 || *key < first_from_loaded {
+                first_from_loaded = *key;
             }
-            self.last_prepared = first_from_loaded - 1
         }
-        let next = self.last_prepared + 1;
-        match self.operations.remove(&next) {
+        match self.operations.remove(&first_from_loaded) {
             Some(v) => Ok(v),
             None => Err("data is inconsistent".to_owned()),
         }

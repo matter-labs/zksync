@@ -162,56 +162,60 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, wallet1: ethers
 }
 
 (async () => {
-    const WEB3_URL = process.env.WEB3_URL;
-    // Mnemonic for eth wallet.
-    const MNEMONIC = process.env.TEST_MNEMONIC;
-    const ERC_20TOKEN = process.env.TEST_ERC20;
+    try {
+        const WEB3_URL = process.env.WEB3_URL;
+        // Mnemonic for eth wallet.
+        const MNEMONIC = process.env.TEST_MNEMONIC;
+        const ERC_20TOKEN = process.env.TEST_ERC20;
 
-    const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
-    console.log("Running integration test on the ", network, " network");
+        const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
+        console.log("Running integration test on the ", network, " network");
 
-    syncProvider = await Provider.newHttpProvider(process.env.HTTP_RPC_API_ADDR);
+        syncProvider = await Provider.newHttpProvider(process.env.HTTP_RPC_API_ADDR);
 
-    const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
-    const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
+        const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
+        const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
-    const ethWallet = ethers.Wallet.fromMnemonic(
-        MNEMONIC,
-        "m/44'/60'/0'/0/0"
-    ).connect(ethersProvider);
+        const ethWallet = ethers.Wallet.fromMnemonic(
+            MNEMONIC,
+            "m/44'/60'/0'/0/0"
+        ).connect(ethersProvider);
 
-    const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
-    await (await ethWallet.sendTransaction({ to: syncWalletSigner.address, value: parseEther("0.5") }));
-    const syncWallet = await Wallet.fromEthSigner(
-        syncWalletSigner,
-        syncProvider,
-        ethProxy
-    );
+        const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
+        await (await ethWallet.sendTransaction({ to: syncWalletSigner.address, value: parseEther("0.5") }));
+        const syncWallet = await Wallet.fromEthSigner(
+            syncWalletSigner,
+            syncProvider,
+            ethProxy
+        );
 
-    const contract = new Contract(
-        syncProvider.contractAddress.mainContract,
-        franklin_abi.interface,
-        ethWallet,
-    );
+        const contract = new Contract(
+            syncProvider.contractAddress.mainContract,
+            franklin_abi.interface,
+            ethWallet,
+        );
 
-    const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-    await (await ethWallet.sendTransaction({ to: ethWallet2.address, value: parseEther("0.5") }));
-    const syncWallet2 = await Wallet.fromEthSigner(
-        ethWallet2,
-        syncProvider,
-        ethProxy
-    );
+        const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
+        await (await ethWallet.sendTransaction({ to: ethWallet2.address, value: parseEther("0.5") }));
+        const syncWallet2 = await Wallet.fromEthSigner(
+            ethWallet2,
+            syncProvider,
+            ethProxy
+        );
 
-    const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
-    await (await ethWallet.sendTransaction({ to: ethWallet3.address, value: parseEther("0.05") }));
-    const syncWallet3 = await Wallet.fromEthSigner(
-        ethWallet3,
-        syncProvider,
-        ethProxy
-    );
+        const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
+        await (await ethWallet.sendTransaction({ to: ethWallet3.address, value: parseEther("0.05") }));
+        const syncWallet3 = await Wallet.fromEthSigner(
+            ethWallet3,
+            syncProvider,
+            ethProxy
+        );
 
-    await moveFunds(contract, ethProxy, ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "0.018");
-    await moveFunds(contract, ethProxy, ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "0.018");
+        await moveFunds(contract, ethProxy, ethWallet, syncWallet, ethWallet2, syncWallet2, ERC_20TOKEN, "0.018");
+        await moveFunds(contract, ethProxy, ethWallet, syncWallet, ethWallet3, syncWallet3, "ETH", "0.018");
 
-    await syncProvider.disconnect();
+        await syncProvider.disconnect();
+    } catch {
+        process.exit(1);
+    }
 })();
