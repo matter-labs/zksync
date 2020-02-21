@@ -131,13 +131,11 @@ impl<C: ApiClient> BabyProver<C> {
                 BabyProverError::Api(e)
             })?;
 
-        let (block, job_id) = match block_to_prove {
-            Some(b) => b,
-            _ => {
-                trace!("no block to prove from the server");
-                (0, 0)
-            }
-        };
+        let (block, job_id) = block_to_prove.unwrap_or_else(|| {
+            trace!("no block to prove from the server");
+            (0, 0)
+        });
+
         // Notify heartbeat routine on new proving block job or None.
         start_heartbeats_tx
             .send((job_id, false))

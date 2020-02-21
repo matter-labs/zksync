@@ -127,8 +127,13 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
         }
         Err(e) => {
             error!("failed to store received proof: {}", e);
+            let message = if e.to_string().contains("duplicate key") {
+                "duplicate key"
+            } else {
+                "storage layer error"
+            };
             Err(actix_web::error::ErrorInternalServerError(
-                "storage layer error",
+                message
             ))
         }
     }

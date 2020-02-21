@@ -152,14 +152,8 @@ pub fn maintain(
     info!("preparing prover data routine started");
     loop {
         let mut pool = data.write().expect("");
-        match pool.take_next_commits_if_needed(&conn_pool) {
-            Ok(_) => {}
-            Err(e) => error!("take_next_commits_if_needed {}", e),
-        };
-        match pool.prepare_next(&conn_pool) {
-            Ok(_) => {}
-            Err(e) => error!("prepare_next {}", e),
-        };
+        pool.take_next_commits_if_needed(&conn_pool).expect("couldn't get next commits");
+        pool.prepare_next(&conn_pool).expect("couldn't prepare next commits");
         thread::sleep(rounds_interval);
     }
 }

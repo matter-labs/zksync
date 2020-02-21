@@ -84,16 +84,14 @@ impl ApiClient {
     ) -> Result<T, failure::Error> {
         let mut with_checking = || -> Result<T, backoff::Error<failure::Error>> {
             if self.is_terminating() {
-                op().map_err(backoff::Error::Permanent).map_err(|e| {
-                    error!("Error: {}", e);
-                    e
-                })
+                op().map_err(backoff::Error::Permanent)
             } else {
-                op().map_err(backoff::Error::Transient).map_err(|e| {
-                    error!("Error: {}", e);
-                    e
-                })
+                op().map_err(backoff::Error::Transient)
             }
+            .map_err(|e| {
+                error!("{}", e);
+                e
+            })
         };
 
         with_checking
@@ -224,10 +222,11 @@ impl crate::ApiClient for ApiClient {
         proof: groth16::Proof<models::node::Engine>,
     ) -> Result<(), failure::Error> {
         let op = || -> Result<(), failure::Error> {
+            info!("Trying publish proof {}", block);
             let encoded = encode_proof(&proof);
 
             let client = self.get_client()?;
-            let res = client
+            let mut res = client
                 .post(&self.publish_url)
                 .json(&client::PublishReq {
                     block: block as u32,
@@ -236,11 +235,21 @@ impl crate::ApiClient for ApiClient {
                 .send()
                 .map_err(|e| format_err!("failed to send publish request: {}", e))?;
             if res.status() != reqwest::StatusCode::OK {
-                error!("publish request failed with status: {}", res.status());
-                Ok(())
-            } else {
-                Ok(())
+                match res.text() {
+                    Ok(message) => {
+                        if message == "duplicate key" {
+                            warn!("proof for block {} already exists", block);
+                        } else {
+                            bail!("publish request failed with status: {} and message: {}", res.status(), message);
+                        }
+                    }
+                    Err(_) => {
+                        bail!("publish request failed with status: {}", res.status());
+                    }
+                };
             }
+
+            Ok(())
         };
 
         Ok(self.with_retries(&op)?)

@@ -10,8 +10,7 @@
 
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate log;
+use log::*;
 
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
