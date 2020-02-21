@@ -28,7 +28,7 @@ use circuit::witness::withdraw::calculate_withdraw_operations_from_witness;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
 use models::config_options::ThreadPanicNotify;
-use models::node::{apply_updates, AccountMap};
+use models::node::{apply_updates, Account, AccountId, AccountMap};
 use models::node::{Fr, FranklinOp};
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
@@ -212,8 +212,8 @@ impl ProverPoolMaintainer {
         &mut self,
         storage: &storage::StorageProcessor,
         new_block: u32,
-    ) -> Result<AccountMap, String> {
-        let state = match self.account_state {
+    ) -> Result<(), String> {
+        match self.account_state {
             Some((block, ref state)) => {
                 // State is initialized. We need to load diff (if any) and update
                 // the stored state.
@@ -228,11 +228,7 @@ impl ProverPoolMaintainer {
                     apply_updates(&mut new_state, state_diff);
                     debug!("Prover state is updated ({} => {})", block, new_block);
 
-                    self.account_state = Some((new_block, new_state.clone()));
-                    new_state
-                } else {
-                    // There is no diff, return the existing state.
-                    state.clone()
+                    self.account_state = Some((new_block, new_state));
                 }
             }
             None => {
@@ -243,13 +239,23 @@ impl ProverPoolMaintainer {
 
                 debug!("Prover state is initialized");
 
-                self.account_state = Some((block, accounts.clone()));
-
-                accounts
+                self.account_state = Some((block, accounts));
             }
         };
 
-        Ok(state)
+        Ok(())
+    }
+
+    /// Iterates through the stored account state, invoking a provided visitor
+    /// function for each account.
+    ///
+    /// Does nothing if the account state is not initialized at the moment of invocation.
+    fn traverse_accounts_with<F: FnMut(AccountId, &Account)>(&self, mut visitor: F) {
+        if let Some((_, ref state)) = self.account_state {
+            for (account_id, account) in state {
+                visitor(*account_id, account);
+            }
+        }
     }
 
     fn build_prover_data(
@@ -260,16 +266,17 @@ impl ProverPoolMaintainer {
         let block_number = commit_operation.block.block_number;
 
         info!("building prover data for block {}", &block_number);
+        self.update_account_state(storage, block_number - 1)?;
 
         let account_tree = {
-            let accounts = self.update_account_state(storage, block_number - 1)?;
-
             let mut account_tree =
                 CircuitAccountTree::new(models::params::account_tree_depth() as u32);
-            for (account_id, account) in accounts {
+
+            self.traverse_accounts_with(|account_id, account| {
                 let circuit_account = CircuitAccount::from(account.clone());
                 account_tree.insert(account_id, circuit_account);
-            }
+            });
+
             account_tree
         };
 
