@@ -585,6 +585,9 @@ pub struct BlockDetails {
     #[sql_type = "Text"]
     pub new_state_root: String,
 
+    #[sql_type = "BigInt"]
+    pub block_size: i64,
+
     #[sql_type = "Nullable<Text>"]
     pub commit_tx_hash: Option<String>,
 
@@ -1629,7 +1632,8 @@ impl StorageProcessor {
             )
             select
             	blocks.number as block_number,
-            	blocks.root_hash as new_state_root,
+                blocks.root_hash as new_state_root,
+                blocks.block_size as block_size,
             	commited.tx_hash as commit_tx_hash,
             	verified.tx_hash as verify_tx_hash,
             	commited.created_at as committed_at,

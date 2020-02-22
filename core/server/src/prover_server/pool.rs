@@ -33,6 +33,7 @@ use prover::prover_data::ProverData;
 
 struct BlockSizedOperationsQueue {
     operations: VecDeque<Operation>,
+    last_loaded_block: BlockNumber,
     block_size: usize,
 }
 
@@ -40,16 +41,9 @@ impl BlockSizedOperationsQueue {
     fn new(block_size: usize) -> Self {
         Self {
             operations: VecDeque::new(),
+            last_loaded_block: 0,
             block_size,
         }
-    }
-
-    fn last_loaded(&self) -> BlockNumber {
-        self.operations
-            .iter()
-            .map(|op| op.block.block_number)
-            .max()
-            .unwrap_or(0)
     }
 
     fn take_next_commits_if_needed(
@@ -60,10 +54,15 @@ impl BlockSizedOperationsQueue {
         if self.operations.len() < limit as usize {
             let storage = conn_pool.access_storage().expect("failed to connect to db");
             let ops = storage
-                .load_unverified_commits_after_block(self.block_size, self.last_loaded(), limit)
+                .load_unverified_commits_after_block(self.block_size, self.last_loaded_block, limit)
                 .map_err(|e| format!("failed to read commit operations: {}", e))?;
 
             self.operations.extend(ops);
+
+            if let Some(op) = self.operations.back() {
+                self.last_loaded_block = op.block.block_number;
+            }
+
             println!(
                 "Operations size {}: {:?}",
                 self.block_size,

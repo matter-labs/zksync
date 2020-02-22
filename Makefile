@@ -229,7 +229,9 @@ apply-kubeconfig:
 
 update-rust: push-image-rust apply-kubeconfig
 	@kubectl patch deployment $(ZKSYNC_ENV)-server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
-	@kubectl patch deployment $(ZKSYNC_ENV)-prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	# TODO: jazzandrock patch each deployment for each prover
+	@kubectl patch deployment $(ZKSYNC_ENV)-prover-10 -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@kubectl patch deployment $(ZKSYNC_ENV)-prover-20 -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
 update-nginx: push-image-nginx apply-kubeconfig
 	@kubectl patch deployment $(ZKSYNC_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"

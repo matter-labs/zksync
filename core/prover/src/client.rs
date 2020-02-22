@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
-use models::config_options::ConfigurationOptions;
+use models::config_options::ProverConfigOpts;
 use models::prover_utils::encode_proof;
 
 #[derive(Serialize, Deserialize)]
@@ -54,11 +54,11 @@ pub struct ApiClient {
 
 impl ApiClient {
     pub fn new(base_url: &str, worker: &str, is_terminating_bool: Option<Arc<AtomicBool>>) -> Self {
-        let config_opts = ConfigurationOptions::from_env();
+        let config_opts = ProverConfigOpts::from_env();
         if worker == "" {
             panic!("worker name cannot be empty")
         }
-        ApiClient {
+        Self {
             register_url: format!("{}/register", base_url),
             block_to_prove_url: format!("{}/block_to_prove", base_url),
             working_on_url: format!("{}/working_on", base_url),
@@ -126,6 +126,7 @@ impl ApiClient {
                 .text()
                 .map_err(|e| format_err!("failed to read register response: {}", e))?;
 
+            println!("res: {}", &text);
             Ok(i32::from_str(&text)
                 .map_err(|e| format_err!("failed to parse register prover id: {}", e))?)
         };

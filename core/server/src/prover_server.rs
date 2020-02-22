@@ -27,6 +27,10 @@ impl AppState {
     }
 }
 
+fn status() -> actix_web::Result<String> {
+    Ok("alive".into())
+}
+
 fn register(
     data: web::Data<AppState>,
     r: web::Json<client::ProverReq>,
@@ -182,6 +186,7 @@ pub fn start_prover_server(
                         preparing_data_pool: data_pool.clone(),
                         prover_timeout,
                     })
+                    .route("/status", web::get().to(status))
                     .route("/register", web::post().to(register))
                     .route("/block_to_prove", web::get().to(block_to_prove))
                     .route("/working_on", web::post().to(working_on))

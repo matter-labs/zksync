@@ -93,3 +93,20 @@ impl ConfigurationOptions {
         }
     }
 }
+
+pub struct ProverConfigOpts {
+    pub req_server_timeout: time::Duration,
+}
+
+impl ProverConfigOpts {
+    pub fn from_env() -> Self {
+        let get_env =
+            |name| env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e));
+        Self {
+            req_server_timeout: get_env("REQ_SERVER_TIMEOUT")
+                .parse::<u64>()
+                .and_then(|d| Ok(time::Duration::from_secs(d)))
+                .expect("REQ_SERVER_TIMEOUT invalid value"),
+        }
+    }
+}

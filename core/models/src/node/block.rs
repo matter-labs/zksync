@@ -40,16 +40,12 @@ impl ExecutedOperations {
 
     pub fn get_eth_public_data(&self) -> Vec<u8> {
         self.get_executed_op()
-            .map(|op| op.public_data())
+            .map(FranklinOp::public_data)
             .unwrap_or_default()
     }
 
     pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
-        self.get_executed_op().map(|op| op.eth_witness())
-    }
-
-    pub fn chunks(&self) -> usize {
-        self.get_executed_op().map(|op| op.chunks()).unwrap_or(0)
+        self.get_executed_op().map(FranklinOp::eth_witness)
     }
 }
 
@@ -77,11 +73,9 @@ impl Block {
         let mut executed_tx_pub_data = self
             .block_transactions
             .iter()
-            .map(|tx| tx.get_eth_public_data())
-            .fold(Vec::new(), |mut acc, pub_data| {
-                acc.extend(pub_data.into_iter());
-                acc
-            });
+            .filter_map(ExecutedOperations::get_executed_op)
+            .flat_map(FranklinOp::public_data)
+            .collect::<Vec<_>>();
 
         // Pad block with noops.
         executed_tx_pub_data.resize(self.smallest_block_size() * 8, 0x00);
@@ -90,31 +84,24 @@ impl Block {
     }
 
     fn get_noops(&self) -> usize {
-        let used_chunks = self
-            .block_transactions
-            .iter()
-            .map(|op| {
-                op.get_executed_op()
-                    .map(|op| op.chunks())
-                    .unwrap_or_default()
-            })
-            .sum::<usize>();
-
-        self.smallest_block_size() - used_chunks
+        self.smallest_block_size() - self.chunks_used()
     }
 
     /// Returns eth_witness data and bytes used by each of the operations
     pub fn get_eth_witness_data(&self) -> (Vec<u8>, Vec<u64>) {
-        let (eth_witness, mut used_bytes) = self.block_transactions.iter().fold(
-            (Vec::new(), Vec::new()),
-            |(mut eth_witness, mut used_bytes), op| {
-                if let Some(witness_bytes) = op.get_eth_witness_bytes() {
+        let (eth_witness, mut used_bytes) = self
+            .block_transactions
+            .iter()
+            .filter_map(ExecutedOperations::get_executed_op)
+            .map(FranklinOp::eth_witness)
+            .fold(
+                (Vec::new(), Vec::new()),
+                |(mut eth_witness, mut used_bytes), witness_bytes| {
                     used_bytes.push(witness_bytes.len() as u64);
                     eth_witness.extend(witness_bytes.into_iter());
-                }
-                (eth_witness, used_bytes)
-            },
-        );
+                    (eth_witness, used_bytes)
+                },
+            );
 
         for _ in 0..self.get_noops() {
             used_bytes.push(0);
@@ -130,8 +117,9 @@ impl Block {
     pub fn chunks_used(&self) -> usize {
         self.block_transactions
             .iter()
-            .map(|tx| tx.chunks())
-            .sum::<usize>()
+            .filter_map(ExecutedOperations::get_executed_op)
+            .map(FranklinOp::chunks)
+            .sum()
     }
 
     pub fn smallest_block_size(&self) -> usize {
@@ -140,9 +128,9 @@ impl Block {
     }
 
     pub fn smallest_block_size_for_chunks(chunks_used: usize) -> usize {
-        for block_size in block_chunk_sizes() {
-            if *block_size >= chunks_used {
-                return *block_size;
+        for &block_size in block_chunk_sizes() {
+            if block_size >= chunks_used {
+                return block_size;
             }
         }
         panic!("There's no block of such size");
