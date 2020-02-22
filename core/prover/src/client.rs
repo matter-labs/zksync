@@ -126,9 +126,11 @@ impl ApiClient {
                 .text()
                 .map_err(|e| format_err!("failed to read register response: {}", e))?;
 
-            println!("res: {}", &text);
             Ok(i32::from_str(&text)
-                .map_err(|e| format_err!("failed to parse register prover id: {}", e))?)
+                .map_err(|e| {
+                    error!("register_prover res: {}", &text[0..100]);
+                    format_err!("failed to parse register prover id: {}", e)
+                })?)
         };
 
         Ok(self.with_retries(&op)?)
@@ -155,6 +157,7 @@ impl ApiClient {
 impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let op = || -> Result<Option<(i64, i32)>, failure::Error> {
+            info!("block_to_prove");
             let client = self.get_client()?;
             let mut res = client
                 .get(&self.block_to_prove_url)
@@ -168,7 +171,10 @@ impl crate::ApiClient for ApiClient {
                 .text()
                 .map_err(|e| format_err!("failed to read block to prove response: {}", e))?;
             let res: client::BlockToProveRes = serde_json::from_str(&text)
-                .map_err(|e| format_err!("failed to parse block to prove response: {}", e))?;
+                .map_err(|e| {
+                    error!("block_to_prove text: {}", &text[0..100]);
+                    format_err!("failed to parse block to prove response: {}", e)
+                })?;
             if res.block != 0 {
                 return Ok(Some((res.block, res.prover_run_id)));
             }
@@ -180,6 +186,7 @@ impl crate::ApiClient for ApiClient {
 
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
         let op = || -> Result<(), failure::Error> {
+            info!("working_on {}", job_id);
             let client = self.get_client()?;
             let res = client
                 .post(&self.working_on_url)
@@ -201,6 +208,7 @@ impl crate::ApiClient for ApiClient {
     fn prover_data(&self, block: i64) -> Result<ProverData, failure::Error> {
         let client = self.get_client()?;
         let op = || -> Result<ProverData, failure::Error> {
+            info!("prover_data");
             let mut res = client
                 .get(&self.prover_data_url)
                 .json(&block)
@@ -210,7 +218,10 @@ impl crate::ApiClient for ApiClient {
                 .text()
                 .map_err(|e| format_err!("failed to read prover data response: {}", e))?;
             let res: Option<ProverData> = serde_json::from_str(&text)
-                .map_err(|e| format_err!("failed to parse prover data response: {}", e))?;
+                .map_err(|e| {
+                    error!("prover_data text: {}", &text[0..100]);
+                    format_err!("failed to parse prover data response: {}", e)
+                })?;
             Ok(res.ok_or_else(|| format_err!("couldn't get ProverData for block {}", block))?)
         };
 

@@ -98,7 +98,7 @@ fn working_on(
     data: web::Data<AppState>,
     r: web::Json<client::WorkingOnReq>,
 ) -> actix_web::Result<()> {
-    trace!(
+    info!(
         "working on request for prover_run with id: {}",
         r.prover_run_id
     );
@@ -194,6 +194,9 @@ pub fn start_prover_server(
                     .route("/publish", web::post().to(publish))
                     .route("/stopped", web::post().to(stopped))
             })
+            .workers(4)
+            .keep_alive(300)
+            .client_timeout(0) // infinity 
             .bind(&bind_to)
             .expect("failed to bind")
             .run()
