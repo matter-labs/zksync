@@ -88,7 +88,7 @@ impl ConfigurationOptions {
                 .expect("Failed to parse PROVER_SERVER_BIND bind address"),
             req_server_timeout: get_env("REQ_SERVER_TIMEOUT")
                 .parse::<u64>()
-                .and_then(|d| Ok(time::Duration::from_secs(d)))
+                .map(time::Duration::from_secs)
                 .expect("REQ_SERVER_TIMEOUT invalid value"),
         }
     }
@@ -105,7 +105,7 @@ impl ProverConfigOpts {
         Self {
             req_server_timeout: get_env("REQ_SERVER_TIMEOUT")
                 .parse::<u64>()
-                .and_then(|d| Ok(time::Duration::from_secs(d)))
+                .map(time::Duration::from_secs)
                 .expect("REQ_SERVER_TIMEOUT invalid value"),
         }
     }

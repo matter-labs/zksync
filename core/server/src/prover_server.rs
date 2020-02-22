@@ -196,7 +196,7 @@ pub fn start_prover_server(
             })
             .workers(4)
             .keep_alive(300)
-            .client_timeout(0) // infinity 
+            .client_timeout(0) // infinity
             .bind(&bind_to)
             .expect("failed to bind")
             .run()

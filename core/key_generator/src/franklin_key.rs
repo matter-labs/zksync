@@ -61,13 +61,13 @@ fn generate_and_write_parameters<F: Fn() -> Parameters<Bn256>>(
 }
 
 pub fn make_block_proof_key() {
-    for block_size in params::block_chunk_sizes() {
-        let (key_file_path, get_vk_file_path) = get_block_proof_key_and_vk_path(*block_size);
+    for &block_size in params::block_chunk_sizes() {
+        let (key_file_path, get_vk_file_path) = get_block_proof_key_and_vk_path(block_size);
         generate_and_write_parameters(
             key_file_path,
             get_vk_file_path,
-            || make_circuit_parameters(*block_size),
-            &format!("{}Block{}", CONTRACT_FUNCTION_NAME, block_size,),
+            || make_circuit_parameters(block_size),
+            &format!("{}Block{}", CONTRACT_FUNCTION_NAME, block_size),
         );
     }
 }

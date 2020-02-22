@@ -63,7 +63,7 @@ impl BlockSizedOperationsQueue {
                 self.last_loaded_block = op.block.block_number;
             }
 
-            println!(
+            trace!(
                 "Operations size {}: {:?}",
                 self.block_size,
                 self.operations
