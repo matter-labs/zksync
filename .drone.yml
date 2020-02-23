@@ -124,8 +124,6 @@ steps:
   - f cargo clippy --tests --benches -- -D warnings
   depends_on:
   - prepare-ci-env
-  depends_on:
-  - prepare-ci-env
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
