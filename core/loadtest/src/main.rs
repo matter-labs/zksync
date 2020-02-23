@@ -34,31 +34,21 @@ struct TestAccount {
 }
 
 struct TestContext {
-    deposit_initial: f64,
+    deposit_initial: u64,
     n_deposits: i32,
-    deposit_from_amount: f64,
-    deposit_to_amount: f64,
+    deposit_from_amount: u64,
+    deposit_to_amount: u64,
     n_transfers: i32,
-    transfer_from_amount: f64,
-    transfer_to_amount: f64,
+    transfer_from_amount: u64,
+    transfer_to_amount: u64,
     n_withdraws: i32,
-    withdraw_from_amount: f64,
-    withdraw_to_amount: f64,
+    withdraw_from_amount: u64,
+    withdraw_to_amount: u64,
 }
 
 fn main() {
     env_logger::init();
 
-    let deposit_initial = 1.0;
-    let n_transfers = 5;
-    let n_withdraws = 2;
-    let n_deposits = 2;
-    let deposit_from_amount = 0.1;
-    let deposit_to_amount = 1.0;
-    let transfer_from_amount = 0.01;
-    let transfer_to_amount = 0.1;
-    let withdraw_from_amount = 0.01;
-    let withdraw_to_amount = 0.2;
     let config = ConfigurationOptions::from_env();
     let filepath = env::args().nth(1).expect("account.json path not given");
     let input_accs = read_accounts(filepath.clone());
@@ -71,19 +61,23 @@ fn main() {
     block_on(send_transactions(
         &test_accounts,
         TestContext {
-            deposit_initial,
-            n_deposits,
-            deposit_from_amount,
-            deposit_to_amount,
-            n_transfers,
-            transfer_from_amount,
-            transfer_to_amount,
-            n_withdraws,
-            withdraw_from_amount,
-            withdraw_to_amount,
+            deposit_initial: eth_to_wei(1.0),
+            n_deposits: 2,
+            deposit_from_amount: eth_to_wei(0.1),
+            deposit_to_amount: eth_to_wei(1.0),
+            n_transfers: 5,
+            transfer_from_amount: eth_to_wei(0.01),
+            transfer_to_amount: eth_to_wei(0.1),
+            n_withdraws: 2,
+            withdraw_from_amount: eth_to_wei(0.01),
+            withdraw_to_amount: eth_to_wei(0.2),
         },
     ));
     info!("loadtest completed.");
+}
+
+fn eth_to_wei(v: f64) -> u64 {
+    (v * 1000000000000000000f64) as u64
 }
 
 fn read_accounts(filepath: String) -> Vec<AccountInfo> {
@@ -146,19 +140,23 @@ async fn send_transactions_from_acc(
     ctx: &TestContext,
 ) -> Result<(), failure::Error> {
     let test_acc = &test_accounts[index];
+    update_eth_nonce(test_acc).await?;
     deposit_single(test_acc, BigDecimal::from(ctx.deposit_initial)).await?;
     change_pubkey(test_acc).await?;
-    update_eth_nonce(test_acc).await?;
+    let smallest_rand_step = 100000000;
     let futs_deposits = try_join_all((0..ctx.n_deposits).map(|_i| {
         let amount = rand::thread_rng().gen_range(ctx.deposit_from_amount, ctx.deposit_to_amount);
+        let amount = amount - amount % smallest_rand_step;
         deposit_single(test_acc, BigDecimal::from(amount))
     }));
     let futs_withdraws = try_join_all((0..ctx.n_withdraws).map(|_i| {
         let amount = rand::thread_rng().gen_range(ctx.withdraw_from_amount, ctx.withdraw_to_amount);
+        let amount = amount - amount % smallest_rand_step;
         withdraw_single(test_acc, BigDecimal::from(amount))
     }));
     let futs_transfers = try_join_all((0..ctx.n_transfers).map(|_i| {
         let amount = rand::thread_rng().gen_range(ctx.transfer_from_amount, ctx.transfer_to_amount);
+        let amount = amount - amount % smallest_rand_step;
         transfer_single(index, test_accounts, BigDecimal::from(amount))
     }));
     try_join!(futs_deposits, futs_withdraws, futs_transfers)?;
@@ -278,6 +276,7 @@ async fn transfer_single(
         None,
         true,
     )));
+    trace!("tranfer(valid: {}): {:?}", tx.check_correctness(), tx);
     send_tx(tx).await
 }
 
