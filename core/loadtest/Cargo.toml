@@ -34,8 +34,6 @@ reqwest = "0.9.22"
 
 futures01 = { package = "futures", version = "0.1" }
 
-server = { path = "../server", version = "0.0.1" }
-
 log = "0.4"
 
 env_logger = "0.6"
