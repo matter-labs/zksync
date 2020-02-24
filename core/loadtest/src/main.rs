@@ -175,18 +175,22 @@ async fn send_transactions_from_acc(
     let op_id = deposit_single(test_acc, BigDecimal::from(ctx.deposit_initial)).await?;
     info!("account {} made initial deposit", addr_hex);
     sent_txs.add_op_id(op_id);
-    change_pubkey(test_acc).await?;
+    change_pubkey(test_acc)?;
     let futs_deposits = try_join_all((0..ctx.n_deposits).map(|_i| {
         let amount = rand_amount(ctx.deposit_from_amount, ctx.deposit_to_amount);
         deposit_single(test_acc, amount)
     }));
     let futs_withdraws = try_join_all((0..ctx.n_withdraws).map(|_i| {
-        let amount = rand_amount(ctx.withdraw_from_amount, ctx.withdraw_to_amount);
-        withdraw_single(test_acc, amount)
+        async {
+            let amount = rand_amount(ctx.withdraw_from_amount, ctx.withdraw_to_amount);
+            withdraw_single(test_acc, amount)
+        }
     }));
     let futs_transfers = try_join_all((0..ctx.n_transfers).map(|_i| {
-        let amount = rand_amount(ctx.transfer_from_amount, ctx.transfer_to_amount);
-        transfer_single(index, test_accounts, amount)
+        async {
+            let amount = rand_amount(ctx.transfer_from_amount, ctx.transfer_to_amount);
+            transfer_single(index, test_accounts, amount)
+        }
     }));
     let (deposit_ids, withdraw_hashes, transfer_hashes) =
         try_join!(futs_deposits, futs_withdraws, futs_transfers)?;
@@ -220,11 +224,10 @@ async fn update_eth_nonce(test_acc: &TestAccount) -> Result<(), failure::Error> 
     Ok(())
 }
 
-async fn change_pubkey(ta: &TestAccount) -> Result<TxHash, failure::Error> {
+fn change_pubkey(ta: &TestAccount) -> Result<TxHash, failure::Error> {
     send_tx(FranklinTx::ChangePubKey(Box::new(
         ta.zk_acc.create_change_pubkey_tx(None, true, false),
     )))
-    .await
 }
 
 // deposits to contract and waits for node to execute it.
@@ -260,10 +263,7 @@ async fn deposit_single(
 }
 
 // sends withdraw.
-async fn withdraw_single(
-    test_acc: &TestAccount,
-    amount: BigDecimal,
-) -> Result<TxHash, failure::Error> {
+fn withdraw_single(test_acc: &TestAccount, amount: BigDecimal) -> Result<TxHash, failure::Error> {
     let tx = FranklinTx::Withdraw(Box::new(test_acc.zk_acc.sign_withdraw(
         0, // ETH
         amount,
@@ -272,11 +272,11 @@ async fn withdraw_single(
         None,
         true,
     )));
-    send_tx(tx).await
+    send_tx(tx)
 }
 
 // sends transfer tx to a random receiver.
-async fn transfer_single(
+fn transfer_single(
     index_from: usize,
     test_accounts: &[TestAccount],
     amount: BigDecimal,
@@ -292,7 +292,7 @@ async fn transfer_single(
         None,
         true,
     )));
-    send_tx(tx).await
+    send_tx(tx)
 }
 
 #[derive(Serialize)]
@@ -315,7 +315,7 @@ impl SubmitTxMsg {
 }
 
 // sends tx to server json rpc endpoint.
-async fn send_tx(tx: FranklinTx) -> Result<TxHash, failure::Error> {
+fn send_tx(tx: FranklinTx) -> Result<TxHash, failure::Error> {
     let tx_hash = tx.hash();
     let msg = SubmitTxMsg::new(tx);
 
