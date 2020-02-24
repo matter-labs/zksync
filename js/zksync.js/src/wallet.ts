@@ -14,21 +14,47 @@ import {
     IERC20_INTERFACE,
     isTokenETH,
     SYNC_MAIN_CONTRACT_INTERFACE,
-    TokenSet
 } from "./utils";
 
 export class Wallet {
     public provider: Provider;
 
     private constructor(
-        public signer: Signer,
         public ethSigner: ethers.Signer,
-        public cachedAddress: Address
+        public cachedAddress: Address,
+        public signer?: Signer,
     ) {}
 
     connect(provider: Provider) {
         this.provider = provider;
         return this;
+    }
+
+    static async fromEthSigner(
+        ethWallet: ethers.Signer,
+        provider: Provider,
+        signer?: Signer
+    ): Promise<Wallet> {
+        const walletSigner = signer ? signer : await Signer.fromETHSignature(ethWallet);
+        const wallet = new Wallet(
+            ethWallet,
+            await ethWallet.getAddress(),
+            walletSigner,
+    );
+        wallet.connect(provider);
+        return wallet;
+    }
+
+    static async fromEthSignerNoKeys(
+        ethWallet: ethers.Signer,
+        provider: Provider,
+    ): Promise<Wallet> {
+        const wallet = new Wallet(
+            ethWallet,
+            await ethWallet.getAddress()
+        );
+        wallet.connect(provider);
+        return wallet;
     }
 
     async syncTransfer(transfer: {
@@ -38,6 +64,10 @@ export class Wallet {
         fee: utils.BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for sending zksync transactions.");
+        }
+
         const tokenId = await this.provider.tokenSet.resolveTokenId(
             transfer.token
         );
@@ -74,6 +104,10 @@ export class Wallet {
         fee: utils.BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for sending zksync transactions.");
+        }
+
         const withdrawAddress =
             withdraw.ethAddress == null ? this.address() : withdraw.ethAddress;
         const tokenId = await this.provider.tokenSet.resolveTokenId(
@@ -105,23 +139,10 @@ export class Wallet {
         );
     }
 
-    async close(nonce: Nonce = "committed"): Promise<Transaction> {
-        const numNonce = await this.getNonce(nonce);
-        const signedCloseTransaction = this.signer.signSyncCloseAccount({
-            nonce: numNonce
-        });
-
-        const transactionHash = await this.provider.submitTx(
-            signedCloseTransaction
-        );
-        return new Transaction(
-            signedCloseTransaction,
-            transactionHash,
-            this.provider
-        );
-    }
-
     async isCurrentPubkeySet(): Promise<boolean> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for current pubkey calculation.");
+        }
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const signerPubKeyHash = this.signer.pubKeyHash();
         return currentPubKeyHash === signerPubKeyHash;
@@ -131,6 +152,10 @@ export class Wallet {
         nonce: Nonce = "committed",
         onchainAuth = false
     ): Promise<Transaction> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for current pubkey calculation.");
+        }
+
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
 
@@ -160,6 +185,10 @@ export class Wallet {
     async authChangePubkey(
         nonce: Nonce = "committed"
     ): Promise<ContractTransaction> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for current pubkey calculation.");
+        }
+
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
 
@@ -204,21 +233,6 @@ export class Wallet {
         return this.cachedAddress;
     }
 
-    static async fromEthSigner(
-        ethWallet: ethers.Signer,
-        provider: Provider
-    ): Promise<Wallet> {
-        const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
-        const seed = Buffer.from(seedHex, "hex");
-        const signer = Signer.fromSeed(seed);
-        const wallet = new Wallet(
-            signer,
-            ethWallet,
-            await ethWallet.getAddress()
-        );
-        wallet.connect(provider);
-        return wallet;
-    }
 
     async getAccountState(): Promise<AccountState> {
         return this.provider.getState(this.address());

@@ -15,7 +15,7 @@
     "websocket-as-promised": "^0.10.1"
   },
   "peerDependencies": {
-    "ethers": "^4.0.43"
+    "ethers": "^4.0.45"
   },
   "devDependencies": {
     "@types/bn.js": "^4.11.5",
