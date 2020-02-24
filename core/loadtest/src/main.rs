@@ -181,16 +181,12 @@ async fn send_transactions_from_acc(
         deposit_single(test_acc, amount)
     }));
     let futs_withdraws = try_join_all((0..ctx.n_withdraws).map(|_i| {
-        async {
-            let amount = rand_amount(ctx.withdraw_from_amount, ctx.withdraw_to_amount);
-            withdraw_single(test_acc, amount)
-        }
+        let amount = rand_amount(ctx.withdraw_from_amount, ctx.withdraw_to_amount);
+        withdraw_single(test_acc, amount)
     }));
     let futs_transfers = try_join_all((0..ctx.n_transfers).map(|_i| {
-        async {
-            let amount = rand_amount(ctx.transfer_from_amount, ctx.transfer_to_amount);
-            transfer_single(index, test_accounts, amount)
-        }
+        let amount = rand_amount(ctx.transfer_from_amount, ctx.transfer_to_amount);
+        transfer_single(index, test_accounts, amount)
     }));
     let (deposit_ids, withdraw_hashes, transfer_hashes) =
         try_join!(futs_deposits, futs_withdraws, futs_transfers)?;
@@ -263,7 +259,10 @@ async fn deposit_single(
 }
 
 // sends withdraw.
-fn withdraw_single(test_acc: &TestAccount, amount: BigDecimal) -> Result<TxHash, failure::Error> {
+async fn withdraw_single(
+    test_acc: &TestAccount,
+    amount: BigDecimal,
+) -> Result<TxHash, failure::Error> {
     let tx = FranklinTx::Withdraw(Box::new(test_acc.zk_acc.sign_withdraw(
         0, // ETH
         amount,
@@ -276,7 +275,7 @@ fn withdraw_single(test_acc: &TestAccount, amount: BigDecimal) -> Result<TxHash,
 }
 
 // sends transfer tx to a random receiver.
-fn transfer_single(
+async fn transfer_single(
     index_from: usize,
     test_accounts: &[TestAccount],
     amount: BigDecimal,
