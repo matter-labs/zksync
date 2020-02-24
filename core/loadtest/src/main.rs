@@ -1,27 +1,28 @@
+// Built-in
+use std::fs::File;
+use std::io::prelude::*;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+use std::{env, thread};
+// External
 use bigdecimal::BigDecimal;
 use futures::executor::block_on;
 use futures::future::try_join_all;
 use futures::try_join;
 use jsonrpc_core::types::response::Output;
-use log::{info, trace};
-use models::config_options::ConfigurationOptions;
-use models::node::tx::FranklinTx;
-use models::node::tx::TxHash;
+use log::{debug, info, trace};
 use rand::Rng;
-use serde::Deserialize;
-use serde::Serialize;
-use std::env;
-use std::fs::File;
-use std::io::prelude::*;
-use std::sync::Arc;
-use std::sync::Mutex;
-use std::thread;
-use std::time::{Duration, Instant};
-use testkit::eth_account::EthereumAccount;
-use testkit::zksync_account::ZksyncAccount;
+use serde::{Deserialize, Serialize};
 use web3::transports::Http;
 use web3::types::U256;
 use web3::types::{H160, H256};
+// Workspace
+use models::config_options::ConfigurationOptions;
+use models::node::tx::FranklinTx;
+use models::node::tx::TxHash;
+use testkit::eth_account::EthereumAccount;
+use testkit::zksync_account::ZksyncAccount;
 
 #[derive(Deserialize, Debug)]
 struct AccountInfo {
@@ -85,11 +86,11 @@ fn main() {
 
     let config = ConfigurationOptions::from_env();
     let filepath = env::args().nth(1).expect("account.json path not given");
-    let test_spec = read_test_spec(filepath.clone());
+    let test_spec = read_test_spec(filepath);
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
     let test_accounts = Arc::new(construct_test_accounts(
         &test_spec.input_accounts,
-        transport.clone(),
+        transport,
         &config,
     ));
     info!("sending transactions");
@@ -169,8 +170,10 @@ async fn send_transactions_from_acc(
     sent_txs: &SentTransactions,
 ) -> Result<(), failure::Error> {
     let test_acc = &test_accounts[index];
+    let addr_hex = hex::encode(test_acc.eth_acc.address);
     update_eth_nonce(test_acc).await?;
     let op_id = deposit_single(test_acc, BigDecimal::from(ctx.deposit_initial)).await?;
+    info!("account {} made initial deposit", addr_hex);
     sent_txs.add_op_id(op_id);
     change_pubkey(test_acc).await?;
     let futs_deposits = try_join_all((0..ctx.n_deposits).map(|_i| {
@@ -187,6 +190,10 @@ async fn send_transactions_from_acc(
     }));
     let (deposit_ids, withdraw_hashes, transfer_hashes) =
         try_join!(futs_deposits, futs_withdraws, futs_transfers)?;
+    info!(
+        "simultaneous deposits, transfers and withdraws sent for account: {}",
+        addr_hex
+    );
     sent_txs.add_op_ids(deposit_ids);
     sent_txs.add_tx_hashes(withdraw_hashes);
     sent_txs.add_tx_hashes(transfer_hashes);
@@ -285,7 +292,6 @@ async fn transfer_single(
         None,
         true,
     )));
-    trace!("tranfer(valid: {}): {:?}", tx.check_correctness(), tx);
     send_tx(tx).await
 }
 
@@ -330,17 +336,20 @@ async fn send_tx(tx: FranklinTx) -> Result<TxHash, failure::Error> {
 async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration) {
     let start = Instant::now();
     let serial_ids = sent_txs.op_serial_ids.lock().unwrap();
+    let sleep_period = Duration::from_millis(500);
     for id in serial_ids.iter() {
         loop {
             let (executed, verified) = ethop_info(*id as u64)
                 .await
                 .expect("[wait_for_verify] call ethop_info");
             if executed && verified {
+                debug!("deposit (serial_id={}) is verified", *id);
                 break;
             }
             if start.elapsed() > timeout {
                 panic!("[wait_for_verify] timeout")
             }
+            thread::sleep(sleep_period);
         }
     }
     let tx_hashes = sent_txs.tx_hashes.lock().unwrap();
@@ -350,11 +359,13 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration) {
                 .await
                 .expect("[wait_for_verify] call tx_info");
             if verified {
+                debug!("{} is verified", hash.to_string());
                 break;
             }
             if start.elapsed() > timeout {
                 panic!("[wait_for_verify] timeout")
             }
+            thread::sleep(sleep_period);
         }
     }
 }
