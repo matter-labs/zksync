@@ -154,7 +154,7 @@ async function logETHBalance(
     await logSyncBalance(syncWallet2, depositToken);
     await logETHBalance(syncWallet2, depositToken);
 
-    const withdrawHandle = await syncWallet2.withdrawTo({
+    const withdrawHandle = await syncWallet2.withdrawFromSyncToEthereum({
         ethAddress: ethWallet2.address,
         token: depositToken,
         amount: ethers.utils.parseEther(withdrawAmount),

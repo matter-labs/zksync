@@ -97,8 +97,8 @@ export class Wallet {
         );
     }
 
-    async withdrawTo(withdraw: {
-        ethAddress?: string;
+    async withdrawFromSyncToEthereum(withdraw: {
+        ethAddress: string;
         token: TokenLike;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
@@ -108,8 +108,6 @@ export class Wallet {
             throw new Error("ZKSync signer is required for sending zksync transactions.");
         }
 
-        const withdrawAddress =
-            withdraw.ethAddress == null ? this.address() : withdraw.ethAddress;
         const tokenId = await this.provider.tokenSet.resolveTokenId(
             withdraw.token
         );
@@ -119,7 +117,7 @@ export class Wallet {
                 : await this.getNonce();
         const transactionData = {
             from: this.address(),
-            ethAddress: withdrawAddress,
+            ethAddress: withdraw.ethAddress,
             tokenId,
             amount: withdraw.amount,
             fee: withdraw.fee,

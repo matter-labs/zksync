@@ -1,6 +1,8 @@
 import { utils } from "ethers";
 
+// 0x-prefixed, hex encoded, ethereum account address
 export type Address = string;
+// sync:-prefixed, hex encoded, hash of the account public key
 export type PubKeyHash = string;
 
 // Symbol like "ETH" or "FAU" or token contract address(zero address is implied for "ETH").
@@ -17,6 +19,7 @@ export interface AccountState {
     id?: number;
     committed: {
         balances: {
+            // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: utils.BigNumberish;
         };
         nonce: number;
@@ -24,6 +27,7 @@ export interface AccountState {
     };
     verified: {
         balances: {
+            // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: utils.BigNumberish;
         };
         nonce: number;
@@ -89,6 +93,7 @@ export interface ContractAddress {
 }
 
 export interface Tokens {
+    // Token are indexed by their symbol (e.g. "ETH")
     [token: string]: {
         address: string;
         id: number;

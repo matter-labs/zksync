@@ -1,6 +1,6 @@
 import BN = require("bn.js");
 import { utils, constants } from "ethers";
-import { TokenAddress, TokenLike, Tokens } from "./types";
+import {TokenAddress, TokenLike, Tokens, TokenSymbol} from "./types";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -299,7 +299,7 @@ export class TokenSet {
         return this.resolveTokenObject(tokenLike).address;
     }
 
-    public resolveTokenSymbol(tokenLike: TokenLike): TokenAddress {
+    public resolveTokenSymbol(tokenLike: TokenLike): TokenSymbol {
         return this.resolveTokenObject(tokenLike).symbol;
     }
 }

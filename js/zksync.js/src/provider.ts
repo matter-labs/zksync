@@ -189,7 +189,7 @@ export class ETHProxy {
     }
 
     async resolveTokenId(token: TokenAddress): Promise<number> {
-        if (token == "ETH") {
+        if (token == "0x0000000000000000000000000000000000000000") {
             return 0;
         } else {
             const tokenId = await this.governanceContract.tokenIds(token);

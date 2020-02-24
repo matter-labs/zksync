@@ -103,22 +103,6 @@ export class Signer {
         };
     }
 
-    signSyncCloseAccount(close: { nonce: number }): CloseAccount {
-        const type = Buffer.from([4]);
-        const account = serializeAddress(this.pubKeyHash());
-        const nonce = serializeNonce(close.nonce);
-
-        const msg = Buffer.concat([type, account, nonce]);
-        const signature = signTransactionBytes(this.privateKey, msg);
-
-        return {
-            type: "Close",
-            account: this.pubKeyHash(),
-            nonce: close.nonce,
-            signature
-        };
-    }
-
     static fromPrivateKey(pk: BN): Signer {
         return new Signer(pk);
     }
