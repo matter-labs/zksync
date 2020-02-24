@@ -85,7 +85,7 @@ fn main() {
     env_logger::init();
 
     let config = ConfigurationOptions::from_env();
-    let filepath = env::args().nth(1).expect("account.json path not given");
+    let filepath = env::args().nth(1).expect("test spec file not given");
     let test_spec = read_test_spec(filepath);
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
     let test_accounts = Arc::new(construct_test_accounts(
@@ -337,13 +337,13 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration) {
     let start = Instant::now();
     let serial_ids = sent_txs.op_serial_ids.lock().unwrap();
     let sleep_period = Duration::from_millis(500);
-    for id in serial_ids.iter() {
+    for &id in serial_ids.iter() {
         loop {
-            let (executed, verified) = ethop_info(*id as u64)
+            let (executed, verified) = ethop_info(id as u64)
                 .await
                 .expect("[wait_for_verify] call ethop_info");
             if executed && verified {
-                debug!("deposit (serial_id={}) is verified", *id);
+                debug!("deposit (serial_id={}) is verified", id);
                 break;
             }
             if start.elapsed() > timeout {
@@ -445,7 +445,7 @@ async fn tx_info(tx_hash: TxHash) -> Result<bool, failure::Error> {
         .post("http://localhost:3030")
         .json(&msg)
         .send()
-        .expect("failed to send ethop_info");
+        .expect("failed to send tx_info");
     if res.status() != reqwest::StatusCode::OK {
         failure::bail!("non-ok response: {}", res.status());
     }

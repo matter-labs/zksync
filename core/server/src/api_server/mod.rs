@@ -6,7 +6,7 @@
 
 mod event_notify;
 mod rest;
-pub mod rpc_server;
+mod rpc_server;
 mod rpc_subscriptions;
 
 use crate::mempool::MempoolRequest;
