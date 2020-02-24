@@ -28,7 +28,7 @@ use circuit::witness::withdraw::calculate_withdraw_operations_from_witness;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
 use models::config_options::ThreadPanicNotify;
-use models::node::{apply_updates, Account, AccountId, AccountMap};
+use models::node::{apply_updates, AccountMap};
 use models::node::{Fr, FranklinOp};
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
@@ -246,16 +246,26 @@ impl ProverPoolMaintainer {
         Ok(())
     }
 
-    /// Iterates through the stored account state, invoking a provided visitor
-    /// function for each account.
+    /// Builds an `CircutAccountTree` based on the stored account state.
     ///
-    /// Does nothing if the account state is not initialized at the moment of invocation.
-    fn traverse_accounts_with<F: FnMut(AccountId, &Account)>(&self, mut visitor: F) {
+    /// This method does not update the account state itself and expects
+    /// it to be up to date.
+    fn build_account_tree(&self) -> CircuitAccountTree {
+        assert!(
+            self.account_state.is_some(),
+            "There is no state to build a circuit account tree"
+        );
+
+        let mut account_tree = CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+
         if let Some((_, ref state)) = self.account_state {
-            for (account_id, account) in state {
-                visitor(*account_id, account);
+            for (&account_id, account) in state {
+                let circuit_account = CircuitAccount::from(account.clone());
+                account_tree.insert(account_id, circuit_account);
             }
         }
+
+        account_tree
     }
 
     fn build_prover_data(
@@ -266,19 +276,9 @@ impl ProverPoolMaintainer {
         let block_number = commit_operation.block.block_number;
 
         info!("building prover data for block {}", &block_number);
+
         self.update_account_state(storage, block_number - 1)?;
-
-        let account_tree = {
-            let mut account_tree =
-                CircuitAccountTree::new(models::params::account_tree_depth() as u32);
-
-            self.traverse_accounts_with(|account_id, account| {
-                let circuit_account = CircuitAccount::from(account.clone());
-                account_tree.insert(account_id, circuit_account);
-            });
-
-            account_tree
-        };
+        let account_tree = self.build_account_tree();
 
         let mut witness_accum = WitnessBuilder::new(
             account_tree,
