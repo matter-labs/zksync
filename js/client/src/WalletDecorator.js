@@ -398,6 +398,12 @@ export class WalletDecorator {
         const address = options.address;
 
         try {
+            if (!await window.syncWallet.isCurrentPubkeySet()) {
+                yield info(`Unlocking account...`);
+                const setPk = await window.syncWallet.setCurrentPubkeyWithZksyncTx();
+                await setPk.awaitReceipt();
+            }
+
             yield info(`Sending transfer...`);
 
             const transferTransaction = await window.syncWallet.syncTransfer({
@@ -427,9 +433,15 @@ export class WalletDecorator {
         const fee     = utils.bigNumberify(options.fee);
 
         try {
+            if (!await window.syncWallet.isCurrentPubkeySet()) {
+                yield info(`Unlocking account...`);
+                const setPk = await window.syncWallet.setCurrentPubkeyWithZksyncTx();
+                await setPk.awaitReceipt();
+            }
+
             yield info(`Sending withdraw...`);
 
-            const withdrawTransaction = await window.syncWallet.withdrawTo({
+            const withdrawTransaction = await window.syncWallet.withdrawFromSyncToEthereum({
                 ethAddress: await window.ethSigner.getAddress(),
                 token,
                 amount,

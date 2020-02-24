@@ -66,11 +66,6 @@ export default {
                 if (this.$parent.$router.currentRoute.path !== '/main') {
                     this.$parent.$router.push('/main');
                 }
-
-                if (!await syncWallet.isCurrentPubkeySet()) {
-                    const setPk = await syncWallet.setCurrentPubkeyWithZksyncTx();
-                    await setPk.awaitReceipt();
-                }
             } catch (e) {
                 this.$refs.alertLogin.display({
                     message: `Login failed with ${e.message}`,

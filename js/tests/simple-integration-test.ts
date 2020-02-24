@@ -77,7 +77,7 @@ async function testWithdraw(contract: Contract, ethProxy: ETHProxy, withdrawTo: 
     const operatorBeforeWithdraw = await getOperatorBalance(token);
     const onchainBalanceBeforeWithdraw = await withdrawTo.getEthereumBalance(token);
     const startTime = new Date().getTime();
-    const withdrawHandle = await syncWallet.withdrawTo({
+    const withdrawHandle = await syncWallet.withdrawFromSyncToEthereum({
         ethAddress: withdrawTo.address(),
         token,
         amount,
