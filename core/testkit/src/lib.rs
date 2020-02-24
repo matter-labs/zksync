@@ -62,7 +62,8 @@ impl<T: Transport> AccountSet<T> {
             block_on(from.deposit_erc20(address, amount, &to.address))
                 .expect("erc20 deposit should not fail")
         } else {
-            block_on(from.deposit_eth(amount, &to.address, None)).expect("eth deposit should not fail")
+            block_on(from.deposit_eth(amount, &to.address, None))
+                .expect("eth deposit should not fail")
         }
     }
 

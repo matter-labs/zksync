@@ -60,8 +60,7 @@ impl ZksyncAccount {
 
     pub fn nonce(&self) -> Nonce {
         let n = self.nonce.lock().unwrap();
-        let v = *n;
-        return v;
+        *n
     }
 
     pub fn sign_transfer(

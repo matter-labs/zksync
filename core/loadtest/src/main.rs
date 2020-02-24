@@ -113,12 +113,12 @@ fn read_test_spec(filepath: String) -> TestSpec {
 
 // parses and builds new accounts.
 fn construct_test_accounts(
-    input_accs: &Vec<AccountInfo>,
+    input_accs: &[AccountInfo],
     transport: Http,
     config: &ConfigurationOptions,
 ) -> Vec<TestAccount> {
     input_accs
-        .into_iter()
+        .iter()
         .map(|acc_info| {
             let addr: H160 = acc_info.address.parse().expect("failed to parse address");
             let pk: H256 = acc_info
@@ -147,7 +147,7 @@ fn construct_test_accounts(
 }
 
 // sends confugured deposits, withdraws and transfers from each account concurrently.
-async fn send_transactions(test_accounts: &Vec<TestAccount>, ctx: &TestSpec) -> SentTransactions {
+async fn send_transactions(test_accounts: &[TestAccount], ctx: &TestSpec) -> SentTransactions {
     let sent_txs = SentTransactions::new();
     try_join_all(
         test_accounts
@@ -164,7 +164,7 @@ async fn send_transactions(test_accounts: &Vec<TestAccount>, ctx: &TestSpec) -> 
 // sends configured deposits, withdraws and transfer from a single account concurrently.
 async fn send_transactions_from_acc(
     index: usize,
-    test_accounts: &Vec<TestAccount>,
+    test_accounts: &[TestAccount],
     ctx: &TestSpec,
     sent_txs: &SentTransactions,
 ) -> Result<(), failure::Error> {
@@ -195,7 +195,7 @@ async fn send_transactions_from_acc(
 
 // generates random amount for transaction within given range [from, to).
 fn rand_amount(from: u64, to: u64) -> BigDecimal {
-    let smallest_rand_step = 100000000;
+    let smallest_rand_step = 100_000_000;
     let amount = rand::thread_rng().gen_range(from, to);
     BigDecimal::from(amount - amount % smallest_rand_step)
 }
@@ -259,7 +259,7 @@ async fn withdraw_single(
 ) -> Result<TxHash, failure::Error> {
     let tx = FranklinTx::Withdraw(Box::new(test_acc.zk_acc.sign_withdraw(
         0, // ETH
-        BigDecimal::from(amount),
+        amount,
         BigDecimal::from(0),
         &test_acc.eth_acc.address,
         None,
@@ -271,7 +271,7 @@ async fn withdraw_single(
 // sends transfer tx to a random receiver.
 async fn transfer_single(
     index_from: usize,
-    test_accounts: &Vec<TestAccount>,
+    test_accounts: &[TestAccount],
     amount: BigDecimal,
 ) -> Result<TxHash, failure::Error> {
     let from = &test_accounts[index_from];
