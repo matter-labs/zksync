@@ -1,0 +1,55 @@
+{
+    "deposit_initial": 1000000000000000000,
+    "n_deposits": 5,
+    "deposit_from_amount": 100000000000000000,
+    "deposit_to_amount": 1000000000000000000,
+    "n_transfers": 10,
+    "transfer_from_amount": 10000000000000000,
+    "transfer_to_amount": 100000000000000000,
+    "n_withdraws": 5,
+    "withdraw_from_amount": 10000000000000000,
+    "withdraw_to_amount": 200000000000000000,
+    "verify_timeout_sec": 1000,
+    "input_accounts": [
+        {
+            "address": "1eb592c49ced0e0663b9702d8d676153e27eab2d",
+            "private_key": "a3c4158f636b313a5e679e8f5281450b6b5fc1011a91f6f21f1798a17eda6012"
+        },
+        {
+            "address": "e907f6d135425c53bf3522fa919f732ea4064f1f",
+            "private_key": "9fb7f9d42b551398cf156f19e22077d4f605e83072772e6fa90c861a67f2aa7c"
+        },
+        {
+            "address": "85526534c356ef82a294602850d3fd4a31dc04e8",
+            "private_key": "3d5b44dd1601faa8d8cc31a35114e705a57fdb973473271769b01663c0c074da"
+        },
+        {
+            "address": "1efbe5e30d13629e579209ad4a788cb47123679c",
+            "private_key": "ed7009c8fbaa1af9401653c9df2809470f2d76ed0a946b563fd57f9e033f6c28"
+        },
+        {
+            "address": "63ae349aef325201437497252c9a5f6cdd6488e8",
+            "private_key": "d1c7fbaddd9e084999e40d247612a0b6bd7ef52b251a4eeffcfde16b5c6215a4"
+        },
+        {
+            "address": "29b75646f44e2648664e7046776d047a6ce30802",
+            "private_key": "66517bff7487e6d6478b9caaeac55241033a41ad5ef6d0ff3d79056b62e49a94"
+        },
+        {
+            "address": "a254e81e7ce714e1fc67ec00d1ced27280e95a63",
+            "private_key": "e7ce180e4836baa8af18ee8f36cf3019e1df82c56be6b3a5ec6797f1fa54c256"
+        },
+        {
+            "address": "97968ebb9db35325f77ba48ada600e1a54014c68",
+            "private_key": "4f07b21a4bf89ca67cc86c2dc438111443e52cc61b9a19f852e065f98ce4134c"
+        },
+        {
+            "address": "8e8d86044a1aff19a2d9418bc837a0c05a4ee420",
+            "private_key": "11c5b4cfcd17ad744d6f240b4fdfb25d0e204ca9cd45abd9425d03a1fa3281b7"
+        },
+        {
+            "address": "605097ad245c959f16bda1cc59e0f3555c45441d",
+            "private_key": "3c2306503c1b90d07d806712b6a616e734337079b23174f02f2b75687f596f82"
+        }
+    ]
+}

@@ -29,6 +29,22 @@ struct AccountInfo {
     pub private_key: String,
 }
 
+#[derive(Deserialize)]
+struct TestSpec {
+    deposit_initial: u64,
+    n_deposits: i32,
+    deposit_from_amount: u64,
+    deposit_to_amount: u64,
+    n_transfers: i32,
+    transfer_from_amount: u64,
+    transfer_to_amount: u64,
+    n_withdraws: i32,
+    withdraw_from_amount: u64,
+    withdraw_to_amount: u64,
+    verify_timeout_sec: u64,
+    input_accounts: Vec<AccountInfo>,
+}
+
 struct TestAccount {
     zk_acc: ZksyncAccount,
     eth_acc: EthereumAccount<Http>,
@@ -64,58 +80,30 @@ impl SentTransactions {
     }
 }
 
-struct TestContext {
-    deposit_initial: u64,
-    n_deposits: i32,
-    deposit_from_amount: u64,
-    deposit_to_amount: u64,
-    n_transfers: i32,
-    transfer_from_amount: u64,
-    transfer_to_amount: u64,
-    n_withdraws: i32,
-    withdraw_from_amount: u64,
-    withdraw_to_amount: u64,
-}
-
 fn main() {
     env_logger::init();
 
     let config = ConfigurationOptions::from_env();
     let filepath = env::args().nth(1).expect("account.json path not given");
-    let input_accs = read_accounts(filepath.clone());
+    let test_spec = read_test_spec(filepath.clone());
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
     let test_accounts = Arc::new(construct_test_accounts(
-        input_accs,
+        &test_spec.input_accounts,
         transport.clone(),
         &config,
     ));
     info!("sending transactions");
-    let sent_txs = block_on(send_transactions(
-        &test_accounts,
-        TestContext {
-            deposit_initial: eth_to_wei(1.0),
-            n_deposits: 2,
-            deposit_from_amount: eth_to_wei(0.1),
-            deposit_to_amount: eth_to_wei(1.0),
-            n_transfers: 5,
-            transfer_from_amount: eth_to_wei(0.01),
-            transfer_to_amount: eth_to_wei(0.1),
-            n_withdraws: 2,
-            withdraw_from_amount: eth_to_wei(0.01),
-            withdraw_to_amount: eth_to_wei(0.2),
-        },
-    ));
+    let sent_txs = block_on(send_transactions(&test_accounts, &test_spec));
     info!("waiting for all transactions to be verified");
-    block_on(wait_for_verify(sent_txs, Duration::from_secs(1000)));
+    block_on(wait_for_verify(
+        sent_txs,
+        Duration::from_secs(test_spec.verify_timeout_sec),
+    ));
     info!("loadtest completed.");
 }
 
-fn eth_to_wei(v: f64) -> u64 {
-    (v * 1000000000000000000f64) as u64
-}
-
 // reads accounts from a file.
-fn read_accounts(filepath: String) -> Vec<AccountInfo> {
+fn read_test_spec(filepath: String) -> TestSpec {
     let mut f = File::open(filepath).expect("no input file");
     let mut buffer = String::new();
     f.read_to_string(&mut buffer)
@@ -125,7 +113,7 @@ fn read_accounts(filepath: String) -> Vec<AccountInfo> {
 
 // parses and builds new accounts.
 fn construct_test_accounts(
-    input_accs: Vec<AccountInfo>,
+    input_accs: &Vec<AccountInfo>,
     transport: Http,
     config: &ConfigurationOptions,
 ) -> Vec<TestAccount> {
@@ -159,7 +147,7 @@ fn construct_test_accounts(
 }
 
 // sends confugured deposits, withdraws and transfers from each account concurrently.
-async fn send_transactions(test_accounts: &Vec<TestAccount>, ctx: TestContext) -> SentTransactions {
+async fn send_transactions(test_accounts: &Vec<TestAccount>, ctx: &TestSpec) -> SentTransactions {
     let sent_txs = SentTransactions::new();
     try_join_all(
         test_accounts
@@ -177,7 +165,7 @@ async fn send_transactions(test_accounts: &Vec<TestAccount>, ctx: TestContext) -
 async fn send_transactions_from_acc(
     index: usize,
     test_accounts: &Vec<TestAccount>,
-    ctx: &TestContext,
+    ctx: &TestSpec,
     sent_txs: &SentTransactions,
 ) -> Result<(), failure::Error> {
     let test_acc = &test_accounts[index];
