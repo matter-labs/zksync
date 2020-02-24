@@ -86,7 +86,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync circuit-tests
   depends_on:
-  - prepare-ci-env
+  - run-genesis
 - name: rust-tests-prover
   image: matterlabs/ci
   commands:
@@ -95,7 +95,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync prover-tests
   depends_on:
-  - prepare-ci-env
+  - run-genesis
 - name: rust-tests-db
   image: matterlabs/ci
   commands:
@@ -113,7 +113,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo test
   depends_on:
-  - prepare-ci-env
+  - run-genesis
 - name: rust-checks
   image: matterlabs/ci
   commands:
@@ -123,7 +123,7 @@ steps:
   - cargo fmt -- --check
   - f cargo clippy --tests --benches -- -D warnings
   depends_on:
-  - prepare-ci-env
+  - run-genesis
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
