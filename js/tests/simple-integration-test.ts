@@ -7,14 +7,13 @@ import {
 const franklin_abi = require('../../contracts/build/Franklin.json');
 import { ethers, utils, Contract } from "ethers";
 import {parseEther} from "ethers/utils";
-import {TokenSet} from "zksync/build/utils";
 
 
 let syncProvider: Provider;
 
 async function getOperatorBalance(token: types.TokenLike, type: "committed" | "verified" = "committed") {
     const accountState = await syncProvider.getState(process.env.OPERATOR_FRANKLIN_ADDRESS);
-    const tokenSet = new TokenSet(await syncProvider.getTokens());
+    const tokenSet = syncProvider.tokenSet;
     const tokenSymbol = tokenSet.resolveTokenSymbol(token);
     let balance;
     if (type == "committed") {

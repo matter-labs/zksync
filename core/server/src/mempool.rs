@@ -28,9 +28,6 @@ use storage::ConnectionPool;
 use tokio::runtime::Runtime;
 use web3::types::Address;
 
-// TODO: temporary limit
-const MAX_NUMBER_OF_WITHDRAWS: usize = 4;
-
 #[derive(Debug, Serialize, Deserialize, Fail)]
 pub enum TxAddError {
     #[fail(display = "Tx nonce is too low.")]
@@ -251,20 +248,10 @@ impl Mempool {
     }
 
     fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<FranklinTx>) {
-        let mut withdrawals = 0;
         let mut txs_for_commit = Vec::new();
         let mut txs_for_reinsert = VecDeque::new();
 
         while let Some(tx) = self.mempool_state.ready_txs.pop_front() {
-            if let FranklinTx::Withdraw(_) = &tx {
-                if withdrawals >= MAX_NUMBER_OF_WITHDRAWS {
-                    txs_for_reinsert.push_back(tx);
-                    continue;
-                } else {
-                    withdrawals += 1;
-                }
-            }
-
             let chunks_for_tx = self.mempool_state.chunks_for_tx(&tx);
             if chunks_left >= chunks_for_tx {
                 txs_for_commit.push(tx);

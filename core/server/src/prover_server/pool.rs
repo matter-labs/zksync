@@ -62,7 +62,7 @@ impl ProversDataPool {
     }
 
     fn all_prepared(&self) -> bool {
-        self.last_loaded == self.last_prepared
+        self.operations.is_empty()
     }
 
     fn store_to_prove(&mut self, op: models::Operation) {
@@ -72,19 +72,13 @@ impl ProversDataPool {
     }
 
     fn take_next_to_prove(&mut self) -> Result<models::Operation, String> {
-        if self.last_prepared == 0 {
-            // Pool restart or first ever take.
-            // Handling restart case by setting proper value for `last_prepared`.
-            let mut first_from_loaded = 0;
-            for key in self.operations.keys() {
-                if first_from_loaded == 0 || *key < first_from_loaded {
-                    first_from_loaded = *key;
-                }
+        let mut first_from_loaded = 0;
+        for key in self.operations.keys() {
+            if first_from_loaded == 0 || *key < first_from_loaded {
+                first_from_loaded = *key;
             }
-            self.last_prepared = first_from_loaded - 1
         }
-        let next = self.last_prepared + 1;
-        match self.operations.remove(&next) {
+        match self.operations.remove(&first_from_loaded) {
             Some(v) => Ok(v),
             None => Err("data is inconsistent".to_owned()),
         }
@@ -101,11 +95,8 @@ pub fn maintain(
         if has_capacity(&data) {
             take_next_commits(&conn_pool, &data).expect("failed to get next commit operations");
         }
-        if all_prepared(&data) {
-            thread::sleep(rounds_interval);
-        } else {
-            prepare_next(&conn_pool, &data).expect("failed to prepare prover data");
-        }
+        prepare_next(&conn_pool, &data).expect("failed to prepare prover data");
+        thread::sleep(rounds_interval);
     }
 }
 
@@ -136,17 +127,15 @@ fn take_next_commits(
     Ok(())
 }
 
-fn all_prepared(data: &Arc<RwLock<ProversDataPool>>) -> bool {
-    let d = data.read().expect("failed to acquire a lock");
-    d.all_prepared()
-}
-
 fn prepare_next(
     conn_pool: &storage::ConnectionPool,
     data: &Arc<RwLock<ProversDataPool>>,
 ) -> Result<(), String> {
     let op = {
         let mut d = data.write().expect("failed to acquire a lock");
+        if d.all_prepared() {
+            return Ok(());
+        }
         d.take_next_to_prove()?
     };
     let storage = conn_pool.access_storage().expect("failed to connect to db");

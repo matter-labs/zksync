@@ -78,7 +78,43 @@ steps:
   depends_on:
   - prepare-ci-env
   - yarn
-- name: rust-checks-and-tests
+- name: rust-tests-circuit
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync circuit-tests
+  depends_on:
+  - prepare-ci-env
+- name: rust-tests-prover
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync prover-tests
+  depends_on:
+  - prepare-ci-env
+- name: rust-tests-db
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync db-test
+  depends_on:
+  - run-genesis
+- name: rust-tests-unit
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - f cargo test
+  depends_on:
+  - prepare-ci-env
+- name: rust-checks
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
@@ -86,12 +122,8 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - cargo fmt -- --check
   - f cargo clippy --tests --benches -- -D warnings
-  - f cargo test
-  - zksync circuit-tests
-  - zksync prover-tests
-  - zksync db-test
   depends_on:
-  - run-genesis
+  - prepare-ci-env
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
@@ -127,7 +159,57 @@ steps:
       - ./keys
   depends_on:
      - redeploy-and-integration-testkit
-     - rust-checks-and-tests
+     - rust-tests-circuit
+     - rust-tests-prover
+     - rust-tests-db
+     - rust-tests-unit
+     - rust-checks
+- name: preparations-for-integration-simple
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync db-setup
+  - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
+  - zksync build-contracts
+  - zksync db-reset
+  - zksync genesis
+  - zksync redeploy
+  - f cargo build --release --bin server
+  - f cargo build --release --bin dummy_prover
+  depends_on:
+  - rebuild-cache
+- name: start-server-detached
+  image: matterlabs/ci
+  detach: true
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync server
+  depends_on:
+  - preparations-for-integration-simple
+- name: start-prover-detached
+  image: matterlabs/ci
+  detach: true
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync dummy-prover
+  depends_on:
+  - preparations-for-integration-simple
+- name: integration-simple
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync integration-simple
+  depends_on:
+  - start-server-detached
+  - start-prover-detached
 ---
 # This pipeline publishes images and updates stage
 kind: pipeline
