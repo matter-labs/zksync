@@ -4,12 +4,16 @@ import "./Events.sol";
 import "./Ownable.sol";
 
 
-/// @title WaitUpgradeMode Contract
+/// @title UpgradeMode Contract
 /// @author Matter Labs
-contract WaitUpgradeMode is UpgradeModeEvents, Ownable {
+contract UpgradeMode is UpgradeModeEvents, Ownable {
+
+    /// @notice Maximal upgrade time (in seconds)
+    /// @dev After this period from the start of the upgrade anyone can cancel it forcibly
+    uint256 constant MAX_UPGRADE_PERIOD = 60 * 60 * 24 * 14; /// 14 days
 
     /// @notice Waiting period to activate closed status mode (in seconds)
-    uint256 constant WAIT_UPGRADE_MODE_PERIOD = 60 * 60 * 24 * 7 * 2; /// two weeks
+    uint256 constant WAIT_UPGRADE_MODE_PERIOD = 60 * 60 * 24 * 10; /// 10 days
 
     /// @notice Version of upgradeable field
     uint64 public version;
@@ -77,18 +81,37 @@ contract WaitUpgradeMode is UpgradeModeEvents, Ownable {
         return closedStatusActive;
     }
 
+    /// @notice Force cancellation
+    function forceCancel() external {
+        requireMaster(msg.sender);
+
+        require(
+            waitUpgradeModeActive,
+            "ucf11"
+        ); // ucf11 - unable to cancel not active mode
+
+        require(
+            now >= activationTime + MAX_UPGRADE_PERIOD,
+            "ucf12"
+        ); // ucf12 - unable to force cancel upgrade until MAX_UPGRADE_PERIOD passes
+
+        waitUpgradeModeActive = false;
+        closedStatusActive = false;
+        activationTime = 0;
+        emit UpgradeForciblyCanceled(version);
+    }
+
     /// @notice Finishes upgrade
     function finish() external {
         requireMaster(msg.sender);
         require(
-            closedStatusActive,
+            isClosedStatusActive(),
             "umf11"
         ); // umf11 - unable to finish upgrade without closed status active
 
         waitUpgradeModeActive = false;
         closedStatusActive = false;
         activationTime = 0;
-
         emit UpgradeCompleted(version);
         version++;
     }

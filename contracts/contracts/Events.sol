@@ -72,6 +72,11 @@ contract UpgradeModeEvents {
         uint64 version
     );
 
+    /// @notice Upgrade mode force cancellation event
+    event UpgradeForciblyCanceled(
+        uint64 version
+    );
+
     /// @notice Upgrade mode complete event
     event UpgradeCompleted(
         uint64 version

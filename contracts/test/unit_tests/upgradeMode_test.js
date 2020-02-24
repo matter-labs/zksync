@@ -5,12 +5,12 @@ const { wallet1, wallet2, deployTestContract, getCallRevertReason, SKIP_TEST } =
 const { performance } = require('perf_hooks');
 
 
-describe("WaitUpgradeMode unit test", function () {
+describe("UpgradeMode unit test", function () {
     this.timeout(50000);
 
     let testContract
     before(async () => {
-        testContract = await deployContract(wallet1, require('../../build/WaitUpgradeModeTest'), [], {
+        testContract = await deployContract(wallet1, require('../../build/UpgradeModeTest'), [], {
             gasLimit: 6000000,
         })
     });
@@ -20,6 +20,7 @@ describe("WaitUpgradeMode unit test", function () {
         expect(await getCallRevertReason( () => testContract_with_wallet2_signer.activate() )).equal("oro11")
         expect(await getCallRevertReason( () => testContract_with_wallet2_signer.cancel() )).equal("oro11")
         expect(await getCallRevertReason( () => testContract_with_wallet2_signer.isClosedStatusActive() )).equal("VM did not revert")
+        expect(await getCallRevertReason( () => testContract_with_wallet2_signer.forceCancel() )).equal("oro11")
         expect(await getCallRevertReason( () => testContract_with_wallet2_signer.finish() )).equal("oro11")
     });
 
@@ -99,6 +100,47 @@ describe("WaitUpgradeMode unit test", function () {
             await expect(testContract.cancel())
                 .to.emit(testContract, 'UpgradeCanceled')
                 .withArgs(1);
+        });
+    }
+
+    if (SKIP_TEST) {
+        it.skip("checking that force cancellation works correctly", async () => {});
+    }
+    else {
+        it("checking that force cancellation works correctly", async () => {
+            let start_time = performance.now();
+
+            // activate
+            await expect(testContract.activate())
+                .to.emit(testContract, 'UpgradeModeActivated')
+                .withArgs(1);
+
+            let activated_time = performance.now();
+
+            // wait and force cancel
+            let all_time_in_sec = parseInt(await testContract.get_MAX_UPGRADE_PERIOD());
+            for (let step = 1; step <= 5; step++) {
+                if (step != 5) {
+                    while ((performance.now() - start_time) < Math.round(all_time_in_sec * 1000.0 * step / 10.0 + 10)) {
+                        // wait
+                    }
+                } else {
+                    while ((performance.now() - activated_time) < all_time_in_sec * 1000 + 10) {
+                        // wait
+                    }
+                }
+
+                if (step != 5) {
+                    expect(await getCallRevertReason( () => testContract.forceCancel() )).equal("ucf12")
+                } else {
+                    await expect(testContract.forceCancel())
+                        .to.emit(testContract, 'UpgradeForciblyCanceled')
+                        .withArgs(1);
+                    expect(await testContract.waitUpgradeModeActive()).to.equal(false)
+                }
+            }
+
+            expect(await getCallRevertReason( () => testContract.forceCancel() )).equal("ucf11")
         });
     }
 
