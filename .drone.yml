@@ -86,7 +86,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync circuit-tests
   depends_on:
-  - prepare-ci-env
+  - run-genesis
 - name: rust-tests-prover
   image: matterlabs/ci
   commands:
@@ -95,7 +95,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync prover-tests
   depends_on:
-  - prepare-ci-env
+  - run-genesis
 - name: rust-tests-db
   image: matterlabs/ci
   commands:
@@ -113,7 +113,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - f cargo test
   depends_on:
-  - prepare-ci-env
+  - run-genesis
 - name: rust-checks
   image: matterlabs/ci
   commands:
@@ -123,7 +123,7 @@ steps:
   - cargo fmt -- --check
   - f cargo clippy --tests --benches -- -D warnings
   depends_on:
-  - prepare-ci-env
+  - run-genesis
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
@@ -164,12 +164,48 @@ steps:
      - rust-tests-db
      - rust-tests-unit
      - rust-checks
+---
+kind: pipeline
+type: docker
+name: integration-simple
+clone:
+    depth: 10
+volumes:
+  - name: cache
+    host:
+      path: /drone-cache
+services:
+  - name: geth
+    image: matterlabs/geth:latest
+  - name: postgres
+    image: postgres:10.4
+trigger:
+  event:
+  - pull_request
+steps:
+- name: restore-cache
+  image: drillster/drone-volume-cache
+  volumes:
+  - name: cache
+    path: /cache
+  settings:
+    restore: true
+    mount:
+      - ./contracts/node_modules
+      - ./js/client/node_modules
+      - ./js/explorer/node_modules
+      - ./target/cargo
+      - ./keys
 - name: preparations-for-integration-simple
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - ci-prepare-env.sh
+  - zksync env ci
+  - zksync yarn
+  - zksync db-wait
   - zksync db-setup
   - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
   - zksync build-contracts
@@ -179,7 +215,7 @@ steps:
   - f cargo build --release --bin server
   - f cargo build --release --bin dummy_prover
   depends_on:
-  - rebuild-cache
+  - restore-cache
 - name: start-server-detached
   image: matterlabs/ci
   detach: true
