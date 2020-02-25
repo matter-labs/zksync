@@ -139,7 +139,7 @@ pub fn apply_transfer(
 ) -> TransferWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
-    println!("Initial root = {}", before_root);
+    debug!("Initial root = {}", before_root);
     let (audit_path_from_before, audit_balance_path_from_before) =
         get_audits(tree, transfer.from_account_address, transfer.token);
 
@@ -195,7 +195,7 @@ pub fn apply_transfer(
     );
 
     let intermediate_root = tree.root_hash();
-    println!("Intermediate root = {}", intermediate_root);
+    debug!("Intermediate root = {}", intermediate_root);
 
     let (audit_path_from_intermediate, audit_balance_path_from_intermediate) =
         get_audits(tree, transfer.from_account_address, transfer.token);

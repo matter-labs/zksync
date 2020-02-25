@@ -1,125 +1,65 @@
 // Built-in
 // External
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 // Workspace
 use circuit::account::AccountWitness;
 use circuit::operation::{
-    Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
+    OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
 use models::node::{Engine, Fr};
-use models::serialization::*;
+// Local
+use crate::serialization::*;
 
 /// ProverData is data prover needs to calculate proof of the given block.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ProverData {
-    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
+    #[serde(with = "FrSerde")]
     pub public_data_commitment: Fr,
-    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
+    #[serde(with = "FrSerde")]
     pub old_root: Fr,
-    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
+    #[serde(with = "FrSerde")]
     pub new_root: Fr,
-    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
+    #[serde(with = "FrSerde")]
     pub validator_address: Fr,
-    #[serde(
-        serialize_with = "vec_optional_fr_ser",
-        deserialize_with = "vec_optional_fr_de"
-    )]
+    #[serde(with = "VecOptionalFrSerde")]
     pub validator_balances: Vec<Option<Fr>>,
-    #[serde(
-        serialize_with = "vec_optional_fr_ser",
-        deserialize_with = "vec_optional_fr_de"
-    )]
+    #[serde(with = "VecOptionalFrSerde")]
     pub validator_audit_path: Vec<Option<Fr>>,
-    #[serde(
-        serialize_with = "vec_operations_ser",
-        deserialize_with = "vec_operations_de"
-    )]
+    #[serde(with = "VecOperationsSerde")]
     pub operations: Vec<circuit::operation::Operation<Engine>>,
     #[serde(with = "AccountWitnessDef")]
     pub validator_account: circuit::account::AccountWitness<Engine>,
 }
 
-pub fn vec_operations_ser<S: Serializer>(
-    operations: &[Operation<Engine>],
-    ser: S,
-) -> Result<S::Ok, S::Error> {
-    #[derive(Serialize)]
-    struct Wrapper(#[serde(with = "OperationDef")] Operation<Engine>);
-
-    let v = operations.iter().map(|a| Wrapper(a.clone())).collect();
-    Vec::serialize(&v, ser)
-}
-
-fn vec_operations_de<'de, D>(deserializer: D) -> Result<Vec<Operation<Engine>>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    #[derive(Deserialize)]
-    struct Wrapper(#[serde(with = "OperationDef")] Operation<Engine>);
-
-    let v = Vec::deserialize(deserializer)?;
-    Ok(v.into_iter().map(|Wrapper(a)| a).collect())
-}
-
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "circuit::account::AccountWitness::<Engine>")]
 struct AccountWitnessDef {
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub nonce: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub pub_key_hash: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub address: Option<Fr>,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "circuit::operation::Operation::<Engine>")]
 pub struct OperationDef {
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub new_root: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub tx_type: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub chunk: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub pubdata_chunk: Option<Fr>,
 
     pub signer_pub_key_packed: Vec<Option<bool>>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub first_sig_msg: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub second_sig_msg: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub third_sig_msg: Option<Fr>,
     pub signature_data: SignatureData,
     #[serde(with = "OperationArgumentsDef")]
@@ -133,60 +73,30 @@ pub struct OperationDef {
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "circuit::operation::OperationArguments::<Engine>")]
 pub struct OperationArgumentsDef {
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub a: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub b: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub amount_packed: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub full_amount: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub fee: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub new_pub_key_hash: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub eth_address: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub pub_nonce: Option<Fr>,
 }
 
 #[derive(Serialize, Deserialize)]
 #[serde(remote = "circuit::operation::OperationBranch::<Engine>")]
 pub struct OperationBranchDef {
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub address: Option<Fr>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub token: Option<Fr>,
     #[serde(with = "OperationBranchWitnessDef")]
     pub witness: OperationBranchWitness<Engine>,
@@ -197,19 +107,10 @@ pub struct OperationBranchDef {
 pub struct OperationBranchWitnessDef {
     #[serde(with = "AccountWitnessDef")]
     pub account_witness: AccountWitness<Engine>,
-    #[serde(
-        serialize_with = "vec_optional_fr_ser",
-        deserialize_with = "vec_optional_fr_de"
-    )]
+    #[serde(with = "VecOptionalFrSerde")]
     pub account_path: Vec<Option<Fr>>,
-    #[serde(
-        serialize_with = "optional_fr_ser",
-        deserialize_with = "optional_fr_de"
-    )]
+    #[serde(with = "OptionalFrSerde")]
     pub balance_value: Option<Fr>,
-    #[serde(
-        serialize_with = "vec_optional_fr_ser",
-        deserialize_with = "vec_optional_fr_de"
-    )]
+    #[serde(with = "VecOptionalFrSerde")]
     pub balance_subtree_path: Vec<Option<Fr>>,
 }
