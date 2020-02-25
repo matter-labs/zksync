@@ -4,8 +4,6 @@ version = "0.1.0"
 authors = ["furkhat <vailodf@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 models = { path = "../models", version = "0.0.1" }
 testkit = { path = "../testkit", version = "0.1.0"}
@@ -18,12 +16,6 @@ web3 = "0.8.0"
 
 hex = "0.3.2"
 
-pairing = { package = "pairing_ce", version = "0.17.0" }
-
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
-
-ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
-
 futures = { version = "0.3", features = ["compat"] }
 
 failure = "0.1"
@@ -31,8 +23,6 @@ failure = "0.1"
 bigdecimal = { version = "0.1.0", features = ["serde"]}
 
 reqwest = "0.9.22"
-
-futures01 = { package = "futures", version = "0.1" }
 
 log = "0.4"
 

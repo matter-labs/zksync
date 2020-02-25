@@ -1,14 +1,14 @@
 {
-    "deposit_initial": 3000000000000000000,
+    "deposit_initial_gwei": 3000000000,
     "n_deposits": 5,
-    "deposit_from_amount": 1000000000000000,
-    "deposit_to_amount": 1000000000000000000,
+    "deposit_from_amount_gwei": 1000000,
+    "deposit_to_amount_gwei": 1000000000,
     "n_transfers": 10,
-    "transfer_from_amount": 100000000000000,
-    "transfer_to_amount": 10000000000000000,
+    "transfer_from_amount_gwei": 100000,
+    "transfer_to_amount_gwei": 10000000,
     "n_withdraws": 5,
-    "withdraw_from_amount": 10000000000000000,
-    "withdraw_to_amount": 200000000000000000,
+    "withdraw_from_amount_gwei": 10000000,
+    "withdraw_to_amount_gwei": 200000000,
     "verify_timeout_sec": 1000,
     "input_accounts": [
         {
