@@ -286,5 +286,5 @@ pub fn print_boolean_vec(bits: &[Boolean]) {
         bytes.push(b);
     }
 
-    println!("Hex: {}", hex::encode(&bytes));
+    debug!("Hex: {}", hex::encode(&bytes));
 }
