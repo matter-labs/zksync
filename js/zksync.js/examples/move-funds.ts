@@ -89,16 +89,16 @@ async function logETHBalance(
     await logETHBalance(syncWallet, depositToken);
     await logSyncBalance(syncWallet, depositToken, "committed");
 
-    if (!(await syncWallet.isCurrentPubkeySet())) {
+    if (!(await syncWallet.isSigningKeySet())) {
         console.log("==================================");
         console.log(
             "Unlocking account with onchain tx: ",
             syncWallet.address()
         );
         try {
-            await (await syncWallet.authChangePubkey()).wait();
+            await (await syncWallet.onchainAuthSigningKey()).wait();
         } catch (e) {}
-        const unlockAccountHandle = await syncWallet.setCurrentPubkeyWithZksyncTx(
+        const unlockAccountHandle = await syncWallet.setSigningKey(
             "committed",
             true
         );
@@ -131,13 +131,13 @@ async function logETHBalance(
     await logSyncBalance(syncWallet, depositToken, "committed");
     await logSyncBalance(syncWallet2, depositToken, "committed");
 
-    if (!(await syncWallet2.isCurrentPubkeySet())) {
+    if (!(await syncWallet2.isSigningKeySet())) {
         console.log("==================================");
         console.log(
             "Unlocking account with offchain tx: ",
             syncWallet2.address()
         );
-        const unlockAccount2Handle = await syncWallet2.setCurrentPubkeyWithZksyncTx();
+        const unlockAccount2Handle = await syncWallet2.setSigningKey();
         await unlockAccount2Handle.awaitReceipt();
         console.log("Account unlocked");
     } else {

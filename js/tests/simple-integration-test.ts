@@ -107,27 +107,27 @@ async function testWithdraw(contract: Contract, ethProxy: ETHProxy, withdrawTo: 
 }
 
 async function testChangePubkeyOnchain(syncWallet: Wallet) {
-    if (! await syncWallet.isCurrentPubkeySet()) {
+    if (! await syncWallet.isSigningKeySet()) {
         const startTime = new Date().getTime();
-        await (await syncWallet.authChangePubkey("committed")).wait();
-        const changePubkeyHandle = await syncWallet.setCurrentPubkeyWithZksyncTx("committed", true);
+        await (await syncWallet.onchainAuthSigningKey("committed")).wait();
+        const changePubkeyHandle = await syncWallet.setSigningKey("committed", true);
         console.log(`Change pubkey onchain posted: ${(new Date().getTime()) - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey onchain committed: ${(new Date().getTime()) - startTime} ms`);
-        if (! await syncWallet.isCurrentPubkeySet()) {
+        if (! await syncWallet.isSigningKeySet()) {
             throw new Error("Change pubkey onchain failed");
         }
     }
 }
 
 async function testChangePubkeyOffchain(syncWallet: Wallet) {
-    if (! await syncWallet.isCurrentPubkeySet()) {
+    if (! await syncWallet.isSigningKeySet()) {
         const startTime = new Date().getTime();
-        const changePubkeyHandle = await syncWallet.setCurrentPubkeyWithZksyncTx();
+        const changePubkeyHandle = await syncWallet.setSigningKey();
         console.log(`Change pubkey offchain posted: ${(new Date().getTime()) - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey offchain committed: ${(new Date().getTime()) - startTime} ms`);
-        if (! await syncWallet.isCurrentPubkeySet()) {
+        if (! await syncWallet.isSigningKeySet()) {
             throw new Error("Change pubkey offchain failed");
         }
     }

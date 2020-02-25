@@ -137,7 +137,7 @@ export class Wallet {
         );
     }
 
-    async isCurrentPubkeySet(): Promise<boolean> {
+    async isSigningKeySet(): Promise<boolean> {
         if (!this.signer) {
             throw new Error("ZKSync signer is required for current pubkey calculation.");
         }
@@ -146,7 +146,7 @@ export class Wallet {
         return currentPubKeyHash === signerPubKeyHash;
     }
 
-    async setCurrentPubkeyWithZksyncTx(
+    async setSigningKey(
         nonce: Nonce = "committed",
         onchainAuth = false
     ): Promise<Transaction> {
@@ -158,7 +158,7 @@ export class Wallet {
         const newPubKeyHash = this.signer.pubKeyHash();
 
         if (currentPubKeyHash == newPubKeyHash) {
-            throw new Error("Current PubKeyHash is the same as new");
+            throw new Error("Current signing key is set already");
         }
 
         const numNonce = await this.getNonce(nonce);
@@ -180,7 +180,7 @@ export class Wallet {
         return new Transaction(txData, transactionHash, this.provider);
     }
 
-    async authChangePubkey(
+    async onchainAuthSigningKey(
         nonce: Nonce = "committed"
     ): Promise<ContractTransaction> {
         if (!this.signer) {

@@ -93,7 +93,7 @@ export interface ContractAddress {
 }
 
 export interface Tokens {
-    // Token are indexed by their symbol (e.g. "ETH")
+    // Tokens are indexed by their symbol (e.g. "ETH")
     [token: string]: {
         address: string;
         id: number;
