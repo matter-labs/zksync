@@ -111,7 +111,7 @@ pub fn apply_deposit(
 ) -> DepositWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
-    println!("deposit Initial root = {}", before_root);
+    debug!("deposit Initial root = {}", before_root);
     let (audit_path_before, audit_balance_path_before) =
         get_audits(tree, deposit.account_address, deposit.token);
 
@@ -120,7 +120,7 @@ pub fn apply_deposit(
     let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
     let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
     let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
-    println!("amount_as_field_element is: {}", amount_as_field_element);
+    debug!("amount_as_field_element is: {}", amount_as_field_element);
     //calculate a and b
     let a = amount_as_field_element;
     let b = Fr::zero();
@@ -139,7 +139,7 @@ pub fn apply_deposit(
         );
 
     let after_root = tree.root_hash();
-    println!("deposit After root = {}", after_root);
+    debug!("deposit After root = {}", after_root);
     let (audit_path_after, audit_balance_path_after) =
         get_audits(tree, deposit.account_address, deposit.token);
 
@@ -194,7 +194,7 @@ pub fn calculate_deposit_operations_from_witness(
         .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
         .collect();
 
-    println!(
+    debug!(
         "acc_path{} \n bal_path {} ",
         deposit_witness.before.witness.account_path.len(),
         deposit_witness.before.witness.balance_subtree_path.len()
