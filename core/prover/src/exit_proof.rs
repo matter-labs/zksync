@@ -9,21 +9,14 @@ use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
 use models::node::{AccountMap, Address, Engine, TokenId};
 use models::prover_utils::{
-    create_random_full_baby_proof, encode_proof, read_circuit_proving_parameters,
-    verify_full_baby_proof,
+    create_random_full_baby_proof, encode_proof, get_exodus_proof_key_and_vk_path,
+    read_circuit_proving_parameters, verify_full_baby_proof,
 };
 use models::EncodedProof;
 use std::time::Instant;
 
 fn read_parameters() -> Result<Parameters<Engine>, failure::Error> {
-    let path = {
-        let mut key_file_path = std::path::PathBuf::new();
-        key_file_path.push(&std::env::var("KEY_DIR")?);
-        key_file_path.push(&format!("{}", models::params::block_size_chunks()));
-        key_file_path.push(&format!("{}", models::params::account_tree_depth()));
-        key_file_path.push(models::params::EXIT_KEY_FILENAME);
-        key_file_path
-    };
+    let path = get_exodus_proof_key_and_vk_path().0;
     Ok(read_circuit_proving_parameters(&path)?)
 }
 
