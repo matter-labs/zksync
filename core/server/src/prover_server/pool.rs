@@ -285,7 +285,7 @@ impl Maintainer {
 
                 self.account_state = Some((block, accounts));
             }
-        };
+        }
 
         Ok(())
     }

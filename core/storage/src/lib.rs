@@ -10,8 +10,7 @@
 
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate log;
+use log::*;
 
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
@@ -585,6 +584,9 @@ pub struct BlockDetails {
 
     #[sql_type = "Text"]
     pub new_state_root: String,
+
+    #[sql_type = "BigInt"]
+    pub block_size: i64,
 
     #[sql_type = "Nullable<Text>"]
     pub commit_tx_hash: Option<String>,
@@ -1630,7 +1632,8 @@ impl StorageProcessor {
             )
             select
             	blocks.number as block_number,
-            	blocks.root_hash as new_state_root,
+                blocks.root_hash as new_state_root,
+                blocks.block_size as block_size,
             	commited.tx_hash as commit_tx_hash,
             	verified.tx_hash as verify_tx_hash,
             	commited.created_at as committed_at,
@@ -2066,20 +2069,24 @@ impl StorageProcessor {
     ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
-            // TODO: jazzandrock rewrite in amore beautiful way
             let job: Option<BlockNumber> = diesel::sql_query(format!("
-                with maybe_blocks as (SELECT * FROM operations o
+                WITH unsized_blocks AS (
+                    SELECT * FROM operations o
                     WHERE action_type = 'COMMIT'
-                    AND block_number >
-                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
-                    AND NOT EXISTS 
-                        (SELECT * FROM proofs WHERE block_number = o.block_number)
-                    AND NOT EXISTS
-                        (SELECT * FROM prover_runs 
-                            WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds'))
-                select min(block_number) as integer_value from maybe_blocks
-                inner join blocks on maybe_blocks.block_number = blocks.number
-                inner join active_provers on blocks.block_size = active_provers.block_size and active_provers.worker = '{}'
+                        AND block_number >
+                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
+                        AND NOT EXISTS 
+                            (SELECT * FROM proofs WHERE block_number = o.block_number)
+                        AND NOT EXISTS
+                            (SELECT * FROM prover_runs 
+                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
+                )
+                SELECT min(block_number) AS integer_value FROM unsized_blocks
+                INNER JOIN blocks 
+                    ON unsized_blocks.block_number = blocks.number
+                INNER JOIN active_provers 
+                    ON blocks.block_size = active_provers.block_size 
+                    AND active_provers.worker = '{}'
                 ", prover_timeout.as_secs(), worker_))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);

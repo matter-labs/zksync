@@ -99,8 +99,7 @@ pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
 static mut TEST_BLOCK_SIZE_CHUNKS_VALUE: usize = 0;
-/// block_size_chunks.
-/// Value must be specified as environment variable at compile time under `BLOCK_SIZE_CHUNKS` key.
+/// block_size_chunks used for tests.
 pub fn test_block_size_chunks() -> usize {
     // use of mutable static is unsafe as it can be mutated by multiple threads.
     // using `unsafe` block as there's no risk of data race, the worst that can
@@ -144,7 +143,7 @@ pub fn block_chunk_sizes() -> &'static [usize] {
 }
 
 pub fn max_block_chunk_size() -> usize {
-    block_chunk_sizes().last().cloned().unwrap()
+    *block_chunk_sizes().last().unwrap()
 }
 
 /// Priority op should be executed for this number of eth blocks.

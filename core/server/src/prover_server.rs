@@ -27,6 +27,10 @@ impl AppState {
     }
 }
 
+fn status() -> actix_web::Result<String> {
+    Ok("alive".into())
+}
+
 fn register(
     data: web::Data<AppState>,
     r: web::Json<client::ProverReq>,
@@ -94,7 +98,7 @@ fn working_on(
     data: web::Data<AppState>,
     r: web::Json<client::WorkingOnReq>,
 ) -> actix_web::Result<()> {
-    trace!(
+    info!(
         "working on request for prover_run with id: {}",
         r.prover_run_id
     );
@@ -127,9 +131,12 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
         }
         Err(e) => {
             error!("failed to store received proof: {}", e);
-            Err(actix_web::error::ErrorInternalServerError(
-                "storage layer error",
-            ))
+            let message = if e.to_string().contains("duplicate key") {
+                "duplicate key"
+            } else {
+                "storage layer error"
+            };
+            Err(actix_web::error::ErrorInternalServerError(message))
         }
     }
 }
@@ -179,6 +186,7 @@ pub fn start_prover_server(
                         preparing_data_pool: data_pool.clone(),
                         prover_timeout,
                     })
+                    .route("/status", web::get().to(status))
                     .route("/register", web::post().to(register))
                     .route("/block_to_prove", web::get().to(block_to_prove))
                     .route("/working_on", web::post().to(working_on))
@@ -186,6 +194,9 @@ pub fn start_prover_server(
                     .route("/publish", web::post().to(publish))
                     .route("/stopped", web::post().to(stopped))
             })
+            .workers(4)
+            .keep_alive(300)
+            .client_timeout(0) // infinity
             .bind(&bind_to)
             .expect("failed to bind")
             .run()

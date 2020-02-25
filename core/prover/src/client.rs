@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
-use models::config_options::ConfigurationOptions;
+use models::config_options::ProverConfigOpts;
 use models::prover_utils::encode_proof;
 
 #[derive(Serialize, Deserialize)]
@@ -54,11 +54,11 @@ pub struct ApiClient {
 
 impl ApiClient {
     pub fn new(base_url: &str, worker: &str, is_terminating_bool: Option<Arc<AtomicBool>>) -> Self {
-        let config_opts = ConfigurationOptions::from_env();
+        let config_opts = ProverConfigOpts::from_env();
         if worker == "" {
             panic!("worker name cannot be empty")
         }
-        ApiClient {
+        Self {
             register_url: format!("{}/register", base_url),
             block_to_prove_url: format!("{}/block_to_prove", base_url),
             working_on_url: format!("{}/working_on", base_url),
@@ -84,16 +84,14 @@ impl ApiClient {
     ) -> Result<T, failure::Error> {
         let mut with_checking = || -> Result<T, backoff::Error<failure::Error>> {
             if self.is_terminating() {
-                op().map_err(backoff::Error::Permanent).map_err(|e| {
-                    error!("Error: {}", e);
-                    e
-                })
+                op().map_err(backoff::Error::Permanent)
             } else {
-                op().map_err(backoff::Error::Transient).map_err(|e| {
-                    error!("Error: {}", e);
-                    e
-                })
+                op().map_err(backoff::Error::Transient)
             }
+            .map_err(|e| {
+                error!("{}", e);
+                e
+            })
         };
 
         with_checking
@@ -156,6 +154,7 @@ impl ApiClient {
 impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let op = || -> Result<Option<(i64, i32)>, failure::Error> {
+            trace!("sending block_to_prove");
             let client = self.get_client()?;
             let mut res = client
                 .get(&self.block_to_prove_url)
@@ -181,6 +180,7 @@ impl crate::ApiClient for ApiClient {
 
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
         let op = || -> Result<(), failure::Error> {
+            trace!("sending working_on {}", job_id);
             let client = self.get_client()?;
             let res = client
                 .post(&self.working_on_url)
@@ -202,6 +202,7 @@ impl crate::ApiClient for ApiClient {
     fn prover_data(&self, block: i64) -> Result<ProverData, failure::Error> {
         let client = self.get_client()?;
         let op = || -> Result<ProverData, failure::Error> {
+            trace!("sending prover_data");
             let mut res = client
                 .get(&self.prover_data_url)
                 .json(&block)
@@ -224,10 +225,11 @@ impl crate::ApiClient for ApiClient {
         proof: groth16::Proof<models::node::Engine>,
     ) -> Result<(), failure::Error> {
         let op = || -> Result<(), failure::Error> {
+            trace!("Trying publish proof {}", block);
             let encoded = encode_proof(&proof);
 
             let client = self.get_client()?;
-            let res = client
+            let mut res = client
                 .post(&self.publish_url)
                 .json(&client::PublishReq {
                     block: block as u32,
@@ -236,11 +238,25 @@ impl crate::ApiClient for ApiClient {
                 .send()
                 .map_err(|e| format_err!("failed to send publish request: {}", e))?;
             if res.status() != reqwest::StatusCode::OK {
-                error!("publish request failed with status: {}", res.status());
-                Ok(())
-            } else {
-                Ok(())
+                match res.text() {
+                    Ok(message) => {
+                        if message == "duplicate key" {
+                            warn!("proof for block {} already exists", block);
+                        } else {
+                            bail!(
+                                "publish request failed with status: {} and message: {}",
+                                res.status(),
+                                message
+                            );
+                        }
+                    }
+                    Err(_) => {
+                        bail!("publish request failed with status: {}", res.status());
+                    }
+                };
             }
+
+            Ok(())
         };
 
         Ok(self.with_retries(&op)?)

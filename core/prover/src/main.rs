@@ -5,6 +5,7 @@ use std::sync::mpsc;
 use std::sync::Arc;
 use std::{env, thread, time};
 // External deps
+use clap::{App, Arg};
 use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use log::*;
 use signal_hook::iterator::Signals;
@@ -14,16 +15,25 @@ use prover::{client, read_circuit_params};
 use prover::{start, BabyProver};
 
 fn main() {
-    let args = std::env::args().collect::<Vec<String>>();
+    let cli = App::new("Prover")
+        .author("Matter Labs")
+        .arg(
+            Arg::with_name("block_size_chunks")
+                .help("Size of blocks this prover deals with.")
+                .required(true)
+                .index(1),
+        )
+        .arg(
+            Arg::with_name("worker_name")
+                .help("Name of the worker. Must be unique!")
+                .required(true)
+                .index(2),
+        )
+        .get_matches();
 
-    // TODO: jazzandrock read from env?
-    let block_size_chunks = {
-        let block_size_chunks = match args.get(1) {
-            Some(size) => size.clone(),
-            None => env::var("TEST_BLOCK_SIZE_CHUNKS").expect("TEST_BLOCK_SIZE_CHUNKS is missing"),
-        };
-        usize::from_str(&block_size_chunks).unwrap()
-    };
+    let block_size_chunks = usize::from_str(cli.value_of("block_size_chunks").unwrap())
+        .expect("invalid block_size_chunks");
+    let worker_name = cli.value_of("worker_name").unwrap();
 
     env_logger::init();
     const ABSENT_PROVER_ID: i32 = -1;
@@ -37,11 +47,6 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal))
         .expect("Error setting SIGQUIT handler");
 
-    // TODO: jazzandrock maybe create names from default name + block_size?
-    let worker_name = match args.get(2) {
-        Some(name) => name.clone(),
-        None => env::var("POD_NAME").expect("POD_NAME is missing"),
-    };
     info!("creating prover, worker name: {}", worker_name);
 
     // Create client

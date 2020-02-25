@@ -111,7 +111,7 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - f cargo test
+  - f cargo test --release
   depends_on:
   - run-genesis
 - name: rust-checks
