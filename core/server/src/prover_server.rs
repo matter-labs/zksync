@@ -154,12 +154,12 @@ pub fn start_prover_server(
             let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new()));
 
             // Start pool maintainer thread.
-            let pool_maintainer = pool::ProverPoolMaintainer::new(
+            let pool_maintainer = pool::Maintainer::new(
                 connection_pool.clone(),
                 Arc::clone(&data_pool),
                 rounds_interval,
             );
-            pool_maintainer.start_maintain_routine(panic_notify);
+            pool_maintainer.start(panic_notify);
 
             // Start HTTP server.
             HttpServer::new(move || {

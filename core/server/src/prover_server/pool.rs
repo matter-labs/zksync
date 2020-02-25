@@ -94,7 +94,7 @@ impl ProversDataPool {
     }
 }
 
-/// `ProverPoolMaintainer` is a helper structure that maintains the
+/// `Maintainer` is a helper structure that maintains the
 /// prover data pool.
 ///
 /// The essential part of this structure is `maintain` function
@@ -102,9 +102,9 @@ impl ProversDataPool {
 /// pool.
 ///
 /// `migrate` function is private and is invoked by the
-/// public `start_maintain_routine` function, which starts
+/// public `start` function, which starts
 /// the named thread dedicated for that routine only.
-pub struct ProverPoolMaintainer {
+pub struct Maintainer {
     /// Connection to the database.
     conn_pool: storage::ConnectionPool,
     /// Thread-safe reference to the data pool.
@@ -118,8 +118,8 @@ pub struct ProverPoolMaintainer {
     account_state: Option<(u32, AccountMap)>,
 }
 
-impl ProverPoolMaintainer {
-    /// Creates a new `ProverPoolMaintainer` object.
+impl Maintainer {
+    /// Creates a new `Maintainer` object.
     pub fn new(
         conn_pool: storage::ConnectionPool,
         data: Arc<RwLock<ProversDataPool>>,
@@ -134,7 +134,7 @@ impl ProverPoolMaintainer {
     }
 
     /// Starts the thread running `maintain` method.
-    pub fn start_maintain_routine(mut self, panic_notify: mpsc::Sender<bool>) {
+    pub fn start(mut self, panic_notify: mpsc::Sender<bool>) {
         thread::Builder::new()
             .name("prover_server_pool".to_string())
             .spawn(move || {
