@@ -27,15 +27,16 @@ use circuit::witness::withdraw::apply_withdraw_tx;
 use circuit::witness::withdraw::calculate_withdraw_operations_from_witness;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
-use models::node::{BlockNumber, Fr, FranklinOp};
-use models::Operation;
 use models::config_options::ThreadPanicNotify;
-use models::node::{apply_updates, AccountMap};
+use models::node::{apply_updates, AccountMap, BlockNumber, Fr, FranklinOp};
+use models::Operation;
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
 
+#[derive(Debug, Clone)]
 struct BlockSizedOperationsQueue {
     operations: VecDeque<Operation>,
+    last_loaded_block: BlockNumber,
     block_size: usize,
 }
 
@@ -43,18 +44,13 @@ impl BlockSizedOperationsQueue {
     fn new(block_size: usize) -> Self {
         Self {
             operations: VecDeque::new(),
+            last_loaded_block: 0,
             block_size,
         }
     }
 
-    fn last_loaded(&self) -> BlockNumber {
-        self.operations
-            .iter()
-            .map(|op| op.block.block_number)
-            .max()
-            .unwrap_or(0)
-    }
-
+    /// Fills the operations queue if the amount of non-processed operations
+    /// is less than `limit`.
     fn take_next_commits_if_needed(
         &mut self,
         conn_pool: &storage::ConnectionPool,
@@ -63,11 +59,16 @@ impl BlockSizedOperationsQueue {
         if self.operations.len() < limit as usize {
             let storage = conn_pool.access_storage().expect("failed to connect to db");
             let ops = storage
-                .load_unverified_commits_after_block(self.block_size, self.last_loaded(), limit)
+                .load_unverified_commits_after_block(self.block_size, self.last_loaded_block, limit)
                 .map_err(|e| format!("failed to read commit operations: {}", e))?;
 
             self.operations.extend(ops);
-            println!(
+
+            if let Some(op) = self.operations.back() {
+                self.last_loaded_block = op.block.block_number;
+            }
+
+            trace!(
                 "Operations size {}: {:?}",
                 self.block_size,
                 self.operations
@@ -80,18 +81,10 @@ impl BlockSizedOperationsQueue {
         Ok(())
     }
 
-    fn prepare_next_if_any(
-        &mut self,
-        conn_pool: &storage::ConnectionPool,
-    ) -> Result<Option<(BlockNumber, ProverData)>, String> {
-        match self.operations.pop_front() {
-            Some(op) => {
-                let storage = conn_pool.access_storage().expect("failed to connect to db");
-                let pd = build_prover_data(&storage, &op)?;
-                Ok(Some((op.block.block_number, pd)))
-            }
-            None => Ok(None),
-        }
+    /// Takes the oldest non-processed operation out of the queue.
+    /// Returns `None` if there are no non-processed operations.
+    fn take_next_operation(&mut self) -> Option<Operation> {
+        self.operations.pop_front()
     }
 }
 
@@ -99,6 +92,31 @@ pub struct ProversDataPool {
     limit: i64,
     op_queues: HashMap<usize, BlockSizedOperationsQueue>,
     prepared: HashMap<BlockNumber, ProverData>,
+}
+
+impl ProversDataPool {
+    pub fn new(limit: i64) -> Self {
+        let mut res = Self {
+            limit,
+            op_queues: HashMap::new(),
+            prepared: HashMap::new(),
+        };
+
+        for block_size in models::params::block_chunk_sizes() {
+            res.op_queues
+                .insert(*block_size, BlockSizedOperationsQueue::new(*block_size));
+        }
+
+        res
+    }
+
+    pub fn get(&self, block: BlockNumber) -> Option<&ProverData> {
+        self.prepared.get(&block)
+    }
+
+    pub fn clean_up(&mut self, block: BlockNumber) {
+        self.prepared.remove(&block);
+    }
 }
 
 /// `Maintainer` is a helper structure that maintains the
@@ -156,67 +174,77 @@ impl Maintainer {
     fn maintain(&mut self) {
         info!("preparing prover data routine started");
         loop {
-            if self.has_capacity() {
-                self.take_next_commits()
-                    .expect("failed to get next commit operations");
-            }
-            self.prepare_next().expect("failed to prepare prover data");
+            self.take_next_commits_if_needed()
+                .expect("couldn't get next commits");
+            self.prepare_next().expect("couldn't prepare next commits");
             thread::sleep(self.rounds_interval);
         }
-
-    pub fn get(&self, block: BlockNumber) -> Option<&ProverData> {
-        self.prepared.get(&block)
     }
 
-    fn has_capacity(&self) -> bool {
-        let data = self.data.read().expect("failed to acquire a lock");
-        data.has_capacity()
-    }
+    /// Loads the operations to process for every available prover queue.
+    fn take_next_commits_if_needed(&mut self) -> Result<(), String> {
+        // When updating this method, be sure to not hold lock longer than necessary,
+        // since it can cause provers to not be able to interact with the server.
 
-    fn take_next_commits_if_needed(
-        &mut self,
-        conn_pool: &storage::ConnectionPool,
-    ) -> Result<(), String> {
-        for (_, queue) in self.op_queues.iter_mut() {
-            queue.take_next_commits_if_needed(conn_pool, self.limit)?;
-        }
-                .conn_pool
-                .access_storage()
-                .expect("failed to connect to db");
-            storage
-                .load_unverified_commits_after_block(data.last_loaded, data.limit)
-                .map_err(|e| format!("failed to read commit operations: {}", e))?
+        // Clone the required data to process it without holding the lock.
+        let (mut queues, limit) = {
+            let pool = self.data.read().expect("failed to get write lock on data");
+            (pool.op_queues.clone(), pool.limit)
         };
 
-        if !ops.is_empty() {
-            let mut data = self.data.write().expect("failed to acquire a lock");
-            for op in ops.into_iter() {
-                (*data).store_to_prove(op)
-        for (_, queue) in self.op_queues.iter_mut() {
-            if let Some((block_number, pd)) = queue.prepare_next_if_any(conn_pool)? {
-                self.prepared.insert(block_number, pd);
-            }
+        // Process every queue and fill it with data.
+        for queue in queues.values_mut() {
+            queue.take_next_commits_if_needed(&self.conn_pool, limit)?;
         }
+
+        // Update the queues in pool.
+        // Since this structure is the only writer to the queues, it is guaranteed
+        // to not contain data that will be overwritten by the assignment.
+        let mut pool = self.data.write().expect("failed to get write lock on data");
+        pool.op_queues = queues;
 
         Ok(())
     }
 
+    /// Goes through existing queues of operations and builds a prover data for each of them.
     fn prepare_next(&mut self) -> Result<(), String> {
-        let op = {
-            let mut data = self.data.write().expect("failed to acquire a lock");
-            if data.all_prepared() {
-                return Ok(());
-            }
-            data.take_next_to_prove()?
+        // When updating this method, be sure to not hold lock longer than necessary,
+        // since it can cause provers to not be able to interact with the server.
+
+        // Clone the queues to process them without holding the lock.
+        let mut queues = {
+            let pool = self.data.read().expect("failed to get write lock on data");
+
+            pool.op_queues.clone()
         };
-        let storage = self
-            .conn_pool
-            .access_storage()
-            .expect("failed to connect to db");
-        let pd = self.build_prover_data(&storage, &op)?;
-        let mut data = self.data.write().expect("failed to acquire a lock");
-        (*data).last_prepared += 1;
-        (*data).prepared.insert(op.block.block_number as i64, pd);
+
+        // Create a storage for prepared data.
+        let mut prepared = HashMap::new();
+
+        // Go through every queue, take the next operation to process, and build the
+        // prover data for them.
+        // Empty queues are ignored.
+        for queue in queues.values_mut() {
+            let maybe_op = queue.take_next_operation();
+            if let Some(op) = maybe_op {
+                let storage = self
+                    .conn_pool
+                    .access_storage()
+                    .expect("failed to connect to db");
+                let pd = self.build_prover_data(&storage, &op)?;
+                prepared.insert(op.block.block_number, pd);
+            }
+        }
+
+        // Update the queues and prepared data in pool.
+        // Since this structure is the only writer to the queues, it is guaranteed
+        // to not contain data that will be overwritten by the assignment.
+        // Prepared data is appended to the existing one, thus we can not worry about
+        // synchronization as well.
+        let mut pool = self.data.write().expect("failed to get write lock on data");
+        pool.op_queues = queues;
+        pool.prepared.extend(prepared);
+
         Ok(())
     }
 
@@ -290,6 +318,7 @@ impl Maintainer {
         commit_operation: &models::Operation,
     ) -> Result<ProverData, String> {
         let block_number = commit_operation.block.block_number;
+        let block_size = commit_operation.block.smallest_block_size();
 
         info!("building prover data for block {}", &block_number);
 
@@ -504,14 +533,8 @@ impl Maintainer {
 
         witness_accum.add_operation_with_pubdata(operations, pub_data);
         witness_accum.extend_pubdata_with_noops();
-        assert_eq!(
-            witness_accum.pubdata.len(),
-            64 * models::params::block_size_chunks()
-        );
-        assert_eq!(
-            witness_accum.operations.len(),
-            models::params::block_size_chunks()
-        );
+        assert_eq!(witness_accum.pubdata.len(), 64 * block_size);
+        assert_eq!(witness_accum.operations.len(), block_size);
 
         witness_accum.collect_fees(&fees);
         assert_eq!(
