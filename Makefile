@@ -158,11 +158,10 @@ flatten: prepare-contracts
 	$(call flatten_file,Verifier.sol)
 
 gen-keys-if-not-present:
-	test -f ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
+	test -f ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol || gen-keys
 
 prepare-contracts:
-	@cp ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
-	@cp ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKeyExit.sol contracts/contracts/VerificationKeyExit.sol || (echo "please run gen-keys" && exit 1)
+	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 
@@ -314,12 +313,7 @@ dev-build-geth:
 dev-push-geth:
 	@docker push "${GETH_DOCKER_IMAGE}"
 
-# Key generator 
-
-make-keys:
-	@cargo run -p key_generator --release --bin key_generator
-
- # Data Restore
+# Data Restore
 
 data-restore-setup-and-run: data-restore-build data-restore-restart
 

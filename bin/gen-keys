@@ -1,11 +1,18 @@
 #!/bin/bash
 
+set -e
+
 . .setup_env
 
 # HACK: We need to rebuild sources in case hardcoded values changed that might affect the keys
 touch core/models/src/lib.rs
 
-mkdir -p $ZKSYNC_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH
-cargo run --bin key_generator --release
+OUTPUT_DIR=$ZKSYNC_HOME/$KEY_DIR/account-$ACCOUNT_TREE_DEPTH/
 
-cp $ZKSYNC_HOME/$KEY_DIR/$BLOCK_SIZE_CHUNKS/$ACCOUNT_TREE_DEPTH/VerificationKey.sol $ZKSYNC_HOME/contracts/contracts
+mkdir -p $OUTPUT_DIR/block-$BLOCK_SIZE_CHUNKS
+mkdir -p "$OUTPUT_DIR/exodus_key"
+cargo run --bin key_generator --release -- block
+cargo run --bin key_generator --release -- exodus_key
+cargo run --bin key_generator --release -- contract
+
+cp $OUTPUT_DIR/VerificationKey.sol $ZKSYNC_HOME/contracts/contracts

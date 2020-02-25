@@ -1,32 +1,26 @@
 // Built-in deps
 use std::path::PathBuf;
 // External deps
-use crate::franklin_crypto::bellman::groth16::generate_random_parameters;
-use crate::franklin_crypto::bellman::groth16::Parameters;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
-use crate::rand::OsRng;
 use circuit::account::AccountWitness;
 use circuit::circuit::FranklinCircuit;
 use circuit::operation::*;
+use crypto_exports::franklin_crypto::bellman::groth16::generate_random_parameters;
+use crypto_exports::franklin_crypto::bellman::groth16::Parameters;
+use crypto_exports::franklin_crypto::bellman::pairing::bn256::*;
+use crypto_exports::rand::OsRng;
 // Workspace deps
-use crate::vk_contract_generator::generate_vk_contract;
+use crate::vk_contract_generator::generate_vk_function;
 use circuit::exit_circuit::ZksyncExitCircuit;
 use models::params;
+use models::prover_utils::{get_block_proof_key_and_vk_path, get_exodus_proof_key_and_vk_path};
 use std::time::Instant;
 
-const CONTRACT_FILENAME: &str = "VerificationKey.sol";
-const CONTRACT_NAME: &str = "VerificationKey";
 const CONTRACT_FUNCTION_NAME: &str = "getVk";
-
-const CONTRACT_FILENAME_EXIT_CIRCUIT: &str = "VerificationKeyExit.sol";
-const CONTRACT_NAME_EXIT_CIRCUIT: &str = "VerificationKeyExit";
-const CONTRACT_FUNCTION_NAME_EXIT_CIRCUIT: &str = "getVkExit";
 
 fn generate_and_write_parameters<F: Fn() -> Parameters<Bn256>>(
     key_file_path: PathBuf,
     contract_file_path: PathBuf,
     gen_parameters: F,
-    contract_name: &str,
     contract_function_name: &str,
 ) {
     info!(
@@ -55,15 +49,10 @@ fn generate_and_write_parameters<F: Fn() -> Parameters<Bn256>>(
 
     let f_r = File::open(&key_file_path).expect("Unable to open file");
     let mut r = BufReader::new(f_r);
-    let circuit_params =
-        crate::franklin_crypto::bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
-            .expect("Unable to read proving key");
+    let circuit_params = crypto_exports::bellman::groth16::Parameters::<Bn256>::read(&mut r, true)
+        .expect("Unable to read proving key");
 
-    let contract_content = generate_vk_contract(
-        &circuit_params.vk,
-        contract_name.to_string(),
-        contract_function_name.to_string(),
-    );
+    let contract_content = generate_vk_function(&circuit_params.vk, contract_function_name);
 
     let mut f_cont = BufWriter::new(f_cont);
     f_cont
@@ -71,58 +60,28 @@ fn generate_and_write_parameters<F: Fn() -> Parameters<Bn256>>(
         .expect("Unable to write contract");
 }
 
-pub fn make_franklin_key() {
-    let out_dir = {
-        let mut out_dir = PathBuf::new();
-        out_dir.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
-        out_dir.push(&format!("{}", params::block_size_chunks()));
-        out_dir.push(&format!("{}", params::account_tree_depth()));
-        out_dir
-    };
-
-    // Generate main circuit parameters
-    {
-        let key_file_path = {
-            let mut key_file_path = out_dir.clone();
-            key_file_path.push(params::KEY_FILENAME);
-            key_file_path
-        };
-        let contract_file_path = {
-            let mut contract_file_path = out_dir.clone();
-            contract_file_path.push(CONTRACT_FILENAME);
-            contract_file_path
-        };
-        generate_and_write_parameters(
-            key_file_path,
-            contract_file_path,
-            make_circuit_parameters,
-            CONTRACT_NAME,
+pub fn make_block_proof_key() {
+    let (key_file_path, get_vk_file_path) = get_block_proof_key_and_vk_path();
+    generate_and_write_parameters(
+        key_file_path,
+        get_vk_file_path,
+        make_circuit_parameters,
+        &format!(
+            "{}Block{}",
             CONTRACT_FUNCTION_NAME,
-        );
-    }
+            params::block_size_chunks()
+        ),
+    );
+}
 
-    // Generate exit circuit parameters
-    {
-        let key_file_path = {
-            let mut key_file_path = out_dir.clone();
-            key_file_path.push(params::EXIT_KEY_FILENAME);
-            key_file_path
-        };
-        let contract_file_path = {
-            let mut contract_file_path = out_dir;
-            contract_file_path.push(CONTRACT_FILENAME_EXIT_CIRCUIT);
-            contract_file_path
-        };
-        generate_and_write_parameters(
-            key_file_path,
-            contract_file_path,
-            make_exit_circuit_parameters,
-            CONTRACT_NAME_EXIT_CIRCUIT,
-            CONTRACT_FUNCTION_NAME_EXIT_CIRCUIT,
-        );
-    }
-
-    info!("Done");
+pub fn make_exodus_key() {
+    let (key_file_path, get_vk_file_path) = get_exodus_proof_key_and_vk_path();
+    generate_and_write_parameters(
+        key_file_path,
+        get_vk_file_path,
+        make_exit_circuit_parameters,
+        &format!("{}{}", CONTRACT_FUNCTION_NAME, "Exit"),
+    );
 }
 
 pub fn make_circuit_parameters() -> Parameters<Bn256> {

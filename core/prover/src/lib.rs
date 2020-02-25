@@ -10,12 +10,13 @@ use std::{fmt, thread, time};
 // External deps
 use crate::franklin_crypto::bellman::groth16;
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
-use log::{error, info, trace};
+use log::*;
 // Workspace deps
 use models::node::Engine;
 
 use crypto_exports::franklin_crypto;
 use crypto_exports::rand;
+use models::prover_utils::{get_block_proof_key_and_vk_path, read_circuit_proving_parameters};
 
 pub struct BabyProver<C: ApiClient> {
     circuit_params: groth16::Parameters<Engine>,
@@ -216,4 +217,10 @@ impl<C: ApiClient> BabyProver<C> {
             }
         }
     }
+}
+
+pub fn read_circuit_params() -> groth16::Parameters<Engine> {
+    let path = get_block_proof_key_and_vk_path().0;
+    debug!("Reading key from {}", path.to_string_lossy());
+    read_circuit_proving_parameters(&path).expect("Failed to read circuit parameters")
 }
