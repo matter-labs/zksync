@@ -252,13 +252,17 @@ async fn deposit_single(
         .eth_acc
         .deposit_eth(deposit_amount, &test_acc.zk_acc.address, nonce)
         .await?;
+    wait_for_deposit_executed(po.serial_id, rpc_addr).await
+}
+
+async fn wait_for_deposit_executed(serial_id: u64, rpc_addr: &str) -> Result<u32, failure::Error> {
     let mut executed = false;
     // 5 min wait
     let start = Instant::now();
     let timeout = Duration::from_secs(DEPOSIT_TIMEOUT_SEC);
     let check_period = Duration::from_secs(1);
     while start.elapsed() < timeout {
-        let (ex, _) = ethop_info(po.serial_id, rpc_addr).await?;
+        let (ex, _) = ethop_info(serial_id, rpc_addr).await?;
         if ex {
             executed = true;
             break;
@@ -266,7 +270,7 @@ async fn deposit_single(
         thread::sleep(check_period);
     }
     if executed {
-        return Ok(po.serial_id as u32);
+        return Ok(serial_id as u32);
     }
     failure::bail!("timeout")
 }
