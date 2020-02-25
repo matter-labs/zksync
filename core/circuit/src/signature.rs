@@ -17,6 +17,9 @@ use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::params as franklin_constants;
 use models::params::FR_BIT_WIDTH_PADDED;
 
+/// Max len of message for signature, we use Pedersen hash to compress message to this len before signing.
+const MAX_SIGN_MESSAGE_BIT_WIDTH: usize = 256;
+
 pub struct AllocatedSignatureData<E: JubjubEngine> {
     pub eddsa: EddsaSignature<E>,
     pub is_verified: Boolean,
@@ -268,7 +271,13 @@ pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
     generator: ecc::EdwardsPoint<E>,
 ) -> Result<Boolean, SynthesisError> {
     let mut sig_data_bits = sig_data_bits.to_vec();
-    sig_data_bits.resize(256, Boolean::constant(false));
+    assert!(
+        sig_data_bits.len() <= MAX_SIGN_MESSAGE_BIT_WIDTH,
+        "Signature message len is too big {}/{}",
+        sig_data_bits.len(),
+        MAX_SIGN_MESSAGE_BIT_WIDTH
+    );
+    sig_data_bits.resize(MAX_SIGN_MESSAGE_BIT_WIDTH, Boolean::constant(false));
 
     let mut first_round_bits: Vec<Boolean> = vec![];
 
@@ -277,14 +286,14 @@ pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
         .get_x()
         .clone()
         .into_bits_le(cs.namespace(|| "pk_x_bits"))?;
-    pk_x_serialized.resize(256, Boolean::constant(false));
+    pk_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
 
     let mut r_x_serialized = signature
         .r
         .get_x()
         .clone()
         .into_bits_le(cs.namespace(|| "r_x_bits"))?;
-    r_x_serialized.resize(256, Boolean::constant(false));
+    r_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
 
     first_round_bits.extend(pk_x_serialized);
     first_round_bits.extend(r_x_serialized);
@@ -298,7 +307,7 @@ pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
     let mut first_round_hash_bits = first_round_hash
         .get_x()
         .into_bits_le(cs.namespace(|| "first_round_hash_bits"))?;
-    first_round_hash_bits.resize(256, Boolean::constant(false));
+    first_round_hash_bits.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
 
     let mut second_round_bits = vec![];
     second_round_bits.extend(first_round_hash_bits);
@@ -338,7 +347,13 @@ pub fn verify_sha256<E: JubjubEngine, CS: ConstraintSystem<E>>(
     const IPUT_PAD_LEN_FOR_SHA256: usize = 768;
 
     let mut sig_data_bits = sig_data_bits.to_vec();
-    sig_data_bits.resize(256, Boolean::constant(false));
+    assert!(
+        sig_data_bits.len() <= MAX_SIGN_MESSAGE_BIT_WIDTH,
+        "Signature message len is too big {}/{}",
+        sig_data_bits.len(),
+        MAX_SIGN_MESSAGE_BIT_WIDTH
+    );
+    sig_data_bits.resize(MAX_SIGN_MESSAGE_BIT_WIDTH, Boolean::constant(false));
     sig_data_bits = le_bits_into_le_bytes(sig_data_bits);
 
     let mut hash_input: Vec<Boolean> = vec![];
