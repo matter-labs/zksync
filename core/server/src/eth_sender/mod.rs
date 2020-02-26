@@ -17,82 +17,46 @@ use std::str::FromStr;
 use std::time::Duration;
 // External uses
 use bigdecimal::BigDecimal;
-use failure::ensure;
-use futures::{channel::mpsc, compat::Future01CompatExt, executor::block_on};
+use futures::channel::mpsc;
 use tokio::runtime::Runtime;
 use tokio::time;
 use web3::contract::Options;
-use web3::transports::Http;
-use web3::types::{TransactionReceipt, H256, U256};
-use web3::Transport;
+use web3::types::{H256, U256};
 // Workspace uses
-use eth_client::{ETHClient, SignedCallResult};
-use models::abi::zksync_contract;
+use eth_client::SignedCallResult;
 use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::config;
 use models::{Action, ActionType, Operation};
-use storage::{ConnectionPool, StorageETHOperation, StorageProcessor};
+use storage::{ConnectionPool, StorageProcessor};
+// Local uses
+use self::ethereum_interface::{EthereumHttpClient, EthereumInterface};
+pub use self::transactions::*;
+
+mod ethereum_interface;
+pub mod transactions;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 const WAIT_CONFIRMATIONS: u64 = 1;
 
-struct OperationETHState {
-    operation: Operation,
-    txs: Vec<TransactionETHState>,
-}
-
-#[derive(Debug, Clone)]
-pub struct TransactionETHState {
-    pub op_id: i64,
-    pub deadline_block: u64,
-    pub signed_tx: SignedCallResult,
-}
-
-impl From<StorageETHOperation> for TransactionETHState {
-    fn from(stored: StorageETHOperation) -> Self {
-        TransactionETHState {
-            op_id: stored.op_id,
-            deadline_block: stored.deadline_block as u64,
-            signed_tx: SignedCallResult {
-                raw_tx: stored.raw_tx,
-                gas_price: U256::from_str(&stored.gas_price.to_string()).unwrap(),
-                nonce: U256::from(stored.nonce as u128),
-                hash: H256::from_slice(&stored.tx_hash),
-            },
-        }
-    }
-}
-
-impl TransactionETHState {
-    fn is_stuck(&self, current_block: u64) -> bool {
-        current_block >= self.deadline_block
-    }
-}
-
-struct ExecutedTxStatus {
-    confirmations: u64,
-    success: bool,
-}
-
-struct ETHSender<T: Transport> {
+struct ETHSender<Eth: EthereumInterface> {
     // unconfirmed operations queue
     unconfirmed_ops: VecDeque<OperationETHState>,
     db_pool: ConnectionPool,
-    eth_client: ETHClient<T>,
+    ethereum: Eth,
     rx_for_eth: mpsc::Receiver<Operation>,
     op_notify: mpsc::Sender<Operation>,
 }
 
-impl<T: Transport> ETHSender<T> {
+impl<Eth: EthereumInterface> ETHSender<Eth> {
     fn new(
         db_pool: ConnectionPool,
-        eth_client: ETHClient<T>,
+        ethereum: Eth,
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
         let mut sender = Self {
-            eth_client,
+            ethereum,
             unconfirmed_ops: VecDeque::new(),
             db_pool: db_pool.clone(),
             rx_for_eth,
@@ -171,36 +135,6 @@ impl<T: Transport> ETHSender<T> {
         }
     }
 
-    fn block_number(&self) -> Result<u64, failure::Error> {
-        Ok(block_on(self.eth_client.web3.eth().block_number().compat()).map(|n| n.as_u64())?)
-    }
-
-    fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error> {
-        match block_on(
-            self.eth_client
-                .web3
-                .eth()
-                .transaction_receipt(*hash)
-                .compat(),
-        )? {
-            Some(TransactionReceipt {
-                block_number: Some(tx_block_number),
-                status: Some(status),
-                ..
-            }) => {
-                let confirmations = self
-                    .block_number()?
-                    .saturating_sub(tx_block_number.as_u64());
-                let success = status.as_u64() == 1;
-                Ok(Some(ExecutedTxStatus {
-                    confirmations,
-                    success,
-                }))
-            }
-            _ => Ok(None),
-        }
-    }
-
     fn save_signed_tx_to_db(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
         Ok(storage.save_operation_eth_tx(
@@ -219,7 +153,7 @@ impl<T: Transport> ETHSender<T> {
     }
 
     fn drive_to_completion(&self, op: &mut OperationETHState) -> Result<bool, failure::Error> {
-        let current_block = self.block_number()?;
+        let current_block = self.ethereum.block_number()?;
 
         // check status
         let mut last_pending_tx: Option<(H256, bool)> = None;
@@ -229,7 +163,7 @@ impl<T: Transport> ETHSender<T> {
             if let Some(ExecutedTxStatus {
                 confirmations,
                 success,
-            }) = self.get_tx_status(&tx.signed_tx.hash)?
+            }) = self.ethereum.get_tx_status(&tx.signed_tx.hash)?
             {
                 if success {
                     if confirmations >= WAIT_CONFIRMATIONS {
@@ -289,19 +223,10 @@ impl<T: Transport> ETHSender<T> {
                 "Sending tx for op, op_id: {} tx_hash: {:#x}",
                 new_tx.op_id, new_tx.signed_tx.hash
             );
-            self.send_tx(&new_tx.signed_tx)?;
+            self.ethereum.send_tx(&new_tx.signed_tx)?;
         }
 
         Ok(false)
-    }
-
-    fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error> {
-        let hash = block_on(self.eth_client.send_raw_tx(signed_tx.raw_tx.clone()))?;
-        ensure!(
-            hash == signed_tx.hash,
-            "Hash from signer and Ethereum node mismatch"
-        );
-        Ok(())
     }
 
     fn create_and_save_new_tx(
@@ -315,13 +240,13 @@ impl<T: Transport> ETHSender<T> {
             let old_tx_gas_price =
                 U256::from_dec_str(&stuck_tx.signed_tx.gas_price.to_string()).unwrap();
             let new_gas_price = {
-                let network_price = block_on(self.eth_client.get_gas_price())?;
+                let network_price = self.ethereum.gas_price()?;
                 // replacement price should be at least 10% higher, we make it 15% higher.
                 let replacement_price = (old_tx_gas_price * U256::from(115)) / U256::from(100);
                 std::cmp::max(network_price, replacement_price)
             };
 
-            let new_nonce = block_on(self.eth_client.current_nonce())?;
+            let new_nonce = self.ethereum.current_nonce()?;
 
             info!(
                 "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, old_nonce: {}, new_nonce: {}",
@@ -397,7 +322,7 @@ impl<T: Transport> ETHSender<T> {
                 );
 
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
-                block_on(self.eth_client.sign_call_tx(
+                self.ethereum.sign_call_tx(
                     "commitBlock",
                     (
                         u64::from(op.block.block_number),
@@ -408,29 +333,31 @@ impl<T: Transport> ETHSender<T> {
                         witness_data.1,
                     ),
                     tx_options,
-                ))
+                )
             }
             Action::Verify { proof } => {
                 // function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof) external {
-                block_on(self.eth_client.sign_call_tx(
+                self.ethereum.sign_call_tx(
                     "verifyBlock",
                     (u64::from(op.block.block_number), *proof.clone()),
                     tx_options,
-                ))
+                )
             }
         }
     }
 
     fn call_complete_withdrawals(&self) -> Result<(), failure::Error> {
         // function completeWithdrawals(uint32 _n) external {
-        let tx = block_on(self.eth_client.sign_call_tx(
-            "completeWithdrawals",
-            config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
-            Options::default(),
-        ))
-        .map_err(|e| failure::format_err!("completeWithdrawals: {}", e))?;
+        let tx = self
+            .ethereum
+            .sign_call_tx(
+                "completeWithdrawals",
+                config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+                Options::default(),
+            )
+            .map_err(|e| failure::format_err!("completeWithdrawals: {}", e))?;
         info!("Sending completeWithdrawals tx with hash: {:#?}", tx.hash);
-        self.send_tx(&tx)
+        self.ethereum.send_tx(&tx)
     }
 }
 
@@ -445,22 +372,12 @@ pub fn start_eth_sender(
         .name("eth_sender".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
-            let (_event_loop, transport) =
-                Http::new(&config_options.web3_url).expect("failed to start web3 transport");
 
-            let eth_client = ETHClient::new(
-                transport,
-                zksync_contract(),
-                config_options.operator_eth_addr,
-                config_options.operator_private_key,
-                config_options.contract_eth_addr,
-                config_options.chain_id,
-                config_options.gas_price_factor,
-            );
+            let ethereum =
+                EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
 
             let mut runtime = Runtime::new().expect("eth-sender-runtime");
-            let eth_sender =
-                ETHSender::new(pool, eth_client, send_requst_receiver, op_notify_sender);
+            let eth_sender = ETHSender::new(pool, ethereum, send_requst_receiver, op_notify_sender);
             runtime.block_on(eth_sender.run());
         })
         .expect("Eth sender thread");
