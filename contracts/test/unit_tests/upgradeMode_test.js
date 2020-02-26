@@ -28,7 +28,7 @@ describe("UpgradeMode unit test", function () {
         // activate
         await expect(testContract.activate())
             .to.emit(testContract, 'UpgradeModeActivated')
-            .withArgs(0);
+            .withArgs(1);
 
         expect(await testContract.waitUpgradeModeActive()).to.equal(true)
         await testContract.isClosedStatusActive();
@@ -39,7 +39,7 @@ describe("UpgradeMode unit test", function () {
         // cancel
         await expect(testContract.cancel())
             .to.emit(testContract, 'UpgradeCanceled')
-            .withArgs(0);
+            .withArgs(1);
 
         expect(await testContract.waitUpgradeModeActive()).to.equal(false)
 
@@ -59,7 +59,7 @@ describe("UpgradeMode unit test", function () {
             // activate
             await expect(testContract.activate())
                 .to.emit(testContract, 'UpgradeModeActivated')
-                .withArgs(0);
+                .withArgs(1);
 
             let activated_time = performance.now();
 
@@ -82,7 +82,7 @@ describe("UpgradeMode unit test", function () {
                 } else {
                     await expect(testContract.isClosedStatusActive())
                         .to.emit(testContract, 'UpgradeModeClosedStatusActivated')
-                        .withArgs(0);
+                        .withArgs(1);
                     expect(await testContract.closedStatusActive()).to.equal(true)
                 }
             }
@@ -90,16 +90,16 @@ describe("UpgradeMode unit test", function () {
             // finish
             await expect(testContract.finish())
                 .to.emit(testContract, 'UpgradeCompleted')
-                .withArgs(0);
+                .withArgs(1);
 
 
-            // one more activate and cancel with version equal to 1
+            // one more activate and cancel with version equal to 2
             await expect(testContract.activate())
                 .to.emit(testContract, 'UpgradeModeActivated')
-                .withArgs(1);
+                .withArgs(2);
             await expect(testContract.cancel())
                 .to.emit(testContract, 'UpgradeCanceled')
-                .withArgs(1);
+                .withArgs(2);
         });
     }
 
@@ -113,7 +113,7 @@ describe("UpgradeMode unit test", function () {
             // activate
             await expect(testContract.activate())
                 .to.emit(testContract, 'UpgradeModeActivated')
-                .withArgs(1);
+                .withArgs(2);
 
             let activated_time = performance.now();
 
@@ -131,16 +131,16 @@ describe("UpgradeMode unit test", function () {
                 }
 
                 if (step != 5) {
-                    expect(await getCallRevertReason( () => testContract.forceCancel() )).equal("ucf12")
+                    expect(await getCallRevertReason( () => testContract.forceCancel() )).equal("ufc12")
                 } else {
                     await expect(testContract.forceCancel())
                         .to.emit(testContract, 'UpgradeForciblyCanceled')
-                        .withArgs(1);
+                        .withArgs(2);
                     expect(await testContract.waitUpgradeModeActive()).to.equal(false)
                 }
             }
 
-            expect(await getCallRevertReason( () => testContract.forceCancel() )).equal("ucf11")
+            expect(await getCallRevertReason( () => testContract.forceCancel() )).equal("ufc11")
         });
     }
 

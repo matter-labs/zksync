@@ -3,7 +3,7 @@ const { expect, use } = require("chai")
 const { createMockProvider, getWallets, solidity, deployContract } = require("ethereum-waffle");
 const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
 
-const SKIP_TEST = true;
+const SKIP_TEST = false;
 
 // For: geth
 

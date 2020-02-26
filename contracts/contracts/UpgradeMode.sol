@@ -31,7 +31,7 @@ contract UpgradeMode is UpgradeModeEvents, Ownable {
     /// @notice Contract constructor
     /// @dev Calls Ownable contract constructor
     constructor() Ownable() public {
-        version = 0;
+        version = 1;
         waitUpgradeModeActive = false;
         closedStatusActive = false;
         activationTime = 0;
@@ -65,6 +65,24 @@ contract UpgradeMode is UpgradeModeEvents, Ownable {
         emit UpgradeCanceled(version);
     }
 
+    /// @notice Force upgrade cancellation
+    function forceCancel() external {
+        requireMaster(msg.sender);
+        require(
+            waitUpgradeModeActive,
+            "ufc11"
+        ); // ufc11 - unable to cancel not active mode
+        require(
+            now >= activationTime + MAX_UPGRADE_PERIOD,
+            "ufc12"
+        ); // ufc12 - unable to force cancel upgrade until MAX_UPGRADE_PERIOD passes
+
+        waitUpgradeModeActive = false;
+        closedStatusActive = false;
+        activationTime = 0;
+        emit UpgradeForciblyCanceled(version);
+    }
+
     /// @notice Checks that closed status is active and activates it if needed
     /// @return Bool flag indicating that closed status is active
     function isClosedStatusActive() public returns (bool) {
@@ -79,26 +97,6 @@ contract UpgradeMode is UpgradeModeEvents, Ownable {
             emit UpgradeModeClosedStatusActivated(version);
         }
         return closedStatusActive;
-    }
-
-    /// @notice Force cancellation
-    function forceCancel() external {
-        requireMaster(msg.sender);
-
-        require(
-            waitUpgradeModeActive,
-            "ucf11"
-        ); // ucf11 - unable to cancel not active mode
-
-        require(
-            now >= activationTime + MAX_UPGRADE_PERIOD,
-            "ucf12"
-        ); // ucf12 - unable to force cancel upgrade until MAX_UPGRADE_PERIOD passes
-
-        waitUpgradeModeActive = false;
-        closedStatusActive = false;
-        activationTime = 0;
-        emit UpgradeForciblyCanceled(version);
     }
 
     /// @notice Finishes upgrade

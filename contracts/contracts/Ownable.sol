@@ -3,6 +3,7 @@ pragma solidity 0.5.16;
 /// @title Ownable Contract
 /// @author Matter Labs
 contract Ownable {
+
     /// @notice Storage position of the masters address
     bytes32 private constant masterPosition = keccak256("master");
 
@@ -49,4 +50,5 @@ contract Ownable {
         ); // otp11 - new masters address can't be zero address
         setMaster(_newMaster);
     }
+
 }

@@ -17,6 +17,8 @@ cp $IN_DIR/Storage.sol $OUT_DIR/StorageTest.sol
 cp $IN_DIR/Config.sol $OUT_DIR/ConfigTest.sol
 cp $IN_DIR/Ownable.sol $OUT_DIR/OwnableTest.sol
 cp $IN_DIR/UpgradeMode.sol $OUT_DIR/UpgradeModeTest.sol
+cp $IN_DIR/Upgradeable.sol $OUT_DIR/UpgradeableTest.sol
+cp $IN_DIR/Proxy.sol $OUT_DIR/ProxyTest.sol
 
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
@@ -26,10 +28,16 @@ ssed 's/Config/ConfigTest/' -i $OUT_DIR/*.sol
 ssed 's/PriorityQueue/PriorityQueueTest/' -i $OUT_DIR/*.sol
 ssed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
 ssed 's/Ownable/OwnableTest/' -i $OUT_DIR/*.sol
-ssed 's/UpgradeMode/UpgradeModeTest/' -i $OUT_DIR/*.sol
+ssed 's/UpgradeMode/UpgradeModeTest/g' -i $OUT_DIR/*.sol
+ssed 's/Upgradeable/UpgradeableTest/' -i $OUT_DIR/*.sol
+ssed 's/Proxy/ProxyTest/' -i $OUT_DIR/*.sol
 # Workaround -> priority queue has FranklinTest in method names.
 ssed 's/FranklinTest/Franklin/' -i $OUT_DIR/PriorityQueueTest.sol
+# Workaround -> ownable and upgradeable has Storage in comments.
+ssed 's/StorageTest/Storage/' -i $OUT_DIR/OwnableTest.sol
+ssed 's/StorageTest/Storage/' -i $OUT_DIR/UpgradeableTest.sol
 # Workaround -> upgrade mode has UpgradeMode in event and variable names.
+ssed 's/UpgradeModeTestEvents/UpgradeModeEvents/' -i $OUT_DIR/UpgradeModeTest.sol
 ssed 's/UpgradeModeTestActivated/UpgradeModeActivated/' -i $OUT_DIR/UpgradeModeTest.sol
 ssed 's/UpgradeModeTestClosedStatusActivated/UpgradeModeClosedStatusActivated/' -i $OUT_DIR/UpgradeModeTest.sol
 ssed 's/UpgradeModeTestForciblyCanceled/UpgradeModeForciblyCanceled/' -i $OUT_DIR/UpgradeModeTest.sol
