@@ -1,6 +1,7 @@
 pub mod client;
 pub mod exit_proof;
 pub mod prover_data;
+pub mod serialization;
 
 // Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -61,7 +62,7 @@ pub fn start<C: 'static + Sync + Send + ApiClient>(
     let (tx_block_start, rx_block_start) = mpsc::channel();
     let prover = Arc::new(prover);
     let prover_rc = Arc::clone(&prover);
-    thread::spawn(move || {
+    let join_handle = thread::spawn(move || {
         let tx_block_start2 = tx_block_start.clone();
         exit_err_tx
             .send(prover.run_rounds(tx_block_start))
@@ -71,6 +72,9 @@ pub fn start<C: 'static + Sync + Send + ApiClient>(
             .expect("failed to send heartbeat exit request"); // exit heartbeat routine request.
     });
     prover_rc.keep_sending_work_heartbeats(rx_block_start);
+    join_handle
+        .join()
+        .expect("failed to join on running rounds thread");
 }
 
 impl<C: ApiClient> BabyProver<C> {
@@ -197,7 +201,7 @@ impl<C: ApiClient> BabyProver<C> {
 
     fn keep_sending_work_heartbeats(&self, start_heartbeats_rx: mpsc::Receiver<(i32, bool)>) {
         let mut job_id = 0;
-        while !self.stop_signal.load(Ordering::SeqCst) {
+        loop {
             thread::sleep(self.heartbeat_interval);
             let (j, quit) = match start_heartbeats_rx.try_recv() {
                 Ok(v) => v,

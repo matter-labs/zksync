@@ -103,12 +103,13 @@ fn main() {
 
     // Start prover
     let (exit_err_tx, exit_err_rx) = mpsc::channel();
-    thread::spawn(move || {
+    let jh = thread::spawn(move || {
         start(worker, exit_err_tx);
     });
 
     // Handle prover exit errors.
     let err = exit_err_rx.recv();
+    jh.join().expect("failed to join on worker thread");
     error!("prover exited with error: {:?}", err);
     {
         let prover_id = prover_id_arc.load(Ordering::SeqCst);
