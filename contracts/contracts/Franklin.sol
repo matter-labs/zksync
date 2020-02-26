@@ -363,6 +363,7 @@ contract Franklin is Storage, Config, Events {
     function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint64[] memory _ethWitnessSizes)
         internal {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
+        require(_publicData.length / 8 == _ethWitnessSizes.length, "fcs13"); // eth witness data is malformed
 
         uint256 currentPointer = 0;
         uint64[2] memory currentEthWitness;
