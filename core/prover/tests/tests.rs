@@ -46,15 +46,15 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
             stop_signal_ar,
         );
         let (tx, rx) = mpsc::channel();
-        thread::spawn(move || {
-            rx.recv().unwrap(); // mock receive exit error.
+        let jh = thread::spawn(move || {
+            rx.recv().expect("on receive from exit error channel"); // mock receive exit error.
         });
         prover::start(p, tx);
-        println!("run exited!");
+        jh.join().expect("failed to join recv");
         done_tx.send(()).expect("unexpected failure");
     });
 
-    let timeout = time::Duration::from_millis(500);
+    let timeout = time::Duration::from_secs(10);
 
     // Must receive heartbeat requests.
     heartbeat_rx
@@ -66,14 +66,17 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
 
     // Send stop signal.
     let jh = thread::spawn(move || {
-        println!("waiting for first hearbeat");
-        heartbeat_rx.recv_timeout(timeout).unwrap();
+        println!("waiting for first heartbeat");
+        // receive at least one heartbeat.
+        heartbeat_rx
+            .recv_timeout(timeout)
+            .expect("[heartbeat_rx] first heartbeat");
+        while let Ok(_) = heartbeat_rx.recv_timeout(timeout) {}
         // BabyProver must be stopped.
-        done_rx.recv_timeout(timeout).unwrap();
+        done_rx.recv_timeout(timeout).expect("[done_rx] recv");
     });
-    println!("sending stop signal.");
     stop_signal.store(true, Ordering::SeqCst);
-    jh.join().expect("did not exit properly");
+    jh.join().expect("prover did not exit properly");
 }
 
 #[test]
