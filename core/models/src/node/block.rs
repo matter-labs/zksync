@@ -52,7 +52,7 @@ impl ExecutedOperations {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block {
     pub block_number: BlockNumber,
-    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
+    #[serde(with = "FrSerde")]
     pub new_root_hash: Fr,
     pub fee_account: AccountId,
     pub block_transactions: Vec<ExecutedOperations>,

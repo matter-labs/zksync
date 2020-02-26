@@ -1,6 +1,7 @@
 pub mod client;
 pub mod exit_proof;
 pub mod prover_data;
+pub mod serialization;
 
 // Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
