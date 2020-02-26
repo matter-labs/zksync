@@ -272,6 +272,8 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
                     return Ok(OperationCommitment::Committed);
                 }
                 TxCheckOutcome::Stuck => {
+                    // Update the last stuck transaction. If we won't exit the loop early,
+                    // it will be used to create a new transaction with higher gas limit.
                     last_stuck_tx = Some(tx);
                 }
                 TxCheckOutcome::Failed(receipt) => {
@@ -292,9 +294,11 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
         // Reaching this point will mean that either there was no transactions to process,
         // or the latest transaction got stuck.
         // Either way we should create a new transaction (the approach is the same,
-        // `create_and_save_new_tx` will adapt its logic based on `last_stuck_tx`).
+        // `create_new_tx` will adapt its logic based on `last_stuck_tx`).
         let deadline_block = current_block + EXPECTED_WAIT_TIME_BLOCKS;
-        let new_tx = self.create_and_save_new_tx(&op.operation, deadline_block, last_stuck_tx)?;
+        let new_tx = self.create_new_tx(&op.operation, deadline_block, last_stuck_tx)?;
+        // New transaction should be persisted in the DB *before* sending it.
+        self.save_signed_tx_to_db(&new_tx)?;
 
         op.txs.push(new_tx.clone());
         info!(
@@ -306,64 +310,61 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
         Ok(OperationCommitment::Pending)
     }
 
-    fn create_and_save_new_tx(
+    /// Creates a new transaction. If stuck tx is provided, the new transaction will be
+    /// and updated version of it; otherwise a brand new transaction will be created.
+    fn create_new_tx(
         &self,
         op: &Operation,
         deadline_block: u64,
         stuck_tx: Option<&TransactionETHState>,
     ) -> Result<TransactionETHState, failure::Error> {
-        // if transaction was stuck we better to up gas price.
         let tx_options = if let Some(stuck_tx) = stuck_tx {
-            let old_tx_gas_price =
-                U256::from_dec_str(&stuck_tx.signed_tx.gas_price.to_string()).unwrap();
-            let new_gas_price = {
-                let network_price = self.ethereum.gas_price()?;
-                // replacement price should be at least 10% higher, we make it 15% higher.
-                let replacement_price = (old_tx_gas_price * U256::from(115)) / U256::from(100);
-                std::cmp::max(network_price, replacement_price)
-            };
-
-            let new_nonce = self.ethereum.current_nonce()?;
-
-            info!(
-                "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, old_nonce: {}, new_nonce: {}",
-                stuck_tx.signed_tx.hash,
-                old_tx_gas_price,
-                new_gas_price,
-                stuck_tx.signed_tx.nonce,
-                new_nonce
-            );
-
-            Options::with(move |opt| {
-                opt.gas_price = Some(new_gas_price);
-                opt.nonce = Some(new_nonce);
-            })
+            self.tx_options_from_stuck_tx(stuck_tx)?
         } else {
             Options::default()
         };
 
-        //        // FAIL TEST
-        //        let rnd: u64 = rand::thread_rng().gen_range(0,10);
-        //        if rnd < 3 {
-        //            error!("Messing with nonce");
-        //            let mut committed_nonce = self.eth_client.current_nonce().wait()?;
-        //            committed_nonce += (rnd + 1).into();
-        //            tx_options.nonce = Some(committed_nonce);
-        //        }
-        //        // TEST
-
         let signed_tx = self.sign_operation_tx(op, tx_options)?;
-        let new_transaction = TransactionETHState {
+        Ok(TransactionETHState {
             op_id: op.id.unwrap(),
             deadline_block,
             signed_tx,
-        };
-        self.save_signed_tx_to_db(&new_transaction)?;
-        trace!(
-            "Signed new ETH: tx_hash {:#?}",
-            new_transaction.signed_tx.hash
+        })
+    }
+
+    // Calculates a new gas amount for the replacement of the stuck tx.
+    // Replacement price should be at least 10% higher, we make it 15% higher.
+    fn scale_gas(&self, old_tx_gas_price: U256) -> Result<U256, failure::Error> {
+        let network_price = self.ethereum.gas_price()?;
+        let replacement_price = (old_tx_gas_price * U256::from(115)) / U256::from(100);
+        Ok(std::cmp::max(network_price, replacement_price))
+    }
+
+    /// Creates a new tx options from a stuck transaction, with updated gas amount
+    /// and nonce.
+    fn tx_options_from_stuck_tx(
+        &self,
+        stuck_tx: &TransactionETHState,
+    ) -> Result<Options, failure::Error> {
+        let old_tx_gas_price =
+            U256::from_dec_str(&stuck_tx.signed_tx.gas_price.to_string()).unwrap();
+
+        let new_gas_price = self.scale_gas(old_tx_gas_price)?;
+        let new_nonce = self.ethereum.current_nonce()?;
+
+        info!(
+            "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, old_nonce: {}, new_nonce: {}",
+            stuck_tx.signed_tx.hash,
+            old_tx_gas_price,
+            new_gas_price,
+            stuck_tx.signed_tx.nonce,
+            new_nonce
         );
-        Ok(new_transaction)
+
+        Ok(Options::with(move |opt| {
+            opt.gas_price = Some(new_gas_price);
+            opt.nonce = Some(new_nonce);
+        }))
     }
 
     fn sign_operation_tx(
