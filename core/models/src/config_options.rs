@@ -25,7 +25,6 @@ pub struct ConfigurationOptions {
     pub web3_url: String,
     pub governance_eth_addr: H160,
     pub governance_genesis_tx_hash: H256,
-    pub priority_queue_eth_addr: H160,
     pub operator_franklin_addr: Address,
     pub operator_eth_addr: H160,
     pub operator_private_key: H256,
@@ -64,9 +63,6 @@ impl ConfigurationOptions {
             governance_genesis_tx_hash: get_env("GOVERNANCE_GENESIS_TX_HASH")[2..]
                 .parse()
                 .expect("Failed to parse GOVERNANCE_GENESIS_TX_HASH"),
-            priority_queue_eth_addr: get_env("PRIORITY_QUEUE_ADDR")[2..]
-                .parse()
-                .expect("Failed to parse PRIORITY_QUEUE_ADDR as ETH contract address"),
             operator_franklin_addr: get_env("OPERATOR_FRANKLIN_ADDRESS")[2..]
                 .parse()
                 .expect("Failed to parse OPERATOR_FRANKLIN_ADDRESS"),

@@ -37,7 +37,6 @@ contract Franklin is Storage, Config, Events {
     constructor(
         address _governanceAddress,
         address _verifierAddress,
-        address, // FIXME: remove _priorityQueueAddress in tests
         address, // FIXME: remove _genesisAccAddress
         bytes32 _genesisRoot
     ) public {

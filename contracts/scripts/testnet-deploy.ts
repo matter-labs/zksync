@@ -11,14 +11,10 @@ import {
     governanceContractSourceCode,
     governanceContractCode,
     postContractToTesseracts,
-    deployPriorityQueue,
-    priorityQueueContractSourceCode,
-    priorityQueueContractCode,
     deployVerifier,
     verifierContractSourceCode,
     verifierContractCode,
     governanceTestContractCode,
-    priorityQueueTestContractCode,
     verifierTestContractCode,
     franklinTestContractCode
 } from "../src.ts/deploy";
@@ -70,37 +66,37 @@ async function main() {
         let timer = new Date().getTime();
         const governanceCode = args.test ? governanceTestContractCode : governanceContractCode;
         const governance = await deployGovernance(wallet, governanceCode, governanceConstructorArgs);
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${governance.deployTransaction.hash}`);
+        console.log(`GOVERNANCE_ADDR=${governance.address}`);
         console.log(`Governance contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         governanceAddress = governance.address;
 
         timer = new Date().getTime();
-        const priorityQueueCode = args.test ? priorityQueueTestContractCode : priorityQueueContractCode;
-        const priorityQueue = await deployPriorityQueue(wallet, priorityQueueCode, priorityQueueConstructorArgs);
-        console.log(`Priority queue contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
-        priorityQueueAddress = priorityQueue.address;
-
-        timer = new Date().getTime();
         const verifierCode = args.test ? verifierTestContractCode : verifierContractCode;
         const verifier = await deployVerifier(wallet, verifierCode, verifierConstructorArgs);
+        console.log(`VERIFIER_ADDR=${verifier.address}`);
         console.log(`Verifier contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         verifierAddress = verifier.address;
 
         franklinConstructorArgs = [
             governanceAddress,
             verifierAddress,
-            priorityQueueAddress,
             process.env.OPERATOR_FRANKLIN_ADDRESS.replace('sync:', '0x'),
             process.env.GENESIS_ROOT || ethers.constants.HashZero,
         ];
         timer = new Date().getTime();
         const franklinCode = args.test ? franklinTestContractCode : franklinContractCode;
         const franklin = await deployFranklin(wallet, franklinCode, franklinConstructorArgs);
+        console.log(`CONTRACT_GENESIS_TX_HASH=${franklin.deployTransaction.hash}`);
+        console.log(`CONTRACT_ADDR=${franklin.address}`);
+
         console.log(`Main contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         franklinAddress = franklin.address;
 
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
 
         const erc20 = await addTestERC20Token(wallet, governance);
+        console.log("TEST_ERC20=" + erc20.address);
         await mintTestERC20Token(testWallet, erc20);
 
         if (args.publish) {
@@ -108,14 +104,12 @@ async function main() {
                 if (process.env.ETH_NETWORK === 'localhost') {
                     await Promise.all([
                         postContractToTesseracts(governanceCode, "Governance", governanceAddress),
-                        postContractToTesseracts(priorityQueueCode, "PriorityQueue", priorityQueueAddress),
                         postContractToTesseracts(verifierCode, "Verifier", verifierAddress),
                         postContractToTesseracts(franklinCode, "Franklin", franklinAddress),
                     ]);
                 } else {
                     await Promise.all([
                         publishSourceCodeToEtherscan('Governance', governanceAddress, governanceContractSourceCode, governanceContractCode, governanceConstructorArgs),
-                        publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, priorityQueueConstructorArgs),
                         publishSourceCodeToEtherscan('Verifier', verifierAddress, verifierContractSourceCode, verifierContractCode, verifierConstructorArgs),
                         publishSourceCodeToEtherscan('Franklin', franklinAddress, franklinContractSourceCode, franklinContractCode, franklinConstructorArgs),
                     ]);

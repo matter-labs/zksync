@@ -154,7 +154,6 @@ flatten: prepare-contracts
 	@mkdir -p contracts/flat
 	$(call flatten_file,Franklin.sol)
 	$(call flatten_file,Governance.sol)
-	$(call flatten_file,PriorityQueue.sol)
 	$(call flatten_file,Verifier.sol)
 
 gen-keys-if-not-present:
