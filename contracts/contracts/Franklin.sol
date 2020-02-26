@@ -298,7 +298,7 @@ contract Franklin is Storage, Config, Events {
         bytes32 _newRoot,
         bytes calldata _publicData,
         bytes calldata _ethWitness,
-        uint64[] calldata _ethWitnessSizes
+        uint32[] calldata _ethWitnessSizes
     ) external {
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
@@ -316,6 +316,7 @@ contract Franklin is Storage, Config, Events {
             uint64 priorityNumber = totalCommittedPriorityRequests - oldPriorOp;
 
             createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _publicData, startId, totalProcessed, priorityNumber);
+            totalBlocksCommitted++;
 
             emit BlockCommitted(_blockNumber);
         }
@@ -360,16 +361,18 @@ contract Franklin is Storage, Config, Events {
     /// @param _publicData Operations packed in bytes array
     /// @param _ethWitness Eth witness that was posted with commit
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
-    function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint64[] memory _ethWitnessSizes)
+    function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
         internal {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
-        require(_publicData.length / 8 == _ethWitnessSizes.length, "fcs13"); // eth witness data is malformed
 
         uint256 currentPointer = 0;
-        uint64[2] memory currentEthWitness;
+
+        uint32 ethWitnessOffset = 0;
+        uint32 currentOperation = 0;
 
         while (currentPointer < _publicData.length) {
-            bytes memory currentEthWitnessBytes = Bytes.slice(_ethWitness, currentEthWitness[1], _ethWitnessSizes[currentEthWitness[0]]);
+            require(currentOperation < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
+            bytes memory currentEthWitnessBytes = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[currentOperation]);
 
             currentPointer  = processOp(
                 currentPointer,
@@ -377,8 +380,8 @@ contract Franklin is Storage, Config, Events {
                 currentEthWitnessBytes
             );
 
-            currentEthWitness[1] += _ethWitnessSizes[currentEthWitness[0]];
-            currentEthWitness[0] += 1;
+            ethWitnessOffset += _ethWitnessSizes[currentOperation];
+            currentOperation += 1;
         }
         require(currentPointer == _publicData.length, "fcs12"); // last chunk exceeds pubdata
     }
@@ -454,7 +457,7 @@ contract Franklin is Storage, Config, Events {
         }
 
         if (opType == uint8(Operations.OpType.ChangePubKey)) {
-            Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, _currentPointer);
+            Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, _currentPointer + 1);
             if (_currentEthWitness.length > 0) {
                 bool valid = verifyChangePubkeySignature(_currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
                 require(valid, "fpp15"); // failed to verify change pubkey hash signature
