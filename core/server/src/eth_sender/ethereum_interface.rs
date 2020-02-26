@@ -95,9 +95,18 @@ impl EthereumInterface for EthereumHttpClient {
                     .block_number()?
                     .saturating_sub(tx_block_number.as_u64());
                 let success = status.as_u64() == 1;
+
+                // Set the receipt only for failures.
+                let receipt = if success {
+                    None
+                } else {
+                    Some(receipt.unwrap())
+                };
+
                 Ok(Some(ExecutedTxStatus {
                     confirmations,
                     success,
+                    receipt,
                 }))
             }
             _ => Ok(None),

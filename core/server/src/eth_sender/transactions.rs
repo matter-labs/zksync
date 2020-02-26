@@ -6,7 +6,7 @@
 // Built-in deps
 use std::str::FromStr;
 // External uses
-use web3::types::{H256, U256};
+use web3::types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::Operation;
@@ -70,4 +70,33 @@ pub(super) struct ExecutedTxStatus {
     pub confirmations: u64,
     /// Whether transaction was executed successfully or failed.
     pub success: bool,
+    /// Receipt for a transaction. Will be set to `Some` only if the transaction
+    /// failed during execution.
+    pub receipt: Option<TransactionReceipt>,
+}
+
+/// The result of the check for the Ethereum transaction commitment.
+#[derive(Debug)]
+pub enum TxCheckOutcome {
+    /// Transaction was committed and confirmed.
+    Committed,
+    /// Transaction is pending yet.
+    Pending,
+    /// Transaction is considered stuck, a replacement should be made.
+    Stuck,
+    /// Transaction execution failed.
+    Failed(TransactionReceipt),
+}
+
+/// Enumeration denoting if the operation was successfully committed, or not yet.
+#[derive(Debug, PartialEq, Eq)]
+pub enum OperationCommitment {
+    Committed,
+    Pending,
+}
+
+impl Default for OperationCommitment {
+    fn default() -> Self {
+        Self::Pending
+    }
 }
