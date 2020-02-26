@@ -51,6 +51,8 @@ pub(super) trait EthereumInterface {
     ) -> Result<SignedCallResult, failure::Error>;
 }
 
+/// Wrapper over `ETHClient` using `Http` transport.
+/// Supposed to be an actual Ethereum intermediator for the `ETHSender`.
 pub struct EthereumHttpClient {
     eth_client: ETHClient<Http>,
 }
@@ -75,13 +77,15 @@ impl EthereumHttpClient {
 
 impl EthereumInterface for EthereumHttpClient {
     fn get_tx_status(&self, hash: &H256) -> Result<Option<ExecutedTxStatus>, failure::Error> {
-        match block_on(
+        let receipt = block_on(
             self.eth_client
                 .web3
                 .eth()
                 .transaction_receipt(*hash)
                 .compat(),
-        )? {
+        )?;
+
+        match receipt {
             Some(TransactionReceipt {
                 block_number: Some(tx_block_number),
                 status: Some(status),

@@ -1,16 +1,3 @@
-//! Transaction sending policy.
-//!
-//! Goal is to handle stuck transactions.
-//! When we try to commit operation to ETH we select nonce, gas price, sign transaction and
-//! watch for its confirmations.
-//!
-//! If transaction is not confirmed for a while we increase gas price and do the same, but we
-//! keep list of all sent transactions for one particular operations, since we can't be sure which
-//! one will be commited so we track all of them.
-//!
-//! Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
-//! that state is always recoverable.
-
 // Built-in deps
 use std::collections::{HashSet, VecDeque};
 use std::str::FromStr;
@@ -39,12 +26,43 @@ const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 const WAIT_CONFIRMATIONS: u64 = 1;
 
+/// `ETHSender` is a structure capable of anchoring
+/// the ZKSync operations to the Ethereum blockchain.
+///
+/// # Description
+///
+/// The essential part of this structure is an event loop (which is supposed to be run
+/// in a separate thread), which obtains the operations to commit through the channel,
+/// and then commits them to the Ethereum, ensuring that all the transactions are
+/// successfully included in blocks and executed.
+///
+/// Also `ETHSender` preserves the order of operations: it guarantees that operations
+/// are committed in FIFO order, meaning that until the older operation is committed
+/// and has enough confirmations, no other operations will be committed.
+///
+/// # Transaction sending policy
+///
+/// The goal is to handle stuck transactions.
+///
+/// When we try to commit operation to ETH, we select nonce, gas price, sign
+/// transaction and watch for its confirmations.
+///
+/// If transaction is not confirmed for a while, we increase the gas price and do the same, but we
+/// keep the list of all sent transactions for one particular operations, since we can't be
+/// sure which one will be committed; thus we have to track all of them.
+///
+/// Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
+/// that state is always recoverable.
 struct ETHSender<Eth: EthereumInterface> {
-    // unconfirmed operations queue
+    /// Unconfirmed operations queue.
     unconfirmed_ops: VecDeque<OperationETHState>,
+    /// Connection to the database.
     db_pool: ConnectionPool,
+    /// Ethereum intermediator.
     ethereum: Eth,
+    /// Channel for receiving operations to commit.
     rx_for_eth: mpsc::Receiver<Operation>,
+    /// Channel to notify about committed operations.
     op_notify: mpsc::Sender<Operation>,
 }
 
@@ -69,6 +87,28 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
         sender
     }
 
+    async fn run(mut self) {
+        let mut timer = time::interval(TX_POLL_PERIOD);
+
+        loop {
+            self.retrieve_operations();
+            timer.tick().await;
+            self.try_commit_current_op();
+        }
+    }
+
+    /// Obtains all the available operations to commit through the channel
+    /// and stores them within self for further processing.
+    fn retrieve_operations(&mut self) {
+        while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
+            self.unconfirmed_ops.push_back(OperationETHState {
+                operation,
+                txs: Vec::new(),
+            });
+        }
+    }
+
+    /// Restores the state of `ETHSender` from the database.
     fn restore_state(&mut self, storage: StorageProcessor) -> Result<(), failure::Error> {
         self.unconfirmed_ops = storage
             .load_unconfirmed_operations()?
@@ -115,23 +155,6 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
             } else {
                 self.unconfirmed_ops.push_front(current_op);
             }
-        }
-    }
-
-    async fn run(mut self) {
-        let mut timer = time::interval(TX_POLL_PERIOD);
-
-        loop {
-            while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
-                self.unconfirmed_ops.push_back(OperationETHState {
-                    operation,
-                    txs: Vec::new(),
-                });
-            }
-
-            timer.tick().await;
-
-            self.try_commit_current_op();
         }
     }
 
