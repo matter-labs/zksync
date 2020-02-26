@@ -206,7 +206,7 @@ contract Franklin is Storage, Config, Events {
         registerSingleWithdrawal(tokenId, _amount);
         require(IERC20(_token).transfer(msg.sender, _amount), "fw011"); // token transfer failed withdraw
     }
-    
+
     /// @notice Register full exit request - pack pubdata, add priority request
     /// @param _accountId Numerical id of the account
     /// @param _token Token address, 0 address for ether
@@ -219,7 +219,7 @@ contract Franklin is Storage, Config, Events {
         // Fee is:
         //   fee coeff * base tx gas cost * gas price
         uint256 fee = FEE_GAS_PRICE_MULTIPLIER * BASE_FULL_EXIT_GAS * tx.gasprice;
-        
+
         uint16 tokenId;
         if (_token == address(0)) {
             tokenId = 0;
@@ -311,19 +311,12 @@ contract Franklin is Storage, Config, Events {
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
             uint64 startId = totalOnchainOps;
-            (uint64 totalProcessed, uint64 priorityNumber) = collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
-
-            // Verify that priority operations from this block are valid
-            // (their data is similar to data from priority requests mapping)
-            verifyPriorityOperations(startId, totalProcessed, priorityNumber);
+            uint64 oldPriorOp = totalCommittedPriorityRequests;
+            collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
+            uint64 totalProcessed = totalOnchainOps - startId;
+            uint64 priorityNumber = totalCommittedPriorityRequests - oldPriorOp;
 
             createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _publicData, startId, totalProcessed, priorityNumber);
-
-            totalOnchainOps = startId + totalProcessed;
-
-            totalBlocksCommitted += 1;
-
-            totalCommittedPriorityRequests += priorityNumber;
 
             emit BlockCommitted(_blockNumber);
         }
@@ -368,31 +361,21 @@ contract Franklin is Storage, Config, Events {
     /// @param _publicData Operations packed in bytes array
     /// @param _ethWitness Eth witness that was posted with commit
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
-    /// @return onchain operations start id for global onchain operations counter, nchain operations number for this block, priority operations number for this block
     function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint64[] memory _ethWitnessSizes)
-        internal
-        returns (uint64 processedOnchainOps, uint64 priorityCount)
-    {
+        internal {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
 
-        uint64 currentOnchainOp = totalOnchainOps;
         uint256 currentPointer = 0;
         uint64[2] memory currentEthWitness;
 
         while (currentPointer < _publicData.length) {
-            uint8 opType = uint8(_publicData[currentPointer]);
             bytes memory currentEthWitnessBytes = Bytes.slice(_ethWitness, currentEthWitness[1], _ethWitnessSizes[currentEthWitness[0]]);
-            (uint256 len, uint64 ops, uint64 priority) = processOp(
-                opType,
+
+            currentPointer  = processOp(
                 currentPointer,
                 _publicData,
-                currentOnchainOp,
                 currentEthWitnessBytes
             );
-            currentPointer += len;
-            processedOnchainOps += ops;
-            priorityCount += priority;
-            currentOnchainOp += ops;
 
             currentEthWitness[1] += _ethWitnessSizes[currentEthWitness[0]];
             currentEthWitness[0] += 1;
@@ -417,54 +400,61 @@ contract Franklin is Storage, Config, Events {
     }
 
     /// @notice On the first byte determines the type of operation, if it is an onchain operation - saves it in storage
-    /// @param _opType Operation type
     /// @param _currentPointer Current pointer in pubdata
     /// @param _publicData Operation pubdata
-    /// @param _currentOnchainOp Operation identifier in onchain operations mapping
-    /// @return operation processed length, and indicators if this operation is an onchain operation and if it is a priority operation (1 if true)
+    /// @param _currentEthWitness current eth witness for operation
+    /// @return new pointer in pubdata
     function processOp(
-        uint8 _opType,
         uint256 _currentPointer,
         bytes memory _publicData,
-        uint64 _currentOnchainOp,
         bytes memory _currentEthWitness
-    ) internal returns (uint256 processedLen, uint64 processedOnchainOps, uint64 priorityCount) {
-        uint256 opDataPointer = _currentPointer + 1; // operation type byte
+    ) internal returns (uint256 _newPubdataOffset) {
+        uint8 opType = uint8(_publicData[_currentPointer]);
 
-        if (_opType == uint8(Operations.OpType.Noop)) return (NOOP_BYTES, 0, 0);
-        if (_opType == uint8(Operations.OpType.TransferToNew)) return (TRANSFER_TO_NEW_BYTES, 0, 0);
-        if (_opType == uint8(Operations.OpType.Transfer)) return (TRANSFER_BYTES, 0, 0);
-        if (_opType == uint8(Operations.OpType.CloseAccount)) return (CLOSE_ACCOUNT_BYTES, 0, 0);
+        if (opType == uint8(Operations.OpType.Noop)) return _currentPointer + NOOP_BYTES;
+        if (opType == uint8(Operations.OpType.TransferToNew)) return _currentPointer + TRANSFER_TO_NEW_BYTES;
+        if (opType == uint8(Operations.OpType.Transfer)) return _currentPointer + TRANSFER_BYTES;
+        if (opType == uint8(Operations.OpType.CloseAccount)) return _currentPointer + CLOSE_ACCOUNT_BYTES;
 
-        if (_opType == uint8(Operations.OpType.Deposit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, DEPOSIT_BYTES - 1);
-            onchainOps[_currentOnchainOp] = OnchainOperation(
+        if (opType == uint8(Operations.OpType.Deposit)) {
+            bytes memory pubData = Bytes.slice(_publicData, _currentPointer + 1, DEPOSIT_BYTES - 1);
+            onchainOps[totalOnchainOps] = OnchainOperation(
                 Operations.OpType.Deposit,
                 pubData
             );
-            return (DEPOSIT_BYTES, 1, 1);
+            verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
+
+            totalOnchainOps++;
+
+            return _currentPointer + DEPOSIT_BYTES;
         }
 
-        if (_opType == uint8(Operations.OpType.PartialExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, PARTIAL_EXIT_BYTES - 1);
-            onchainOps[_currentOnchainOp] = OnchainOperation(
+        if (opType == uint8(Operations.OpType.PartialExit)) {
+            bytes memory pubData = Bytes.slice(_publicData, _currentPointer + 1, PARTIAL_EXIT_BYTES - 1);
+            onchainOps[totalOnchainOps] = OnchainOperation(
                 Operations.OpType.PartialExit,
                 pubData
             );
-            return (PARTIAL_EXIT_BYTES, 1, 0);
+            totalOnchainOps++;
+
+            return _currentPointer + PARTIAL_EXIT_BYTES;
         }
 
-        if (_opType == uint8(Operations.OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, opDataPointer, FULL_EXIT_BYTES - 1);
-            onchainOps[_currentOnchainOp] = OnchainOperation(
+        if (opType == uint8(Operations.OpType.FullExit)) {
+            bytes memory pubData = Bytes.slice(_publicData, _currentPointer + 1, FULL_EXIT_BYTES - 1);
+            onchainOps[totalOnchainOps] = OnchainOperation(
                 Operations.OpType.FullExit,
                 pubData
             );
-            return (FULL_EXIT_BYTES, 1, 1);
+
+            verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
+
+            totalOnchainOps++;
+            return _currentPointer + FULL_EXIT_BYTES;
         }
 
-        if (_opType == uint8(Operations.OpType.ChangePubKey)) {
-            Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, opDataPointer);
+        if (opType == uint8(Operations.OpType.ChangePubKey)) {
+            Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, _currentPointer);
             if (_currentEthWitness.length > 0) {
                 bool valid = verifyChangePubkeySignature(_currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
                 require(valid, "fpp15"); // failed to verify change pubkey hash signature
@@ -472,12 +462,12 @@ contract Franklin is Storage, Config, Events {
                 bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
                 require(valid, "fpp16"); // new pub key hash is not authenticated properly
             }
-            return (CHANGE_PUBKEY_BYTES, 0, 0);
+            return _currentPointer + CHANGE_PUBKEY_BYTES;
         }
 
         revert("fpp14"); // unsupported op
     }
-    
+
     /// @notice Creates block commitment from its data
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
@@ -507,37 +497,24 @@ contract Franklin is Storage, Config, Events {
         return hash;
     }
 
-    /// @notice Check if blocks' priority operations are valid
-    /// @param _startId Onchain op start id
-    /// @param _totalProcessed How many ops are procceeded
-    /// @param _number Priority ops number
-    function verifyPriorityOperations(uint64 _startId, uint64 _totalProcessed, uint64 _number) internal view {
-        require(_number <= totalOpenPriorityRequests-totalCommittedPriorityRequests, "fvs11"); // too many priority requests
-        uint64 start = _startId;
-        uint64 end = start + _totalProcessed;
-        
-        uint64 counter = 0;
-        for (uint64 current = start; current < end; ++current) {
-            if (onchainOps[current].opType == Operations.OpType.FullExit || onchainOps[current].opType == Operations.OpType.Deposit) {
-                OnchainOperation storage op = onchainOps[current];
+    function verifyNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
+        require(totalOpenPriorityRequests > totalCommittedPriorityRequests, "vnp11"); // no more priority requests in queue
 
-                uint64 _priorityRequestId = counter + firstPriorityRequestId + totalCommittedPriorityRequests;
-                Operations.OpType priorReqType = priorityRequests[_priorityRequestId].opType;
-                bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
+        uint64 _priorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
+        Operations.OpType priorReqType = priorityRequests[_priorityRequestId].opType;
+        bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
 
-                require(priorReqType == op.opType, "fvs12"); // incorrect priority op type
+        require(priorReqType == _onchainOp.opType, "nvp12"); // incorrect priority op type
 
-                if (op.opType == Operations.OpType.Deposit) {
-                    require(Operations.depositPubdataMatch(priorReqPubdata, op.pubData), "fvs13");
-                } else if (op.opType == Operations.OpType.FullExit) {
-                    require(Operations.fullExitPubdataMatch(priorReqPubdata, op.pubData), "fvs14");
-                } else {
-                    revert("fvs15"); // invalid or non-priority operation
-                }
-
-                counter++;
-            }
+        if (_onchainOp.opType == Operations.OpType.Deposit) {
+            require(Operations.depositPubdataMatch(priorReqPubdata, _onchainOp.pubData), "vnp13");
+        } else if (_onchainOp.opType == Operations.OpType.FullExit) {
+            require(Operations.fullExitPubdataMatch(priorReqPubdata, _onchainOp.pubData), "vnp14");
+        } else {
+            revert("vnp15"); // invalid or non-priority operation
         }
+
+        totalCommittedPriorityRequests++;
     }
 
     /// @notice Removes some onchain ops (for example in case of wrong priority comparison)
