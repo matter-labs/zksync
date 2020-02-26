@@ -1,4 +1,3 @@
-docs/setup-dev.md
 # Prerequisites
 
 ## `Docker`
