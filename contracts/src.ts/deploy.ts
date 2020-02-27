@@ -1,6 +1,6 @@
-import {deployContract} from 'ethereum-waffle';
-import {ethers} from 'ethers';
-import {bigNumberify, parseEther} from "ethers/utils";
+import { deployContract } from 'ethereum-waffle';
+import { ethers } from 'ethers';
+import { bigNumberify, parseEther } from "ethers/utils";
 import Axios from "axios";
 import * as qs from 'querystring';
 import * as url from 'url';
@@ -12,7 +12,7 @@ const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
 export const ERC20MintableContract = function () {
     let contract = require('openzeppelin-solidity/build/contracts/ERC20Mintable');
-    contract.evm = {bytecode: contract.bytecode};
+    contract.evm = { bytecode: contract.bytecode };
     return contract
 }();
 
@@ -37,31 +37,31 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
         let constructorInputs = compiled
             .abi
             .filter(i => i.type === 'constructor');
-            
+
         if (constructorInputs.length > 0) {
-            constructorArguments = 
+            constructorArguments =
                 ethers.utils.defaultAbiCoder
-                .encode(
-                    constructorInputs[0].inputs,
-                    constructorParams
-                )
-                .slice(2);
+                    .encode(
+                        constructorInputs[0].inputs,
+                        constructorParams
+                    )
+                    .slice(2);
         }
     }
 
     let data = {
-        apikey:             process.env.ETHERSCAN_API_KEY,  // A valid API-Key is required        
-        module:             'contract',                     // Do not change
-        action:             'verifysourcecode',             // Do not change
+        apikey: process.env.ETHERSCAN_API_KEY,  // A valid API-Key is required
+        module: 'contract',                     // Do not change
+        action: 'verifysourcecode',             // Do not change
         contractaddress,                                    // Contract Address starts with 0x...     
         sourceCode,                                         // Contract Source Code (Flattened if necessary)
         contractname,                                       // ContractName
-        compilerversion:    'v0.5.16+commit.9c3226ce',      // see http://etherscan.io/solcversions for list of support versions
-        optimizationUsed:   0,                              // 0 = No Optimization, 1 = Optimization used
-        runs:               200,                            // set to 200 as default unless otherwise         
+        compilerversion: 'v0.5.16+commit.9c3226ce',      // see http://etherscan.io/solcversions for list of support versions
+        optimizationUsed: 0,                              // 0 = No Optimization, 1 = Optimization used
+        runs: 200,                            // set to 200 as default unless otherwise
         constructorArguements: constructorArguments         // if applicable. How nice, they have a typo in their api
     };
-    
+
     let r = await Axios.post(etherscanApiUrl, qs.stringify(data));
     let retriesLeft = 20;
     if (r.data.status != 1) {
@@ -78,12 +78,12 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
     } else {
         let status;
         let retriesLeft = 10;
-        while (retriesLeft --> 0) {
+        while (retriesLeft-- > 0) {
             status = await Axios.get(`http://api.etherscan.io/api?module=contract&&action=checkverifystatus&&guid=${r.data.result}`).then(r => r.data);
-            
-            if (status.result.includes('Pending in queue') == false) 
+
+            if (status.result.includes('Pending in queue') == false)
                 break;
-            
+
             await sleep(5000);
         }
 
@@ -192,4 +192,3 @@ export async function addTestNotApprovedERC20Token(wallet) {
         console.error("Add token error:" + err);
     }
 }
-
