@@ -148,13 +148,16 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
     fn try_commit(&mut self, mut operation: OperationETHState) {
         // Check the transactions associated with the operation, and send a new one if required.
 
-        // TODO is it correct to use `unwrap_or_default` here?
+        // We perform a commitment step here. In case of error, we suppose that this is some
+        // network issue which won't appear the next time, so we report the situation to the
+        // log and consider the operation pending (meaning that we won't process it on this
+        // step, but will try to do so on the next one).
         let result = self
-            .drive_to_completion(&mut operation)
+            .perform_commitment_step(&mut operation)
             .map_err(|e| {
                 warn!("Error while trying to complete uncommitted op: {}", e);
             })
-            .unwrap_or_default();
+            .unwrap_or(OperationCommitment::Pending);
 
         // Check if we've completed the commitment.
         match result {
@@ -186,6 +189,83 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
                 self.unconfirmed_ops.push_front(operation);
             }
         }
+    }
+
+    /// Checks the state of the operation commitment, choosing the necessary action to perform.
+    /// Initially this method sends the first transaction to the Ethereum blockchain.
+    /// Within next invocations for the same operation, state of sent transaction is checked.
+    /// If transaction(s) will be pending yet, this method won't do anything.
+    /// If one of transactions will be successfully confirmed on chain, the commitment will be considered
+    /// finished.
+    /// In case of stuck transaction, another transaction with increased gas limit will be sent.
+    /// In case of transaction failure, it will be reported and processed according to failure handling
+    /// policy.
+    fn perform_commitment_step(
+        &self,
+        op: &mut OperationETHState,
+    ) -> Result<OperationCommitment, failure::Error> {
+        let current_block = self.ethereum.block_number()?;
+
+        // Check statuses of existing transactions.
+        let mut failed_txs: HashSet<H256> = HashSet::new();
+        let mut last_stuck_tx: Option<&TransactionETHState> = None;
+
+        // Go through every transaction in a loop. We will exit this method early
+        // if there will be discovered a pending or successfully committed transaction.
+        for tx in &op.txs {
+            match self.check_transaction_state(tx, current_block)? {
+                TxCheckOutcome::Pending => {
+                    // Transaction is pending, nothing to do yet.
+                    return Ok(OperationCommitment::Pending);
+                }
+                TxCheckOutcome::Committed => {
+                    info!(
+                        "Operation {}, {}  block: {}, committed, tx: {:#x}",
+                        op.operation.id.unwrap(),
+                        op.operation.action.to_string(),
+                        op.operation.block.block_number,
+                        tx.signed_tx.hash,
+                    );
+                    self.save_completed_tx_to_db(&tx.signed_tx.hash)?;
+                    return Ok(OperationCommitment::Committed);
+                }
+                TxCheckOutcome::Stuck => {
+                    // Update the last stuck transaction. If we won't exit the loop early,
+                    // it will be used to create a new transaction with higher gas limit.
+                    last_stuck_tx = Some(tx);
+                }
+                TxCheckOutcome::Failed(receipt) => {
+                    warn!(
+                        "ETH transaction failed: tx: {:#x}, operation_id: {}; tx_receipt: {:#?} ",
+                        tx.signed_tx.hash,
+                        op.operation.id.unwrap(),
+                        receipt,
+                    );
+                    failed_txs.insert(tx.signed_tx.hash);
+
+                    // TODO: React on a failure. There should be an failed tx processing
+                    // policy.
+                }
+            }
+        }
+
+        // Reaching this point will mean that either there were no transactions to process,
+        // or the latest transaction got stuck.
+        // Either way we should create a new transaction (the approach is the same,
+        // `create_new_tx` will adapt its logic based on `last_stuck_tx`).
+        let deadline_block = current_block + EXPECTED_WAIT_TIME_BLOCKS;
+        let new_tx = self.create_new_tx(&op.operation, deadline_block, last_stuck_tx)?;
+        // New transaction should be persisted in the DB *before* sending it.
+        self.save_signed_tx_to_db(&new_tx)?;
+
+        op.txs.push(new_tx.clone());
+        info!(
+            "Sending tx for op, op_id: {} tx_hash: {:#x}",
+            new_tx.op_id, new_tx.signed_tx.hash
+        );
+        self.ethereum.send_tx(&new_tx.signed_tx)?;
+
+        Ok(OperationCommitment::Pending)
     }
 
     fn save_signed_tx_to_db(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
@@ -240,74 +320,6 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
         };
 
         Ok(outcome)
-    }
-
-    fn drive_to_completion(
-        &self,
-        op: &mut OperationETHState,
-    ) -> Result<OperationCommitment, failure::Error> {
-        let current_block = self.ethereum.block_number()?;
-
-        // Check statuses of existing transactions.
-        let mut failed_txs: HashSet<H256> = HashSet::new();
-        let mut last_stuck_tx: Option<&TransactionETHState> = None;
-
-        // Go through every transaction in a loop. We will exit this method early
-        // if there will be discovered a pending or successfully committed transaction.
-        for tx in &op.txs {
-            match self.check_transaction_state(tx, current_block)? {
-                TxCheckOutcome::Pending => {
-                    // Transaction is pending, nothing to do yet.
-                    return Ok(OperationCommitment::Pending);
-                }
-                TxCheckOutcome::Committed => {
-                    info!(
-                        "Operation {}, {}  block: {}, committed, tx: {:#x}",
-                        op.operation.id.unwrap(),
-                        op.operation.action.to_string(),
-                        op.operation.block.block_number,
-                        tx.signed_tx.hash,
-                    );
-                    self.save_completed_tx_to_db(&tx.signed_tx.hash)?;
-                    return Ok(OperationCommitment::Committed);
-                }
-                TxCheckOutcome::Stuck => {
-                    // Update the last stuck transaction. If we won't exit the loop early,
-                    // it will be used to create a new transaction with higher gas limit.
-                    last_stuck_tx = Some(tx);
-                }
-                TxCheckOutcome::Failed(receipt) => {
-                    warn!(
-                        "ETH transaction failed: tx: {:#x}, operation_id: {}; tx_receipt: {:#?} ",
-                        tx.signed_tx.hash,
-                        op.operation.id.unwrap(),
-                        receipt,
-                    );
-                    failed_txs.insert(tx.signed_tx.hash);
-
-                    // TODO: React on a failure. There should be an failed tx processing
-                    // policy.
-                }
-            }
-        }
-
-        // Reaching this point will mean that either there was no transactions to process,
-        // or the latest transaction got stuck.
-        // Either way we should create a new transaction (the approach is the same,
-        // `create_new_tx` will adapt its logic based on `last_stuck_tx`).
-        let deadline_block = current_block + EXPECTED_WAIT_TIME_BLOCKS;
-        let new_tx = self.create_new_tx(&op.operation, deadline_block, last_stuck_tx)?;
-        // New transaction should be persisted in the DB *before* sending it.
-        self.save_signed_tx_to_db(&new_tx)?;
-
-        op.txs.push(new_tx.clone());
-        info!(
-            "Sending tx for op, op_id: {} tx_hash: {:#x}",
-            new_tx.op_id, new_tx.signed_tx.hash
-        );
-        self.ethereum.send_tx(&new_tx.signed_tx)?;
-
-        Ok(OperationCommitment::Pending)
     }
 
     /// Creates a new transaction. If stuck tx is provided, the new transaction will be
@@ -367,6 +379,7 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
         }))
     }
 
+    /// Creates a signed transaction according to the operation action.
     fn sign_operation_tx(
         &self,
         op: &Operation,
