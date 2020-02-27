@@ -50,6 +50,20 @@ impl MockDatabase {
             .is_none());
     }
 
+    pub fn assert_not_stored(&self, tx: &TransactionETHState) {
+        assert!(self
+            .confirmed_operations
+            .borrow()
+            .get(&tx.signed_tx.hash)
+            .is_none());
+
+        assert!(self
+            .unconfirmed_operations
+            .borrow()
+            .get(&tx.signed_tx.hash)
+            .is_none());
+    }
+
     /// Ensures that the provided transaction is stored as confirmed.
     pub fn assert_confirmed(&self, tx: &TransactionETHState) {
         assert_eq!(
@@ -94,13 +108,25 @@ impl DatabaseAccess for MockDatabase {
     }
 }
 
-#[derive(Default)]
+#[derive(Debug)]
 pub(super) struct MockEthereum {
     pub block_number: u64,
     pub nonce: U256,
     pub gas_price: U256,
     pub tx_statuses: RefCell<HashMap<H256, ExecutedTxStatus>>,
     pub sent_txs: RefCell<HashMap<H256, SignedCallResult>>,
+}
+
+impl Default for MockEthereum {
+    fn default() -> Self {
+        Self {
+            block_number: 1,
+            nonce: Default::default(),
+            gas_price: 100.into(),
+            tx_statuses: Default::default(),
+            sent_txs: Default::default(),
+        }
+    }
 }
 
 impl MockEthereum {
