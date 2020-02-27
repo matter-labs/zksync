@@ -6,7 +6,7 @@ use web3::contract::{tokens::Tokenize, Options};
 use web3::types::{H256, U256};
 
 use eth_client::SignedCallResult;
-use models::Operation;
+use models::{Action, Operation};
 
 use super::ETHSender;
 use crate::eth_sender::database::DatabaseAccess;
@@ -180,6 +180,37 @@ impl MockEthereum {
         self.tx_statuses
             .borrow_mut()
             .insert(tx.signed_tx.hash, status);
+    }
+
+    /// Replicates the `ETHCLient::sign_operation_tx` method for testing.
+    pub fn create_signed_tx_replica(&self, op: &Operation) -> SignedCallResult {
+        match &op.action {
+            Action::Commit => {
+                let root = op.block.get_eth_encoded_root();
+                let public_data = op.block.get_eth_public_data();
+                let witness_data = op.block.get_eth_witness_data();
+                self.sign_call_tx(
+                    "commitBlock",
+                    (
+                        u64::from(op.block.block_number),
+                        u64::from(op.block.fee_account),
+                        root,
+                        public_data,
+                        witness_data.0,
+                        witness_data.1,
+                    ),
+                    Options::default(),
+                )
+                .unwrap()
+            }
+            Action::Verify { proof } => self
+                .sign_call_tx(
+                    "verifyBlock",
+                    (u64::from(op.block.block_number), *proof.clone()),
+                    Options::default(),
+                )
+                .unwrap(),
+        }
     }
 }
 

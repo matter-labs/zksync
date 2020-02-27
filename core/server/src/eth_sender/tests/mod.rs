@@ -47,6 +47,29 @@ fn deadline_block() {
     );
 }
 
+/// Checks that `ETHSender` invokes `EthereumInterface::sign_call_tx` as expected.
+#[test]
+fn tx_creation() {
+    let (eth_sender, _, _) = default_eth_sender();
+
+    let operations = vec![
+        test_data::commit_operation(0),
+        test_data::verify_operation(0),
+    ];
+
+    for operation in operations {
+        let actual_tx = eth_sender
+            .create_new_tx(
+                &operation,
+                eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
+                None,
+            )
+            .unwrap();
+        let expected_tx = eth_sender.ethereum.create_signed_tx_replica(&operation);
+        assert_eq!(actual_tx.signed_tx, expected_tx);
+    }
+}
+
 /// Test for a normal `ETHSender` workflow: we send the two sequential
 /// operations (commit and verify), they are successfully committed to
 /// the Ethereum, and notification is sent after `verify` operation
