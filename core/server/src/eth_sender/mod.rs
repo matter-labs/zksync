@@ -27,6 +27,9 @@ mod database;
 mod ethereum_interface;
 mod transactions;
 
+#[cfg(test)]
+mod tests;
+
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 const WAIT_CONFIRMATIONS: u64 = 1;
@@ -107,6 +110,7 @@ impl<ETH: EthereumInterface> ETHSender<ETH> {
     }
 
     /// Changes the used failure policy.
+    #[cfg(test)]
     pub fn set_failure_policy(&mut self, failure_policy: FailureHandler) {
         self.failure_policy = failure_policy;
     }

@@ -14,6 +14,7 @@ use storage::StorageETHOperation;
 
 /// An intermediate state of the operation to be stored on
 /// the Ethereum chain.
+#[derive(Debug, Clone)]
 pub(super) struct OperationETHState {
     /// ZKSync operation to be stored.
     pub operation: Operation,
@@ -65,6 +66,7 @@ impl TransactionETHState {
 }
 
 /// State of the executed Ethereum transaction.
+#[derive(Debug, Clone)]
 pub(super) struct ExecutedTxStatus {
     /// Amount of confirmations for a block containing the transaction.
     pub confirmations: u64,
