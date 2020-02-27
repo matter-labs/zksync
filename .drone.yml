@@ -29,36 +29,19 @@
 #       - ./js/explorer/node_modules
 #       - ./target/cargo
 #       - ./keys
-# - name: prepare-ci-env
+# - name: init
 #   image: matterlabs/ci
 #   commands:
 #   - export ZKSYNC_HOME=`pwd`
 #   - export PATH=$ZKSYNC_HOME/bin:$PATH
 #   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
 #   - ci-prepare-env.sh
-#   depends_on:
-#   - restore-cache
-# - name: yarn
-#   image: matterlabs/ci
-#   commands:
-#   - export ZKSYNC_HOME=`pwd`
-#   - export PATH=$ZKSYNC_HOME/bin:$PATH
-#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
 #   - zksync env ci
 #   - zksync yarn
-#   depends_on:
-#   - prepare-ci-env
-# - name: db-setup
-#   image: matterlabs/ci
-#   commands:
-#   - export ZKSYNC_HOME=`pwd`
-#   - export PATH=$ZKSYNC_HOME/bin:$PATH
-#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-#   - zksync env ci
 #   - zksync db-wait
 #   - zksync db-setup
 #   depends_on:
-#   - prepare-ci-env
+#   - restore-cache
 # - name: run-genesis
 #   image: matterlabs/ci
 #   commands:
@@ -67,7 +50,21 @@
 #   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
 #   - zksync genesis
 #   depends_on:
-#   - db-setup
+#   - init
+# - name: rust-tests-and-checks
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync circuit-tests
+#   - zksync prover-tests
+#   - zksync db-test
+#   - f cargo test
+#   - cargo fmt -- --check
+#   - f cargo clippy --tests --benches -- -D warnings
+#   depends_on:
+#   - run-genesis
 # - name: build-contracts
 #   image: matterlabs/ci
 #   commands:
@@ -76,54 +73,7 @@
 #   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
 #   - zksync build-contracts
 #   depends_on:
-#   - prepare-ci-env
-#   - yarn
-# - name: rust-tests-circuit
-#   image: matterlabs/ci
-#   commands:
-#   - export ZKSYNC_HOME=`pwd`
-#   - export PATH=$ZKSYNC_HOME/bin:$PATH
-#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-#   - zksync circuit-tests
-#   depends_on:
-#   - run-genesis
-# - name: rust-tests-prover
-#   image: matterlabs/ci
-#   commands:
-#   - export ZKSYNC_HOME=`pwd`
-#   - export PATH=$ZKSYNC_HOME/bin:$PATH
-#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-#   - zksync prover-tests
-#   depends_on:
-#   - run-genesis
-# - name: rust-tests-db
-#   image: matterlabs/ci
-#   commands:
-#   - export ZKSYNC_HOME=`pwd`
-#   - export PATH=$ZKSYNC_HOME/bin:$PATH
-#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-#   - zksync db-test
-#   depends_on:
-#   - run-genesis
-# - name: rust-tests-unit
-#   image: matterlabs/ci
-#   commands:
-#   - export ZKSYNC_HOME=`pwd`
-#   - export PATH=$ZKSYNC_HOME/bin:$PATH
-#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-#   - f cargo test
-#   depends_on:
-#   - run-genesis
-# - name: rust-checks
-#   image: matterlabs/ci
-#   commands:
-#   - export ZKSYNC_HOME=`pwd`
-#   - export PATH=$ZKSYNC_HOME/bin:$PATH
-#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-#   - cargo fmt -- --check
-#   - f cargo clippy --tests --benches -- -D warnings
-#   depends_on:
-#   - run-genesis
+#   - init
 # - name: redeploy-and-integration-testkit
 #   image: matterlabs/ci
 #   commands:
@@ -159,11 +109,7 @@
 #       - ./keys
 #   depends_on:
 #      - redeploy-and-integration-testkit
-#      - rust-tests-circuit
-#      - rust-tests-prover
-#      - rust-tests-db
-#      - rust-tests-unit
-#      - rust-checks
+#      - rust-tests-and-checks
 # ---
 # kind: pipeline
 # type: docker
@@ -213,7 +159,7 @@
 #   - zksync genesis
 #   - zksync redeploy
 #   - f cargo build --release --bin server
-#   - f cargo build --bin dummy_prover
+#   - f cargo build --release --bin dummy_prover
 #   depends_on:
 #   - restore-cache
 # - name: start-server-detached
@@ -253,6 +199,7 @@ type: docker
 name: update-stage
 clone:
     depth: 10
+
 volumes:
   - name: cache
     host:
@@ -266,6 +213,7 @@ volumes:
   - name: cargo-registry-musl
     host:
       path: /tmp/cargo-registry-musl
+
 trigger:
   # target:
   # - stage
@@ -307,7 +255,7 @@ steps:
   depends_on:
   - restore-cache
 
-- name: client-and-explorer-build-and-publish
+- name: nginx-build-and-publish
   image: matterlabs/ci
   environment:
     USERNAME:
@@ -333,7 +281,7 @@ steps:
   depends_on:
   - init
 
-- name: build-rust-and-publish
+- name: build-rust
   image: ekidd/rust-musl-builder
   volumes:
   - name: cargo-git-musl
@@ -405,6 +353,6 @@ steps:
   - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/stage.env KUBECONFIG=`pwd`/kubeconfig.yaml
   - zksync apply-kubeconfig
   depends_on:
-  - nginx-image-publish
+  - nginx-build-and-publish
   - server-image-publish
   - prover-image-publish

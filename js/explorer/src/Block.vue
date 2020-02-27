@@ -142,8 +142,8 @@ export default {
 
                 switch (type) {
                     case "Deposit":
-                        from               = shortenHash(tx.priority_op.data.sender, 'unknown sender');
-                        to                 = shortenHash(tx.priority_op.data.account, 'unknown account');
+                        from               = shortenHash(tx.priority_op.data.from, 'unknown sender');
+                        to                 = shortenHash(tx.priority_op.data.to, 'unknown account');
                         from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.sender}`;
                         to_explorer_link   = `${this.routerBase}accounts/${tx.priority_op.data.account}`;
                         from_onchain_icon  = `<span class="onchain_icon">onchain</span>`;
@@ -165,9 +165,13 @@ export default {
                         amount             = `${formatToken(tx.tx.amount, token)} ${token}`;
                         fee                = `${formatToken(tx.tx.fee, token)} ${token}`;
                         break;
+                    case "ChangePubKey":
+                        from               = shortenHash(tx.tx.account, 'unknown account address');
+                        to                 = shortenHash(tx.tx.newPkHash, 'unknown pubkey hash');
+                        break;
                     case "Withdraw":
-                        from               = shortenHash(tx.tx.account, 'unknown account');
-                        to                 = shortenHash(tx.tx.ethAddress, 'unknown ethAddress');
+                        from               = shortenHash(tx.tx.from, 'unknown account');
+                        to                 = shortenHash(tx.tx.to, 'unknown ethAddress');
                         from_explorer_link = `${this.routerBase}accounts/${tx.tx.account}`;
                         to_explorer_link   = `${this.blockchain_explorer_address}/${tx.tx.ethAddress}`;
                         from_onchain_icon  = '';
@@ -177,7 +181,14 @@ export default {
                         amount             = `${formatToken(tx.tx.amount, token)} ${token}`;
                         fee                = `${formatToken(tx.tx.fee, token)} ${token}`;
                         break;
-                    default: 
+                    case "FullExit":
+                        from               = shortenHash(tx.priority_op.data.eth_address, 'unknown account address');
+                        token              = tx.priority_op.data.token;
+                        token              = tokens[token].syncSymbol;
+                        amount             = `${formatToken(tx.op.withdraw_amount, token)} ${token}`;
+                        fee                = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
+                        break;
+                    default:
                         throw new Error('switch reached default');
                 }
 

@@ -15,9 +15,9 @@ init:
 	@bin/init
 
 yarn:
+	@cd js/zksync.js && yarn && yarn build
 	@cd js/client && yarn
 	@cd js/explorer && yarn
-	@cd js/zksync.js && yarn
 	@cd contracts && yarn
 	@cd js/tests && yarn
 

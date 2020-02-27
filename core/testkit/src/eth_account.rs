@@ -243,6 +243,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         amount: BigDecimal,
         to: &Address,
+        nonce: Option<U256>,
     ) -> Result<PriorityOp, failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
@@ -250,7 +251,8 @@ impl<T: Transport> EthereumAccount<T> {
                 "depositETH",
                 (big_dec_to_u256(amount.clone()), *to),
                 Options::with(|opt| {
-                    opt.value = Some(big_dec_to_u256(amount.clone() + priority_op_fee()))
+                    opt.value = Some(big_dec_to_u256(amount.clone() + priority_op_fee()));
+                    opt.nonce = nonce;
                 }),
             )
             .await
