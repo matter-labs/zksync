@@ -105,7 +105,7 @@ dummy-prover:
 	cargo run --bin dummy_prover
 
 prover:
-	@bin/launch_dev_provers
+	@bin/provers-launch-dev
 
 server:
 	@cargo run --bin server --release
@@ -227,9 +227,7 @@ apply-kubeconfig:
 
 update-rust: push-image-rust apply-kubeconfig
 	@kubectl patch deployment $(ZKSYNC_ENV)-server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
-	# TODO: jazzandrock patch each deployment for each prover
-	@kubectl patch deployment $(ZKSYNC_ENV)-prover-10 -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
-	@kubectl patch deployment $(ZKSYNC_ENV)-prover-20 -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@bin/provers-patch-deployments
 
 update-nginx: push-image-nginx apply-kubeconfig
 	@kubectl patch deployment $(ZKSYNC_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
@@ -255,7 +253,7 @@ endif
 restart: stop start
 
 start-provers:
-	@bin/scale-provers 1
+	@bin/provers-scale 1
 
 start-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --replicas=1
@@ -264,7 +262,7 @@ start-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=1
 
 stop-provers:
-	@bin/scale-provers 0
+	@bin/provers-scale 0
 
 stop-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=0
