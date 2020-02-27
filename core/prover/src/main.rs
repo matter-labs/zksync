@@ -52,19 +52,6 @@ fn main() {
     // Create client
     let api_url = env::var("PROVER_SERVER_URL").expect("PROVER_SERVER_URL is missing");
     let api_client = client::ApiClient::new(&api_url, &worker_name, Some(stop_signal.clone()));
-    // Create prover
-    let jubjub_params = AltJubjubBn256::new();
-    let circuit_params = read_circuit_params(block_size_chunks);
-    let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
-    let worker = BabyProver::new(
-        circuit_params,
-        jubjub_params,
-        block_size_chunks,
-        api_client.clone(),
-        heartbeat_interval,
-        stop_signal,
-    );
-
     let prover_id_arc = Arc::new(AtomicI32::new(ABSENT_PROVER_ID));
 
     // Handle termination requests.
@@ -93,6 +80,19 @@ fn main() {
         });
     }
 
+    // Create prover
+    let jubjub_params = AltJubjubBn256::new();
+    let circuit_params = read_circuit_params(block_size_chunks);
+    let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
+    let worker = BabyProver::new(
+        circuit_params,
+        jubjub_params,
+        block_size_chunks,
+        api_client.clone(),
+        heartbeat_interval,
+        stop_signal,
+    );
+    
     // Register prover
     prover_id_arc.store(
         api_client

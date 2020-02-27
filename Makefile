@@ -105,9 +105,7 @@ dummy-prover:
 	cargo run --bin dummy_prover
 
 prover:
-	@echo "Launching prover $(POD_NAME)$(TEST_BLOCK_SIZE_CHUNKS) of block size $(TEST_BLOCK_SIZE_CHUNKS)"
-	@echo "To customize, run 'f cargo run --release --bin prover'"
-	@cargo run --release --bin prover $(TEST_BLOCK_SIZE_CHUNKS) "$(POD_NAME)$(TEST_BLOCK_SIZE_CHUNKS)"
+	@bin/launch_dev_provers
 
 server:
 	@cargo run --bin server --release
