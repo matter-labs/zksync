@@ -4,7 +4,7 @@ use failure::ensure;
 use futures::{compat::Future01CompatExt, executor::block_on};
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
-use web3::transports::Http;
+use web3::transports::{EventLoopHandle, Http};
 use web3::types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use super::ExecutedTxStatus;
@@ -55,6 +55,8 @@ pub(super) trait EthereumInterface {
 /// Supposed to be an actual Ethereum intermediator for the `ETHSender`.
 pub struct EthereumHttpClient {
     eth_client: ETHClient<Http>,
+    // We have to prevent handle from drop, since it will cause event loop termination.
+    _event_loop: EventLoopHandle,
 }
 
 impl EthereumHttpClient {
@@ -71,7 +73,10 @@ impl EthereumHttpClient {
             options.gas_price_factor,
         );
 
-        Ok(Self { eth_client })
+        Ok(Self {
+            eth_client,
+            _event_loop,
+        })
     }
 }
 

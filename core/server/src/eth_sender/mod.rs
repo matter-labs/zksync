@@ -1,9 +1,7 @@
 // Built-in deps
 use std::collections::{HashSet, VecDeque};
-use std::str::FromStr;
 use std::time::Duration;
 // External uses
-use bigdecimal::BigDecimal;
 use futures::channel::mpsc;
 use tokio::runtime::Runtime;
 use tokio::time;
@@ -14,11 +12,13 @@ use eth_client::SignedCallResult;
 use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::config;
 use models::{Action, ActionType, Operation};
-use storage::{ConnectionPool, StorageProcessor};
+use storage::ConnectionPool;
 // Local uses
+use self::database::{Database, DatabaseAccess};
 use self::ethereum_interface::{EthereumHttpClient, EthereumInterface};
-pub use self::transactions::*;
+use self::transactions::*;
 
+mod database;
 mod ethereum_interface;
 pub mod transactions;
 
@@ -57,7 +57,7 @@ struct ETHSender<Eth: EthereumInterface> {
     /// Unconfirmed operations queue.
     unconfirmed_ops: VecDeque<OperationETHState>,
     /// Connection to the database.
-    db_pool: ConnectionPool,
+    db: Box<dyn DatabaseAccess>,
     /// Ethereum intermediator.
     ethereum: Eth,
     /// Channel for receiving operations to commit.
@@ -68,25 +68,25 @@ struct ETHSender<Eth: EthereumInterface> {
 
 impl<Eth: EthereumInterface> ETHSender<Eth> {
     fn new(
-        db_pool: ConnectionPool,
+        db: Box<dyn DatabaseAccess>,
         ethereum: Eth,
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
-        let mut sender = Self {
+        let unconfirmed_ops = db
+            .restore_state()
+            .expect("Failed loading unconfirmed operations from the storage");
+
+        Self {
             ethereum,
-            unconfirmed_ops: VecDeque::new(),
-            db_pool: db_pool.clone(),
+            unconfirmed_ops,
+            db,
             rx_for_eth,
             op_notify,
-        };
-        let storage = db_pool.access_storage().expect("Failed to access storage");
-        if sender.restore_state(storage).is_err() {
-            info!("No unconfirmed operations");
         }
-        sender
     }
 
+    /// Main routine of `ETHSender`.
     async fn run(mut self) {
         let mut timer = time::interval(TX_POLL_PERIOD);
 
@@ -111,19 +111,6 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
                 txs: Vec::new(),
             });
         }
-    }
-
-    /// Restores the state of `ETHSender` from the database.
-    fn restore_state(&mut self, storage: StorageProcessor) -> Result<(), failure::Error> {
-        self.unconfirmed_ops = storage
-            .load_unconfirmed_operations()?
-            .into_iter()
-            .map(|(operation, txs)| OperationETHState {
-                operation,
-                txs: txs.into_iter().map(|tx| tx.into()).collect(),
-            })
-            .collect();
-        Ok(())
     }
 
     /// Attempts to commit the provided operation to the Ethereum blockchain.
@@ -226,7 +213,7 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
                         op.operation.block.block_number,
                         tx.signed_tx.hash,
                     );
-                    self.save_completed_tx_to_db(&tx.signed_tx.hash)?;
+                    self.db.confirm_operation(&tx.signed_tx.hash)?;
                     return Ok(OperationCommitment::Committed);
                 }
                 TxCheckOutcome::Stuck => {
@@ -256,7 +243,7 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
         let deadline_block = current_block + EXPECTED_WAIT_TIME_BLOCKS;
         let new_tx = self.create_new_tx(&op.operation, deadline_block, last_stuck_tx)?;
         // New transaction should be persisted in the DB *before* sending it.
-        self.save_signed_tx_to_db(&new_tx)?;
+        self.db.save_unconfirmed_operation(&new_tx)?;
 
         op.txs.push(new_tx.clone());
         info!(
@@ -266,23 +253,6 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
         self.ethereum.send_tx(&new_tx.signed_tx)?;
 
         Ok(OperationCommitment::Pending)
-    }
-
-    fn save_signed_tx_to_db(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        Ok(storage.save_operation_eth_tx(
-            tx.op_id,
-            tx.signed_tx.hash,
-            tx.deadline_block,
-            tx.signed_tx.nonce.as_u32(),
-            BigDecimal::from_str(&tx.signed_tx.gas_price.to_string()).unwrap(),
-            tx.signed_tx.raw_tx.clone(),
-        )?)
-    }
-
-    fn save_completed_tx_to_db(&self, hash: &H256) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        Ok(storage.confirm_eth_tx(hash)?)
     }
 
     fn check_transaction_state(
@@ -467,8 +437,10 @@ pub fn start_eth_sender(
             let ethereum =
                 EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
 
+            let db = Box::new(Database::new(pool));
+
             let mut runtime = Runtime::new().expect("eth-sender-runtime");
-            let eth_sender = ETHSender::new(pool, ethereum, send_requst_receiver, op_notify_sender);
+            let eth_sender = ETHSender::new(db, ethereum, send_requst_receiver, op_notify_sender);
             runtime.block_on(eth_sender.run());
         })
         .expect("Eth sender thread");
