@@ -1,12 +1,12 @@
 // Built-in deps
-use std::collections::{HashSet, VecDeque};
+use std::collections::VecDeque;
 use std::time::Duration;
 // External uses
 use futures::channel::mpsc;
 use tokio::runtime::Runtime;
 use tokio::time;
 use web3::contract::Options;
-use web3::types::{H256, U256};
+use web3::types::{TransactionReceipt, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
@@ -20,11 +20,15 @@ use self::transactions::*;
 
 mod database;
 mod ethereum_interface;
-pub mod transactions;
+mod transactions;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 const WAIT_CONFIRMATIONS: u64 = 1;
+
+/// Failure handler is a function which will be invoked upon
+/// an Ethereum transaction failure.
+pub type FailureHandler = Box<dyn Fn(TransactionReceipt)>;
 
 /// `ETHSender` is a structure capable of anchoring
 /// the ZKSync operations to the Ethereum blockchain.
@@ -53,26 +57,36 @@ const WAIT_CONFIRMATIONS: u64 = 1;
 ///
 /// Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 /// that state is always recoverable.
-struct ETHSender<Eth: EthereumInterface> {
+struct ETHSender<ETH: EthereumInterface> {
     /// Unconfirmed operations queue.
     unconfirmed_ops: VecDeque<OperationETHState>,
     /// Connection to the database.
     db: Box<dyn DatabaseAccess>,
     /// Ethereum intermediator.
-    ethereum: Eth,
+    ethereum: ETH,
     /// Channel for receiving operations to commit.
     rx_for_eth: mpsc::Receiver<Operation>,
     /// Channel to notify about committed operations.
     op_notify: mpsc::Sender<Operation>,
+    /// Callback to handle a transaction failure.
+    failure_policy: FailureHandler,
 }
 
-impl<Eth: EthereumInterface> ETHSender<Eth> {
-    fn new(
+impl<ETH: EthereumInterface> ETHSender<ETH> {
+    pub fn new(
         db: Box<dyn DatabaseAccess>,
-        ethereum: Eth,
+        ethereum: ETH,
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
+        let default_failure_policy = |receipt| {
+            info!(
+                "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
+                receipt
+            );
+            panic!("Cannot operate after unexpected TX failure");
+        };
+
         let unconfirmed_ops = db
             .restore_state()
             .expect("Failed loading unconfirmed operations from the storage");
@@ -83,11 +97,17 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
             db,
             rx_for_eth,
             op_notify,
+            failure_policy: Box::new(default_failure_policy),
         }
     }
 
+    /// Changes the used failure policy.
+    pub fn set_failure_policy(&mut self, failure_policy: FailureHandler) {
+        self.failure_policy = failure_policy;
+    }
+
     /// Main routine of `ETHSender`.
-    async fn run(mut self) {
+    pub async fn run(mut self) {
         let mut timer = time::interval(TX_POLL_PERIOD);
 
         loop {
@@ -194,7 +214,6 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
         let current_block = self.ethereum.block_number()?;
 
         // Check statuses of existing transactions.
-        let mut failed_txs: HashSet<H256> = HashSet::new();
         let mut last_stuck_tx: Option<&TransactionETHState> = None;
 
         // Go through every transaction in a loop. We will exit this method early
@@ -228,10 +247,8 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
                         op.operation.id.unwrap(),
                         receipt,
                     );
-                    failed_txs.insert(tx.signed_tx.hash);
-
-                    // TODO: React on a failure. There should be an failed tx processing
-                    // policy.
+                    // Process the failure according to the chosen policy.
+                    (self.failure_policy)(receipt);
                 }
             }
         }
@@ -255,6 +272,8 @@ impl<Eth: EthereumInterface> ETHSender<Eth> {
         Ok(OperationCommitment::Pending)
     }
 
+    /// Looks up for a transaction state on the Ethereum chain
+    /// and reduces it to the simpler `TxCheckOutcome` report.
     fn check_transaction_state(
         &self,
         tx: &TransactionETHState,
