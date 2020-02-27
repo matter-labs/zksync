@@ -10,10 +10,12 @@
     "bn.js": "^5.0.0",
     "crypto-js": "^3.1.9-1",
     "elliptic": "^6.5.0",
-    "ethers": "^4.0.43",
     "js-sha256": "^0.9.0",
     "websocket": "^1.0.30",
     "websocket-as-promised": "^0.10.1"
+  },
+  "peerDependencies": {
+    "ethers": "^4.0.45"
   },
   "devDependencies": {
     "@types/bn.js": "^4.11.5",
@@ -24,9 +26,9 @@
     "@types/mocha": "^5.2.7",
     "@types/node": "^12.6.8",
     "chai": "^4.2.0",
+    "ethers": "^4.0.45",
     "mocha": "^6.2.0",
     "openzeppelin-solidity": "^2.3.0",
-    "prando": "^5.1.1",
     "prettier": "1.18.2",
     "ts-node": "^8.3.0",
     "tslint": "^6.0.0-beta0",
@@ -37,6 +39,7 @@
     "lint:ts-fix": "tslint -c tslint.json --fix {examples,test,src}/**/*.ts",
     "test": "mocha -r ts-node/register tests/**/*.test.ts",
     "fmt": "prettier --tab-width 4 --parser typescript --write \"{src,tests,examples}/*.ts\"",
-    "build": "tsc"
+    "build": "tsc",
+    "watch": "tsc --watch"
   }
 }

@@ -1,7 +1,6 @@
 import * as zksync from "../src/index";
 import { Contract, ethers, utils } from "ethers";
 import { formatEther, parseEther } from "ethers/utils";
-import { emergencyWithdraw } from "../src/index";
 
 const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
@@ -16,7 +15,7 @@ function shortAddr(address: string): string {
 
 async function logSyncBalance(
     wallet: zksync.Wallet,
-    token: zksync.types.Token,
+    token: zksync.types.TokenLike,
     type: "committed" | "verified" = "committed"
 ) {
     const balance = formatEther(await wallet.getBalance(token, type));
@@ -27,11 +26,14 @@ async function logSyncBalance(
     );
 }
 
-async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
-    const balance = await zksync.getEthereumBalance(wallet, token);
+async function logETHBalance(
+    wallet: zksync.Wallet,
+    token: zksync.types.TokenLike
+) {
+    const balance = await wallet.getEthereumBalance(token);
 
     console.log(
-        `ETH:${shortAddr(wallet.address)} balance: ${balance} ${token}`
+        `ETH:${shortAddr(wallet.address())} balance: ${balance} ${token}`
     );
 }
 
@@ -53,8 +55,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
     ).connect(ethersProvider);
     const syncWallet = await zksync.Wallet.fromEthSigner(
         ethWallet,
-        syncProvider,
-        ethProxy
+        syncProvider
     );
 
     const ethWallet2 = ethers.Wallet.fromMnemonic(
@@ -63,8 +64,7 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
     ).connect(ethersProvider);
     const syncWallet2 = await zksync.Wallet.fromEthSigner(
         ethWallet2,
-        syncProvider,
-        ethProxy
+        syncProvider
     );
 
     const depositAmount = "0.0017";
@@ -75,31 +75,30 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
             ethWallet.address
         )} -> SYNC:${shortAddr(syncWallet.address())}`
     );
-    await logETHBalance(ethWallet, depositToken);
+    await logETHBalance(syncWallet, depositToken);
     await logSyncBalance(syncWallet, depositToken, "verified");
 
-    const depositHandle = await zksync.depositFromETH({
-        depositFrom: ethWallet,
-        depositTo: syncWallet,
+    const depositHandle = await syncWallet.depositToSyncFromEthereum({
+        depositTo: syncWallet.address(),
         token: depositToken,
         amount: utils.parseEther(depositAmount)
     });
     const depositReceipt = await depositHandle.awaitReceipt();
     console.log("Deposit committed, block:", depositReceipt.block.blockNumber);
 
-    await logETHBalance(ethWallet, depositToken);
+    await logETHBalance(syncWallet, depositToken);
     await logSyncBalance(syncWallet, depositToken, "committed");
 
-    if (!(await syncWallet.isCurrentPubkeySet())) {
+    if (!(await syncWallet.isSigningKeySet())) {
         console.log("==================================");
         console.log(
             "Unlocking account with onchain tx: ",
             syncWallet.address()
         );
         try {
-            await (await syncWallet.authChangePubkey()).wait();
+            await (await syncWallet.onchainAuthSigningKey()).wait();
         } catch (e) {}
-        const unlockAccountHandle = await syncWallet.setCurrentPubkeyWithZksyncTx(
+        const unlockAccountHandle = await syncWallet.setSigningKey(
             "committed",
             true
         );
@@ -132,13 +131,13 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
     await logSyncBalance(syncWallet, depositToken, "committed");
     await logSyncBalance(syncWallet2, depositToken, "committed");
 
-    if (!(await syncWallet2.isCurrentPubkeySet())) {
+    if (!(await syncWallet2.isSigningKeySet())) {
         console.log("==================================");
         console.log(
             "Unlocking account with offchain tx: ",
             syncWallet2.address()
         );
-        const unlockAccount2Handle = await syncWallet2.setCurrentPubkeyWithZksyncTx();
+        const unlockAccount2Handle = await syncWallet2.setSigningKey();
         await unlockAccount2Handle.awaitReceipt();
         console.log("Account unlocked");
     } else {
@@ -153,9 +152,9 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
         )} -> ETH:${shortAddr(ethWallet2.address)}`
     );
     await logSyncBalance(syncWallet2, depositToken);
-    await logETHBalance(ethWallet2, depositToken);
+    await logETHBalance(syncWallet2, depositToken);
 
-    const withdrawHandle = await syncWallet2.withdrawTo({
+    const withdrawHandle = await syncWallet2.withdrawFromSyncToEthereum({
         ethAddress: ethWallet2.address,
         token: depositToken,
         amount: ethers.utils.parseEther(withdrawAmount),
@@ -165,14 +164,13 @@ async function logETHBalance(wallet: ethers.Wallet, token: zksync.types.Token) {
     console.log("Withdraw verified, block", withdrawReceipt.block.blockNumber);
 
     await logSyncBalance(syncWallet2, depositToken, "verified");
-    await logETHBalance(ethWallet2, depositToken);
+    await logETHBalance(syncWallet2, depositToken);
 
     console.log("==================================");
     await logSyncBalance(syncWallet2, depositToken, "committed");
 
     console.log(`FullExit of ${TOKEN} from: ${syncWallet2.address()}`);
-    const fullExitHandle = await emergencyWithdraw({
-        withdrawFrom: syncWallet2,
+    const fullExitHandle = await syncWallet2.emergencyWithdraw({
         token: TOKEN
     });
     const fullExitReceipt = await fullExitHandle.awaitReceipt();

@@ -40,7 +40,7 @@ pub struct ZKSyncAccountId(pub usize);
 pub struct Token(pub TokenId);
 
 /// Account set is used to create transactions using stored account
-/// in a covenient way
+/// in a convenient way
 pub struct AccountSet<T: Transport> {
     pub eth_accounts: Vec<EthereumAccount<T>>,
     pub zksync_accounts: Vec<ZksyncAccount>,
@@ -62,7 +62,8 @@ impl<T: Transport> AccountSet<T> {
             block_on(from.deposit_erc20(address, amount, &to.address))
                 .expect("erc20 deposit should not fail")
         } else {
-            block_on(from.deposit_eth(amount, &to.address)).expect("eth deposit should not fail")
+            block_on(from.deposit_eth(amount, &to.address, None))
+                .expect("eth deposit should not fail")
         }
     }
 

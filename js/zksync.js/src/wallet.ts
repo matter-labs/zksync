@@ -4,7 +4,7 @@ import { serializeAddress, serializeNonce, Signer } from "./signer";
 import {
     AccountState,
     Address,
-    Token,
+    TokenLike,
     Nonce,
     PriorityOperationReceipt,
     TransactionReceipt,
@@ -12,35 +12,65 @@ import {
 } from "./types";
 import {
     IERC20_INTERFACE,
+    isTokenETH,
     SYNC_MAIN_CONTRACT_INTERFACE,
-    SYNC_PRIOR_QUEUE_INTERFACE
 } from "./utils";
-import { serializePointPacked } from "./crypto";
 
 export class Wallet {
     public provider: Provider;
-    public ethProxy: ETHProxy;
 
     private constructor(
-        public signer: Signer,
         public ethSigner: ethers.Signer,
-        public cachedAddress: string
+        public cachedAddress: Address,
+        public signer?: Signer,
     ) {}
 
-    connect(provider: Provider, ethProxy: ETHProxy) {
+    connect(provider: Provider) {
         this.provider = provider;
-        this.ethProxy = ethProxy;
         return this;
+    }
+
+    static async fromEthSigner(
+        ethWallet: ethers.Signer,
+        provider: Provider,
+        signer?: Signer
+    ): Promise<Wallet> {
+        const walletSigner = signer ? signer : await Signer.fromETHSignature(ethWallet);
+        const wallet = new Wallet(
+            ethWallet,
+            await ethWallet.getAddress(),
+            walletSigner,
+    );
+        wallet.connect(provider);
+        return wallet;
+    }
+
+    static async fromEthSignerNoKeys(
+        ethWallet: ethers.Signer,
+        provider: Provider,
+    ): Promise<Wallet> {
+        const wallet = new Wallet(
+            ethWallet,
+            await ethWallet.getAddress()
+        );
+        wallet.connect(provider);
+        return wallet;
     }
 
     async syncTransfer(transfer: {
         to: Address;
-        token: Token;
+        token: TokenLike;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
-        const tokenId = await this.ethProxy.resolveTokenId(transfer.token);
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for sending zksync transactions.");
+        }
+
+        const tokenId = await this.provider.tokenSet.resolveTokenId(
+            transfer.token
+        );
         const nonce =
             transfer.nonce != null
                 ? await this.getNonce(transfer.nonce)
@@ -67,23 +97,27 @@ export class Wallet {
         );
     }
 
-    async withdrawTo(withdraw: {
-        ethAddress?: string;
-        token: Token;
+    async withdrawFromSyncToEthereum(withdraw: {
+        ethAddress: string;
+        token: TokenLike;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce?: Nonce;
     }): Promise<Transaction> {
-        const withdrawAddress =
-            withdraw.ethAddress == null ? this.address() : withdraw.ethAddress;
-        const tokenId = await this.ethProxy.resolveTokenId(withdraw.token);
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for sending zksync transactions.");
+        }
+
+        const tokenId = await this.provider.tokenSet.resolveTokenId(
+            withdraw.token
+        );
         const nonce =
             withdraw.nonce != null
                 ? await this.getNonce(withdraw.nonce)
                 : await this.getNonce();
         const transactionData = {
             from: this.address(),
-            ethAddress: withdrawAddress,
+            ethAddress: withdraw.ethAddress,
             tokenId,
             amount: withdraw.amount,
             fee: withdraw.fee,
@@ -103,37 +137,28 @@ export class Wallet {
         );
     }
 
-    async close(nonce: Nonce = "committed"): Promise<Transaction> {
-        const numNonce = await this.getNonce(nonce);
-        const signedCloseTransaction = this.signer.signSyncCloseAccount({
-            nonce: numNonce
-        });
-
-        const transactionHash = await this.provider.submitTx(
-            signedCloseTransaction
-        );
-        return new Transaction(
-            signedCloseTransaction,
-            transactionHash,
-            this.provider
-        );
-    }
-
-    async isCurrentPubkeySet(): Promise<boolean> {
+    async isSigningKeySet(): Promise<boolean> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for current pubkey calculation.");
+        }
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const signerPubKeyHash = this.signer.pubKeyHash();
         return currentPubKeyHash === signerPubKeyHash;
     }
 
-    async setCurrentPubkeyWithZksyncTx(
+    async setSigningKey(
         nonce: Nonce = "committed",
         onchainAuth = false
     ): Promise<Transaction> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for current pubkey calculation.");
+        }
+
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
 
         if (currentPubKeyHash == newPubKeyHash) {
-            throw new Error("Current PubKeyHash is the same as new");
+            throw new Error("Current signing key is set already");
         }
 
         const numNonce = await this.getNonce(nonce);
@@ -155,9 +180,13 @@ export class Wallet {
         return new Transaction(txData, transactionHash, this.provider);
     }
 
-    async authChangePubkey(
+    async onchainAuthSigningKey(
         nonce: Nonce = "committed"
     ): Promise<ContractTransaction> {
+        if (!this.signer) {
+            throw new Error("ZKSync signer is required for current pubkey calculation.");
+        }
+
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
 
@@ -168,7 +197,7 @@ export class Wallet {
         const numNonce = await this.getNonce(nonce);
 
         const mainZkSyncContract = new Contract(
-            this.ethProxy.contractAddress.mainContract,
+            this.provider.contractAddress.mainContract,
             SYNC_MAIN_CONTRACT_INTERFACE,
             this.ethSigner
         );
@@ -202,177 +231,170 @@ export class Wallet {
         return this.cachedAddress;
     }
 
-    static async fromEthSigner(
-        ethWallet: ethers.Signer,
-        provider?: Provider,
-        ethProxy?: ETHProxy
-    ): Promise<Wallet> {
-        const seedHex = (await ethWallet.signMessage("Matter login")).substr(2);
-        const seed = Buffer.from(seedHex, "hex");
-        const signer = Signer.fromSeed(seed);
-        const wallet = new Wallet(
-            signer,
-            ethWallet,
-            await ethWallet.getAddress()
-        );
-        if (provider && ethProxy) {
-            wallet.connect(provider, ethProxy);
-        }
-        return wallet;
-    }
 
     async getAccountState(): Promise<AccountState> {
         return this.provider.getState(this.address());
     }
 
     async getBalance(
-        token: Token,
+        token: TokenLike,
         type: "committed" | "verified" = "committed"
     ): Promise<utils.BigNumber> {
         const accountState = await this.getAccountState();
-        if (token != "ETH") {
-            token = token.toLowerCase();
-        }
+        const tokenSymbol = this.provider.tokenSet.resolveTokenSymbol(token);
         let balance;
-        if (type == "committed") {
-            balance = accountState.committed.balances[token] || "0";
+        if (type === "committed") {
+            balance = accountState.committed.balances[tokenSymbol] || "0";
         } else {
-            balance = accountState.verified.balances[token] || "0";
+            balance = accountState.verified.balances[tokenSymbol] || "0";
         }
         return utils.bigNumberify(balance);
     }
-}
 
-export async function depositFromETH(deposit: {
-    depositFrom: ethers.Signer;
-    depositTo: Wallet;
-    token: Token;
-    amount: utils.BigNumberish;
-    maxFeeInETHToken?: utils.BigNumberish;
-}): Promise<ETHOperation> {
-    const gasPrice = await deposit.depositFrom.provider.getGasPrice();
-
-    let maxFeeInETHToken;
-    if (deposit.maxFeeInETHToken != null) {
-        maxFeeInETHToken = deposit.maxFeeInETHToken;
-    } else {
-        const baseFee = await deposit.depositTo.ethProxy.estimateDepositFeeInETHToken(
-            deposit.token,
-            gasPrice
-        );
-        maxFeeInETHToken = baseFee;
+    async getEthereumBalance(token: TokenLike): Promise<utils.BigNumber> {
+        let balance: utils.BigNumber;
+        if (isTokenETH(token)) {
+            balance = await this.ethSigner.provider.getBalance(
+                this.cachedAddress
+            );
+        } else {
+            const erc20contract = new Contract(
+                this.provider.tokenSet.resolveTokenAddress(token),
+                IERC20_INTERFACE,
+                this.ethSigner
+            );
+            balance = await erc20contract.balanceOf(this.cachedAddress);
+        }
+        return balance;
     }
-    const mainZkSyncContract = new Contract(
-        deposit.depositTo.provider.contractAddress.mainContract,
-        SYNC_MAIN_CONTRACT_INTERFACE,
-        deposit.depositFrom
-    );
 
-    let ethTransaction;
+    async depositToSyncFromEthereum(deposit: {
+        depositTo: Address;
+        token: TokenLike;
+        amount: utils.BigNumberish;
+        maxFeeInETHToken?: utils.BigNumberish;
+    }): Promise<ETHOperation> {
+        const gasPrice = await this.ethSigner.provider.getGasPrice();
 
-    if (deposit.token == "ETH") {
-        ethTransaction = await mainZkSyncContract.depositETH(
-            deposit.amount,
-            deposit.depositTo.address(),
-            {
-                value: utils.bigNumberify(deposit.amount).add(maxFeeInETHToken),
-                gasLimit: utils.bigNumberify("200000"),
+        const ethProxy = new ETHProxy(
+            this.ethSigner.provider,
+            this.provider.contractAddress
+        );
+
+        let maxFeeInETHToken;
+        if (deposit.maxFeeInETHToken != null) {
+            maxFeeInETHToken = deposit.maxFeeInETHToken;
+        } else {
+            maxFeeInETHToken = await ethProxy.estimateDepositFeeInETHToken(
+                deposit.token,
                 gasPrice
+            );
+        }
+        const mainZkSyncContract = new Contract(
+            this.provider.contractAddress.mainContract,
+            SYNC_MAIN_CONTRACT_INTERFACE,
+            this.ethSigner
+        );
+
+        let ethTransaction;
+
+        if (isTokenETH(deposit.token)) {
+            ethTransaction = await mainZkSyncContract.depositETH(
+                deposit.amount,
+                deposit.depositTo,
+                {
+                    value: utils
+                        .bigNumberify(deposit.amount)
+                        .add(maxFeeInETHToken),
+                    gasLimit: utils.bigNumberify("200000"),
+                    gasPrice
+                }
+            );
+        } else {
+            const tokenAddress = this.provider.tokenSet.resolveTokenAddress(
+                deposit.token
+            );
+            // ERC20 token deposit
+            const erc20contract = new Contract(
+                tokenAddress,
+                IERC20_INTERFACE,
+                this.ethSigner
+            );
+            const approveTx = await erc20contract.approve(
+                this.provider.contractAddress.mainContract,
+                deposit.amount
+            );
+            ethTransaction = await mainZkSyncContract.depositERC20(
+                tokenAddress,
+                deposit.amount,
+                deposit.depositTo,
+                {
+                    gasLimit: utils.bigNumberify("250000"),
+                    value: maxFeeInETHToken,
+                    nonce: approveTx.nonce + 1,
+                    gasPrice
+                }
+            );
+        }
+
+        return new ETHOperation(ethTransaction, this.provider);
+    }
+
+    async emergencyWithdraw(withdraw: {
+        token: TokenLike;
+        maxFeeInETHToken?: utils.BigNumberish;
+        accountId?: number;
+        nonce?: Nonce;
+    }): Promise<ETHOperation> {
+        const gasPrice = await this.ethSigner.provider.getGasPrice();
+        const ethProxy = new ETHProxy(
+            this.ethSigner.provider,
+            this.provider.contractAddress
+        );
+
+        let maxFeeInETHToken;
+        if (withdraw.maxFeeInETHToken != null) {
+            maxFeeInETHToken = withdraw.maxFeeInETHToken;
+        } else {
+            maxFeeInETHToken = await ethProxy.estimateEmergencyWithdrawFeeInETHToken(
+                gasPrice
+            );
+        }
+
+        let accountId;
+        if (withdraw.accountId != null) {
+            accountId = withdraw.accountId;
+        } else {
+            const accountState = await this.getAccountState();
+            if (!accountState.id) {
+                throw new Error(
+                    "Can't resolve account id from the ZK Sync node"
+                );
             }
+            accountId = accountState.id;
+        }
+
+        const mainZkSyncContract = new Contract(
+            ethProxy.contractAddress.mainContract,
+            SYNC_MAIN_CONTRACT_INTERFACE,
+            this.ethSigner
         );
-    } else {
-        // ERC20 token deposit
-        const erc20contract = new Contract(
-            deposit.token,
-            IERC20_INTERFACE,
-            deposit.depositFrom
+
+        const tokenAddress = this.provider.tokenSet.resolveTokenAddress(
+            withdraw.token
         );
-        const approveTx = await erc20contract.approve(
-            deposit.depositTo.provider.contractAddress.mainContract,
-            deposit.amount
-        );
-        ethTransaction = await mainZkSyncContract.depositERC20(
-            deposit.token,
-            deposit.amount,
-            deposit.depositTo.address(),
+        const ethTransaction = await mainZkSyncContract.fullExit(
+            accountId,
+            tokenAddress,
             {
-                gasLimit: utils.bigNumberify("250000"),
+                gasLimit: utils.bigNumberify("500000"),
                 value: maxFeeInETHToken,
-                nonce: approveTx.nonce + 1,
                 gasPrice
             }
         );
+
+        return new ETHOperation(ethTransaction, this.provider);
     }
-
-    return new ETHOperation(ethTransaction, deposit.depositTo.provider);
-}
-
-export async function emergencyWithdraw(withdraw: {
-    withdrawFrom: Wallet;
-    token: Token;
-    maxFeeInETHToken?: utils.BigNumberish;
-    accountId?: number;
-    nonce?: Nonce;
-}): Promise<ETHOperation> {
-    const gasPrice = await withdraw.withdrawFrom.ethSigner.provider.getGasPrice();
-
-    let maxFeeInETHToken;
-    if (withdraw.maxFeeInETHToken != null) {
-        maxFeeInETHToken = withdraw.maxFeeInETHToken;
-    } else {
-        maxFeeInETHToken = await withdraw.withdrawFrom.ethProxy.estimateEmergencyWithdrawFeeInETHToken(
-            gasPrice
-        );
-    }
-
-    let accountId;
-    if (withdraw.accountId != null) {
-        accountId = withdraw.accountId;
-    } else {
-        const accountState = await withdraw.withdrawFrom.getAccountState();
-        if (!accountState.id) {
-            throw new Error("Can't resolve account id from the ZK Sync node");
-        }
-        accountId = accountState.id;
-    }
-
-    const mainZkSyncContract = new Contract(
-        withdraw.withdrawFrom.ethProxy.contractAddress.mainContract,
-        SYNC_MAIN_CONTRACT_INTERFACE,
-        withdraw.withdrawFrom.ethSigner
-    );
-
-    let tokenAddress = "0x0000000000000000000000000000000000000000";
-    if (withdraw.token != "ETH") {
-        tokenAddress = withdraw.token;
-    }
-    const ethTransaction = await mainZkSyncContract.fullExit(
-        accountId,
-        tokenAddress,
-        {
-            gasLimit: utils.bigNumberify("500000"),
-            value: maxFeeInETHToken,
-            gasPrice
-        }
-    );
-
-    return new ETHOperation(ethTransaction, withdraw.withdrawFrom.provider);
-}
-
-export async function getEthereumBalance(
-    ethSigner: ethers.Signer,
-    token: Token
-): Promise<utils.BigNumber> {
-    let balance: utils.BigNumber;
-    if (token == "ETH") {
-        balance = await ethSigner.provider.getBalance(
-            await ethSigner.getAddress()
-        );
-    } else {
-        const erc20contract = new Contract(token, IERC20_INTERFACE, ethSigner);
-        balance = await erc20contract.balanceOf(await ethSigner.getAddress());
-    }
-    return balance;
 }
 
 class ETHOperation {
