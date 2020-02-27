@@ -5,7 +5,7 @@ const {ethers } = require("ethers");
 const zksync = require("zksync");
 
 
-describe("ZK Sync unit tests", function () {
+describe("ZK Sync signature verification unit tests", function () {
     this.timeout(50000);
 
     let testContract;
@@ -56,3 +56,32 @@ describe("ZK Sync unit tests", function () {
     });
 
 });
+//
+// describe("ZK Sync deposit unit tests", function () {
+//     this.timeout(50000);
+//
+//     let zksyncContract;
+//     let tokenContract;
+//     before(async () => {
+//         const verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode, []);
+//         const governanceDeployedContract = await deployGovernance(wallet, governanceTestContractCode, [wallet.address]);
+//         zksyncContract = await deployFranklin(
+//             wallet,
+//             franklinTestContractCode,
+//             [
+//                 governanceDeployedContract.address,
+//                 verifierDeployedContract.address,
+//                 wallet.address,
+//                 ethers.constants.HashZero,
+//             ],
+//         );
+//         await governanceDeployedContract.setValidator(wallet.address, true);
+//         tokenContract = await addTestERC20Token(wallet, governanceDeployedContract);
+//         await mintTestERC20Token(wallet, tokenContract);
+//     });
+//
+//     it("signature verification success", async () => {
+//
+//     });
+//
+// });

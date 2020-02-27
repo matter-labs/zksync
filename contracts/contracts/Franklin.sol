@@ -173,11 +173,7 @@ contract Franklin is Storage, Config, Events {
     /// @param _token Token address
     /// @param _amount Token amount
     /// @param _franklinAddr Receiver Layer 2 address
-    function depositERC20(
-        address _token,
-        uint128 _amount,
-        address _franklinAddr
-    ) external payable {
+    function depositERC20(address _token, uint128 _amount, address _franklinAddr) external payable {
         requireActive();
 
         // Fee is:
@@ -209,10 +205,7 @@ contract Franklin is Storage, Config, Events {
     /// @notice Register full exit request - pack pubdata, add priority request
     /// @param _accountId Numerical id of the account
     /// @param _token Token address, 0 address for ether
-    function fullExit (
-        uint24 _accountId,
-        address _token
-    ) external payable {
+    function fullExit (uint24 _accountId, address _token) external payable {
         requireActive();
 
         // Fee is:
@@ -653,16 +646,10 @@ contract Franklin is Storage, Config, Events {
     /// @param _proof Proof
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner
-    function exit(
-        uint16 _tokenId,
-        uint128 _amount,
-        uint256[8] calldata _proof
-    ) external {
+    function exit(uint16 _tokenId, uint128 _amount, uint256[8] calldata _proof) external {
         require(exodusMode, "fet11"); // must be in exodus mode
         require(exited[msg.sender][_tokenId] == false, "fet12"); // already exited
         require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
-
-
 
         balancesToWithdraw[msg.sender][_tokenId] += _amount;
         exited[msg.sender][_tokenId] = true;
