@@ -23,10 +23,6 @@ pub(super) struct MockDatabase {
 }
 
 impl MockDatabase {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     pub fn with_restorable_state(
         restore_state: impl IntoIterator<Item = OperationETHState>,
     ) -> Self {
@@ -151,6 +147,13 @@ impl MockEthereum {
         );
     }
 
+    pub fn assert_sent_by_hash(&self, hash: &H256) {
+        assert!(
+            self.sent_txs.borrow().get(hash).is_some(),
+            format!("Transaction with hash {:?} was not sent", hash),
+        );
+    }
+
     /// Increments the blocks by a provided `confirmations` and marks the sent transaction
     /// as a success.
     pub fn add_successfull_execution(&mut self, tx: &TransactionETHState, confirmations: u64) {
@@ -257,15 +260,27 @@ impl EthereumInterface for MockEthereum {
     }
 }
 
-/// Creates a default `ETHSender` with mock Ethereum connection and database.
-/// Return the `ETHSender` itself along with communication channels to interact with it.
+/// Creates a default `ETHSender` with mock Ethereum connection/database and no operations in DB.
+/// Returns the `ETHSender` itself along with communication channels to interact with it.
 pub(super) fn default_eth_sender() -> (
     ETHSender<MockEthereum, MockDatabase>,
     mpsc::Sender<Operation>,
     mpsc::Receiver<Operation>,
 ) {
+    restored_eth_sender(Vec::new())
+}
+
+/// Creates an `ETHSender` with mock Ethereum connection/database and restores its state "from DB".
+/// Returns the `ETHSender` itself along with communication channels to interact with it.
+pub(super) fn restored_eth_sender(
+    restore_state: impl IntoIterator<Item = OperationETHState>,
+) -> (
+    ETHSender<MockEthereum, MockDatabase>,
+    mpsc::Sender<Operation>,
+    mpsc::Receiver<Operation>,
+) {
     let ethereum = MockEthereum::default();
-    let db = MockDatabase::new();
+    let db = MockDatabase::with_restorable_state(restore_state);
 
     let (operation_sender, operation_receiver) = mpsc::channel(CHANNEL_CAPACITY);
     let (notify_sender, notify_receiver) = mpsc::channel(CHANNEL_CAPACITY);

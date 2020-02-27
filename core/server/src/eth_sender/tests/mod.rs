@@ -1,6 +1,6 @@
-use super::ETHSender;
+use super::{ethereum_interface::EthereumInterface, transactions::OperationETHState, ETHSender};
 
-use self::mock::default_eth_sender;
+use self::mock::{default_eth_sender, restored_eth_sender};
 
 mod mock;
 mod test_data;
@@ -70,10 +70,11 @@ fn tx_creation() {
     }
 }
 
-/// Test for a normal `ETHSender` workflow: we send the two sequential
-/// operations (commit and verify), they are successfully committed to
-/// the Ethereum, and notification is sent after `verify` operation
-/// is committed.
+/// Test for a normal `ETHSender` workflow:
+/// - we send the two sequential operations (commit and verify);
+/// - they are successfully committed to the Ethereum;
+/// - `completeWithdrawals` tx is sent to the Ethereum;
+/// - notification is sent after `verify` operation is committed.
 #[test]
 fn operation_commitment_workflow() {
     let (mut eth_sender, mut sender, mut receiver) = default_eth_sender();
@@ -119,6 +120,17 @@ fn operation_commitment_workflow() {
         // Check that operation is confirmed.
         eth_sender.db.assert_confirmed(&expected_tx);
     }
+
+    // Check that `completeWithdrawals` transaction is sent.
+    let tx = eth_sender
+        .ethereum
+        .sign_call_tx(
+            "completeWithdrawals",
+            models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+            Default::default(),
+        )
+        .unwrap();
+    eth_sender.ethereum.assert_sent_by_hash(&tx.hash);
 
     // We should be notified about verify operation being completed.
     assert_eq!(
@@ -271,4 +283,46 @@ fn transaction_failure() {
         .ethereum
         .add_failed_execution(&failing_tx, super::WAIT_CONFIRMATIONS);
     eth_sender.proceed_next_operation();
+}
+
+/// Check that after recovering state with several non-processed operations
+/// they will be processed normally.
+#[test]
+fn restore_state() {
+    let operations = vec![
+        test_data::commit_operation(0),
+        test_data::verify_operation(0),
+    ];
+
+    // Create `OperationETHState` objects from operations and restore state.
+    let stored_operations = operations.iter().map(|operation| OperationETHState {
+        operation: operation.clone(),
+        txs: Vec::new(),
+    });
+
+    let (mut eth_sender, _, mut receiver) = restored_eth_sender(stored_operations);
+
+    for operation in operations {
+        // Note that we DO NOT send an operation to `ETHSender` and neither receive it.
+
+        // We do process operations restored from the DB though.
+        // The rest of this test is the same as in `operation_commitment_workflow`.
+        eth_sender.proceed_next_operation();
+
+        let expected_tx = eth_sender
+            .create_new_tx(
+                &operation,
+                eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
+                None,
+            )
+            .unwrap();
+
+        eth_sender
+            .ethereum
+            .add_successfull_execution(&expected_tx, super::WAIT_CONFIRMATIONS);
+        eth_sender.proceed_next_operation();
+        eth_sender.db.assert_confirmed(&expected_tx);
+    }
+
+    assert!(receiver.try_next().unwrap().is_some());
 }
