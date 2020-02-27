@@ -65,11 +65,11 @@ pub type FailureHandler = Box<dyn Fn(TransactionReceipt)>;
 ///
 /// Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 /// that state is always recoverable.
-struct ETHSender<ETH: EthereumInterface> {
+struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     /// Unconfirmed operations queue.
     unconfirmed_ops: VecDeque<OperationETHState>,
     /// Connection to the database.
-    db: Box<dyn DatabaseAccess>,
+    db: DB,
     /// Ethereum intermediator.
     ethereum: ETH,
     /// Channel for receiving operations to commit.
@@ -80,9 +80,9 @@ struct ETHSender<ETH: EthereumInterface> {
     failure_policy: FailureHandler,
 }
 
-impl<ETH: EthereumInterface> ETHSender<ETH> {
+impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     pub fn new(
-        db: Box<dyn DatabaseAccess>,
+        db: DB,
         ethereum: ETH,
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
@@ -465,7 +465,7 @@ pub fn start_eth_sender(
             let ethereum =
                 EthereumHttpClient::new(&config_options).expect("Ethereum client creation failed");
 
-            let db = Box::new(Database::new(pool));
+            let db = Database::new(pool);
 
             let mut runtime = Runtime::new().expect("eth-sender-runtime");
             let eth_sender = ETHSender::new(db, ethereum, send_requst_receiver, op_notify_sender);

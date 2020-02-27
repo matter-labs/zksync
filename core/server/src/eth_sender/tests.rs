@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
 
+use futures::channel::mpsc;
 use web3::contract::{tokens::Tokenize, Options};
 use web3::types::{H256, U256};
 
@@ -9,6 +10,9 @@ use eth_client::SignedCallResult;
 use super::database::DatabaseAccess;
 use super::ethereum_interface::EthereumInterface;
 use super::transactions::{ExecutedTxStatus, OperationETHState, TransactionETHState};
+use super::ETHSender;
+
+const CHANNEL_CAPACITY: usize = 16;
 
 #[derive(Debug, Default)]
 struct MockDatabase {
@@ -110,4 +114,41 @@ impl EthereumInterface for MockEthereum {
             hash: H256::random(), // Okay for test purposes.
         })
     }
+}
+
+/// Creates a default ETHSender with mock Ethereum connection and database.
+fn default_eth_sender() -> ETHSender<MockEthereum, MockDatabase> {
+    let ethereum = MockEthereum::default();
+    let db = MockDatabase::new();
+
+    let (sender, receiver) = mpsc::channel(CHANNEL_CAPACITY);
+
+    ETHSender::new(db, ethereum, receiver, sender)
+}
+
+/// Basic test that `ETHSender` creation does not panic and initializes correctly.
+#[test]
+fn basic_test() {
+    let eth_sender = default_eth_sender();
+
+    // Check that there are no unconfirmed operations by default.
+    assert!(eth_sender.unconfirmed_ops.is_empty());
+}
+
+/// Check for the gas scaling: gas is expected to be increased by 15% or set equal
+/// to gas cost suggested by Ethereum (if it's greater).
+#[test]
+fn scale_gas() {
+    let mut eth_sender = default_eth_sender();
+
+    // Set the gas price in Ethereum to 1000.
+    eth_sender.ethereum.gas_price = 1000.into();
+
+    // Check that gas price of 1000 is increased to 1150.
+    let scaled_gas = eth_sender.scale_gas(1000.into()).unwrap();
+    assert_eq!(scaled_gas, 1150.into());
+
+    // Check that gas price of 100 is increased to 1000 (price in Ethereum object).
+    let scaled_gas = eth_sender.scale_gas(100.into()).unwrap();
+    assert_eq!(scaled_gas, 1000.into());
 }
