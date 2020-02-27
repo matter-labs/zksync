@@ -1,5 +1,8 @@
-use lazy_static::lazy_static;
+//! Data to be used in tests as the input for `ETHSender`.
 
+// External uses
+use lazy_static::lazy_static;
+// Workspace uses
 use models::Operation;
 
 const COMMIT_OPERATIONS_STR: &str = r#"

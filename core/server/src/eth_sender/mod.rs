@@ -389,11 +389,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         op: &Operation,
         tx_options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
-        info!(
-            "Operation--------\n\n{}\n\n-----------",
-            serde_json::to_string(op).unwrap()
-        );
-
         match &op.action {
             Action::Commit => {
                 //                let mut block_number = op.block.block_number;

@@ -1,13 +1,16 @@
+//! Mocking utilities for tests.
+
+// Built-in deps
 use std::cell::RefCell;
 use std::collections::{HashMap, VecDeque};
-
+// External uses
 use futures::channel::mpsc;
 use web3::contract::{tokens::Tokenize, Options};
 use web3::types::{H256, U256};
-
+// Workspace uses
 use eth_client::SignedCallResult;
 use models::{Action, Operation};
-
+// Local uses
 use super::ETHSender;
 use crate::eth_sender::database::DatabaseAccess;
 use crate::eth_sender::ethereum_interface::EthereumInterface;
@@ -15,6 +18,7 @@ use crate::eth_sender::transactions::{ExecutedTxStatus, OperationETHState, Trans
 
 const CHANNEL_CAPACITY: usize = 16;
 
+/// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
 pub(super) struct MockDatabase {
     restore_state: VecDeque<OperationETHState>,
@@ -23,6 +27,7 @@ pub(super) struct MockDatabase {
 }
 
 impl MockDatabase {
+    /// Creates a database with emulation of previously stored uncommitted requests.
     pub fn with_restorable_state(
         restore_state: impl IntoIterator<Item = OperationETHState>,
     ) -> Self {
@@ -46,6 +51,7 @@ impl MockDatabase {
             .is_none());
     }
 
+    /// Ensures that the provided transaction is not stored in the database.
     pub fn assert_not_stored(&self, tx: &TransactionETHState) {
         assert!(self
             .confirmed_operations
@@ -104,6 +110,7 @@ impl DatabaseAccess for MockDatabase {
     }
 }
 
+/// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug)]
 pub(super) struct MockEthereum {
     pub block_number: u64,
@@ -140,6 +147,7 @@ impl MockEthereum {
         H256::from_low_u64_ne(result)
     }
 
+    /// Checks that there was a request to send the provided transaction.
     pub fn assert_sent(&self, tx: &TransactionETHState) {
         assert_eq!(
             self.sent_txs.borrow().get(&tx.signed_tx.hash),
@@ -147,6 +155,7 @@ impl MockEthereum {
         );
     }
 
+    /// Checks that there was a request to send a transaction with the provided hash.
     pub fn assert_sent_by_hash(&self, hash: &H256) {
         assert!(
             self.sent_txs.borrow().get(hash).is_some(),

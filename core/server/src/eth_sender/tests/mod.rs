@@ -1,6 +1,6 @@
-use super::{ethereum_interface::EthereumInterface, transactions::OperationETHState, ETHSender};
-
+// Local uses
 use self::mock::{default_eth_sender, restored_eth_sender};
+use super::{ethereum_interface::EthereumInterface, transactions::OperationETHState, ETHSender};
 
 mod mock;
 mod test_data;
@@ -47,7 +47,8 @@ fn deadline_block() {
     );
 }
 
-/// Checks that `ETHSender` invokes `EthereumInterface::sign_call_tx` as expected.
+/// Checks that `ETHSender` invokes `EthereumInterface::sign_call_tx` to obtain the
+/// raw transaction contents (and does not mess with it).
 #[test]
 fn tx_creation() {
     let (eth_sender, _, _) = default_eth_sender();
