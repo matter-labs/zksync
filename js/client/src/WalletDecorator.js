@@ -398,9 +398,9 @@ export class WalletDecorator {
         const address = options.address;
 
         try {
-            if (!await window.syncWallet.isCurrentPubkeySet()) {
-                yield info(`Unlocking account...`);
-                const setPk = await window.syncWallet.setCurrentPubkeyWithZksyncTx();
+            if (!await window.syncWallet.isSigningKeySet()) {
+                yield info(`Changing signing key...`);
+                const setPk = await window.syncWallet.setSigningKey();
                 await setPk.awaitReceipt();
             }
 
@@ -433,9 +433,9 @@ export class WalletDecorator {
         const fee     = utils.bigNumberify(options.fee);
 
         try {
-            if (!await window.syncWallet.isCurrentPubkeySet()) {
-                yield info(`Unlocking account...`);
-                const setPk = await window.syncWallet.setCurrentPubkeyWithZksyncTx();
+            if (!await window.syncWallet.isSigningKeySet()) {
+                yield info(`Changing signing key...`);
+                const setPk = await window.syncWallet.setSigningKey();
                 await setPk.awaitReceipt();
             }
 
