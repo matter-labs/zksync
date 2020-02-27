@@ -166,6 +166,21 @@ impl MockEthereum {
             .borrow_mut()
             .insert(tx.signed_tx.hash, status);
     }
+
+    /// Same as `add_successfull_execution`, but marks the transaction as a failure.
+    pub fn add_failed_execution(&mut self, tx: &TransactionETHState, confirmations: u64) {
+        self.block_number += confirmations;
+        self.nonce += 1.into();
+
+        let status = ExecutedTxStatus {
+            confirmations,
+            success: false,
+            receipt: Some(Default::default()),
+        };
+        self.tx_statuses
+            .borrow_mut()
+            .insert(tx.signed_tx.hash, status);
+    }
 }
 
 impl EthereumInterface for MockEthereum {

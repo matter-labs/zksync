@@ -34,10 +34,6 @@ const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 const WAIT_CONFIRMATIONS: u64 = 1;
 
-/// Failure handler is a function which will be invoked upon
-/// an Ethereum transaction failure.
-pub type FailureHandler = Box<dyn Fn(TransactionReceipt)>;
-
 /// `ETHSender` is a structure capable of anchoring
 /// the ZKSync operations to the Ethereum blockchain.
 ///
@@ -83,8 +79,6 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     rx_for_eth: mpsc::Receiver<Operation>,
     /// Channel to notify about committed operations.
     op_notify: mpsc::Sender<Operation>,
-    /// Callback to handle a transaction failure.
-    failure_policy: FailureHandler,
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
@@ -94,14 +88,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
-        let default_failure_policy = |receipt| {
-            info!(
-                "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
-                receipt
-            );
-            panic!("Cannot operate after unexpected TX failure");
-        };
-
         let unconfirmed_ops = db
             .restore_state()
             .expect("Failed loading unconfirmed operations from the storage");
@@ -112,14 +98,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             db,
             rx_for_eth,
             op_notify,
-            failure_policy: Box::new(default_failure_policy),
         }
-    }
-
-    /// Changes the used failure policy.
-    #[cfg(test)]
-    pub fn set_failure_policy(&mut self, failure_policy: FailureHandler) {
-        self.failure_policy = failure_policy;
     }
 
     /// Main routine of `ETHSender`.
@@ -229,7 +208,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// In case of transaction failure, it will be reported and processed according to failure handling
     /// policy.
     fn perform_commitment_step(
-        &self,
+        &mut self,
         op: &mut OperationETHState,
     ) -> Result<OperationCommitment, failure::Error> {
         let current_block = self.ethereum.block_number()?;
@@ -269,7 +248,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         receipt,
                     );
                     // Process the failure according to the chosen policy.
-                    (self.failure_policy)(receipt);
+                    self.failure_handler(receipt);
                 }
             }
         }
@@ -291,6 +270,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         self.ethereum.send_tx(&new_tx.signed_tx)?;
 
         Ok(OperationCommitment::Pending)
+    }
+
+    /// Handles a transaction execution failure by reporting the issue to the log
+    /// and terminating the node.
+    fn failure_handler(&self, receipt: TransactionReceipt) -> ! {
+        info!(
+            "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
+            receipt
+        );
+        panic!("Cannot operate after unexpected TX failure");
     }
 
     /// Helper method encapsulating the logic of determining the next deadline block.

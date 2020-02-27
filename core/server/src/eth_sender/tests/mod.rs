@@ -222,3 +222,30 @@ fn operations_order() {
         assert!(receiver.try_next().unwrap().is_some());
     }
 }
+
+/// Check that upon a transaction failure the incident causes a panic by default.
+#[test]
+#[should_panic(expected = "Cannot operate after unexpected TX failure")]
+fn transaction_failure() {
+    let (mut eth_sender, mut sender, _) = default_eth_sender();
+
+    // Workflow for the test is similar to `operation_commitment_workflow`.
+    let operation = test_data::commit_operation(0);
+    sender.try_send(operation.clone()).unwrap();
+
+    let failing_tx = eth_sender
+        .create_new_tx(
+            &operation,
+            eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
+            None,
+        )
+        .unwrap();
+
+    eth_sender.retrieve_operations();
+    eth_sender.proceed_next_operation();
+
+    eth_sender
+        .ethereum
+        .add_failed_execution(&failing_tx, super::WAIT_CONFIRMATIONS);
+    eth_sender.proceed_next_operation();
+}
