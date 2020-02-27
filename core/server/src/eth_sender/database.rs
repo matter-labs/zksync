@@ -14,6 +14,7 @@ use storage::ConnectionPool;
 // Local uses
 use super::transactions::{OperationETHState, TransactionETHState};
 
+/// Abstract database access trait, optimized for the needs of `ETHSender`.
 pub(super) trait DatabaseAccess {
     /// Loads the unconfirmed operations from the database.
     fn restore_state(&self) -> Result<VecDeque<OperationETHState>, failure::Error>;
@@ -25,6 +26,8 @@ pub(super) trait DatabaseAccess {
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error>;
 }
 
+/// The actual database wrapper.
+/// This structure uses `ConnectionPool` to interact with an existing database.
 pub struct Database {
     /// Connection to the database.
     db_pool: ConnectionPool,

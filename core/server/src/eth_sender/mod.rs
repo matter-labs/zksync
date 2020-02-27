@@ -1,3 +1,8 @@
+//! `eth_sender` module is capable of synchronizing the operations
+//! occurring in `ZKSync` with the Ethereum blockchain by creating
+//! transactions from the operations, sending them and ensuring that
+//! every transaction is executed successfully and confirmed.
+
 // Built-in deps
 use std::collections::VecDeque;
 use std::time::Duration;
