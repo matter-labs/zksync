@@ -44,4 +44,14 @@ describe("Bytes unit test", function () {
         expect(r.offset).equal(3)
     });
 
+    it("should convert to hex", async () => {
+        const x = Buffer.alloc(256);
+        for (let b = 0; b < 255; b++) {
+            x[b] = b
+        }
+        let hexString = x.toString("hex").toLowerCase();
+        let r = await bytesTestContract.bytesToHexConvert(x);
+        expect(r).eq(hexString);
+    });
+
 });
