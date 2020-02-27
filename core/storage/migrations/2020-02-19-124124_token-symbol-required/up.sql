@@ -1,0 +1,2 @@
+ALTER TABLE tokens
+    ALTER COLUMN symbol SET NOT NULL;

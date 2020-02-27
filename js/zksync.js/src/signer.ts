@@ -6,7 +6,7 @@ import {
     serializePointPacked,
     signTransactionBytes
 } from "./crypto";
-import { utils } from "ethers";
+import {ethers, utils} from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
 import BN = require("bn.js");
 import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw } from "./types";
@@ -103,28 +103,18 @@ export class Signer {
         };
     }
 
-    signSyncCloseAccount(close: { nonce: number }): CloseAccount {
-        const type = Buffer.from([4]);
-        const account = serializeAddress(this.pubKeyHash());
-        const nonce = serializeNonce(close.nonce);
-
-        const msg = Buffer.concat([type, account, nonce]);
-        const signature = signTransactionBytes(this.privateKey, msg);
-
-        return {
-            type: "Close",
-            account: this.pubKeyHash(),
-            nonce: close.nonce,
-            signature
-        };
-    }
-
     static fromPrivateKey(pk: BN): Signer {
         return new Signer(pk);
     }
 
     static fromSeed(seed: Buffer): Signer {
         return new Signer(privateKeyFromSeed(seed));
+    }
+
+    static async fromETHSignature(ethSigner: ethers.Signer): Promise<Signer> {
+        const sign = await ethSigner.signMessage("Access ZK Sync account.\n" + "\n" + "Only sign this message for a trusted client!");
+        const seed = Buffer.from(sign.substr(2), "hex");
+        return  Signer.fromSeed(seed);
     }
 }
 
