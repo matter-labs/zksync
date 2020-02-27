@@ -15,9 +15,9 @@ init:
 	@bin/init
 
 yarn:
-	@cd js/zksync.js && yarn && yarn build
 	@cd js/client && yarn
 	@cd js/explorer && yarn
+	@cd js/zksync.js && yarn
 	@cd contracts && yarn
 	@cd js/tests && yarn
 
@@ -213,6 +213,11 @@ deposit: confirm_action
 	@node contracts/scripts/deposit.js
 
 # Devops: main
+
+# Promote build
+
+promote-to-stage:
+	@drone build promote $(git config --get remote.origin.url|sed -e 's/git@github.com:\(.*\).git/\1/') $(ci-build) stage
 
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-insert-contract
