@@ -65,6 +65,13 @@ pub type FailureHandler = Box<dyn Fn(TransactionReceipt)>;
 ///
 /// Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 /// that state is always recoverable.
+///
+/// # Failure policy
+///
+/// By default, `ETHSender` expects no transactions to fail, and thus upon a failure it will
+/// report the incident to the log and then panic to prevent continue working in a probably
+/// erroneous conditions. Failure handling policy is determined by a corresponding callback,
+/// which can be changed if needed.
 struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     /// Unconfirmed operations queue.
     unconfirmed_ops: VecDeque<OperationETHState>,
@@ -124,10 +131,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             self.retrieve_operations();
             timer.tick().await;
 
-            // Commit the next operation (if any).
-            if let Some(current_op) = self.unconfirmed_ops.pop_front() {
-                self.try_commit(current_op);
-            }
+            // ...and proceed them.
+            self.proceed_next_operation();
         }
     }
 
@@ -139,6 +144,13 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 operation,
                 txs: Vec::new(),
             });
+        }
+    }
+
+    fn proceed_next_operation(&mut self) {
+        // Commit the next operation (if any).
+        if let Some(current_op) = self.unconfirmed_ops.pop_front() {
+            self.try_commit(current_op);
         }
     }
 
@@ -266,7 +278,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         // or the latest transaction got stuck.
         // Either way we should create a new transaction (the approach is the same,
         // `create_new_tx` will adapt its logic based on `last_stuck_tx`).
-        let deadline_block = current_block + EXPECTED_WAIT_TIME_BLOCKS;
+        let deadline_block = self.get_deadline_block(current_block);
         let new_tx = self.create_new_tx(&op.operation, deadline_block, last_stuck_tx)?;
         // New transaction should be persisted in the DB *before* sending it.
         self.db.save_unconfirmed_operation(&new_tx)?;
@@ -279,6 +291,11 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         self.ethereum.send_tx(&new_tx.signed_tx)?;
 
         Ok(OperationCommitment::Pending)
+    }
+
+    /// Helper method encapsulating the logic of determining the next deadline block.
+    fn get_deadline_block(&self, current_block: u64) -> u64 {
+        current_block + EXPECTED_WAIT_TIME_BLOCKS
     }
 
     /// Looks up for a transaction state on the Ethereum chain
@@ -383,6 +400,11 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         op: &Operation,
         tx_options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
+        info!(
+            "Operation--------\n\n{}\n\n-----------",
+            serde_json::to_string(op).unwrap()
+        );
+
         match &op.action {
             Action::Commit => {
                 //                let mut block_number = op.block.block_number;

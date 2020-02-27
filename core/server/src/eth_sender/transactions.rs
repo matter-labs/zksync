@@ -29,7 +29,7 @@ pub(super) struct OperationETHState {
 }
 
 /// Representation of the transaction sent to the Ethereum chain.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TransactionETHState {
     /// ZKSync operation identifier.
     pub op_id: i64,

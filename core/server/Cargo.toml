@@ -47,3 +47,4 @@ reqwest = "0.9.22"
 
 [dev-dependencies]
 testhelper = { path = "../testhelper", version = "0.1.0"}
+lazy_static = "1.4"
