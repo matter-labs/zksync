@@ -5,4 +5,4 @@ Creat promotion job on CI to deploy to target environment.
 
 `zksync promote-to-stage build=<DRONE_CI_BUILD>` where `<DRONE_CI_BUILD>` is a build number to promote to staging.
 
-Example: `zksync promote-to-stage build=122`
+Example: `zksync promote-to-stage ci-build=23`

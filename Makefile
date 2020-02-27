@@ -217,7 +217,7 @@ deposit: confirm_action
 # Promote build
 
 promote-to-stage:
-	@drone build promote $(git config --get remote.origin.url|sed -e 's/git@github.com:\(.*\).git/\1/') $(ci-build) stage
+	@bin/promote-to-stage.sh $(ci-build)
 
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-insert-contract
