@@ -218,7 +218,6 @@ trigger:
   target:
   - stage
   event:
-  - pull_request
   - promote
 
 steps:
