@@ -161,7 +161,7 @@ var Wallet = /** @class */ (function () {
         if (nonce === void 0) { nonce = "committed"; }
         if (onchainAuth === void 0) { onchainAuth = false; }
         return __awaiter(this, void 0, void 0, function () {
-            var currentPubKeyHash, newPubKeyHash, numNonce, newPkHash, message, ethSignature, _a, txData, transactionHash;
+            var currentPubKeyHash, newPubKeyHash, numNonce, msgNonce, message, ethSignature, _a, txData, transactionHash;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0: return [4 /*yield*/, this.getCurrentPubKeyHash()];
@@ -174,8 +174,8 @@ var Wallet = /** @class */ (function () {
                         return [4 /*yield*/, this.getNonce(nonce)];
                     case 2:
                         numNonce = _b.sent();
-                        newPkHash = signer_1.serializeAddress(newPubKeyHash);
-                        message = Buffer.concat([signer_1.serializeNonce(numNonce), newPkHash]);
+                        msgNonce = signer_1.serializeNonce(numNonce).toString("hex").toLowerCase();
+                        message = "Register ZK Sync pubkey:\n\n" + newPubKeyHash.toLowerCase() + " nonce: 0x" + msgNonce + "\n\nOnly sign this message for a trusted client!";
                         if (!onchainAuth) return [3 /*break*/, 3];
                         _a = null;
                         return [3 /*break*/, 5];

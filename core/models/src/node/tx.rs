@@ -223,17 +223,34 @@ impl ChangePubKey {
         out
     }
 
-    pub fn get_eth_signed_data(nonce: Nonce, new_pubkey_hash: &PubKeyHash) -> Vec<u8> {
-        let mut eth_signed_msg = Vec::with_capacity(24);
-        eth_signed_msg.extend_from_slice(&nonce.to_be_bytes());
-        eth_signed_msg.extend_from_slice(&new_pubkey_hash.data);
-        eth_signed_msg
+    pub fn get_eth_signed_data(
+        nonce: Nonce,
+        new_pubkey_hash: &PubKeyHash,
+    ) -> Result<Vec<u8>, failure::Error> {
+        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 135;
+        let mut eth_signed_msg = Vec::with_capacity(CHANGE_PUBKEY_SIGNATURE_LEN);
+        eth_signed_msg.extend_from_slice(b"Register ZK Sync pubkey:\n\n");
+        eth_signed_msg.extend_from_slice(
+            format!(
+                "{} nonce: 0x{}\n\n",
+                new_pubkey_hash.to_hex().to_ascii_lowercase(),
+                hex::encode(&nonce.to_be_bytes()).to_ascii_lowercase()
+            )
+            .as_bytes(),
+        );
+        eth_signed_msg.extend_from_slice(b"Only sign this message for a trusted client!");
+        ensure!(
+            eth_signed_msg.len() == CHANGE_PUBKEY_SIGNATURE_LEN,
+            "Change pubkey signed message len is too big"
+        );
+        Ok(eth_signed_msg)
     }
 
     pub fn verify_eth_signature(&self) -> Option<Address> {
         self.eth_signature.as_ref().and_then(|sign| {
-            sign.signature_recover_signer(&Self::get_eth_signed_data(self.nonce, &self.new_pk_hash))
+            Self::get_eth_signed_data(self.nonce, &self.new_pk_hash)
                 .ok()
+                .and_then(|msg| sign.signature_recover_signer(&msg).ok())
         })
     }
 

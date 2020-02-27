@@ -399,7 +399,10 @@ contract Franklin is Storage, Config, Events {
 
         uint8 signV = uint8(_signature[offset]);
 
-        bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n24", _nonce, _newPkHash);
+        bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n135");
+        signedMessage = abi.encodePacked(signedMessage, "Register ZK Sync pubkey:\n\n");
+        signedMessage = abi.encodePacked(signedMessage, "sync:", Bytes.bytesToHexASCIIBytes(_newPkHash), " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n\n");
+        signedMessage = abi.encodePacked(signedMessage, "Only sign this message for a trusted client!");
         address recoveredAddress = ecrecover(keccak256(signedMessage), signV, signR, signS);
         return recoveredAddress == _ethAddress;
     }

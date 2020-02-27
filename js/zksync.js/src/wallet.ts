@@ -137,8 +137,8 @@ export class Wallet {
         }
 
         const numNonce = await this.getNonce(nonce);
-        const newPkHash = serializeAddress(newPubKeyHash);
-        const message = Buffer.concat([serializeNonce(numNonce), newPkHash]);
+        const msgNonce = serializeNonce(numNonce).toString("hex").toLowerCase();
+        const message = `Register ZK Sync pubkey:\n\n${newPubKeyHash.toLowerCase()} nonce: 0x${msgNonce}\n\nOnly sign this message for a trusted client!`;
         const ethSignature = onchainAuth
             ? null
             : await this.ethSigner.signMessage(message);
