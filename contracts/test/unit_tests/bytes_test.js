@@ -26,12 +26,12 @@ describe("Bytes unit test", function () {
     });
 
     it("should fail to read bytes beyond range", async () => {
-        let revertReason = await getCallRevertReason( () => bytesTestContract.read("0x0102030405060708", 8, 2) )
+        let {revertReason} = await getCallRevertReason( () => bytesTestContract.read("0x0102030405060708", 8, 2) )
         expect(revertReason).equal("bse11")
     });
 
     it("should fail to read too many bytes", async () => {
-        let revertReason = await getCallRevertReason( () => bytesTestContract.read("0x0102030405060708", 4, 5) )
+        let {revertReason} = await getCallRevertReason( () => bytesTestContract.read("0x0102030405060708", 4, 5) )
         expect(revertReason).equal("bse11")
     });
 

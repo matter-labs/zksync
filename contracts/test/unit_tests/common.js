@@ -28,12 +28,13 @@ async function deployTestContract(file) {
 
 async function getCallRevertReason(f) {
     let revertReason = "VM did not revert"
+    let result;
     try {
-        let r = await f()
+        result = await f();
     } catch(e) {
         revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason
     } 
-    return revertReason
+    return {revertReason, result};
 }
 
 module.exports = {
