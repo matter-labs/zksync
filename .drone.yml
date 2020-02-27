@@ -272,8 +272,8 @@ steps:
   - zksync dist-client > /dev/null
   - zksync dist-explorer > /dev/null
   - docker login -u $USERNAME -p $PASSWORD
-  - docker build -t $REPO:${ZKSYNC_ENV}-${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
-  - docker push $REPO:${ZKSYNC_ENV}-${DRONE_COMMIT_SHA:0:8}
+  - docker build -t $REPO:stage-${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
+  - docker push $REPO:stage-${DRONE_COMMIT_SHA:0:8}
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
