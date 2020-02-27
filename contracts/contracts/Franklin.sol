@@ -310,10 +310,12 @@ contract Franklin is Storage, Config, Events {
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
             uint64 startId = totalOnchainOps;
-            uint64 oldPriorOp = totalCommittedPriorityRequests;
+            uint64 priorityNumber = totalCommittedPriorityRequests;
+
             collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
+
+            priorityNumber = totalCommittedPriorityRequests - priorityNumber;
             uint64 totalProcessed = totalOnchainOps - startId;
-            uint64 priorityNumber = totalCommittedPriorityRequests - oldPriorOp;
 
             createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _publicData, startId, totalProcessed, priorityNumber);
             totalBlocksCommitted++;
@@ -374,7 +376,7 @@ contract Franklin is Storage, Config, Events {
             require(currentOperation < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
             bytes memory currentEthWitnessBytes = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[currentOperation]);
 
-            currentPointer  = processOp(
+            currentPointer  = processNextOperation(
                 currentPointer,
                 _publicData,
                 currentEthWitnessBytes
@@ -407,7 +409,7 @@ contract Franklin is Storage, Config, Events {
     /// @param _publicData Operation pubdata
     /// @param _currentEthWitness current eth witness for operation
     /// @return new pointer in pubdata
-    function processOp(
+    function processNextOperation(
         uint256 _currentPointer,
         bytes memory _publicData,
         bytes memory _currentEthWitness
