@@ -1,252 +1,252 @@
-kind: pipeline
-type: docker
-name: tests
-clone:
-    depth: 10
-volumes:
-  - name: cache
-    host:
-      path: /drone-cache
-services:
-  - name: geth
-    image: matterlabs/geth:latest
-  - name: postgres
-    image: postgres:10.4
-trigger:
-  event:
-  - pull_request
-steps:
-- name: restore-cache
-  image: drillster/drone-volume-cache
-  volumes:
-  - name: cache
-    path: /cache
-  settings:
-    restore: true
-    mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
-      - ./target/cargo
-      - ./keys
-- name: prepare-ci-env
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - ci-prepare-env.sh
-  depends_on:
-  - restore-cache
-- name: yarn
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync env ci
-  - zksync yarn
-  depends_on:
-  - prepare-ci-env
-- name: db-setup
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync env ci
-  - zksync db-wait
-  - zksync db-setup
-  depends_on:
-  - prepare-ci-env
-- name: run-genesis
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync genesis
-  depends_on:
-  - db-setup
-- name: build-contracts
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync build-contracts
-  depends_on:
-  - prepare-ci-env
-  - yarn
-- name: rust-tests-circuit
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync circuit-tests
-  depends_on:
-  - run-genesis
-- name: rust-tests-prover
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync prover-tests
-  depends_on:
-  - run-genesis
-- name: rust-tests-db
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync db-test
-  depends_on:
-  - run-genesis
-- name: rust-tests-unit
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - f cargo test
-  depends_on:
-  - run-genesis
-- name: rust-checks
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - cargo fmt -- --check
-  - f cargo clippy --tests --benches -- -D warnings
-  depends_on:
-  - run-genesis
-- name: redeploy-and-integration-testkit
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync redeploy
-  - zksync integration-testkit
-  depends_on:
-  - run-genesis
-  - build-contracts
-- name: contract-test
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync test-contracts
-  depends_on:
-  - build-contracts
-- name: rebuild-cache
-  image: drillster/drone-volume-cache
-  volumes:
-  - name: cache
-    path: /cache
-  settings:
-    rebuild: true
-    mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
-      - ./target/cargo
-      - ./keys
-  depends_on:
-     - redeploy-and-integration-testkit
-     - rust-tests-circuit
-     - rust-tests-prover
-     - rust-tests-db
-     - rust-tests-unit
-     - rust-checks
----
-kind: pipeline
-type: docker
-name: integration-simple
-clone:
-    depth: 10
-volumes:
-  - name: cache
-    host:
-      path: /drone-cache
-services:
-  - name: geth
-    image: matterlabs/geth:latest
-  - name: postgres
-    image: postgres:10.4
-trigger:
-  event:
-  - pull_request
-steps:
-- name: restore-cache
-  image: drillster/drone-volume-cache
-  volumes:
-  - name: cache
-    path: /cache
-  settings:
-    restore: true
-    mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
-      - ./target/cargo
-      - ./keys
-- name: preparations-for-integration-simple
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - ci-prepare-env.sh
-  - zksync env ci
-  - zksync yarn
-  - zksync db-wait
-  - zksync db-setup
-  - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
-  - zksync build-contracts
-  - zksync db-reset
-  - zksync genesis
-  - zksync redeploy
-  - f cargo build --release --bin server
-  - f cargo build --release --bin dummy_prover
-  depends_on:
-  - restore-cache
-- name: start-server-detached
-  image: matterlabs/ci
-  detach: true
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync server
-  depends_on:
-  - preparations-for-integration-simple
-- name: start-prover-detached
-  image: matterlabs/ci
-  detach: true
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync dummy-prover
-  depends_on:
-  - preparations-for-integration-simple
-- name: integration-simple
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync integration-simple
-  depends_on:
-  - start-server-detached
-  - start-prover-detached
----
+# kind: pipeline
+# type: docker
+# name: tests
+# clone:
+#     depth: 10
+# volumes:
+#   - name: cache
+#     host:
+#       path: /drone-cache
+# services:
+#   - name: geth
+#     image: matterlabs/geth:latest
+#   - name: postgres
+#     image: postgres:10.4
+# trigger:
+#   event:
+#   - pull_request
+# steps:
+# - name: restore-cache
+#   image: drillster/drone-volume-cache
+#   volumes:
+#   - name: cache
+#     path: /cache
+#   settings:
+#     restore: true
+#     mount:
+#       - ./contracts/node_modules
+#       - ./js/client/node_modules
+#       - ./js/explorer/node_modules
+#       - ./target/cargo
+#       - ./keys
+# - name: prepare-ci-env
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - ci-prepare-env.sh
+#   depends_on:
+#   - restore-cache
+# - name: yarn
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync env ci
+#   - zksync yarn
+#   depends_on:
+#   - prepare-ci-env
+# - name: db-setup
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync env ci
+#   - zksync db-wait
+#   - zksync db-setup
+#   depends_on:
+#   - prepare-ci-env
+# - name: run-genesis
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync genesis
+#   depends_on:
+#   - db-setup
+# - name: build-contracts
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync build-contracts
+#   depends_on:
+#   - prepare-ci-env
+#   - yarn
+# - name: rust-tests-circuit
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync circuit-tests
+#   depends_on:
+#   - run-genesis
+# - name: rust-tests-prover
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync prover-tests
+#   depends_on:
+#   - run-genesis
+# - name: rust-tests-db
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync db-test
+#   depends_on:
+#   - run-genesis
+# - name: rust-tests-unit
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - f cargo test
+#   depends_on:
+#   - run-genesis
+# - name: rust-checks
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - cargo fmt -- --check
+#   - f cargo clippy --tests --benches -- -D warnings
+#   depends_on:
+#   - run-genesis
+# - name: redeploy-and-integration-testkit
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync redeploy
+#   - zksync integration-testkit
+#   depends_on:
+#   - run-genesis
+#   - build-contracts
+# - name: contract-test
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync test-contracts
+#   depends_on:
+#   - build-contracts
+# - name: rebuild-cache
+#   image: drillster/drone-volume-cache
+#   volumes:
+#   - name: cache
+#     path: /cache
+#   settings:
+#     rebuild: true
+#     mount:
+#       - ./contracts/node_modules
+#       - ./js/client/node_modules
+#       - ./js/explorer/node_modules
+#       - ./target/cargo
+#       - ./keys
+#   depends_on:
+#      - redeploy-and-integration-testkit
+#      - rust-tests-circuit
+#      - rust-tests-prover
+#      - rust-tests-db
+#      - rust-tests-unit
+#      - rust-checks
+# ---
+# kind: pipeline
+# type: docker
+# name: integration-simple
+# clone:
+#     depth: 10
+# volumes:
+#   - name: cache
+#     host:
+#       path: /drone-cache
+# services:
+#   - name: geth
+#     image: matterlabs/geth:latest
+#   - name: postgres
+#     image: postgres:10.4
+# trigger:
+#   event:
+#   - pull_request
+# steps:
+# - name: restore-cache
+#   image: drillster/drone-volume-cache
+#   volumes:
+#   - name: cache
+#     path: /cache
+#   settings:
+#     restore: true
+#     mount:
+#       - ./contracts/node_modules
+#       - ./js/client/node_modules
+#       - ./js/explorer/node_modules
+#       - ./target/cargo
+#       - ./keys
+# - name: preparations-for-integration-simple
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - ci-prepare-env.sh
+#   - zksync env ci
+#   - zksync yarn
+#   - zksync db-wait
+#   - zksync db-setup
+#   - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
+#   - zksync build-contracts
+#   - zksync db-reset
+#   - zksync genesis
+#   - zksync redeploy
+#   - f cargo build --release --bin server
+#   - f cargo build --bin dummy_prover
+#   depends_on:
+#   - restore-cache
+# - name: start-server-detached
+#   image: matterlabs/ci
+#   detach: true
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync server
+#   depends_on:
+#   - preparations-for-integration-simple
+# - name: start-prover-detached
+#   image: matterlabs/ci
+#   detach: true
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync dummy-prover
+#   depends_on:
+#   - preparations-for-integration-simple
+# - name: integration-simple
+#   image: matterlabs/ci
+#   commands:
+#   - export ZKSYNC_HOME=`pwd`
+#   - export PATH=$ZKSYNC_HOME/bin:$PATH
+#   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+#   - zksync integration-simple
+#   depends_on:
+#   - start-server-detached
+#   - start-prover-detached
+# ---
 # This pipeline publishes images and updates stage
 kind: pipeline
 type: docker
@@ -267,10 +267,12 @@ volumes:
     host:
       path: /tmp/cargo-registry-musl
 trigger:
-  branch:
-  - dev
+  # branch:
+  # - pull_request
+  # - dev
   event:
-  - push
+  - pull_request
+  # - push
 
 steps:
 
@@ -302,35 +304,10 @@ steps:
   - stage-prepare-env.sh $DB_URL $WEB3_URL
   - zksync env stage
   - zksync yarn
-  depends_on:
-  - restore-cache
-
-- name: build-contracts
-  image: matterlabs/ci
-  commands:
-  - export ZKSYNC_HOME=`pwd`
-  - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync gen-keys-if-not-present
   - zksync build-contracts
   depends_on:
-  - init
-
-- name: rebuild-cache
-  image: drillster/drone-volume-cache
-  volumes:
-  - name: cache
-    path: /cache
-  settings:
-    rebuild: true
-    mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
-      - ./target/cargo
-      - ./keys
-  depends_on:
-     - build-contracts
+  - restore-cache
 
 - name: client-and-explorer-build
   image: matterlabs/ci
@@ -343,7 +320,7 @@ steps:
   - zksync dist-client > /dev/null
   - zksync dist-explorer > /dev/null
   depends_on:
-  - build-contracts
+  - init
 
 - name: nginx-image-publish
   image: docker
@@ -379,7 +356,7 @@ steps:
   - sudo chown -R rust:rust ./target
   - f cargo build --release
   depends_on:
-  - build-contracts
+  - init
 
 - name: server-image-publish
   image: docker
