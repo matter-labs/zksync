@@ -254,15 +254,8 @@ steps:
   depends_on:
   - restore-cache
 
-- name: nginx-build-and-publish
+- name: client-and-explorer-build
   image: matterlabs/ci
-  environment:
-    USERNAME:
-      from_secret: docker_username
-    PASSWORD:
-      from_secret: docker_password
-    DOCKERFILE: ./docker/nginx/Dockerfile
-    REPO: matterlabs/nginx
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
@@ -271,14 +264,27 @@ steps:
   - zksync yarn
   - zksync dist-client > /dev/null
   - zksync dist-explorer > /dev/null
+  depends_on:
+  - init
+
+- name: nginx-image-publish
+  image: docker
+  commands:
   - docker login -u $USERNAME -p $PASSWORD
-  - docker build -t $REPO:stage-${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
-  - docker push $REPO:stage-${DRONE_COMMIT_SHA:0:8}
+  - docker build -t $REPO:${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
+  - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
+  environment:
+    USERNAME:
+      from_secret: docker_username
+    PASSWORD:
+      from_secret: docker_password
+    DOCKERFILE: ./docker/nginx/Dockerfile
+    REPO: matterlabs/nginx
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
   depends_on:
-  - init
+  - client-and-explorer-build
 
 - name: build-rust
   image: ekidd/rust-musl-builder
@@ -352,6 +358,6 @@ steps:
   - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/stage.env KUBECONFIG=`pwd`/kubeconfig.yaml
   - zksync apply-kubeconfig
   depends_on:
-  - nginx-build-and-publish
+  - nginx-image-publish
   - server-image-publish
   - prover-image-publish
