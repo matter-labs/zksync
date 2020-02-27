@@ -5,5 +5,5 @@ set -e
 
 echo contracts-test
 cd contracts
-yarn test || true # FIXME: after test merges done
+yarn unit-test
 cd ..
