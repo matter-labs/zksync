@@ -20,7 +20,11 @@ import {
     governanceTestContractCode,
     priorityQueueTestContractCode,
     verifierTestContractCode,
-    franklinTestContractCode
+    franklinTestContractCode,
+    proxyContractCode,
+    proxyContractSourceCode,
+    proxyTestContractCode,
+    deployProxy,
 } from "../src.ts/deploy";
 
 async function main() {
@@ -55,48 +59,81 @@ async function main() {
     let verifierAddress = process.env.VERIFIER_ADDR;
     let franklinAddress = process.env.CONTRACT_ADDR;
 
-    let governanceConstructorArgs = [wallet.address];
-    let priorityQueueConstructorArgs = [governanceAddress];
-    let verifierConstructorArgs = [];
-    let franklinConstructorArgs = [
-        governanceAddress,
-        verifierAddress,
-        priorityQueueAddress,
-        process.env.OPERATOR_FRANKLIN_ADDRESS,
-        process.env.GENESIS_ROOT || ethers.constants.HashZero,
-    ];
+    let governanceInitArgs = ["address"];
+    let governanceInitArgsValues = [wallet.address];
+    let priorityQueueInitArgs = ["address"];
+    let priorityQueueInitArgsValues = [governanceAddress];
+    let verifierInitArgs = [];
+    let verifierInitArgsValues = [];
 
     if (args.deploy) {
         let timer = new Date().getTime();
+        const proxyCode = args.test ? proxyTestContractCode : proxyContractCode;
+
         const governanceCode = args.test ? governanceTestContractCode : governanceContractCode;
-        const governance = await deployGovernance(wallet, governanceCode, governanceConstructorArgs);
+        let governance, governanceAddressDeployed;
+        [governance, governanceAddressDeployed] = await deployGovernance(
+            wallet,
+            proxyCode,
+            governanceCode,
+            governanceInitArgs,
+            governanceInitArgsValues,
+        );
         console.log(`Governance contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
-        governanceAddress = governance.address;
+        governanceAddress = governanceAddressDeployed;
 
         timer = new Date().getTime();
         const priorityQueueCode = args.test ? priorityQueueTestContractCode : priorityQueueContractCode;
-        const priorityQueue = await deployPriorityQueue(wallet, priorityQueueCode, priorityQueueConstructorArgs);
+        let priorityQueue, priorityQueueAddressDeployed;
+        [priorityQueue, priorityQueueAddressDeployed] = await deployPriorityQueue(
+            wallet,
+            proxyCode,
+            priorityQueueCode,
+            priorityQueueInitArgs,
+            priorityQueueInitArgsValues,
+        );
         console.log(`Priority queue contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
-        priorityQueueAddress = priorityQueue.address;
+        priorityQueueAddress = priorityQueueAddressDeployed;
 
         timer = new Date().getTime();
         const verifierCode = args.test ? verifierTestContractCode : verifierContractCode;
-        const verifier = await deployVerifier(wallet, verifierCode, verifierConstructorArgs);
+        let verifier, verifierAddressDeployed;
+        [verifier, verifierAddressDeployed] = await deployVerifier(
+            wallet,
+            proxyCode,
+            verifierCode,
+            verifierInitArgs,
+            verifierInitArgsValues,
+        );
         console.log(`Verifier contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
-        verifierAddress = verifier.address;
+        verifierAddress = verifierAddressDeployed;
 
-        franklinConstructorArgs = [
-            governanceAddress,
-            verifierAddress,
-            priorityQueueAddress,
-            process.env.OPERATOR_FRANKLIN_ADDRESS.replace('sync:', '0x'),
+        let franklinInitArgs = [
+            "address",
+            "address",
+            "address",
+            "address",
+            "bytes32",
+        ];
+        let franklinInitArgsValues = [
+            governance.address,
+            verifier.address,
+            priorityQueue.address,
+            process.env.OPERATOR_FRANKLIN_ADDRESS.replace("sync:", "0x"),
             process.env.GENESIS_ROOT || ethers.constants.HashZero,
         ];
         timer = new Date().getTime();
         const franklinCode = args.test ? franklinTestContractCode : franklinContractCode;
-        const franklin = await deployFranklin(wallet, franklinCode, franklinConstructorArgs);
+        let franklin, franklinAddressDeployed;
+        [franklin, franklinAddressDeployed] = await deployFranklin(
+            wallet,
+            proxyCode,
+            franklinCode,
+            franklinInitArgs,
+            franklinInitArgsValues,
+        );
         console.log(`Main contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
-        franklinAddress = franklin.address;
+        franklinAddress = franklinAddressDeployed;
 
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
 
@@ -114,10 +151,15 @@ async function main() {
                     ]);
                 } else {
                     await Promise.all([
-                        publishSourceCodeToEtherscan('Governance', governanceAddress, governanceContractSourceCode, governanceContractCode, governanceConstructorArgs),
-                        publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, priorityQueueConstructorArgs),
-                        publishSourceCodeToEtherscan('Verifier', verifierAddress, verifierContractSourceCode, verifierContractCode, verifierConstructorArgs),
-                        publishSourceCodeToEtherscan('Franklin', franklinAddress, franklinContractSourceCode, franklinContractCode, franklinConstructorArgs),
+                        publishSourceCodeToEtherscan('GovernanceProxy', governance.address, proxyContractSourceCode, proxyContractCode, []),
+                        publishSourceCodeToEtherscan('PriorityQueueProxy', priorityQueue.address, proxyContractSourceCode, proxyContractCode, []),
+                        publishSourceCodeToEtherscan('VerifierProxy', verifier.address, proxyContractSourceCode, proxyContractCode, []),
+                        publishSourceCodeToEtherscan('FranklinProxy', franklin.address, proxyContractSourceCode, proxyContractCode, []),
+
+                        publishSourceCodeToEtherscan('Governance', governanceAddress, governanceContractSourceCode, governanceContractCode, []),
+                        publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, []),
+                        publishSourceCodeToEtherscan('Verifier', verifierAddress, verifierContractSourceCode, verifierContractCode, []),
+                        publishSourceCodeToEtherscan('Franklin', franklinAddress, franklinContractSourceCode, franklinContractCode, []),
                     ]);
                 }
             } catch (e) {

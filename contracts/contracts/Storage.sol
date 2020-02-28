@@ -6,10 +6,15 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./PriorityQueue.sol";
 
+import "./UpgradeMode.sol";
+
 
 /// @title zkSync storage contract
 /// @author Matter Labs
 contract Storage {
+
+    /// @notice UpgradeMode contract
+    UpgradeMode upgradeMode;
 
     /// @notice Verifier contract. Used to verify block proof and exit proof
     Verifier internal verifier;

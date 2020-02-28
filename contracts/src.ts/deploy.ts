@@ -7,7 +7,7 @@ import * as url from 'url';
 import * as fs from 'fs';
 import * as path from 'path';
 
-
+const abi = require('ethereumjs-abi')
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
 export const ERC20MintableContract = function () {
@@ -16,16 +16,19 @@ export const ERC20MintableContract = function () {
     return contract
 }();
 
+export const proxyContractCode =         require(`../flat_build/Proxy`);
 export const franklinContractCode =      require(`../flat_build/Franklin`);
 export const verifierContractCode =      require(`../flat_build/Verifier`);
 export const governanceContractCode =    require(`../flat_build/Governance`);
 export const priorityQueueContractCode = require(`../flat_build/PriorityQueue`);
 
+export const proxyContractSourceCode         = fs.readFileSync('flat/Proxy.sol', 'utf8');
 export const franklinContractSourceCode      = fs.readFileSync('flat/Franklin.sol', 'utf8');
 export const verifierContractSourceCode      = fs.readFileSync('flat/Verifier.sol', 'utf8');
 export const governanceContractSourceCode    = fs.readFileSync('flat/Governance.sol', 'utf8');
 export const priorityQueueContractSourceCode = fs.readFileSync('flat/PriorityQueue.sol', 'utf8');
 
+export const proxyTestContractCode         = require('../build/ProxyTest');
 export const franklinTestContractCode      = require('../build/FranklinTest');
 export const verifierTestContractCode      = require('../build/VerifierTest');
 export const governanceTestContractCode    = require('../build/GovernanceTest');
@@ -94,19 +97,41 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
     }
 }
 
-export async function deployGovernance(
+export async function deployProxy(
     wallet,
-    governanceCode,
-    constructorArgs
+    proxyCode,
 ) {
     try {
-        let governance = await deployContract(wallet, governanceCode, constructorArgs, {
+        const proxy = await deployContract(wallet, proxyCode, [], {
             gasLimit: 3000000,
         });
-        console.log(`GOVERNANCE_GENESIS_TX_HASH=${governance.deployTransaction.hash}`);
-        console.log(`GOVERNANCE_ADDR=${governance.address}`);
 
-        return governance;
+        return proxy;
+    } catch (err) {
+        console.log("Proxy deploy error:" + err);
+    }
+}
+
+export async function deployGovernance(
+    wallet,
+    proxyCode,
+    governanceCode,
+    initArgs,
+    initArgsValues,
+) {
+    try {
+        const proxy = await deployProxy(wallet, proxyCode);
+        const governance = await deployContract(wallet, governanceCode, [], {
+            gasLimit: 3000000,
+        });
+        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
+        const tx = await proxy.initialize(governance.address, initArgsInBytes);
+        await tx.wait();
+
+        const returnContract = new ethers.Contract(proxy.address, governanceCode.interface, wallet);
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${tx.hash}`);
+        console.log(`GOVERNANCE_ADDR=${proxy.address}`);
+        return [returnContract, governance.address];
     } catch (err) {
         console.log("Governance deploy error:" + err);
     }
@@ -114,16 +139,23 @@ export async function deployGovernance(
 
 export async function deployPriorityQueue(
     wallet,
+    proxyCode,
     priorityQueueCode,
-    constructorArgs
+    initArgs,
+    initArgsValues,
 ) {
     try {
-        let priorityQueue = await deployContract(wallet, priorityQueueCode, constructorArgs, {
-            gasLimit: 5000000,
+        const proxy = await deployProxy(wallet, proxyCode);
+        const priorityQueue = await deployContract(wallet, priorityQueueCode, [], {
+            gasLimit: 3000000,
         });
-        console.log(`PRIORITY_QUEUE_ADDR=${priorityQueue.address}`);
+        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
+        const tx = await proxy.initialize(priorityQueue.address, initArgsInBytes);
+        await tx.wait();
 
-        return priorityQueue;
+        const returnContract = new ethers.Contract(proxy.address, priorityQueueCode.interface, wallet);
+        console.log(`PRIORITY_QUEUE_ADDR=${proxy.address}`);
+        return [returnContract, priorityQueue.address];
     } catch (err) {
         console.log("Priority queue deploy error:" + err);
     }
@@ -131,16 +163,23 @@ export async function deployPriorityQueue(
 
 export async function deployVerifier(
     wallet,
+    proxyCode,
     verifierCode,
-    constructorArgs
+    initArgs,
+    initArgsValues,
 ) {
     try {
-        let verifier = await deployContract(wallet, verifierCode, constructorArgs, {
-            gasLimit: 2000000,
+        const proxy = await deployProxy(wallet, proxyCode);
+        const verifier = await deployContract(wallet, verifierCode, [], {
+            gasLimit: 3000000,
         });
-        console.log(`VERIFIER_ADDR=${verifier.address}`);
+        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
+        const tx = await proxy.initialize(verifier.address, initArgsInBytes);
+        await tx.wait();
 
-        return verifier;
+        const returnContract = new ethers.Contract(proxy.address, verifierCode.interface, wallet);
+        console.log(`VERIFIER_ADDR=${proxy.address}`);
+        return [returnContract, verifier.address];
     } catch (err) {
         console.log("Verifier deploy error:" + err);
     }
@@ -148,33 +187,40 @@ export async function deployVerifier(
 
 export async function deployFranklin(
     wallet,
+    proxyCode,
     franklinCode,
-    constructorArgs
+    initArgs,
+    initArgsValues,
 ) {
     try {
         let [
-            governanceAddress,
-            verifierAddress,
-            priorityQueueAddress,
+            governanceProxyAddress,
+            verifierProxyAddress,
+            priorityQueueProxyAddress,
             genesisAddress,
             genesisRoot
-        ] = constructorArgs;
+        ] = initArgsValues;
 
-        let contract = await deployContract(
+        const proxy = await deployProxy(wallet, proxyCode);
+        const contract = await deployContract(
             wallet,
             franklinCode,
-            constructorArgs,
+            [],
             {
                 gasLimit: 6000000,
             });
-        console.log(`CONTRACT_GENESIS_TX_HASH=${contract.deployTransaction.hash}`);
-        console.log(`CONTRACT_ADDR=${contract.address}`);
+        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
+        const initTx = await proxy.initialize(contract.address, initArgsInBytes);
+        await initTx.wait();
 
-        const priorityQueueContract = new ethers.Contract(priorityQueueAddress, priorityQueueContractCode.interface, wallet);
-        const setAddressTx = await priorityQueueContract.setFranklinAddress(contract.address, { gasLimit: 1000000 })
+        const priorityQueueProxyContract = new ethers.Contract(priorityQueueProxyAddress, priorityQueueContractCode.interface, wallet);
+        const setAddressTx = await priorityQueueProxyContract.setFranklinAddress(proxy.address, { gasLimit: 1000000 })
         await setAddressTx.wait();
-        
-        return contract;
+
+        const returnContract = new ethers.Contract(proxy.address, franklinCode.interface, wallet);
+        console.log(`CONTRACT_GENESIS_TX_HASH=${initTx.hash}`);
+        console.log(`CONTRACT_ADDR=${proxy.address}`);
+        return [returnContract, contract.address];
     } catch (err) {
         console.log("Franklin deploy error:" + err);
     }

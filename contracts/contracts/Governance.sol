@@ -1,8 +1,14 @@
 pragma solidity 0.5.16;
 
+import "./UpgradeMode.sol";
+
+
 /// @title Governance Contract
 /// @author Matter Labs
 contract Governance {
+
+    /// @notice UpgradeMode contract
+    UpgradeMode upgradeMode;
 
     /// @notice Token added to Franklin net
     event TokenAdded(
@@ -25,9 +31,20 @@ contract Governance {
     /// @notice List of permitted validators
     mapping(address => bool) public validators;
 
-    /// @notice Construct Governance contract
-    /// @param _networkGovernor The address of network governor
-    constructor(address _networkGovernor) public {
+    /// @notice Governance contract initialization
+    /// @param upgradeModeAddress Address of UpgradeMode contract
+    /// @param initializationParameters Encoded representation of initialization parameters:
+        /// _networkGovernor The address of network governor
+    function initialize(
+        address upgradeModeAddress,
+        bytes calldata initializationParameters
+    ) external {
+        upgradeMode = UpgradeMode(upgradeModeAddress);
+
+        (
+        address _networkGovernor
+        ) = abi.decode(initializationParameters, (address));
+
         networkGovernor = _networkGovernor;
         validators[_networkGovernor] = true;
     }

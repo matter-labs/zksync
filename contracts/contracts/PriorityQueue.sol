@@ -7,7 +7,14 @@ import "./Governance.sol";
 // FIXME: remove this from tests and delete
 contract PriorityQueue {
 
-    constructor(address _governanceAddress) public {
+    constructor() public {
+
+    }
+
+    function initialize(
+        address upgradeModeAddress,
+        bytes calldata initializationParameters
+    ) external {
 
     }
 

@@ -10,6 +10,7 @@ import {
     verifierTestContractCode,
     governanceTestContractCode,
     priorityQueueTestContractCode,
+    proxyTestContractCode,
 } from "../src.ts/deploy";
 
 import { expect, use } from "chai";
@@ -54,12 +55,42 @@ describe("Integration test", async function () {
 
     before(async () => {
         //console.log("---\n");
-        verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode, []);
-        governanceDeployedContract = await deployGovernance(wallet, governanceTestContractCode, [wallet.address]);
-        priorityQueueDeployedContract = await deployPriorityQueue(wallet, priorityQueueTestContractCode, [governanceDeployedContract.address]);
-        franklinDeployedContract = await deployFranklin(
+        let verifierAddressDeployed;
+        [verifierDeployedContract, verifierAddressDeployed] = await deployVerifier(
             wallet,
+            proxyTestContractCode,
+            verifierTestContractCode,
+            [],
+            [],
+        );
+        let governanceAddressDeployed;
+        [governanceDeployedContract, governanceAddressDeployed] = await deployGovernance(
+            wallet,
+            proxyTestContractCode,
+            governanceTestContractCode,
+            ["address"],
+            [wallet.address],
+        );
+        let priorityQueueAddressDeployed;
+        [priorityQueueDeployedContract, priorityQueueAddressDeployed] = await deployPriorityQueue(
+            wallet,
+            proxyTestContractCode,
+            priorityQueueTestContractCode,
+            ["address"],
+            [governanceDeployedContract.address],
+        );
+        let franklinAddressDeployed;
+        [franklinDeployedContract, franklinAddressDeployed] = await deployFranklin(
+            wallet,
+            proxyTestContractCode,
             franklinTestContractCode,
+            [
+                "address",
+                "address",
+                "address",
+                "address",
+                "bytes32",
+            ],
             [
                 governanceDeployedContract.address,
                 verifierDeployedContract.address,

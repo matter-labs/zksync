@@ -29,18 +29,28 @@ contract Franklin is Storage, Config, Events {
 
     // mapping (uint32 => bool) tokenMigrated;
 
-    /// @notice Constructs Franklin contract
-    /// @param _governanceAddress The address of Governance contract
-    /// @param _verifierAddress The address of Verifier contract
-    /// _genesisAccAddress The address of single account, that exists in genesis block
-    /// @param _genesisRoot Genesis blocks (first block) root
-    constructor(
+    /// @notice Franklin contract initialization
+    /// @param upgradeModeAddress Address of UpgradeMode contract
+    /// @param initializationParameters Encoded representation of initialization parameters:
+        /// _governanceAddress The address of Governance contract
+        /// _verifierAddress The address of Verifier contract
+        /// _ // FIXME: remove _priorityQueueAddress in tests
+        /// _ // FIXME: remove _genesisAccAddress
+        /// _genesisRoot Genesis blocks (first block) root
+    function initialize(
+        address upgradeModeAddress,
+        bytes calldata initializationParameters
+    ) external {
+        upgradeMode = UpgradeMode(upgradeModeAddress);
+
+        (
         address _governanceAddress,
         address _verifierAddress,
-        address, // FIXME: remove _priorityQueueAddress in tests
-        address, // FIXME: remove _genesisAccAddress
+        ,
+        ,
         bytes32 _genesisRoot
-    ) public {
+        ) = abi.decode(initializationParameters, (address, address, address, address, bytes32));
+
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
 

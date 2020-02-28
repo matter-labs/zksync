@@ -3,13 +3,32 @@ pragma solidity 0.5.16;
 import "./VerificationKey.sol";
 import "./VerificationKeyExit.sol";
 
+import "./UpgradeMode.sol";
+
+
 /// @title Verifier Contract
 /// @notice Based on https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
 /// @dev TODO: - remove DUMMY_VERIFIER variable for production
 /// @author Matter Labs
 contract Verifier is VerificationKey, VerificationKeyExit {
+
+    /// @notice UpgradeMode contract
+    UpgradeMode upgradeMode;
+
     /// @notice If this flag is true - dummy verification is used instead of full verifier
     bool constant DUMMY_VERIFIER = false;
+
+    /// @notice Verifier contract initialization
+    /// @param upgradeModeAddress Address of UpgradeMode contract
+    /// @param initializationParameters Encoded representation of initialization parameters
+    function initialize(
+        address upgradeModeAddress,
+        bytes calldata initializationParameters
+    ) external {
+        upgradeMode = UpgradeMode(upgradeModeAddress);
+
+        // parameters are not used during initialization
+    }
 
     /// @notice Rollup block proof verification
     /// @param _proof Block proof

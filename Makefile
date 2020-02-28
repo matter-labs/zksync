@@ -152,6 +152,7 @@ endef
 # Flatten contract source
 flatten: prepare-contracts
 	@mkdir -p contracts/flat
+	$(call flatten_file,Proxy.sol)
 	$(call flatten_file,Franklin.sol)
 	$(call flatten_file,Governance.sol)
 	$(call flatten_file,PriorityQueue.sol)

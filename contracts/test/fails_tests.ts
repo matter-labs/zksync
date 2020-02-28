@@ -11,6 +11,7 @@ import {
     mintTestERC20Token,
     priorityQueueTestContractCode,
     verifierTestContractCode,
+    proxyTestContractCode,
 } from "../src.ts/deploy";
 import {expect, use} from "chai";
 const { createMockProvider, getWallets, solidity } = require("ethereum-waffle");
@@ -62,16 +63,42 @@ describe("PLANNED FAILS", function () {
 
     beforeEach(async () => {
         console.log("---\n");
-        verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode, []);
-        governanceDeployedContract = await deployGovernance(wallet, governanceTestContractCode, [wallet.address]);
-        priorityQueueDeployedContract = await deployPriorityQueue(
+        let verifierAddressDeployed;
+        [verifierDeployedContract, verifierAddressDeployed] = await deployVerifier(
             wallet,
-            priorityQueueTestContractCode,
-            [governanceDeployedContract.address]
+            proxyTestContractCode,
+            verifierTestContractCode,
+            [],
+            [],
         );
-        franklinDeployedContract = await deployFranklin(
+        let governanceAddressDeployed;
+        [governanceDeployedContract, governanceAddressDeployed] = await deployGovernance(
             wallet,
+            proxyTestContractCode,
+            governanceTestContractCode,
+            ["address"],
+            [wallet.address],
+        );
+        let priorityQueueAddressDeployed;
+        [priorityQueueDeployedContract, priorityQueueAddressDeployed] = await deployPriorityQueue(
+            wallet,
+            proxyTestContractCode,
+            priorityQueueTestContractCode,
+            ["address"],
+            [governanceDeployedContract.address],
+        );
+        let franklinAddressDeployed;
+        [franklinDeployedContract, franklinAddressDeployed] = await deployFranklin(
+            wallet,
+            proxyTestContractCode,
             franklinTestContractCode,
+            [
+                "address",
+                "address",
+                "address",
+                "address",
+                "bytes32",
+            ],
             [
                 governanceDeployedContract.address,
                 verifierDeployedContract.address,
