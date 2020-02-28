@@ -264,13 +264,20 @@ impl EthereumInterface for MockEthereum {
         params: P,
         options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
-        let raw_tx = ethabi::encode(params.into_tokens().as_ref());
+        let gas_price = options.gas_price.unwrap_or(self.gas_price);
+        let nonce = options.nonce.unwrap_or(self.nonce);
+
+        // Nonce and gas_price are appended to distinguish the same transactions
+        // with different gas by their hash in tests.
+        let mut raw_tx = ethabi::encode(params.into_tokens().as_ref());
+        raw_tx.append(&mut ethabi::encode(gas_price.into_tokens().as_ref()));
+        raw_tx.append(&mut ethabi::encode(nonce.into_tokens().as_ref()));
         let hash = Self::fake_sha256(raw_tx.as_ref()); // Okay for test purposes.
 
         Ok(SignedCallResult {
             raw_tx,
-            gas_price: options.gas_price.unwrap_or(self.gas_price),
-            nonce: options.nonce.unwrap_or(self.nonce),
+            gas_price,
+            nonce,
             hash,
         })
     }

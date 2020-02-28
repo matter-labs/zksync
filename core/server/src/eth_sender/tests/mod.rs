@@ -433,3 +433,51 @@ fn restore_state() {
 
     assert!(receiver.try_next().unwrap().is_some());
 }
+
+/// Checks that even after getting the first transaction stuck and sending the next
+/// one, confirmation for the first (stuck) transaction is processed and leads
+/// to the operation commitment.
+#[test]
+fn confirmations_independence() {
+    // Workflow in the test is the same as in `stuck_transaction`, except for the fact
+    // that confirmation is obtained for the stuck transaction instead of the latter one.
+
+    let (mut eth_sender, mut sender, _) = default_eth_sender();
+
+    let operation = test_data::commit_operation(0);
+    sender.try_send(operation.clone()).unwrap();
+
+    eth_sender.retrieve_operations();
+    eth_sender.proceed_next_operation();
+
+    let stuck_tx = eth_sender
+        .create_new_tx(
+            &operation,
+            eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
+            None,
+        )
+        .unwrap();
+
+    eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
+    eth_sender.ethereum.nonce += 1.into();
+    eth_sender.proceed_next_operation();
+
+    let next_tx = eth_sender
+        .create_new_tx(
+            &operation,
+            eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
+            Some(&stuck_tx),
+        )
+        .unwrap();
+    eth_sender.db.assert_stored(&next_tx);
+    eth_sender.ethereum.assert_sent(&next_tx);
+
+    // Add a confirmation for a *stuck* transaction.
+    eth_sender
+        .ethereum
+        .add_successfull_execution(&stuck_tx, super::WAIT_CONFIRMATIONS);
+    eth_sender.proceed_next_operation();
+
+    // Check that operation is confirmed.
+    eth_sender.db.assert_confirmed(&stuck_tx);
+}
