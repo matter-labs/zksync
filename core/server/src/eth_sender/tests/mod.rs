@@ -1,6 +1,10 @@
 // Local uses
 use self::mock::{default_eth_sender, restored_eth_sender};
-use super::{ethereum_interface::EthereumInterface, transactions::OperationETHState, ETHSender};
+use super::{
+    ethereum_interface::EthereumInterface,
+    transactions::{ExecutedTxStatus, OperationETHState, TransactionETHState, TxCheckOutcome},
+    ETHSender,
+};
 
 mod mock;
 mod test_data;
@@ -69,6 +73,114 @@ fn tx_creation() {
         let expected_tx = eth_sender.ethereum.create_signed_tx_replica(&operation);
         assert_eq!(actual_tx.signed_tx, expected_tx);
     }
+}
+
+/// Checks that received transaction response is reduced to the
+/// `TxCheckOutcome` correctly.
+///
+/// Here we check every possible output of the `check_transaction_state` method.
+#[test]
+fn transaction_state() {
+    let (mut eth_sender, _, _) = default_eth_sender();
+    let current_block = eth_sender.ethereum.block_number;
+    let deadline_block = eth_sender.get_deadline_block(current_block);
+    let operations: Vec<TransactionETHState> = vec![
+        test_data::commit_operation(0), // Will be committed.
+        test_data::commit_operation(1), // Will be pending because of not enough confirmations.
+        test_data::commit_operation(2), // Will be failed.
+        test_data::commit_operation(3), // Will be stuck.
+        test_data::commit_operation(4), // Will be pending due no response.
+    ]
+    .iter()
+    .map(|op| eth_sender.create_new_tx(op, deadline_block, None).unwrap())
+    .collect();
+
+    // Committed operation.
+    let committed_response = ExecutedTxStatus {
+        confirmations: super::WAIT_CONFIRMATIONS,
+        success: true,
+        receipt: None,
+    };
+    eth_sender
+        .ethereum
+        .add_execution(&operations[0], &committed_response);
+
+    // Pending operation.
+    let pending_response = ExecutedTxStatus {
+        confirmations: super::WAIT_CONFIRMATIONS - 1,
+        success: true,
+        receipt: None,
+    };
+    eth_sender
+        .ethereum
+        .add_execution(&operations[1], &pending_response);
+
+    // Failed operation.
+    let failed_response = ExecutedTxStatus {
+        confirmations: super::WAIT_CONFIRMATIONS,
+        success: false,
+        receipt: Some(Default::default()),
+    };
+    eth_sender
+        .ethereum
+        .add_execution(&operations[2], &failed_response);
+
+    // Checks.
+
+    // Committed operation.
+    assert_eq!(
+        eth_sender
+            .check_transaction_state(
+                &operations[0],
+                current_block + committed_response.confirmations
+            )
+            .unwrap(),
+        TxCheckOutcome::Committed
+    );
+
+    // Pending operation (no enough confirmations).
+    assert_eq!(
+        eth_sender
+            .check_transaction_state(
+                &operations[1],
+                current_block + pending_response.confirmations
+            )
+            .unwrap(),
+        TxCheckOutcome::Pending
+    );
+
+    // Failed operation.
+    assert_eq!(
+        eth_sender
+            .check_transaction_state(
+                &operations[2],
+                current_block + failed_response.confirmations
+            )
+            .unwrap(),
+        TxCheckOutcome::Failed(Default::default())
+    );
+
+    // Stuck operation.
+    assert_eq!(
+        eth_sender
+            .check_transaction_state(
+                &operations[3],
+                current_block + super::EXPECTED_WAIT_TIME_BLOCKS
+            )
+            .unwrap(),
+        TxCheckOutcome::Stuck
+    );
+
+    // Pending operation (no response yet).
+    assert_eq!(
+        eth_sender
+            .check_transaction_state(
+                &operations[4],
+                current_block + super::EXPECTED_WAIT_TIME_BLOCKS - 1
+            )
+            .unwrap(),
+        TxCheckOutcome::Pending
+    );
 }
 
 /// Test for a normal `ETHSender` workflow:

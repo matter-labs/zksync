@@ -78,7 +78,7 @@ pub(super) struct ExecutedTxStatus {
 }
 
 /// The result of the check for the Ethereum transaction commitment.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TxCheckOutcome {
     /// Transaction was committed and confirmed.
     Committed,

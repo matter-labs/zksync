@@ -163,6 +163,13 @@ impl MockEthereum {
         );
     }
 
+    /// Adds an response for the sent transaction for `ETHSender` to receive.
+    pub fn add_execution(&mut self, tx: &TransactionETHState, status: &ExecutedTxStatus) {
+        self.tx_statuses
+            .borrow_mut()
+            .insert(tx.signed_tx.hash, status.clone());
+    }
+
     /// Increments the blocks by a provided `confirmations` and marks the sent transaction
     /// as a success.
     pub fn add_successfull_execution(&mut self, tx: &TransactionETHState, confirmations: u64) {
