@@ -14,7 +14,7 @@ import {Contract, ethers} from "ethers";
 
 const { expect } = require("chai")
 const { deployContract } = require("ethereum-waffle");
-const { wallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE} = require("./common");
+const { wallet, exitWallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE} = require("./common");
 import * as zksync from "zksync";
 
 const TEST_PRIORITY_EXPIRATION = 16;
@@ -197,6 +197,19 @@ describe("ZK priority queue ops unit tests", function () {
     });
 });
 
+async function onchainBalance(ethWallet: ethers.Wallet, token: Address): Promise<BigNumber> {
+    if (token === ethers.constants.AddressZero) {
+        return ethWallet.getBalance();
+    } else {
+        const erc20contract = new Contract(
+            token,
+            IERC20_INTERFACE.abi,
+            ethWallet,
+        );
+        return bigNumberify(await erc20contract.balanceOf(ethWallet.address));
+    }
+}
+
 describe("ZK Sync withdraw unit tests", function () {
     this.timeout(50000);
 
@@ -226,26 +239,16 @@ describe("ZK Sync withdraw unit tests", function () {
 
     async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
         let gasFee: BigNumber;
-        let balanceBefore: BigNumber;
-        let balanceAfter: BigNumber;
+        const balanceBefore = await onchainBalance(ethWallet, token);
         const contractBalanceBefore = bigNumberify(await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId));
         if (token === ethers.constants.AddressZero) {
-            balanceBefore = await ethWallet.getBalance();
             const tx = await zksyncContract.withdrawETH(amount);
             const receipt = await tx.wait();
             gasFee = receipt.gasUsed.mul(await ethWallet.provider.getGasPrice());
-            balanceAfter = await ethWallet.getBalance();
         } else {
-            const erc20contract = new Contract(
-                token,
-                IERC20_INTERFACE.abi,
-                ethWallet,
-            );
-            balanceBefore = bigNumberify(await erc20contract.balanceOf(ethWallet.address));
-            const tx = await zksyncContract.withdrawERC20(token, amount);
-            await tx.wait();
-            balanceAfter = bigNumberify(await erc20contract.balanceOf(ethWallet.address));
+            await zksyncContract.withdrawERC20(token, amount);
         }
+        const balanceAfter = await onchainBalance(ethWallet, token);
 
         const expectedBalance = token == AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
         expect(balanceAfter.toString(), "withdraw account balance mismatch").eq(expectedBalance.toString());
@@ -318,5 +321,31 @@ describe("ZK Sync withdraw unit tests", function () {
 
         const {revertReason} = await getCallRevertReason( async () => await performWithdraw(wallet, incorrectTokenContract.address, 1, withdrawAmount.add(1)));
         expect(revertReason, "wrong revert reason").eq("gvs12");
+    });
+
+    it("Complete pending withdawals, eth, known erc20", async () => {
+        zksyncContract.connect(wallet);
+        const withdrawAmount = parseEther("1.0");
+        const withdrawsToCancel = 5;
+
+        await wallet.sendTransaction({to: zksyncContract.address, value: withdrawAmount});
+        await tokenContract.transfer(zksyncContract.address, withdrawAmount);
+
+
+        for (const tokenAddress of [AddressZero, tokenContract.address]) {
+            const tokenId = await ethProxy.resolveTokenId(tokenAddress);
+
+            await zksyncContract.setBalanceToWithdraw(exitWallet.address, tokenId, 0);
+            await zksyncContract.addPendingWithdrawal(exitWallet.address, tokenId, withdrawAmount.div(2));
+            await zksyncContract.addPendingWithdrawal(exitWallet.address, tokenId, withdrawAmount.div(2));
+
+            const onchainBalBefore = await onchainBalance(exitWallet, tokenAddress);
+
+            await zksyncContract.completeWithdrawals(withdrawsToCancel);
+
+            const onchainBalAfter = await onchainBalance(exitWallet, tokenAddress);
+
+            expect(onchainBalAfter.sub(onchainBalBefore)).eq(withdrawAmount.toString());
+        }
     });
 });

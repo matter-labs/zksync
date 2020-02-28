@@ -21,5 +21,9 @@ contract ZKSyncUnitTest is FranklinTest {
     }
 
     function () payable external{}
-}
 
+    function addPendingWithdrawal(address _to, uint16 _tokenId, uint128 _amount) external {
+        storeWithdrawalAsPending(_to, _tokenId, _amount);
+    }
+
+}
