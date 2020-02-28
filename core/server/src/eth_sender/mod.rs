@@ -391,14 +391,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     ) -> Result<SignedCallResult, failure::Error> {
         match &op.action {
             Action::Commit => {
-                //                let mut block_number = op.block.block_number;
-                //                // FAIL TEST
-                //                let rnd = rand::thread_rng().gen_range(0,10);
-                //                if rnd < 5 {
-                //                    error!("Messing with tx pubdata");
-                //                    block_number += rnd + 1;
-                //                }
-                //                // FAIL TEST
                 let root = op.block.get_eth_encoded_root();
 
                 let public_data = op.block.get_eth_public_data();
