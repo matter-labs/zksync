@@ -106,7 +106,7 @@ struct StorageBalance {
 pub struct Token {
     pub id: i32,
     pub address: String,
-    pub symbol: Option<String>,
+    pub symbol: String,
 }
 
 #[derive(Debug, Insertable)]
@@ -2146,11 +2146,11 @@ impl StorageProcessor {
         Ok(serde_json::from_value(stored.proof).unwrap())
     }
 
-    pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
+    pub fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()> {
         let new_token = Token {
             id: i32::from(id),
             address: address.to_string(),
-            symbol: symbol.map(String::from),
+            symbol: symbol.to_string(),
         };
         diesel::insert_into(tokens::table)
             .values(&new_token)
@@ -2274,7 +2274,11 @@ impl StorageProcessor {
             self.update_block_events(block_events)?;
 
             for token in token_events.iter() {
-                self.store_token(token.id as u16, &format!("0x{:x}", token.address), None)?;
+                self.store_token(
+                    token.id as u16,
+                    &format!("0x{:x}", token.address),
+                    &format!("ERC20-{}", token.id),
+                )?;
             }
 
             self.update_last_watched_block_number(last_watched_eth_number)?;

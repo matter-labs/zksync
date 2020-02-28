@@ -7,16 +7,19 @@ import { utils, ethers, Contract } from "ethers";
 import {
     AccountState,
     Address,
-    Token,
+    TokenLike,
     TransactionReceipt,
     PriorityOperationReceipt,
     ContractAddress,
-    Tokens
+    Tokens,
+    TokenAddress
 } from "./types";
 import {
+    isTokenETH,
     sleep,
     SYNC_GOV_CONTRACT_INTERFACE,
-    SYNC_MAIN_CONTRACT_INTERFACE
+    SYNC_MAIN_CONTRACT_INTERFACE,
+    TokenSet
 } from "./utils";
 
 export async function getDefaultProvider(
@@ -44,12 +47,14 @@ export async function getDefaultProvider(
 
 export class Provider {
     contractAddress: ContractAddress;
+    public tokenSet: TokenSet;
     private constructor(public transport: AbstractJSONRPCTransport) {}
 
     static async newWebsocketProvider(address: string): Promise<Provider> {
         const transport = await WSTransport.connect(address);
         const provider = new Provider(transport);
         provider.contractAddress = await provider.getContractAddress();
+        provider.tokenSet = new TokenSet(await provider.getTokens());
         return provider;
     }
 
@@ -59,6 +64,7 @@ export class Provider {
         const transport = new HTTPTransport(address);
         const provider = new Provider(transport);
         provider.contractAddress = await provider.getContractAddress();
+        provider.tokenSet = new TokenSet(await provider.getTokens());
         return provider;
     }
 
@@ -182,8 +188,8 @@ export class ETHProxy {
         );
     }
 
-    async resolveTokenId(token: Token): Promise<number> {
-        if (token == "ETH") {
+    async resolveTokenId(token: TokenAddress): Promise<number> {
+        if (token == "0x0000000000000000000000000000000000000000") {
             return 0;
         } else {
             const tokenId = await this.governanceContract.tokenIds(token);
@@ -195,11 +201,11 @@ export class ETHProxy {
     }
 
     async estimateDepositFeeInETHToken(
-        token: Token,
+        token: TokenLike,
         gasPrice?: utils.BigNumber
     ): Promise<utils.BigNumber> {
         gasPrice = gasPrice || (await this.ethersProvider.getGasPrice());
-        const multiplier = token == "ETH" ? 179000 : 214000;
+        const multiplier = isTokenETH(token) ? 179000 : 214000;
         return gasPrice.mul(2 * multiplier);
     }
 

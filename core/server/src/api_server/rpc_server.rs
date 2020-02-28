@@ -32,7 +32,7 @@ impl ResponseAccountState {
                 balances.insert("ETH".to_string(), balance);
             } else {
                 let token = tokens.get(&token_id).ok_or_else(Error::internal_error)?;
-                balances.insert(token.address.clone(), balance);
+                balances.insert(token.symbol.clone(), balance);
             }
         }
 
@@ -294,7 +294,7 @@ impl Rpc for RpcApp {
                 if id == 0 {
                     ("ETH".to_string(), token)
                 } else {
-                    (token.address.clone(), token)
+                    (token.symbol.clone(), token)
                 }
             })
             .collect())
