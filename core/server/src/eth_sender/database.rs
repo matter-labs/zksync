@@ -40,7 +40,6 @@ impl Database {
 }
 
 impl DatabaseAccess for Database {
-    /// Restores the state of `ETHSender` from the database.
     fn restore_state(&self) -> Result<VecDeque<OperationETHState>, failure::Error> {
         let storage = self
             .db_pool
