@@ -65,7 +65,7 @@ const VERIFY_KEY_FILENAME: &str = "GetVk.sol";
 
 pub fn get_keys_root_dir() -> PathBuf {
     let mut out_dir = PathBuf::new();
-    out_dir.push(&std::env::var("ZKSYNC_HOME").expect("ZKSYNC_HOME not set"));
+    out_dir.push(&std::env::var("ZKSYNC_HOME").unwrap_or("/".to_owned()));
     out_dir.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
     out_dir.push(&format!("account-{}", crate::params::account_tree_depth()));
     out_dir
