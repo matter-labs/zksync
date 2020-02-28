@@ -62,6 +62,14 @@ describe("Proxy unit test", function () {
 
     it("check Proxy reverts", async () => {
         expect(await getCallRevertReason( () => proxyTestContract.initialize(DummyFirst.address, []) )).equal("uin11");
+        expect(await getCallRevertReason( () => proxyDummyInterface.initialize(DummyFirst.address, []) )).equal("uin11");
+
+        let proxyTestContract_with_wallet2_signer = await proxyTestContract.connect(wallet2);
+        expect(await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.initialize(DummyFirst.address, []) )).equal("oro11");
+
+        let proxyDummyInterface_with_wallet2_signer = await proxyDummyInterface.connect(wallet2);
+        expect(await getCallRevertReason( () => proxyDummyInterface_with_wallet2_signer.initialize(DummyFirst.address, []) )).equal("oro11");
+
         expect(await getCallRevertReason( () => proxyTestContract.upgradeTarget("0x0000000000000000000000000000000000000000") )).equal("uut11");
         expect(await getCallRevertReason( () => proxyTestContract.upgradeTarget(DummyFirst.address) )).equal("uut12");
     });
