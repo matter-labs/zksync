@@ -33,7 +33,7 @@ fn main() {
     let req_server_timeout = env::var("REQ_SERVER_TIMEOUT")
         .expect("REQ_SERVER_TIMEOUT is missing")
         .parse::<u64>()
-        .and_then(|d| Ok(time::Duration::from_secs(d)))
+        .map(time::Duration::from_secs)
         .expect("REQ_SERVER_TIMEOUT invalid value");
     let api_client = client::ApiClient::new(
         &api_url,
