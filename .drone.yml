@@ -260,6 +260,7 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync env stage
   # too much logs and pipeline is failing
   - zksync yarn
   - zksync dist-client > /dev/null
@@ -296,6 +297,7 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - zksync env stage
   - sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
   - sudo chown -R rust:rust ./target
   - f cargo build --release
