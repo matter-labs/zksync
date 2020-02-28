@@ -15,5 +15,6 @@ python3 $ZKSYNC_HOME/bin/replace-env-variable.py $STAGE_ENV_FILE ACCOUNT_TREE_DE
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $STAGE_ENV_FILE ZKSYNC_ACTION=dont_ask
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $STAGE_ENV_FILE PROVER_SERVER_URL=http://stage-server:8088
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $STAGE_ENV_FILE KEYS_SPACE_URL=https://keys-multitoken.fra1.digitaloceanspaces.com/stage
+python3 $ZKSYNC_HOME/bin/replace-env-variable.py $STAGE_ENV_FILE CONTRACT_ADDR=0xFF87B9FE99a7003010004849671E7C3BB8AF3fb8
 
 zksync env stage
