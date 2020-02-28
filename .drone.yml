@@ -271,8 +271,8 @@ steps:
   image: docker
   commands:
   - docker login -u $USERNAME -p $PASSWORD
-  - docker build -t $REPO:${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
-  - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
+  - docker build -t $REPO:stage-${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
+  - docker push $REPO:stage-${DRONE_COMMIT_SHA:0:8}
   environment:
     USERNAME:
       from_secret: docker_username

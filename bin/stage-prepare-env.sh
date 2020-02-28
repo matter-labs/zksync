@@ -10,7 +10,7 @@ python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE ETH_NETWORK=rinkeb
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE DATABASE_URL=$1
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE WEB3_URL=$2
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE API_SERVER=https://stage-api.zksync.dev
-python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE BLOCK_SIZE_CHUNKS=18
+python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE BLOCK_SIZE_CHUNKS=50
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE ACCOUNT_TREE_DEPTH=16
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE ZKSYNC_ACTION=dont_ask
 
