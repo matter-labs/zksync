@@ -6,3 +6,5 @@ Creat promotion job on CI to deploy to target environment.
 `zksync promote-to-stage build=<DRONE_CI_BUILD>` where `<DRONE_CI_BUILD>` is a build number to promote to staging.
 
 Example: `zksync promote-to-stage ci-build=23`
+
+If you update contract address (or any similar node related environment), do not forget to update `bin/stage-prepare-env.sh` file.
