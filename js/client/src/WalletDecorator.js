@@ -354,7 +354,7 @@ export class WalletDecorator {
 
         let res = {};
         let assign = key => ([token, balance]) => {
-            let tokenInfo = tokenInfoFromToken(token);
+            let tokenInfo = tokenInfoFromSymbol(token);
             if (res[tokenInfo.id] === undefined) {
                 res[tokenInfo.id] = {
                     tokenName: tokenInfo.symbol,
@@ -377,7 +377,7 @@ export class WalletDecorator {
     franklinBalancesAsRenderableList() {
         return Object.entries(this.syncState.committed.balances)
             .map(([token, balance]) => {
-                const tokenInfo = tokenInfoFromToken(token);
+                const tokenInfo = tokenInfoFromSymbol(token);
                 return {
                     tokenInfo,
                     tokenName: tokenInfo.symbol,
