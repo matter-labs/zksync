@@ -331,7 +331,6 @@ impl Maintainer {
             block_number,
         );
 
-        let initial_root = witness_accum.account_tree.root_hash();
         let ops = storage
             .get_block_operations(block_number)
             .map_err(|e| format!("failed to get block operations {}", e))?;
@@ -547,7 +546,7 @@ impl Maintainer {
 
         Ok(ProverData {
             public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
-            old_root: initial_root,
+            old_root: witness_accum.initial_root_hash,
             new_root: commit_operation.block.new_root_hash,
             validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string())
                 .expect("failed to parse"),

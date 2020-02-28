@@ -98,32 +98,6 @@ pub const LEAF_DATA_BIT_WIDTH: usize =
 pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const ETH_TOKEN_ID: TokenId = 0;
 
-static mut TEST_BLOCK_SIZE_CHUNKS_VALUE: usize = 0;
-/// block_size_chunks used for tests.
-pub fn test_block_size_chunks() -> usize {
-    // use of mutable static is unsafe as it can be mutated by multiple threads.
-    // using `unsafe` block as there's no risk of data race, the worst that can
-    // happen is we read and set environment value multuple times, which is ok.
-    unsafe {
-        if TEST_BLOCK_SIZE_CHUNKS_VALUE == 0 {
-            let value: &'static str = env!("TEST_BLOCK_SIZE_CHUNKS");
-            TEST_BLOCK_SIZE_CHUNKS_VALUE =
-                usize::from_str(value).expect("block size chunks value is invalid");
-            let runtime_value =
-                env::var("TEST_BLOCK_SIZE_CHUNKS").expect("TEST_BLOCK_SIZE_CHUNKS missing");
-            let runtime_value =
-                usize::from_str(&runtime_value).expect("TEST_BLOCK_SIZE_CHUNKS invalid");
-            if runtime_value != TEST_BLOCK_SIZE_CHUNKS_VALUE {
-                panic!(
-                    "TEST_BLOCK_SIZE_CHUNKS want runtime value: {}, got: {}",
-                    TEST_BLOCK_SIZE_CHUNKS_VALUE, runtime_value
-                );
-            }
-        }
-        TEST_BLOCK_SIZE_CHUNKS_VALUE
-    }
-}
-
 static mut BLOCK_CHUNK_SIZES_VALUE: Vec<usize> = Vec::new();
 
 pub fn block_chunk_sizes() -> &'static [usize] {

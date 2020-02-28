@@ -3,7 +3,7 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use crate::params::block_chunk_sizes;
+use crate::params::{block_chunk_sizes, max_block_chunk_size};
 use crate::serialization::*;
 use web3::types::H256;
 
@@ -89,19 +89,16 @@ impl Block {
 
     /// Returns eth_witness data and bytes used by each of the operations
     pub fn get_eth_witness_data(&self) -> (Vec<u8>, Vec<u64>) {
-        let (eth_witness, mut used_bytes) = self
-            .block_transactions
-            .iter()
-            .filter_map(ExecutedOperations::get_executed_op)
-            .map(FranklinOp::eth_witness)
-            .fold(
-                (Vec::new(), Vec::new()),
-                |(mut eth_witness, mut used_bytes), witness_bytes| {
-                    used_bytes.push(witness_bytes.len() as u64);
-                    eth_witness.extend(witness_bytes.into_iter());
-                    (eth_witness, used_bytes)
-                },
-            );
+        let mut eth_witness = Vec::new();
+        let mut used_bytes = Vec::new();
+
+        for block_tx in &self.block_transactions {
+            if let Some(franklin_op) = block_tx.get_executed_op() {
+                let witness_bytes = franklin_op.eth_witness();
+                used_bytes.push(witness_bytes.len() as u64);
+                eth_witness.extend(witness_bytes.into_iter());
+            }
+        }
 
         for _ in 0..self.get_noops() {
             used_bytes.push(0);
@@ -133,6 +130,10 @@ impl Block {
                 return block_size;
             }
         }
-        panic!("There's no block of such size");
+        panic!(
+            "Provided chunks amount ({}) cannot fit in one block, maximum available size is {}",
+            chunks_used,
+            max_block_chunk_size()
+        );
     }
 }

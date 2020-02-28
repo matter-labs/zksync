@@ -76,7 +76,8 @@ impl WitnessBuilder {
     /// Add noops if pubdata isn't of right size
     pub fn extend_pubdata_with_noops(&mut self) {
         let chunks_used = self.operations.len();
-        for _ in 0..Block::smallest_block_size_for_chunks(chunks_used) - chunks_used {
+        let chunks_remaining = Block::smallest_block_size_for_chunks(chunks_used) - chunks_used;
+        for _ in 0..chunks_remaining {
             self.operations.push(crate::witness::noop::noop_operation(
                 &self.account_tree,
                 self.fee_account_id,

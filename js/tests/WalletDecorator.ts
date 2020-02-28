@@ -1,7 +1,6 @@
 import * as ethers from 'ethers';
 const zksync = require('zksync');
 import * as utils from './utils';
-import { Token } from 'zksync/build/types';
 import { sleep } from 'zksync/build/utils';
 const contractCode = require('../../contracts/flat_build/Franklin');
 const erc20ContractCode = require('openzeppelin-solidity/build/contracts/IERC20');
@@ -176,12 +175,12 @@ export class WalletDecorator {
     }
 
     async setCurrentPubkeyWithZksyncTx() {
-        if (await this.syncWallet.isCurrentPubkeySet()) return;
+        if (await this.syncWallet.isSigningKeySet()) return;
 
         const syncNonce = this.syncNonce++;
 
         const startTime = new Date().getTime();
-        const changePubkeyHandle = await this.syncWallet.setCurrentPubkeyWithZksyncTx(syncNonce);
+        const changePubkeyHandle = await this.syncWallet.onchainAuthSigningKey(syncNonce);
         console.log(`Change pubkey offchain posted: ${(new Date().getTime()) - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey offchain committed: ${(new Date().getTime()) - startTime} ms`);
@@ -400,7 +399,7 @@ export class WalletDecorator {
             ...await Promise.all(
                 tokens.map(
                     async token => {
-                        const eth      = await zksync.getEthereumBalance(this.ethWallet, token).then(ethers.utils.formatEther);
+                        const eth      = await this.syncWallet.getEthereumBalance(token).then(ethers.utils.formatEther);
                         const sync     = await this.syncWallet.getBalance(token).then(ethers.utils.formatEther);
                         const withdraw = withdrawBalances[token];
                         return {

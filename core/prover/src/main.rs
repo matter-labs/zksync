@@ -92,7 +92,7 @@ fn main() {
         heartbeat_interval,
         stop_signal,
     );
-    
+
     // Register prover
     prover_id_arc.store(
         api_client

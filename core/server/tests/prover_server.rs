@@ -7,6 +7,7 @@ use futures::channel::mpsc;
 // Workspace deps
 use circuit::witness::deposit::apply_deposit_tx;
 use circuit::witness::deposit::calculate_deposit_operations_from_witness;
+use models::params::block_chunk_sizes;
 use prover::client;
 use prover::ApiClient;
 use server::prover_server;
@@ -39,7 +40,7 @@ fn client_with_empty_worker_name_panics() {
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
-    let block_size_chunks = models::params::test_block_size_chunks();
+    let block_size_chunks = block_chunk_sizes()[0];
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
     let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
     let id = client
@@ -65,7 +66,7 @@ fn api_client_simple_simulation() {
     let addr = spawn_server(prover_timeout, rounds_interval);
 
     let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
-    let block_size_chunks = models::params::test_block_size_chunks();
+    let block_size_chunks = block_chunk_sizes()[0];
     // call block_to_prove and check its none
     let to_prove = client
         .block_to_prove(block_size_chunks)
@@ -74,7 +75,7 @@ fn api_client_simple_simulation() {
 
     let storage = access_storage();
 
-    let (op, wanted_prover_data) = test_operation_and_wanted_prover_data();
+    let (op, wanted_prover_data) = test_operation_and_wanted_prover_data(block_size_chunks);
 
     println!("inserting test operation");
     // write test commit operation to db
@@ -127,6 +128,7 @@ fn api_client_simple_simulation() {
 }
 
 pub fn test_operation_and_wanted_prover_data(
+    block_size_chunks: usize,
 ) -> (models::Operation, prover::prover_data::ProverData) {
     let mut circuit_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
@@ -225,18 +227,15 @@ pub fn test_operation_and_wanted_prover_data(
         pub_data.extend(deposit_witness.get_pubdata());
     }
 
-    for _ in 0..models::params::test_block_size_chunks() - operations.len() {
+    for _ in 0..block_size_chunks - operations.len() {
         operations.push(circuit::witness::noop::noop_operation(
             &circuit_tree,
             block.fee_account,
         ));
         pub_data.extend(vec![false; 64]);
     }
-    assert_eq!(
-        pub_data.len(),
-        64 * models::params::test_block_size_chunks()
-    );
-    assert_eq!(operations.len(), models::params::test_block_size_chunks());
+    assert_eq!(pub_data.len(), 64 * block_size_chunks);
+    assert_eq!(operations.len(), block_size_chunks);
 
     let validator_acc = circuit_tree
         .get(block.fee_account as u32)

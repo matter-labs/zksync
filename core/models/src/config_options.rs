@@ -15,6 +15,10 @@ impl Drop for ThreadPanicNotify {
     }
 }
 
+fn get_env(name: &str) -> String {
+    env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e))
+}
+
 #[derive(Clone)]
 pub struct ConfigurationOptions {
     pub rest_api_server_address: SocketAddr,
@@ -33,14 +37,10 @@ pub struct ConfigurationOptions {
     pub gas_price_factor: usize,
     pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
-    pub req_server_timeout: time::Duration,
 }
 
 impl ConfigurationOptions {
     pub fn from_env() -> ConfigurationOptions {
-        let get_env =
-            |name| env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e));
-
         ConfigurationOptions {
             rest_api_server_address: get_env("REST_API_BIND")
                 .parse()
@@ -86,10 +86,6 @@ impl ConfigurationOptions {
             prover_server_address: get_env("PROVER_SERVER_BIND")
                 .parse()
                 .expect("Failed to parse PROVER_SERVER_BIND bind address"),
-            req_server_timeout: get_env("REQ_SERVER_TIMEOUT")
-                .parse::<u64>()
-                .map(time::Duration::from_secs)
-                .expect("REQ_SERVER_TIMEOUT invalid value"),
         }
     }
 }
@@ -100,8 +96,6 @@ pub struct ProverConfigOpts {
 
 impl ProverConfigOpts {
     pub fn from_env() -> Self {
-        let get_env =
-            |name| env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e));
         Self {
             req_server_timeout: get_env("REQ_SERVER_TIMEOUT")
                 .parse::<u64>()
