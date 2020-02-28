@@ -248,7 +248,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         receipt,
                     );
                     // Process the failure according to the chosen policy.
-                    self.failure_handler(receipt);
+                    self.failure_handler(&receipt);
                 }
             }
         }
@@ -274,7 +274,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Handles a transaction execution failure by reporting the issue to the log
     /// and terminating the node.
-    fn failure_handler(&self, receipt: TransactionReceipt) -> ! {
+    fn failure_handler(&self, receipt: &TransactionReceipt) -> ! {
         info!(
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
@@ -315,7 +315,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     status.receipt.is_some(),
                     "Receipt should exist for a failed transaction"
                 );
-                TxCheckOutcome::Failed(status.receipt.unwrap())
+                TxCheckOutcome::Failed(Box::new(status.receipt.unwrap()))
             }
             // Stuck transaction.
             None if tx.is_stuck(current_block) => TxCheckOutcome::Stuck,

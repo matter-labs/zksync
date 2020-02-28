@@ -86,8 +86,8 @@ pub enum TxCheckOutcome {
     Pending,
     /// Transaction is considered stuck, a replacement should be made.
     Stuck,
-    /// Transaction execution failed.
-    Failed(TransactionReceipt),
+    /// Transaction execution failed. Receipt is boxed to reduce the enum object size.
+    Failed(Box<TransactionReceipt>),
 }
 
 /// Enumeration denoting if the operation was successfully committed, or not yet.

@@ -318,16 +318,12 @@ fn operations_order() {
 
     // Also we create the list of expected transactions.
     let mut expected_txs = Vec::new();
-    for idx in 0..operations.len() {
+    for (idx, operation) in operations.iter().enumerate() {
         // We start from the 1 block, and step logic is:
         // N blocks to confirm, repeated `idx` times.
         let start_block = 1 + super::WAIT_CONFIRMATIONS * idx as u64;
         let expected_tx = eth_sender
-            .create_new_tx(
-                &operations[idx],
-                eth_sender.get_deadline_block(start_block),
-                None,
-            )
+            .create_new_tx(operation, eth_sender.get_deadline_block(start_block), None)
             .unwrap();
 
         // Update nonce as well (it will be reset below).
@@ -345,24 +341,22 @@ fn operations_order() {
     eth_sender.retrieve_operations();
 
     // Then we go through the operations and check that the order of operations is preserved.
-    for idx in 0..operations.len() {
+    for (idx, tx) in expected_txs.iter().enumerate() {
         eth_sender.proceed_next_operation();
 
         // Check that current expected tx is stored, but the next ones are not.
-        eth_sender.db.assert_stored(&expected_txs[idx]);
-        eth_sender.ethereum.assert_sent(&expected_txs[idx]);
+        eth_sender.db.assert_stored(tx);
+        eth_sender.ethereum.assert_sent(tx);
 
-        for following_idx in (idx + 1)..operations.len() {
-            eth_sender
-                .db
-                .assert_not_stored(&expected_txs[following_idx])
+        for following_tx in expected_txs[idx + 1..].iter() {
+            eth_sender.db.assert_not_stored(following_tx)
         }
 
         eth_sender
             .ethereum
-            .add_successfull_execution(&expected_txs[idx], super::WAIT_CONFIRMATIONS);
+            .add_successfull_execution(tx, super::WAIT_CONFIRMATIONS);
         eth_sender.proceed_next_operation();
-        eth_sender.db.assert_confirmed(&expected_txs[idx]);
+        eth_sender.db.assert_confirmed(tx);
     }
 
     // We should be notified about all the verify operations being completed.
