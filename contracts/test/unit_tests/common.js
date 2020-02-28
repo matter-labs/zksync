@@ -3,6 +3,8 @@ const { expect, use } = require("chai")
 const { createMockProvider, getWallets, solidity, deployContract } = require("ethereum-waffle");
 const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
 
+const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20");
+
 // For: geth
 
 // const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
@@ -42,5 +44,6 @@ module.exports = {
     wallet,
     exitWallet,
     deployTestContract,
-    getCallRevertReason
+    getCallRevertReason,
+    IERC20_INTERFACE
 }

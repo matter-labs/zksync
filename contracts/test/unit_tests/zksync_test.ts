@@ -1,20 +1,21 @@
 import {
-    addTestERC20Token,
+    addTestERC20Token, addTestNotApprovedERC20Token,
     deployFranklin,
     deployGovernance,
     deployVerifier, franklinTestContractCode,
     governanceTestContractCode, mintTestERC20Token,
     verifierTestContractCode
 } from "../../src.ts/deploy";
-import {BigNumber, BigNumberish, parseEther} from "ethers/utils";
+import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
 import {ETHProxy} from "zksync";
 import {Address, TokenAddress} from "zksync/build/types";
+import {AddressZero} from "ethers/constants";
+import {Contract, ethers} from "ethers";
 
 const { expect } = require("chai")
 const { deployContract } = require("ethereum-waffle");
-const { wallet, deployTestContract, getCallRevertReason } = require("./common")
-const {ethers } = require("ethers");
-const zksync = require("zksync");
+const { wallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE} = require("./common");
+import * as zksync from "zksync";
 
 const TEST_PRIORITY_EXPIRATION = 16;
 
@@ -25,7 +26,7 @@ describe("ZK Sync signature verification unit tests", function () {
     let testContract;
     let randomWallet = ethers.Wallet.createRandom();
     before(async () => {
-        testContract = await deployContract(wallet, require('../../build/ZKSyncUnitTest'), [], {
+        testContract = await deployContract(wallet, require('../../build/ZKSyncUnitTest'), [AddressZero, AddressZero, AddressZero, Buffer.alloc(32, 0)], {
             gasLimit: 6000000,
         });
     });
@@ -71,7 +72,7 @@ describe("ZK Sync signature verification unit tests", function () {
 
 });
 
-describe("ZK Sync deposit unit tests", function () {
+describe("ZK priority queue ops unit tests", function () {
     this.timeout(50000);
 
     let zksyncContract;
@@ -193,5 +194,129 @@ describe("ZK Sync deposit unit tests", function () {
 
         await performFullExitRequest(accountId, ethers.constants.AddressZero, fee);
         await performFullExitRequest(accountId, tokenContract.address, fee);
+    });
+});
+
+describe("ZK Sync withdraw unit tests", function () {
+    this.timeout(50000);
+
+    let zksyncContract;
+    let tokenContract;
+    let incorrectTokenContract;
+    let ethProxy;
+    before(async () => {
+        const verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode, []);
+        const governanceDeployedContract = await deployGovernance(wallet, governanceTestContractCode, [wallet.address]);
+        zksyncContract = await deployFranklin(
+            wallet,
+            require("../../build/ZKSyncUnitTest"),
+            [
+                governanceDeployedContract.address,
+                verifierDeployedContract.address,
+                wallet.address,
+                ethers.constants.HashZero,
+            ],
+        );
+        await governanceDeployedContract.setValidator(wallet.address, true);
+        tokenContract = await addTestERC20Token(wallet, governanceDeployedContract);
+        incorrectTokenContract = await addTestNotApprovedERC20Token(wallet);
+        await mintTestERC20Token(wallet, tokenContract);
+        ethProxy = new ETHProxy(wallet.provider, {mainContract: zksyncContract.address, govContract: governanceDeployedContract.address});
+    });
+
+    async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
+        let gasFee: BigNumber;
+        let balanceBefore: BigNumber;
+        let balanceAfter: BigNumber;
+        const contractBalanceBefore = bigNumberify(await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId));
+        if (token === ethers.constants.AddressZero) {
+            balanceBefore = await ethWallet.getBalance();
+            const tx = await zksyncContract.withdrawETH(amount);
+            const receipt = await tx.wait();
+            gasFee = receipt.gasUsed.mul(await ethWallet.provider.getGasPrice());
+            balanceAfter = await ethWallet.getBalance();
+        } else {
+            const erc20contract = new Contract(
+                token,
+                IERC20_INTERFACE.abi,
+                ethWallet,
+            );
+            balanceBefore = bigNumberify(await erc20contract.balanceOf(ethWallet.address));
+            const tx = await zksyncContract.withdrawERC20(token, amount);
+            await tx.wait();
+            balanceAfter = bigNumberify(await erc20contract.balanceOf(ethWallet.address));
+        }
+
+        const expectedBalance = token == AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
+        expect(balanceAfter.toString(), "withdraw account balance mismatch").eq(expectedBalance.toString());
+
+        const contractBalanceAfter = bigNumberify(await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId));
+        const expectedContractBalance = contractBalanceBefore.sub(amount);
+        expect(contractBalanceAfter.toString(), "withdraw contract balance mismatch").eq(expectedContractBalance.toString());
+    }
+
+    it("Withdraw ETH success", async () => {
+        zksyncContract.connect(wallet);
+        const withdrawAmount = parseEther("1.0");
+
+        const sendETH = await wallet.sendTransaction({to: zksyncContract.address, value: withdrawAmount.mul(2)});
+        await sendETH.wait();
+
+        await zksyncContract.setBalanceToWithdraw(wallet.address, 0, withdrawAmount);
+        await performWithdraw(wallet, AddressZero, 0, withdrawAmount);
+
+        await zksyncContract.setBalanceToWithdraw(wallet.address, 0, withdrawAmount);
+        await performWithdraw(wallet, AddressZero, 0, withdrawAmount.div(2));
+        await performWithdraw(wallet, AddressZero, 0, withdrawAmount.div(2));
+    });
+
+    it("Withdraw ETH incorrect ammount", async () => {
+        zksyncContract.connect(wallet);
+        const withdrawAmount = parseEther("1.0");
+
+        const sendETH = await wallet.sendTransaction({to: zksyncContract.address, value: withdrawAmount});
+        await sendETH.wait();
+
+        await zksyncContract.setBalanceToWithdraw(wallet.address, 0, withdrawAmount);
+        const {revertReason} = await getCallRevertReason( async () => await performWithdraw(wallet, AddressZero, 0, withdrawAmount.add(1)));
+        expect(revertReason, "wrong revert reason").eq("frw11");
+    });
+
+    it("Withdraw ERC20 success", async () => {
+        zksyncContract.connect(wallet);
+        const withdrawAmount = parseEther("1.0");
+
+        const sendERC20 = await tokenContract.transfer(zksyncContract.address, withdrawAmount.mul(2));
+        await sendERC20.wait();
+        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
+
+        await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
+        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount);
+
+        await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
+        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.div(2));
+        await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.div(2));
+    });
+
+    it("Withdraw ERC20 incorrect amount", async () => {
+        zksyncContract.connect(wallet);
+        const withdrawAmount = parseEther("1.0");
+
+        const sendERC20 = await tokenContract.transfer(zksyncContract.address, withdrawAmount);
+        await sendERC20.wait();
+        const tokenId = await ethProxy.resolveTokenId(tokenContract.address);
+
+        await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
+
+        const {revertReason} = await getCallRevertReason( async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1)));
+        expect(revertReason, "wrong revert reason").eq("frw11");
+    });
+
+    it("Withdraw ERC20 unsupported token", async () => {
+        zksyncContract.connect(wallet);
+        const withdrawAmount = parseEther("1.0");
+
+        const {revertReason} = await getCallRevertReason( async () => await performWithdraw(wallet, incorrectTokenContract.address, 1, withdrawAmount.add(1)));
+        expect(revertReason, "wrong revert reason").eq("gvs12");
     });
 });
