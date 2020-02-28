@@ -1,11 +1,12 @@
 pragma solidity 0.5.16;
 
+import "./Config.sol";
 import "./UpgradeMode.sol";
 
 
 /// @title Governance Contract
 /// @author Matter Labs
-contract Governance {
+contract Governance is Config {
 
     /// @notice UpgradeMode contract
     UpgradeMode upgradeMode;
@@ -61,6 +62,7 @@ contract Governance {
     function addToken(address _token) external {
         requireGovernor(msg.sender);
         require(tokenIds[_token] == 0, "gan11"); // token exists
+        require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "gan12"); // no free identifiers for tokens
         tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
         tokenIds[_token] = totalTokens + 1;
         totalTokens++;

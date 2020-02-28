@@ -1,12 +1,12 @@
 // Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
-use std::{env, fs, io, path, thread, time};
+use std::{thread, time};
 // External deps
 use crypto_exports::franklin_crypto::{self, bellman};
 use crypto_exports::pairing::ff::{Field, PrimeField};
 // Workspace deps
-use prover;
+use prover::read_circuit_params;
 use testhelper::TestAccount;
 
 #[test]
@@ -24,7 +24,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // Run prover in a separate thread.
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_signal_ar = Arc::clone(&stop_signal);
-    let circuit_parameters = read_circuit_parameters();
+    let circuit_parameters = read_circuit_params();
     let jubjub_params = franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     thread::spawn(move || {
         // Create channel for proofs, not using in this test.
@@ -42,15 +42,15 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
             stop_signal_ar,
         );
         let (tx, rx) = mpsc::channel();
-        thread::spawn(move || {
-            rx.recv().unwrap(); // mock receive exit error.
+        let jh = thread::spawn(move || {
+            rx.recv().expect("on receive from exit error channel"); // mock receive exit error.
         });
         prover::start(p, tx);
-        println!("run exited!");
+        jh.join().expect("failed to join recv");
         done_tx.send(()).expect("unexpected failure");
     });
 
-    let timeout = time::Duration::from_millis(500);
+    let timeout = time::Duration::from_secs(10);
 
     // Must receive heartbeat requests.
     heartbeat_rx
@@ -62,21 +62,24 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
 
     // Send stop signal.
     let jh = thread::spawn(move || {
-        println!("waiting for first hearbeat");
-        heartbeat_rx.recv_timeout(timeout).unwrap();
+        println!("waiting for first heartbeat");
+        // receive at least one heartbeat.
+        heartbeat_rx
+            .recv_timeout(timeout)
+            .expect("[heartbeat_rx] first heartbeat");
+        while let Ok(_) = heartbeat_rx.recv_timeout(timeout) {}
         // BabyProver must be stopped.
-        done_rx.recv_timeout(timeout).unwrap();
+        done_rx.recv_timeout(timeout).expect("[done_rx] recv");
     });
-    println!("sending stop signal.");
     stop_signal.store(true, Ordering::SeqCst);
-    jh.join().expect("did not exit properly");
+    jh.join().expect("prover did not exit properly");
 }
 
 #[test]
 #[cfg_attr(not(feature = "keys-required"), ignore)]
 fn prover_proves_a_block_and_publishes_result() {
     // Testing [black box] the actual proof calculation by mocking genesis and +1 block.
-    let circuit_params = read_circuit_parameters();
+    let circuit_params = read_circuit_params();
     let verify_key = bellman::groth16::prepare_verifying_key(&circuit_params.vk);
     let stop_signal = Arc::new(AtomicBool::new(false));
     let (proof_tx, proof_rx) = mpsc::channel();
@@ -259,27 +262,6 @@ fn new_test_data_for_prover() -> prover::prover_data::ProverData {
         validator_audit_path,
         validator_account: validator_account_witness,
     }
-}
-
-fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engine> {
-    let out_dir = {
-        let mut out_dir = path::PathBuf::new();
-        out_dir.push(&env::var("ZKSYNC_HOME").expect("ZKSYNC_HOME is not set"));
-        out_dir.push(&env::var("KEY_DIR").expect("KEY_DIR is not set"));
-        out_dir.push(&format!("{}", models::params::block_size_chunks()));
-        out_dir.push(&format!("{}", models::params::account_tree_depth()));
-        out_dir
-    };
-    let key_file_path = {
-        let mut key_file_path = out_dir;
-        key_file_path.push(models::params::KEY_FILENAME);
-        key_file_path
-    };
-    println!("key file path is {:?}", key_file_path);
-    let f = fs::File::open(&key_file_path).expect("Unable to open file");
-    let mut r = io::BufReader::new(f);
-    bellman::groth16::Parameters::<models::node::Engine>::read(&mut r, true)
-        .expect("Unable to read proving key")
 }
 
 struct MockApiClient<F: Fn() -> Option<prover::prover_data::ProverData>> {

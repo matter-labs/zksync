@@ -2,6 +2,7 @@ const ethers = require("ethers")
 const { expect, use } = require("chai")
 const { createMockProvider, getWallets, solidity, deployContract } = require("ethereum-waffle");
 const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
+const abi = require('ethereumjs-abi')
 
 const SKIP_TEST = false;
 
@@ -28,6 +29,31 @@ async function deployTestContract(file) {
     }
 }
 
+async function deployProxyContract(
+    wallet,
+    proxyCode,
+    contractCode,
+    initArgs,
+    initArgsValues,
+) {
+    try {
+        const proxy = await deployContract(wallet, proxyCode, [], {
+            gasLimit: 3000000,
+        });
+        const contract = await deployContract(wallet, contractCode, [], {
+            gasLimit: 3000000,
+        });
+        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
+        const tx = await proxy.initialize(contract.address, initArgsInBytes);
+        await tx.wait();
+
+        const returnContract = new ethers.Contract(proxy.address, contractCode.interface, wallet);
+        return [returnContract, contract.address];
+    } catch (err) {
+        console.log('Error deploying proxy contract: ', err)
+    }
+}
+
 async function getCallRevertReason(f) {
     let revertReason = "VM did not revert"
     try {
@@ -45,6 +71,7 @@ module.exports = {
     wallet2,
     exitWallet,
     deployTestContract,
+    deployProxyContract,
     getCallRevertReason,
     SKIP_TEST
 }

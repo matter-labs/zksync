@@ -58,6 +58,7 @@ contract Storage {
         uint64 priorityOperations;
         bytes32 commitment;
         bytes32 stateRoot;
+        uint32 chunks;
     }
 
     /// @notice Blocks by Franklin block id

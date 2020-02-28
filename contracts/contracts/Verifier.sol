@@ -1,8 +1,6 @@
 pragma solidity 0.5.16;
 
 import "./VerificationKey.sol";
-import "./VerificationKeyExit.sol";
-
 import "./UpgradeMode.sol";
 
 
@@ -10,7 +8,7 @@ import "./UpgradeMode.sol";
 /// @notice Based on https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
 /// @dev TODO: - remove DUMMY_VERIFIER variable for production
 /// @author Matter Labs
-contract Verifier is VerificationKey, VerificationKeyExit {
+contract Verifier is VerificationKey {
 
     /// @notice UpgradeMode contract
     UpgradeMode upgradeMode;
@@ -36,7 +34,8 @@ contract Verifier is VerificationKey, VerificationKeyExit {
     /// @return bool flag that indicates if block proof is valid
     function verifyBlockProof(
         uint256[8] calldata _proof,
-        bytes32 _commitment
+        bytes32 _commitment,
+        uint32 _chunks
     ) external view returns (bool) {
         if (DUMMY_VERIFIER) {
             return true;
@@ -45,7 +44,7 @@ contract Verifier is VerificationKey, VerificationKeyExit {
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
-        (vk, gammaABC) = getVk();
+        (vk, gammaABC) = getVkBlock(_chunks);
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(_commitment) & mask;
         return Verify(vk, gammaABC, _proof, inputs);

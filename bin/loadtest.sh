@@ -1,3 +1,3 @@
 #!/bin/bash
 
-cd js/tests && yarn loadtest
+f cargo run --release --bin loadtest $ZKSYNC_HOME/core/loadtest/src/loadtest.json

@@ -1,9 +1,4 @@
-import {
-    Wallet,
-    depositFromETH,
-    emergencyWithdraw,
-    getEthereumBalance
-} from "./wallet";
+import { Wallet } from "./wallet";
 import { Provider, ETHProxy, getDefaultProvider } from "./provider";
 import { Signer } from "./signer";
 import {
@@ -23,9 +18,6 @@ export {
     closestPackableTransactionFee,
     closestPackableTransactionAmount,
     getDefaultProvider,
-    depositFromETH,
-    emergencyWithdraw,
-    getEthereumBalance,
     types,
     utils,
     crypto

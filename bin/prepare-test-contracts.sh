@@ -22,11 +22,11 @@ cp $IN_DIR/Proxy.sol $OUT_DIR/ProxyTest.sol
 
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
+ssed 's/PriorityQueue/PriorityQueueTest/' -i $OUT_DIR/*.sol
+ssed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
 ssed 's/Franklin/FranklinTest/' -i $OUT_DIR/*.sol
 ssed 's/Storage/StorageTest/' -i $OUT_DIR/*.sol
 ssed 's/Config/ConfigTest/' -i $OUT_DIR/*.sol
-ssed 's/PriorityQueue/PriorityQueueTest/' -i $OUT_DIR/*.sol
-ssed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
 ssed 's/Ownable/OwnableTest/' -i $OUT_DIR/*.sol
 ssed 's/UpgradeMode/UpgradeModeTest/g' -i $OUT_DIR/*.sol
 ssed 's/Upgradeable/UpgradeableTest/' -i $OUT_DIR/*.sol
@@ -55,12 +55,14 @@ create_constant_getter() {
 }
 
 # Change constants
-set_constant EXPECT_VERIFICATION_IN 8 $OUT_DIR/FranklinTest.sol
-set_constant MAX_UNVERIFIED_BLOCKS 4 $OUT_DIR/FranklinTest.sol
+set_constant MAX_AMOUNT_OF_REGISTERED_TOKENS 4 $OUT_DIR/ConfigTest.sol
+set_constant EXPECT_VERIFICATION_IN 8 $OUT_DIR/ConfigTest.sol
+set_constant MAX_UNVERIFIED_BLOCKS 4 $OUT_DIR/ConfigTest.sol
 set_constant PRIORITY_EXPIRATION 16 $OUT_DIR/ConfigTest.sol
 set_constant MAX_UPGRADE_PERIOD 5 $OUT_DIR/UpgradeModeTest.sol
 set_constant WAIT_UPGRADE_MODE_PERIOD 3 $OUT_DIR/UpgradeModeTest.sol
 
+create_constant_getter MAX_AMOUNT_OF_REGISTERED_TOKENS $OUT_DIR/ConfigTest.sol
 create_constant_getter MAX_UPGRADE_PERIOD $OUT_DIR/UpgradeModeTest.sol
 create_constant_getter WAIT_UPGRADE_MODE_PERIOD $OUT_DIR/UpgradeModeTest.sol
 

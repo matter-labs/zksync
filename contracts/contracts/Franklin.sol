@@ -316,7 +316,7 @@ contract Franklin is Storage, Config, Events {
         governance.requireActiveValidator(msg.sender);
         if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
             require(totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS, "fck13"); // too many blocks committed
-            
+
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
@@ -350,6 +350,9 @@ contract Franklin is Storage, Config, Events {
         bytes memory _publicData,
         uint64 _startId, uint64 _totalProcessed, uint64 _priorityNumber
     ) internal {
+        uint32 blockChunks = uint32(_publicData.length / 8);
+        require(verifier.isBlockSizeSupported(blockChunks), "ccb10");
+
         // Create block commitment for verification proof
         bytes32 commitment = createBlockCommitment(
             _blockNumber,
@@ -366,7 +369,8 @@ contract Franklin is Storage, Config, Events {
             _totalProcessed, // total number of onchain ops in block
             _priorityNumber, // total number of priority onchain ops in block
             commitment, // blocks' commitment
-            _newRoot // new root
+            _newRoot, // new root
+            blockChunks
         );
     }
 
@@ -569,7 +573,7 @@ contract Franklin is Storage, Config, Events {
         require(_blockNumber == totalBlocksVerified + 1, "fvk11"); // only verify next block
         governance.requireActiveValidator(msg.sender);
 
-        require(verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment), "fvk13"); // proof verification failed
+        require(verifier.verifyBlockProof(_proof, blocks[_blockNumber].commitment, blocks[_blockNumber].chunks), "fvk13"); // proof verification failed
 
         consummateOnchainOps(_blockNumber);
 
