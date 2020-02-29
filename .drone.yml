@@ -242,11 +242,13 @@ steps:
       from_secret: stage_db_url
     WEB3_URL:
       from_secret: stage_web3_url
+    CONTRACT_ADDR:
+      from_secret: contract_addr
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - stage-prepare-env.sh $DB_URL $WEB3_URL
+  - stage-prepare-env.sh $DB_URL $WEB3_URL $CONTRACT_ADDR
   - zksync env stage
   - zksync yarn
   - zksync gen-keys-if-not-present
