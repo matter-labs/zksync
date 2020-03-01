@@ -423,3 +423,202 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
         }
     });
 });
+
+describe("ZK Sync test process next operation", function () {
+    this.timeout(50000);
+
+    let zksyncContract;
+    let tokenContract;
+    let incorrectTokenContract;
+    let ethProxy;
+    before(async () => {
+        const verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode, []);
+        const governanceDeployedContract = await deployGovernance(wallet, governanceTestContractCode, [wallet.address]);
+        zksyncContract = await deployFranklin(
+            wallet,
+            require("../../build/ZKSyncUnitTest"),
+            [
+                governanceDeployedContract.address,
+                verifierDeployedContract.address,
+                wallet.address,
+                ethers.constants.HashZero,
+            ],
+        );
+        await governanceDeployedContract.setValidator(wallet.address, true);
+        tokenContract = await addTestERC20Token(wallet, governanceDeployedContract);
+        incorrectTokenContract = await addTestNotApprovedERC20Token(wallet);
+        await mintTestERC20Token(wallet, tokenContract);
+        ethProxy = new ETHProxy(wallet.provider, {mainContract: zksyncContract.address, govContract: governanceDeployedContract.address});
+    });
+
+    it("Process noop", async () => {
+        zksyncContract.connect(wallet);
+
+        const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
+
+        const pubdata = Buffer.alloc(8, 0);
+        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+
+        const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
+        expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
+        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
+    });
+
+    it("Process transfer", async () => {
+        zksyncContract.connect(wallet);
+
+        const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
+
+        const pubdata = Buffer.alloc(8 * 2, 0xff);
+        pubdata[0] = 0x05;
+        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+
+        const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
+        expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
+        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
+    });
+    it("Process transfer to new", async () => {
+        zksyncContract.connect(wallet);
+
+        const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
+
+        const pubdata = Buffer.alloc(8 * 5, 0xff);
+        pubdata[0] = 0x02;
+        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+
+        const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
+        expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
+        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
+    });
+
+    it("Process deposit", async () => {
+        zksyncContract.connect(wallet);
+        const depositAmount = parseEther("0.7");
+
+        await zksyncContract.depositETH(depositAmount, wallet.address, {value: parseEther("0.8")});
+
+        const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
+
+        // construct deposit pubdata
+        const pubdata = Buffer.alloc(8 * 6, 0);
+        pubdata[0] = 0x01;
+        pubdata.writeUIntBE(0xaabbff, 1, 3);
+        Buffer.from(depositAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, 6);
+        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 22);
+
+        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+
+        const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
+        expect(committedPriorityRequestsAfter - 1, "priority request number").eq(committedPriorityRequestsBefore);
+        expect(totalOnchainOpsAfter - 1, "committed onchain ops number").eq(totalOnchainOpsBefore);
+    });
+
+    it("Process partial exit", async () => {
+        zksyncContract.connect(wallet);
+
+        const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
+
+        // construct deposit pubdata
+        const pubdata = Buffer.alloc(8 * 6, 0);
+        pubdata[0] = 0x03;
+
+        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+
+        const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
+        expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
+        expect(totalOnchainOpsAfter - 1, "committed onchain ops number").eq(totalOnchainOpsBefore);
+    });
+
+    it("Process full exit", async () => {
+        zksyncContract.connect(wallet);
+        const tokenId = 0x01;
+        const fullExitAmount = parseEther("0.7");
+        const accountId = 0xaabbff;
+
+        await zksyncContract.fullExit(accountId, tokenContract.address, {value: parseEther("0.1")});
+
+        const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
+
+        // construct deposit pubdata
+        const pubdata = Buffer.alloc(8 * 6, 0);
+        pubdata[0] = 0x06;
+        pubdata.writeUIntBE(accountId, 1, 3);
+        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 4);
+        pubdata.writeUInt16BE(tokenId, 24);
+        Buffer.from(fullExitAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, 26);
+
+        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+
+        const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
+        expect(committedPriorityRequestsAfter - 1, "priority request number").eq(committedPriorityRequestsBefore);
+        expect(totalOnchainOpsAfter - 1, "committed onchain ops number").eq(totalOnchainOpsBefore);
+    });
+
+    it("Change pubkey with auth", async () => {
+        zksyncContract.connect(wallet);
+
+        const nonce = 0x1234;
+        const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
+        await zksyncContract.authPubkeyHash(pubkeyHash, nonce);
+
+        const accountId = 0xffee12;
+
+        const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
+
+        // construct deposit pubdata
+        const pubdata = Buffer.alloc(8 * 6, 0);
+        pubdata[0] = 0x07;
+        pubdata.writeUIntBE(accountId, 1, 3);
+        Buffer.from(pubkeyHash.substr(2), "hex").copy(pubdata, 4);
+        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 24);
+        pubdata.writeUInt32BE(nonce, 44);
+
+        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+
+        const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
+        expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
+        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
+    });
+
+    it("Change pubkey with posted signature", async () => {
+        zksyncContract.connect(wallet);
+
+        const nonce = 0x1234;
+        const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
+        const ethWitness = await zksync.utils.signChangePubkeyMessage(wallet, pubkeyHash, nonce);
+
+        const accountId = 0xffee12;
+
+        const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
+
+        // construct deposit pubdata
+        const pubdata = Buffer.alloc(8 * 6, 0);
+        pubdata[0] = 0x07;
+        pubdata.writeUIntBE(accountId, 1, 3);
+        Buffer.from(pubkeyHash.substr(5), "hex").copy(pubdata, 4);
+        Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 24);
+        pubdata.writeUInt32BE(nonce, 44);
+
+        await zksyncContract.testProcessNextOperation(0, pubdata, ethWitness, pubdata.length);
+
+        const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
+        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
+        expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
+        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
+    });
+});

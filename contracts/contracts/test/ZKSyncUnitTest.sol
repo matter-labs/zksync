@@ -26,4 +26,13 @@ contract ZKSyncUnitTest is FranklinTest {
         storeWithdrawalAsPending(_to, _tokenId, _amount);
     }
 
+    function testProcessNextOperation(
+        uint256 _pubdataOffset,
+        bytes calldata _publicData,
+        bytes calldata _currentEthWitness,
+        uint256 _expectedBytesProcessed
+    ) external {
+        require(processNextOperation(_pubdataOffset, _publicData, _currentEthWitness) == _expectedBytesProcessed, "bytes processed incorrect");
+    }
+
 }
