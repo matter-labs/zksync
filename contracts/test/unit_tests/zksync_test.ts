@@ -31,7 +31,7 @@ describe("ZK Sync signature verification unit tests", function () {
         });
     });
 
-    it("signature verification success", async () => {
+    it("pubkey hash signature verification success", async () => {
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
         const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce);
@@ -40,7 +40,7 @@ describe("ZK Sync signature verification unit tests", function () {
         expect(result).eq(true);
     });
 
-    it("signature verification incorrect nonce", async () => {
+    it("pubkey hash signature verification incorrect nonce", async () => {
         const incorrectNonce = 0x11223345;
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
@@ -50,7 +50,7 @@ describe("ZK Sync signature verification unit tests", function () {
         expect(result).eq(false);
     });
 
-    it("signature verification incorrect pubkey hash", async () => {
+    it("pubkey hash signature verification incorrect pubkey hash", async () => {
         const incorrectPubkeyHash = "sync:aaaafefefefefefefefefefefefefefefefefefe";
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
@@ -60,7 +60,7 @@ describe("ZK Sync signature verification unit tests", function () {
         expect(result).eq(false);
     });
 
-    it("signature verification incorrect signer", async () => {
+    it("pubkey hash signature verification incorrect signer", async () => {
         const incorrectSignerAddress = wallet.address;
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
@@ -70,6 +70,14 @@ describe("ZK Sync signature verification unit tests", function () {
         expect(result).eq(false);
     });
 
+    it("signature verification success", async () => {
+        for(const message of [Buffer.from("msg", "ascii"), Buffer.alloc(0), Buffer.alloc(10, 1)]) {
+            const signature = await wallet.signMessage(message);
+            const sinedMessage = Buffer.concat([Buffer.from(`\x19Ethereum Signed Message:\n${message.length}`, "ascii"), message]);
+            const address = await testContract.testVerifyEthereumSignature(signature, sinedMessage);
+            expect(address, `address mismatch, message ${message.toString("hex")}`).eq(wallet.address);
+        }
+    });
 });
 
 describe("ZK priority queue ops unit tests", function () {

@@ -35,4 +35,7 @@ contract ZKSyncUnitTest is FranklinTest {
         require(processNextOperation(_pubdataOffset, _publicData, _currentEthWitness) == _expectedBytesProcessed, "bytes processed incorrect");
     }
 
+    function testVerifyEthereumSignature(bytes calldata _signature, bytes calldata _message) external pure returns (address) {
+        return verifyEthereumSignature(_signature, _message);
+    }
 }

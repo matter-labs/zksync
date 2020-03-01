@@ -381,22 +381,29 @@ contract Franklin is Storage, Config, Events {
         require(pubdataOffset == _publicData.length, "fcs12"); // last chunk exceeds pubdata
     }
 
-    function verifyChangePubkeySignature(bytes memory _signature, bytes memory _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
-        uint offset = 0;
+    /// @notice Verifies ethereum signature for given message and recovers address of the signer
+    /// @param _signature 65 bytes concatenated. R (32) + S (32) + V (1)
+    /// @param _message signed message.
+    /// @return address of the signer
+    function verifyEthereumSignature(bytes memory _signature, bytes memory _message) internal pure returns (address) {
+        require(_signature.length == 2*ETH_SIGN_RS_BYTES + 1, "ves10"); // incorrect signature length
 
+        uint offset = 0;
         bytes32 signR = Bytes.bytesToBytes32(Bytes.slice(_signature, offset, ETH_SIGN_RS_BYTES));
         offset += ETH_SIGN_RS_BYTES;
-
         bytes32 signS = Bytes.bytesToBytes32(Bytes.slice(_signature, offset, ETH_SIGN_RS_BYTES));
         offset += ETH_SIGN_RS_BYTES;
-
         uint8 signV = uint8(_signature[offset]);
 
+        return ecrecover(keccak256(_message), signV, signR, signS);
+    }
+
+    function verifyChangePubkeySignature(bytes memory _signature, bytes memory _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
         bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n135");
         signedMessage = abi.encodePacked(signedMessage, "Register ZK Sync pubkey:\n\n");
         signedMessage = abi.encodePacked(signedMessage, "sync:", Bytes.bytesToHexASCIIBytes(_newPkHash), " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n\n");
         signedMessage = abi.encodePacked(signedMessage, "Only sign this message for a trusted client!");
-        address recoveredAddress = ecrecover(keccak256(signedMessage), signV, signR, signS);
+        address recoveredAddress = verifyEthereumSignature(_signature, signedMessage);
         return recoveredAddress == _ethAddress;
     }
 
