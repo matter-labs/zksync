@@ -349,3 +349,77 @@ describe("ZK Sync withdraw unit tests", function () {
         }
     });
 });
+
+describe("ZK Sync auth pubkey onchain unit tests", function () {
+    this.timeout(50000);
+
+    let zksyncContract;
+    let tokenContract;
+    let incorrectTokenContract;
+    let ethProxy;
+    before(async () => {
+        const verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode, []);
+        const governanceDeployedContract = await deployGovernance(wallet, governanceTestContractCode, [wallet.address]);
+        zksyncContract = await deployFranklin(
+            wallet,
+            require("../../build/ZKSyncUnitTest"),
+            [
+                governanceDeployedContract.address,
+                verifierDeployedContract.address,
+                wallet.address,
+                ethers.constants.HashZero,
+            ],
+        );
+        await governanceDeployedContract.setValidator(wallet.address, true);
+        tokenContract = await addTestERC20Token(wallet, governanceDeployedContract);
+        incorrectTokenContract = await addTestNotApprovedERC20Token(wallet);
+        await mintTestERC20Token(wallet, tokenContract);
+        ethProxy = new ETHProxy(wallet.provider, {mainContract: zksyncContract.address, govContract: governanceDeployedContract.address});
+    });
+
+    it("Auth pubkey success", async () => {
+        zksyncContract.connect(wallet);
+
+        const nonce = 0x1234;
+        const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
+
+        const receipt = await (await zksyncContract.authPubkeyHash(pubkeyHash, nonce)).wait();
+        let authEvent;
+        for (const event of receipt.logs) {
+            const parsedLog = zksyncContract.interface.parseLog(event);
+            if (parsedLog && parsedLog.name === "FactAuth") {
+                authEvent = parsedLog;
+                break;
+            }
+        }
+
+        expect(authEvent.values.sender, "event sender incorrect").eq(wallet.address);
+        expect(authEvent.values.nonce, "event nonce incorrect").eq(nonce);
+        expect(authEvent.values.fact, "event fact incorrect").eq(pubkeyHash);
+    });
+
+    it("Auth pubkey rewrite fail", async () => {
+        zksyncContract.connect(wallet);
+
+        const nonce = 0xdead;
+        const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
+
+        await zksyncContract.authPubkeyHash(pubkeyHash, nonce);
+        //
+        const otherPubkeyHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        const {revertReason} = await getCallRevertReason(async () => await zksyncContract.authPubkeyHash(otherPubkeyHash, nonce) );
+        expect(revertReason, "revert reason incorrect").eq("ahf11");
+    });
+
+    it("Auth pubkey incorrect length fail", async () => {
+        zksyncContract.connect(wallet);
+        const nonce = 0x7656;
+        const shortPubkeyHash = "0xfefefefefefefefefefefefefefefefefefefe";
+        const longPubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefefe";
+
+        for (const pkHash of [shortPubkeyHash, longPubkeyHash]) {
+            const {revertReason} = await getCallRevertReason(async () => await zksyncContract.authPubkeyHash(shortPubkeyHash, nonce) );
+            expect(revertReason, "revert reason incorrect").eq("ahf10");
+        }
+    });
+});
