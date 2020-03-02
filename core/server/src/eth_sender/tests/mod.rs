@@ -64,7 +64,7 @@ fn tx_creation() {
 
     for operation in operations {
         let actual_tx = eth_sender
-            .create_new_tx(
+            .sign_new_tx(
                 &operation,
                 eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
                 None,
@@ -92,7 +92,7 @@ fn transaction_state() {
         test_data::commit_operation(4), // Will be pending due no response.
     ]
     .iter()
-    .map(|op| eth_sender.create_new_tx(op, deadline_block, None).unwrap())
+    .map(|op| eth_sender.sign_new_tx(op, deadline_block, None).unwrap())
     .collect();
 
     // Committed operation.
@@ -211,7 +211,7 @@ fn operation_commitment_workflow() {
 
         // Now we should see that transaction is stored in the database and sent to the Ethereum.
         let expected_tx = eth_sender
-            .create_new_tx(
+            .sign_new_tx(
                 &operation,
                 eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
                 None,
@@ -269,7 +269,7 @@ fn stuck_transaction() {
     eth_sender.proceed_next_operation();
 
     let stuck_tx = eth_sender
-        .create_new_tx(
+        .sign_new_tx(
             &operation,
             eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
             None,
@@ -278,12 +278,11 @@ fn stuck_transaction() {
 
     // Skip some blocks and expect sender to send a new tx.
     eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
-    eth_sender.ethereum.nonce += 1.into();
     eth_sender.proceed_next_operation();
 
     // Check that new transaction is sent (and created based on the previous stuck tx).
     let expected_tx = eth_sender
-        .create_new_tx(
+        .sign_new_tx(
             &operation,
             eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
             Some(&stuck_tx),
@@ -323,7 +322,7 @@ fn operations_order() {
         // N blocks to confirm, repeated `idx` times.
         let start_block = 1 + super::WAIT_CONFIRMATIONS * idx as u64;
         let expected_tx = eth_sender
-            .create_new_tx(operation, eth_sender.get_deadline_block(start_block), None)
+            .sign_new_tx(operation, eth_sender.get_deadline_block(start_block), None)
             .unwrap();
 
         // Update nonce as well (it will be reset below).
@@ -376,7 +375,7 @@ fn transaction_failure() {
     sender.try_send(operation.clone()).unwrap();
 
     let failing_tx = eth_sender
-        .create_new_tx(
+        .sign_new_tx(
             &operation,
             eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
             None,
@@ -417,7 +416,7 @@ fn restore_state() {
         eth_sender.proceed_next_operation();
 
         let expected_tx = eth_sender
-            .create_new_tx(
+            .sign_new_tx(
                 &operation,
                 eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
                 None,
@@ -451,7 +450,7 @@ fn confirmations_independence() {
     eth_sender.proceed_next_operation();
 
     let stuck_tx = eth_sender
-        .create_new_tx(
+        .sign_new_tx(
             &operation,
             eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
             None,
@@ -459,11 +458,10 @@ fn confirmations_independence() {
         .unwrap();
 
     eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
-    eth_sender.ethereum.nonce += 1.into();
     eth_sender.proceed_next_operation();
 
     let next_tx = eth_sender
-        .create_new_tx(
+        .sign_new_tx(
             &operation,
             eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
             Some(&stuck_tx),

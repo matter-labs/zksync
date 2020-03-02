@@ -256,9 +256,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         // Reaching this point will mean that either there were no transactions to process,
         // or the latest transaction got stuck.
         // Either way we should create a new transaction (the approach is the same,
-        // `create_new_tx` will adapt its logic based on `last_stuck_tx`).
+        // `sign_new_tx` will adapt its logic based on `last_stuck_tx`).
         let deadline_block = self.get_deadline_block(current_block);
-        let new_tx = self.create_new_tx(&op.operation, deadline_block, last_stuck_tx)?;
+        let new_tx = self.sign_new_tx(&op.operation, deadline_block, last_stuck_tx)?;
         // New transaction should be persisted in the DB *before* sending it.
         self.db.save_unconfirmed_operation(&new_tx)?;
 
@@ -328,7 +328,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Creates a new transaction. If stuck tx is provided, the new transaction will be
     /// and updated version of it; otherwise a brand new transaction will be created.
-    fn create_new_tx(
+    fn sign_new_tx(
         &self,
         op: &Operation,
         deadline_block: u64,
