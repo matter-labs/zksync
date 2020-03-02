@@ -17,62 +17,21 @@ kubectl config view
 
 ## Deploy
 
-1. Deploy contracts:
+### Manually
 
-```
-deploy-contracts prod
-```
+Activate env with `zksync <TARGET_ENV>`
 
-2. Upload the .pk key files to DO Spaces:
+Only if verifier or circuit changes:
+1. gen keys
+2. upload keys to KEYS_SPACE_URL
 
-https://cloud.digitalocean.com/spaces/keys?i=ba0188
+Only if deploying new contract or fresh depoyment:
+1. `zksync build-contracts`
+2. `zksync db-reset || zksync db-setup`
+3. `zksync genesis`
+4. `zksync redeploy` (OR `zksync init-deploy` on fresh deploy)
 
-3. Build and push your images to DockerHub:
-
-```
-make push
-```
-
-4. Deploy kubernetes and/or update env vars
-
-```
-deploy-kube prod
-```
-
-5. Scale nodes:
-
-```
-kubectl scale deployments/server --replicas=1
-kubectl scale deployments/prover --replicas=3
-```
-
-## Check status:
-
-1. Nodes:
-```
-kubectl get pods
-```
-
-2. Web server:
-https://api1.mattr.network/api/v0.1/status
-
-## Misc
-
-### Commands
-
-https://kubernetes.io/docs/reference/kubectl/cheatsheet/
-
-```
-kubectl get pods -o wide
-kubectl logs -f <pod id>
-```
-
-### Secrets
-
-View secret:
-
-```kubectl get secret franklin-secret -o yaml```
-
-Misc:
-
-```kubectl set env --from=configmap/myconfigmap deployment/myapp```
+Update node:
+5. `zksync update-rust`
+6. `zksync update-nginx`
+7. `zksync restart`

@@ -2,7 +2,6 @@ use crate::node::Address;
 use futures::{channel::mpsc, executor::block_on, SinkExt};
 use std::env;
 use std::net::SocketAddr;
-use std::time;
 use web3::types::{H160, H256};
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
 pub struct ThreadPanicNotify(pub mpsc::Sender<bool>);
@@ -25,7 +24,6 @@ pub struct ConfigurationOptions {
     pub web3_url: String,
     pub governance_eth_addr: H160,
     pub governance_genesis_tx_hash: H256,
-    pub priority_queue_eth_addr: H160,
     pub operator_franklin_addr: Address,
     pub operator_eth_addr: H160,
     pub operator_private_key: H256,
@@ -33,7 +31,6 @@ pub struct ConfigurationOptions {
     pub gas_price_factor: usize,
     pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
-    pub req_server_timeout: time::Duration,
 }
 
 impl ConfigurationOptions {
@@ -64,9 +61,6 @@ impl ConfigurationOptions {
             governance_genesis_tx_hash: get_env("GOVERNANCE_GENESIS_TX_HASH")[2..]
                 .parse()
                 .expect("Failed to parse GOVERNANCE_GENESIS_TX_HASH"),
-            priority_queue_eth_addr: get_env("PRIORITY_QUEUE_ADDR")[2..]
-                .parse()
-                .expect("Failed to parse PRIORITY_QUEUE_ADDR as ETH contract address"),
             operator_franklin_addr: get_env("OPERATOR_FRANKLIN_ADDRESS")[2..]
                 .parse()
                 .expect("Failed to parse OPERATOR_FRANKLIN_ADDRESS"),
@@ -86,10 +80,6 @@ impl ConfigurationOptions {
             prover_server_address: get_env("PROVER_SERVER_BIND")
                 .parse()
                 .expect("Failed to parse PROVER_SERVER_BIND bind address"),
-            req_server_timeout: get_env("REQ_SERVER_TIMEOUT")
-                .parse::<u64>()
-                .and_then(|d| Ok(time::Duration::from_secs(d)))
-                .expect("REQ_SERVER_TIMEOUT invalid value"),
         }
     }
 }

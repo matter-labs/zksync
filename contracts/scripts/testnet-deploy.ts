@@ -11,14 +11,10 @@ import {
     governanceContractSourceCode,
     governanceContractCode,
     postContractToTesseracts,
-    deployPriorityQueue,
-    priorityQueueContractSourceCode,
-    priorityQueueContractCode,
     deployVerifier,
     verifierContractSourceCode,
     verifierContractCode,
     governanceTestContractCode,
-    priorityQueueTestContractCode,
     verifierTestContractCode,
     franklinTestContractCode,
     proxyContractCode,
@@ -71,29 +67,18 @@ async function main() {
         const proxyCode = args.test ? proxyTestContractCode : proxyContractCode;
 
         const governanceCode = args.test ? governanceTestContractCode : governanceContractCode;
-        let governance, governanceAddressDeployed;
-        [governance, governanceAddressDeployed] = await deployGovernance(
+        let governance, governanceAddressDeployed, governanceTxHash;
+        [governance, governanceAddressDeployed, governanceTxHash] = await deployGovernance(
             wallet,
             proxyCode,
             governanceCode,
             governanceInitArgs,
             governanceInitArgsValues,
         );
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${governanceTxHash}`);
+        console.log(`GOVERNANCE_ADDR=${governance.address}`);
         console.log(`Governance contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         governanceAddress = governanceAddressDeployed;
-
-        timer = new Date().getTime();
-        const priorityQueueCode = args.test ? priorityQueueTestContractCode : priorityQueueContractCode;
-        let priorityQueue, priorityQueueAddressDeployed;
-        [priorityQueue, priorityQueueAddressDeployed] = await deployPriorityQueue(
-            wallet,
-            proxyCode,
-            priorityQueueCode,
-            priorityQueueInitArgs,
-            priorityQueueInitArgsValues,
-        );
-        console.log(`Priority queue contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
-        priorityQueueAddress = priorityQueueAddressDeployed;
 
         timer = new Date().getTime();
         const verifierCode = args.test ? verifierTestContractCode : verifierContractCode;
@@ -105,11 +90,11 @@ async function main() {
             verifierInitArgs,
             verifierInitArgsValues,
         );
+        console.log(`VERIFIER_ADDR=${verifier.address}`);
         console.log(`Verifier contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         verifierAddress = verifierAddressDeployed;
 
         let franklinInitArgs = [
-            "address",
             "address",
             "address",
             "address",
@@ -118,26 +103,29 @@ async function main() {
         let franklinInitArgsValues = [
             governance.address,
             verifier.address,
-            priorityQueue.address,
             process.env.OPERATOR_FRANKLIN_ADDRESS.replace("sync:", "0x"),
             process.env.GENESIS_ROOT || ethers.constants.HashZero,
         ];
         timer = new Date().getTime();
         const franklinCode = args.test ? franklinTestContractCode : franklinContractCode;
-        let franklin, franklinAddressDeployed;
-        [franklin, franklinAddressDeployed] = await deployFranklin(
+        let franklin, franklinAddressDeployed, franklinTxHash;
+        [franklin, franklinAddressDeployed, franklinTxHash] = await deployFranklin(
             wallet,
             proxyCode,
             franklinCode,
             franklinInitArgs,
             franklinInitArgsValues,
         );
+        console.log(`CONTRACT_GENESIS_TX_HASH=${franklinTxHash}`);
+        console.log(`CONTRACT_ADDR=${franklin.address}`);
+
         console.log(`Main contract deployed, time: ${(new Date().getTime() - timer) / 1000} secs`);
         franklinAddress = franklinAddressDeployed;
 
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
 
         const erc20 = await addTestERC20Token(wallet, governance);
+        console.log("TEST_ERC20=" + erc20.address);
         await mintTestERC20Token(testWallet, erc20);
 
         if (args.publish) {
@@ -145,19 +133,16 @@ async function main() {
                 if (process.env.ETH_NETWORK === 'localhost') {
                     await Promise.all([
                         postContractToTesseracts(governanceCode, "Governance", governanceAddress),
-                        postContractToTesseracts(priorityQueueCode, "PriorityQueue", priorityQueueAddress),
                         postContractToTesseracts(verifierCode, "Verifier", verifierAddress),
                         postContractToTesseracts(franklinCode, "Franklin", franklinAddress),
                     ]);
                 } else {
                     await Promise.all([
                         publishSourceCodeToEtherscan('GovernanceProxy', governance.address, proxyContractSourceCode, proxyContractCode, []),
-                        publishSourceCodeToEtherscan('PriorityQueueProxy', priorityQueue.address, proxyContractSourceCode, proxyContractCode, []),
                         publishSourceCodeToEtherscan('VerifierProxy', verifier.address, proxyContractSourceCode, proxyContractCode, []),
                         publishSourceCodeToEtherscan('FranklinProxy', franklin.address, proxyContractSourceCode, proxyContractCode, []),
 
                         publishSourceCodeToEtherscan('Governance', governanceAddress, governanceContractSourceCode, governanceContractCode, []),
-                        publishSourceCodeToEtherscan('PriorityQueue', priorityQueueAddress, priorityQueueContractSourceCode, priorityQueueContractCode, []),
                         publishSourceCodeToEtherscan('Verifier', verifierAddress, verifierContractSourceCode, verifierContractCode, []),
                         publishSourceCodeToEtherscan('Franklin', franklinAddress, franklinContractSourceCode, franklinContractCode, []),
                     ]);

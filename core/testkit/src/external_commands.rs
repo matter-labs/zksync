@@ -11,7 +11,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone)]
 pub struct Contracts {
     pub governance: Address,
-    pub priority_queue: Address,
     pub verifier: Address,
     pub contract: Address,
     pub test_erc20_address: Address,
@@ -22,12 +21,6 @@ fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
         Some((
             String::from("GOVERNANCE_ADDR"),
             Address::from_str(&deploy_script_out["GOVERNANCE_ADDR=0x".len()..])
-                .expect("can't parse contract address"),
-        ))
-    } else if deploy_script_out.starts_with("PRIORITY_QUEUE_ADDR=0x") {
-        Some((
-            String::from("PRIORITY_QUEUE_ADDR"),
-            Address::from_str(&deploy_script_out["PRIORITY_QUEUE_ADDR=0x".len()..])
                 .expect("can't parse contract address"),
         ))
     } else if deploy_script_out.starts_with("VERIFIER_ADDR=0x") {
@@ -76,9 +69,6 @@ pub fn deploy_test_contracts() -> Contracts {
         governance: contracts
             .remove("GOVERNANCE_ADDR")
             .expect("GOVERNANCE_ADDR missing"),
-        priority_queue: contracts
-            .remove("PRIORITY_QUEUE_ADDR")
-            .expect("PRIORITY_QUEUE_ADDR missing"),
         verifier: contracts
             .remove("VERIFIER_ADDR")
             .expect("VERIFIER_ADDR missing"),

@@ -12,7 +12,7 @@ import {
 } from "./types";
 import {
     IERC20_INTERFACE,
-    isTokenETH,
+    isTokenETH, signChangePubkeyMessage,
     SYNC_MAIN_CONTRACT_INTERFACE,
 } from "./utils";
 
@@ -162,11 +162,9 @@ export class Wallet {
         }
 
         const numNonce = await this.getNonce(nonce);
-        const newPkHash = serializeAddress(newPubKeyHash);
-        const message = Buffer.concat([serializeNonce(numNonce), newPkHash]);
         const ethSignature = onchainAuth
             ? null
-            : await this.ethSigner.signMessage(message);
+            : await signChangePubkeyMessage(this.ethSigner, newPubKeyHash, numNonce);
 
         const txData = {
             type: "ChangePubKey",

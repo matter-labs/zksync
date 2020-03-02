@@ -10,7 +10,6 @@ OUT_DIR=./contracts/contracts/generated
 rm -rf $OUT_DIR
 mkdir -p $OUT_DIR
 cp $IN_DIR/Governance.sol $OUT_DIR/GovernanceTest.sol
-cp $IN_DIR/PriorityQueue.sol $OUT_DIR/PriorityQueueTest.sol
 cp $IN_DIR/Verifier.sol $OUT_DIR/VerifierTest.sol
 cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTest.sol
 cp $IN_DIR/Storage.sol $OUT_DIR/StorageTest.sol
@@ -22,7 +21,6 @@ cp $IN_DIR/Proxy.sol $OUT_DIR/ProxyTest.sol
 
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
-ssed 's/PriorityQueue/PriorityQueueTest/' -i $OUT_DIR/*.sol
 ssed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
 ssed 's/Franklin/FranklinTest/' -i $OUT_DIR/*.sol
 ssed 's/Storage/StorageTest/' -i $OUT_DIR/*.sol
@@ -31,8 +29,6 @@ ssed 's/Ownable/OwnableTest/' -i $OUT_DIR/*.sol
 ssed 's/UpgradeMode/UpgradeModeTest/g' -i $OUT_DIR/*.sol
 ssed 's/Upgradeable/UpgradeableTest/' -i $OUT_DIR/*.sol
 ssed 's/Proxy/ProxyTest/' -i $OUT_DIR/*.sol
-# Workaround -> priority queue has FranklinTest in method names.
-ssed 's/FranklinTest/Franklin/' -i $OUT_DIR/PriorityQueueTest.sol
 # Workaround -> ownable and upgradeable has Storage in comments.
 ssed 's/StorageTest/Storage/' -i $OUT_DIR/OwnableTest.sol
 ssed 's/StorageTest/Storage/' -i $OUT_DIR/UpgradeableTest.sol

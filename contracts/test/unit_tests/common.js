@@ -2,6 +2,8 @@ const ethers = require("ethers")
 const { expect, use } = require("chai")
 const { createMockProvider, getWallets, solidity, deployContract } = require("ethereum-waffle");
 const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
+
+const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20");
 const abi = require('ethereumjs-abi')
 
 const SKIP_TEST = false;
@@ -56,12 +58,13 @@ async function deployProxyContract(
 
 async function getCallRevertReason(f) {
     let revertReason = "VM did not revert"
+    let result;
     try {
-        let r = await f()
+        result = await f();
     } catch(e) {
         revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason
     } 
-    return revertReason
+    return {revertReason, result};
 }
 
 module.exports = {
@@ -73,5 +76,6 @@ module.exports = {
     deployTestContract,
     deployProxyContract,
     getCallRevertReason,
-    SKIP_TEST
+    IERC20_INTERFACE,
+    SKIP_TEST,
 }

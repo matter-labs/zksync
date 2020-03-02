@@ -20,19 +20,16 @@ export const proxyContractCode = require(`../flat_build/Proxy`);
 export const franklinContractCode = require(`../flat_build/Franklin`);
 export const verifierContractCode = require(`../flat_build/Verifier`);
 export const governanceContractCode = require(`../flat_build/Governance`);
-export const priorityQueueContractCode = require(`../flat_build/PriorityQueue`);
 
 export const proxyContractSourceCode = fs.readFileSync('flat/Proxy.sol', 'utf8');
 export const franklinContractSourceCode = fs.readFileSync('flat/Franklin.sol', 'utf8');
 export const verifierContractSourceCode = fs.readFileSync('flat/Verifier.sol', 'utf8');
 export const governanceContractSourceCode = fs.readFileSync('flat/Governance.sol', 'utf8');
-export const priorityQueueContractSourceCode = fs.readFileSync('flat/PriorityQueue.sol', 'utf8');
 
 export const proxyTestContractCode = require('../build/ProxyTest');
 export const franklinTestContractCode = require('../build/FranklinTest');
 export const verifierTestContractCode = require('../build/VerifierTest');
 export const governanceTestContractCode = require('../build/GovernanceTest');
-export const priorityQueueTestContractCode = require('../build/PriorityQueueTest');
 
 export async function publishSourceCodeToEtherscan(contractname, contractaddress, sourceCode, compiled, constructorParams: any[]) {
     const network = process.env.ETH_NETWORK;
@@ -79,7 +76,7 @@ export async function publishSourceCodeToEtherscan(contractname, contractaddress
                 await publishSourceCodeToEtherscan(contractname, contractaddress, sourceCode, compiled, constructorParams);
             }
         } else {
-            console.log(`Problem publishing ${contractname}:`, r.data);
+            console.error(`Problem publishing ${contractname}:`, r.data);
         }
     } else {
         let status;
@@ -108,7 +105,7 @@ export async function deployProxy(
 
         return proxy;
     } catch (err) {
-        console.log("Proxy deploy error:" + err);
+        console.error("Proxy deploy error:" + err);
     }
 }
 
@@ -129,35 +126,9 @@ export async function deployGovernance(
         await tx.wait();
 
         const returnContract = new ethers.Contract(proxy.address, governanceCode.interface, wallet);
-        console.log(`GOVERNANCE_GENESIS_TX_HASH=${tx.hash}`);
-        console.log(`GOVERNANCE_ADDR=${proxy.address}`);
         return [returnContract, governance.address];
     } catch (err) {
         console.log("Governance deploy error:" + err);
-    }
-}
-
-export async function deployPriorityQueue(
-    wallet,
-    proxyCode,
-    priorityQueueCode,
-    initArgs,
-    initArgsValues,
-) {
-    try {
-        const proxy = await deployProxy(wallet, proxyCode);
-        const priorityQueue = await deployContract(wallet, priorityQueueCode, [], {
-            gasLimit: 3000000,
-        });
-        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const tx = await proxy.initialize(priorityQueue.address, initArgsInBytes);
-        await tx.wait();
-
-        const returnContract = new ethers.Contract(proxy.address, priorityQueueCode.interface, wallet);
-        console.log(`PRIORITY_QUEUE_ADDR=${proxy.address}`);
-        return [returnContract, priorityQueue.address];
-    } catch (err) {
-        console.log("Priority queue deploy error:" + err);
     }
 }
 
@@ -178,10 +149,9 @@ export async function deployVerifier(
         await tx.wait();
 
         const returnContract = new ethers.Contract(proxy.address, verifierCode.interface, wallet);
-        console.log(`VERIFIER_ADDR=${proxy.address}`);
         return [returnContract, verifier.address];
     } catch (err) {
-        console.log("Verifier deploy error:" + err);
+        console.error("Verifier deploy error:" + err);
     }
 }
 
@@ -196,7 +166,6 @@ export async function deployFranklin(
         let [
             governanceProxyAddress,
             verifierProxyAddress,
-            priorityQueueProxyAddress,
             genesisAddress,
             genesisRoot
         ] = initArgsValues;
@@ -213,13 +182,7 @@ export async function deployFranklin(
         const initTx = await proxy.initialize(contract.address, initArgsInBytes);
         await initTx.wait();
 
-        const priorityQueueProxyContract = new ethers.Contract(priorityQueueProxyAddress, priorityQueueContractCode.interface, wallet);
-        const setAddressTx = await priorityQueueProxyContract.setFranklinAddress(proxy.address, { gasLimit: 1000000 })
-        await setAddressTx.wait();
-
         const returnContract = new ethers.Contract(proxy.address, franklinCode.interface, wallet);
-        console.log(`CONTRACT_GENESIS_TX_HASH=${initTx.hash}`);
-        console.log(`CONTRACT_ADDR=${proxy.address}`);
         return [returnContract, contract.address];
     } catch (err) {
         console.log("Franklin deploy error:" + err);
@@ -246,11 +209,10 @@ export async function addTestERC20Token(wallet, governance) {
     try {
         let erc20 = await deployContract(wallet, ERC20MintableContract, []);
         await erc20.mint(wallet.address, parseEther("3000000000"));
-        console.log("TEST_ERC20=" + erc20.address);
         await (await governance.addToken(erc20.address)).wait();
         return erc20;
     } catch (err) {
-        console.log("Add token error:" + err);
+        console.error("Add token error:" + err);
     }
 }
 
@@ -259,7 +221,7 @@ export async function mintTestERC20Token(wallet, erc20) {
         const txCall = await erc20.mint(wallet.address, parseEther("3000000000"));
         await txCall.wait();
     } catch (err) {
-        console.log("Mint token error:" + err);
+        console.error("Mint token error:" + err);
     }
 }
 
@@ -267,9 +229,8 @@ export async function addTestNotApprovedERC20Token(wallet) {
     try {
         let erc20 = await deployContract(wallet, ERC20MintableContract, []);
         await erc20.mint(wallet.address, bigNumberify("1000000000"));
-        console.log("TEST_ERC20=" + erc20.address);
-        return erc20
+        return erc20;
     } catch (err) {
-        console.log("Add token error:" + err);
+        console.error("Add token error:" + err);
     }
 }
