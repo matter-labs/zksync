@@ -56,7 +56,7 @@ fn block_to_prove(
     }
     let storage = data.access_storage()?;
     let ret = storage
-        .prover_run_for_next_commit(&r.name, data.prover_timeout)
+        .prover_run_for_next_commit(&r.name, data.prover_timeout, r.block_size)
         .map_err(|e| {
             error!("could not get next unverified commit operation: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")

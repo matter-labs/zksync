@@ -14,10 +14,10 @@ fn main() {
     let pool = ConnectionPool::new();
     let worker = "dummy_worker";
     info!("Started prover");
-    loop {
+    for &block_size in models::params::block_chunk_sizes().iter().cycle() {
         let storage = pool.access_storage().expect("Storage access");
         let job = storage
-            .prover_run_for_next_commit(worker, time::Duration::from_secs(10))
+            .prover_run_for_next_commit(worker, time::Duration::from_secs(10), block_size)
             .expect("prover job, db access");
         if let Some(job) = job {
             info!("Received job for block: {}", job.block_number);

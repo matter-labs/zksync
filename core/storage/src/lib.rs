@@ -2066,6 +2066,7 @@ impl StorageProcessor {
         &self,
         worker_: &str,
         prover_timeout: time::Duration,
+        block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
@@ -2083,11 +2084,8 @@ impl StorageProcessor {
                 )
                 SELECT min(block_number) AS integer_value FROM unsized_blocks
                 INNER JOIN blocks 
-                    ON unsized_blocks.block_number = blocks.number
-                INNER JOIN active_provers 
-                    ON blocks.block_size = active_provers.block_size 
-                    AND active_provers.worker = '{}'
-                ", prover_timeout.as_secs(), worker_))
+                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = {}
+                ", prover_timeout.as_secs(), block_size))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             if let Some(block_number_) = job {
