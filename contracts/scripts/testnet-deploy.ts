@@ -51,14 +51,11 @@ async function main() {
     const testWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
 
     let governanceAddress = process.env.GOVERNANCE_ADDR;
-    let priorityQueueAddress = process.env.PRIORITY_QUEUE_ADDR;
     let verifierAddress = process.env.VERIFIER_ADDR;
     let franklinAddress = process.env.CONTRACT_ADDR;
 
     let governanceInitArgs = ["address"];
     let governanceInitArgsValues = [wallet.address];
-    let priorityQueueInitArgs = ["address"];
-    let priorityQueueInitArgsValues = [governanceAddress];
     let verifierInitArgs = [];
     let verifierInitArgsValues = [];
 
