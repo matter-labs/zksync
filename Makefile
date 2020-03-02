@@ -1,7 +1,7 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
-export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
+export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(ZKSYNC_ENV)-$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
@@ -213,6 +213,11 @@ deposit: confirm_action
 	@node contracts/scripts/deposit.js
 
 # Devops: main
+
+# Promote build
+
+promote-to-stage:
+	@bin/promote-to-stage.sh $(ci-build)
 
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-insert-contract

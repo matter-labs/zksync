@@ -51,7 +51,17 @@ fn main() {
 
     // Create client
     let api_url = env::var("PROVER_SERVER_URL").expect("PROVER_SERVER_URL is missing");
-    let api_client = client::ApiClient::new(&api_url, &worker_name, Some(stop_signal.clone()));
+    let req_server_timeout = env::var("REQ_SERVER_TIMEOUT")
+        .expect("REQ_SERVER_TIMEOUT is missing")
+        .parse::<u64>()
+        .map(time::Duration::from_secs)
+        .expect("REQ_SERVER_TIMEOUT invalid value");
+    let api_client = client::ApiClient::new(
+        &api_url,
+        &worker_name,
+        Some(stop_signal.clone()),
+        req_server_timeout,
+    );
     let prover_id_arc = Arc::new(AtomicI32::new(ABSENT_PROVER_ID));
 
     // Handle termination requests.

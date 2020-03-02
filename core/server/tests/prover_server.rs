@@ -34,7 +34,7 @@ fn access_storage() -> storage::StorageProcessor {
 #[test]
 #[should_panic]
 fn client_with_empty_worker_name_panics() {
-    client::ApiClient::new("", "", None);
+    client::ApiClient::new("", "", None, time::Duration::from_secs(1));
 }
 
 #[test]
@@ -42,7 +42,12 @@ fn client_with_empty_worker_name_panics() {
 fn api_client_register_start_and_stop_of_prover() {
     let block_size_chunks = block_chunk_sizes()[0];
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
+    let client = client::ApiClient::new(
+        &format!("http://{}", &addr),
+        "foo",
+        None,
+        time::Duration::from_secs(1),
+    );
     let id = client
         .register_prover(block_size_chunks)
         .expect("failed to register");
@@ -65,8 +70,14 @@ fn api_client_simple_simulation() {
 
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
     let block_size_chunks = block_chunk_sizes()[0];
+    let client = client::ApiClient::new(
+        &format!("http://{}", &addr),
+        "foo",
+        None,
+        time::Duration::from_secs(1),
+    );
+
     // call block_to_prove and check its none
     let to_prove = client
         .block_to_prove(block_size_chunks)
