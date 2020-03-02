@@ -14,6 +14,10 @@ impl Drop for ThreadPanicNotify {
     }
 }
 
+fn get_env(name: &str) -> String {
+    env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e))
+}
+
 #[derive(Clone)]
 pub struct ConfigurationOptions {
     pub rest_api_server_address: SocketAddr,
@@ -36,9 +40,6 @@ pub struct ConfigurationOptions {
 
 impl ConfigurationOptions {
     pub fn from_env() -> ConfigurationOptions {
-        let get_env =
-            |name| env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e));
-
         ConfigurationOptions {
             rest_api_server_address: get_env("REST_API_BIND")
                 .parse()

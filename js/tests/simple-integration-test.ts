@@ -71,7 +71,7 @@ async function testTransfer(syncWallet1: Wallet, syncWallet2: Wallet, token: typ
     }
 }
 
-async function testWithdraw(contract: Contract, ethProxy: ETHProxy, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber, fee: utils.BigNumber) {
+async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber, fee: utils.BigNumber) {
     const wallet2BeforeWithdraw = await syncWallet.getBalance(token);
     const operatorBeforeWithdraw = await getOperatorBalance(token);
     const onchainBalanceBeforeWithdraw = await withdrawTo.getEthereumBalance(token);
@@ -89,7 +89,7 @@ async function testWithdraw(contract: Contract, ethProxy: ETHProxy, withdrawTo: 
     const operatorAfterWithdraw = await getOperatorBalance(token);
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
-    const tokenId = await ethProxy.resolveTokenId(token);
+    const tokenId = await withdrawTo.provider.tokenSet.resolveTokenId(token);
     const pendingToBeOnchainBalance = await contract.balancesToWithdraw(
         await withdrawTo.address(),
         tokenId,
@@ -153,7 +153,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Transfer ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
-    await testWithdraw(contract, ethProxy, syncWallet2, syncWallet2, token, withdrawAmount, withdrawFee);
+    await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, withdrawFee);
     console.log(`Withdraw ok, Token: ${token}`);
 }
 

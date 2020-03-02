@@ -57,7 +57,7 @@ steps:
   - zksync circuit-tests
   - zksync prover-tests
   - zksync db-test
-  - f cargo test
+  - f cargo test --release
   - cargo fmt -- --check
   - f cargo clippy --tests --benches -- -D warnings
   depends_on:

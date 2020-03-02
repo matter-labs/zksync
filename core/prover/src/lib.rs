@@ -12,22 +12,22 @@ use crate::franklin_crypto::bellman::groth16;
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use log::*;
 // Workspace deps
-use models::node::Engine;
-
 use crypto_exports::franklin_crypto;
 use crypto_exports::rand;
+use models::node::Engine;
 use models::prover_utils::{get_block_proof_key_and_vk_path, read_circuit_proving_parameters};
 
 pub struct BabyProver<C: ApiClient> {
     circuit_params: groth16::Parameters<Engine>,
     jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
+    block_size: usize,
     api_client: C,
     heartbeat_interval: time::Duration,
     stop_signal: Arc<AtomicBool>,
 }
 
 pub trait ApiClient {
-    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error>;
+    fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error>;
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error>;
     fn prover_data(&self, block: i64) -> Result<prover_data::ProverData, failure::Error>;
     fn publish(
@@ -81,6 +81,7 @@ impl<C: ApiClient> BabyProver<C> {
     pub fn new(
         circuit_params: groth16::Parameters<Engine>,
         jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
+        block_size: usize,
         api_client: C,
         heartbeat_interval: time::Duration,
         stop_signal: Arc<AtomicBool>,
@@ -88,6 +89,7 @@ impl<C: ApiClient> BabyProver<C> {
         BabyProver {
             circuit_params,
             jubjub_params,
+            block_size,
             api_client,
             heartbeat_interval,
             stop_signal,
@@ -125,18 +127,19 @@ impl<C: ApiClient> BabyProver<C> {
         rng: &mut rand::OsRng,
         start_heartbeats_tx: &mpsc::Sender<(i32, bool)>,
     ) -> Result<(), BabyProverError> {
-        let block_to_prove = self.api_client.block_to_prove().map_err(|e| {
-            let e = format!("failed to get block to prove {}", e);
-            BabyProverError::Api(e)
-        })?;
+        let block_to_prove = self
+            .api_client
+            .block_to_prove(self.block_size)
+            .map_err(|e| {
+                let e = format!("failed to get block to prove {}", e);
+                BabyProverError::Api(e)
+            })?;
 
-        let (block, job_id) = match block_to_prove {
-            Some(b) => b,
-            _ => {
-                trace!("no block to prove from the server");
-                (0, 0)
-            }
-        };
+        let (block, job_id) = block_to_prove.unwrap_or_else(|| {
+            trace!("no block to prove from the server");
+            (0, 0)
+        });
+
         // Notify heartbeat routine on new proving block job or None.
         start_heartbeats_tx
             .send((job_id, false))
@@ -154,10 +157,10 @@ impl<C: ApiClient> BabyProver<C> {
 
         let instance = circuit::circuit::FranklinCircuit {
             params: &self.jubjub_params,
-            operation_batch_size: models::params::block_size_chunks(),
+            operation_batch_size: self.block_size,
             old_root: Some(prover_data.old_root),
             new_root: Some(prover_data.new_root),
-            block_number: models::node::Fr::from_str(&(block).to_string()),
+            block_number: models::node::Fr::from_str(&block.to_string()),
             validator_address: Some(prover_data.validator_address),
             pub_data_commitment: Some(prover_data.public_data_commitment),
             operations: prover_data.operations,
@@ -222,8 +225,8 @@ impl<C: ApiClient> BabyProver<C> {
     }
 }
 
-pub fn read_circuit_params() -> groth16::Parameters<Engine> {
-    let path = get_block_proof_key_and_vk_path().0;
+pub fn read_circuit_params(block_size: usize) -> groth16::Parameters<Engine> {
+    let path = get_block_proof_key_and_vk_path(block_size).0;
     debug!("Reading key from {}", path.to_string_lossy());
     read_circuit_proving_parameters(&path).expect("Failed to read circuit parameters")
 }
