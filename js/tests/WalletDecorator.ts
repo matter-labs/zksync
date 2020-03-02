@@ -177,13 +177,12 @@ export class WalletDecorator {
     async setCurrentPubkeyWithZksyncTx() {
         if (await this.syncWallet.isSigningKeySet()) return;
 
-        const syncNonce = this.syncNonce++;
-
         const startTime = new Date().getTime();
-        const changePubkeyHandle = await this.syncWallet.onchainAuthSigningKey(syncNonce);
-        console.log(`Change pubkey offchain posted: ${(new Date().getTime()) - startTime} ms`);
+        await (await this.syncWallet.onchainAuthSigningKey(this.syncNonce++)).wait();
+        const changePubkeyHandle = await this.syncWallet.setSigningKey(this.syncNonce++, true);
+        console.log(`Change pubkey onchain posted: ${(new Date().getTime()) - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
-        console.log(`Change pubkey offchain committed: ${(new Date().getTime()) - startTime} ms`);
+        console.log(`Change pubkey onchain committed: ${(new Date().getTime()) - startTime} ms`);
     }
 
     async mainchainSendToMany(wallets, tokens, amounts) {
