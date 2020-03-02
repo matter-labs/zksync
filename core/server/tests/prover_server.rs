@@ -33,14 +33,19 @@ fn access_storage() -> storage::StorageProcessor {
 #[test]
 #[should_panic]
 fn client_with_empty_worker_name_panics() {
-    client::ApiClient::new("", "", None);
+    client::ApiClient::new("", "", None, time::Duration::from_secs(1));
 }
 
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
+    let client = client::ApiClient::new(
+        &format!("http://{}", &addr),
+        "foo",
+        None,
+        time::Duration::from_secs(1),
+    );
     let id = client.register_prover().expect("failed to register");
     let storage = access_storage();
     storage
@@ -61,7 +66,12 @@ fn api_client_simple_simulation() {
 
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo", None);
+    let client = client::ApiClient::new(
+        &format!("http://{}", &addr),
+        "foo",
+        None,
+        time::Duration::from_secs(1),
+    );
 
     // call block_to_prove and check its none
     let to_prove = client

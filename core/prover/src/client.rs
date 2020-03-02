@@ -13,7 +13,6 @@ use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
-use models::config_options::ConfigurationOptions;
 use models::prover_utils::encode_proof;
 
 #[derive(Serialize, Deserialize)]
@@ -52,8 +51,12 @@ pub struct ApiClient {
 }
 
 impl ApiClient {
-    pub fn new(base_url: &str, worker: &str, is_terminating_bool: Option<Arc<AtomicBool>>) -> Self {
-        let config_opts = ConfigurationOptions::from_env();
+    pub fn new(
+        base_url: &str,
+        worker: &str,
+        is_terminating_bool: Option<Arc<AtomicBool>>,
+        req_server_timeout: time::Duration,
+    ) -> Self {
         if worker == "" {
             panic!("worker name cannot be empty")
         }
@@ -65,7 +68,7 @@ impl ApiClient {
             publish_url: format!("{}/publish", base_url),
             stopped_url: format!("{}/stopped", base_url),
             worker: worker.to_string(),
-            req_server_timeout: config_opts.req_server_timeout,
+            req_server_timeout,
             is_terminating_bool,
         }
     }
