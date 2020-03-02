@@ -2860,6 +2860,7 @@ dependencies = [
  "jsonrpc-http-server 14.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-pubsub 14.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "jsonrpc-ws-server 14.0.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "lazy_static 1.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.4.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "models 0.0.1",
  "plasma 0.1.1",
