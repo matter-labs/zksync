@@ -24,9 +24,6 @@ steps:
   settings:
     restore: true
     mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
 - name: init
@@ -102,9 +99,6 @@ steps:
   settings:
     rebuild: true
     mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
   depends_on:
@@ -137,9 +131,6 @@ steps:
   settings:
     restore: true
     mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
 - name: preparations-for-integration-simple
@@ -229,9 +220,6 @@ steps:
   settings:
     restore: true
     mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
 
