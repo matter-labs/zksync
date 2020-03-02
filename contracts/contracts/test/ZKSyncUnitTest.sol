@@ -1,6 +1,7 @@
 pragma solidity 0.5.16;
 
 import "../generated/FranklinTest.sol";
+import "../generated/UpgradeModeTest.sol";
 
 
 contract ZKSyncUnitTest is FranklinTest {
@@ -10,7 +11,15 @@ contract ZKSyncUnitTest is FranklinTest {
         address _verifierAddress,
         address _genesisAccAddress,
         bytes32 _genesisRoot
-    ) FranklinTest(_governanceAddress, _verifierAddress, _genesisAccAddress, _genesisRoot) public{}
+    ) FranklinTest() public{
+        /// initialization
+        upgradeMode = new UpgradeModeTest();
+
+        verifier = VerifierTest(_verifierAddress);
+        governance = GovernanceTest(_governanceAddress);
+
+        blocks[0].stateRoot = _genesisRoot;
+    }
 
     function changePubkeySignatureCheck(bytes calldata _signature, bytes calldata _newPkHash, uint32 _nonce, address _ethAddress) external pure returns (bool) {
         return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress);

@@ -47,7 +47,7 @@ contract Franklin is Storage, Config, Events {
         address _verifierAddress,
         ,
         bytes32 _genesisRoot
-        ) = abi.decode(initializationParameters, (address, address, address, address, bytes32));
+        ) = abi.decode(initializationParameters, (address, address, address, bytes32));
 
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);

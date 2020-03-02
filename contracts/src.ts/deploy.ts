@@ -126,7 +126,7 @@ export async function deployGovernance(
         await tx.wait();
 
         const returnContract = new ethers.Contract(proxy.address, governanceCode.interface, wallet);
-        return [returnContract, governance.address];
+        return [returnContract, governance.address, tx.hash];
     } catch (err) {
         console.log("Governance deploy error:" + err);
     }
@@ -149,7 +149,7 @@ export async function deployVerifier(
         await tx.wait();
 
         const returnContract = new ethers.Contract(proxy.address, verifierCode.interface, wallet);
-        return [returnContract, verifier.address];
+        return [returnContract, verifier.address, tx.hash];
     } catch (err) {
         console.error("Verifier deploy error:" + err);
     }
@@ -183,7 +183,7 @@ export async function deployFranklin(
         await initTx.wait();
 
         const returnContract = new ethers.Contract(proxy.address, franklinCode.interface, wallet);
-        return [returnContract, contract.address];
+        return [returnContract, contract.address, initTx.hash];
     } catch (err) {
         console.log("Franklin deploy error:" + err);
     }

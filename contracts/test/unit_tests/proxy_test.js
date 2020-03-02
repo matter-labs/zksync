@@ -52,26 +52,26 @@ describe("Proxy unit test", function () {
 
     it("checking that requireMaster calls present", async () => {
         let proxyTestContract_with_wallet2_signer = await proxyTestContract.connect(wallet2);
-        expect(await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.upgradeTarget(DummySecond.address) )).equal("oro11")
-        expect(await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.cancelUpgradeTarget() )).equal("oro11")
-        expect(await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.finishTargetUpgrade([]) )).equal("oro11")
+        expect((await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.upgradeTarget(DummySecond.address) )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.cancelUpgradeTarget() )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.finishTargetUpgrade([]) )).revertReason).equal("oro11")
 
         // bonus: check that force cancellation do not have requireMaster call
-        expect(await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.forceCancelUpgradeTarget() )).to.not.equal("oro11")
+        expect((await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.forceCancelUpgradeTarget() )).revertReason).to.not.equal("oro11")
     });
 
     it("check Proxy reverts", async () => {
-        expect(await getCallRevertReason( () => proxyTestContract.initialize(DummyFirst.address, []) )).equal("uin11");
-        expect(await getCallRevertReason( () => proxyDummyInterface.initialize(DummyFirst.address, []) )).equal("uin11");
+        expect((await getCallRevertReason( () => proxyTestContract.initialize(DummyFirst.address, []) )).revertReason).equal("uin11");
+        expect((await getCallRevertReason( () => proxyDummyInterface.initialize(DummyFirst.address, []) )).revertReason).equal("uin11");
 
         let proxyTestContract_with_wallet2_signer = await proxyTestContract.connect(wallet2);
-        expect(await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.initialize(DummyFirst.address, []) )).equal("oro11");
+        expect((await getCallRevertReason( () => proxyTestContract_with_wallet2_signer.initialize(DummyFirst.address, []) )).revertReason).equal("oro11");
 
         let proxyDummyInterface_with_wallet2_signer = await proxyDummyInterface.connect(wallet2);
-        expect(await getCallRevertReason( () => proxyDummyInterface_with_wallet2_signer.initialize(DummyFirst.address, []) )).equal("oro11");
+        expect((await getCallRevertReason( () => proxyDummyInterface_with_wallet2_signer.initialize(DummyFirst.address, []) )).revertReason).equal("oro11");
 
-        expect(await getCallRevertReason( () => proxyTestContract.upgradeTarget("0x0000000000000000000000000000000000000000") )).equal("uut11");
-        expect(await getCallRevertReason( () => proxyTestContract.upgradeTarget(DummyFirst.address) )).equal("uut12");
+        expect((await getCallRevertReason( () => proxyTestContract.upgradeTarget("0x0000000000000000000000000000000000000000") )).revertReason).equal("uut11");
+        expect((await getCallRevertReason( () => proxyTestContract.upgradeTarget(DummyFirst.address) )).revertReason).equal("uut12");
     });
 
     it("check upgrade canceling", async () => {
@@ -106,7 +106,7 @@ describe("Proxy unit test", function () {
                 }
 
                 if (step != 3) {
-                    expect(await getCallRevertReason( () => proxyTestContract.finishTargetUpgrade([]))).equal("umf11");
+                    expect((await getCallRevertReason( () => proxyTestContract.finishTargetUpgrade([]))).revertReason).equal("umf11");
                 } else {
                     await proxyTestContract.finishTargetUpgrade([bytes[2], bytes[3]]);
                 }
@@ -133,7 +133,7 @@ describe("Proxy unit test", function () {
     }
     else {
         it("checking that force cancellation works correctly", async () => {
-            expect(await getCallRevertReason( () => proxyTestContract.forceCancelUpgradeTarget())).equal("ufc11");
+            expect((await getCallRevertReason( () => proxyTestContract.forceCancelUpgradeTarget())).revertReason).equal("ufc11");
 
             let start_time = performance.now();
 
@@ -156,9 +156,9 @@ describe("Proxy unit test", function () {
                 }
 
                 if (step != 3) {
-                    expect(await getCallRevertReason( () => proxyTestContract.forceCancelUpgradeTarget())).equal("ufc12");
+                    expect((await getCallRevertReason( () => proxyTestContract.forceCancelUpgradeTarget())).revertReason).equal("ufc12");
                 } else {
-                    expect(await getCallRevertReason( () => proxyTestContract.finishTargetUpgrade([]))).equal("ufu11");
+                    expect((await getCallRevertReason( () => proxyTestContract.finishTargetUpgrade([]))).revertReason).equal("ufu11");
                     await proxyTestContract.forceCancelUpgradeTarget();
                 }
             }

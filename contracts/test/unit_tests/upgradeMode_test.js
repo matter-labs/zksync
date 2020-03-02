@@ -17,11 +17,11 @@ describe("UpgradeMode unit test", function () {
 
     it("checking that requireMaster calls present", async () => {
         let testContract_with_wallet2_signer = await testContract.connect(wallet2);
-        expect(await getCallRevertReason( () => testContract_with_wallet2_signer.activate() )).equal("oro11")
-        expect(await getCallRevertReason( () => testContract_with_wallet2_signer.cancel() )).equal("oro11")
-        expect(await getCallRevertReason( () => testContract_with_wallet2_signer.isClosedStatusActive() )).equal("VM did not revert")
-        expect(await getCallRevertReason( () => testContract_with_wallet2_signer.forceCancel() )).equal("oro11")
-        expect(await getCallRevertReason( () => testContract_with_wallet2_signer.finish() )).equal("oro11")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.activate() )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.cancel() )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.isClosedStatusActive() )).revertReason).equal("VM did not revert")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.forceCancel() )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.finish() )).revertReason).equal("oro11")
     });
 
     it("test activate, test cancel, test finish without closed status active", async () => {
@@ -34,7 +34,7 @@ describe("UpgradeMode unit test", function () {
         await testContract.isClosedStatusActive();
         expect(await testContract.closedStatusActive()).to.equal(false)
 
-        expect(await getCallRevertReason( () => testContract.activate() )).equal("uma11")
+        expect((await getCallRevertReason( () => testContract.activate() )).revertReason).equal("uma11")
 
         // cancel
         await expect(testContract.cancel())
@@ -43,10 +43,10 @@ describe("UpgradeMode unit test", function () {
 
         expect(await testContract.waitUpgradeModeActive()).to.equal(false)
 
-        expect(await getCallRevertReason( () => testContract.cancel() )).equal("umc11")
+        expect((await getCallRevertReason( () => testContract.cancel() )).revertReason).equal("umc11")
 
         // finish
-        expect(await getCallRevertReason( () => testContract.finish() )).equal("umf11")
+        expect((await getCallRevertReason( () => testContract.finish() )).revertReason).equal("umf11")
     });
 
     if (SKIP_TEST) {
@@ -131,7 +131,7 @@ describe("UpgradeMode unit test", function () {
                 }
 
                 if (step != 5) {
-                    expect(await getCallRevertReason( () => testContract.forceCancel() )).equal("ufc12")
+                    expect((await getCallRevertReason( () => testContract.forceCancel() )).revertReason).equal("ufc12")
                 } else {
                     await expect(testContract.forceCancel())
                         .to.emit(testContract, 'UpgradeForciblyCanceled')
@@ -140,7 +140,7 @@ describe("UpgradeMode unit test", function () {
                 }
             }
 
-            expect(await getCallRevertReason( () => testContract.forceCancel() )).equal("ufc11")
+            expect((await getCallRevertReason( () => testContract.forceCancel() )).revertReason).equal("ufc11")
         });
     }
 
