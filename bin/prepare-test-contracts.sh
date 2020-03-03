@@ -35,7 +35,7 @@ ssed 's/StorageTest/Storage/' -i $OUT_DIR/UpgradeableTest.sol
 # Workaround -> upgrade mode has UpgradeMode in event and variable names.
 ssed 's/UpgradeModeTestEvents/UpgradeModeEvents/' -i $OUT_DIR/UpgradeModeTest.sol
 ssed 's/UpgradeModeTestActivated/UpgradeModeActivated/' -i $OUT_DIR/UpgradeModeTest.sol
-ssed 's/UpgradeModeTestClosedStatusActivated/UpgradeModeClosedStatusActivated/' -i $OUT_DIR/UpgradeModeTest.sol
+ssed 's/UpgradeModeTestFinalizeStatusActivated/UpgradeModeFinalizeStatusActivated/' -i $OUT_DIR/UpgradeModeTest.sol
 ssed 's/UpgradeModeTestForciblyCanceled/UpgradeModeForciblyCanceled/' -i $OUT_DIR/UpgradeModeTest.sol
 ssed 's/waitUpgradeModeTestActive/waitUpgradeModeActive/' -i $OUT_DIR/UpgradeModeTest.sol
 
@@ -47,7 +47,7 @@ set_constant() {
 	ssed -E "s/(.*constant $1)(.*)\;/\1 = $2\;/" -i $3
 }
 create_constant_getter() {
-	ssed -E "s/    (.*) (constant $1)(.*)\;(.*)/    \1 \2\3\;\4\n    function get_$1() external view returns (\1) {\n        return $1\;\n    }/" -i $2
+	ssed -E "s/    (.*) (constant $1)(.*)\;(.*)/    \1 \2\3\;\4\n    function get_$1() external pure returns (\1) {\n        return $1\;\n    }/" -i $2
 }
 
 # Change constants

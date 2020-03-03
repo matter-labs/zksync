@@ -109,6 +109,59 @@ export async function deployProxy(
     }
 }
 
+// note that this upgrade must be finished later
+export async function upgradeContract(
+    wallet,
+    proxyContract,
+    newTargetAddress,
+) {
+    try {
+        const proxy = new ethers.Contract(proxyContract.address, proxyContractCode.interface, wallet);
+        const tx = await proxy.upgradeTarget(newTargetAddress);
+        await tx.wait();
+
+        return true;
+    } catch (err) {
+        return false;
+    }
+}
+
+// cancels upgrade
+export async function cancelUpgrade(
+    wallet,
+    proxyContract,
+) {
+    try {
+        const proxy = new ethers.Contract(proxyContract.address, proxyContractCode.interface, wallet);
+        const tx = await proxy.cancelUpgradeTarget();
+        await tx.wait();
+
+        return true;
+    } catch (err) {
+        return false;
+    }
+}
+
+// trying to finish the upgrade
+export async function finishUpgrade(
+    wallet,
+    proxyContract,
+    initArgs,
+    initArgsValues,
+) {
+    try {
+        const proxy = new ethers.Contract(proxyContract.address, proxyContractCode.interface, wallet);
+
+        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
+        const tx = await proxy.finishTargetUpgrade(initArgsInBytes);
+        await tx.wait();
+
+        return true;
+    } catch (err) {
+        return false;
+    }
+}
+
 export async function deployGovernance(
     wallet,
     proxyCode,

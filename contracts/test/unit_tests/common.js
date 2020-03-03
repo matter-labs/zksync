@@ -6,6 +6,7 @@ const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils
 const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20");
 const abi = require('ethereumjs-abi')
 
+/// Skipping slow tests
 const SKIP_TEST = false;
 
 // For: geth

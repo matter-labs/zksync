@@ -5,7 +5,7 @@ const { wallet1, wallet2, deployTestContract, getCallRevertReason, SKIP_TEST } =
 const { performance } = require('perf_hooks');
 
 
-describe("UpgradeMode unit test", function () {
+describe("UpgradeMode unit tests", function () {
     this.timeout(50000);
 
     let testContract
@@ -19,20 +19,20 @@ describe("UpgradeMode unit test", function () {
         let testContract_with_wallet2_signer = await testContract.connect(wallet2);
         expect((await getCallRevertReason( () => testContract_with_wallet2_signer.activate() )).revertReason).equal("oro11")
         expect((await getCallRevertReason( () => testContract_with_wallet2_signer.cancel() )).revertReason).equal("oro11")
-        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.isClosedStatusActive() )).revertReason).equal("VM did not revert")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.isFinalizeStatusActive() )).revertReason).equal("VM did not revert")
         expect((await getCallRevertReason( () => testContract_with_wallet2_signer.forceCancel() )).revertReason).equal("oro11")
         expect((await getCallRevertReason( () => testContract_with_wallet2_signer.finish() )).revertReason).equal("oro11")
     });
 
-    it("test activate, test cancel, test finish without closed status active", async () => {
+    it("test activate, test cancel, test finish without finalize status active", async () => {
         // activate
         await expect(testContract.activate())
             .to.emit(testContract, 'UpgradeModeActivated')
             .withArgs(1);
 
         expect(await testContract.waitUpgradeModeActive()).to.equal(true)
-        await testContract.isClosedStatusActive();
-        expect(await testContract.closedStatusActive()).to.equal(false)
+        await testContract.isFinalizeStatusActive();
+        expect(await testContract.finalizeStatusActive()).to.equal(false)
 
         expect((await getCallRevertReason( () => testContract.activate() )).revertReason).equal("uma11")
 
@@ -63,7 +63,7 @@ describe("UpgradeMode unit test", function () {
 
             let activated_time = performance.now();
 
-            // wait and activate closed status
+            // wait and activate finalize status
             let all_time_in_sec = parseInt(await testContract.get_WAIT_UPGRADE_MODE_PERIOD());
             for (let step = 1; step <= 3; step++) {
                 if (step != 3) {
@@ -77,13 +77,13 @@ describe("UpgradeMode unit test", function () {
                 }
 
                 if (step != 3) {
-                    await testContract.isClosedStatusActive();
-                    expect(await testContract.closedStatusActive()).to.equal(false)
+                    await testContract.isFinalizeStatusActive();
+                    expect(await testContract.finalizeStatusActive()).to.equal(false)
                 } else {
-                    await expect(testContract.isClosedStatusActive())
-                        .to.emit(testContract, 'UpgradeModeClosedStatusActivated')
+                    await expect(testContract.isFinalizeStatusActive())
+                        .to.emit(testContract, 'UpgradeModeFinalizeStatusActivated')
                         .withArgs(1);
-                    expect(await testContract.closedStatusActive()).to.equal(true)
+                    expect(await testContract.finalizeStatusActive()).to.equal(true)
                 }
             }
 

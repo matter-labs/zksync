@@ -3,7 +3,7 @@ const { deployContract } = require("ethereum-waffle");
 const { wallet1, wallet2, deployTestContract, getCallRevertReason } = require("./common")
 
 
-describe("Ownable unit test", function () {
+describe("Ownable unit tests", function () {
     this.timeout(50000);
 
     let testContract

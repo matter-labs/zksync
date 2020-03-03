@@ -10,7 +10,7 @@ const proxyTestContractCode = require('../../build/ProxyTest');
 // some random constants for checking write and read from storage
 const bytes = [133, 174, 97, 255]
 
-describe("Proxy unit test", function () {
+describe("Proxy unit tests", function () {
     this.timeout(50000);
 
     let proxyTestContract
@@ -77,7 +77,9 @@ describe("Proxy unit test", function () {
     it("check upgrade canceling", async () => {
         // activate and cancel
         await proxyTestContract.upgradeTarget(DummySecond.address);
+        expect((await getCallRevertReason( () => proxyTestContract.upgradeTarget(DummySecond.address))).revertReason).equal("uma11");
         await proxyTestContract.cancelUpgradeTarget();
+        expect((await getCallRevertReason( () => proxyTestContract.cancelUpgradeTarget())).revertReason).equal("umc11");
     });
 
     if (SKIP_TEST) {

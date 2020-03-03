@@ -67,8 +67,8 @@ contract UpgradeModeEvents {
         uint64 version
     );
 
-    /// @notice Upgrade mode closed status event
-    event UpgradeModeClosedStatusActivated(
+    /// @notice Upgrade mode finalize status event
+    event UpgradeModeFinalizeStatusActivated(
         uint64 version
     );
 

@@ -55,6 +55,13 @@ contract Franklin is Storage, Config, Events {
         blocks[0].stateRoot = _genesisRoot;
     }
 
+    /// @notice Checks that contract is ready to be upgraded
+    /// Ensures that all full exit requests received while waiting for the upgrade will be processed before finishing upgrade
+    /// @return Bool flag indicating that contract is ready to be upgraded
+    function readyToBeUpgraded() external view returns (bool) {
+        return !exodusMode && (firstPriorityRequestId >= requestsToProcessBeforeUpgrade);
+    }
+
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external {
@@ -695,7 +702,7 @@ contract Franklin is Storage, Config, Events {
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
-        priorityRequests[firstPriorityRequestId+totalOpenPriorityRequests] = PriorityOperation({
+        priorityRequests[firstPriorityRequestId + totalOpenPriorityRequests] = PriorityOperation({
             opType: _opType,
             pubData: _pubData,
             expirationBlock: expirationBlock,
@@ -704,7 +711,7 @@ contract Franklin is Storage, Config, Events {
 
         emit NewPriorityRequest(
             msg.sender,
-            firstPriorityRequestId+totalOpenPriorityRequests,
+            firstPriorityRequestId + totalOpenPriorityRequests,
             uint8(_opType),
             _pubData,
             expirationBlock,
@@ -712,6 +719,10 @@ contract Franklin is Storage, Config, Events {
         );
 
         totalOpenPriorityRequests++;
+
+        if (_opType == Operations.OpType.FullExit && !upgradeMode.isFinalizeStatusActive()) {
+            requestsToProcessBeforeUpgrade = firstPriorityRequestId + totalOpenPriorityRequests;
+        }
     }
 
     /// @notice Collects fees from provided requests number for the block validator, store it on her

@@ -10,10 +10,10 @@ contract UpgradeMode is UpgradeModeEvents, Ownable {
 
     /// @notice Maximal upgrade time (in seconds)
     /// @dev After this period from the start of the upgrade anyone can cancel it forcibly
-    uint256 constant MAX_UPGRADE_PERIOD = 60 * 60 * 24 * 14; /// 14 days
+    uint256 constant MAX_UPGRADE_PERIOD = 2 weeks;
 
-    /// @notice Waiting period to activate closed status mode (in seconds)
-    uint256 constant WAIT_UPGRADE_MODE_PERIOD = 60 * 60 * 24 * 10; /// 10 days
+    /// @notice Waiting period to activate finalize status mode (in seconds)
+    uint256 constant WAIT_UPGRADE_MODE_PERIOD = 10 days;
 
     /// @notice Version of upgradeable field
     uint64 public version;
@@ -21,8 +21,8 @@ contract UpgradeMode is UpgradeModeEvents, Ownable {
     /// @notice Flag indicating that wait upgrade mode is active
     bool public waitUpgradeModeActive;
 
-    /// @notice Flag indicating that closed status is active
-    bool public closedStatusActive;
+    /// @notice Flag indicating that finalize status is active
+    bool public finalizeStatusActive;
 
     /// @notice Time of activating waiting upgrade mode
     /// @dev Will be equal to zero in case of not active mode
@@ -33,7 +33,7 @@ contract UpgradeMode is UpgradeModeEvents, Ownable {
     constructor() Ownable() public {
         version = 1;
         waitUpgradeModeActive = false;
-        closedStatusActive = false;
+        finalizeStatusActive = false;
         activationTime = 0;
     }
 
@@ -46,7 +46,7 @@ contract UpgradeMode is UpgradeModeEvents, Ownable {
         ); // uma11 - unable to activate active mode
 
         waitUpgradeModeActive = true;
-        closedStatusActive = false;
+        finalizeStatusActive = false;
         activationTime = now;
         emit UpgradeModeActivated(version);
     }
@@ -60,7 +60,7 @@ contract UpgradeMode is UpgradeModeEvents, Ownable {
         ); // umc11 - unable to cancel not active mode
 
         waitUpgradeModeActive = false;
-        closedStatusActive = false;
+        finalizeStatusActive = false;
         activationTime = 0;
         emit UpgradeCanceled(version);
     }
@@ -78,37 +78,37 @@ contract UpgradeMode is UpgradeModeEvents, Ownable {
         ); // ufc12 - unable to force cancel upgrade until MAX_UPGRADE_PERIOD passes
 
         waitUpgradeModeActive = false;
-        closedStatusActive = false;
+        finalizeStatusActive = false;
         activationTime = 0;
         emit UpgradeForciblyCanceled(version);
     }
 
-    /// @notice Checks that closed status is active and activates it if needed
-    /// @return Bool flag indicating that closed status is active
-    function isClosedStatusActive() public returns (bool) {
+    /// @notice Checks that finalize status is active and activates it if needed
+    /// @return Bool flag indicating that finalize status is active
+    function isFinalizeStatusActive() public returns (bool) {
         if (!waitUpgradeModeActive) {
             return false;
         }
-        if (closedStatusActive) {
+        if (finalizeStatusActive) {
             return true;
         }
         if (now >= activationTime + WAIT_UPGRADE_MODE_PERIOD) {
-            closedStatusActive = true;
-            emit UpgradeModeClosedStatusActivated(version);
+            finalizeStatusActive = true;
+            emit UpgradeModeFinalizeStatusActivated(version);
         }
-        return closedStatusActive;
+        return finalizeStatusActive;
     }
 
     /// @notice Finishes upgrade
     function finish() external {
         requireMaster(msg.sender);
         require(
-            isClosedStatusActive(),
+            isFinalizeStatusActive(),
             "umf11"
-        ); // umf11 - unable to finish upgrade without closed status active
+        ); // umf11 - unable to finish upgrade without finalize status active
 
         waitUpgradeModeActive = false;
-        closedStatusActive = false;
+        finalizeStatusActive = false;
         activationTime = 0;
         emit UpgradeCompleted(version);
         version++;
