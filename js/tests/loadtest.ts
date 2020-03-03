@@ -25,8 +25,8 @@ const TRANSFER_NUM_MULTIPLIER=10;
     const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
     console.log(`Running loadtest on the ${network} network`);
 
-    // syncProvider = await getDefaultProvider(network);
-    syncProvider = await Provider.newWebsocketProvider("wss://stage-api.zksync.dev/jsrpc-ws");
+    syncProvider = await getDefaultProvider(network);
+    // syncProvider = await Provider.newWebsocketProvider("wss://stage-api.zksync.dev/jsrpc-ws");
 
     const depositAmount = utils.parseEther(DEPOSIT_AMOUNT);
     const transferAmount = depositAmount.div(CLIENTS_TOTAL * TRANSFER_DIVISOR);
