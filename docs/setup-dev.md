@@ -148,6 +148,11 @@ brew tap ethereum/ethereum
 brew install solidity@5
 ```
 
+## drone cli
+
+drone cli used to create promotion jobs [described here](docs/promote.md)
+https://docs.drone.io/cli/install/
+
 ## Environment
 
 Edit the lines below and add them to your shell profile file (e.g. `~/.bash_profile`):

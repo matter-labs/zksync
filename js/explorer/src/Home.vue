@@ -157,6 +157,7 @@ export default {
             if (blocks) {
                 this.blocks = blocks.map( b => ({
                     block_number:   b.block_number,
+                    block_size:     b.block_size,
                     status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
                     new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
                     committed_at:   formatTime(b.committed_at),

@@ -1,9 +1,11 @@
 // Built-in deps
+use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::mpsc;
 use std::sync::Arc;
 use std::{env, thread, time};
 // External deps
+use clap::{App, Arg};
 use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use log::*;
 use signal_hook::iterator::Signals;
@@ -13,6 +15,26 @@ use prover::{client, read_circuit_params};
 use prover::{start, BabyProver};
 
 fn main() {
+    let cli = App::new("Prover")
+        .author("Matter Labs")
+        .arg(
+            Arg::with_name("block_size_chunks")
+                .help("Size of blocks this prover deals with.")
+                .required(true)
+                .index(1),
+        )
+        .arg(
+            Arg::with_name("worker_name")
+                .help("Name of the worker. Must be unique!")
+                .required(true)
+                .index(2),
+        )
+        .get_matches();
+
+    let block_size_chunks = usize::from_str(cli.value_of("block_size_chunks").unwrap())
+        .expect("invalid block_size_chunks");
+    let worker_name = cli.value_of("worker_name").unwrap();
+
     env_logger::init();
     const ABSENT_PROVER_ID: i32 = -1;
 
@@ -25,24 +47,21 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal))
         .expect("Error setting SIGQUIT handler");
 
-    let worker_name = env::var("POD_NAME").expect("POD_NAME is missing");
     info!("creating prover, worker name: {}", worker_name);
 
     // Create client
     let api_url = env::var("PROVER_SERVER_URL").expect("PROVER_SERVER_URL is missing");
-    let api_client = client::ApiClient::new(&api_url, &worker_name, Some(stop_signal.clone()));
-    // Create prover
-    let jubjub_params = AltJubjubBn256::new();
-    let circuit_params = read_circuit_params();
-    let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
-    let worker = BabyProver::new(
-        circuit_params,
-        jubjub_params,
-        api_client.clone(),
-        heartbeat_interval,
-        stop_signal,
+    let req_server_timeout = env::var("REQ_SERVER_TIMEOUT")
+        .expect("REQ_SERVER_TIMEOUT is missing")
+        .parse::<u64>()
+        .map(time::Duration::from_secs)
+        .expect("REQ_SERVER_TIMEOUT invalid value");
+    let api_client = client::ApiClient::new(
+        &api_url,
+        &worker_name,
+        Some(stop_signal.clone()),
+        req_server_timeout,
     );
-
     let prover_id_arc = Arc::new(AtomicI32::new(ABSENT_PROVER_ID));
 
     // Handle termination requests.
@@ -71,10 +90,23 @@ fn main() {
         });
     }
 
+    // Create prover
+    let jubjub_params = AltJubjubBn256::new();
+    let circuit_params = read_circuit_params(block_size_chunks);
+    let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
+    let worker = BabyProver::new(
+        circuit_params,
+        jubjub_params,
+        block_size_chunks,
+        api_client.clone(),
+        heartbeat_interval,
+        stop_signal,
+    );
+
     // Register prover
     prover_id_arc.store(
         api_client
-            .register_prover()
+            .register_prover(block_size_chunks)
             .expect("failed to register prover"),
         Ordering::SeqCst,
     );

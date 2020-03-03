@@ -10,8 +10,7 @@
 
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate log;
+use log::*;
 
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
@@ -500,6 +499,7 @@ struct StorageBlock {
     fee_account_id: i64,
     unprocessed_prior_op_before: i64,
     unprocessed_prior_op_after: i64,
+    block_size: i64,
 }
 
 impl StoredOperation {
@@ -563,6 +563,7 @@ pub struct ActiveProver {
     pub worker: String,
     pub created_at: NaiveDateTime,
     pub stopped_at: Option<NaiveDateTime>,
+    pub block_size: i64,
 }
 
 #[derive(Debug, QueryableByName)]
@@ -586,6 +587,9 @@ pub struct BlockDetails {
 
     #[sql_type = "Text"]
     pub new_state_root: String,
+
+    #[sql_type = "BigInt"]
+    pub block_size: i64,
 
     #[sql_type = "Nullable<Text>"]
     pub commit_tx_hash: Option<String>,
@@ -831,6 +835,7 @@ impl StorageProcessor {
                 fee_account_id: i64::from(block.fee_account),
                 unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
                 unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
+                block_size: block.smallest_block_size() as i64,
             };
 
             diesel::insert_into(blocks::table)
@@ -1632,7 +1637,8 @@ impl StorageProcessor {
             )
             select
             	blocks.number as block_number,
-            	blocks.root_hash as new_state_root,
+                blocks.root_hash as new_state_root,
+                blocks.block_size as block_size,
             	commited.tx_hash as commit_tx_hash,
             	verified.tx_hash as verify_tx_hash,
             	commited.created_at as committed_at,
@@ -1839,31 +1845,35 @@ impl StorageProcessor {
 
     pub fn load_unverified_commits_after_block(
         &self,
-        block: i64,
+        block_size: usize,
+        block: BlockNumber,
         limit: i64,
     ) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
             let ops: Vec<StoredOperation> = diesel::sql_query(format!(
                 "
-                SELECT * FROM operations
-                  WHERE action_type = 'COMMIT'
-                   AND block_number > (
-                     SELECT COALESCE(max(block_number), 0)
-                       FROM operations
-                       WHERE action_type = 'VERIFY'
-                   )
-                   AND block_number > {}
-                  LIMIT {}
-            ",
-                block, limit
+                WITH sized_operations AS (
+                    SELECT operations.* FROM operations
+                    LEFT JOIN blocks ON number = block_number
+                    LEFT JOIN proofs USING (block_number)
+                    WHERE proof IS NULL AND block_size = {}
+                )
+                SELECT * FROM sized_operations
+                WHERE action_type = 'COMMIT'
+                    AND block_number > (
+                        SELECT COALESCE(max(block_number), 0)
+                        FROM sized_operations
+                        WHERE action_type = 'VERIFY'
+                    )
+                    AND block_number > {}
+                ORDER BY block_number
+                LIMIT {}
+                ",
+                block_size, block, limit
             ))
             .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
-    }
-
-    pub fn load_unverified_commits(&self) -> QueryResult<Vec<Operation>> {
-        self.load_unverified_commits_after_block(0, 10e9 as i64)
     }
 
     fn get_account_and_last_block(
@@ -2061,20 +2071,26 @@ impl StorageProcessor {
         &self,
         worker_: &str,
         prover_timeout: time::Duration,
+        block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
-                    SELECT min(block_number) as integer_value FROM operations o
+                WITH unsized_blocks AS (
+                    SELECT * FROM operations o
                     WHERE action_type = 'COMMIT'
-                    AND block_number >
-                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
-                    AND NOT EXISTS 
-                        (SELECT * FROM proofs WHERE block_number = o.block_number)
-                    AND NOT EXISTS
-                        (SELECT * FROM prover_runs 
-                            WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
-                ", prover_timeout.as_secs()))
+                        AND block_number >
+                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
+                        AND NOT EXISTS 
+                            (SELECT * FROM proofs WHERE block_number = o.block_number)
+                        AND NOT EXISTS
+                            (SELECT * FROM prover_runs 
+                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
+                )
+                SELECT min(block_number) AS integer_value FROM unsized_blocks
+                INNER JOIN blocks 
+                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = {}
+                ", prover_timeout.as_secs(), block_size))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             if let Some(block_number_) = job {
@@ -2102,10 +2118,13 @@ impl StorageProcessor {
             .map(|_| ())
     }
 
-    pub fn register_prover(&self, worker_: &str) -> QueryResult<i32> {
+    pub fn register_prover(&self, worker_: &str, block_size_: usize) -> QueryResult<i32> {
         use crate::schema::active_provers::dsl::*;
         let inserted: ActiveProver = insert_into(active_provers)
-            .values(&vec![(worker.eq(worker_.to_string()))])
+            .values(&vec![(
+                worker.eq(worker_.to_string()),
+                block_size.eq(block_size_ as i64),
+            )])
             .get_result(self.conn())?;
         Ok(inserted.id)
     }
