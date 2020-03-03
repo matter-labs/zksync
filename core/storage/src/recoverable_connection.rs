@@ -1,12 +1,34 @@
+// Built-in deps
 use std::cell::RefCell;
-
+use std::time::Duration;
+// External uses
 use diesel::backend::UsesAnsiSavepointSyntax;
 use diesel::connection::{AnsiTransactionManager, Connection, SimpleConnection};
 use diesel::prelude::*;
 use diesel::query_builder::{AsQuery, QueryFragment, QueryId};
 use diesel::query_source::QueryableByName;
+use diesel::result::Error as DieselError;
 use diesel::types::HasSqlType;
 
+const RETRIES_AMOUNT: usize = 10;
+const RETRY_QUANTILE: Duration = Duration::from_millis(200);
+
+/// `RecoverableConnection` is a generic wrapper over Diesel's connection types
+/// which is capable of reestablishment of the connection and retrying the same
+/// query multiple times in case of database being unavailable for short periods
+/// of time.
+///
+/// The design goals of this wrappers are speed and robustness: since most of the times
+/// database will be available, the overhead introduces by this wrapper should not be
+/// big. On the other hand, if the database is unavailable, we only care about restoring
+/// the connection, and thus the speed is not a highest priority.
+///
+/// In an actual implementation, this means that in normal conditions the only overhead
+/// we have to deal with is introduced by using `RefCell` (and that's not much).
+///
+/// If the connection breaks, we will try to establish a new one (because Diesel can't
+/// restore the existing connection: once it's broken, it's broken) in a loop with an
+/// increasing intervals between attempts.
 pub struct RecoverableConnection<Conn: Connection> {
     database_url: String,
     connection: RefCell<Conn>,
@@ -46,9 +68,8 @@ where
         Self::Backend: HasSqlType<T::SqlType>,
         U: Queryable<T::SqlType, Self::Backend>,
     {
-        // Note: Since source is consumed by value and trait does not require `Clone`,
-        // we cannot retry the query here.
-        self.connection.borrow().query_by_index(source)
+        let query = source.as_query();
+        self.exec_with_retries(|| self.connection.borrow().query_by_index(&query))
     }
 
     fn query_by_name<T, U>(&self, source: &T) -> QueryResult<Vec<U>>
@@ -75,31 +96,57 @@ impl<Conn> RecoverableConnection<Conn>
 where
     Conn: Connection,
 {
+    /// Performs the query (represented as a closure) with a prior knowledge
+    /// that the database can sometimes stop responding for short periods of time.
+    ///
+    /// In case of the database unavailability, the same request is repeated with
+    /// increasing time intervals.
     fn exec_with_retries<F, T>(&self, f: F) -> QueryResult<T>
     where
         F: Fn() -> QueryResult<T>,
     {
-        for _ in 0..10 {
+        for attempt in 0..RETRIES_AMOUNT {
             match f() {
                 Ok(result) => {
-                    log::info!("Successfully performed query");
                     return Ok(result);
                 }
-                Err(error) => {
-                    log::warn!("Error connecting database ({}), retrying", error);
-                    std::thread::sleep(std::time::Duration::from_millis(5000));
-                    match Conn::establish(self.database_url.as_ref()) {
-                        Ok(conn) => {
-                            *self.connection.borrow_mut() = conn;
-                        }
-                        Err(_) => {
-                            // TODO should we react?
-                        }
+                Err(error) if self.is_db_connection_error(&error) => {
+                    log::warn!("Error connecting database ({:?}), retrying", error);
+                    std::thread::sleep(scale_retry_period(attempt));
+                    if let Ok(conn) = Conn::establish(self.database_url.as_ref()) {
+                        *self.connection.borrow_mut() = conn;
                     }
+                }
+                Err(other) => {
+                    // Not a connection issue, so it's none of our business.
+                    // Just propagate it.
+                    return Err(other);
                 }
             }
         }
 
+        // At this point we are sure that database is down, we cannot work without a database.
         panic!("Cannot connect to the database after several retries, it is probably down");
     }
+
+    /// Checks whether occurred error is the database connection issue.
+    fn is_db_connection_error(&self, error: &DieselError) -> bool {
+        if let DieselError::DatabaseError(_kind, info) = error {
+            let msg = info.message();
+
+            // We have to compare the string message representation, because `Diesel` doesn't have
+            // clear error kinds associated with these errors.
+            msg.starts_with("server closed the connection unexpectedly")
+                || msg.starts_with("no connection to the server")
+        } else {
+            false
+        }
+    }
+}
+
+// Scales the retry interval, so that we will have smaller retry intervals in the beginning
+// (hoping that the connection will be restored almost immediately), but then we will wait longer
+// not to spam the (hopefully) initializing database with many requests.
+fn scale_retry_period(n_attempt: usize) -> Duration {
+    RETRY_QUANTILE * (n_attempt + 1) as u32
 }
