@@ -939,11 +939,11 @@ impl StorageProcessor {
 
             let (tx_from, tx_to, tx_fee) = match tx_type {
                 "Withdraw" => (
-                    operation["tx"]["account"]
+                    operation["tx"]["from"]
                         .as_str()
                         .unwrap_or("unknown from")
                         .to_string(),
-                    operation["tx"]["ethAddress"]
+                    operation["tx"]["to"]
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
@@ -959,6 +959,17 @@ impl StorageProcessor {
                         .unwrap_or("unknown to")
                         .to_string(),
                     operation["tx"]["fee"].as_str().map(|v| v.to_string()),
+                ),
+                "ChangePubKeyOffchain" => (
+                    operation["tx"]["account"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["tx"]["newPkHash"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    None,
                 ),
                 &_ => (
                     "unknown from".to_string(),
@@ -1004,11 +1015,11 @@ impl StorageProcessor {
 
             let (tx_from, tx_to, tx_fee) = match tx_type {
                 "Deposit" => (
-                    operation["priority_op"]["sender"]
+                    operation["priority_op"]["from"]
                         .as_str()
                         .unwrap_or("unknown from")
                         .to_string(),
-                    operation["priority_op"]["account"]
+                    operation["priority_op"]["to"]
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
