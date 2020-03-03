@@ -105,15 +105,23 @@ where
     where
         F: Fn() -> QueryResult<T>,
     {
-        for attempt in 0..RETRIES_AMOUNT {
+        for attempt in 1..=RETRIES_AMOUNT {
             match f() {
                 Ok(result) => {
                     return Ok(result);
                 }
                 Err(error) if self.is_db_connection_error(&error) => {
-                    log::warn!("Error connecting database ({:?}), retrying", error);
+                    log::warn!(
+                        "Error connecting database ({}), retry attempt #{}",
+                        error,
+                        attempt
+                    );
                     std::thread::sleep(scale_retry_period(attempt));
                     if let Ok(conn) = Conn::establish(self.database_url.as_ref()) {
+                        log::info!(
+                            "Connection with the database reestablished after {} retries",
+                            attempt
+                        );
                         *self.connection.borrow_mut() = conn;
                     }
                 }
@@ -148,5 +156,5 @@ where
 // (hoping that the connection will be restored almost immediately), but then we will wait longer
 // not to spam the (hopefully) initializing database with many requests.
 fn scale_retry_period(n_attempt: usize) -> Duration {
-    RETRY_QUANTILE * (n_attempt + 1) as u32
+    RETRY_QUANTILE * n_attempt as u32
 }
