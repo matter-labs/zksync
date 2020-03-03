@@ -48,6 +48,8 @@ spec:
           value: "${PROVER_SERVER_URL}"
         - name: REQ_SERVER_TIMEOUT
           value: "${REQ_SERVER_TIMEOUT}"
+        - name: BLOCK_CHUNK_SIZES
+          value: "${BLOCK_CHUNK_SIZES}"
         - name: NODE_NAME
           valueFrom:
             fieldRef:
