@@ -64,6 +64,12 @@ async function main() {
                     deployer.postContractToTesseracts("Verifier"),
                     deployer.postContractToTesseracts("Franklin"),
                 ]);
+            } else {
+                // sequentially, since etherscan has request limit
+                await deployer.publishSourceCodeToEtherscan("Governance");
+                await deployer.publishSourceCodeToEtherscan("PriorityQueue");
+                await deployer.publishSourceCodeToEtherscan("Verifier");
+                await deployer.publishSourceCodeToEtherscan("Franklin");
             }
         } catch (e) {
             console.error("Failed to post contract code: ", e.toString());

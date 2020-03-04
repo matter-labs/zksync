@@ -25,16 +25,49 @@ export const verifierTestContractCode = require('../build/VerifierTest');
 export const governanceTestContractCode = require('../build/GovernanceTest');
 export const priorityQueueTestContractCode = require('../build/PriorityQueueTest');
 
+import { ImportsFsEngine } from '@resolver-engine/imports-fs';
+import { gatherSources } from '@resolver-engine/imports';
+
+async function getSolidityInput(contractPath) {
+    let input = await gatherSources([contractPath], process.cwd(), ImportsFsEngine());
+    input = input.map(obj => ({...obj, url: obj.url.replace(`${process.cwd()}/`, '')}));
+    
+    let sources: { [s: string]: {} } = {};
+    for (let file of input) {
+        sources[file.url] = { content: file.source };
+    }
+
+    let config = require('../.waffle.json');
+    let inputJSON = {
+        language: "Solidity",
+        sources,
+        settings: {
+            outputSelection: {
+                "*": {
+                    "*": [
+                        "abi",
+                        "evm.bytecode",
+                        "evm.deployedBytecode"
+                    ]
+                }
+            },
+            ...config.compilerOptions
+        }
+    };
+
+    return JSON.stringify(inputJSON, null, 2);
+}
+
 export class Deployer {
     bytecodes: any;
     addresses: any;
 
     constructor(public wallet: ethers.Wallet, isTest: boolean) {
         this.bytecodes = {
-            Governance: isTest ? governanceContractCode : governanceTestContractCode,
-            PriorityQueue: isTest ? priorityQueueContractCode : priorityQueueTestContractCode,
-            Verifier: isTest ? verifierContractCode : verifierTestContractCode,
-            Franklin: isTest ? franklinContractCode : franklinTestContractCode,
+            Governance:    isTest ? governanceTestContractCode    : governanceContractCode,
+            PriorityQueue: isTest ? priorityQueueTestContractCode : priorityQueueContractCode,
+            Verifier:      isTest ? verifierTestContractCode      : verifierContractCode,
+            Franklin:      isTest ? franklinTestContractCode      : franklinContractCode,
         };
 
         this.addresses = {
@@ -70,6 +103,9 @@ export class Deployer {
     encodedConstructorArgs(contractName) {
         const args = this.constructorArgs(contractName);
         const iface = this.bytecodes[contractName].abi.filter(i => i.type === 'constructor');
+
+        if (iface.length == 0) return null;
+
         return ethers
             .utils
             .defaultAbiCoder
@@ -148,6 +184,57 @@ export class Deployer {
         };
         await Axios.post(`http://localhost:8000/${address}/contract`, qs.stringify(req), config);
     }
+
+    async publishSourceCodeToEtherscan(contractname) {
+        const contractPath = `contracts/${contractname}.sol`;
+        const sourceCode = await getSolidityInput(contractPath);
+
+        const network = process.env.ETH_NETWORK;
+        const etherscanApiUrl = network === 'mainnet' ? 'https://api.etherscan.io/api' : `https://api-${network}.etherscan.io/api`;
+    
+        const constructorArguments = this.encodedConstructorArgs(contractname);
+        const contractaddress = this.addresses[contractname];
+    
+        let data = {
+            apikey:             process.env.ETHERSCAN_API_KEY,  // A valid API-Key is required        
+            module:             'contract',                     // Do not change
+            action:             'verifysourcecode',             // Do not change
+            contractaddress,                                    // Contract Address starts with 0x...     
+            sourceCode,                                         // Contract Source Code (Flattened if necessary)
+            codeformat:         'solidity-standard-json-input',
+            contractname:       `${contractPath}:${contractname}`,
+            compilerversion:    'v0.5.16+commit.9c3226ce',      // see http://etherscan.io/solcversions for list of support versions
+            constructorArguements: constructorArguments         // if applicable. How nice, they have a typo in their api
+        };
+        
+        let r = await Axios.post(etherscanApiUrl, qs.stringify(data));
+        let retriesLeft = 20;
+        if (r.data.status != 1) {
+            if (r.data.result.includes('Unable to locate ContractCode')) {
+                // waiting for etherscan backend and try again
+                await sleep(15000);
+                if (retriesLeft > 0) {
+                    --retriesLeft;
+                    await this.publishSourceCodeToEtherscan(contractname);
+                }
+            } else {
+                console.log(`Problem publishing ${contractname}:`, r.data);
+            }
+        } else {
+            let status;
+            let retriesLeft = 10;
+            while (retriesLeft --> 0) {
+                status = await Axios.get(`http://api.etherscan.io/api?module=contract&&action=checkverifystatus&&guid=${r.data.result}`).then(r => r.data);
+                
+                if (status.result.includes('Pending in queue') == false) 
+                    break;
+                
+                await sleep(5000);
+            }
+    
+            console.log(`Published ${contractname} sources on https://${network}.etherscan.io/address/${contractaddress} with status`, status);
+        }
+    }    
 }
 
 export async function addTestERC20Token(wallet, governance) {

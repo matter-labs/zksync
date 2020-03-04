@@ -9,7 +9,7 @@
     "argparse": "^1.0.10",
     "axios": "^0.19.0",
     "chai": "^4.2.0",
-    "ethereum-waffle": "file:/Users/oleg/Desktop/Waffle",
+    "ethereum-waffle": "2.0.12",
     "ethers": "4.0.33",
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
