@@ -2,14 +2,11 @@ import { ethers } from "ethers";
 import {
     addTestERC20Token,
     mintTestERC20Token,
-    deployFranklin,
-    deployGovernance,
-    deployPriorityQueue,
-    deployVerifier,
     franklinTestContractCode,
     verifierTestContractCode,
     governanceTestContractCode,
     priorityQueueTestContractCode,
+    Deployer,
 } from "../src.ts/deploy";
 
 import { expect, use } from "chai";
@@ -46,6 +43,7 @@ const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 describe("Integration test", async function () {
     this.timeout(50000);
 
+    const deployer = new Deployer(wallet, true);
     let franklinDeployedContract;
     let governanceDeployedContract;
     let erc20DeployedToken;
@@ -54,20 +52,10 @@ describe("Integration test", async function () {
 
     before(async () => {
         //console.log("---\n");
-        verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode, []);
-        governanceDeployedContract = await deployGovernance(wallet, governanceTestContractCode, [wallet.address]);
-        priorityQueueDeployedContract = await deployPriorityQueue(wallet, priorityQueueTestContractCode, [governanceDeployedContract.address]);
-        franklinDeployedContract = await deployFranklin(
-            wallet,
-            franklinTestContractCode,
-            [
-                governanceDeployedContract.address,
-                verifierDeployedContract.address,
-                priorityQueueDeployedContract.address,
-                wallet.address,
-                ethers.constants.HashZero,
-            ],
-        );
+        verifierDeployedContract = await deployer.deployVerifier();
+        governanceDeployedContract = await deployer.deployGovernance();
+        priorityQueueDeployedContract = await deployer.deployPriorityQueue();
+        franklinDeployedContract = await deployer.deployFranklin();
         await governanceDeployedContract.setValidator(wallet.address, true);
         erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
         await mintTestERC20Token(wallet, erc20DeployedToken);
