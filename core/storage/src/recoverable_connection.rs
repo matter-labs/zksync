@@ -1,5 +1,5 @@
 // Built-in deps
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::time::Duration;
 // External uses
 use diesel::backend::UsesAnsiSavepointSyntax;
@@ -18,6 +18,8 @@ const RETRY_QUANTILE: Duration = Duration::from_millis(200);
 /// query multiple times in case of database being unavailable for short periods
 /// of time.
 ///
+/// # Retrying Functionality
+///
 /// The design goals of this wrappers are speed and robustness: since most of the times
 /// database will be available, the overhead introduces by this wrapper should not be
 /// big. On the other hand, if the database is unavailable, we only care about restoring
@@ -29,10 +31,21 @@ const RETRY_QUANTILE: Duration = Duration::from_millis(200);
 /// If the connection breaks, we will try to establish a new one (because Diesel can't
 /// restore the existing connection: once it's broken, it's broken) in a loop with an
 /// increasing intervals between attempts.
+///
+/// # Enabling or Disabling
+///
+/// The retrying functionality can be either turned on or off, so the existing connection
+/// can modify its behavior while being used as a part of the connections pool.
+///
+/// More than that, retrying functionality is disabled *by default*, since the Diesel
+/// connection pool can re-create connections on its own, and we don't want the connection
+/// to retry the operation unless it was explicitly enabled. Instead, the `ConnectionPool`
+/// structure manages this setting upon every storage access request.
 pub struct RecoverableConnection<Conn: Connection> {
     database_url: String,
     connection: RefCell<Conn>,
     transaction_manager: AnsiTransactionManager,
+    retrying_enabled: Cell<bool>,
 }
 
 impl<Conn: Connection> SimpleConnection for RecoverableConnection<Conn> {
@@ -54,6 +67,7 @@ where
             database_url: database_url.into(),
             connection: RefCell::new(connection),
             transaction_manager: AnsiTransactionManager::new(),
+            retrying_enabled: Cell::new(false),
         })
     }
 
@@ -105,6 +119,11 @@ where
     where
         F: Fn() -> QueryResult<T>,
     {
+        // If retrying is not enabled, we simply execute the task once.
+        if !self.retrying_enabled.get() {
+            return f();
+        }
+
         for attempt in 1..=RETRIES_AMOUNT {
             match f() {
                 Ok(result) => {
@@ -149,6 +168,17 @@ where
         } else {
             false
         }
+    }
+
+    /// Disables the retrying functionality (effectively making the connection
+    /// the equivalent of the underlying connection).
+    pub fn disable_retrying(&self) {
+        self.retrying_enabled.set(false);
+    }
+
+    /// Enables the retrying functionality.
+    pub fn enable_retrying(&self) {
+        self.retrying_enabled.set(true);
     }
 }
 

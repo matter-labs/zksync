@@ -25,6 +25,7 @@ use models::{fe_from_hex, fe_to_hex};
 use models::{Action, ActionType, EncodedProof, Operation, TokenAddedEvent};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
+use std::ops::Deref;
 use std::time;
 use web3::types::H256;
 
@@ -71,6 +72,15 @@ impl ConnectionPool {
 
     pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
         let connection = self.pool.get()?;
+        connection.deref().enable_retrying();
+
+        Ok(StorageProcessor::from_pool(connection))
+    }
+
+    pub fn access_storage_fragile(&self) -> Result<StorageProcessor, PoolError> {
+        let connection = self.pool.get()?;
+        connection.deref().disable_retrying();
+
         Ok(StorageProcessor::from_pool(connection))
     }
 }
