@@ -25,10 +25,14 @@ use models::{fe_from_hex, fe_to_hex};
 use models::{Action, ActionType, EncodedProof, Operation, TokenAddedEvent};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
+use std::ops::Deref;
 use std::time;
 use web3::types::H256;
 
+mod recoverable_connection;
 mod schema;
+
+use recoverable_connection::RecoverableConnection;
 
 use crate::schema::*;
 
@@ -49,15 +53,16 @@ use web3::types::Address;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
-    pool: Pool<ConnectionManager<PgConnection>>,
+    pool: Pool<ConnectionManager<RecoverableConnection<PgConnection>>>,
 }
 
 impl ConnectionPool {
     pub fn new() -> Self {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let max_size = env::var("DB_POOL_SIZE").unwrap_or_else(|_| "10".to_string());
-        let max_size = max_size.parse().expect("DB_POOL_SIZE must be integer");
-        let manager = ConnectionManager::<PgConnection>::new(database_url);
+        let max_size = env::var("DB_POOL_SIZE")
+            .map(|size| size.parse().expect("DB_POOL_SIZE must be integer"))
+            .unwrap_or(10);
+        let manager = ConnectionManager::<RecoverableConnection<PgConnection>>::new(database_url);
         let pool = Pool::builder()
             .max_size(max_size)
             .build(manager)
@@ -66,8 +71,28 @@ impl ConnectionPool {
         Self { pool }
     }
 
+    /// Creates a `StorageProcessor` entity over a recoverable connection.
+    /// Upon a database outage connection will block the thread until
+    /// it will be able to recover the connection (or, if connection cannot
+    /// be restored after several retries, this will be considered as
+    /// irrecoverable database error and result in panic).
+    ///
+    /// This method is intended to be used in crucial contexts, where the
+    /// database access is must-have (e.g. block committer).
     pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
         let connection = self.pool.get()?;
+        connection.deref().enable_retrying();
+
+        Ok(StorageProcessor::from_pool(connection))
+    }
+
+    /// Creates a `StorageProcessor` entity using non-recoverable connection, which
+    /// will not handle the database outages. This method is intended to be used in
+    /// non-crucial contexts, such as API endpoint handlers.
+    pub fn access_storage_fragile(&self) -> Result<StorageProcessor, PoolError> {
+        let connection = self.pool.get()?;
+        connection.deref().disable_retrying();
+
         Ok(StorageProcessor::from_pool(connection))
     }
 }
@@ -717,8 +742,8 @@ pub struct AccountTransaction {
 }
 
 enum ConnectionHolder {
-    Pooled(PooledConnection<ConnectionManager<PgConnection>>),
-    Direct(PgConnection),
+    Pooled(PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>),
+    Direct(RecoverableConnection<PgConnection>),
 }
 
 pub struct StorageProcessor {
@@ -773,19 +798,21 @@ pub struct StoredAccountState {
 impl StorageProcessor {
     pub fn establish_connection() -> ConnectionResult<Self> {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let connection = PgConnection::establish(&database_url)?; //.expect(&format!("Error connecting to {}", database_url));
+        let connection = RecoverableConnection::establish(&database_url)?; //.expect(&format!("Error connecting to {}", database_url));
         Ok(Self {
             conn: ConnectionHolder::Direct(connection),
         })
     }
 
-    pub fn from_pool(conn: PooledConnection<ConnectionManager<PgConnection>>) -> Self {
+    pub fn from_pool(
+        conn: PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>,
+    ) -> Self {
         Self {
             conn: ConnectionHolder::Pooled(conn),
         }
     }
 
-    fn conn(&self) -> &PgConnection {
+    fn conn(&self) -> &RecoverableConnection<PgConnection> {
         match self.conn {
             ConnectionHolder::Pooled(ref conn) => conn,
             ConnectionHolder::Direct(ref conn) => conn,
