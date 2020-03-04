@@ -141,7 +141,7 @@ deploy-contracts: confirm_action build-contracts
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
-build-contracts: confirm_action
+build-contracts: confirm_action prepare-contracts
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
