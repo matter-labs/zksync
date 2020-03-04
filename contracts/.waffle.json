@@ -11,5 +11,6 @@
     "ganacheOptions": {
         "gasLimit": "7000000", 
         "gasPrice": "0x77359400"
-    }
+    },
+    "fileToSaveSolidityJsonInput": "/tmp/zksync-solidity-input.json"
 }

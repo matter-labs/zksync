@@ -141,21 +141,9 @@ deploy-contracts: confirm_action build-contracts
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
-build-contracts: confirm_action flatten
+build-contracts: confirm_action
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
-
-define flatten_file
-	@cd contracts && scripts/solidityFlattener.pl --mainsol $(1) --outputsol flat/$(1);
-endef
-
-# Flatten contract source
-flatten: prepare-contracts
-	@mkdir -p contracts/flat
-	$(call flatten_file,Franklin.sol)
-	$(call flatten_file,Governance.sol)
-	$(call flatten_file,PriorityQueue.sol)
-	$(call flatten_file,Verifier.sol)
 
 gen-keys-if-not-present:
 	test -f ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol || gen-keys
