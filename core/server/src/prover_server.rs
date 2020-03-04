@@ -22,7 +22,7 @@ struct AppState {
 impl AppState {
     fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor> {
         self.connection_pool
-            .access_storage()
+            .access_storage_fragile()
             .map_err(actix_web::error::ErrorInternalServerError)
     }
 }
