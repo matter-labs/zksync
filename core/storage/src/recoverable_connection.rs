@@ -7,7 +7,6 @@ use diesel::connection::{AnsiTransactionManager, Connection, SimpleConnection};
 use diesel::prelude::*;
 use diesel::query_builder::{AsQuery, QueryFragment, QueryId};
 use diesel::query_source::QueryableByName;
-use diesel::result::Error as DieselError;
 use diesel::types::HasSqlType;
 
 const RETRIES_AMOUNT: usize = 10;
@@ -129,12 +128,15 @@ where
                 Ok(result) => {
                     return Ok(result);
                 }
-                Err(error) if self.is_db_connection_error(&error) => {
+                Err(error) => {
+                    // In case of error encountered, we're gonna retry the connection, since
+                    // most likely the error is caused by some issue with the database server.
                     log::warn!(
-                        "Error connecting database ({}), retry attempt #{}",
+                        "Error while interacting with database ({}), retry attempt #{}",
                         error,
                         attempt
                     );
+
                     std::thread::sleep(scale_retry_period(attempt));
                     if let Ok(conn) = Conn::establish(self.database_url.as_ref()) {
                         log::info!(
@@ -144,30 +146,11 @@ where
                         *self.connection.borrow_mut() = conn;
                     }
                 }
-                Err(other) => {
-                    // Not a connection issue, so it's none of our business.
-                    // Just propagate it.
-                    return Err(other);
-                }
             }
         }
 
         // At this point we are sure that database is down, we cannot work without a database.
         panic!("Cannot connect to the database after several retries, it is probably down");
-    }
-
-    /// Checks whether occurred error is the database connection issue.
-    fn is_db_connection_error(&self, error: &DieselError) -> bool {
-        if let DieselError::DatabaseError(_kind, info) = error {
-            let msg = info.message();
-
-            // We have to compare the string message representation, because `Diesel` doesn't have
-            // clear error kinds associated with these errors.
-            msg.starts_with("server closed the connection unexpectedly")
-                || msg.starts_with("no connection to the server")
-        } else {
-            false
-        }
     }
 
     /// Disables the retrying functionality (effectively making the connection
