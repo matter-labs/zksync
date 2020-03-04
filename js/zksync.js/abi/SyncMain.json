@@ -330,6 +330,11 @@
           "internalType": "bytes32",
           "name": "stateRoot",
           "type": "bytes32"
+        },
+        {
+          "internalType": "uint32",
+          "name": "chunks",
+          "type": "uint32"
         }
       ],
       "payable": false,
@@ -458,11 +463,6 @@
           "internalType": "uint16",
           "name": "_tokenId",
           "type": "uint16"
-        },
-        {
-          "internalType": "address",
-          "name": "_owner",
-          "type": "address"
         },
         {
           "internalType": "uint128",
@@ -748,6 +748,21 @@
       ],
       "payable": false,
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [],
+      "name": "triggerExodusIfNeeded",
+      "outputs": [
+        {
+          "internalType": "bool",
+          "name": "",
+          "type": "bool"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

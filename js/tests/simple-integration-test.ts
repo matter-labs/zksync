@@ -178,7 +178,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     const syncWalletRich = await Wallet.fromEthSigner(ethWallet, syncProvider);
 
     const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
-    await (await ethWallet.sendTransaction({to: syncWalletSigner.address, value: parseEther("0.5")}));
+    await (await ethWallet.sendTransaction({to: syncWalletSigner.address, value: parseEther("0.01")}));
     const syncWallet = await Wallet.fromEthSigner(
         syncWalletSigner,
         syncProvider,
@@ -191,14 +191,14 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     );
 
     const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-    await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.5")}));
+    await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.01")}));
     const syncWallet2 = await Wallet.fromEthSigner(
         ethWallet2,
         syncProvider,
     );
 
     const ethWallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
-    await (await ethWallet.sendTransaction({to: ethWallet3.address, value: parseEther("0.05")}));
+    await (await ethWallet.sendTransaction({to: ethWallet3.address, value: parseEther("0.01")}));
     const syncWallet3 = await Wallet.fromEthSigner(
         ethWallet3,
         syncProvider,
