@@ -2226,6 +2226,14 @@ impl StorageProcessor {
         Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
     }
 
+    pub fn token_symbol_from_id(&self, token: TokenId) -> QueryResult<Option<String>> {
+        Ok(tokens::table
+            .find(i32::from(token))
+            .first::<Token>(self.conn())
+            .optional()?
+            .map(|t| t.symbol))
+    }
+
     // Data restore part
 
     fn save_operation(&self, op: &Operation) -> QueryResult<()> {

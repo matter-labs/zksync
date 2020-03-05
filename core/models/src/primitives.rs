@@ -1,4 +1,5 @@
 // Built-in deps
+use std::collections::VecDeque;
 use std::convert::TryInto;
 use std::str::FromStr;
 // External deps
@@ -462,6 +463,25 @@ pub fn bytes32_from_slice(bytes: &[u8]) -> Option<[u8; 32]> {
     let bytes = &bytes[..array.len()];
     array.copy_from_slice(bytes);
     Some(array)
+}
+
+pub fn format_ether_simple(wei: &str) -> String {
+    const N_DECIMAL: usize = 18;
+    let mut chars = wei.chars().collect::<VecDeque<char>>();
+    while chars.len() < N_DECIMAL {
+        chars.push_front('0');
+    }
+    chars.insert(chars.len() - N_DECIMAL, '.');
+    if *chars.front().unwrap() == '.' {
+        chars.push_front('0');
+    }
+    while *chars.back().unwrap() == '0' {
+        chars.pop_back();
+    }
+    if *chars.back().unwrap() == '.' {
+        chars.push_back('0');
+    }
+    chars.iter().collect()
 }
 
 #[cfg(test)]

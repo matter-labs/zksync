@@ -9,8 +9,10 @@ use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::config_options::ThreadPanicNotify;
+use models::node::tx::PackedEthSignature;
 use models::node::tx::TxHash;
 use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
+use models::primitives::format_ether_simple;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use storage::{ConnectionPool, StorageProcessor, Token};
@@ -99,6 +101,7 @@ pub trait Rpc {
     fn tx_submit(
         &self,
         tx: FranklinTx,
+        signature_string: Option<String>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
@@ -124,6 +127,80 @@ impl RpcApp {
         self.connection_pool
             .access_storage_fragile()
             .map_err(|_| Error::internal_error())
+    }
+
+    fn token_symbol_from_id(&self, token: TokenId) -> Result<String> {
+        self.access_storage()?
+            .token_symbol_from_id(token)
+            .map_err(|_| Error::internal_error())?
+            .ok_or(Error {
+                code: 120.into(),
+                message: "No such token registered".into(),
+                data: None,
+            })
+    }
+
+    fn get_message_to_sign_for_tx(&self, tx: &FranklinTx) -> Result<Option<String>> {
+        match tx {
+            FranklinTx::Transfer(tx) => Ok(Some(format!(
+                "Transfer {} {}\nTo: {:?}\nNonce: {}",
+                format_ether_simple(&tx.amount.to_string()),
+                self.token_symbol_from_id(tx.token)?,
+                tx.to,
+                tx.nonce,
+            ))),
+            FranklinTx::Withdraw(tx) => Ok(Some(format!(
+                "Withdraw {} {}\nTo: {:?}\nNonce: {}",
+                format_ether_simple(&tx.amount.to_string()),
+                self.token_symbol_from_id(tx.token)?,
+                tx.to,
+                tx.nonce,
+            ))),
+            _ => Ok(None),
+        }
+    }
+
+    /// if it doesn't return error, signature is verified
+    fn verify_message_signature_for_tx(
+        &self,
+        tx: &FranklinTx,
+        signature_string: Option<String>,
+    ) -> Result<()> {
+        let rpc_message = |message: String| Error {
+            code: 121.into(),
+            message,
+            data: None,
+        };
+
+        match self.get_message_to_sign_for_tx(&tx)? {
+            Some(message_to_sign) => {
+                let packed_signature = signature_string
+                    .ok_or_else(|| rpc_message("Signature required".into()))
+                    .and_then(|s| {
+                        if s.len() != 132 {
+                            return Err(rpc_message(
+                                "Signature must be 132 character hex string".into(),
+                            ));
+                        }
+                        hex::decode(&s[2..]).map_err(|e| rpc_message(e.to_string()))
+                    })
+                    .and_then(|b| {
+                        PackedEthSignature::deserialize_packed(&b)
+                            .map_err(|e| rpc_message(e.to_string()))
+                    })?;
+
+                let signer = packed_signature
+                    .signature_recover_signer(message_to_sign.as_bytes())
+                    .map_err(|e| rpc_message(e.to_string()))?;
+
+                if signer == tx.account() {
+                    Ok(())
+                } else {
+                    Err(rpc_message("Signature verification failed".into()))
+                }
+            }
+            None => Ok(()),
+        }
     }
 }
 
@@ -238,6 +315,7 @@ impl Rpc for RpcApp {
     fn tx_submit(
         &self,
         tx: FranklinTx,
+        signature_string: Option<String>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send> {
         if tx.is_close() {
             return Box::new(futures01::future::err(Error {
@@ -245,6 +323,10 @@ impl Rpc for RpcApp {
                 message: "Account close tx is disabled.".to_string(),
                 data: None,
             }));
+        }
+
+        if let Err(error) = self.verify_message_signature_for_tx(&tx, signature_string) {
+            return Box::new(futures01::future::err(error));
         }
 
         let mut mempool_sender = self.mempool_request_sender.clone();

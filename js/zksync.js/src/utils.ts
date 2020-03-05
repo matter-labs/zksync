@@ -303,3 +303,22 @@ export class TokenSet {
         return this.resolveTokenObject(tokenLike).symbol;
     }
 }
+
+export function formatEtherSimple(wei: string) {
+    const N_DECIMAL = 18;
+    let chars = wei.split('');
+    while (chars.length < N_DECIMAL) {
+        chars.unshift('0');
+    }
+    chars.splice(chars.length - N_DECIMAL, 0, '.');
+    if (chars[0] == '.') {
+        chars.unshift('0');
+    }
+    while (chars[chars.length - 1] == '0') {
+        chars.pop();
+    }
+    if (chars[chars.length - 1] == '.') {
+        chars.push('0');
+    }
+    return chars.join('');
+}
