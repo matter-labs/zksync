@@ -6,17 +6,10 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./Operations.sol";
 
-import "./UpgradeMode.sol";
 
 /// @title zkSync storage contract
 /// @author Matter Labs
 contract Storage {
-
-    /// @notice UpgradeMode contract
-    UpgradeMode upgradeMode;
-
-    /// @notice Number of priority requests that must be processed at the time of finishing upgrade
-    uint64 requestsToProcessBeforeUpgrade;
 
     /// @notice Verifier contract. Used to verify block proof and exit proof
     Verifier internal verifier;

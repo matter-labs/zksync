@@ -1,7 +1,6 @@
 pragma solidity 0.5.16;
 
 import "./VerificationKey.sol";
-import "./UpgradeMode.sol";
 
 
 /// @title Verifier Contract
@@ -10,21 +9,14 @@ import "./UpgradeMode.sol";
 /// @author Matter Labs
 contract Verifier is VerificationKey {
 
-    /// @notice UpgradeMode contract
-    UpgradeMode upgradeMode;
-
     /// @notice If this flag is true - dummy verification is used instead of full verifier
     bool constant DUMMY_VERIFIER = false;
 
     /// @notice Verifier contract initialization
-    /// @param upgradeModeAddress Address of UpgradeMode contract
     /// @param initializationParameters Encoded representation of initialization parameters
     function initialize(
-        address upgradeModeAddress,
         bytes calldata initializationParameters
     ) external {
-        upgradeMode = UpgradeMode(upgradeModeAddress);
-
         // parameters are not used during initialization
     }
 

@@ -30,18 +30,14 @@ contract Franklin is Storage, Config, Events {
     // mapping (uint32 => bool) tokenMigrated;
 
     /// @notice Franklin contract initialization
-    /// @param upgradeModeAddress Address of UpgradeMode contract
     /// @param initializationParameters Encoded representation of initialization parameters:
         /// _governanceAddress The address of Governance contract
         /// _verifierAddress The address of Verifier contract
         /// _ // FIXME: remove _genesisAccAddress
         /// _genesisRoot Genesis blocks (first block) root
     function initialize(
-        address upgradeModeAddress,
         bytes calldata initializationParameters
     ) external {
-        upgradeMode = UpgradeMode(upgradeModeAddress);
-
         (
         address _governanceAddress,
         address _verifierAddress,
@@ -53,13 +49,6 @@ contract Franklin is Storage, Config, Events {
         governance = Governance(_governanceAddress);
 
         blocks[0].stateRoot = _genesisRoot;
-    }
-
-    /// @notice Checks that contract is ready to be upgraded
-    /// Ensures that all full exit requests received while waiting for the upgrade will be processed before finishing upgrade
-    /// @return Bool flag indicating that contract is ready to be upgraded
-    function readyToBeUpgraded() external view returns (bool) {
-        return !exodusMode && (firstPriorityRequestId >= requestsToProcessBeforeUpgrade);
     }
 
     /// @notice executes pending withdrawals
@@ -719,10 +708,6 @@ contract Franklin is Storage, Config, Events {
         );
 
         totalOpenPriorityRequests++;
-
-        if (_opType == Operations.OpType.FullExit && !upgradeMode.isFinalizeStatusActive()) {
-            requestsToProcessBeforeUpgrade = firstPriorityRequestId + totalOpenPriorityRequests;
-        }
     }
 
     /// @notice Collects fees from provided requests number for the block validator, store it on her

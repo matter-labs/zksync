@@ -53,33 +53,33 @@ contract Events {
     );
 }
 
-/// @title Upgrade mode events
+/// @title Upgrade events
 /// @author Matter Labs
-contract UpgradeModeEvents {
+contract UpgradeEvents {
 
     /// @notice Upgrade mode enter event
     event UpgradeModeActivated(
+        address proxyAddress,
         uint64 version
     );
 
     /// @notice Upgrade mode cancel event
     event UpgradeCanceled(
+        address proxyAddress,
         uint64 version
     );
 
     /// @notice Upgrade mode finalize status event
     event UpgradeModeFinalizeStatusActivated(
-        uint64 version
-    );
-
-    /// @notice Upgrade mode force cancellation event
-    event UpgradeForciblyCanceled(
+        address proxyAddress,
         uint64 version
     );
 
     /// @notice Upgrade mode complete event
     event UpgradeCompleted(
-        uint64 version
+        address proxyAddress,
+        uint64 version,
+        address newTargetAddress
     );
 
 }

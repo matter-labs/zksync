@@ -6,9 +6,6 @@ const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils
 const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20");
 const abi = require('ethereumjs-abi')
 
-/// Skipping slow tests
-const SKIP_TEST = false;
-
 // For: geth
 
 // const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
@@ -47,7 +44,7 @@ async function deployProxyContract(
             gasLimit: 3000000,
         });
         const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const tx = await proxy.initialize(contract.address, initArgsInBytes);
+        const tx = await proxy.initializeTarget(contract.address, initArgsInBytes);
         await tx.wait();
 
         const returnContract = new ethers.Contract(proxy.address, contractCode.interface, wallet);
@@ -78,5 +75,4 @@ module.exports = {
     deployProxyContract,
     getCallRevertReason,
     IERC20_INTERFACE,
-    SKIP_TEST,
 }

@@ -4,9 +4,13 @@ interface DummyTarget {
 
     function get_DUMMY_INDEX() external pure returns (uint256);
 
-    function initialize(address _address, bytes calldata _initializationParameters) external;
+    function initialize(bytes calldata initializationParameters) external;
 
-    function readyToBeUpgraded() external returns (bool);
+    function verifiedPriorityOperations() external returns (uint64);
+
+    function registeredPriorityOperations() external returns (uint64);
+
+    function verifyPriorityOperation() external;
 
 }
 
@@ -17,19 +21,27 @@ contract DummyFirst is DummyTarget {
         return DUMMY_INDEX;
     }
 
-    function initialize(address _address, bytes calldata _initializationParameters) external {
-        bytes memory initializationParameters = _initializationParameters;
+    uint64 _verifiedPriorityOperations;
+
+    function initialize(bytes calldata initializationParameters) external {
         bytes32 byte_0 = bytes32(uint256(uint8(initializationParameters[0])));
         bytes32 byte_1 = bytes32(uint256(uint8(initializationParameters[1])));
         assembly {
-            sstore(0, _address)
             sstore(1, byte_0)
             sstore(2, byte_1)
         }
     }
 
-    function readyToBeUpgraded() external returns (bool) {
-        return true;
+    function verifiedPriorityOperations() external returns (uint64){
+        return _verifiedPriorityOperations;
+    }
+
+    function registeredPriorityOperations() external returns (uint64){
+        return 1;
+    }
+
+    function verifyPriorityOperation() external {
+        _verifiedPriorityOperations++;
     }
 
 }
@@ -41,19 +53,27 @@ contract DummySecond is DummyTarget {
         return DUMMY_INDEX;
     }
 
-    function initialize(address _address, bytes calldata _initializationParameters) external {
-        bytes memory initializationParameters = _initializationParameters;
+    uint64 _verifiedPriorityOperations;
+
+    function initialize(bytes calldata initializationParameters) external {
         bytes32 byte_0 = bytes32(uint256(uint8(initializationParameters[0])));
         bytes32 byte_1 = bytes32(uint256(uint8(initializationParameters[1])));
         assembly {
-            sstore(0, _address)
             sstore(2, byte_0)
             sstore(3, byte_1)
         }
     }
 
-    function readyToBeUpgraded() external returns (bool) {
-        return false;
+    function verifiedPriorityOperations() external returns (uint64){
+        return _verifiedPriorityOperations;
+    }
+
+    function registeredPriorityOperations() external returns (uint64){
+        return 0;
+    }
+
+    function verifyPriorityOperation() external {
+        _verifiedPriorityOperations++;
     }
 
 }

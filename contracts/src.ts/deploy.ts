@@ -109,59 +109,6 @@ export async function deployProxy(
     }
 }
 
-// note that this upgrade must be finished later
-export async function upgradeContract(
-    wallet,
-    proxyContract,
-    newTargetAddress,
-) {
-    try {
-        const proxy = new ethers.Contract(proxyContract.address, proxyContractCode.interface, wallet);
-        const tx = await proxy.upgradeTarget(newTargetAddress);
-        await tx.wait();
-
-        return true;
-    } catch (err) {
-        return false;
-    }
-}
-
-// cancels upgrade
-export async function cancelUpgrade(
-    wallet,
-    proxyContract,
-) {
-    try {
-        const proxy = new ethers.Contract(proxyContract.address, proxyContractCode.interface, wallet);
-        const tx = await proxy.cancelUpgradeTarget();
-        await tx.wait();
-
-        return true;
-    } catch (err) {
-        return false;
-    }
-}
-
-// trying to finish the upgrade
-export async function finishUpgrade(
-    wallet,
-    proxyContract,
-    initArgs,
-    initArgsValues,
-) {
-    try {
-        const proxy = new ethers.Contract(proxyContract.address, proxyContractCode.interface, wallet);
-
-        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const tx = await proxy.finishTargetUpgrade(initArgsInBytes);
-        await tx.wait();
-
-        return true;
-    } catch (err) {
-        return false;
-    }
-}
-
 export async function deployGovernance(
     wallet,
     proxyCode,
@@ -175,7 +122,7 @@ export async function deployGovernance(
             gasLimit: 3000000,
         });
         const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const tx = await proxy.initialize(governance.address, initArgsInBytes);
+        const tx = await proxy.initializeTarget(governance.address, initArgsInBytes);
         await tx.wait();
 
         const returnContract = new ethers.Contract(proxy.address, governanceCode.interface, wallet);
@@ -198,7 +145,7 @@ export async function deployVerifier(
             gasLimit: 3000000,
         });
         const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const tx = await proxy.initialize(verifier.address, initArgsInBytes);
+        const tx = await proxy.initializeTarget(verifier.address, initArgsInBytes);
         await tx.wait();
 
         const returnContract = new ethers.Contract(proxy.address, verifierCode.interface, wallet);
@@ -232,7 +179,7 @@ export async function deployFranklin(
                 gasLimit: 6000000,
             });
         const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const initTx = await proxy.initialize(contract.address, initArgsInBytes);
+        const initTx = await proxy.initializeTarget(contract.address, initArgsInBytes);
         await initTx.wait();
 
         const returnContract = new ethers.Contract(proxy.address, franklinCode.interface, wallet);

@@ -1,7 +1,6 @@
 pragma solidity 0.5.16;
 
 import "../generated/FranklinTest.sol";
-import "../generated/UpgradeModeTest.sol";
 
 
 contract ZKSyncUnitTest is FranklinTest {
@@ -13,7 +12,6 @@ contract ZKSyncUnitTest is FranklinTest {
         bytes32 _genesisRoot
     ) FranklinTest() public{
         /// initialization
-        upgradeMode = new UpgradeModeTest();
 
         verifier = VerifierTest(_verifierAddress);
         governance = GovernanceTest(_governanceAddress);
