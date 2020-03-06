@@ -35,7 +35,6 @@ ssed 's/StorageTest/Storage/' -i $OUT_DIR/UpgradeableTest.sol
 # Workaround -> upgrade module has Proxy in method name.
 ssed 's/upgradeProxyTest/upgradeProxy/' -i $OUT_DIR/UpgradeModuleTest.sol
 ssed 's/cancelProxyTestUpgrade/cancelProxyUpgrade/' -i $OUT_DIR/UpgradeModuleTest.sol
-ssed 's/forceCancelProxyTestUpgrade/forceCancelProxyUpgrade/' -i $OUT_DIR/UpgradeModuleTest.sol
 ssed 's/finishProxyTestUpgrade/finishProxyUpgrade/' -i $OUT_DIR/UpgradeModuleTest.sol
 
 
