@@ -14,6 +14,7 @@ use models::node::block::{ExecutedPriorityOp, ExecutedTx};
 use models::node::{AccountId, BlockNumber, FranklinOp, FranklinTx, PriorityOp};
 use models::{Action, ActionType, Operation};
 // Local imports
+use crate::interfaces::prover::ProverInterface;
 use crate::schema::*;
 
 // TODO this module should not know about storage processor.
