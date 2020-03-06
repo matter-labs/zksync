@@ -9,10 +9,11 @@ use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::config_options::ThreadPanicNotify;
+use models::misc::constants::ETH_SIGNATURE_HEX_LENGTH;
+use models::misc::utils::format_ether;
 use models::node::tx::PackedEthSignature;
 use models::node::tx::TxHash;
 use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
-use models::primitives::format_ether_simple;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::string::ToString;
@@ -177,14 +178,14 @@ impl RpcApp {
         match tx {
             FranklinTx::Transfer(tx) => Ok(Some(format!(
                 "Transfer {} {}\nTo: {:?}\nNonce: {}",
-                format_ether_simple(&tx.amount.to_string()),
+                format_ether(&tx.amount),
                 self.token_symbol_from_id(tx.token)?,
                 tx.to,
                 tx.nonce,
             ))),
             FranklinTx::Withdraw(tx) => Ok(Some(format!(
                 "Withdraw {} {}\nTo: {:?}\nNonce: {}",
-                format_ether_simple(&tx.amount.to_string()),
+                format_ether(&tx.amount),
                 self.token_symbol_from_id(tx.token)?,
                 tx.to,
                 tx.nonce,
@@ -220,8 +221,11 @@ impl RpcApp {
                 let packed_signature = signature_string
                     .ok_or_else(|| rpc_message("Signature required"))
                     .and_then(|s| {
-                        if s.len() != 132 {
-                            return Err(rpc_message("Signature must be 132 character hex string"));
+                        if s.len() != ETH_SIGNATURE_HEX_LENGTH {
+                            return Err(rpc_message(format!(
+                                "Signature must be {} character hex string",
+                                ETH_SIGNATURE_HEX_LENGTH
+                            )));
                         }
                         hex::decode(&s[2..]).map_err(rpc_message)
                     })
