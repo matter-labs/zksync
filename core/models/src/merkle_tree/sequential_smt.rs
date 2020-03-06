@@ -421,10 +421,10 @@ mod tests {
         impl BenchStats {
             pub fn add_time(&mut self, time: time::Duration) {
                 if self.min_time.unwrap_or(time) >= time {
-                    self.min_time = Some(time.clone());
+                    self.min_time = Some(time);
                 }
                 if self.max_time.unwrap_or(time) <= time {
-                    self.max_time = Some(time.clone());
+                    self.max_time = Some(time);
                 }
 
                 self.overall += time;
