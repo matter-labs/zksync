@@ -1,9 +1,10 @@
-use diesel::pg::PgConnection;
-use diesel::r2d2::{ConnectionManager, Pool, PoolError};
-
+// Built-in deps
 use std::env;
 use std::ops::Deref;
-
+// External imports
+use diesel::pg::PgConnection;
+use diesel::r2d2::{ConnectionManager, Pool, PoolError};
+// Local imports
 use crate::recoverable_connection::RecoverableConnection;
 use crate::StorageProcessor;
 

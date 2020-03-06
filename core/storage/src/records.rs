@@ -2,21 +2,19 @@
 //! of the tables. Each structure is associated with one of the tables
 //! used in project and is used to interact with the database.
 
+// External imports
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
-
+use diesel::prelude::*;
+use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
+use serde_derive::{Deserialize, Serialize};
+use serde_json::value::Value;
+// Workspace imports
 use models::node::block::{ExecutedPriorityOp, ExecutedTx};
 use models::node::{AccountId, BlockNumber, FranklinOp, FranklinTx, PriorityOp};
 use models::{Action, ActionType, Operation};
-use serde_derive::{Deserialize, Serialize};
-
+// Local imports
 use crate::schema::*;
-
-use diesel::prelude::*;
-
-use serde_json::value::Value;
-
-use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
 
 // TODO this module should not know about storage processor.
 use super::StorageProcessor;

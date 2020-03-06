@@ -1,4 +1,4 @@
-// Std imports
+// Built-in deps
 use std::cmp::Ordering;
 // External imports
 use web3::types::Address;

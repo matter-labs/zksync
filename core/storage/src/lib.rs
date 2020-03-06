@@ -6,12 +6,12 @@
 //!
 //! This way we have the following advantages:
 //! 1) Easy access to state for any block (useful for provers which work on different blocks)
-//! 2) We can rewind any `commited` state (which is not final)
+//! 2) We can rewind any `committed` state (which is not final)
 
 #[macro_use]
 extern crate diesel;
 
-// Std imports
+// Built-in deps
 use std::cmp;
 use std::collections::HashMap;
 use std::env;
