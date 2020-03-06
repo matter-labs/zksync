@@ -18,13 +18,12 @@ use std::env;
 use std::time;
 // External imports
 use bigdecimal::BigDecimal;
-use diesel::dsl::*;
+use diesel::dsl::{count_star, delete, insert_into, max, now, sql_query, update};
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 use diesel::sql_types::Text;
 use itertools::Itertools;
-use log::*;
 use serde_json::value::Value;
 use web3::types::Address;
 use web3::types::H256;
@@ -242,7 +241,7 @@ impl StorageProcessor {
         if let Some(tx) = tx {
             let block_number = tx.block_number;
             let operation = tx.operation.unwrap_or_else(|| {
-                debug!("operation empty in executed_transactions");
+                log::debug!("operation empty in executed_transactions");
                 Value::default()
             });
 
@@ -608,9 +607,10 @@ impl StorageProcessor {
     ) -> QueryResult<()> {
         self.conn().transaction(|| {
             for (update_order_id, (id, upd)) in accounts_updated.iter().enumerate() {
-                debug!(
+                log::debug!(
                     "Committing state update for account {} in block {}",
-                    id, block_number
+                    id,
+                    block_number
                 );
                 match *upd {
                     AccountUpdate::Create { ref address, nonce } => {
@@ -680,7 +680,7 @@ impl StorageProcessor {
     }
 
     pub fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
-        info!("Applying state update for block: {}", block_number);
+        log::info!("Applying state update for block: {}", block_number);
         self.conn().transaction(|| {
             let account_balance_diff = account_balance_updates::table
                 .filter(account_balance_updates::block_number.eq(&(i64::from(block_number))))
@@ -715,7 +715,7 @@ impl StorageProcessor {
                 account_diff
             };
 
-            debug!("Sorted account update list: {:?}", account_updates);
+            log::debug!("Sorted account update list: {:?}", account_updates);
 
             for acc_update in account_updates.into_iter() {
                 match acc_update {
@@ -775,14 +775,15 @@ impl StorageProcessor {
     pub fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
         self.conn().transaction(|| {
             let (verif_block, mut accounts) = self.load_verified_state()?;
-            debug!(
+            log::debug!(
                 "Verified state block: {}, accounts: {:#?}",
-                verif_block, accounts
+                verif_block,
+                accounts
             );
 
             // Fetch updates from blocks: verif_block +/- 1, ... , block
             if let Some((block, state_diff)) = self.load_state_diff(verif_block, block)? {
-                debug!("Loaded state diff: {:#?}", state_diff);
+                log::debug!("Loaded state diff: {:#?}", state_diff);
                 apply_updates(&mut accounts, state_diff);
                 Ok((block, accounts))
             } else {
@@ -861,15 +862,15 @@ impl StorageProcessor {
                 )
                 .load::<StorageAccountPubkeyUpdate>(self.conn())?;
 
-            debug!(
+            log::debug!(
                 "Loading state diff: forward: {}, start_block: {}, end_block: {}, unbounded: {}",
                 time_forward,
                 start_block,
                 end_block,
                 to_block.is_none()
             );
-            debug!("Loaded account balance diff: {:#?}", account_balance_diff);
-            debug!("Loaded account creation diff: {:#?}", account_creation_diff);
+            log::debug!("Loaded account balance diff: {:#?}", account_balance_diff);
+            log::debug!("Loaded account creation diff: {:#?}", account_creation_diff);
 
             let (mut account_updates, last_block) = {
                 let mut account_diff = Vec::new();
