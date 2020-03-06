@@ -8,6 +8,7 @@ use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 
 use super::hasher::Hasher;
 use crate::primitives::BitIteratorLe;
+
 #[derive(Clone)]
 pub struct PedersenHasher<E: JubjubEngine> {
     params: &'static E::Params,
