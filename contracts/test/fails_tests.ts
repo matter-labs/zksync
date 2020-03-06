@@ -1,28 +1,21 @@
-import { ethers } from "ethers";
+import {ethers} from "ethers";
 import {
     addTestERC20Token,
     addTestNotApprovedERC20Token,
-    deployFranklin,
-    deployGovernance,
-    deployPriorityQueue,
-    deployVerifier,
-    franklinTestContractCode,
-    governanceTestContractCode,
     mintTestERC20Token,
-    priorityQueueTestContractCode,
-    verifierTestContractCode,
+    Deployer,
 } from "../src.ts/deploy";
-import { expect, use } from "chai";
-import { solidity } from "ethereum-waffle";
-import { bigNumberify, hexlify, parseEther } from "ethers/utils";
+import {expect, use} from "chai";
+const { createMockProvider, getWallets, solidity } = require("ethereum-waffle");
+import {bigNumberify, hexlify, parseEther} from "ethers/utils";
 import {
-    cancelOustandingDepositsForExodus,
+    cancelOustandingDepositsForExodus, CHUNKS_SIZE,
     createDepositPublicData,
     createNoopPublicData,
     createWrongDepositPublicData,
     createWrongNoopPublicData,
     createWrongOperationPublicData,
-    hex_to_ascii,
+    hex_to_ascii, OPERATIONS,
     postBlockCommit,
     postBlockVerify,
     postErc20Deposit,
@@ -34,15 +27,26 @@ import {
 
 use(solidity);
 
-const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+// For: geth
+
+// const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
+// const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+// const exitWallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/2").connect(provider);
+
+// For: ganache
+
+const provider = createMockProvider() //{gasLimit: 7000000, gasPrice: 2000000000});
+const [wallet, exitWallet]  = getWallets(provider);
+
 const franklinAddress = "0809101112131415161718192021222334252627";
 const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
+const PRIORITY_QUEUE_EXIRATION = 16;
 
 describe("PLANNED FAILS", function () {
     this.timeout(100000);
+    provider.pollingInterval = 100; // faster deploys/txs on localhost
 
+    const deployer = new Deployer(wallet, true);
     let franklinDeployedContract;
     let governanceDeployedContract;
     let verifierDeployedContract;
@@ -52,31 +56,17 @@ describe("PLANNED FAILS", function () {
 
     beforeEach(async () => {
         console.log("---\n");
-        verifierDeployedContract = await deployVerifier(wallet, verifierTestContractCode, []);
-        governanceDeployedContract = await deployGovernance(wallet, governanceTestContractCode, [wallet.address]);
-        priorityQueueDeployedContract = await deployPriorityQueue(
-            wallet,
-            priorityQueueTestContractCode,
-            [governanceDeployedContract.address]
-        );
-        franklinDeployedContract = await deployFranklin(
-            wallet,
-            franklinTestContractCode,
-            [
-                governanceDeployedContract.address,
-                verifierDeployedContract.address,
-                priorityQueueDeployedContract.address,
-                wallet.address,
-                ethers.constants.HashZero,
-            ],
-        );
+        verifierDeployedContract = await deployer.deployVerifier();
+        governanceDeployedContract = await deployer.deployGovernance();
+        priorityQueueDeployedContract = await deployer.deployPriorityQueue();
+        franklinDeployedContract = await deployer.deployFranklin();
         await governanceDeployedContract.setValidator(wallet.address, true);
         erc20DeployedToken1 = await addTestERC20Token(wallet, governanceDeployedContract);
         erc20DeployedToken2 = await addTestNotApprovedERC20Token(wallet);
         await mintTestERC20Token(wallet, erc20DeployedToken1);
         await mintTestERC20Token(wallet, erc20DeployedToken2);
         // Make sure that exit wallet can execute transactions.
-        await wallet.sendTransaction({ to: exitWallet.address, value: parseEther("1.0") });
+        await wallet.sendTransaction({to: exitWallet.address, value: parseEther("1.0")});
     });
 
     it("Onchain errors", async () => {
@@ -165,18 +155,12 @@ describe("PLANNED FAILS", function () {
         console.log("\n - Full Exit: Wrong token address started");
         const value = parseEther("0.3"); // the value passed to tx
         const accountId = 0;
-        const pubKey = "0x0000000000000000000000000000000000000000000000000000000000000000";
-        const signature = "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-        const nonce = 0;
         await postFullExit(
             provider,
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accountId,
-            pubKey,
             erc20DeployedToken2.address,
-            signature,
-            nonce,
             value,
             "gvs11",
         );
@@ -190,34 +174,47 @@ describe("PLANNED FAILS", function () {
             franklinDeployedContract,
             priorityQueueDeployedContract,
             accountId,
-            pubKey,
             erc20DeployedToken1.address,
-            signature,
-            nonce,
             wrongValue,
             "fft11",
         );
         console.log(" + Full Exit: Wrong tx value (lower than fee) passed");
 
-        // Full Exit: Wrong signature length
-        console.log("\n - Full Exit: Wrong signature length started");
-        const wrongSignature = "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-        await postFullExit(
-            provider,
-            franklinDeployedContract,
-            priorityQueueDeployedContract,
-            accountId,
-            pubKey,
-            erc20DeployedToken1.address,
-            wrongSignature,
-            nonce,
-            value,
-            "fft12",
-        );
-        console.log(" + Full Exit: Wrong signature length passed");
     });
 
-    it("Enter Exodus Mode", async () => {
+    it("Enter Exodus Mode external caller", async () => {
+        const depositValue = parseEther("10");
+        const depositAmount = parseEther("9.996778");
+        const depositFee = parseEther("0.003222");
+        await postEthDeposit(
+            provider,
+            wallet,
+            franklinDeployedContract,
+            priorityQueueDeployedContract,
+            depositAmount,
+            depositFee,
+            franklinAddress,
+            depositValue,
+            null,
+        );
+        const blockNumberSinceLastDeposit = await provider.getBlockNumber();
+
+        let tx = await (await franklinDeployedContract.triggerExodusIfNeeded()).wait();
+        let isExodusTriggered = await franklinDeployedContract.exodusMode();
+        expect(tx.status, "Asking for exodus should succeed").eq(1);
+        expect(isExodusTriggered, "Exodus should not be triggered").eq(false);
+
+        while (await provider.getBlockNumber() - blockNumberSinceLastDeposit < PRIORITY_QUEUE_EXIRATION) {
+            await new Promise((r) => setTimeout(r, 300));
+        }
+
+        tx = await (await franklinDeployedContract.triggerExodusIfNeeded()).wait();
+        isExodusTriggered = await franklinDeployedContract.exodusMode();
+        expect(tx.status, "Asking for exodus should succeed").eq(1);
+        expect(isExodusTriggered, "Exodus should be triggered after priority expiration").eq(true);
+    });
+
+    it("Enter Exodus Mode with commit", async () => {
         console.log("\n - test Exodus Mode started");
 
         let depositsToCancel;
@@ -226,6 +223,7 @@ describe("PLANNED FAILS", function () {
         const depositAmount = parseEther("9.996778"); // amount after: tx value - some counted fee
         const depositFee = parseEther("0.003222"); // tx fee
 
+        let blockNumberSinceLastDeposit = await provider.getBlockNumber();
         for (let i = 0; i < 5; i++) {
             await postEthDeposit(
                 provider,
@@ -238,6 +236,7 @@ describe("PLANNED FAILS", function () {
                 depositValue,
                 null,
             );
+            blockNumberSinceLastDeposit = await provider.getBlockNumber();
             console.log(`Posted ${i + 1} deposit`);
         }
 
@@ -254,7 +253,12 @@ describe("PLANNED FAILS", function () {
             "frc11",
         );
 
-        console.log("Got revert code when there is not exodus mode");
+        console.log("Cancel deposits before exodus is triggered failed, ok");
+
+
+        while (await provider.getBlockNumber() - blockNumberSinceLastDeposit < PRIORITY_QUEUE_EXIRATION) {
+            await new Promise((r) => setTimeout(r, 300));
+        }
 
         // Get commit exodus mode revert code
         const noopBlockPublicData = createNoopPublicData();
@@ -269,16 +273,15 @@ describe("PLANNED FAILS", function () {
             null,
             null,
             null,
-            "fre11",
+            null,
+            true,
         );
-
-        console.log("Got exodus mode commit tx revert code while creating block");
 
         // Get commit exodus event
         const exodus = await franklinDeployedContract.exodusMode();
-        expect(exodus).equal(true);
+        expect(exodus, "exodus mode is not triggered").equal(true);
 
-        console.log("Got commit exodus event");
+        console.log("Exodus mode triggered");
 
         // Get deposit exodus mode revert code
         await postEthDeposit(
@@ -574,8 +577,9 @@ describe("PLANNED FAILS", function () {
         const noopBlockPublicData = createNoopPublicData();
 
         let reverted = false;
-        for (let i = 0; i < 10000; i++) {
-
+        let i = 0;
+        let blockNumberSinceLastBlock = await provider.getBlockNumber();
+        for (i = 0; i < 2; i++) {
             expect(await franklinDeployedContract.totalBlocksCommitted()).equal(i);
             const tx = await franklinDeployedContract.commitBlock(i + 1, 22,
                 Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
@@ -584,17 +588,29 @@ describe("PLANNED FAILS", function () {
                     gasLimit: bigNumberify("500000"),
                 },
             );
-            const receipt = await tx.wait();
-
-            const event = receipt.events.pop();
-            if (event.event == "BlocksReverted") {
-                expect(await franklinDeployedContract.totalBlocksCommitted()).equal(0);
-                reverted = true;
-                break;
-            }
+            await tx.wait();
+            blockNumberSinceLastBlock = await provider.getBlockNumber();
         }
 
-        expect(reverted).equal(true);
+        while (await provider.getBlockNumber() - blockNumberSinceLastBlock < 8) {
+        }
+
+        const tx = await franklinDeployedContract.commitBlock(i + 1, 22,
+            Buffer.from("0000000000000000000000000000000000000000000000000000000000000000", "hex"),
+            noopBlockPublicData,
+            {
+                gasLimit: bigNumberify("500000"),
+            },
+        );
+        const receipt = await tx.wait();
+
+        const event = receipt.events.pop();
+        if (event.event == "BlocksReverted") {
+            expect(await franklinDeployedContract.totalBlocksCommitted()).equal(0);
+            reverted = true;
+        }
+
+        expect(reverted, "reverted event expected").equal(true);
         console.log(" + Blocks revert passed");
     });
 
@@ -609,12 +625,49 @@ describe("PLANNED FAILS", function () {
             },
         );
         await prTx2.wait()
-            .catch(() => { });
+            .catch(() => {
+            });
 
         const code1 = await provider.call(prTx2, prTx2.blockNumber);
         const reason1 = hex_to_ascii(code1.substr(138));
 
         expect(reason1.substring(0, 5)).equal("pcs11");
         console.log(" + Set franklin address twice will not work passed");
+    });
+
+    it("Commit block small priority op chunk", async () => {
+        const shortendPubdataPriorityOps = [];
+
+        const shortDepositPubdata = Buffer.alloc((OPERATIONS.deposit.chunks - 1) * CHUNKS_SIZE, 0);
+        shortDepositPubdata[0] = OPERATIONS.deposit.id; // set correct op type
+        shortendPubdataPriorityOps.push(shortDepositPubdata);
+
+        const shortFullExitPubdata = Buffer.alloc((OPERATIONS.fullExit.chunks - 1) * CHUNKS_SIZE, 0);
+        shortFullExitPubdata[0] = OPERATIONS.fullExit.id; // set correct op type
+        shortendPubdataPriorityOps.push(shortFullExitPubdata);
+
+        const shortChangePubkeyOnchainPubdata = Buffer.alloc((OPERATIONS.changePubkeyOnchain.chunks - 1) * CHUNKS_SIZE, 0);
+        shortChangePubkeyOnchainPubdata[0] = OPERATIONS.changePubkeyOnchain.id; // set correct op type
+        shortendPubdataPriorityOps.push(shortChangePubkeyOnchainPubdata);
+
+        const shortWithdrawPubdata = Buffer.alloc((OPERATIONS.withdraw.chunks - 1) * CHUNKS_SIZE, 0);
+        shortWithdrawPubdata[0] = OPERATIONS.withdraw.id; // set correct op type
+        shortendPubdataPriorityOps.push(shortWithdrawPubdata);
+
+        for (const shortPubdata of shortendPubdataPriorityOps) {
+            await postBlockCommit(
+                provider,
+                wallet,
+                franklinDeployedContract,
+                1,
+                22,
+                "0000000000000000000000000000000000000000000000000000000000000000",
+                shortPubdata,
+                null,
+                null,
+                null,
+                "bse11",
+            );
+        }
     });
 });

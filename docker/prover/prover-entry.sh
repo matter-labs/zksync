@@ -6,9 +6,8 @@
 echo NODE_NAME=$NODE_NAME
 echo POD_NAME=$POD_NAME
 
-. /bin/.load_keys
+. /bin/load_keys
 
 echo key download complete, starting prover
 
-export DATABASE_URL=$PROVER_DATABASE_URL
-exec prover 2>&1
+exec prover $BLOCK_SIZE_CHUNKS "$POD_NAME" 2>&1

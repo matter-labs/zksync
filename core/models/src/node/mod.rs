@@ -1,12 +1,12 @@
 use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use super::params;
 use super::primitives::{pack_as_float, u128_to_bigdecimal, unpack_float};
-use bigdecimal::BigDecimal;
-use franklin_crypto::{
+use crate::franklin_crypto::bellman::pairing::bn256;
+use crate::franklin_crypto::{
     eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
     jubjub::JubjubEngine,
 };
-use pairing::bn256;
+use bigdecimal::BigDecimal;
 
 pub mod account;
 pub mod block;
@@ -17,7 +17,7 @@ pub mod tx;
 
 pub use web3::types::{H256, U128, U256};
 
-pub use self::account::{Account, AccountAddress, AccountUpdate};
+pub use self::account::{Account, AccountUpdate, PubKeyHash};
 pub use self::block::{ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 pub use self::operations::{
     CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,

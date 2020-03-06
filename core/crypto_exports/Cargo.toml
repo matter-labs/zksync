@@ -1,0 +1,9 @@
+[package]
+name = "crypto_exports"
+version = "0.1.0"
+authors = ["Matter Labs"]
+edition = "2018"
+
+[dependencies]
+franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="plonk"}
+rand = "0.4"

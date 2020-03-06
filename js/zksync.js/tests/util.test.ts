@@ -2,7 +2,8 @@ import { expect } from "chai";
 import BN = require("bn.js");
 import {
     closestPackableTransactionAmount,
-    closestPackableTransactionFee
+    closestPackableTransactionFee,
+    TokenSet
 } from "../src/utils";
 import { pedersenHash } from "../src/crypto";
 import { bigNumberify } from "ethers/utils";
@@ -179,5 +180,50 @@ describe("Pedersen hash", function() {
 
         expect(resultPoint.getX().eq(expectedX)).equal(true);
         expect(resultPoint.getY().eq(expectedY)).equal(true);
+    });
+});
+
+describe("Token cache resolve", function() {
+    it("Test token cache resolve", function() {
+        const tokens = {
+            ETH: {
+                address: "0x0000000000000000000000000000000000000000",
+                id: 0,
+                symbol: "ETH"
+            },
+            "ERC20-1": {
+                address: "0xEEeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+                id: 1,
+                symbol: "ERC20-1"
+            }
+        };
+        const tokenCache = new TokenSet(tokens);
+
+        expect(tokenCache.resolveTokenId("ETH")).eq(0, "ETH by id resolve");
+        expect(
+            tokenCache.resolveTokenId(
+                "0x0000000000000000000000000000000000000000"
+            )
+        ).eq(0, "ETH by addr resolve");
+        expect(tokenCache.resolveTokenId("ERC20-1")).eq(
+            1,
+            "ERC20 by id resolve"
+        );
+        expect(
+            tokenCache.resolveTokenId(
+                "0xEEeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            )
+        ).eq(1, "ERC20 by addr resolve");
+        expect(
+            tokenCache.resolveTokenId(
+                "0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+            )
+        ).eq(1, "ERC20 by addr resolve");
+        expect(() =>
+            tokenCache.resolveTokenId(
+                "0xdddddddddddddddddddddddddddddddddddddddd"
+            )
+        ).to.throw();
+        expect(() => tokenCache.resolveTokenId("ERC20-2")).to.throw();
     });
 });

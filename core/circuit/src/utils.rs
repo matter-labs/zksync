@@ -1,12 +1,12 @@
-use bellman::{ConstraintSystem, SynthesisError};
-use ff::{BitIterator, Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField};
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 
-use franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
-use franklin_crypto::circuit::num::{AllocatedNum, Num};
-use franklin_crypto::circuit::Assignment;
-use franklin_crypto::eddsa::Signature;
-use franklin_crypto::eddsa::{PrivateKey, PublicKey};
-use franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
+use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
+use crate::franklin_crypto::circuit::num::{AllocatedNum, Num};
+use crate::franklin_crypto::circuit::Assignment;
+use crate::franklin_crypto::eddsa::Signature;
+use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
+use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
 
 use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
@@ -23,20 +23,19 @@ pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
             acc
         })
 }
-pub fn sign_pedersen<R, E>(
+pub fn sign_pedersen<E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,
     params: &E::Params,
-    rng: &mut R,
 ) -> SignatureData
 where
-    R: rand::Rng,
     E: JubjubEngine,
 {
     let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
 
-    let signature = private_key.musig_pedersen_sign(&message_bytes, rng, p_g, params);
+    let seed = Seed::deterministic_seed(&private_key, &message_bytes);
+    let signature = private_key.musig_pedersen_sign(&message_bytes, &seed, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let _is_valid_signature =
@@ -90,15 +89,13 @@ where
     }
 }
 
-pub fn sign_sha<R, E>(
+pub fn sign_sha<E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,
     params: &E::Params,
-    rng: &mut R,
 ) -> Option<TransactionSignature<E>>
 where
-    R: rand::Rng,
     E: JubjubEngine,
 {
     let raw_data: Vec<bool> = msg_data.to_vec();
@@ -116,7 +113,8 @@ where
         message_bytes.push(byte);
     }
 
-    let signature = private_key.musig_sha256_sign(&message_bytes, rng, p_g, params);
+    let seed = Seed::deterministic_seed(&private_key, &message_bytes);
+    let signature = private_key.musig_sha256_sign(&message_bytes, &seed, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let is_valid_signature =
@@ -274,4 +272,19 @@ pub fn append_packed_public_key(
     assert_eq!(1, x_bits.len());
     content.extend(y_bits);
     content.extend(x_bits);
+}
+
+pub fn print_boolean_vec(bits: &[Boolean]) {
+    let mut bytes = vec![];
+    for slice in bits.chunks(8) {
+        let mut b = 0u8;
+        for (i, bit) in slice.iter().enumerate() {
+            if bit.get_value().unwrap() {
+                b |= 1u8 << (7 - i);
+            }
+        }
+        bytes.push(b);
+    }
+
+    debug!("Hex: {}", hex::encode(&bytes));
 }

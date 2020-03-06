@@ -1,11 +1,12 @@
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
+use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
+use crate::franklin_crypto::circuit::boolean::Boolean;
 use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
-use bellman::{ConstraintSystem, SynthesisError};
-use franklin_crypto::circuit::boolean::Boolean;
 
-use franklin_crypto::circuit::expression::Expression;
-use franklin_crypto::circuit::num::AllocatedNum;
-use franklin_crypto::circuit::pedersen_hash;
-use franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::circuit::expression::Expression;
+use crate::franklin_crypto::circuit::num::AllocatedNum;
+use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::params as franklin_constants;
 
 #[derive(Clone)]
@@ -14,9 +15,37 @@ pub struct CircuitElement<E: JubjubEngine> {
     bits_le: Vec<Boolean>,
     length: usize,
 }
+
 impl<E: JubjubEngine> CircuitElement<E> {
+    pub fn unsafe_empty_of_some_length(zero_num: AllocatedNum<E>, length: usize) -> Self {
+        let bits = vec![Boolean::constant(false); length];
+        CircuitElement {
+            number: zero_num,
+            bits_le: bits,
+            length,
+        }
+    }
+
+    pub fn into_padded_le_bits(self, to_length: usize) -> Vec<Boolean> {
+        let mut bits = self.bits_le;
+        assert!(to_length >= bits.len());
+        bits.resize(to_length, Boolean::constant(false));
+
+        bits
+    }
+
+    pub fn into_padded_be_bits(self, to_length: usize) -> Vec<Boolean> {
+        let mut bits = self.bits_le;
+        assert!(to_length >= bits.len());
+        bits.resize(to_length, Boolean::constant(false));
+        bits.reverse();
+
+        bits
+    }
+
     pub fn pad(self, n: usize) -> Self {
         assert!(self.length <= n);
+        assert!(n <= E::Fr::NUM_BITS as usize);
         let mut padded_bits = self.get_bits_le();
         padded_bits.resize(n, Boolean::constant(false));
         CircuitElement {
@@ -25,29 +54,39 @@ impl<E: JubjubEngine> CircuitElement<E> {
             length: n,
         }
     }
-    pub fn from_fe_strict<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
+
+    pub fn from_fe_with_known_length<
+        CS: ConstraintSystem<E>,
+        F: FnOnce() -> Result<E::Fr, SynthesisError>,
+    >(
         mut cs: CS,
         field_element: F,
         max_length: usize,
     ) -> Result<Self, SynthesisError> {
+        assert!(max_length <= E::Fr::NUM_BITS as usize);
         let number =
             AllocatedNum::alloc(cs.namespace(|| "number from field element"), field_element)?;
-        CircuitElement::from_number_strict(cs.namespace(|| "circuit_element"), number, max_length)
+        CircuitElement::from_number_with_known_length(
+            cs.namespace(|| "circuit_element"),
+            number,
+            max_length,
+        )
     }
 
-    pub fn from_fe_padded<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
+    pub fn from_fe<CS: ConstraintSystem<E>, F: FnOnce() -> Result<E::Fr, SynthesisError>>(
         mut cs: CS,
         field_element: F,
     ) -> Result<Self, SynthesisError> {
         let number =
             AllocatedNum::alloc(cs.namespace(|| "number from field element"), field_element)?;
-        CircuitElement::from_number_padded(cs.namespace(|| "circuit_element"), number)
+        CircuitElement::from_number(cs.namespace(|| "circuit_element"), number)
     }
 
     pub fn from_witness_be_bits<CS: ConstraintSystem<E>>(
         mut cs: CS,
         witness_bits: &[Option<bool>],
     ) -> Result<Self, SynthesisError> {
+        assert!(witness_bits.len() <= E::Fr::NUM_BITS as usize);
         let mut allocated_bits =
             allocate_bits_vector(cs.namespace(|| "allocate bits"), witness_bits)?;
         allocated_bits.reverse();
@@ -60,26 +99,13 @@ impl<E: JubjubEngine> CircuitElement<E> {
         })
     }
 
-    pub fn from_number<CS: ConstraintSystem<E>>(
+    pub fn from_number_with_known_length<CS: ConstraintSystem<E>>(
         mut cs: CS,
         number: AllocatedNum<E>,
         max_length: usize,
     ) -> Result<Self, SynthesisError> {
-        // let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
-        let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le_fixed"))?;
-        bits.truncate(max_length);
-        Ok(CircuitElement {
-            number,
-            bits_le: bits,
-            length: max_length,
-        })
-    }
-    pub fn from_number_strict<CS: ConstraintSystem<E>>(
-        mut cs: CS,
-        number: AllocatedNum<E>,
-        max_length: usize,
-    ) -> Result<Self, SynthesisError> {
-        // let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
+        assert!(max_length <= E::Fr::NUM_BITS as usize);
+        // decode into the fixed number of bits
         let bits = number.into_bits_le_fixed(cs.namespace(|| "into_bits_le_fixed"), max_length)?;
 
         let ce = CircuitElement {
@@ -87,37 +113,55 @@ impl<E: JubjubEngine> CircuitElement<E> {
             bits_le: bits,
             length: max_length,
         };
-        // ce.enforce_length(cs.namespace(|| "enforce_length"))?;
 
         Ok(ce)
     }
+
     pub fn from_expression_padded<CS: ConstraintSystem<E>>(
         mut cs: CS,
         expr: Expression<E>,
     ) -> Result<Self, SynthesisError> {
         let mut bits = expr.into_bits_le(cs.namespace(|| "into_bits_le"))?;
-        bits.resize(256, Boolean::constant(false));
+        // this is safe due to "constants"
+        bits.resize(E::Fr::NUM_BITS as usize, Boolean::constant(false));
         let number = pack_bits_to_element(cs.namespace(|| "pack back"), &bits)?;
         let ce = CircuitElement {
             number,
             bits_le: bits,
-            length: 256,
+            length: E::Fr::NUM_BITS as usize,
         };
 
         Ok(ce)
     }
 
-    pub fn from_number_padded<CS: ConstraintSystem<E>>(
+    pub fn from_le_bits<CS: ConstraintSystem<E>>(
+        mut cs: CS,
+        bits: Vec<Boolean>,
+    ) -> Result<Self, SynthesisError> {
+        assert!(bits.len() <= E::Fr::NUM_BITS as usize);
+        let number = pack_bits_to_element(cs.namespace(|| "pack back"), &bits)?;
+        let ce = CircuitElement {
+            number,
+            bits_le: bits,
+            length: E::Fr::NUM_BITS as usize,
+        };
+
+        Ok(ce)
+    }
+
+    pub fn from_number<CS: ConstraintSystem<E>>(
         mut cs: CS,
         number: AllocatedNum<E>,
     ) -> Result<Self, SynthesisError> {
-        let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
-        bits.resize(256, Boolean::constant(false));
+        let bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
+        assert_eq!(bits.len(), E::Fr::NUM_BITS as usize);
+
+        let bits_len = bits.len();
 
         let ce = CircuitElement {
             number,
             bits_le: bits,
-            length: 256,
+            length: bits_len,
         };
 
         Ok(ce)
@@ -135,21 +179,8 @@ impl<E: JubjubEngine> CircuitElement<E> {
             |lc| lc + CS::one(),
             |lc| lc + number_repacked.get_variable(),
         );
+
         Ok(())
-    }
-    pub fn from_le_bits<CS: ConstraintSystem<E>>(
-        mut cs: CS,
-        bits: Vec<Boolean>,
-        max_length: usize,
-    ) -> Result<Self, SynthesisError> {
-        let mut num_bits = bits.clone();
-        num_bits.truncate(max_length);
-        let number = pack_bits_to_element(cs.namespace(|| "pack_truncated_bits"), &bits)?;
-        Ok(CircuitElement {
-            number,
-            bits_le: num_bits,
-            length: max_length,
-        })
     }
 
     pub fn select_if_eq<CS: ConstraintSystem<E>>(
@@ -159,7 +190,9 @@ impl<E: JubjubEngine> CircuitElement<E> {
         x: &Self,
         y: &Self,
     ) -> Result<Self, SynthesisError> {
+        assert!(x.length <= E::Fr::NUM_BITS as usize);
         assert_eq!(x.length, y.length);
+        // select by value and repack into bits
 
         let selected_number = AllocatedNum::select_ifeq(
             cs.namespace(|| "select_ifeq"),
@@ -168,7 +201,8 @@ impl<E: JubjubEngine> CircuitElement<E> {
             &x.get_number(),
             &y.get_number(),
         )?;
-        Ok(CircuitElement::from_number(
+
+        Ok(CircuitElement::from_number_with_known_length(
             cs.namespace(|| "chosen nonce"),
             selected_number,
             x.length,
@@ -182,6 +216,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
         y: &Self,
         condition: &Boolean,
     ) -> Result<Self, SynthesisError> {
+        assert!(x.length <= E::Fr::NUM_BITS as usize);
         assert_eq!(x.length, y.length);
 
         let selected_number = AllocatedNum::conditionally_select(
@@ -190,7 +225,8 @@ impl<E: JubjubEngine> CircuitElement<E> {
             &y.get_number(),
             &condition,
         )?;
-        Ok(CircuitElement::from_number(
+
+        Ok(CircuitElement::from_number_with_known_length(
             cs.namespace(|| "chosen number as ce"),
             selected_number,
             x.length,
@@ -213,7 +249,8 @@ impl<E: JubjubEngine> CircuitElement<E> {
             &y.get_number(),
             &condition,
         )?;
-        Ok(CircuitElement::from_number_strict(
+
+        Ok(CircuitElement::from_number_with_known_length(
             cs.namespace(|| "chosen number as ce"),
             selected_number,
             y.length,
@@ -243,6 +280,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
         bits_be.reverse();
         bits_be
     }
+
     pub fn grab(&self) -> Result<E::Fr, SynthesisError> {
         match self.number.get_value() {
             Some(v) => Ok(v),
@@ -271,45 +309,21 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
     ) -> Result<Self, SynthesisError> {
         let x_num = AllocatedNum::alloc(cs.namespace(|| "x_num"), x)?;
         let y_num = AllocatedNum::alloc(cs.namespace(|| "y_num"), y)?;
-        let x_ce = CircuitElement::from_number_padded(cs.namespace(|| "x"), x_num)?;
-        let y_ce = CircuitElement::from_number_padded(cs.namespace(|| "y"), y_num)?;
-        let mut to_hash = vec![];
-        to_hash.extend(x_ce.get_bits_le());
-        to_hash.extend(y_ce.get_bits_le());
-        let hash = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "hash"),
-            pedersen_hash::Personalization::NoteCommitment,
-            &to_hash,
-            params,
-        )?;
-        let mut hash_bits = hash
-            .get_x()
-            .into_bits_le(cs.namespace(|| "hash into_bits"))?;
-        hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
-        let hash_repacked = pack_bits_to_element(cs.namespace(|| "repack_hash"), &hash_bits)?;
-        let hash_repacked_ce = CircuitElement::from_number(
-            cs.namespace(|| "hash_repacked_ce"),
-            hash_repacked,
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        )?;
 
-        Ok(CircuitPubkey {
-            x: x_ce,
-            y: y_ce,
-            hash: hash_repacked_ce,
-        })
+        Self::from_xy(cs, x_num, y_num, params)
     }
+
     pub fn from_xy<CS: ConstraintSystem<E>>(
         mut cs: CS,
         x: AllocatedNum<E>,
         y: AllocatedNum<E>,
         params: &E::Params,
     ) -> Result<Self, SynthesisError> {
-        let x_ce = CircuitElement::from_number_padded(cs.namespace(|| "x"), x)?;
-        let y_ce = CircuitElement::from_number_padded(cs.namespace(|| "y"), y)?;
+        let x_ce = CircuitElement::from_number(cs.namespace(|| "x"), x)?;
+        let y_ce = CircuitElement::from_number(cs.namespace(|| "y"), y)?;
         let mut to_hash = vec![];
-        to_hash.extend(x_ce.get_bits_le());
-        to_hash.extend(y_ce.get_bits_le());
+        to_hash.extend(x_ce.clone().into_padded_le_bits(256));
+        to_hash.extend(y_ce.clone().into_padded_le_bits(256));
         let hash = pedersen_hash::pedersen_hash(
             cs.namespace(|| "hash"),
             pedersen_hash::Personalization::NoteCommitment,
@@ -321,17 +335,12 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
             .get_x()
             .into_bits_le(cs.namespace(|| "hash into_bits"))?;
         hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
-        let hash_repacked = pack_bits_to_element(cs.namespace(|| "repack_hash"), &hash_bits)?;
-        let hash_repacked_ce = CircuitElement::from_number(
-            cs.namespace(|| "hash_repacked_ce"),
-            hash_repacked,
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        )?;
+        let element = CircuitElement::from_le_bits(cs.namespace(|| "repack_hash"), hash_bits)?;
 
         Ok(CircuitPubkey {
             x: x_ce,
             y: y_ce,
-            hash: hash_repacked_ce,
+            hash: element,
         })
     }
     pub fn get_x(&self) -> CircuitElement<E> {

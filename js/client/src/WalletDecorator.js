@@ -121,7 +121,7 @@ export class WalletDecorator {
                         ? 'ETH' 
                         : tokenInfo.address;
 
-                    return await zksync.getEthereumBalance(window.ethSigner, token);
+                    return await window.syncWallet.getEthereumBalance(token);
                 }
             )
         );
@@ -354,7 +354,7 @@ export class WalletDecorator {
 
         let res = {};
         let assign = key => ([token, balance]) => {
-            let tokenInfo = tokenInfoFromToken(token);
+            let tokenInfo = tokenInfoFromSymbol(token);
             if (res[tokenInfo.id] === undefined) {
                 res[tokenInfo.id] = {
                     tokenName: tokenInfo.symbol,
@@ -377,7 +377,7 @@ export class WalletDecorator {
     franklinBalancesAsRenderableList() {
         return Object.entries(this.syncState.committed.balances)
             .map(([token, balance]) => {
-                const tokenInfo = tokenInfoFromToken(token);
+                const tokenInfo = tokenInfoFromSymbol(token);
                 return {
                     tokenInfo,
                     tokenName: tokenInfo.symbol,
@@ -398,6 +398,12 @@ export class WalletDecorator {
         const address = options.address;
 
         try {
+            if (!await window.syncWallet.isSigningKeySet()) {
+                yield info(`Changing signing key...`);
+                const setPk = await window.syncWallet.setSigningKey();
+                await setPk.awaitReceipt();
+            }
+
             yield info(`Sending transfer...`);
 
             const transferTransaction = await window.syncWallet.syncTransfer({
@@ -427,9 +433,15 @@ export class WalletDecorator {
         const fee     = utils.bigNumberify(options.fee);
 
         try {
+            if (!await window.syncWallet.isSigningKeySet()) {
+                yield info(`Changing signing key...`);
+                const setPk = await window.syncWallet.setSigningKey();
+                await setPk.awaitReceipt();
+            }
+
             yield info(`Sending withdraw...`);
 
-            const withdrawTransaction = await window.syncWallet.withdrawTo({
+            const withdrawTransaction = await window.syncWallet.withdrawFromSyncToEthereum({
                 ethAddress: await window.ethSigner.getAddress(),
                 token,
                 amount,
@@ -510,9 +522,8 @@ export class WalletDecorator {
             yield info(`Sending deposit...`);
 
             const maxFeeInETHToken = await this.getDepositFee(token);
-            const deposit = await zksync.depositFromETH({
-                depositFrom: window.ethSigner,
-                depositTo: window.syncWallet,
+            const deposit = await window.syncWallet.depositToSyncFromEthereum({
+                depositTo: window.syncWallet.address(),
                 maxFeeInETHToken,
                 token,
                 amount,

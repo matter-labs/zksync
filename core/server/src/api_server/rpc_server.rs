@@ -10,15 +10,18 @@ use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
-use models::node::{Account, AccountAddress, AccountId, FranklinTx, Nonce, TokenId};
+use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use storage::{ConnectionPool, StorageProcessor, Token};
+use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
     balances: HashMap<String, BigDecimal>,
     nonce: Nonce,
+    pub_key_hash: PubKeyHash,
 }
 
 impl ResponseAccountState {
@@ -29,13 +32,14 @@ impl ResponseAccountState {
                 balances.insert("ETH".to_string(), balance);
             } else {
                 let token = tokens.get(&token_id).ok_or_else(Error::internal_error)?;
-                balances.insert(token.address.clone(), balance);
+                balances.insert(token.symbol.clone(), balance);
             }
         }
 
         Ok(Self {
             balances,
             nonce: account.nonce,
+            pub_key_hash: account.pub_key_hash,
         })
     }
 }
@@ -43,7 +47,7 @@ impl ResponseAccountState {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfoResp {
-    address: AccountAddress,
+    address: Address,
     id: Option<AccountId>,
     committed: ResponseAccountState,
     verified: ResponseAccountState,
@@ -85,7 +89,7 @@ pub trait Rpc {
     #[rpc(name = "account_info", returns = "AccountInfoResp")]
     fn account_info(
         &self,
-        addr: AccountAddress,
+        addr: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send>;
     #[rpc(name = "ethop_info")]
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp>;
@@ -118,7 +122,7 @@ impl RpcApp {
 impl RpcApp {
     fn access_storage(&self) -> Result<StorageProcessor> {
         self.connection_pool
-            .access_storage()
+            .access_storage_fragile()
             .map_err(|_| Error::internal_error())
     }
 }
@@ -126,7 +130,7 @@ impl RpcApp {
 impl Rpc for RpcApp {
     fn account_info(
         &self,
-        address: AccountAddress,
+        address: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send> {
         let (account, tokens) = if let Ok((account, tokens)) = (|| -> Result<_> {
             let storage = self.access_storage()?;
@@ -141,14 +145,12 @@ impl Rpc for RpcApp {
             return Box::new(futures01::done(Err(Error::internal_error())));
         };
 
-        let id = account.committed.as_ref().map(|(id, _)| *id);
-
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
         let account_state_resp = async move {
             let state_keeper_response = oneshot::channel();
             state_keeper_request_sender
                 .send(StateKeeperRequest::GetAccount(
-                    address.clone(),
+                    address,
                     state_keeper_response.0,
                 ))
                 .await
@@ -158,10 +160,13 @@ impl Rpc for RpcApp {
                 .await
                 .map_err(|_| Error::internal_error())?;
 
-            let committed = if let Some((_, account)) = committed_account_state {
-                ResponseAccountState::try_to_restore(account, &tokens)?
+            let (id, committed) = if let Some((id, account)) = committed_account_state {
+                (
+                    Some(id),
+                    ResponseAccountState::try_to_restore(account, &tokens)?,
+                )
             } else {
-                ResponseAccountState::default()
+                (None, ResponseAccountState::default())
             };
 
             let verified = if let Some((_, account)) = account.verified {
@@ -255,9 +260,9 @@ impl Rpc for RpcApp {
             tx_add_result.map(|_| hash).map_err(|e| {
                 let code = match &e {
                     TxAddError::NonceMismatch => 101,
-                    TxAddError::InvalidSignature => 102,
                     TxAddError::IncorrectTx => 103,
                     TxAddError::Other => 104,
+                    TxAddError::ChangePkNotAuthorized => 105,
                 };
                 Error {
                     code: code.into(),
@@ -289,7 +294,7 @@ impl Rpc for RpcApp {
                 if id == 0 {
                     ("ETH".to_string(), token)
                 } else {
-                    (token.address.clone(), token)
+                    (token.symbol.clone(), token)
                 }
             })
             .collect())

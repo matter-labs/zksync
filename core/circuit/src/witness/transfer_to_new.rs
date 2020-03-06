@@ -1,14 +1,16 @@
 use super::utils::*;
+use crate::franklin_crypto::bellman::pairing::bn256::*;
+use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::circuit::float_point::convert_to_float;
+use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
-use ff::{Field, PrimeField};
-use franklin_crypto::circuit::float_point::convert_to_float;
-use franklin_crypto::jubjub::JubjubEngine;
 use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
+use models::circuit::utils::{
+    append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
+};
 use models::node::TransferToNewOp;
 use models::params as franklin_constants;
-use pairing::bn256::*;
 
 pub struct TransferToNewData {
     pub amount: u128,
@@ -16,7 +18,7 @@ pub struct TransferToNewData {
     pub token: u32,
     pub from_account_address: u32,
     pub to_account_address: u32,
-    pub new_pub_key_hash: Fr,
+    pub new_address: Fr,
 }
 pub struct TransferToNewWitness<E: JubjubEngine> {
     pub from_before: OperationBranch<E>,
@@ -60,8 +62,8 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
 
         append_be_fixed_width(
             &mut pubdata_bits,
-            &self.args.new_pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+            &self.args.eth_address.unwrap(),
+            franklin_constants::ETH_ADDRESS_BIT_WIDTH,
         );
 
         append_be_fixed_width(
@@ -128,15 +130,13 @@ pub fn apply_transfer_to_new_tx(
     tree: &mut CircuitAccountTree,
     transfer_to_new: &TransferToNewOp,
 ) -> TransferToNewWitness<Bn256> {
-    let new_pubkey_hash = transfer_to_new.tx.to.to_fr();
-
     let transfer_data = TransferToNewData {
         amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),
         fee: transfer_to_new.tx.fee.to_string().parse().unwrap(),
         token: u32::from(transfer_to_new.tx.token),
         from_account_address: transfer_to_new.from,
         to_account_address: transfer_to_new.to,
-        new_pub_key_hash: new_pubkey_hash,
+        new_address: eth_address_to_fr(&transfer_to_new.tx.to),
     };
     // le_bit_vector_into_field_element()
     apply_transfer_to_new(tree, &transfer_data)
@@ -147,7 +147,7 @@ pub fn apply_transfer_to_new(
 ) -> TransferToNewWitness<Bn256> {
     //preparing data and base witness
     let before_root = tree.root_hash();
-    println!("Initial root = {}", before_root);
+    debug!("Initial root = {}", before_root);
     let (audit_path_from_before, audit_balance_path_from_before) = get_audits(
         tree,
         transfer_to_new.from_account_address,
@@ -179,9 +179,9 @@ pub fn apply_transfer_to_new(
 
     let amount_encoded: Fr = le_bit_vector_into_field_element(&amount_bits);
 
-    println!("test_transfer_to_new.fee {}", transfer_to_new.fee);
+    debug!("test_transfer_to_new.fee {}", transfer_to_new.fee);
     let fee_as_field_element = Fr::from_str(&transfer_to_new.fee.to_string()).unwrap();
-    println!(
+    debug!(
         "test transfer_to_new fee_as_field_element = {}",
         fee_as_field_element
     );
@@ -194,7 +194,7 @@ pub fn apply_transfer_to_new(
     .unwrap();
 
     let fee_encoded: Fr = le_bit_vector_into_field_element(&fee_bits);
-    println!("fee_encoded in test_transfer_to_new {}", fee_encoded);
+    debug!("fee_encoded in test_transfer_to_new {}", fee_encoded);
     //applying first transfer part
     let (
         account_witness_from_before,
@@ -215,7 +215,7 @@ pub fn apply_transfer_to_new(
     );
 
     let intermediate_root = tree.root_hash();
-    println!("Intermediate root = {}", intermediate_root);
+    debug!("Intermediate root = {}", intermediate_root);
 
     let (audit_path_from_intermediate, audit_balance_path_from_intermediate) = get_audits(
         tree,
@@ -239,8 +239,8 @@ pub fn apply_transfer_to_new(
         transfer_to_new.to_account_address,
         transfer_to_new.token,
         |acc| {
-            assert!((acc.pub_key_hash == Fr::zero()));
-            acc.pub_key_hash = transfer_to_new.new_pub_key_hash;
+            assert!((acc.address == Fr::zero()));
+            acc.address = transfer_to_new.new_address;
         },
         |bal| bal.value.add_assign(&amount_as_field_element),
     );
@@ -323,14 +323,14 @@ pub fn apply_transfer_to_new(
             },
         },
         args: OperationArguments {
-            ethereum_key: Some(Fr::zero()),
+            eth_address: Some(transfer_to_new.new_address),
             amount_packed: Some(amount_encoded),
             full_amount: Some(amount_as_field_element),
             fee: Some(fee_encoded),
             a: Some(a),
             b: Some(b),
             pub_nonce: Some(Fr::zero()),
-            new_pub_key_hash: Some(transfer_to_new.new_pub_key_hash),
+            new_pub_key_hash: Some(Fr::zero()),
         },
         before_root: Some(before_root),
         intermediate_root: Some(intermediate_root),
@@ -440,24 +440,24 @@ mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
-    use models::node::{Account, AccountAddress};
+    use models::node::Account;
     use testkit::zksync_account::ZksyncAccount;
 
     #[test]
     #[ignore]
-    fn test_transfer_to_new() {
+    fn test_transfer_to_new_success() {
         let from_zksync_account = ZksyncAccount::rand();
         let from_account_id = 1;
-        let from_account_address = from_zksync_account.address.clone();
+        let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
             account.add_balance(0, &BigDecimal::from(10));
+            account.pub_key_hash = from_zksync_account.pubkey_hash.clone();
             account
         };
 
         let to_account_id = 2;
-        let to_account_address =
-            AccountAddress::from_hex("sync:2222222222222222222222222222222222222222").unwrap();
+        let to_account_address = "2222222222222222222222222222222222222222".parse().unwrap();
 
         let (mut plasma_state, mut witness_accum) =
             test_genesis_plasma_state(vec![(from_account_id, from_account)]);

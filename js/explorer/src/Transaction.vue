@@ -79,7 +79,8 @@ export default {
                 return;
             }
 
-            txData.tokenName = tokens[txData.token].syncSymbol;
+            txData.tokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
+            txData.amount = txData.amount == "unknown amount" ? "" : txData.amount;
             
             const block = await client.getBlock(txData.block_number);
             txData.status = block.verified_at ? `Verified`
@@ -114,11 +115,11 @@ export default {
 
             const link_from 
                 = this.txData.tx_type == 'Deposit' ? `${this.blockchain_explorer_address}/${this.txData.from}`
-                : `/accounts/${this.txData.from}`;
+                : `${this.routerBase}accounts/${this.txData.from}`;
 
             const link_to 
                 = this.txData.tx_type == 'Withdraw' ? `${this.blockchain_explorer_address}/${this.txData.to}`
-                : `/accounts/${this.txData.to}`;
+                : `${this.routerBase}accounts/${this.txData.to}`;
 
             const onchain_from
                 = this.txData.tx_type == 'Deposit' ? `<span class="onchain_icon">onchain</span>`

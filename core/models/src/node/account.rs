@@ -4,36 +4,37 @@ use crate::primitives::GetBits;
 use std::collections::HashMap;
 use std::convert::TryInto;
 
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use bigdecimal::BigDecimal;
 use failure::ensure;
-use ff::PrimeField;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::Engine;
 use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use crate::circuit::account::{Balance, CircuitAccount};
-use crate::circuit::utils::pub_key_hash_bytes;
+use crate::circuit::utils::{eth_address_to_fr, pub_key_hash_bytes};
+use crate::franklin_crypto::eddsa::PublicKey;
+use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::node::PrivateKey;
 use crate::params::JUBJUB_PARAMS;
-use franklin_crypto::eddsa::PublicKey;
-use franklin_crypto::jubjub::FixedGenerators;
+use web3::types::Address;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
-pub struct AccountAddress {
+pub struct PubKeyHash {
     pub data: [u8; params::FR_ADDRESS_LEN],
 }
 
-impl std::fmt::Debug for AccountAddress {
+impl std::fmt::Debug for PubKeyHash {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.to_hex())
     }
 }
 
-impl AccountAddress {
+impl PubKeyHash {
     pub fn zero() -> Self {
-        AccountAddress {
+        PubKeyHash {
             data: [0; params::FR_ADDRESS_LEN],
         }
     }
@@ -50,7 +51,7 @@ impl AccountAddress {
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(bytes.len() == params::FR_ADDRESS_LEN, "Size mismatch");
-        Ok(AccountAddress {
+        Ok(PubKeyHash {
             data: bytes.try_into().unwrap(),
         })
     }
@@ -76,7 +77,7 @@ impl AccountAddress {
     }
 }
 
-impl Serialize for AccountAddress {
+impl Serialize for PubKeyHash {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -85,21 +86,22 @@ impl Serialize for AccountAddress {
     }
 }
 
-impl<'de> Deserialize<'de> for AccountAddress {
+impl<'de> Deserialize<'de> for PubKeyHash {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
         use serde::de::Error;
         String::deserialize(deserializer).and_then(|string| {
-            AccountAddress::from_hex(&string).map_err(|err| Error::custom(err.to_string()))
+            PubKeyHash::from_hex(&string).map_err(|err| Error::custom(err.to_string()))
         })
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Account {
-    pub address: AccountAddress,
+    pub pub_key_hash: PubKeyHash,
+    pub address: Address,
     balances: HashMap<TokenId, BigDecimal>,
     pub nonce: Nonce,
 }
@@ -113,11 +115,11 @@ impl PartialEq for Account {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum AccountUpdate {
     Create {
-        address: AccountAddress,
+        address: Address,
         nonce: Nonce,
     },
     Delete {
-        address: AccountAddress,
+        address: Address,
         nonce: Nonce,
     },
     UpdateBalance {
@@ -125,6 +127,12 @@ pub enum AccountUpdate {
         new_nonce: Nonce,
         // (token, old, new)
         balance_update: (TokenId, BigDecimal, BigDecimal),
+    },
+    ChangePubKeyHash {
+        old_pub_key_hash: PubKeyHash,
+        new_pub_key_hash: PubKeyHash,
+        old_nonce: Nonce,
+        new_nonce: Nonce,
     },
 }
 
@@ -151,7 +159,8 @@ impl From<Account> for CircuitAccount<super::Engine> {
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();
-        circuit_account.pub_key_hash = acc.address.to_fr();
+        circuit_account.pub_key_hash = acc.pub_key_hash.to_fr();
+        circuit_account.address = eth_address_to_fr(&acc.address);
         circuit_account
     }
 }
@@ -160,11 +169,11 @@ impl AccountUpdate {
     pub fn reversed_update(&self) -> Self {
         match self {
             AccountUpdate::Create { address, nonce } => AccountUpdate::Delete {
-                address: address.clone(),
+                address: *address,
                 nonce: *nonce,
             },
             AccountUpdate::Delete { address, nonce } => AccountUpdate::Create {
-                address: address.clone(),
+                address: *address,
                 nonce: *nonce,
             },
             AccountUpdate::UpdateBalance {
@@ -180,6 +189,17 @@ impl AccountUpdate {
                     balance_update.1.clone(),
                 ),
             },
+            AccountUpdate::ChangePubKeyHash {
+                old_pub_key_hash,
+                new_pub_key_hash,
+                old_nonce,
+                new_nonce,
+            } => AccountUpdate::ChangePubKeyHash {
+                old_pub_key_hash: new_pub_key_hash.clone(),
+                new_pub_key_hash: old_pub_key_hash.clone(),
+                old_nonce: *new_nonce,
+                new_nonce: *old_nonce,
+            },
         }
     }
 }
@@ -189,7 +209,8 @@ impl Default for Account {
         Self {
             balances: HashMap::new(),
             nonce: 0,
-            address: AccountAddress::default(),
+            pub_key_hash: PubKeyHash::default(),
+            address: Address::zero(),
         }
     }
 }
@@ -201,19 +222,19 @@ impl GetBits for Account {
 }
 
 impl Account {
-    pub fn default_with_address(address: &AccountAddress) -> Account {
+    pub fn default_with_address(address: &Address) -> Account {
         let mut account = Account::default();
-        account.address = address.clone();
+        account.address = *address;
         account
     }
 
-    pub fn create_account(id: AccountId, address: AccountAddress) -> (Account, AccountUpdates) {
+    pub fn create_account(id: AccountId, address: Address) -> (Account, AccountUpdates) {
         let mut account = Account::default();
         account.address = address;
         let updates = vec![(
             id,
             AccountUpdate::Create {
-                address: account.address.clone(),
+                address: account.address,
                 nonce: account.nonce,
             },
         )];
@@ -260,6 +281,15 @@ impl Account {
                     account.nonce = new_nonce;
                     Some(account)
                 }
+                AccountUpdate::ChangePubKeyHash {
+                    new_pub_key_hash,
+                    new_nonce,
+                    ..
+                } => {
+                    account.pub_key_hash = new_pub_key_hash;
+                    account.nonce = new_nonce;
+                    Some(account)
+                }
                 _ => {
                     error!(
                         "Incorrect update received {:?} for account {:?}",
@@ -293,7 +323,7 @@ impl Account {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::node::{apply_updates, reverse_updates, AccountAddress, AccountMap, AccountUpdates};
+    use crate::node::{apply_updates, reverse_updates, AccountMap, AccountUpdates};
 
     #[test]
     fn test_default_account() {
@@ -304,7 +334,7 @@ mod test {
     #[test]
     fn test_account_update() {
         let create = AccountUpdate::Create {
-            address: AccountAddress::default(),
+            address: Address::default(),
             nonce: 1,
         };
 
@@ -315,7 +345,7 @@ mod test {
         };
 
         let delete = AccountUpdate::Delete {
-            address: AccountAddress::default(),
+            address: Address::default(),
             nonce: 2,
         };
 
@@ -390,7 +420,7 @@ mod test {
             updates.push((
                 0,
                 AccountUpdate::Delete {
-                    address: AccountAddress::default(),
+                    address: Address::default(),
                     nonce: 8,
                 },
             ));
@@ -405,7 +435,7 @@ mod test {
             updates.push((
                 2,
                 AccountUpdate::Create {
-                    address: AccountAddress::default(),
+                    address: Address::default(),
                     nonce: 36,
                 },
             ));

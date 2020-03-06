@@ -1,35 +1,31 @@
 import {
-    depositFromETH,
     Wallet,
     Provider,
-    ETHProxy, getDefaultProvider, types, emergencyWithdraw
+    ETHProxy, getDefaultProvider, types
 } from "zksync";
 import { ethers, utils } from "ethers";
+import {parseEther} from "ethers/utils";
 
 let syncProvider: Provider;
 
-async function testRandomAccountFullExit(ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.Token) {
-    const fullExit = await emergencyWithdraw({
-        withdrawTo: ethWallet,
-        withdrawFrom: syncWallet,
+async function testRandomAccountFullExit(syncWallet: Wallet, token: types.TokenLike) {
+    const fullExit = await syncWallet.emergencyWithdraw({
         token: "ETH",
         accountId: 2
     });
-    await fullExit.awaitVerifyReceipt();
+    await fullExit.awaitReceipt();
     console.log(`Full exit random account ok, Token: ${token}`);
 }
 
-async function testNormalFullExit(ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.Token) {
+async function testNormalFullExit(syncWallet: Wallet, token: types.TokenLike) {
     const balanceBeforeWithdraw = await syncWallet.getBalance(token);
     if (balanceBeforeWithdraw.eq(0)) {
         throw new Error("Bug in the test code -- balance should be non 0");
     }
-    const fullExit = await emergencyWithdraw({
-        withdrawTo: ethWallet,
-        withdrawFrom: syncWallet,
+    const fullExit = await syncWallet.emergencyWithdraw({
         token,
     });
-    await fullExit.awaitVerifyReceipt();
+    await fullExit.awaitReceipt();
 
     const balanceAfterWithdraw = await syncWallet.getBalance(token);
     if (!balanceAfterWithdraw.eq(0)) {
@@ -38,17 +34,15 @@ async function testNormalFullExit(ethWallet: ethers.Wallet, syncWallet: Wallet, 
     console.log(`Full exit success ok, Token: ${token}`);
 }
 
-async function testEmptyBalanceFullExit(ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.Token) {
+async function testEmptyBalanceFullExit(syncWallet: Wallet, token: types.TokenLike) {
     const balanceBeforeWithdraw = await syncWallet.getBalance(token);
     if (!balanceBeforeWithdraw.eq(0)) {
         throw new Error("Bug in the test code -- balance should be 0");
     }
-    const fullExit = await emergencyWithdraw({
-        withdrawTo: ethWallet,
-        withdrawFrom: syncWallet,
+    const fullExit = await syncWallet.emergencyWithdraw({
         token,
     });
-    await fullExit.awaitVerifyReceipt();
+    await fullExit.awaitReceipt();
 
     const balanceAfterWithdraw = await syncWallet.getBalance(token);
     if (!balanceAfterWithdraw.eq(0)) {
@@ -57,24 +51,27 @@ async function testEmptyBalanceFullExit(ethWallet: ethers.Wallet, syncWallet: Wa
     console.log(`Full exit empty balance ok, Token: ${token}`);
 }
 
-async function testWrongNonceFullExit(ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.Token) {
+async function testWrongETHWalletFullExit(ethWallet: ethers.Wallet, syncWallet: Wallet, token: types.TokenLike) {
     const balanceBeforeWithdraw = await syncWallet.getBalance(token);
     if (balanceBeforeWithdraw.eq(0)) {
         throw new Error("Bug in the test code -- balance should not be 0");
     }
-    const fullExit = await emergencyWithdraw({
-        withdrawTo: ethWallet,
-        withdrawFrom: syncWallet,
+
+    // post emergency withdraw with wrong wallet.
+    const oldWallet = syncWallet.ethSigner;
+    syncWallet.ethSigner = ethWallet;
+    const fullExit = await syncWallet.emergencyWithdraw({
         token,
         nonce: 12341
     });
-    await fullExit.awaitVerifyReceipt();
+    await fullExit.awaitReceipt();
+    syncWallet.ethSigner = oldWallet;
 
     const balanceAfterWithdraw = await syncWallet.getBalance(token);
     if (!balanceAfterWithdraw.eq(balanceBeforeWithdraw)) {
-        throw new Error("Balance after withdraw not zero");
+        throw new Error("Balance after withdraw not equal to balance before withdraw");
     }
-    console.log(`Full exit wrong nonce ok, Token: ${token}`);
+    console.log(`Full exit wrong eth account ok, Token: ${token}`);
 }
 
 (async () => {
@@ -88,35 +85,33 @@ async function testWrongNonceFullExit(ethWallet: ethers.Wallet, syncWallet: Wall
     syncProvider = await getDefaultProvider(network);
 
     const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
-    const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
     const ethWallet = ethers.Wallet.fromMnemonic(
         MNEMONIC,
         "m/44'/60'/0'/0/1"
     ).connect(ethersProvider);
+    const depositWallet = await Wallet.fromEthSignerNoKeys(ethWallet, syncProvider);
 
 
     for (let token of ["ETH", ERC_20TOKEN]) {
-
-        let amount = utils.parseEther("0.89");
+        let amount = utils.parseEther("0.089");
         const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
         const syncWallet2 = await Wallet.fromEthSigner(
             ethWallet2,
             syncProvider,
-            ethProxy
         );
+        await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.5")})).wait();
 
-        await testRandomAccountFullExit(ethWallet, syncWallet2, token);
-        const deposit = await depositFromETH({
-            depositFrom: ethWallet,
-            depositTo: syncWallet2,
+        await testRandomAccountFullExit(syncWallet2, token);
+        const deposit = await depositWallet.depositToSyncFromEthereum({
+            depositTo: syncWallet2.address(),
             token,
             amount,
         });
         await deposit.awaitReceipt();
-        await testWrongNonceFullExit(ethWallet, syncWallet2, token);
-        await testNormalFullExit(ethWallet, syncWallet2, token);
-        await testEmptyBalanceFullExit(ethWallet, syncWallet2, token);
+        await testWrongETHWalletFullExit(ethWallet, syncWallet2, token);
+        await testNormalFullExit(syncWallet2, token);
+        await testEmptyBalanceFullExit(syncWallet2, token);
     }
 
 

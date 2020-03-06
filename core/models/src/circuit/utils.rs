@@ -1,10 +1,12 @@
 use crate::params;
 
-use ff::{BitIterator, PrimeField};
-use franklin_crypto::alt_babyjubjub::JubjubEngine;
+use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
+use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField};
 
+use crate::franklin_crypto::eddsa::PublicKey;
 use crate::merkle_tree::hasher::Hasher;
-use franklin_crypto::eddsa::PublicKey;
+use crate::node::Fr;
+use web3::types::Address;
 
 fn pub_key_hash_bits<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
@@ -121,4 +123,8 @@ pub fn encode_fr_into_fs<E: JubjubEngine>(input: E::Fr) -> E::Fs {
     fr_le_bits.reverse();
 
     le_bit_vector_into_field_element::<E::Fs>(&fr_le_bits)
+}
+
+pub fn eth_address_to_fr(address: &Address) -> Fr {
+    Fr::from_hex(&format!("{:x}", address)).unwrap()
 }

@@ -1,7 +1,7 @@
 // External
-use ff::Field;
-use franklin_crypto::jubjub::JubjubEngine;
-use franklin_crypto::jubjub::{edwards, Unknown};
+use crate::franklin_crypto::bellman::pairing::ff::Field;
+use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::jubjub::{edwards, Unknown};
 use serde::{Deserialize, Serialize};
 // Workspace
 use crate::account::AccountWitness;
@@ -47,7 +47,7 @@ pub struct OperationArguments<E: JubjubEngine> {
     pub full_amount: Option<E::Fr>,
     pub fee: Option<E::Fr>,
     pub new_pub_key_hash: Option<E::Fr>,
-    pub ethereum_key: Option<E::Fr>,
+    pub eth_address: Option<E::Fr>,
     pub pub_nonce: Option<E::Fr>,
 }
 
@@ -72,4 +72,13 @@ impl<E: JubjubEngine> TransactionSignature<E> {
 pub struct SignatureData {
     pub r_packed: Vec<Option<bool>>,
     pub s: Vec<Option<bool>>,
+}
+
+impl SignatureData {
+    pub fn init_empty() -> Self {
+        Self {
+            r_packed: vec![Some(false); 256],
+            s: vec![Some(false); 256],
+        }
+    }
 }

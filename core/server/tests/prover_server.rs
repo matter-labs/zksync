@@ -2,9 +2,12 @@
 use std::str::FromStr;
 use std::{net, thread, time};
 // External deps
-use ff::{Field, PrimeField};
+use crypto_exports::pairing::ff::{Field, PrimeField};
 use futures::channel::mpsc;
 // Workspace deps
+use circuit::witness::deposit::apply_deposit_tx;
+use circuit::witness::deposit::calculate_deposit_operations_from_witness;
+use models::params::block_chunk_sizes;
 use prover::client;
 use prover::ApiClient;
 use server::prover_server;
@@ -31,15 +34,23 @@ fn access_storage() -> storage::StorageProcessor {
 #[test]
 #[should_panic]
 fn client_with_empty_worker_name_panics() {
-    client::ApiClient::new("", "");
+    client::ApiClient::new("", "", None, time::Duration::from_secs(1));
 }
 
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
+    let block_size_chunks = block_chunk_sizes()[0];
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
-    let id = client.register_prover().expect("failed to register");
+    let client = client::ApiClient::new(
+        &format!("http://{}", &addr),
+        "foo",
+        None,
+        time::Duration::from_secs(1),
+    );
+    let id = client
+        .register_prover(block_size_chunks)
+        .expect("failed to register");
     let storage = access_storage();
     storage
         .prover_by_id(id)
@@ -59,17 +70,23 @@ fn api_client_simple_simulation() {
 
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let client = client::ApiClient::new(&format!("http://{}", &addr), "foo");
+    let block_size_chunks = block_chunk_sizes()[0];
+    let client = client::ApiClient::new(
+        &format!("http://{}", &addr),
+        "foo",
+        None,
+        time::Duration::from_secs(1),
+    );
 
     // call block_to_prove and check its none
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to get block to prove");
     assert!(to_prove.is_none());
 
     let storage = access_storage();
 
-    let (op, wanted_prover_data) = test_operation_and_wanted_prover_data();
+    let (op, wanted_prover_data) = test_operation_and_wanted_prover_data(block_size_chunks);
 
     println!("inserting test operation");
     // write test commit operation to db
@@ -81,14 +98,14 @@ fn api_client_simple_simulation() {
 
     // should return block
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to bet block to prove");
     assert!(to_prove.is_some());
 
     // block is taken unless no heartbeat from prover within prover_timeout period
     // should return None at this moment
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to get block to prove");
     assert!(to_prove.is_none());
 
@@ -96,7 +113,7 @@ fn api_client_simple_simulation() {
     thread::sleep(prover_timeout * 10);
 
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to get block to prove");
     assert!(to_prove.is_some());
 
@@ -106,12 +123,12 @@ fn api_client_simple_simulation() {
     client.working_on(job).unwrap();
 
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to get block to prove");
     assert!(to_prove.is_none());
 
     let prover_data = client
-        .prover_data(block, time::Duration::from_secs(30 * 60))
+        .prover_data(block)
         .expect("failed to get prover data");
     assert_eq!(prover_data.old_root, wanted_prover_data.old_root);
     assert_eq!(prover_data.new_root, wanted_prover_data.new_root);
@@ -122,6 +139,7 @@ fn api_client_simple_simulation() {
 }
 
 pub fn test_operation_and_wanted_prover_data(
+    block_size_chunks: usize,
 ) -> (models::Operation, prover::prover_data::ProverData) {
     let mut circuit_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
@@ -133,7 +151,7 @@ pub fn test_operation_and_wanted_prover_data(
     // Fee account
     let mut accounts = models::node::AccountMap::default();
     let mut validator_account = models::node::Account::default();
-    validator_account.address = validator_test_account.address.clone();
+    validator_account.address = validator_test_account.address;
     let validator_account_id: u32 = 0;
     accounts.insert(validator_account_id, validator_account.clone());
 
@@ -148,10 +166,10 @@ pub fn test_operation_and_wanted_prover_data(
     );
     let initial_root = circuit_tree.root_hash();
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
-        sender: web3::types::Address::zero(),
+        from: validator_test_account.address,
         token: 0,
         amount: bigdecimal::BigDecimal::from(10),
-        account: validator_test_account.address,
+        to: validator_test_account.address,
     });
     let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
     let mut fees = Vec::new();
@@ -207,7 +225,7 @@ pub fn test_operation_and_wanted_prover_data(
     let mut operations = vec![];
 
     if let models::node::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
-        let deposit_witness = circuit::witness::deposit::apply_deposit_tx(
+        let deposit_witness = apply_deposit_tx(
             &mut circuit_tree,
             &models::node::operations::DepositOp {
                 priority_op: deposit_op,
@@ -215,41 +233,20 @@ pub fn test_operation_and_wanted_prover_data(
             },
         );
 
-        let deposit_operations =
-            circuit::witness::deposit::calculate_deposit_operations_from_witness(
-                &deposit_witness,
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &circuit::operation::SignatureData {
-                    r_packed: vec![Some(false); 256],
-                    s: vec![Some(false); 256],
-                },
-                &[Some(false); 256],
-            );
+        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
         operations.extend(deposit_operations);
         pub_data.extend(deposit_witness.get_pubdata());
     }
 
-    let phaser = models::merkle_tree::PedersenHasher::<models::node::Engine>::default();
-    let jubjub_params = &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
-    for _ in 0..models::params::block_size_chunks() - operations.len() {
-        let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _a, _b) =
-            circuit::witness::utils::generate_dummy_sig_data(&[false], &phaser, &jubjub_params);
-
+    for _ in 0..block_size_chunks - operations.len() {
         operations.push(circuit::witness::noop::noop_operation(
             &circuit_tree,
             block.fee_account,
-            &first_sig_msg,
-            &second_sig_msg,
-            &third_sig_msg,
-            &signature,
-            &[Some(false); 256],
         ));
         pub_data.extend(vec![false; 64]);
     }
-    assert_eq!(pub_data.len(), 64 * models::params::block_size_chunks());
-    assert_eq!(operations.len(), models::params::block_size_chunks());
+    assert_eq!(pub_data.len(), 64 * block_size_chunks);
+    assert_eq!(operations.len(), block_size_chunks);
 
     let validator_acc = circuit_tree
         .get(block.fee_account as u32)

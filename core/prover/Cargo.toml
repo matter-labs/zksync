@@ -8,14 +8,9 @@ plasma = { path = "../plasma", version = "0.1.1" }
 models = { path = "../models", version = "0.0.1" }
 storage = { path = "../storage", version = "0.0.1" }
 circuit = { path = "../circuit", version = "0.1.1"}
-
-ff = { package = "ff_ce", version = "0.6.0", features = ["derive"] }
-pairing = { package = "pairing_ce", version = "0.17.0" }
-bellman = { package = "bellman_ce", version = "0.3.0" }
-franklin_crypto = { package = "franklin-crypto", git = "https://github.com/matter-labs/franklin-crypto.git", branch="master"}
+crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
 hex = "0.3"
-rand = "0.4"
 rust-crypto = "0.2"
 rustc-hex = "2.0.1"
 
@@ -37,6 +32,8 @@ num-traits = "0.2"
 actix-web = "1.0"
 reqwest = "0.9.22"
 failure = "0.1"
+backoff = "0.1.6"
+clap = "2.33.0"
 
 [dev-dependencies]
 testhelper = { path = "../testhelper", version = "0.1.0"}

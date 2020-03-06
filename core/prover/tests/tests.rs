@@ -1,12 +1,18 @@
 // Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
-use std::{env, fs, io, path, thread, time};
+use std::{thread, time};
 // External deps
-use ff::{Field, PrimeField};
+use bigdecimal::BigDecimal;
+use crypto_exports::franklin_crypto::{self, bellman};
+use crypto_exports::pairing::ff::PrimeField;
 // Workspace deps
-use prover;
-use testhelper::TestAccount;
+use circuit::witness::deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness};
+use models::node::operations::DepositOp;
+use models::node::{Deposit, Engine, Fr};
+use models::params::block_chunk_sizes;
+use prover::prover_data::ProverData;
+use prover::read_circuit_params;
 
 #[test]
 #[cfg_attr(not(feature = "keys-required"), ignore)]
@@ -14,6 +20,8 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // Testing [black box] that:
     // - BabyProver sends `working_on` requests (heartbeat) over api client
     // - BabyProver stops running upon receiving data over stop channel
+
+    let block_size_chunks = block_chunk_sizes()[0];
 
     // Create a channel to notify on provers exit.
     let (done_tx, done_rx) = mpsc::channel();
@@ -23,7 +31,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // Run prover in a separate thread.
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_signal_ar = Arc::clone(&stop_signal);
-    let circuit_parameters = read_circuit_parameters();
+    let circuit_parameters = read_circuit_params(block_size_chunks);
     let jubjub_params = franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     thread::spawn(move || {
         // Create channel for proofs, not using in this test.
@@ -31,6 +39,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
         let p = prover::BabyProver::new(
             circuit_parameters,
             jubjub_params,
+            block_size_chunks,
             MockApiClient {
                 block_to_prove: Mutex::new(Some((1, 1))),
                 heartbeats_tx: Arc::new(Mutex::new(heartbeat_tx)),
@@ -38,19 +47,18 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
                 prover_data_fn: || None,
             },
             time::Duration::from_millis(100),
-            time::Duration::from_secs(1),
             stop_signal_ar,
         );
         let (tx, rx) = mpsc::channel();
-        thread::spawn(move || {
-            rx.recv().unwrap(); // mock receive exit error.
+        let jh = thread::spawn(move || {
+            rx.recv().expect("on receive from exit error channel"); // mock receive exit error.
         });
         prover::start(p, tx);
-        println!("run exited!");
+        jh.join().expect("failed to join recv");
         done_tx.send(()).expect("unexpected failure");
     });
 
-    let timeout = time::Duration::from_millis(500);
+    let timeout = time::Duration::from_secs(10);
 
     // Must receive heartbeat requests.
     heartbeat_rx
@@ -62,26 +70,31 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
 
     // Send stop signal.
     let jh = thread::spawn(move || {
-        println!("waiting for first hearbeat");
-        heartbeat_rx.recv_timeout(timeout).unwrap();
+        println!("waiting for first heartbeat");
+        // receive at least one heartbeat.
+        heartbeat_rx
+            .recv_timeout(timeout)
+            .expect("[heartbeat_rx] first heartbeat");
+        while let Ok(_) = heartbeat_rx.recv_timeout(timeout) {}
         // BabyProver must be stopped.
-        done_rx.recv_timeout(timeout).unwrap();
+        done_rx.recv_timeout(timeout).expect("[done_rx] recv");
     });
-    println!("sending stop signal.");
     stop_signal.store(true, Ordering::SeqCst);
-    jh.join().expect("did not exit properly");
+    jh.join().expect("prover did not exit properly");
 }
 
 #[test]
 #[cfg_attr(not(feature = "keys-required"), ignore)]
 fn prover_proves_a_block_and_publishes_result() {
     // Testing [black box] the actual proof calculation by mocking genesis and +1 block.
-    let circuit_params = read_circuit_parameters();
-    let verify_key = bellman::groth16::prepare_verifying_key(&circuit_params.vk);
     let stop_signal = Arc::new(AtomicBool::new(false));
     let (proof_tx, proof_rx) = mpsc::channel();
     let prover_data = new_test_data_for_prover();
+    let block_size_chunks = prover_data.operations.len();
+
     let public_data_commitment = prover_data.public_data_commitment;
+    let circuit_params = read_circuit_params(block_size_chunks);
+    let verify_key = bellman::groth16::prepare_verifying_key(&circuit_params.vk);
 
     // Run prover in separate thread.
     let stop_signal_ar = Arc::clone(&stop_signal);
@@ -92,13 +105,13 @@ fn prover_proves_a_block_and_publishes_result() {
         let p = prover::BabyProver::new(
             circuit_params,
             jubjub_params,
+            block_size_chunks,
             MockApiClient {
                 block_to_prove: Mutex::new(Some((1, 1))),
                 heartbeats_tx: Arc::new(Mutex::new(tx)),
                 publishes_tx: Arc::new(Mutex::new(proof_tx)),
                 prover_data_fn: move || Some(prover_data.clone()),
             },
-            time::Duration::from_secs(1),
             time::Duration::from_secs(1),
             stop_signal_ar,
         );
@@ -110,7 +123,7 @@ fn prover_proves_a_block_and_publishes_result() {
         prover::start(p, tx);
     });
 
-    let timeout = time::Duration::from_secs(60 * 30); // 10 minutes
+    let timeout = time::Duration::from_secs(60 * 30);
     let proof = proof_rx
         .recv_timeout(timeout)
         .expect("didn't receive proof");
@@ -122,195 +135,53 @@ fn prover_proves_a_block_and_publishes_result() {
     assert!(verify_result.unwrap(), "invalid proof");
 }
 
-fn new_test_data_for_prover() -> prover::prover_data::ProverData {
-    let mut circuit_tree =
-        models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
-    println!("Empty tree root hash: {}", circuit_tree.root_hash());
+fn new_test_data_for_prover() -> ProverData {
+    use circuit::witness::test_utils::test_genesis_plasma_state;
+    let (_plasma_state, mut witness_accum) = test_genesis_plasma_state(Vec::new());
 
-    let validator_test_account = TestAccount::new();
-    println!(
-        "validator account address: {}",
-        validator_test_account.address.to_hex()
-    );
-
-    // Fee account
-    let mut accounts = models::node::AccountMap::default();
-    let mut validator_account = models::node::Account::default();
-    validator_account.address = validator_test_account.address.clone();
-    let validator_account_id: u32 = 0;
-    accounts.insert(validator_account_id, validator_account.clone());
-
-    let mut state = plasma::state::PlasmaState::new(accounts, 1);
-    let genesis_root_hash = state.root_hash();
-    println!("Genesis block root hash: {}", genesis_root_hash);
-    circuit_tree.insert(
-        0,
-        models::circuit::account::CircuitAccount::from(validator_account),
-    );
-    assert_eq!(circuit_tree.root_hash(), genesis_root_hash);
-
-    let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
-        sender: web3::types::Address::zero(),
-        token: 0,
-        amount: bigdecimal::BigDecimal::from(10),
-        account: validator_test_account.address,
-    });
-    let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
-    let mut fees = Vec::new();
-    let mut ops = Vec::new();
-    let mut accounts_updated = Vec::new();
-
-    if let Some(fee) = op_success.fee {
-        fees.push(fee);
-    }
-
-    accounts_updated.append(&mut op_success.updates);
-
-    ops.push(models::node::ExecutedOperations::PriorityOp(Box::new(
-        models::node::ExecutedPriorityOp {
-            op: op_success.executed_op,
-            priority_op: models::node::PriorityOp {
-                serial_id: 0,
-                data: deposit_priority_op.clone(),
-                deadline_block: 2,
-                eth_fee: bigdecimal::BigDecimal::from(0),
-                eth_hash: vec![0; 8],
-            },
-            block_index: 0,
+    let empty_account_id = 1;
+    let empty_account_address = [7u8; 20].into();
+    let deposit_op = DepositOp {
+        priority_op: Deposit {
+            from: empty_account_address,
+            token: 0,
+            amount: BigDecimal::from(1),
+            to: empty_account_address,
         },
-    )));
-
-    let fee_updates = state.collect_fee(&fees, validator_account_id);
-    accounts_updated.extend(fee_updates.into_iter());
-
-    let block = models::node::block::Block {
-        block_number: state.block_number,
-        new_root_hash: state.root_hash(),
-        fee_account: validator_account_id,
-        block_transactions: ops,
-        processed_priority_ops: (0, 1),
+        account_id: empty_account_id,
     };
-    println!("Block: {:?}", block);
 
-    let mut pub_data = vec![];
-    let mut operations = vec![];
+    let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+    let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+    let pub_data_from_witness = deposit_witness.get_pubdata();
 
-    if let models::node::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
-        let deposit_witness = circuit::witness::deposit::apply_deposit_tx(
-            &mut circuit_tree,
-            &models::node::operations::DepositOp {
-                priority_op: deposit_op,
-                account_id: 0,
-            },
-        );
+    witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+    witness_accum.extend_pubdata_with_noops();
+    witness_accum.collect_fees(&Vec::new());
+    witness_accum.calculate_pubdata_commitment();
 
-        let deposit_operations =
-            circuit::witness::deposit::calculate_deposit_operations_from_witness(
-                &deposit_witness,
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &models::node::Fr::zero(),
-                &circuit::operation::SignatureData {
-                    r_packed: vec![Some(false); 256],
-                    s: vec![Some(false); 256],
-                },
-                &[Some(false); 256],
-            );
-        operations.extend(deposit_operations);
-        pub_data.extend(deposit_witness.get_pubdata());
-    }
-
-    let phaser = models::merkle_tree::PedersenHasher::<models::node::Engine>::default();
-    let jubjub_params = &franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
-    for _ in 0..models::params::block_size_chunks() - operations.len() {
-        let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _a, _b) =
-            circuit::witness::utils::generate_dummy_sig_data(&[false], &phaser, &jubjub_params);
-
-        operations.push(circuit::witness::noop::noop_operation(
-            &circuit_tree,
-            block.fee_account,
-            &first_sig_msg,
-            &second_sig_msg,
-            &third_sig_msg,
-            &signature,
-            &[Some(false); 256],
-        ));
-        pub_data.extend(vec![false; 64]);
-    }
-    assert_eq!(pub_data.len(), 64 * models::params::block_size_chunks());
-    assert_eq!(operations.len(), models::params::block_size_chunks());
-
-    let validator_acc = circuit_tree
-        .get(block.fee_account as u32)
-        .expect("fee_account is not empty");
-    let mut validator_balances = vec![];
-    for i in 0..1 << models::params::BALANCE_TREE_DEPTH {
-        let balance_value = match validator_acc.subtree.get(i as u32) {
-            None => models::node::Fr::zero(),
-            Some(bal) => bal.value,
-        };
-        validator_balances.push(Some(balance_value));
-    }
-    let _: models::node::Fr = circuit_tree.root_hash();
-    let (root_after_fee, validator_account_witness) =
-        circuit::witness::utils::apply_fee(&mut circuit_tree, block.fee_account, 0, 0);
-
-    println!("root after fees {}", root_after_fee);
-    println!("block new hash {}", block.new_root_hash);
-    assert_eq!(root_after_fee, block.new_root_hash);
-    let (validator_audit_path, _) =
-        circuit::witness::utils::get_audits(&circuit_tree, block.fee_account as u32, 0);
-
-    let public_data_commitment =
-        circuit::witness::utils::public_data_commitment::<models::node::Engine>(
-            &pub_data,
-            Some(genesis_root_hash),
-            Some(root_after_fee),
-            Some(models::node::Fr::from_str(&block.fee_account.to_string()).unwrap()),
-            Some(models::node::Fr::from_str(&(block.block_number).to_string()).unwrap()),
-        );
-
-    prover::prover_data::ProverData {
-        public_data_commitment,
-        old_root: genesis_root_hash,
-        new_root: block.new_root_hash,
-        validator_address: models::node::Fr::from_str(&block.fee_account.to_string()).unwrap(),
-        operations,
-        validator_balances,
-        validator_audit_path,
-        validator_account: validator_account_witness,
+    ProverData {
+        public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
+        old_root: witness_accum.initial_root_hash,
+        new_root: witness_accum.root_after_fees.unwrap(),
+        validator_address: Fr::from_str(&witness_accum.fee_account_id.to_string())
+            .expect("failed to parse"),
+        operations: witness_accum.operations,
+        validator_balances: witness_accum.fee_account_balances.unwrap(),
+        validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),
+        validator_account: witness_accum.fee_account_witness.unwrap(),
     }
 }
 
-fn read_circuit_parameters() -> bellman::groth16::Parameters<models::node::Engine> {
-    let out_dir = {
-        let mut out_dir = path::PathBuf::new();
-        out_dir.push(&env::var("KEY_DIR").expect("KEY_DIR not set"));
-        out_dir.push(&format!("{}", models::params::block_size_chunks()));
-        out_dir.push(&format!("{}", models::params::account_tree_depth()));
-        out_dir
-    };
-    let key_file_path = {
-        let mut key_file_path = out_dir;
-        key_file_path.push(models::params::KEY_FILENAME);
-        key_file_path
-    };
-    println!("key file path is {:?}", key_file_path);
-    let f = fs::File::open(&key_file_path).expect("Unable to open file");
-    let mut r = io::BufReader::new(f);
-    bellman::groth16::Parameters::<models::node::Engine>::read(&mut r, true)
-        .expect("Unable to read proving key")
-}
-
-struct MockApiClient<F: Fn() -> Option<prover::prover_data::ProverData>> {
+struct MockApiClient<F: Fn() -> Option<ProverData>> {
     block_to_prove: Mutex<Option<(i64, i32)>>,
     heartbeats_tx: Arc<Mutex<mpsc::Sender<()>>>,
-    publishes_tx: Arc<Mutex<mpsc::Sender<bellman::groth16::Proof<models::node::Engine>>>>,
+    publishes_tx: Arc<Mutex<mpsc::Sender<bellman::groth16::Proof<Engine>>>>,
     prover_data_fn: F,
 }
 
-impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for MockApiClient<F> {
-    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
+impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
+    fn block_to_prove(&self, _block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         Ok(*block_to_prove)
     }
@@ -326,11 +197,7 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
         Ok(())
     }
 
-    fn prover_data(
-        &self,
-        _block: i64,
-        _timeout: time::Duration,
-    ) -> Result<prover::prover_data::ProverData, failure::Error> {
+    fn prover_data(&self, _block: i64) -> Result<ProverData, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if (*block_to_prove).is_some() {
             let v = (self.prover_data_fn)();
@@ -344,8 +211,7 @@ impl<F: Fn() -> Option<prover::prover_data::ProverData>> prover::ApiClient for M
     fn publish(
         &self,
         _block: i64,
-        p: bellman::groth16::Proof<models::node::Engine>,
-        _public_data_commitment: models::node::Fr,
+        p: bellman::groth16::Proof<Engine>,
     ) -> Result<(), failure::Error> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();

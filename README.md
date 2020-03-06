@@ -24,20 +24,23 @@ Prepare dev environment prerequisites: see [docs/setup-dev.md](docs/setup-dev.md
 
 Setup:
 
-```
-zksync dev-up
+```sh
 zksync init
 ```
 
 To completely reset the dev environment:
 
 - Stop services:
-```zksync dev-down```
+  ```sh
+  zksync dev-down
+  ```
 - Repeat the setup procedure above
 
 # (Re)deploy db and contraсts:
 
-```zksync redeploy```
+```sh
+zksync redeploy
+```
 
 ## Environment configurations
 
@@ -45,69 +48,93 @@ Env config files are held in `etc/env/`
 
 List configurations:
 
-```zksync env```
+```sh
+zksync env
+```
 
 Switch between configurations:
 
-```zksync env <ENV_NAME>```
-
-## Monitoring & management:
-
-Seed for Metamask: fine music test violin matrix prize squirrel panther purchase material script deal
-Geth: ```geth attach $(bin/kube-geth-url)```
-
-NOTE: if you are resetting geth, each Metamask account must be manually reset via Settings > Advanced > Reset account.
+```sh
+zksync env <ENV_NAME>
+```
 
 ## Build and run server + prover locally for development:
 
 Run server:
-```
+
+```sh
 zksync server
 ```
 
-By default block chunk size set to `100`. For testing & development purposes you
-ca change it to smaller values. Two places requires a change:
-1. Environment variable value in `./etc/env/dev.env` `BLOCK_SIZE_CHUNKS`
-2. Rust constant at `./core/models/params.rs` `BLOCK_SIZE_CHUNKS`
-If you apply changes, do not forget to redeploy contracts `zksync redeploy`.
+By default block chunk size set to `50`. For testing & development purposes you
+can change it to the smaller value.
 
-You must prepare keys. This only needs to be done once:
+**Note:** Currently it's not recommended though. Lowering the block chunk size may
+break several tests, since some of them create big blocks.
+
+If you have to change the block chunk size anyway, you should change the environment
+variable `BLOCK_SIZE_CHUNKS` value in `./etc/env/dev.env`.
+
+After that you may need to invalidate `cargo` cache by touching the files of `models`:
+
+```sh
+touch core/models/**/*.rs
 ```
+
+This is required, because `models` take the environment variable value at the compile time, and
+we have to recompile this module to set correct values.
+
+If you use additional caching systems (like `sccache`), you may have to remove their cache as well.
+
+After that you must generate keys. This only needs to be done once:
+
+```sh
 ./bin/gen-keys
 zksync redeploy
 ```
+
 Run prover:
-```
+
+```sh
 zksync prover
 ```
 
 Run client
-```
+
+```sh
 zksync client
 ```
 
 Client UI will be available at http://localhost:8080.
 Make sure you have environment variables set right, you can check it by running:
-```zksync env```. You should see `* dev` in output.
+`zksync env`. You should see `* dev` in output.
 
 ## Build and push images to dockerhub:
 
-```zksync dockerhub-push```
+```sh
+zksync dockerhub-push
+```
 
 # Development
 
 ## Database migrations
 
-- ```cd core/storage```
+- 
+  ```sh
+  cd core/storage
+  ```
 - Add diesel migration
 - Rename `core/storage/schema.rs.generated` to `schema.rs`
-- Run tests: ```zksync db-tests```
+- Run tests:
+  ```sh
+  zksync db-tests
+  ```
 
 ## Generating keys
 
 To generate a proving key, from `server` dir run:
 
-```
+```sh
 cargo run --release --bin read_write_keys
 ```
 
@@ -115,7 +142,7 @@ It will generate a `*VerificationKey.sol` and `*_pk.key` files for 'deposit', 'e
 
 Move files to proper locations:
 
-```shell
+```sh
 mv -f n*VerificationKey.sol ./contracts/contracts/
 mv -f *_pk.key ./prover/keys/
 ```
@@ -126,7 +153,7 @@ If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant 
 
 ### Re-build contracts:
 
-```
+```sh
 cd contracts; yarn build
 ```
 
@@ -136,7 +163,7 @@ So you need to rebuild the code on every change (to be automated).
 
 ### Publish source code on etherscan
 
-```
+```sh
 zksync publish-source
 ```
 
