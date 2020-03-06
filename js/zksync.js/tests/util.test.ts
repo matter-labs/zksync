@@ -4,7 +4,6 @@ import {
     closestPackableTransactionAmount,
     closestPackableTransactionFee,
     TokenSet,
-    formatEtherSimple,
 } from "../src/utils";
 import { pedersenHash } from "../src/crypto";
 import { bigNumberify, formatEther } from "ethers/utils";
@@ -226,29 +225,5 @@ describe("Token cache resolve", function() {
             )
         ).to.throw();
         expect(() => tokenCache.resolveTokenId("ERC20-2")).to.throw();
-    });
-});
-
-describe("formatEtherSimple", function() {
-    it('formats just like ethers.utils.formatEther', function() {
-        let nums = [bigNumberify(0)];
-        const N = 25;
-        for (let i = 0; i < N; ++i) {
-            nums.push(bigNumberify('193'.padEnd(i, '0')));
-        }
-        let numsCombined = [];
-        for (let i = 0; i < N; ++i) {
-            for (let j = 0; j <= i; ++j) {
-                numsCombined.push(
-                    nums[i].add(nums[j])
-                )
-            }
-        }
-        for (const num of numsCombined) {
-            const n = num.toString();
-            const us = formatEtherSimple(n);
-            const them = formatEther(n);
-            expect(us == them);
-        }
     });
 });

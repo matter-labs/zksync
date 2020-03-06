@@ -14,7 +14,6 @@ import {
     IERC20_INTERFACE,
     isTokenETH,
     SYNC_MAIN_CONTRACT_INTERFACE,
-    formatEtherSimple,
 } from "./utils";
 
 export class Wallet {
@@ -85,7 +84,7 @@ export class Wallet {
             nonce
         };
 
-        const stringAmount = formatEtherSimple(utils.bigNumberify(transfer.amount).toString());
+        const stringAmount = utils.formatEther(transfer.amount);
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             transfer.token
         );
@@ -137,7 +136,7 @@ export class Wallet {
             nonce
         };
 
-        const stringAmount = formatEtherSimple(utils.bigNumberify(withdraw.amount).toString());
+        const stringAmount = utils.formatEther(withdraw.amount);
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             withdraw.token
         );
