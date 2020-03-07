@@ -80,14 +80,16 @@ impl AppState {
             .expect("State update thread");
     }
 }
+
 #[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct TestnetConfigResponse {
-    address: String,
+    contract_address: String,
 }
 
 fn handle_get_testnet_config(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
-    let address = data.contract_address.clone();
-    Ok(HttpResponse::Ok().json(TestnetConfigResponse { address }))
+    let contract_address = data.contract_address.clone();
+    Ok(HttpResponse::Ok().json(TestnetConfigResponse { contract_address }))
 }
 
 fn handle_get_network_status(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
@@ -443,7 +445,7 @@ pub(super) fn start_server_thread_detached(
             let state = AppState {
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
-                contract_address: format!("{}", contract_address),
+                contract_address: format!("{:?}", contract_address),
                 mempool_request_sender,
             };
             state.spawn_network_status_updater(panic_notify);

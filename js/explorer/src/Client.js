@@ -1,13 +1,12 @@
 import config from './env-config';
-import constants from './constants';
+import * as constants from './constants';
 import { readableEther } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
 const zksync = require('zksync');   
-const ethers = require('ethers');
 import axios from 'axios';
 
 async function fetch(req) {
-    let r = await axios(req).catch(_ => ({}));
+    let r = await axios(req).catch(() => ({}));
     if (r.status == 200) {
         return r.data;
     } else {
@@ -48,6 +47,13 @@ export class Client {
         };
 
         return new Client(props);
+    }
+
+    async testnetConfig() {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/testnet_config`,
+        });
     }
 
     async status() {
