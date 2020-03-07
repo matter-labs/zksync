@@ -189,8 +189,8 @@ export class Client {
                             { key: 'pq_id',       label: 'Priority op' },
                         ],
                         data: Object.assign(data, {
-                            from: tx.tx.priority_op.sender,
-                            to: tx.tx.priority_op.account,
+                            from: tx.tx.priority_op.from,
+                            to: tx.tx.priority_op.to,
                             pq_id: tx.pq_id,
                             token, amount,
                             hash,
@@ -243,8 +243,8 @@ export class Client {
                             { key: 'hash',        label: 'Tx hash' },
                         ],
                         data: Object.assign(data, {
-                            from: tx.tx.account,
-                            to: tx.tx.ethAddress,
+                            from: tx.tx.from,
+                            to: tx.tx.to,
                             token, amount,
                             hash: tx.hash,
                         }),

@@ -2,7 +2,7 @@ import { utils } from "ethers";
 
 // 0x-prefixed, hex encoded, ethereum account address
 export type Address = string;
-// sync:-prefixed, hex encoded, hash of the account public key
+// 0x-prefixed, hex encoded, hash of the account public key
 export type PubKeyHash = string;
 
 // Symbol like "ETH" or "FAU" or token contract address(zero address is implied for "ETH").

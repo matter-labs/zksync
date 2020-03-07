@@ -24,7 +24,7 @@ export class Signer {
     }
 
     pubKeyHash(): PubKeyHash {
-        return `sync:${pubkeyToAddress(this.publicKey).toString("hex")}`;
+        return `0x${pubkeyToAddress(this.publicKey).toString("hex")}`;
     }
 
     signSyncTransfer(transfer: {
@@ -120,19 +120,11 @@ export class Signer {
 
 // Sync or eth address
 export function serializeAddress(address: Address | string): Buffer {
-    const prefixlessAddress = address.startsWith("0x")
-        ? address.substr(2)
-        : address.startsWith("sync:")
-        ? address.substr(5)
-        : null;
-
-    if (prefixlessAddress === null) {
-        throw new Error(
-            "ETH address must start with '0x' and Sync address start with 'sync:'"
-        );
+    if (address.startsWith("0x") === false) {
+        throw new Error("Address must start with '0x'");
     }
 
-    const addressBytes = Buffer.from(prefixlessAddress, "hex");
+    const addressBytes = Buffer.from(address.substr(2), "hex");
     if (addressBytes.length != 20) {
         throw new Error("Address must be 20 bytes long");
     }
