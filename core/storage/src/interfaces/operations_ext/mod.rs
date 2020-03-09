@@ -8,11 +8,14 @@ use models::node::PubKeyHash;
 use models::ActionType;
 // Local imports
 use self::records::{
-    AccountTransaction, PriorityOpReceiptResponse, ReadTx, StoredExecutedTransaction,
-    TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
+    AccountTransaction, PriorityOpReceiptResponse, ReadTx, TransactionsHistoryItem,
+    TxByHashResponse, TxReceiptResponse,
 };
 use crate::interfaces::{
-    operations::records::{StoredExecutedPriorityOperation, StoredOperation},
+    operations::{
+        records::{StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation},
+        OperationsSchema,
+    },
     prover::records::ProverRun,
 };
 use crate::schema::*;
@@ -20,15 +23,12 @@ use crate::StorageProcessor;
 
 pub mod records;
 
-pub struct TransactionsSchema<'a>(pub &'a StorageProcessor);
+pub struct OperationsExtSchema<'a>(pub &'a StorageProcessor);
 
-impl<'a> TransactionsSchema<'a> {
+impl<'a> OperationsExtSchema<'a> {
     pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
         self.0.conn().transaction(|| {
-            let tx = executed_transactions::table
-                .filter(executed_transactions::tx_hash.eq(hash))
-                .first::<StoredExecutedTransaction>(self.0.conn())
-                .optional()?;
+            let tx = OperationsSchema(self.0).get_executed_operation(hash)?;
 
             if let Some(tx) = tx {
                 let commited = operations::table
@@ -69,12 +69,10 @@ impl<'a> TransactionsSchema<'a> {
         })
     }
 
-    pub fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
+    pub fn get_priority_op_receipt(&self, op_id: u32) -> QueryResult<PriorityOpReceiptResponse> {
         // TODO: jazzandrock maybe use one db query(?).
-        let stored_executed_prior_op = executed_priority_operations::table
-            .filter(executed_priority_operations::priority_op_serialid.eq(op_id))
-            .first::<StoredExecutedPriorityOperation>(self.0.conn())
-            .optional()?;
+        let stored_executed_prior_op =
+            OperationsSchema(self.0).get_executed_priority_operation(op_id)?;
 
         match stored_executed_prior_op {
             Some(stored_executed_prior_op) => {
@@ -113,10 +111,8 @@ impl<'a> TransactionsSchema<'a> {
         // TODO: Maybe move the transformations to api_server?
 
         // first check executed_transactions
-        let tx: Option<StoredExecutedTransaction> = executed_transactions::table
-            .filter(executed_transactions::tx_hash.eq(hash))
-            .first(self.0.conn())
-            .optional()?;
+        let tx: Option<StoredExecutedTransaction> =
+            OperationsSchema(self.0).get_executed_operation(hash)?;
 
         if let Some(tx) = tx {
             let block_number = tx.block_number;
@@ -383,17 +379,5 @@ impl<'a> TransactionsSchema<'a> {
             .collect::<Vec<AccountTransaction>>();
 
         Ok(res)
-    }
-
-    pub fn get_executed_priority_op(
-        &self,
-        priority_op_id: u32,
-    ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
-        executed_priority_operations::table
-            .filter(
-                executed_priority_operations::priority_op_serialid.eq(i64::from(priority_op_id)),
-            )
-            .first::<StoredExecutedPriorityOperation>(self.0.conn())
-            .optional()
     }
 }

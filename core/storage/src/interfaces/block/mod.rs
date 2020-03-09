@@ -13,12 +13,15 @@ use models::{fe_from_hex, fe_to_hex, Action, ActionType, Operation};
 use self::records::{BlockDetails, StorageBlock};
 use crate::interfaces::{
     ethereum::records::StorageETHOperation,
-    operations::records::{
-        NewExecutedPriorityOperation, NewOperation, StoredExecutedPriorityOperation,
-        StoredOperation,
+    operations::{
+        records::{
+            NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
+            StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+        },
+        OperationsSchema,
     },
+    operations_ext::records::{InsertTx, ReadTx},
     state::StateSchema,
-    transactions::records::{InsertTx, NewExecutedTransaction, ReadTx, StoredExecutedTransaction},
 };
 use crate::schema::*;
 use crate::StorageProcessor;
@@ -50,12 +53,12 @@ impl<'a> BlockSchema<'a> {
                 }
             };
 
-            let stored: StoredOperation = diesel::insert_into(operations::table)
-                .values(&NewOperation {
-                    block_number: i64::from(op.block.block_number),
-                    action_type: op.action.to_string(),
-                })
-                .get_result(self.0.conn())?;
+            let new_operation = NewOperation {
+                block_number: i64::from(op.block.block_number),
+                action_type: op.action.to_string(),
+            };
+            let stored: StoredOperation =
+                OperationsSchema(self.0).store_operation(new_operation)?;
             stored.into_op(self.0)
         })
     }
@@ -64,8 +67,7 @@ impl<'a> BlockSchema<'a> {
         for block_tx in block.block_transactions.iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
-                    let stored_tx =
-                        NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
+                    let new_tx = NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
                     diesel::insert_into(mempool::table)
                         .values(&InsertTx {
                             hash: tx.tx.hash().as_ref().to_vec(),
@@ -75,19 +77,14 @@ impl<'a> BlockSchema<'a> {
                         })
                         .on_conflict_do_nothing()
                         .execute(self.0.conn())?;
-                    diesel::insert_into(executed_transactions::table)
-                        .values(&stored_tx)
-                        .execute(self.0.conn())?;
+                    OperationsSchema(self.0).store_executed_operation(new_tx)?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
-                    let stored_priority_op =
-                        NewExecutedPriorityOperation::prepare_stored_priority_op(
-                            prior_op,
-                            block.block_number,
-                        );
-                    diesel::insert_into(executed_priority_operations::table)
-                        .values(&stored_priority_op)
-                        .execute(self.0.conn())?;
+                    let new_priority_op = NewExecutedPriorityOperation::prepare_stored_priority_op(
+                        prior_op,
+                        block.block_number,
+                    );
+                    OperationsSchema(self.0).store_executed_priority_operation(new_priority_op)?;
                 }
             }
         }
