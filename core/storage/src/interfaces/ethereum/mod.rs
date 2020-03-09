@@ -9,7 +9,7 @@ use web3::types::H256;
 use models::Operation;
 // Local imports
 use self::records::{NewETHOperation, StorageETHOperation, StoredLastWatchedEthBlockNumber};
-use crate::interfaces::transactions::records::StoredOperation;
+use crate::interfaces::operations::records::StoredOperation;
 use crate::schema::*;
 use crate::StorageProcessor;
 

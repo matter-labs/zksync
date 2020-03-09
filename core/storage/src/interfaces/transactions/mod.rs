@@ -8,11 +8,13 @@ use models::node::PubKeyHash;
 use models::ActionType;
 // Local imports
 use self::records::{
-    AccountTransaction, PriorityOpReceiptResponse, ReadTx, StoredExecutedPriorityOperation,
-    StoredExecutedTransaction, StoredOperation, TransactionsHistoryItem, TxByHashResponse,
-    TxReceiptResponse,
+    AccountTransaction, PriorityOpReceiptResponse, ReadTx, StoredExecutedTransaction,
+    TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
 };
-use crate::interfaces::prover::records::ProverRun;
+use crate::interfaces::{
+    operations::records::{StoredExecutedPriorityOperation, StoredOperation},
+    prover::records::ProverRun,
+};
 use crate::schema::*;
 use crate::StorageProcessor;
 

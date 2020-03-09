@@ -32,13 +32,11 @@ mod schema;
 mod tests;
 
 pub mod connection_pool;
-pub mod data;
 pub mod diff;
 pub mod interfaces;
 
 // TODO re-exports to deal with
 pub use crate::connection_pool::ConnectionPool;
-pub use crate::data::*;
 pub use crate::diff::StorageAccountDiff;
 pub use crate::interfaces::prover::ProverInterface;
 

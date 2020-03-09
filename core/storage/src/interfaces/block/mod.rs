@@ -13,10 +13,11 @@ use models::{fe_from_hex, fe_to_hex, Action, ActionType, Operation};
 use self::records::{BlockDetails, StorageBlock};
 use crate::interfaces::{
     ethereum::records::StorageETHOperation,
-    transactions::records::{
-        InsertTx, NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation, ReadTx,
-        StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+    operations::records::{
+        NewExecutedPriorityOperation, NewOperation, StoredExecutedPriorityOperation,
+        StoredOperation,
     },
+    transactions::records::{InsertTx, NewExecutedTransaction, ReadTx, StoredExecutedTransaction},
 };
 use crate::schema::*;
 use crate::StorageProcessor;

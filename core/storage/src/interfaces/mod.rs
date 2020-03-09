@@ -3,6 +3,7 @@ pub mod block;
 pub mod config;
 pub mod data_restore;
 pub mod ethereum;
+pub mod operations;
 pub mod prover;
 pub mod state;
 pub mod stats;
