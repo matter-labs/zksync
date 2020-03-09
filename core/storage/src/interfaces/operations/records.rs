@@ -11,7 +11,7 @@ use models::{Action, ActionType, Operation};
 use crate::schema::*;
 
 // TODO this module should not know about storage processor and interfaces.
-use crate::interfaces::{block::BlockInterface, prover::ProverInterface, state::StateInterface};
+use crate::interfaces::{block::BlockSchema, prover::ProverSchema, state::StateSchema};
 use crate::StorageProcessor;
 
 #[derive(Debug, Insertable)]
@@ -69,16 +69,16 @@ impl StoredOperation {
             Action::Commit
         } else if self.action_type == ActionType::VERIFY.to_string() {
             // verify
-            let proof = Box::new(conn.load_proof(block_number)?);
+            let proof = Box::new(ProverSchema(&conn).load_proof(block_number)?);
             Action::Verify { proof }
         } else {
             unreachable!("Incorrect action type in db");
         };
 
-        let block = conn
+        let block = BlockSchema(&conn)
             .get_block(block_number)?
             .expect("Block for action does not exist");
-        let accounts_updated = conn.load_state_diff_for_block(block_number)?;
+        let accounts_updated = StateSchema(&conn).load_state_diff_for_block(block_number)?;
         Ok(Operation {
             id,
             action,

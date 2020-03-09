@@ -33,7 +33,6 @@ pub mod interfaces;
 // TODO re-exports to deal with
 pub use crate::connection_pool::ConnectionPool;
 pub use crate::diff::StorageAccountDiff;
-pub use crate::interfaces::prover::ProverInterface;
 
 enum ConnectionHolder {
     Pooled(PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>),

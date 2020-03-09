@@ -8,13 +8,11 @@ use crate::StorageProcessor;
 
 pub mod records;
 
-pub trait ConfigInterface {
-    fn load_config(&self) -> QueryResult<ServerConfig>;
-}
+pub struct ConfigSchema<'a>(pub &'a StorageProcessor);
 
-impl ConfigInterface for StorageProcessor {
-    fn load_config(&self) -> QueryResult<ServerConfig> {
+impl<'a> ConfigSchema<'a> {
+    pub fn load_config(&self) -> QueryResult<ServerConfig> {
         use crate::schema::server_config::dsl::*;
-        server_config.first(self.conn())
+        server_config.first(self.0.conn())
     }
 }

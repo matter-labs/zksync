@@ -13,7 +13,7 @@ use models::node::{apply_updates, AccountMap, AccountUpdate, Fr, PubKeyHash};
 use models::primitives::u128_to_bigdecimal;
 use models::{Action, EncodedProof, Operation};
 // Local imports
-use crate::interfaces::{block::BlockInterface, state::StateInterface};
+use crate::interfaces::{block::BlockSchema, prover::ProverSchema, state::StateSchema};
 
 fn acc_create_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32, AccountUpdate)> {
     let id: u32 = rng.gen();
@@ -126,53 +126,60 @@ fn test_commit_rewind() {
         }
     };
 
-    conn.execute_operation(&get_operation(1, Action::Commit, updates_block_1))
+    BlockSchema(&conn)
+        .execute_operation(&get_operation(1, Action::Commit, updates_block_1))
         .expect("Commit block 1");
-    conn.execute_operation(&get_operation(2, Action::Commit, updates_block_2))
+    BlockSchema(&conn)
+        .execute_operation(&get_operation(2, Action::Commit, updates_block_2))
         .expect("Commit block 2");
-    conn.execute_operation(&get_operation(3, Action::Commit, updates_block_3))
+    BlockSchema(&conn)
+        .execute_operation(&get_operation(3, Action::Commit, updates_block_3))
         .expect("Commit block 3");
 
-    let (block, state) = conn.load_committed_state(Some(1)).unwrap();
+    let (block, state) = StateSchema(&conn).load_committed_state(Some(1)).unwrap();
     assert_eq!((block, &state), (1, &accounts_block_1));
 
-    let (block, state) = conn.load_committed_state(Some(2)).unwrap();
+    let (block, state) = StateSchema(&conn).load_committed_state(Some(2)).unwrap();
     assert_eq!((block, &state), (2, &accounts_block_2));
 
-    let (block, state) = conn.load_committed_state(Some(3)).unwrap();
+    let (block, state) = StateSchema(&conn).load_committed_state(Some(3)).unwrap();
     assert_eq!((block, &state), (3, &accounts_block_3));
 
-    conn.store_proof(1, &Default::default())
+    ProverSchema(&conn)
+        .store_proof(1, &Default::default())
         .expect("Store proof block 1");
-    conn.execute_operation(&get_operation(
-        1,
-        Action::Verify {
-            proof: Default::default(),
-        },
-        Vec::new(),
-    ))
-    .expect("Verify block 1");
-    conn.store_proof(2, &Default::default())
+    BlockSchema(&conn)
+        .execute_operation(&get_operation(
+            1,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            Vec::new(),
+        ))
+        .expect("Verify block 1");
+    ProverSchema(&conn)
+        .store_proof(2, &Default::default())
         .expect("Store proof block 2");
-    conn.execute_operation(&get_operation(
-        2,
-        Action::Verify {
-            proof: Default::default(),
-        },
-        Vec::new(),
-    ))
-    .expect("Verify block 2");
+    BlockSchema(&conn)
+        .execute_operation(&get_operation(
+            2,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            Vec::new(),
+        ))
+        .expect("Verify block 2");
 
-    let (block, state) = conn.load_committed_state(Some(1)).unwrap();
+    let (block, state) = StateSchema(&conn).load_committed_state(Some(1)).unwrap();
     assert_eq!((block, &state), (1, &accounts_block_1));
 
-    let (block, state) = conn.load_committed_state(Some(2)).unwrap();
+    let (block, state) = StateSchema(&conn).load_committed_state(Some(2)).unwrap();
     assert_eq!((block, &state), (2, &accounts_block_2));
 
-    let (block, state) = conn.load_committed_state(Some(3)).unwrap();
+    let (block, state) = StateSchema(&conn).load_committed_state(Some(3)).unwrap();
     assert_eq!((block, &state), (3, &accounts_block_3));
 
-    let (block, state) = conn.load_committed_state(None).unwrap();
+    let (block, state) = StateSchema(&conn).load_committed_state(None).unwrap();
     assert_eq!((block, &state), (3, &accounts_block_3));
 }
 
@@ -188,11 +195,11 @@ fn test_store_proof() {
     let conn = pool.access_storage().unwrap();
     conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
 
-    assert!(conn.load_proof(1).is_err());
+    assert!(ProverSchema(&conn).load_proof(1).is_err());
 
     let proof = EncodedProof::default();
-    assert!(conn.store_proof(1, &proof).is_ok());
+    assert!(ProverSchema(&conn).store_proof(1, &proof).is_ok());
 
-    let loaded = conn.load_proof(1).expect("must load proof");
+    let loaded = ProverSchema(&conn).load_proof(1).expect("must load proof");
     assert_eq!(loaded, proof);
 }

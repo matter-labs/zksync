@@ -11,14 +11,10 @@ use crate::StorageProcessor;
 
 pub mod records;
 
-pub trait TokensInterface {
-    fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()>;
+pub struct TokensSchema<'a>(pub &'a StorageProcessor);
 
-    fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>>;
-}
-
-impl TokensInterface for StorageProcessor {
-    fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()> {
+impl<'a> TokensSchema<'a> {
+    pub fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()> {
         let new_token = Token {
             id: i32::from(id),
             address: address.to_string(),
@@ -30,14 +26,14 @@ impl TokensInterface for StorageProcessor {
             .do_update()
             // update token address but not symbol -- so we can update it externally
             .set(tokens::address.eq(new_token.address.clone()))
-            .execute(self.conn())
+            .execute(self.0.conn())
             .map(drop)
     }
 
-    fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
+    pub fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
         let tokens = tokens::table
             .order(tokens::id.asc())
-            .load::<Token>(self.conn())?;
+            .load::<Token>(self.0.conn())?;
         Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
     }
 }

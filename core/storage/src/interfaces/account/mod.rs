@@ -17,29 +17,16 @@ mod stored_state;
 pub(crate) use self::restore_account::restore_account;
 pub use self::stored_state::StoredAccountState;
 
-pub trait AccountInterface {
+pub struct AccountSchema<'a>(pub &'a StorageProcessor);
+
+impl<'a> AccountSchema<'a> {
     // Verified, commited states.
-    fn account_state_by_address(&self, address: &Address) -> QueryResult<StoredAccountState>;
-
-    fn last_committed_state_for_account(
-        &self,
-        account_id: AccountId,
-    ) -> QueryResult<Option<models::node::Account>>;
-
-    fn last_verified_state_for_account(
-        &self,
-        account_id: AccountId,
-    ) -> QueryResult<Option<models::node::Account>>;
-}
-
-impl AccountInterface for StorageProcessor {
-    // Verified, commited states.
-    fn account_state_by_address(&self, address: &Address) -> QueryResult<StoredAccountState> {
+    pub fn account_state_by_address(&self, address: &Address) -> QueryResult<StoredAccountState> {
         let account_create_record = account_creates::table
             .filter(account_creates::address.eq(address.as_bytes().to_vec()))
             .filter(account_creates::is_create.eq(true))
             .order(account_creates::block_number.desc())
-            .first::<StorageAccountCreation>(self.conn())
+            .first::<StorageAccountCreation>(self.0.conn())
             .optional()?;
 
         let account_id = if let Some(account_create_record) = account_create_record {
@@ -63,25 +50,25 @@ impl AccountInterface for StorageProcessor {
         })
     }
 
-    fn last_committed_state_for_account(
+    pub fn last_committed_state_for_account(
         &self,
         account_id: AccountId,
     ) -> QueryResult<Option<models::node::Account>> {
-        self.conn().transaction(|| {
+        self.0.conn().transaction(|| {
             let (last_block, account) = self.get_account_and_last_block(account_id)?;
 
             let account_balance_diff: Vec<StorageAccountUpdate> = {
                 account_balance_updates::table
                     .filter(account_balance_updates::account_id.eq(&(i64::from(account_id))))
                     .filter(account_balance_updates::block_number.gt(&last_block))
-                    .load::<StorageAccountUpdate>(self.conn())?
+                    .load::<StorageAccountUpdate>(self.0.conn())?
             };
 
             let account_creation_diff: Vec<StorageAccountCreation> = {
                 account_creates::table
                     .filter(account_creates::account_id.eq(&(i64::from(account_id))))
                     .filter(account_creates::block_number.gt(&last_block))
-                    .load::<StorageAccountCreation>(self.conn())?
+                    .load::<StorageAccountCreation>(self.0.conn())?
             };
 
             let account_diff = {
@@ -110,28 +97,26 @@ impl AccountInterface for StorageProcessor {
         })
     }
 
-    fn last_verified_state_for_account(
+    pub fn last_verified_state_for_account(
         &self,
         account_id: AccountId,
     ) -> QueryResult<Option<models::node::Account>> {
         let (_, account) = self.get_account_and_last_block(account_id)?;
         Ok(account)
     }
-}
 
-impl StorageProcessor {
     fn get_account_and_last_block(
         &self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
-        self.conn().transaction(|| {
+        self.0.conn().transaction(|| {
             if let Some(account) = accounts::table
                 .find(i64::from(account_id))
-                .first::<StorageAccount>(self.conn())
+                .first::<StorageAccount>(self.0.conn())
                 .optional()?
             {
                 let balances: Vec<StorageBalance> =
-                    StorageBalance::belonging_to(&account).load(self.conn())?;
+                    StorageBalance::belonging_to(&account).load(self.0.conn())?;
 
                 let last_block = account.last_block;
                 let (_, account) = restore_account(account, balances);

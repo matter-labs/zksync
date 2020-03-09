@@ -15,43 +15,23 @@ use crate::StorageProcessor;
 
 pub mod records;
 
-pub trait EthereumInterface {
-    fn load_unconfirmed_operations(
-        &self,
-    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>>;
+pub struct EthereumSchema<'a>(pub &'a StorageProcessor);
 
-    fn load_sent_unconfirmed_ops(&self) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>>;
-
-    fn save_operation_eth_tx(
-        &self,
-        op_id: i64,
-        hash: H256,
-        deadline_block: u64,
-        nonce: u32,
-        gas_price: BigDecimal,
-        raw_tx: Vec<u8>,
-    ) -> QueryResult<()>;
-
-    fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()>;
-
-    fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber>;
-}
-
-impl EthereumInterface for StorageProcessor {
-    fn load_unconfirmed_operations(
+impl<'a> EthereumSchema<'a> {
+    pub fn load_unconfirmed_operations(
         &self,
         // TODO: move Eth transaction state to models and add it here
     ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
-        self.conn().transaction(|| {
+        self.0.conn().transaction(|| {
             let ops: Vec<_> = operations::table
                 .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
                 .filter(operations::confirmed.eq(false))
                 .order(operations::id.asc())
-                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.conn())?;
+                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.0.conn())?;
 
             let mut ops = ops
                 .into_iter()
-                .map(|(o, e)| o.into_op(self).map(|o| (o, e)))
+                .map(|(o, e)| o.into_op(self.0).map(|o| (o, e)))
                 .collect::<QueryResult<Vec<_>>>()?;
             ops.sort_by_key(|(o, _)| o.id.unwrap()); // operations from db MUST have and id.
 
@@ -82,16 +62,18 @@ impl EthereumInterface for StorageProcessor {
         })
     }
 
-    fn load_sent_unconfirmed_ops(&self) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
-        self.conn().transaction(|| {
+    pub fn load_sent_unconfirmed_ops(
+        &self,
+    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
+        self.0.conn().transaction(|| {
             let ops: Vec<_> = operations::table
                 .filter(eth_operations::confirmed.eq(false))
                 .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
                 .order(operations::id.asc())
-                .load::<(StoredOperation, StorageETHOperation)>(self.conn())?;
+                .load::<(StoredOperation, StorageETHOperation)>(self.0.conn())?;
             let mut ops_with_eth_actions = Vec::new();
             for (op, eth_op) in ops.into_iter() {
-                ops_with_eth_actions.push((op.into_op(self)?, eth_op));
+                ops_with_eth_actions.push((op.into_op(self.0)?, eth_op));
             }
             Ok(ops_with_eth_actions
                 .into_iter()
@@ -118,7 +100,7 @@ impl EthereumInterface for StorageProcessor {
         })
     }
 
-    fn save_operation_eth_tx(
+    pub fn save_operation_eth_tx(
         &self,
         op_id: i64,
         hash: H256,
@@ -136,29 +118,29 @@ impl EthereumInterface for StorageProcessor {
                 tx_hash: hash.as_bytes().to_vec(),
                 raw_tx,
             })
-            .execute(self.conn())
+            .execute(self.0.conn())
             .map(drop)
     }
 
-    fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
-        self.conn().transaction(|| {
+    pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
             update(eth_operations::table.filter(eth_operations::tx_hash.eq(hash.as_bytes())))
                 .set(eth_operations::confirmed.eq(true))
-                .execute(self.conn())
+                .execute(self.0.conn())
                 .map(drop)?;
             let (op, _) = operations::table
                 .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
                 .filter(eth_operations::tx_hash.eq(hash.as_bytes()))
-                .first::<(StoredOperation, StorageETHOperation)>(self.conn())?;
+                .first::<(StoredOperation, StorageETHOperation)>(self.0.conn())?;
 
             update(operations::table.filter(operations::id.eq(op.id)))
                 .set(operations::confirmed.eq(true))
-                .execute(self.conn())
+                .execute(self.0.conn())
                 .map(drop)
         })
     }
 
-    fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
-        data_restore_last_watched_eth_block::table.first(self.conn())
+    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
+        data_restore_last_watched_eth_block::table.first(self.0.conn())
     }
 }

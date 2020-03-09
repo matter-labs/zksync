@@ -20,44 +20,21 @@ use crate::StorageProcessor;
 
 pub mod records;
 
-pub trait TransactionsInterface {
-    fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>>;
+pub struct TransactionsSchema<'a>(pub &'a StorageProcessor);
 
-    fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse>;
-
-    fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>>;
-
-    fn get_account_transactions_history(
-        &self,
-        address: &PubKeyHash,
-        offset: i64,
-        limit: i64,
-    ) -> QueryResult<Vec<TransactionsHistoryItem>>;
-
-    fn get_account_transactions(
-        &self,
-        address: &PubKeyHash,
-    ) -> QueryResult<Vec<AccountTransaction>>;
-
-    fn get_executed_priority_op(
-        &self,
-        priority_op_id: u32,
-    ) -> QueryResult<Option<StoredExecutedPriorityOperation>>;
-}
-
-impl TransactionsInterface for StorageProcessor {
-    fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
-        self.conn().transaction(|| {
+impl<'a> TransactionsSchema<'a> {
+    pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
+        self.0.conn().transaction(|| {
             let tx = executed_transactions::table
                 .filter(executed_transactions::tx_hash.eq(hash))
-                .first::<StoredExecutedTransaction>(self.conn())
+                .first::<StoredExecutedTransaction>(self.0.conn())
                 .optional()?;
 
             if let Some(tx) = tx {
                 let commited = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
                     .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
-                    .first::<StoredOperation>(self.conn())
+                    .first::<StoredOperation>(self.0.conn())
                     .optional()?
                     .is_some();
 
@@ -68,14 +45,14 @@ impl TransactionsInterface for StorageProcessor {
                 let verified = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
                     .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
-                    .first::<StoredOperation>(self.conn())
+                    .first::<StoredOperation>(self.0.conn())
                     .optional()?
                     .map(|v| v.confirmed)
                     .unwrap_or(false);
 
                 let prover_run: Option<ProverRun> = prover_runs::table
                     .filter(prover_runs::block_number.eq(tx.block_number))
-                    .first::<ProverRun>(self.conn())
+                    .first::<ProverRun>(self.0.conn())
                     .optional()?;
 
                 Ok(Some(TxReceiptResponse {
@@ -92,30 +69,30 @@ impl TransactionsInterface for StorageProcessor {
         })
     }
 
-    fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
+    pub fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
         // TODO: jazzandrock maybe use one db query(?).
         let stored_executed_prior_op = executed_priority_operations::table
             .filter(executed_priority_operations::priority_op_serialid.eq(op_id))
-            .first::<StoredExecutedPriorityOperation>(self.conn())
+            .first::<StoredExecutedPriorityOperation>(self.0.conn())
             .optional()?;
 
         match stored_executed_prior_op {
             Some(stored_executed_prior_op) => {
                 let prover_run: Option<ProverRun> = prover_runs::table
                     .filter(prover_runs::block_number.eq(stored_executed_prior_op.block_number))
-                    .first::<ProverRun>(self.conn())
+                    .first::<ProverRun>(self.0.conn())
                     .optional()?;
 
                 let commit = operations::table
                     .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
                     .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
-                    .first::<StoredOperation>(self.conn())
+                    .first::<StoredOperation>(self.0.conn())
                     .optional()?;
 
                 let confirm = operations::table
                     .filter(operations::block_number.eq(stored_executed_prior_op.block_number))
                     .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
-                    .first::<StoredOperation>(self.conn())
+                    .first::<StoredOperation>(self.0.conn())
                     .optional()?;
 
                 Ok(PriorityOpReceiptResponse {
@@ -132,13 +109,13 @@ impl TransactionsInterface for StorageProcessor {
         }
     }
 
-    fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+    pub fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
         // TODO: Maybe move the transformations to api_server?
 
         // first check executed_transactions
         let tx: Option<StoredExecutedTransaction> = executed_transactions::table
             .filter(executed_transactions::tx_hash.eq(hash))
-            .first(self.conn())
+            .first(self.0.conn())
             .optional()?;
 
         if let Some(tx) = tx {
@@ -215,7 +192,7 @@ impl TransactionsInterface for StorageProcessor {
         // then check executed_priority_operations
         let tx: Option<StoredExecutedPriorityOperation> = executed_priority_operations::table
             .filter(executed_priority_operations::eth_hash.eq(hash))
-            .first(self.conn())
+            .first(self.0.conn())
             .optional()?;
 
         if let Some(tx) = tx {
@@ -265,7 +242,7 @@ impl TransactionsInterface for StorageProcessor {
         Ok(None)
     }
 
-    fn get_account_transactions_history(
+    pub fn get_account_transactions_history(
         &self,
         address: &PubKeyHash,
         offset: i64,
@@ -344,10 +321,10 @@ impl TransactionsInterface for StorageProcessor {
             limit = limit
         );
 
-        diesel::sql_query(query).load::<TransactionsHistoryItem>(self.conn())
+        diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())
     }
 
-    fn get_account_transactions(
+    pub fn get_account_transactions(
         &self,
         address: &PubKeyHash,
     ) -> QueryResult<Vec<AccountTransaction>> {
@@ -364,7 +341,7 @@ impl TransactionsInterface for StorageProcessor {
                 ReadTx,
                 Option<StoredExecutedTransaction>,
                 Option<StoredOperation>,
-            )>(self.conn())?;
+            )>(self.0.conn())?;
 
         let res = all_txs
             .into_iter()
@@ -408,7 +385,7 @@ impl TransactionsInterface for StorageProcessor {
         Ok(res)
     }
 
-    fn get_executed_priority_op(
+    pub fn get_executed_priority_op(
         &self,
         priority_op_id: u32,
     ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {
@@ -416,7 +393,7 @@ impl TransactionsInterface for StorageProcessor {
             .filter(
                 executed_priority_operations::priority_op_serialid.eq(i64::from(priority_op_id)),
             )
-            .first::<StoredExecutedPriorityOperation>(self.conn())
+            .first::<StoredExecutedPriorityOperation>(self.0.conn())
             .optional()
     }
 }
