@@ -13,7 +13,10 @@ use models::node::{apply_updates, AccountMap, AccountUpdate, Fr, PubKeyHash};
 use models::primitives::u128_to_bigdecimal;
 use models::{Action, EncodedProof, Operation};
 // Local imports
-use crate::interfaces::{block::BlockSchema, prover::ProverSchema, state::StateSchema};
+use crate::{
+    chain::{block::BlockSchema, state::StateSchema},
+    prover::ProverSchema,
+};
 
 fn acc_create_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32, AccountUpdate)> {
     let id: u32 = rng.gen();

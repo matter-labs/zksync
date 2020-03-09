@@ -26,9 +26,14 @@ mod schema;
 #[cfg(test)]
 mod tests;
 
+pub mod chain;
+pub mod config;
 pub mod connection_pool;
+pub mod data_restore;
 pub mod diff;
-pub mod interfaces;
+pub mod ethereum;
+pub mod prover;
+pub mod tokens;
 
 // TODO re-exports to deal with
 pub use crate::connection_pool::ConnectionPool;

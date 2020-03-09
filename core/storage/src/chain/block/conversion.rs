@@ -10,16 +10,16 @@ use models::{
 };
 // Local imports
 use crate::{
-    interfaces::{
+    chain::{
         block::BlockSchema,
         operations::records::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
             StoredExecutedTransaction, StoredOperation,
         },
         operations_ext::records::ReadTx,
-        prover::ProverSchema,
         state::StateSchema,
     },
+    prover::ProverSchema,
     StorageProcessor,
 };
 

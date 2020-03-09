@@ -6,7 +6,7 @@ use web3::types::Address;
 use models::node::PubKeyHash;
 use models::node::{AccountUpdate, TokenId};
 // Local imports
-use crate::interfaces::account::records::*;
+use crate::chain::account::records::*;
 
 #[derive(Debug)]
 pub enum StorageAccountDiff {

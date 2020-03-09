@@ -8,8 +8,7 @@ use models::node::PubKeyHash;
 use models::node::{apply_updates, reverse_updates, AccountMap, AccountUpdate, AccountUpdates};
 // Local imports
 use self::records::{StoredBlockEvent, StoredStorageState};
-use crate::diff::StorageAccountDiff;
-use crate::interfaces::{
+use crate::chain::{
     account::{
         records::{
             StorageAccount, StorageAccountCreation, StorageAccountPubkeyUpdate,
@@ -20,6 +19,7 @@ use crate::interfaces::{
     },
     block::BlockSchema,
 };
+use crate::diff::StorageAccountDiff;
 use crate::schema::*;
 use crate::StorageProcessor;
 

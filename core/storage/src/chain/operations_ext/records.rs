@@ -5,7 +5,7 @@ use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value;
 // Workspace imports
 // Local imports
-use crate::interfaces::prover::records::ProverRun;
+use crate::prover::records::ProverRun;
 use crate::schema::*;
 
 #[derive(Debug, Serialize, Deserialize)]

@@ -11,15 +11,15 @@ use self::records::{
     AccountTransaction, PriorityOpReceiptResponse, ReadTx, TransactionsHistoryItem,
     TxByHashResponse, TxReceiptResponse,
 };
-use crate::interfaces::{
-    operations::{
+use crate::schema::*;
+use crate::StorageProcessor;
+use crate::{
+    chain::operations::{
         records::{StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation},
         OperationsSchema,
     },
     prover::records::ProverRun,
 };
-use crate::schema::*;
-use crate::StorageProcessor;
 
 pub mod records;
 

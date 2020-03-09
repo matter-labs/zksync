@@ -11,20 +11,23 @@ use models::node::{
 use models::{fe_from_hex, fe_to_hex, Action, ActionType, Operation};
 // Local imports
 use self::records::{BlockDetails, StorageBlock};
-use crate::interfaces::{
-    ethereum::records::StorageETHOperation,
-    operations::{
-        records::{
-            NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
-            StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
-        },
-        OperationsSchema,
-    },
-    operations_ext::records::{InsertTx, ReadTx},
-    state::StateSchema,
-};
 use crate::schema::*;
 use crate::StorageProcessor;
+use crate::{
+    chain::{
+        mempool::MempoolSchema,
+        operations::{
+            records::{
+                NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
+                StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+            },
+            OperationsSchema,
+        },
+        operations_ext::records::{InsertTx, ReadTx},
+        state::StateSchema,
+    },
+    ethereum::records::StorageETHOperation,
+};
 
 mod conversion;
 pub mod records;
@@ -76,15 +79,13 @@ impl<'a> BlockSchema<'a> {
                     let serialized_tx = serde_json::to_value(&tx.tx).unwrap_or_default();
 
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block.block_number);
-                    diesel::insert_into(mempool::table)
-                        .values(&InsertTx {
-                            hash,
-                            primary_account_address,
-                            nonce,
-                            tx: serialized_tx,
-                        })
-                        .on_conflict_do_nothing()
-                        .execute(self.0.conn())?;
+                    let mempool_tx = InsertTx {
+                        hash,
+                        primary_account_address,
+                        nonce,
+                        tx: serialized_tx,
+                    };
+                    MempoolSchema(self.0).insert_tx(mempool_tx)?;
                     OperationsSchema(self.0).store_executed_operation(new_tx)?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {

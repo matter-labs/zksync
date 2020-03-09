@@ -8,16 +8,18 @@ use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp};
 use models::{Action, Operation, TokenAddedEvent};
 // Local imports
 use self::records::StoredRollupOpsBlock;
-use crate::interfaces::{
-    block::BlockSchema,
-    ethereum::records::NewLastWatchedEthBlockNumber,
-    operations::records::{NewFranklinOp, NewOperation, StoredFranklinOp, StoredOperation},
-    state::records::{NewBlockEvent, NewStorageState},
-    state::StateSchema,
-    tokens::TokensSchema,
-};
 use crate::schema::*;
 use crate::StorageProcessor;
+use crate::{
+    chain::{
+        block::BlockSchema,
+        operations::records::{NewFranklinOp, NewOperation, StoredFranklinOp, StoredOperation},
+        state::records::{NewBlockEvent, NewStorageState},
+        state::StateSchema,
+    },
+    ethereum::records::NewLastWatchedEthBlockNumber,
+    tokens::TokensSchema,
+};
 
 pub mod records;
 
