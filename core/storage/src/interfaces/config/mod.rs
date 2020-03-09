@@ -3,8 +3,10 @@
 use diesel::prelude::*;
 // Workspace imports
 // Local imports
-use crate::records::*;
+use self::records::ServerConfig;
 use crate::StorageProcessor;
+
+pub mod records;
 
 impl StorageProcessor {
     pub fn load_config(&self) -> QueryResult<ServerConfig> {

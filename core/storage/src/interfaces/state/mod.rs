@@ -7,11 +7,18 @@ use diesel::prelude::*;
 use models::node::PubKeyHash;
 use models::node::{apply_updates, reverse_updates, AccountMap, AccountUpdate, AccountUpdates};
 // Local imports
+use self::records::{StoredBlockEvent, StoredStorageState};
 use crate::diff::StorageAccountDiff;
+use crate::interfaces::account::records::{
+    StorageAccount, StorageAccountCreation, StorageAccountPubkeyUpdate,
+    StorageAccountPubkeyUpdateInsert, StorageAccountUpdate, StorageAccountUpdateInsert,
+    StorageBalance,
+};
 use crate::interfaces::account::restore_account;
-use crate::records::*;
 use crate::schema::*;
 use crate::StorageProcessor;
+
+pub mod records;
 
 impl StorageProcessor {
     pub fn commit_state_update(

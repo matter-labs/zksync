@@ -5,7 +5,7 @@ use web3::types::Address;
 use models::node::PubKeyHash;
 use models::node::{Account, AccountId, TokenId};
 // Local imports
-use crate::records::*;
+use super::records::*;
 
 pub(crate) fn restore_account(
     stored_account: StorageAccount,

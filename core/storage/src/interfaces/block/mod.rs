@@ -10,9 +10,18 @@ use models::node::{
 };
 use models::{fe_from_hex, fe_to_hex, Action, ActionType, Operation};
 // Local imports
-use crate::records::*;
+use self::records::{BlockDetails, StorageBlock};
+use crate::interfaces::{
+    ethereum::records::StorageETHOperation,
+    transactions::records::{
+        InsertTx, NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation, ReadTx,
+        StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+    },
+};
 use crate::schema::*;
 use crate::StorageProcessor;
+
+pub mod records;
 
 impl StorageProcessor {
     /// Execute an operation: store op, modify state accordingly, load additional data and meta tx info

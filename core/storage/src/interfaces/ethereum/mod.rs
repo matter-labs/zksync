@@ -8,9 +8,12 @@ use web3::types::H256;
 // Workspace imports
 use models::Operation;
 // Local imports
-use crate::records::*;
+use self::records::{NewETHOperation, StorageETHOperation, StoredLastWatchedEthBlockNumber};
+use crate::interfaces::transactions::records::StoredOperation;
 use crate::schema::*;
 use crate::StorageProcessor;
+
+pub mod records;
 
 impl StorageProcessor {
     pub fn load_unconfirmed_operations(

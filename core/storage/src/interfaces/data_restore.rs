@@ -7,7 +7,12 @@ use models::node::block::Block;
 use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp};
 use models::{Action, Operation, TokenAddedEvent};
 // Local imports
-use crate::records::*;
+use crate::data::*;
+use crate::interfaces::{
+    ethereum::records::NewLastWatchedEthBlockNumber,
+    state::records::{NewBlockEvent, NewStorageState},
+    transactions::records::{NewOperation, StoredOperation},
+};
 use crate::schema::*;
 use crate::StorageProcessor;
 

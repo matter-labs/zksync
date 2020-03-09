@@ -7,8 +7,10 @@ use diesel::prelude::*;
 use models::node::BlockNumber;
 use models::EncodedProof;
 // Local imports
-use crate::records::*;
+use self::records::{ActiveProver, IntegerNumber, NewProof, ProverRun, StoredProof};
 use crate::StorageProcessor;
+
+pub mod records;
 
 pub trait ProverInterface {
     fn prover_run_for_next_commit(

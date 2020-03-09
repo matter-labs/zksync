@@ -5,11 +5,12 @@ use web3::types::Address;
 // Workspace imports
 use models::node::{Account, AccountId, AccountUpdates};
 // Local imports
+use self::records::*;
 use crate::diff::StorageAccountDiff;
-use crate::records::*;
 use crate::schema::*;
 use crate::StorageProcessor;
 
+pub mod records;
 mod restore_account;
 mod stored_state;
 

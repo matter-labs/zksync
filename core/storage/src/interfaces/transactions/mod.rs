@@ -7,9 +7,16 @@ use serde_json::value::Value;
 use models::node::PubKeyHash;
 use models::ActionType;
 // Local imports
-use crate::records::*;
+use self::records::{
+    AccountTransaction, PriorityOpReceiptResponse, ReadTx, StoredExecutedPriorityOperation,
+    StoredExecutedTransaction, StoredOperation, TransactionsHistoryItem, TxByHashResponse,
+    TxReceiptResponse,
+};
+use crate::interfaces::prover::records::ProverRun;
 use crate::schema::*;
 use crate::StorageProcessor;
+
+pub mod records;
 
 impl StorageProcessor {
     pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {

@@ -5,9 +5,11 @@ use diesel::prelude::*;
 // Workspace imports
 use models::node::TokenId;
 // Local imports
-use crate::records::*;
+use self::records::Token;
 use crate::schema::*;
 use crate::StorageProcessor;
+
+pub mod records;
 
 impl StorageProcessor {
     pub fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()> {
