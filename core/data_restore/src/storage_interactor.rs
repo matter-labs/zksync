@@ -13,8 +13,16 @@ use models::node::{AccountMap, AccountUpdate, AccountUpdates, FranklinOp};
 use models::TokenAddedEvent;
 use models::{Action, EncodedProof, Operation};
 use storage::{
-    ConnectionPool, NewBlockEvent, NewLastWatchedEthBlockNumber, StoredBlockEvent,
-    StoredRollupOpsBlock,
+    interfaces::{
+        block::BlockSchema,
+        data_restore::{records::StoredRollupOpsBlock, DataRestoreSchema},
+        ethereum::{records::NewLastWatchedEthBlockNumber, EthereumSchema},
+        state::{
+            records::{NewBlockEvent, StoredBlockEvent},
+            StateSchema,
+        },
+    },
+    ConnectionPool,
 };
 
 /// Saves genesis account state in storage
@@ -29,14 +37,14 @@ pub fn save_genesis_tree_state(
     genesis_acc_update: AccountUpdate,
 ) {
     let storage = connection_pool.access_storage().expect("db failed");
-    let (_last_committed, mut _accounts) = storage
+    let (_last_committed, mut _accounts) = StateSchema(&storage)
         .load_committed_state(None)
         .expect("Cant load comitted state");
     assert!(
         _last_committed == 0 && _accounts.is_empty(),
         "db should be empty"
     );
-    storage
+    DataRestoreSchema(&storage)
         .save_genesis_state(genesis_acc_update)
         .expect("Cant update genesis state");
 }
@@ -57,7 +65,7 @@ pub fn update_tree_state(
     let storage = connection_pool.access_storage().expect("db failed");
 
     if accounts_updated.is_empty() && block.number_of_processed_prior_ops() == 0 {
-        storage
+        DataRestoreSchema(&storage)
             .save_block_transactions_with_data_restore_state(&block)
             .expect("Cant save block transactions");
     } else {
@@ -77,7 +85,7 @@ pub fn update_tree_state(
             id: None,
         };
 
-        storage
+        DataRestoreSchema(&storage)
             .save_block_operations_with_data_restore_state(&commit_op, &verify_op)
             .expect("Cant execute verify operation");
     }
@@ -109,7 +117,7 @@ pub fn save_events_state(
         block_number: last_watched_eth_block_number.to_string(),
     };
 
-    storage
+    DataRestoreSchema(&storage)
         .save_events_state_with_data_restore_state(new_events.as_slice(), tokens, &block_number)
         .expect("Cant update events state");
 }
@@ -148,7 +156,7 @@ pub fn save_rollup_ops(connection_pool: &ConnectionPool, blocks: &[RollupOpsBloc
         }
     }
 
-    storage
+    DataRestoreSchema(&storage)
         .save_rollup_ops_with_data_restore_state(ops.as_slice())
         .expect("Cant update rollup operations");
 }
@@ -161,7 +169,7 @@ pub fn save_rollup_ops(connection_pool: &ConnectionPool, blocks: &[RollupOpsBloc
 ///
 pub fn get_ops_blocks_from_storage(connection_pool: &ConnectionPool) -> Vec<RollupOpsBlock> {
     let storage = connection_pool.access_storage().expect("db failed");
-    storage
+    DataRestoreSchema(&storage)
         .load_rollup_ops_blocks()
         .expect("Cant load operation blocks")
         .iter()
@@ -192,7 +200,7 @@ pub fn stored_ops_block_into_ops_block(op_block: &StoredRollupOpsBlock) -> Rollu
 pub fn get_storage_state(connection_pool: &ConnectionPool) -> StorageUpdateState {
     let storage = connection_pool.access_storage().expect("db failed");
 
-    let storage_state_string = storage
+    let storage_state_string = StateSchema(&storage)
         .load_storage_state()
         .expect("Cant load storage state")
         .storage_state;
@@ -214,7 +222,7 @@ pub fn get_storage_state(connection_pool: &ConnectionPool) -> StorageUpdateState
 pub fn get_last_watched_block_number_from_storage(connection_pool: &ConnectionPool) -> u64 {
     let storage = connection_pool.access_storage().expect("db failed");
 
-    let last_watched_block_number_string = storage
+    let last_watched_block_number_string = EthereumSchema(&storage)
         .load_last_watched_block_number()
         .expect("Cant load last watched block number")
         .block_number;
@@ -235,7 +243,7 @@ pub fn get_block_events_state_from_storage(connection_pool: &ConnectionPool) -> 
 
     let storage = connection_pool.access_storage().expect("db failed");
 
-    let committed = storage
+    let committed = StateSchema(&storage)
         .load_committed_events_state()
         .expect("Cant load committed state");
 
@@ -245,7 +253,7 @@ pub fn get_block_events_state_from_storage(connection_pool: &ConnectionPool) -> 
         committed_events.push(block_event);
     }
 
-    let verified = storage
+    let verified = StateSchema(&storage)
         .load_verified_events_state()
         .expect("Cant load verified state");
     let mut verified_events: Vec<BlockEvent> = vec![];
@@ -290,11 +298,11 @@ pub fn stored_block_event_into_block_event(block: StoredBlockEvent) -> BlockEven
 pub fn get_tree_state(connection_pool: &ConnectionPool) -> (u32, AccountMap, u64, u32) {
     let storage = connection_pool.access_storage().expect("db failed");
 
-    let (last_block, account_map) = storage
+    let (last_block, account_map) = StateSchema(&storage)
         .load_verified_state()
         .expect("There are no last verified state in storage");
 
-    let block = storage
+    let block = BlockSchema(&storage)
         .get_block(last_block)
         .expect("Cant get the last block from storage")
         .expect("There are no last block in storage - restart driver");
