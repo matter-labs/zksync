@@ -11,8 +11,14 @@ use crate::StorageProcessor;
 
 pub mod records;
 
-impl StorageProcessor {
-    pub fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()> {
+pub trait TokensInterface {
+    fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()>;
+
+    fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>>;
+}
+
+impl TokensInterface for StorageProcessor {
+    fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()> {
         let new_token = Token {
             id: i32::from(id),
             address: address.to_string(),
@@ -28,7 +34,7 @@ impl StorageProcessor {
             .map(drop)
     }
 
-    pub fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
+    fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
         let tokens = tokens::table
             .order(tokens::id.asc())
             .load::<Token>(self.conn())?;

@@ -8,10 +8,10 @@ use models::node::block::ExecutedPriorityOp;
 use models::node::{AccountId, BlockNumber, FranklinOp, PriorityOp};
 use models::{Action, ActionType, Operation};
 // Local imports
-use crate::interfaces::prover::ProverInterface;
 use crate::schema::*;
 
-// TODO this module should not know about storage processor.
+// TODO this module should not know about storage processor and interfaces.
+use crate::interfaces::{block::BlockInterface, prover::ProverInterface, state::StateInterface};
 use crate::StorageProcessor;
 
 #[derive(Debug, Insertable)]

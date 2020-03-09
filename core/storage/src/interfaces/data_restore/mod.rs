@@ -9,20 +9,46 @@ use models::{Action, Operation, TokenAddedEvent};
 // Local imports
 use self::records::StoredRollupOpsBlock;
 use crate::interfaces::{
+    block::BlockInterface,
     ethereum::records::NewLastWatchedEthBlockNumber,
     operations::records::{NewFranklinOp, NewOperation, StoredFranklinOp, StoredOperation},
     state::records::{NewBlockEvent, NewStorageState},
+    state::StateInterface,
+    tokens::TokensInterface,
 };
 use crate::schema::*;
 use crate::StorageProcessor;
 
 pub mod records;
 
-impl StorageProcessor {
-    pub fn save_block_transactions_with_data_restore_state(
+pub trait DataRestoreInterface {
+    fn save_block_transactions_with_data_restore_state(&self, block: &Block) -> QueryResult<()>;
+
+    fn save_block_operations_with_data_restore_state(
         &self,
-        block: &Block,
-    ) -> QueryResult<()> {
+        commit_op: &Operation,
+        verify_op: &Operation,
+    ) -> QueryResult<()>;
+
+    fn save_events_state_with_data_restore_state(
+        &self,
+        block_events: &[NewBlockEvent],
+        token_events: &[TokenAddedEvent],
+        last_watched_eth_number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()>;
+
+    fn save_rollup_ops_with_data_restore_state(
+        &self,
+        ops: &[(BlockNumber, &FranklinOp, AccountId)],
+    ) -> QueryResult<()>;
+
+    fn save_genesis_state(&self, genesis_acc_update: AccountUpdate) -> QueryResult<()>;
+
+    fn load_rollup_ops_blocks(&self) -> QueryResult<Vec<StoredRollupOpsBlock>>;
+}
+
+impl DataRestoreInterface for StorageProcessor {
+    fn save_block_transactions_with_data_restore_state(&self, block: &Block) -> QueryResult<()> {
         self.conn().transaction(|| {
             self.save_block_transactions(block)?;
             let state = NewStorageState {
@@ -33,7 +59,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn save_block_operations_with_data_restore_state(
+    fn save_block_operations_with_data_restore_state(
         &self,
         commit_op: &Operation,
         verify_op: &Operation,
@@ -49,7 +75,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn save_events_state_with_data_restore_state(
+    fn save_events_state_with_data_restore_state(
         &self,
         block_events: &[NewBlockEvent],
         token_events: &[TokenAddedEvent],
@@ -77,7 +103,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn save_rollup_ops_with_data_restore_state(
+    fn save_rollup_ops_with_data_restore_state(
         &self,
         ops: &[(BlockNumber, &FranklinOp, AccountId)],
     ) -> QueryResult<()> {
@@ -97,7 +123,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn save_genesis_state(&self, genesis_acc_update: AccountUpdate) -> QueryResult<()> {
+    fn save_genesis_state(&self, genesis_acc_update: AccountUpdate) -> QueryResult<()> {
         self.conn().transaction(|| {
             self.commit_state_update(0, &[(0, genesis_acc_update)])?;
             self.apply_state_update(0)?;
@@ -105,7 +131,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_rollup_ops_blocks(&self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
+    fn load_rollup_ops_blocks(&self) -> QueryResult<Vec<StoredRollupOpsBlock>> {
         let stored_operations = rollup_ops::table
             .order(rollup_ops::id.asc())
             .load::<StoredFranklinOp>(self.conn())?;
@@ -134,7 +160,9 @@ impl StorageProcessor {
             .collect();
         Ok(ops_blocks)
     }
+}
 
+impl StorageProcessor {
     fn save_operation(&self, op: &Operation) -> QueryResult<()> {
         self.conn().transaction(|| {
             match &op.action {

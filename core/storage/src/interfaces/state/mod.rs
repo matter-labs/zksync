@@ -9,19 +9,58 @@ use models::node::{apply_updates, reverse_updates, AccountMap, AccountUpdate, Ac
 // Local imports
 use self::records::{StoredBlockEvent, StoredStorageState};
 use crate::diff::StorageAccountDiff;
-use crate::interfaces::account::records::{
-    StorageAccount, StorageAccountCreation, StorageAccountPubkeyUpdate,
-    StorageAccountPubkeyUpdateInsert, StorageAccountUpdate, StorageAccountUpdateInsert,
-    StorageBalance,
+use crate::interfaces::{
+    account::{
+        records::{
+            StorageAccount, StorageAccountCreation, StorageAccountPubkeyUpdate,
+            StorageAccountPubkeyUpdateInsert, StorageAccountUpdate, StorageAccountUpdateInsert,
+            StorageBalance,
+        },
+        restore_account,
+    },
+    block::BlockInterface,
 };
-use crate::interfaces::account::restore_account;
 use crate::schema::*;
 use crate::StorageProcessor;
 
 pub mod records;
 
-impl StorageProcessor {
-    pub fn commit_state_update(
+pub trait StateInterface {
+    fn commit_state_update(
+        &self,
+        block_number: u32,
+        accounts_updated: &[(u32, AccountUpdate)],
+    ) -> QueryResult<()>;
+
+    fn apply_state_update(&self, block_number: u32) -> QueryResult<()>;
+
+    fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)>;
+
+    fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)>;
+
+    /// Returns updates, and block number such that
+    /// if we apply this updates to state of the block #(from_block) we will have state of the block
+    /// #(returned block number)
+    /// returned block number is either to_block, last commited block before to_block, (if to_block == None
+    /// we assume to_bloc = +Inf)
+    fn load_state_diff(
+        &self,
+        from_block: u32,
+        to_block: Option<u32>,
+    ) -> QueryResult<Option<(u32, AccountUpdates)>>;
+
+    /// loads the state of accounts updated in a specific block
+    fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<AccountUpdates>;
+
+    fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>>;
+
+    fn load_verified_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>>;
+
+    fn load_storage_state(&self) -> QueryResult<StoredStorageState>;
+}
+
+impl StateInterface for StorageProcessor {
+    fn commit_state_update(
         &self,
         block_number: u32,
         accounts_updated: &[(u32, AccountUpdate)],
@@ -100,7 +139,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
+    fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
         log::info!("Applying state update for block: {}", block_number);
         self.conn().transaction(|| {
             let account_balance_diff = account_balance_updates::table
@@ -193,7 +232,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
+    fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
         self.conn().transaction(|| {
             let (verif_block, mut accounts) = self.load_verified_state()?;
             log::debug!(
@@ -213,7 +252,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
+    fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
         self.conn().transaction(|| {
             let last_block = self.get_last_verified_block()?;
 
@@ -240,7 +279,7 @@ impl StorageProcessor {
     /// #(returned block number)
     /// returned block number is either to_block, last commited block before to_block, (if to_block == None
     /// we assume to_bloc = +Inf)
-    pub fn load_state_diff(
+    fn load_state_diff(
         &self,
         from_block: u32,
         to_block: Option<u32>,
@@ -344,12 +383,12 @@ impl StorageProcessor {
     }
 
     /// loads the state of accounts updated in a specific block
-    pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<AccountUpdates> {
+    fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<AccountUpdates> {
         self.load_state_diff(block_number - 1, Some(block_number))
             .map(|diff| diff.unwrap_or_default().1)
     }
 
-    pub fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
+    fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
         let events = events_state::table
             .filter(events_state::block_type.eq("Committed".to_string()))
             .order(events_state::block_num.asc())
@@ -357,7 +396,7 @@ impl StorageProcessor {
         Ok(events)
     }
 
-    pub fn load_verified_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
+    fn load_verified_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
         let events = events_state::table
             .filter(events_state::block_type.eq("Verified".to_string()))
             .order(events_state::block_num.asc())
@@ -365,7 +404,7 @@ impl StorageProcessor {
         Ok(events)
     }
 
-    pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
+    fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
         storage_state_update::table.first(self.conn())
     }
 }

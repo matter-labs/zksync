@@ -17,6 +17,7 @@ use crate::interfaces::{
         NewExecutedPriorityOperation, NewOperation, StoredExecutedPriorityOperation,
         StoredOperation,
     },
+    state::StateInterface,
     transactions::records::{InsertTx, NewExecutedTransaction, ReadTx, StoredExecutedTransaction},
 };
 use crate::schema::*;
@@ -24,11 +25,57 @@ use crate::StorageProcessor;
 
 pub mod records;
 
-impl StorageProcessor {
+pub trait BlockInterface {
     /// Execute an operation: store op, modify state accordingly, load additional data and meta tx info
     /// - Commit => store account updates
     /// - Verify => apply account updates
-    pub fn execute_operation(&self, op: &Operation) -> QueryResult<Operation> {
+    fn execute_operation(&self, op: &Operation) -> QueryResult<Operation>;
+
+    fn save_block_transactions(&self, block: &Block) -> QueryResult<()>;
+
+    fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>>;
+
+    fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>>;
+
+    fn get_block_executed_ops(&self, block: BlockNumber) -> QueryResult<Vec<ExecutedOperations>>;
+
+    fn load_stored_op_with_block_number(
+        &self,
+        block_number: BlockNumber,
+        action_type: ActionType,
+    ) -> Option<StoredOperation>;
+
+    fn load_block_range(
+        &self,
+        max_block: BlockNumber,
+        limit: u32,
+    ) -> QueryResult<Vec<BlockDetails>>;
+
+    fn handle_search(&self, query: String) -> Option<BlockDetails>;
+
+    fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation>;
+
+    fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block>;
+
+    fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>>;
+
+    fn load_unverified_commits_after_block(
+        &self,
+        block_size: usize,
+        block: BlockNumber,
+        limit: i64,
+    ) -> QueryResult<Vec<Operation>>;
+
+    fn get_last_committed_block(&self) -> QueryResult<BlockNumber>;
+
+    fn get_last_verified_block(&self) -> QueryResult<BlockNumber>;
+}
+
+impl BlockInterface for StorageProcessor {
+    /// Execute an operation: store op, modify state accordingly, load additional data and meta tx info
+    /// - Commit => store account updates
+    /// - Verify => apply account updates
+    fn execute_operation(&self, op: &Operation) -> QueryResult<Operation> {
         self.conn().transaction(|| {
             match &op.action {
                 Action::Commit => {
@@ -48,28 +95,7 @@ impl StorageProcessor {
         })
     }
 
-    pub(crate) fn save_block(&self, block: &Block) -> QueryResult<()> {
-        self.conn().transaction(|| {
-            self.save_block_transactions(block)?;
-
-            let new_block = StorageBlock {
-                number: i64::from(block.block_number),
-                root_hash: format!("sync-bl:{}", fe_to_hex(&block.new_root_hash)),
-                fee_account_id: i64::from(block.fee_account),
-                unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
-                unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
-                block_size: block.smallest_block_size() as i64,
-            };
-
-            diesel::insert_into(blocks::table)
-                .values(&new_block)
-                .execute(self.conn())?;
-
-            Ok(())
-        })
-    }
-
-    pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
+    fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
@@ -103,7 +129,7 @@ impl StorageProcessor {
         Ok(())
     }
 
-    pub fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>> {
+    fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>> {
         let stored_block = if let Some(block) = blocks::table
             .find(i64::from(block))
             .first::<StorageBlock>(self.conn())
@@ -132,7 +158,7 @@ impl StorageProcessor {
         }))
     }
 
-    pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
+    fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
         let executed_ops = self.get_block_executed_ops(block)?;
         Ok(executed_ops
             .into_iter()
@@ -143,10 +169,7 @@ impl StorageProcessor {
             .collect())
     }
 
-    pub fn get_block_executed_ops(
-        &self,
-        block: BlockNumber,
-    ) -> QueryResult<Vec<ExecutedOperations>> {
+    fn get_block_executed_ops(&self, block: BlockNumber) -> QueryResult<Vec<ExecutedOperations>> {
         self.conn().transaction(|| {
             let mut executed_operations = Vec::new();
 
@@ -186,7 +209,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_stored_op_with_block_number(
+    fn load_stored_op_with_block_number(
         &self,
         block_number: BlockNumber,
         action_type: ActionType,
@@ -199,7 +222,7 @@ impl StorageProcessor {
             .ok()
     }
 
-    pub fn load_block_range(
+    fn load_block_range(
         &self,
         max_block: BlockNumber,
         limit: u32,
@@ -239,7 +262,7 @@ impl StorageProcessor {
         diesel::sql_query(query).load(self.conn())
     }
 
-    pub fn handle_search(&self, query: String) -> Option<BlockDetails> {
+    fn handle_search(&self, query: String) -> Option<BlockDetails> {
         let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
         let l_query = query.to_lowercase();
         let sql_query = format!(
@@ -281,16 +304,16 @@ impl StorageProcessor {
             .ok()
     }
 
-    pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
+    fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
         let op = self.load_stored_op_with_block_number(block_number, ActionType::COMMIT);
         op.and_then(|r| r.into_op(self).ok())
     }
 
-    pub fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block> {
+    fn load_committed_block(&self, block_number: BlockNumber) -> Option<Block> {
         self.load_commit_op(block_number).map(|r| r.block)
     }
 
-    pub fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>> {
+    fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
             let ops: Vec<_> = operations::table
                 .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
@@ -301,7 +324,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_unverified_commits_after_block(
+    fn load_unverified_commits_after_block(
         &self,
         block_size: usize,
         block: BlockNumber,
@@ -334,7 +357,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
+    fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
@@ -343,12 +366,35 @@ impl StorageProcessor {
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
 
-    pub fn get_last_verified_block(&self) -> QueryResult<BlockNumber> {
+    fn get_last_verified_block(&self) -> QueryResult<BlockNumber> {
         use crate::schema::operations::dsl::*;
         operations
             .select(max(block_number))
             .filter(action_type.eq(&ActionType::VERIFY.to_string()))
             .get_result::<Option<i64>>(self.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
+    }
+}
+
+impl StorageProcessor {
+    pub(crate) fn save_block(&self, block: &Block) -> QueryResult<()> {
+        self.conn().transaction(|| {
+            self.save_block_transactions(block)?;
+
+            let new_block = StorageBlock {
+                number: i64::from(block.block_number),
+                root_hash: format!("sync-bl:{}", fe_to_hex(&block.new_root_hash)),
+                fee_account_id: i64::from(block.fee_account),
+                unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
+                unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
+                block_size: block.smallest_block_size() as i64,
+            };
+
+            diesel::insert_into(blocks::table)
+                .values(&new_block)
+                .execute(self.conn())?;
+
+            Ok(())
+        })
     }
 }

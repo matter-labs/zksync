@@ -20,8 +20,33 @@ use crate::StorageProcessor;
 
 pub mod records;
 
-impl StorageProcessor {
-    pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
+pub trait TransactionsInterface {
+    fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>>;
+
+    fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse>;
+
+    fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>>;
+
+    fn get_account_transactions_history(
+        &self,
+        address: &PubKeyHash,
+        offset: i64,
+        limit: i64,
+    ) -> QueryResult<Vec<TransactionsHistoryItem>>;
+
+    fn get_account_transactions(
+        &self,
+        address: &PubKeyHash,
+    ) -> QueryResult<Vec<AccountTransaction>>;
+
+    fn get_executed_priority_op(
+        &self,
+        priority_op_id: u32,
+    ) -> QueryResult<Option<StoredExecutedPriorityOperation>>;
+}
+
+impl TransactionsInterface for StorageProcessor {
+    fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
         self.conn().transaction(|| {
             let tx = executed_transactions::table
                 .filter(executed_transactions::tx_hash.eq(hash))
@@ -67,7 +92,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
+    fn get_priority_op_receipt(&self, op_id: i64) -> QueryResult<PriorityOpReceiptResponse> {
         // TODO: jazzandrock maybe use one db query(?).
         let stored_executed_prior_op = executed_priority_operations::table
             .filter(executed_priority_operations::priority_op_serialid.eq(op_id))
@@ -107,7 +132,7 @@ impl StorageProcessor {
         }
     }
 
-    pub fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+    fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
         // TODO: Maybe move the transformations to api_server?
 
         // first check executed_transactions
@@ -240,7 +265,7 @@ impl StorageProcessor {
         Ok(None)
     }
 
-    pub fn get_account_transactions_history(
+    fn get_account_transactions_history(
         &self,
         address: &PubKeyHash,
         offset: i64,
@@ -322,7 +347,7 @@ impl StorageProcessor {
         diesel::sql_query(query).load::<TransactionsHistoryItem>(self.conn())
     }
 
-    pub fn get_account_transactions(
+    fn get_account_transactions(
         &self,
         address: &PubKeyHash,
     ) -> QueryResult<Vec<AccountTransaction>> {
@@ -383,7 +408,7 @@ impl StorageProcessor {
         Ok(res)
     }
 
-    pub fn get_executed_priority_op(
+    fn get_executed_priority_op(
         &self,
         priority_op_id: u32,
     ) -> QueryResult<Option<StoredExecutedPriorityOperation>> {

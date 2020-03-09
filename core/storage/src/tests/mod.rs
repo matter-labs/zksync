@@ -2,9 +2,18 @@
 // use `zksync db-test-no-reset`/`franklin db-test` script to run them
 
 use super::*;
-use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+
+// External imports
 use diesel::Connection;
+use web3::types::Address;
+// Workspace imports
+use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+use models::node::block::Block;
+use models::node::{apply_updates, AccountMap, AccountUpdate, Fr, PubKeyHash};
 use models::primitives::u128_to_bigdecimal;
+use models::{Action, EncodedProof, Operation};
+// Local imports
+use crate::interfaces::{block::BlockInterface, state::StateInterface};
 
 fn acc_create_random_updates<R: Rng>(rng: &mut R) -> impl Iterator<Item = (u32, AccountUpdate)> {
     let id: u32 = rng.gen();

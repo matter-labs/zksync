@@ -15,8 +15,30 @@ use crate::StorageProcessor;
 
 pub mod records;
 
-impl StorageProcessor {
-    pub fn load_unconfirmed_operations(
+pub trait EthereumInterface {
+    fn load_unconfirmed_operations(
+        &self,
+    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>>;
+
+    fn load_sent_unconfirmed_ops(&self) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>>;
+
+    fn save_operation_eth_tx(
+        &self,
+        op_id: i64,
+        hash: H256,
+        deadline_block: u64,
+        nonce: u32,
+        gas_price: BigDecimal,
+        raw_tx: Vec<u8>,
+    ) -> QueryResult<()>;
+
+    fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()>;
+
+    fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber>;
+}
+
+impl EthereumInterface for StorageProcessor {
+    fn load_unconfirmed_operations(
         &self,
         // TODO: move Eth transaction state to models and add it here
     ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
@@ -60,9 +82,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_sent_unconfirmed_ops(
-        &self,
-    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
+    fn load_sent_unconfirmed_ops(&self) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
         self.conn().transaction(|| {
             let ops: Vec<_> = operations::table
                 .filter(eth_operations::confirmed.eq(false))
@@ -98,7 +118,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn save_operation_eth_tx(
+    fn save_operation_eth_tx(
         &self,
         op_id: i64,
         hash: H256,
@@ -120,7 +140,7 @@ impl StorageProcessor {
             .map(drop)
     }
 
-    pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
+    fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
         self.conn().transaction(|| {
             update(eth_operations::table.filter(eth_operations::tx_hash.eq(hash.as_bytes())))
                 .set(eth_operations::confirmed.eq(true))
@@ -138,7 +158,7 @@ impl StorageProcessor {
         })
     }
 
-    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
+    fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
         data_restore_last_watched_eth_block::table.first(self.conn())
     }
 }

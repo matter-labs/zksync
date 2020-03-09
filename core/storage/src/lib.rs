@@ -17,12 +17,7 @@ use std::env;
 use diesel::pg::PgConnection;
 use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
-use web3::types::Address;
 // Workspace imports
-use models::node::block::Block;
-use models::node::PubKeyHash;
-use models::node::{apply_updates, AccountMap, AccountUpdate, Fr};
-use models::{Action, EncodedProof, Operation};
 // Local imports
 use crate::recoverable_connection::RecoverableConnection;
 
