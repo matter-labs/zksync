@@ -20,7 +20,13 @@ use models::node::BlockNumber;
 use models::{node::block::ExecutedOperations, node::AccountId, ActionType, Operation};
 use std::collections::BTreeMap;
 use std::str::FromStr;
-use storage::ConnectionPool;
+use storage::{
+    interfaces::{
+        account::AccountSchema, block::BlockSchema, operations::OperationsSchema,
+        operations_ext::OperationsExtSchema, tokens::TokensSchema,
+    },
+    ConnectionPool,
+};
 use web3::types::Address;
 
 const MAX_LISTENERS_PER_ENTITY: usize = 2048;
@@ -205,15 +211,17 @@ impl OperationNotifier {
         }
 
         let storage = self.db_pool.access_storage_fragile()?;
-        let executed_op = storage.get_executed_priority_op(serial_id as u32)?;
+        let executed_op =
+            OperationsSchema(&storage).get_executed_priority_operation(serial_id as u32)?;
         if let Some(executed_op) = executed_op {
             let block_info = if let Some(block_with_op) =
-                storage.get_block(executed_op.block_number as u32)?
+                BlockSchema(&storage).get_block(executed_op.block_number as u32)?
             {
-                let verified = if let Some(block_verify) = storage.load_stored_op_with_block_number(
-                    executed_op.block_number as u32,
-                    ActionType::VERIFY,
-                ) {
+                let verified = if let Some(block_verify) = BlockSchema(&storage)
+                    .load_stored_op_with_block_number(
+                        executed_op.block_number as u32,
+                        ActionType::VERIFY,
+                    ) {
                     block_verify.confirmed
                 } else {
                     false
@@ -312,9 +320,7 @@ impl OperationNotifier {
             }
         }
 
-        if let Some(receipt) = self
-            .db_pool
-            .access_storage_fragile()?
+        if let Some(receipt) = OperationsExtSchema(&self.db_pool.access_storage_fragile()?)
             .tx_receipt(hash.as_ref())?
         {
             let tx_info_resp = TransactionInfoResp {
@@ -365,7 +371,7 @@ impl OperationNotifier {
         sub: Subscriber<ResponseAccountState>,
     ) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage_fragile()?;
-        let account_state = storage.account_state_by_address(&address)?;
+        let account_state = AccountSchema(&storage).account_state_by_address(&address)?;
 
         let account_id = if let Some(id) = account_state.committed.as_ref().map(|(id, _)| id) {
             *id
@@ -387,7 +393,7 @@ impl OperationNotifier {
         }
         .map(|(_, a)| a)
         {
-            let tokens = storage.load_tokens()?;
+            let tokens = TokensSchema(&storage).load_tokens()?;
             ResponseAccountState::try_to_restore(account, &tokens)?
         } else {
             ResponseAccountState::default()
@@ -479,13 +485,17 @@ impl OperationNotifier {
         )?;
 
         let updated_accounts = op.accounts_updated.iter().map(|(id, _)| *id);
-        let tokens = storage.load_tokens()?;
+        let tokens = TokensSchema(&storage).load_tokens()?;
 
         for id in updated_accounts {
             if let Some(subs) = self.account_subs.remove(&(id, action)) {
                 let stored_account = match action {
-                    ActionType::COMMIT => storage.last_committed_state_for_account(id)?,
-                    ActionType::VERIFY => storage.last_verified_state_for_account(id)?,
+                    ActionType::COMMIT => {
+                        AccountSchema(&storage).last_committed_state_for_account(id)?
+                    }
+                    ActionType::VERIFY => {
+                        AccountSchema(&storage).last_verified_state_for_account(id)?
+                    }
                 };
 
                 let account = if let Some(account) = stored_account {

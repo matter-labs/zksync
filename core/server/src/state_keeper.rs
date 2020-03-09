@@ -15,7 +15,10 @@ use models::node::{
 use models::params::max_block_chunk_size;
 use models::{ActionType, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
-use storage::ConnectionPool;
+use storage::{
+    interfaces::{block::BlockSchema, state::StateSchema},
+    ConnectionPool,
+};
 use web3::types::Address;
 
 pub enum ExecutedOpId {
@@ -92,9 +95,13 @@ impl PlasmaStateInitParams {
             .access_storage()
             .expect("db connection failed for state restore");
 
-        let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
-        let last_verified = storage.get_last_verified_block().expect("db failed");
-        let unprocessed_priority_op = storage
+        let (last_committed, accounts) = StateSchema(&storage)
+            .load_committed_state(None)
+            .expect("db failed");
+        let last_verified = BlockSchema(&storage)
+            .get_last_verified_block()
+            .expect("db failed");
+        let unprocessed_priority_op = BlockSchema(&storage)
             .load_stored_op_with_block_number(last_committed, ActionType::COMMIT)
             .map(|storage_op| {
                 storage_op
@@ -157,7 +164,9 @@ impl PlasmaStateKeeper {
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
+        let (last_committed, mut accounts) = StateSchema(&storage)
+            .load_committed_state(None)
+            .expect("db failed");
         // TODO: move genesis block creation to separate routine.
         assert!(
             last_committed == 0 && accounts.is_empty(),
@@ -170,10 +179,12 @@ impl PlasmaStateKeeper {
             nonce: fee_account.nonce,
         };
         accounts.insert(0, fee_account);
-        storage
+        StateSchema(&storage)
             .commit_state_update(0, &[(0, db_account_update)])
             .expect("db fail");
-        storage.apply_state_update(0).expect("db fail");
+        StateSchema(&storage)
+            .apply_state_update(0)
+            .expect("db fail");
         let state = PlasmaState::new(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         info!("Genesis block created, state: {}", state.root_hash());

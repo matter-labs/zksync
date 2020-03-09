@@ -7,31 +7,29 @@ use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use futures::channel::mpsc;
 use log::info;
 // Workspace deps
-use circuit::witness::change_pubkey_offchain::{
-    apply_change_pubkey_offchain_tx, calculate_change_pubkey_offchain_from_witness,
+use circuit::witness::{
+    change_pubkey_offchain::{
+        apply_change_pubkey_offchain_tx, calculate_change_pubkey_offchain_from_witness,
+    },
+    close_account::{apply_close_account_tx, calculate_close_account_operations_from_witness},
+    deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness},
+    full_exit::{apply_full_exit_tx, calculate_full_exit_operations_from_witness},
+    transfer::{apply_transfer_tx, calculate_transfer_operations_from_witness},
+    transfer_to_new::{
+        apply_transfer_to_new_tx, calculate_transfer_to_new_operations_from_witness,
+    },
+    utils::{prepare_sig_data, WitnessBuilder},
+    withdraw::{apply_withdraw_tx, calculate_withdraw_operations_from_witness},
 };
-use circuit::witness::close_account::apply_close_account_tx;
-use circuit::witness::close_account::calculate_close_account_operations_from_witness;
-use circuit::witness::deposit::apply_deposit_tx;
-use circuit::witness::deposit::calculate_deposit_operations_from_witness;
-use circuit::witness::full_exit::{
-    apply_full_exit_tx, calculate_full_exit_operations_from_witness,
+use models::{
+    circuit::{account::CircuitAccount, CircuitAccountTree},
+    config_options::ThreadPanicNotify,
+    node::{apply_updates, AccountMap, BlockNumber, Fr, FranklinOp},
+    Operation,
 };
-use circuit::witness::transfer::apply_transfer_tx;
-use circuit::witness::transfer::calculate_transfer_operations_from_witness;
-use circuit::witness::transfer_to_new::apply_transfer_to_new_tx;
-use circuit::witness::transfer_to_new::calculate_transfer_to_new_operations_from_witness;
-use circuit::witness::utils::prepare_sig_data;
-use circuit::witness::utils::WitnessBuilder;
-use circuit::witness::withdraw::apply_withdraw_tx;
-use circuit::witness::withdraw::calculate_withdraw_operations_from_witness;
-use models::circuit::account::CircuitAccount;
-use models::circuit::CircuitAccountTree;
-use models::config_options::ThreadPanicNotify;
-use models::node::{apply_updates, AccountMap, BlockNumber, Fr, FranklinOp};
-use models::Operation;
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
+use storage::interfaces::{block::BlockSchema, state::StateSchema};
 
 #[derive(Debug, Clone)]
 struct BlockSizedOperationsQueue {
@@ -58,7 +56,7 @@ impl BlockSizedOperationsQueue {
     ) -> Result<(), String> {
         if self.operations.len() < limit as usize {
             let storage = conn_pool.access_storage().expect("failed to connect to db");
-            let ops = storage
+            let ops = BlockSchema(&storage)
                 .load_unverified_commits_after_block(self.block_size, self.last_loaded_block, limit)
                 .map_err(|e| format!("failed to read commit operations: {}", e))?;
 
@@ -261,7 +259,7 @@ impl Maintainer {
             Some((block, ref state)) => {
                 // State is initialized. We need to load diff (if any) and update
                 // the stored state.
-                let state_diff = storage
+                let state_diff = StateSchema(&storage)
                     .load_state_diff(block, Some(new_block))
                     .map_err(|e| format!("failed to load committed state: {}", e))?;
 
@@ -277,7 +275,7 @@ impl Maintainer {
             }
             None => {
                 // State is not initialized, load it.
-                let (block, accounts) = storage
+                let (block, accounts) = StateSchema(&storage)
                     .load_committed_state(Some(new_block))
                     .map_err(|e| format!("failed to load committed state: {}", e))?;
 
@@ -331,7 +329,7 @@ impl Maintainer {
             block_number,
         );
 
-        let ops = storage
+        let ops = BlockSchema(&storage)
             .get_block_operations(block_number)
             .map_err(|e| format!("failed to get block operations {}", e))?;
 

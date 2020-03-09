@@ -12,7 +12,13 @@ use models::NetworkStatus;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
-use storage::{ConnectionPool, StorageProcessor};
+use storage::{
+    interfaces::{
+        account::AccountSchema, block::BlockSchema, operations_ext::OperationsExtSchema,
+        stats::StatsSchema, tokens::TokensSchema,
+    },
+    ConnectionPool, StorageProcessor,
+};
 use tokio::{runtime::Runtime, time};
 use web3::types::{Address, H160};
 
@@ -60,13 +66,18 @@ impl AppState {
 
                         let storage = state.connection_pool.access_storage().expect("db failed");
 
-                        let last_verified = storage.get_last_verified_block().unwrap_or(0);
+                        let last_verified =
+                            BlockSchema(&storage).get_last_verified_block().unwrap_or(0);
                         let status = NetworkStatus {
                             next_block_at_max: None,
-                            last_committed: storage.get_last_committed_block().unwrap_or(0),
+                            last_committed: BlockSchema(&storage)
+                                .get_last_committed_block()
+                                .unwrap_or(0),
                             last_verified,
-                            total_transactions: storage.count_total_transactions().unwrap_or(0),
-                            outstanding_txs: storage
+                            total_transactions: StatsSchema(&storage)
+                                .count_total_transactions()
+                                .unwrap_or(0),
+                            outstanding_txs: StatsSchema(&storage)
                                 .count_outstanding_proofs(last_verified)
                                 .unwrap_or(0),
                         };
@@ -110,7 +121,7 @@ fn handle_get_account_state(
     let storage = data.access_storage()?;
 
     let (id, verified, commited) = {
-        let stored_account_state = storage
+        let stored_account_state = AccountSchema(&storage)
             .account_state_by_address(&account_address)
             .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
@@ -144,7 +155,7 @@ fn handle_get_account_state(
 
 fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
-    let tokens = storage
+    let tokens = TokensSchema(&storage)
         .load_tokens()
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
@@ -159,7 +170,7 @@ fn handle_get_account_transactions(
     address: web::Path<PubKeyHash>,
 ) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
-    let txs = storage
+    let txs = OperationsExtSchema(&storage)
         .get_account_transactions(&address)
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
     Ok(HttpResponse::Ok().json(txs))
@@ -178,7 +189,7 @@ fn handle_get_account_transactions_history(
 
     let storage = data.access_storage()?;
 
-    let res = storage
+    let res = OperationsExtSchema(&storage)
         .get_account_transactions_history(&address, offset, limit)
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
@@ -196,7 +207,7 @@ fn handle_get_executed_transaction_by_hash(
         .map_err(|_| HttpResponse::BadRequest().finish())?;
 
     let storage = data.access_storage()?;
-    if let Ok(tx) = storage.tx_receipt(transaction_hash.as_slice()) {
+    if let Ok(tx) = OperationsExtSchema(&storage).tx_receipt(transaction_hash.as_slice()) {
         Ok(HttpResponse::Ok().json(tx))
     } else {
         Ok(HttpResponse::Ok().json(()))
@@ -225,7 +236,7 @@ fn handle_get_tx_by_hash(
 
     let storage = data.access_storage()?;
 
-    let res = storage
+    let res = OperationsExtSchema(&storage)
         .get_tx_by_hash(hash.as_slice())
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
@@ -234,11 +245,11 @@ fn handle_get_tx_by_hash(
 
 fn handle_get_priority_op_receipt(
     data: web::Data<AppState>,
-    id: web::Path<i64>,
+    id: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
 
-    let res = storage
+    let res = OperationsExtSchema(&storage)
         .get_priority_op_receipt(id.into_inner())
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
@@ -253,7 +264,7 @@ fn handle_get_transaction_by_id(
 
     let storage = data.access_storage()?;
 
-    let executed_ops = storage
+    let executed_ops = BlockSchema(&storage)
         .get_block_executed_ops(block_id)
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
@@ -281,10 +292,12 @@ fn handle_get_blocks(
     }
     let storage = data.access_storage()?;
 
-    let resp = storage.load_block_range(max_block, limit).map_err(|e| {
-        warn!("handle_get_blocks db fail: {}", e);
-        HttpResponse::InternalServerError().finish()
-    })?;
+    let resp = BlockSchema(&storage)
+        .load_block_range(max_block, limit)
+        .map_err(|e| {
+            warn!("handle_get_blocks db fail: {}", e);
+            HttpResponse::InternalServerError().finish()
+        })?;
     Ok(HttpResponse::Ok().json(resp))
 }
 
@@ -293,7 +306,7 @@ fn handle_get_block_by_id(
     block_id: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
-    let mut blocks = storage
+    let mut blocks = BlockSchema(&storage)
         .load_block_range(block_id.into_inner(), 1)
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
     if let Some(block) = blocks.pop() {
@@ -311,7 +324,7 @@ fn handle_get_block_transactions(
 
     let storage = data.access_storage()?;
 
-    let executed_ops = storage
+    let executed_ops = BlockSchema(&storage)
         .get_block_executed_ops(block_id)
         .map_err(|_| HttpResponse::InternalServerError().finish())?
         .into_iter()
@@ -354,7 +367,7 @@ fn handle_block_search(
     query: web::Query<BlockSearchQuery>,
 ) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
-    let result = storage.handle_search(query.into_inner().query);
+    let result = BlockSchema(&storage).handle_search(query.into_inner().query);
     if let Some(block) = result {
         Ok(HttpResponse::Ok().json(block))
     } else {

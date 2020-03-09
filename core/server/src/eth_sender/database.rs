@@ -10,7 +10,7 @@ use std::str::FromStr;
 use bigdecimal::BigDecimal;
 use web3::types::H256;
 // Workspace uses
-use storage::ConnectionPool;
+use storage::{interfaces::ethereum::EthereumSchema, ConnectionPool};
 // Local uses
 use super::transactions::{OperationETHState, TransactionETHState};
 
@@ -46,7 +46,7 @@ impl DatabaseAccess for Database {
             .access_storage()
             .expect("Failed to access storage");
 
-        let unconfirmed_ops = storage
+        let unconfirmed_ops = EthereumSchema(&storage)
             .load_unconfirmed_operations()?
             .into_iter()
             .map(|(operation, txs)| OperationETHState {
@@ -59,7 +59,7 @@ impl DatabaseAccess for Database {
 
     fn save_unconfirmed_operation(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
-        Ok(storage.save_operation_eth_tx(
+        Ok(EthereumSchema(&storage).save_operation_eth_tx(
             tx.op_id,
             tx.signed_tx.hash,
             tx.deadline_block,
@@ -71,6 +71,6 @@ impl DatabaseAccess for Database {
 
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
-        Ok(storage.confirm_eth_tx(hash)?)
+        Ok(EthereumSchema(&storage).confirm_eth_tx(hash)?)
     }
 }

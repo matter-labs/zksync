@@ -10,7 +10,7 @@ use web3::types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::Operation;
-use storage::StorageETHOperation;
+use storage::interfaces::ethereum::records::StorageETHOperation;
 
 /// An intermediate state of the operation to be stored on
 /// the Ethereum chain.

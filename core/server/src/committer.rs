@@ -6,7 +6,10 @@ use futures::{SinkExt, StreamExt};
 // Workspace uses
 use crate::mempool::MempoolRequest;
 use models::{Action, CommitRequest, Operation};
-use storage::ConnectionPool;
+use storage::{
+    interfaces::{block::BlockSchema, prover::ProverSchema},
+    ConnectionPool,
+};
 use tokio::{runtime::Runtime, time};
 
 const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -33,7 +36,7 @@ async fn handle_new_commit_task(
                 "Failed transactions committed block: #{}",
                 block.block_number
             );
-            storage
+            BlockSchema(&storage)
                 .save_block_transactions(&block)
                 .expect("committer failed tx save");
             continue;
@@ -46,7 +49,7 @@ async fn handle_new_commit_task(
             id: None,
         };
         info!("commit block #{}", op.block.block_number);
-        let op = storage
+        let op = BlockSchema(&storage)
             .execute_operation(&op)
             .expect("committer must commit the op into db");
 
@@ -75,7 +78,9 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
         let storage = pool
             .access_storage()
             .expect("db connection failed for committer");
-        storage.get_last_verified_block().expect("db failed")
+        BlockSchema(&storage)
+            .get_last_verified_block()
+            .expect("db failed")
     };
 
     let mut timer = time::interval(PROOF_POLL_INTERVAL);
@@ -88,10 +93,10 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
 
         loop {
             let block_number = last_verified_block + 1;
-            let proof = storage.load_proof(block_number);
+            let proof = ProverSchema(&storage).load_proof(block_number);
             if let Ok(proof) = proof {
                 info!("New proof for block: {}", block_number);
-                let block = storage
+                let block = BlockSchema(&storage)
                     .load_committed_block(block_number)
                     .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
                 let op = Operation {
@@ -102,7 +107,7 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
                     accounts_updated: Vec::new(),
                     id: None,
                 };
-                let op = storage
+                let op = BlockSchema(&storage)
                     .execute_operation(&op)
                     .expect("committer must commit the op into db");
                 tx_for_eth
