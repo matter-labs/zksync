@@ -38,14 +38,14 @@ impl<'a> AccountSchema<'a> {
             });
         };
 
-        let commited = self
+        let committed = self
             .last_committed_state_for_account(account_id)?
             .map(|a| (account_id, a));
         let verified = self
             .last_verified_state_for_account(account_id)?
             .map(|a| (account_id, a));
         Ok(StoredAccountState {
-            committed: commited,
+            committed,
             verified,
         })
     }
@@ -53,7 +53,7 @@ impl<'a> AccountSchema<'a> {
     pub fn last_committed_state_for_account(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<Option<models::node::Account>> {
+    ) -> QueryResult<Option<Account>> {
         self.0.conn().transaction(|| {
             let (last_block, account) = self.get_account_and_last_block(account_id)?;
 
@@ -100,7 +100,7 @@ impl<'a> AccountSchema<'a> {
     pub fn last_verified_state_for_account(
         &self,
         account_id: AccountId,
-    ) -> QueryResult<Option<models::node::Account>> {
+    ) -> QueryResult<Option<Account>> {
         let (_, account) = self.get_account_and_last_block(account_id)?;
         Ok(account)
     }

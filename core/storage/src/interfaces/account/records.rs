@@ -37,16 +37,6 @@ pub struct StorageAccountUpdate {
     pub update_order_id: i32,
 }
 
-#[derive(Identifiable, Insertable, QueryableByName, Queryable, Associations)]
-#[belongs_to(StorageAccount, foreign_key = "account_id")]
-#[primary_key(account_id, coin_id)]
-#[table_name = "balances"]
-pub struct StorageBalance {
-    pub account_id: i64,
-    pub coin_id: i32,
-    pub balance: BigDecimal,
-}
-
 #[derive(Debug, Insertable)]
 #[table_name = "account_balance_updates"]
 pub struct StorageAccountUpdateInsert {
@@ -83,4 +73,14 @@ pub struct StorageAccountPubkeyUpdate {
     pub new_pubkey_hash: Vec<u8>,
     pub old_nonce: i64,
     pub new_nonce: i64,
+}
+
+#[derive(Identifiable, Insertable, QueryableByName, Queryable, Associations)]
+#[belongs_to(StorageAccount, foreign_key = "account_id")]
+#[primary_key(account_id, coin_id)]
+#[table_name = "balances"]
+pub struct StorageBalance {
+    pub account_id: i64,
+    pub coin_id: i32,
+    pub balance: BigDecimal,
 }

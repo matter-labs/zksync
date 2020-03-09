@@ -24,10 +24,7 @@ pub mod records;
 pub struct DataRestoreSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> DataRestoreSchema<'a> {
-    pub fn save_block_transactions_with_data_restore_state(
-        &self,
-        block: &Block,
-    ) -> QueryResult<()> {
+    pub fn save_block_transactions_with_data_restore_state(&self, block: Block) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             BlockSchema(self.0).save_block_transactions(block)?;
             let state = NewStorageState {
@@ -40,8 +37,8 @@ impl<'a> DataRestoreSchema<'a> {
 
     pub fn save_block_operations_with_data_restore_state(
         &self,
-        commit_op: &Operation,
-        verify_op: &Operation,
+        commit_op: Operation,
+        verify_op: Operation,
     ) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             self.save_operation(commit_op)?;
@@ -140,13 +137,16 @@ impl<'a> DataRestoreSchema<'a> {
         Ok(ops_blocks)
     }
 
-    fn save_operation(&self, op: &Operation) -> QueryResult<()> {
+    fn save_operation(&self, op: Operation) -> QueryResult<()> {
         self.0.conn().transaction(|| {
+            let block_number = i64::from(op.block.block_number);
+            let action_type = op.action.to_string();
+
             match &op.action {
                 Action::Commit => {
                     StateSchema(self.0)
                         .commit_state_update(op.block.block_number, &op.accounts_updated)?;
-                    BlockSchema(self.0).save_block(&op.block)?;
+                    BlockSchema(self.0).save_block(op.block)?;
                 }
                 Action::Verify { .. } => {
                     StateSchema(self.0).apply_state_update(op.block.block_number)?
@@ -155,8 +155,8 @@ impl<'a> DataRestoreSchema<'a> {
 
             let _stored: StoredOperation = diesel::insert_into(operations::table)
                 .values(&NewOperation {
-                    block_number: i64::from(op.block.block_number),
-                    action_type: op.action.to_string(),
+                    block_number,
+                    action_type,
                 })
                 .get_result(self.0.conn())?;
             Ok(())

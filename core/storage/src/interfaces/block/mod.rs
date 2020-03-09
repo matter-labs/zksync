@@ -26,6 +26,7 @@ use crate::interfaces::{
 use crate::schema::*;
 use crate::StorageProcessor;
 
+mod conversion;
 pub mod records;
 
 pub struct BlockSchema<'a>(pub &'a StorageProcessor);
@@ -40,13 +41,15 @@ impl<'a> BlockSchema<'a> {
     /// Execute an operation: store op, modify state accordingly, load additional data and meta tx info
     /// - Commit => store account updates
     /// - Verify => apply account updates
-    pub fn execute_operation(&self, op: &Operation) -> QueryResult<Operation> {
+    pub fn execute_operation(&self, op: Operation) -> QueryResult<Operation> {
         self.0.conn().transaction(|| {
+            let block_number = op.block.block_number;
+
             match &op.action {
                 Action::Commit => {
                     StateSchema(self.0)
                         .commit_state_update(op.block.block_number, &op.accounts_updated)?;
-                    self.save_block(&op.block)?;
+                    self.save_block(op.block)?;
                 }
                 Action::Verify { .. } => {
                     StateSchema(self.0).apply_state_update(op.block.block_number)?
@@ -54,7 +57,7 @@ impl<'a> BlockSchema<'a> {
             };
 
             let new_operation = NewOperation {
-                block_number: i64::from(op.block.block_number),
+                block_number: i64::from(block_number),
                 action_type: op.action.to_string(),
             };
             let stored: StoredOperation =
@@ -63,17 +66,22 @@ impl<'a> BlockSchema<'a> {
         })
     }
 
-    pub fn save_block_transactions(&self, block: &Block) -> QueryResult<()> {
-        for block_tx in block.block_transactions.iter() {
+    pub(crate) fn save_block_transactions(&self, block: Block) -> QueryResult<()> {
+        for block_tx in block.block_transactions.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
-                    let new_tx = NewExecutedTransaction::prepare_stored_tx(tx, block.block_number);
+                    let hash = tx.tx.hash().as_ref().to_vec();
+                    let primary_account_address = tx.tx.account().as_bytes().to_vec();
+                    let nonce = tx.tx.nonce() as i64;
+                    let serialized_tx = serde_json::to_value(&tx.tx).unwrap_or_default();
+
+                    let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block.block_number);
                     diesel::insert_into(mempool::table)
                         .values(&InsertTx {
-                            hash: tx.tx.hash().as_ref().to_vec(),
-                            primary_account_address: tx.tx.account().as_bytes().to_vec(),
-                            nonce: tx.tx.nonce() as i64,
-                            tx: serde_json::to_value(&tx.tx).unwrap_or_default(),
+                            hash,
+                            primary_account_address,
+                            nonce,
+                            tx: serialized_tx,
                         })
                         .on_conflict_do_nothing()
                         .execute(self.0.conn())?;
@@ -81,7 +89,7 @@ impl<'a> BlockSchema<'a> {
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
                     let new_priority_op = NewExecutedPriorityOperation::prepare_stored_priority_op(
-                        prior_op,
+                        *prior_op,
                         block.block_number,
                     );
                     OperationsSchema(self.0).store_executed_priority_operation(new_priority_op)?;
@@ -153,7 +161,7 @@ impl<'a> BlockSchema<'a> {
                 .load::<StoredExecutedPriorityOperation>(self.0.conn())?;
             let executed_prior_ops = stored_executed_prior_ops
                 .into_iter()
-                .map(|op| ExecutedOperations::PriorityOp(Box::new(op.into())));
+                .map(|op| ExecutedOperations::PriorityOp(Box::new(op.into_executed())));
             executed_operations.extend(executed_prior_ops);
 
             executed_operations.sort_by_key(|exec_op| {
@@ -340,17 +348,24 @@ impl<'a> BlockSchema<'a> {
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
 
-    pub(crate) fn save_block(&self, block: &Block) -> QueryResult<()> {
+    pub(crate) fn save_block(&self, block: Block) -> QueryResult<()> {
         self.0.conn().transaction(|| {
+            let number = i64::from(block.block_number);
+            let root_hash = format!("sync-bl:{}", fe_to_hex(&block.new_root_hash));
+            let fee_account_id = i64::from(block.fee_account);
+            let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
+            let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
+            let block_size = block.smallest_block_size() as i64;
+
             self.save_block_transactions(block)?;
 
             let new_block = StorageBlock {
-                number: i64::from(block.block_number),
-                root_hash: format!("sync-bl:{}", fe_to_hex(&block.new_root_hash)),
-                fee_account_id: i64::from(block.fee_account),
-                unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
-                unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
-                block_size: block.smallest_block_size() as i64,
+                number,
+                root_hash,
+                fee_account_id,
+                unprocessed_prior_op_before,
+                unprocessed_prior_op_after,
+                block_size,
             };
 
             diesel::insert_into(blocks::table)

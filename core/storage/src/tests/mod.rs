@@ -127,13 +127,13 @@ fn test_commit_rewind() {
     };
 
     BlockSchema(&conn)
-        .execute_operation(&get_operation(1, Action::Commit, updates_block_1))
+        .execute_operation(get_operation(1, Action::Commit, updates_block_1))
         .expect("Commit block 1");
     BlockSchema(&conn)
-        .execute_operation(&get_operation(2, Action::Commit, updates_block_2))
+        .execute_operation(get_operation(2, Action::Commit, updates_block_2))
         .expect("Commit block 2");
     BlockSchema(&conn)
-        .execute_operation(&get_operation(3, Action::Commit, updates_block_3))
+        .execute_operation(get_operation(3, Action::Commit, updates_block_3))
         .expect("Commit block 3");
 
     let (block, state) = StateSchema(&conn).load_committed_state(Some(1)).unwrap();
@@ -149,7 +149,7 @@ fn test_commit_rewind() {
         .store_proof(1, &Default::default())
         .expect("Store proof block 1");
     BlockSchema(&conn)
-        .execute_operation(&get_operation(
+        .execute_operation(get_operation(
             1,
             Action::Verify {
                 proof: Default::default(),
@@ -161,7 +161,7 @@ fn test_commit_rewind() {
         .store_proof(2, &Default::default())
         .expect("Store proof block 2");
     BlockSchema(&conn)
-        .execute_operation(&get_operation(
+        .execute_operation(get_operation(
             2,
             Action::Verify {
                 proof: Default::default(),
