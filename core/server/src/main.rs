@@ -17,7 +17,7 @@ use server::prover_server::start_prover_server;
 use server::state_keeper::{start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper};
 use std::cell::RefCell;
 use std::time::Duration;
-use storage::ConnectionPool;
+use storage::{interfaces::config::ConfigSchema, ConnectionPool};
 use tokio::runtime::Runtime;
 use web3::types::H160;
 
@@ -51,7 +51,7 @@ fn main() {
     let storage = connection_pool
         .access_storage()
         .expect("db connection failed for committer");
-    let contract_addr: H160 = storage
+    let contract_addr: H160 = ConfigSchema(&storage)
         .load_config()
         .expect("can not load server_config")
         .contract_addr
