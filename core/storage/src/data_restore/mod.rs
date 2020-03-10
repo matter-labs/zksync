@@ -26,7 +26,7 @@ pub mod records;
 pub struct DataRestoreSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> DataRestoreSchema<'a> {
-    pub fn save_block_transactions_with_data_restore_state(&self, block: Block) -> QueryResult<()> {
+    pub fn save_block_transactions(&self, block: Block) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             BlockSchema(self.0).save_block_transactions(block)?;
             StateSchema(self.0).update_storage_state(self.new_storage_state("None"))?;
@@ -34,7 +34,7 @@ impl<'a> DataRestoreSchema<'a> {
         })
     }
 
-    pub fn save_block_operations_with_data_restore_state(
+    pub fn save_block_operations(
         &self,
         commit_op: Operation,
         verify_op: Operation,
@@ -47,7 +47,7 @@ impl<'a> DataRestoreSchema<'a> {
         })
     }
 
-    pub fn save_events_state_with_data_restore_state(
+    pub fn save_events_state(
         &self,
         block_events: &[NewBlockEvent],
         token_events: &[TokenAddedEvent],
@@ -71,7 +71,7 @@ impl<'a> DataRestoreSchema<'a> {
         })
     }
 
-    pub fn save_rollup_ops_with_data_restore_state(
+    pub fn save_rollup_ops(
         &self,
         ops: &[(BlockNumber, &FranklinOp, AccountId)],
     ) -> QueryResult<()> {
