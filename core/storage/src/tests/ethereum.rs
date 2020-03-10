@@ -129,4 +129,38 @@ fn ethereum_storage() {
         .expect("Unconfirmed operations query failed");
     assert_eq!(unconfirmed_operations[0].0.id, operation.id);
     assert_eq!(unconfirmed_operations[0].1, vec![params.to_eth_op(1)]);
+
+    // Create one more Ethereum transaction.
+    let params_2 = EthereumTxParams::new(operation_id, 2);
+    EthereumSchema(&conn)
+        .save_operation_eth_tx(
+            params_2.op_id,
+            params_2.hash,
+            params_2.deadline_block,
+            params_2.nonce,
+            params_2.gas_price.clone(),
+            params_2.raw_tx.clone(),
+        )
+        .expect("Can't save Ethereum operation 2");
+
+    // Check that we now can load two operations.
+    let unconfirmed_operations = EthereumSchema(&conn)
+        .load_unconfirmed_operations()
+        .expect("Unconfirmed operations query failed");
+    assert_eq!(unconfirmed_operations[0].0.id, operation.id);
+    assert_eq!(
+        unconfirmed_operations[0].1,
+        vec![params.to_eth_op(1), params_2.to_eth_op(2)]
+    );
+
+    // Make the transaction as completed.
+    EthereumSchema(&conn)
+        .confirm_eth_tx(&params_2.hash)
+        .expect("Can't confirm Ethereum tx");
+
+    // Now there should be no unconfirmed transactions.
+    let unconfirmed_operations = EthereumSchema(&conn)
+        .load_unconfirmed_operations()
+        .expect("Unconfirmed operations query failed");
+    assert!(unconfirmed_operations.is_empty());
 }
