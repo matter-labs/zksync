@@ -23,6 +23,10 @@ use crate::{
 
 pub mod records;
 
+/// Data restore schema provides a convenient interface to restore the
+/// sidechain state from the Ethereum contract.
+///
+/// This schema is used exclusively by the `data_restore` crate.
 pub struct DataRestoreSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> DataRestoreSchema<'a> {
