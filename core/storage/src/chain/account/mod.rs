@@ -109,21 +109,21 @@ impl<'a> AccountSchema<'a> {
         &self,
         account_id: AccountId,
     ) -> QueryResult<(i64, Option<Account>)> {
-        self.0.conn().transaction(|| {
-            if let Some(account) = accounts::table
+        let maybe_account = self.0.conn().transaction(|| {
+            accounts::table
                 .find(i64::from(account_id))
                 .first::<StorageAccount>(self.0.conn())
-                .optional()?
-            {
-                let balances: Vec<StorageBalance> =
-                    StorageBalance::belonging_to(&account).load(self.0.conn())?;
+                .optional()
+        })?;
+        if let Some(account) = maybe_account {
+            let balances: Vec<StorageBalance> =
+                StorageBalance::belonging_to(&account).load(self.0.conn())?;
 
-                let last_block = account.last_block;
-                let (_, account) = restore_account(account, balances);
-                Ok((last_block, Some(account)))
-            } else {
-                Ok((0, None))
-            }
-        })
+            let last_block = account.last_block;
+            let (_, account) = restore_account(account, balances);
+            Ok((last_block, Some(account)))
+        } else {
+            Ok((0, None))
+        }
     }
 }
