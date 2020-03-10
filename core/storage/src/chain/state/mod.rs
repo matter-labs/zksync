@@ -7,7 +7,7 @@ use diesel::prelude::*;
 use models::node::PubKeyHash;
 use models::node::{apply_updates, reverse_updates, AccountMap, AccountUpdate, AccountUpdates};
 // Local imports
-use self::records::{StoredBlockEvent, StoredStorageState};
+use self::records::{NewBlockEvent, NewStorageState, StoredBlockEvent, StoredStorageState};
 use crate::chain::{
     account::{
         records::{
@@ -374,5 +374,27 @@ impl<'a> StateSchema<'a> {
 
     pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
         storage_state_update::table.first(self.0.conn())
+    }
+
+    pub(crate) fn update_storage_state(&self, state: NewStorageState) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
+            diesel::delete(storage_state_update::table).execute(self.0.conn())?;
+            diesel::insert_into(storage_state_update::table)
+                .values(state)
+                .execute(self.0.conn())?;
+            Ok(())
+        })
+    }
+
+    pub(crate) fn update_block_events(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
+            diesel::delete(events_state::table).execute(self.0.conn())?;
+            for event in events.iter() {
+                diesel::insert_into(events_state::table)
+                    .values(event)
+                    .execute(self.0.conn())?;
+            }
+            Ok(())
+        })
     }
 }

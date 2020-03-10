@@ -8,7 +8,10 @@ use web3::types::H256;
 // Workspace imports
 use models::Operation;
 // Local imports
-use self::records::{NewETHOperation, StorageETHOperation, StoredLastWatchedEthBlockNumber};
+use self::records::{
+    NewETHOperation, NewLastWatchedEthBlockNumber, StorageETHOperation,
+    StoredLastWatchedEthBlockNumber,
+};
 use crate::chain::operations::records::StoredOperation;
 use crate::schema::*;
 use crate::StorageProcessor;
@@ -22,44 +25,43 @@ impl<'a> EthereumSchema<'a> {
         &self,
         // TODO: move Eth transaction state to models and add it here
     ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
-        self.0.conn().transaction(|| {
-            let ops: Vec<_> = operations::table
+        let ops: Vec<_> = self.0.conn().transaction(|| {
+            operations::table
                 .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
                 .filter(operations::confirmed.eq(false))
                 .order(operations::id.asc())
-                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.0.conn())?;
+                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.0.conn())
+        })?;
 
-            let mut ops = ops
-                .into_iter()
-                .map(|(o, e)| o.into_op(self.0).map(|o| (o, e)))
-                .collect::<QueryResult<Vec<_>>>()?;
-            ops.sort_by_key(|(o, _)| o.id.unwrap()); // operations from db MUST have and id.
+        let mut ops = ops
+            .into_iter()
+            .map(|(o, e)| o.into_op(self.0).map(|o| (o, e)))
+            .collect::<QueryResult<Vec<_>>>()?;
+        ops.sort_by_key(|(o, _)| o.id.unwrap()); // operations from db MUST have and id.
 
-            Ok(ops
-                .into_iter()
-                .group_by(|(o, _)| o.id.unwrap())
-                .into_iter()
-                .map(|(_op_id, group_iter)| {
-                    let fold_result = group_iter.fold(
-                        (None, Vec::new()),
-                        |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _),
-                         (op, eth_op)| {
-                            if let Some(accum_op) = accum_op.as_ref() {
-                                assert_eq!(accum_op.id, op.id);
-                            } else {
-                                accum_op = Some(op);
-                            }
-                            if let Some(eth_op) = eth_op {
-                                accum_eth_ops.push(eth_op);
-                            }
+        Ok(ops
+            .into_iter()
+            .group_by(|(o, _)| o.id.unwrap())
+            .into_iter()
+            .map(|(_op_id, group_iter)| {
+                let fold_result = group_iter.fold(
+                    (None, Vec::new()),
+                    |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _), (op, eth_op)| {
+                        if let Some(accum_op) = accum_op.as_ref() {
+                            assert_eq!(accum_op.id, op.id);
+                        } else {
+                            accum_op = Some(op);
+                        }
+                        if let Some(eth_op) = eth_op {
+                            accum_eth_ops.push(eth_op);
+                        }
 
-                            (accum_op, accum_eth_ops)
-                        },
-                    );
-                    (fold_result.0.unwrap(), fold_result.1)
-                })
-                .collect())
-        })
+                        (accum_op, accum_eth_ops)
+                    },
+                );
+                (fold_result.0.unwrap(), fold_result.1)
+            })
+            .collect())
     }
 
     pub fn load_sent_unconfirmed_ops(
@@ -109,15 +111,17 @@ impl<'a> EthereumSchema<'a> {
         gas_price: BigDecimal,
         raw_tx: Vec<u8>,
     ) -> QueryResult<()> {
+        let operation = NewETHOperation {
+            op_id,
+            nonce: i64::from(nonce),
+            deadline_block: deadline_block as i64,
+            gas_price,
+            tx_hash: hash.as_bytes().to_vec(),
+            raw_tx,
+        };
+
         insert_into(eth_operations::table)
-            .values(&NewETHOperation {
-                op_id,
-                nonce: i64::from(nonce),
-                deadline_block: deadline_block as i64,
-                gas_price,
-                tx_hash: hash.as_bytes().to_vec(),
-                raw_tx,
-            })
+            .values(&operation)
             .execute(self.0.conn())
             .map(drop)
     }
@@ -137,6 +141,19 @@ impl<'a> EthereumSchema<'a> {
                 .set(operations::confirmed.eq(true))
                 .execute(self.0.conn())
                 .map(drop)
+        })
+    }
+
+    pub(crate) fn update_last_watched_block_number(
+        &self,
+        number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
+            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.0.conn())?;
+            diesel::insert_into(data_restore_last_watched_eth_block::table)
+                .values(number)
+                .execute(self.0.conn())?;
+            Ok(())
         })
     }
 

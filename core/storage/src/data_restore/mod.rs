@@ -5,7 +5,7 @@ use itertools::Itertools;
 // Workspace imports
 use models::node::block::Block;
 use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp};
-use models::{Action, Operation, TokenAddedEvent};
+use models::{Operation, TokenAddedEvent};
 // Local imports
 use self::records::StoredRollupOpsBlock;
 use crate::schema::*;
@@ -13,11 +13,11 @@ use crate::StorageProcessor;
 use crate::{
     chain::{
         block::BlockSchema,
-        operations::records::{NewFranklinOp, NewOperation, StoredFranklinOp, StoredOperation},
+        operations::records::{NewFranklinOp, StoredFranklinOp},
         state::records::{NewBlockEvent, NewStorageState},
         state::StateSchema,
     },
-    ethereum::records::NewLastWatchedEthBlockNumber,
+    ethereum::{records::NewLastWatchedEthBlockNumber, EthereumSchema},
     tokens::TokensSchema,
 };
 
@@ -29,10 +29,7 @@ impl<'a> DataRestoreSchema<'a> {
     pub fn save_block_transactions_with_data_restore_state(&self, block: Block) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             BlockSchema(self.0).save_block_transactions(block)?;
-            let state = NewStorageState {
-                storage_state: "None".to_string(),
-            };
-            self.update_storage_state(state)?;
+            StateSchema(self.0).update_storage_state(self.new_storage_state("None"))?;
             Ok(())
         })
     }
@@ -43,12 +40,9 @@ impl<'a> DataRestoreSchema<'a> {
         verify_op: Operation,
     ) -> QueryResult<()> {
         self.0.conn().transaction(|| {
-            self.save_operation(commit_op)?;
-            self.save_operation(verify_op)?;
-            let state = NewStorageState {
-                storage_state: "None".to_string(),
-            };
-            self.update_storage_state(state)?;
+            BlockSchema(self.0).execute_operation(commit_op)?;
+            BlockSchema(self.0).execute_operation(verify_op)?;
+            StateSchema(self.0).update_storage_state(self.new_storage_state("None"))?;
             Ok(())
         })
     }
@@ -60,7 +54,7 @@ impl<'a> DataRestoreSchema<'a> {
         last_watched_eth_number: &NewLastWatchedEthBlockNumber,
     ) -> QueryResult<()> {
         self.0.conn().transaction(|| {
-            self.update_block_events(block_events)?;
+            StateSchema(self.0).update_block_events(block_events)?;
 
             for token in token_events.iter() {
                 TokensSchema(self.0).store_token(
@@ -70,12 +64,8 @@ impl<'a> DataRestoreSchema<'a> {
                 )?;
             }
 
-            self.update_last_watched_block_number(last_watched_eth_number)?;
-
-            let state = NewStorageState {
-                storage_state: "Events".to_string(),
-            };
-            self.update_storage_state(state)?;
+            EthereumSchema(self.0).update_last_watched_block_number(last_watched_eth_number)?;
+            StateSchema(self.0).update_storage_state(self.new_storage_state("Events"))?;
 
             Ok(())
         })
@@ -93,10 +83,7 @@ impl<'a> DataRestoreSchema<'a> {
                     .values(&stored_op)
                     .execute(self.0.conn())?;
             }
-            let state = NewStorageState {
-                storage_state: "Operations".to_string(),
-            };
-            self.update_storage_state(state)?;
+            StateSchema(self.0).update_storage_state(self.new_storage_state("Operations"))?;
             Ok(())
         })
     }
@@ -139,64 +126,9 @@ impl<'a> DataRestoreSchema<'a> {
         Ok(ops_blocks)
     }
 
-    fn save_operation(&self, op: Operation) -> QueryResult<()> {
-        self.0.conn().transaction(|| {
-            let block_number = i64::from(op.block.block_number);
-            let action_type = op.action.to_string();
-
-            match &op.action {
-                Action::Commit => {
-                    StateSchema(self.0)
-                        .commit_state_update(op.block.block_number, &op.accounts_updated)?;
-                    BlockSchema(self.0).save_block(op.block)?;
-                }
-                Action::Verify { .. } => {
-                    StateSchema(self.0).apply_state_update(op.block.block_number)?
-                }
-            };
-
-            let _stored: StoredOperation = diesel::insert_into(operations::table)
-                .values(&NewOperation {
-                    block_number,
-                    action_type,
-                })
-                .get_result(self.0.conn())?;
-            Ok(())
-        })
-    }
-
-    fn update_block_events(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
-        self.0.conn().transaction(|| {
-            diesel::delete(events_state::table).execute(self.0.conn())?;
-            for event in events.iter() {
-                diesel::insert_into(events_state::table)
-                    .values(event)
-                    .execute(self.0.conn())?;
-            }
-            Ok(())
-        })
-    }
-
-    fn update_last_watched_block_number(
-        &self,
-        number: &NewLastWatchedEthBlockNumber,
-    ) -> QueryResult<()> {
-        self.0.conn().transaction(|| {
-            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.0.conn())?;
-            diesel::insert_into(data_restore_last_watched_eth_block::table)
-                .values(number)
-                .execute(self.0.conn())?;
-            Ok(())
-        })
-    }
-
-    fn update_storage_state(&self, state: NewStorageState) -> QueryResult<()> {
-        self.0.conn().transaction(|| {
-            diesel::delete(storage_state_update::table).execute(self.0.conn())?;
-            diesel::insert_into(storage_state_update::table)
-                .values(state)
-                .execute(self.0.conn())?;
-            Ok(())
-        })
+    fn new_storage_state(&self, state: impl ToString) -> NewStorageState {
+        NewStorageState {
+            storage_state: state.to_string(),
+        }
     }
 }
