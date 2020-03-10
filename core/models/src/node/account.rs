@@ -40,12 +40,12 @@ impl PubKeyHash {
     }
 
     pub fn to_hex(&self) -> String {
-        format!("0x{}", hex::encode(&self.data))
+        format!("sync:{}", hex::encode(&self.data))
     }
 
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
-        ensure!(s.starts_with("0x"), "Address should start with 0x");
-        let bytes = hex::decode(&s[2..])?;
+        ensure!(s.starts_with("sync:"), "PubKeyHash should start with sync:");
+        let bytes = hex::decode(&s[5..])?;
         Self::from_bytes(&bytes)
     }
 

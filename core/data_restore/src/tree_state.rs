@@ -487,7 +487,7 @@ mod test {
         };
 
         // let tx5 = Close {
-        //     account: AccountAddress::from_hex("0x8888888888888888888888888888888888888888")
+        //     account: AccountAddress::from_hex("sync:8888888888888888888888888888888888888888")
         //         .unwrap(),
         //     nonce: 2,
         //     signature: TxSignature::default(),

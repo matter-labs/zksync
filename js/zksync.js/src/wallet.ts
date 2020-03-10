@@ -229,7 +229,7 @@ export class Wallet {
         );
 
         const ethTransaction = await mainZkSyncContract.authPubkeyHash(
-            newPubKeyHash,
+            newPubKeyHash.replace("sync:", "0x"),
             numNonce,
             {
                 gasLimit: utils.bigNumberify("200000")
