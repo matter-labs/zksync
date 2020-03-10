@@ -23,6 +23,10 @@ use crate::{
 
 pub mod records;
 
+/// `OperationsExt` schema is a logical extension for an `Operations` schema,
+/// which provides more getters for transactions.
+/// While `Operations` getters are very basic, `OperationsExt` schema can transform
+/// the data to be convenient for the caller.
 pub struct OperationsExtSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> OperationsExtSchema<'a> {
@@ -31,6 +35,7 @@ impl<'a> OperationsExtSchema<'a> {
             let tx = OperationsSchema(self.0).get_executed_operation(hash)?;
 
             if let Some(tx) = tx {
+                // Check whether transaction was committed.
                 let committed = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
                     .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
@@ -38,10 +43,12 @@ impl<'a> OperationsExtSchema<'a> {
                     .optional()?
                     .is_some();
 
+                // We can't provide a receipt for non-committed transaction.
                 if !committed {
                     return Ok(None);
                 }
 
+                // Check whether transaction was verified.
                 let verified = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
                     .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
@@ -50,13 +57,14 @@ impl<'a> OperationsExtSchema<'a> {
                     .map(|v| v.confirmed)
                     .unwrap_or(false);
 
+                // Get the prover job details.
                 let prover_run: Option<ProverRun> = prover_runs::table
                     .filter(prover_runs::block_number.eq(tx.block_number))
                     .first::<ProverRun>(self.0.conn())
                     .optional()?;
 
                 Ok(Some(TxReceiptResponse {
-                    tx_hash: hex::encode(&hash),
+                    tx_hash: hex::encode(hash),
                     block_number: tx.block_number,
                     success: tx.success,
                     verified,
@@ -108,9 +116,24 @@ impl<'a> OperationsExtSchema<'a> {
     }
 
     pub fn get_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
-        // TODO: Maybe move the transformations to api_server?
+        // Attempt to find the transaction in the list of executed operations.
+        if let Some(response) = self.find_tx_by_hash(hash)? {
+            return Ok(Some(response));
+        }
+        // The transaction was not found in the list of executed transactions.
+        // Check executed priority operations list.
+        if let Some(response) = self.find_priority_op_by_hash(hash)? {
+            return Ok(Some(response));
+        }
 
-        // first check executed_transactions
+        // There is no executed transaction with the provided hash.
+        Ok(None)
+    }
+
+    /// Helper method for `get_tx_by_hash` which attempts to find a transaction
+    /// in the list of executed operations.
+    fn find_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+        // TODO: Maybe move the transformations to api_server?
         let tx: Option<StoredExecutedTransaction> =
             OperationsSchema(self.0).get_executed_operation(hash)?;
 
@@ -128,18 +151,7 @@ impl<'a> OperationsExtSchema<'a> {
                 .unwrap_or("unknown amount");
 
             let (tx_from, tx_to, tx_fee) = match tx_type {
-                "Withdraw" => (
-                    operation["tx"]["from"]
-                        .as_str()
-                        .unwrap_or("unknown from")
-                        .to_string(),
-                    operation["tx"]["to"]
-                        .as_str()
-                        .unwrap_or("unknown to")
-                        .to_string(),
-                    operation["tx"]["fee"].as_str().map(|v| v.to_string()),
-                ),
-                "Transfer" | "TransferToNew" => (
+                "Withdraw" | "Transfer" | "TransferToNew" => (
                     operation["tx"]["from"]
                         .as_str()
                         .unwrap_or("unknown from")
@@ -185,7 +197,13 @@ impl<'a> OperationsExtSchema<'a> {
             }));
         };
 
-        // then check executed_priority_operations
+        Ok(None)
+    }
+
+    /// Helper method for `get_tx_by_hash` which attempts to find a transaction
+    /// in the list of executed priority operations.
+    fn find_priority_op_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
+        // TODO: Maybe move the transformations to api_server?
         let tx: Option<StoredExecutedPriorityOperation> = executed_priority_operations::table
             .filter(executed_priority_operations::eth_hash.eq(hash))
             .first(self.0.conn())
@@ -238,6 +256,8 @@ impl<'a> OperationsExtSchema<'a> {
         Ok(None)
     }
 
+    /// Loads the range of the transactions applied to the account starting
+    /// from the block with number $(offset) up to $(offset + limit).
     pub fn get_account_transactions_history(
         &self,
         address: &PubKeyHash,
@@ -245,6 +265,14 @@ impl<'a> OperationsExtSchema<'a> {
         limit: i64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
         // TODO: txs are not ordered
+
+        // This query does the following:
+        // - joins the `mempool` table (which contains the tx body) and
+        //   the `executed_transaction` (which contains the tx header);
+        // - creates a union of data above and the `executed_priority_operations`
+        // - unifies the information to match the `TransactionsHistoryItem`
+        //   structure layout
+        // - returns the obtained results.
         let query = format!(
             "
             select
@@ -320,6 +348,7 @@ impl<'a> OperationsExtSchema<'a> {
         diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())
     }
 
+    /// Loads all the transactions that affected the certain account.
     pub fn get_account_transactions(
         &self,
         address: &PubKeyHash,
