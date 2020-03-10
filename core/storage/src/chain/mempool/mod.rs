@@ -6,6 +6,11 @@ use diesel::prelude::*;
 use crate::schema::*;
 use crate::{chain::operations_ext::records::InsertTx, StorageProcessor};
 
+/// Mempool schema is an auxiliary structure encapsulating the interaction
+/// with the mempool table.
+///
+/// Note that there are no getters here, since the mempool table is used
+/// mostly in joined form for read access.
 pub(crate) struct MempoolSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> MempoolSchema<'a> {

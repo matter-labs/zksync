@@ -11,9 +11,12 @@ use crate::StorageProcessor;
 
 pub mod records;
 
+/// Tokens schema handles the `tokens` table, providing methods to
+/// get and store new tokens.
 pub struct TokensSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> TokensSchema<'a> {
+    /// Persists the token in the database.
     pub fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()> {
         let new_token = Token {
             id: i32::from(id),
@@ -30,6 +33,9 @@ impl<'a> TokensSchema<'a> {
             .map(drop)
     }
 
+    /// Loads all the stored tokens from the database.
+    /// Alongside with the tokens added via `store_token` method, the default `ETH` token
+    /// is returned.
     pub fn load_tokens(&self) -> QueryResult<HashMap<TokenId, Token>> {
         let tokens = tokens::table
             .order(tokens::id.asc())

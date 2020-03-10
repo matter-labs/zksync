@@ -8,9 +8,11 @@ use models::node::BlockNumber;
 use crate::schema::*;
 use crate::StorageProcessor;
 
+/// Auxiliary schema encapsulating the stats counting logic for the storage tables.
 pub struct StatsSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> StatsSchema<'a> {
+    /// Returns the amount of blocks that don't have proofs yet.
     pub fn count_outstanding_proofs(&self, after_block: BlockNumber) -> QueryResult<u32> {
         use crate::schema::executed_transactions::dsl::*;
         let count: i64 = executed_transactions
@@ -20,6 +22,7 @@ impl<'a> StatsSchema<'a> {
         Ok(count as u32)
     }
 
+    /// Returns the amount of executed transactions (both usual and priority).
     pub fn count_total_transactions(&self) -> QueryResult<u32> {
         let count_tx: i64 = executed_transactions::table
             .filter(executed_transactions::success.eq(true))
