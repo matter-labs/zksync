@@ -5,7 +5,15 @@ use serde_derive::{Deserialize, Serialize};
 use crate::schema::*;
 
 #[derive(
-    Debug, Clone, Insertable, QueryableByName, Queryable, Serialize, Deserialize, AsChangeset,
+    Debug,
+    Clone,
+    Insertable,
+    QueryableByName,
+    Queryable,
+    Serialize,
+    Deserialize,
+    AsChangeset,
+    PartialEq,
 )]
 #[table_name = "tokens"]
 pub struct Token {
