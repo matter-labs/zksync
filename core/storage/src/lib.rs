@@ -35,15 +35,11 @@ pub mod ethereum;
 pub mod prover;
 pub mod tokens;
 
-// TODO re-exports to deal with
 pub use crate::connection_pool::ConnectionPool;
-pub use crate::diff::StorageAccountDiff;
 
-enum ConnectionHolder {
-    Pooled(PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>),
-    Direct(RecoverableConnection<PgConnection>),
-}
-
+/// Storage processor is the main storage interaction point.
+/// It holds down the connection (either direct or pooled) to the database
+/// and provide methods to obtain different storage schemas.
 pub struct StorageProcessor {
     conn: ConnectionHolder,
 }
@@ -65,10 +61,45 @@ impl StorageProcessor {
         }
     }
 
+    /// Gains access to the `Chain` schemas.
+    pub fn chain<'a>(&'a self) -> chain::ChainIntermediator<'a> {
+        chain::ChainIntermediator(self)
+    }
+
+    /// Gains access to the `Config` schema.
+    pub fn config<'a>(&'a self) -> config::ConfigSchema<'a> {
+        config::ConfigSchema(self)
+    }
+
+    /// Gains access to the `DataRestore` schema.
+    pub fn data_restore<'a>(&'a self) -> data_restore::DataRestoreSchema<'a> {
+        data_restore::DataRestoreSchema(self)
+    }
+
+    /// Gains access to the `Ethereum` schema.
+    pub fn ethereum<'a>(&'a self) -> ethereum::EthereumSchema<'a> {
+        ethereum::EthereumSchema(self)
+    }
+
+    /// Gains access to the `Prover` schema.
+    pub fn prover<'a>(&'a self) -> prover::ProverSchema<'a> {
+        prover::ProverSchema(self)
+    }
+
+    /// Gains access to the `Tokens` schema.
+    pub fn tokens<'a>(&'a self) -> tokens::TokensSchema<'a> {
+        tokens::TokensSchema(self)
+    }
+
     fn conn(&self) -> &RecoverableConnection<PgConnection> {
         match self.conn {
             ConnectionHolder::Pooled(ref conn) => conn,
             ConnectionHolder::Direct(ref conn) => conn,
         }
     }
+}
+
+enum ConnectionHolder {
+    Pooled(PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>),
+    Direct(RecoverableConnection<PgConnection>),
 }
