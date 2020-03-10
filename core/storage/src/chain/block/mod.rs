@@ -71,7 +71,7 @@ impl<'a> BlockSchema<'a> {
     }
 
     /// Given a block, stores its transactions in the database.
-    pub(crate) fn save_block_transactions(&self, block: Block) -> QueryResult<()> {
+    pub fn save_block_transactions(&self, block: Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {

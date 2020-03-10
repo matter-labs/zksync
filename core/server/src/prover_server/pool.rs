@@ -29,7 +29,6 @@ use models::{
 };
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
-use storage::interfaces::{block::BlockSchema, state::StateSchema};
 
 #[derive(Debug, Clone)]
 struct BlockSizedOperationsQueue {
@@ -56,7 +55,9 @@ impl BlockSizedOperationsQueue {
     ) -> Result<(), String> {
         if self.operations.len() < limit as usize {
             let storage = conn_pool.access_storage().expect("failed to connect to db");
-            let ops = BlockSchema(&storage)
+            let ops = storage
+                .chain()
+                .block_schema()
                 .load_unverified_commits_after_block(self.block_size, self.last_loaded_block, limit)
                 .map_err(|e| format!("failed to read commit operations: {}", e))?;
 
@@ -259,7 +260,9 @@ impl Maintainer {
             Some((block, ref state)) => {
                 // State is initialized. We need to load diff (if any) and update
                 // the stored state.
-                let state_diff = StateSchema(&storage)
+                let state_diff = storage
+                    .chain()
+                    .state_schema()
                     .load_state_diff(block, Some(new_block))
                     .map_err(|e| format!("failed to load committed state: {}", e))?;
 
@@ -275,7 +278,9 @@ impl Maintainer {
             }
             None => {
                 // State is not initialized, load it.
-                let (block, accounts) = StateSchema(&storage)
+                let (block, accounts) = storage
+                    .chain()
+                    .state_schema()
                     .load_committed_state(Some(new_block))
                     .map_err(|e| format!("failed to load committed state: {}", e))?;
 
@@ -329,7 +334,9 @@ impl Maintainer {
             block_number,
         );
 
-        let ops = BlockSchema(&storage)
+        let ops = storage
+            .chain()
+            .block_schema()
             .get_block_operations(block_number)
             .map_err(|e| format!("failed to get block operations {}", e))?;
 

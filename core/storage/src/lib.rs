@@ -67,27 +67,27 @@ impl StorageProcessor {
     }
 
     /// Gains access to the `Config` schema.
-    pub fn config<'a>(&'a self) -> config::ConfigSchema<'a> {
+    pub fn config_schema<'a>(&'a self) -> config::ConfigSchema<'a> {
         config::ConfigSchema(self)
     }
 
     /// Gains access to the `DataRestore` schema.
-    pub fn data_restore<'a>(&'a self) -> data_restore::DataRestoreSchema<'a> {
+    pub fn data_restore_schema<'a>(&'a self) -> data_restore::DataRestoreSchema<'a> {
         data_restore::DataRestoreSchema(self)
     }
 
     /// Gains access to the `Ethereum` schema.
-    pub fn ethereum<'a>(&'a self) -> ethereum::EthereumSchema<'a> {
+    pub fn ethereum_schema<'a>(&'a self) -> ethereum::EthereumSchema<'a> {
         ethereum::EthereumSchema(self)
     }
 
     /// Gains access to the `Prover` schema.
-    pub fn prover<'a>(&'a self) -> prover::ProverSchema<'a> {
+    pub fn prover_schema<'a>(&'a self) -> prover::ProverSchema<'a> {
         prover::ProverSchema(self)
     }
 
     /// Gains access to the `Tokens` schema.
-    pub fn tokens<'a>(&'a self) -> tokens::TokensSchema<'a> {
+    pub fn tokens_schema<'a>(&'a self) -> tokens::TokensSchema<'a> {
         tokens::TokensSchema(self)
     }
 

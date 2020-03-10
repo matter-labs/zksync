@@ -15,10 +15,7 @@ use models::node::{
 use models::params::max_block_chunk_size;
 use models::{ActionType, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
-use storage::{
-    interfaces::{block::BlockSchema, state::StateSchema},
-    ConnectionPool,
-};
+use storage::ConnectionPool;
 use web3::types::Address;
 
 pub enum ExecutedOpId {
@@ -95,14 +92,20 @@ impl PlasmaStateInitParams {
             .access_storage()
             .expect("db connection failed for state restore");
 
-        let (last_committed, accounts) = StateSchema(&storage)
+        let (last_committed, accounts) = storage
+            .chain()
+            .state_schema()
             .load_committed_state(None)
             .expect("db failed");
-        let last_verified = BlockSchema(&storage)
+        let last_verified = storage
+            .chain()
+            .block_schema()
             .get_last_verified_block()
             .expect("db failed");
-        let unprocessed_priority_op = BlockSchema(&storage)
-            .load_stored_op_with_block_number(last_committed, ActionType::COMMIT)
+        let unprocessed_priority_op = storage
+            .chain()
+            .operations_schema()
+            .get_operation(last_committed, ActionType::COMMIT)
             .map(|storage_op| {
                 storage_op
                     .into_op(&storage)
@@ -164,7 +167,9 @@ impl PlasmaStateKeeper {
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let (last_committed, mut accounts) = StateSchema(&storage)
+        let (last_committed, mut accounts) = storage
+            .chain()
+            .state_schema()
             .load_committed_state(None)
             .expect("db failed");
         // TODO: move genesis block creation to separate routine.
@@ -179,10 +184,14 @@ impl PlasmaStateKeeper {
             nonce: fee_account.nonce,
         };
         accounts.insert(0, fee_account);
-        StateSchema(&storage)
+        storage
+            .chain()
+            .state_schema()
             .commit_state_update(0, &[(0, db_account_update)])
             .expect("db fail");
-        StateSchema(&storage)
+        storage
+            .chain()
+            .state_schema()
             .apply_state_update(0)
             .expect("db fail");
         let state = PlasmaState::new(accounts, last_committed + 1);

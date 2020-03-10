@@ -8,10 +8,7 @@ use models::node::{Address, TokenId};
 use models::EncodedProof;
 use serde::Serialize;
 use std::time::Instant;
-use storage::{
-    interfaces::{state::StateSchema, tokens::TokensSchema},
-    ConnectionPool,
-};
+use storage::ConnectionPool;
 
 #[derive(Serialize, Debug)]
 struct ExitProofData {
@@ -81,7 +78,8 @@ fn main() {
     let token_id = if target_token_address == "ETH" {
         0
     } else {
-        let tokens = TokensSchema(&storage)
+        let tokens = storage
+            .tokens_schema()
             .load_tokens()
             .expect("Failed to load token");
         tokens
@@ -90,7 +88,9 @@ fn main() {
             .expect("Token not found")
             .0
     };
-    let accounts = StateSchema(&storage)
+    let accounts = storage
+        .chain()
+        .state_schema()
         .load_verified_state()
         .expect("Failed to load verified state")
         .1;

@@ -18,7 +18,7 @@ use models::config_options::ConfigurationOptions;
 use models::node::{Nonce, PriorityOp, PubKeyHash, TokenId};
 use models::params::PRIORITY_EXPIRATION;
 use models::TokenAddedEvent;
-use storage::{interfaces::tokens::TokensSchema, ConnectionPool};
+use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 use web3::transports::EventLoopHandle;
 
@@ -235,7 +235,7 @@ impl<T: Transport> EthWatch<T> {
             .access_storage()
             .map(|storage| {
                 for (id, address) in &self.eth_state.tokens {
-                    if let Err(e) = TokensSchema(&storage).store_token(
+                    if let Err(e) = storage.tokens_schema().store_token(
                         *id,
                         &format!("0x{:x}", address),
                         &format!("ERC20-{}", id),

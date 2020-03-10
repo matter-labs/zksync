@@ -24,7 +24,7 @@ use models::node::{
 };
 use models::params::max_block_chunk_size;
 use std::collections::{HashMap, VecDeque};
-use storage::{interfaces::state::StateSchema, ConnectionPool};
+use storage::ConnectionPool;
 use tokio::runtime::Runtime;
 use web3::types::Address;
 
@@ -90,7 +90,9 @@ impl MempoolState {
 
     fn restore_from_db(db_pool: &ConnectionPool) -> Self {
         let storage = db_pool.access_storage().expect("mempool db restore");
-        let (_, accounts) = StateSchema(&storage)
+        let (_, accounts) = storage
+            .chain()
+            .state_schema()
             .load_committed_state(None)
             .expect("mempool account state load");
 

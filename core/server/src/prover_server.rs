@@ -12,7 +12,6 @@ use log::{error, info, trace};
 use models::config_options::ThreadPanicNotify;
 use models::node::BlockNumber;
 use prover::client;
-use storage::interfaces::prover::ProverSchema;
 
 struct AppState {
     connection_pool: storage::ConnectionPool,
@@ -41,7 +40,8 @@ fn register(
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let storage = data.access_storage()?;
-    let id = ProverSchema(&storage)
+    let id = storage
+        .prover_schema()
         .register_prover(&r.name, r.block_size)
         .map_err(actix_web::error::ErrorInternalServerError)?;
     Ok(id.to_string())
@@ -56,7 +56,8 @@ fn block_to_prove(
         return Err(actix_web::error::ErrorBadRequest("empty name"));
     }
     let storage = data.access_storage()?;
-    let ret = ProverSchema(&storage)
+    let ret = storage
+        .prover_schema()
         .prover_run_for_next_commit(&r.name, data.prover_timeout, r.block_size)
         .map_err(|e| {
             error!("could not get next unverified commit operation: {}", e);
@@ -107,7 +108,8 @@ fn working_on(
         .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    ProverSchema(&storage)
+    storage
+        .prover_schema()
         .record_prover_is_working(r.prover_run_id)
         .map_err(|e| {
             error!("failed to record prover work in progress request: {}", e);
@@ -121,7 +123,7 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
         .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    match ProverSchema(&storage).store_proof(r.block, &r.proof) {
+    match storage.prover_schema().store_proof(r.block, &r.proof) {
         Ok(_) => {
             let mut data_pool = data
                 .preparing_data_pool
@@ -151,7 +153,8 @@ fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::R
         .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    ProverSchema(&storage)
+    storage
+        .prover_schema()
         .record_prover_stop(*prover_id)
         .map_err(|e| {
             error!("failed to record prover stop: {}", e);
