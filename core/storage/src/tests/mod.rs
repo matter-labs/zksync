@@ -1,5 +1,29 @@
-// These tests require empty DB setup and ignored by default
-// use `zksync db-test-no-reset`/`franklin db-test` script to run them
+//! Tests for storage crate.
+//!
+//! These tests require an empty DB setup and ignored by default.
+//! To run them, use `zksync db-test-no-reset`/`franklin db-test` script
+//! (or, if it's a first run, then `zksync db-test`, which will create all the required
+//! test tables). Also be sure to have Postgres running locally.
+//!
+//! All the tests in this module do roughly follow the same pattern, e.g.:
+//!
+//! ```ignore
+//! #[test]
+//! fn some_test() {
+//!     let conn = StorageProcessor::establish_connection().unwrap();
+//!     db_test(conn.conn(), || {
+//!         // Actual test code.
+//!         Ok(())
+//!     });
+//! }
+//! ```
+//!
+//! Executing the test in `db_test` function as a closure has 2 reasons:
+//! 1. All the changes made there will be rolled back and won't affect other tests.
+//! 2. Since closure should return a `QueryResult`, it is possible to use `?` in tests
+//!    instead of `expect`/`unwrap` after each database interaction.
+//!
+//! The file hierarchy is designed to mirror the actual project structure.
 
 // External imports
 use crypto_exports::rand::{SeedableRng, XorShiftRng};
@@ -20,7 +44,9 @@ where
     Conn: Connection,
     F: FnOnce() -> diesel::QueryResult<T>,
 {
-    conn.test_transaction(f);
+    conn.begin_test_transaction();
+
+    f().expect("Test body returned an error:");
 }
 
 /// Without `db_test` attribute we don't want to run any tests, so we skip them.
