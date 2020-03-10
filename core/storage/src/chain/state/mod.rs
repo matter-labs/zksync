@@ -25,14 +25,23 @@ use crate::StorageProcessor;
 
 pub mod records;
 
+/// State schema is capable of managing... well, the state of the chain.
+///
+/// This roughly includes the two main topics:
+/// - Account management (applying the diffs to the account map).
+/// - Block events (which blocks were committed/verified).
 pub struct StateSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> StateSchema<'a> {
+    /// Stores the list of updates to the account map in the database.
+    /// At this step, the changes are not verified yet, and thus are not applied.
     pub fn commit_state_update(
         &self,
         block_number: u32,
         accounts_updated: &[(u32, AccountUpdate)],
     ) -> QueryResult<()> {
+        // Simply go through the every account update, and update the corresponding table.
+        // This may look scary, but every match arm is very simple by its nature.
         self.0.conn().transaction(|| {
             for (update_order_id, (id, upd)) in accounts_updated.iter().enumerate() {
                 log::debug!(
@@ -42,27 +51,31 @@ impl<'a> StateSchema<'a> {
                 );
                 match *upd {
                     AccountUpdate::Create { ref address, nonce } => {
+                        let account_create = StorageAccountCreation {
+                            update_order_id: update_order_id as i32,
+                            account_id: i64::from(*id),
+                            is_create: true,
+                            block_number: i64::from(block_number),
+                            address: address.as_bytes().to_vec(),
+                            nonce: i64::from(nonce),
+                        };
+
                         diesel::insert_into(account_creates::table)
-                            .values(&StorageAccountCreation {
-                                update_order_id: update_order_id as i32,
-                                account_id: i64::from(*id),
-                                is_create: true,
-                                block_number: i64::from(block_number),
-                                address: address.as_bytes().to_vec(),
-                                nonce: i64::from(nonce),
-                            })
+                            .values(&account_create)
                             .execute(self.0.conn())?;
                     }
                     AccountUpdate::Delete { ref address, nonce } => {
+                        let account_delete = StorageAccountCreation {
+                            update_order_id: update_order_id as i32,
+                            account_id: i64::from(*id),
+                            is_create: false,
+                            block_number: i64::from(block_number),
+                            address: address.as_bytes().to_vec(),
+                            nonce: i64::from(nonce),
+                        };
+
                         diesel::insert_into(account_creates::table)
-                            .values(&StorageAccountCreation {
-                                update_order_id: update_order_id as i32,
-                                account_id: i64::from(*id),
-                                is_create: false,
-                                block_number: i64::from(block_number),
-                                address: address.as_bytes().to_vec(),
-                                nonce: i64::from(nonce),
-                            })
+                            .values(&account_delete)
                             .execute(self.0.conn())?;
                     }
                     AccountUpdate::UpdateBalance {
@@ -70,17 +83,19 @@ impl<'a> StateSchema<'a> {
                         old_nonce,
                         new_nonce,
                     } => {
+                        let account_update = StorageAccountUpdateInsert {
+                            update_order_id: update_order_id as i32,
+                            account_id: i64::from(*id),
+                            block_number: i64::from(block_number),
+                            coin_id: i32::from(token),
+                            old_balance: old_balance.clone(),
+                            new_balance: new_balance.clone(),
+                            old_nonce: i64::from(old_nonce),
+                            new_nonce: i64::from(new_nonce),
+                        };
+
                         diesel::insert_into(account_balance_updates::table)
-                            .values(&StorageAccountUpdateInsert {
-                                update_order_id: update_order_id as i32,
-                                account_id: i64::from(*id),
-                                block_number: i64::from(block_number),
-                                coin_id: i32::from(token),
-                                old_balance: old_balance.clone(),
-                                new_balance: new_balance.clone(),
-                                old_nonce: i64::from(old_nonce),
-                                new_nonce: i64::from(new_nonce),
-                            })
+                            .values(&account_update)
                             .execute(self.0.conn())?;
                     }
                     AccountUpdate::ChangePubKeyHash {
@@ -89,16 +104,18 @@ impl<'a> StateSchema<'a> {
                         old_nonce,
                         new_nonce,
                     } => {
+                        let change_pubkey_hash = StorageAccountPubkeyUpdateInsert {
+                            update_order_id: update_order_id as i32,
+                            account_id: i64::from(*id),
+                            block_number: i64::from(block_number),
+                            old_pubkey_hash: old_pub_key_hash.data.to_vec(),
+                            new_pubkey_hash: new_pub_key_hash.data.to_vec(),
+                            old_nonce: i64::from(old_nonce),
+                            new_nonce: i64::from(new_nonce),
+                        };
+
                         diesel::insert_into(account_pubkey_updates::table)
-                            .values(&StorageAccountPubkeyUpdateInsert {
-                                update_order_id: update_order_id as i32,
-                                account_id: i64::from(*id),
-                                block_number: i64::from(block_number),
-                                old_pubkey_hash: old_pub_key_hash.data.to_vec(),
-                                new_pubkey_hash: new_pub_key_hash.data.to_vec(),
-                                old_nonce: i64::from(old_nonce),
-                                new_nonce: i64::from(new_nonce),
-                            })
+                            .values(&change_pubkey_hash)
                             .execute(self.0.conn())?;
                     }
                 }
@@ -107,9 +124,14 @@ impl<'a> StateSchema<'a> {
         })
     }
 
+    /// Applies the previously stored list of account changes to the stored state.
     pub fn apply_state_update(&self, block_number: u32) -> QueryResult<()> {
         log::info!("Applying state update for block: {}", block_number);
         self.0.conn().transaction(|| {
+            // Collect the stored updates. This includes collecting entries from three tables:
+            // `account_creates` (for creating/removing accounts),
+            // `account_balance_updates` (for changing the balance of accounts),
+            // `account_pubkey_updates` (for changing the accounts public keys).
             let account_balance_diff = account_balance_updates::table
                 .filter(account_balance_updates::block_number.eq(&(i64::from(block_number))))
                 .load::<StorageAccountUpdate>(self.0.conn())?;
@@ -122,6 +144,7 @@ impl<'a> StateSchema<'a> {
                 .filter(account_pubkey_updates::block_number.eq(&(i64::from(block_number))))
                 .load::<StorageAccountPubkeyUpdate>(self.0.conn())?;
 
+            // Collect the updates into one list of `StorageAccountDiff`.
             let account_updates: Vec<StorageAccountDiff> = {
                 let mut account_diff = Vec::new();
                 account_diff.extend(
@@ -145,6 +168,7 @@ impl<'a> StateSchema<'a> {
 
             log::debug!("Sorted account update list: {:?}", account_updates);
 
+            // Then go through the collected list of changes and apply them by one.
             for acc_update in account_updates.into_iter() {
                 match acc_update {
                     StorageAccountDiff::BalanceUpdate(upd) => {
@@ -200,6 +224,10 @@ impl<'a> StateSchema<'a> {
         })
     }
 
+    /// Loads the committed (not necessarily verified) account map state along
+    /// with a block number to which this state applies.
+    /// If the provided block number is `None`, then the latest committed
+    /// state will be loaded.
     pub fn load_committed_state(&self, block: Option<u32>) -> QueryResult<(u32, AccountMap)> {
         self.0.conn().transaction(|| {
             let (verif_block, mut accounts) = self.load_verified_state()?;
@@ -220,6 +248,10 @@ impl<'a> StateSchema<'a> {
         })
     }
 
+    /// Loads the verified account map state along with a block number
+    /// to which this state applies.
+    /// If the provided block number is `None`, then the latest committed
+    /// state will be loaded.
     pub fn load_verified_state(&self) -> QueryResult<(u32, AccountMap)> {
         self.0.conn().transaction(|| {
             let last_block = BlockSchema(self.0).get_last_verified_block()?;
@@ -242,17 +274,20 @@ impl<'a> StateSchema<'a> {
         })
     }
 
-    /// Returns updates, and block number such that
-    /// if we apply this updates to state of the block #(from_block) we will have state of the block
-    /// #(returned block number)
-    /// returned block number is either to_block, last commited block before to_block, (if to_block == None
-    /// we assume to_bloc = +Inf)
+    /// Returns the list of updates, and the block number such that if we apply
+    /// these updates to the state of the block #(from_block), we will obtain state of the block
+    /// #(returned block number).
+    /// Returned block number is either `to_block`, latest committed block before `to_block`.
+    /// If `to_block` is `None`, then it will be assumed to be the number of the latest committed
+    /// block.
     pub fn load_state_diff(
         &self,
         from_block: u32,
         to_block: Option<u32>,
     ) -> QueryResult<Option<(u32, AccountUpdates)>> {
         self.0.conn().transaction(|| {
+            // Resolve the end of range: if it was not provided, we have to fetch
+            // the latest committed block.
             let to_block_resolved = if let Some(to_block) = to_block {
                 to_block
             } else {
@@ -262,12 +297,19 @@ impl<'a> StateSchema<'a> {
                 last_block.map(|n| n as u32).unwrap_or(0)
             };
 
+            // Determine the order: are we going forward or backwards.
+            // Depending on that, determine the start/end of the block range as well.
             let (time_forward, start_block, end_block) = (
                 from_block <= to_block_resolved,
                 cmp::min(from_block, to_block_resolved),
                 cmp::max(from_block, to_block_resolved),
             );
 
+            // Collect the stored updates. This includes collecting entries from three tables:
+            // `account_creates` (for creating/removing accounts),
+            // `account_balance_updates` (for changing the balance of accounts),
+            // `account_pubkey_updates` (for changing the accounts public keys).
+            // The updates are loaded for the given blocks range.
             let account_balance_diff = account_balance_updates::table
                 .filter(
                     account_balance_updates::block_number
@@ -300,6 +342,8 @@ impl<'a> StateSchema<'a> {
             log::debug!("Loaded account balance diff: {:#?}", account_balance_diff);
             log::debug!("Loaded account creation diff: {:#?}", account_creation_diff);
 
+            // Fold the updates into one list and determine the actual last block
+            // (since user-provided one may not exist yet).
             let (mut account_updates, last_block) = {
                 let mut account_diff = Vec::new();
                 account_diff.extend(
@@ -332,16 +376,21 @@ impl<'a> StateSchema<'a> {
                 )
             };
 
+            // Reverse the blocks order if needed.
             if !time_forward {
                 reverse_updates(&mut account_updates);
             }
 
+            // Determine the block number which state will be obtained after
+            // applying the changes.
             let block_after_updates = if time_forward {
                 last_block
             } else {
                 start_block
             };
 
+            // We don't want to return an empty list to avoid the confusion, so return
+            // `None` if there are no changes.
             if !account_updates.is_empty() {
                 Ok(Some((block_after_updates, account_updates)))
             } else {
@@ -350,7 +399,7 @@ impl<'a> StateSchema<'a> {
         })
     }
 
-    /// loads the state of accounts updated in a specific block
+    /// Loads the state of accounts updated in a specific block.
     pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<AccountUpdates> {
         self.load_state_diff(block_number - 1, Some(block_number))
             .map(|diff| diff.unwrap_or_default().1)
