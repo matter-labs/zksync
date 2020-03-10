@@ -21,39 +21,47 @@ impl<'a> ProverSchema<'a> {
         prover_timeout: time::Duration,
         block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
-        self.0.conn().transaction(|| {
-            sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.0.conn())?;
-            let job: Option<BlockNumber> = diesel::sql_query(format!("
-                WITH unsized_blocks AS (
-                    SELECT * FROM operations o
-                    WHERE action_type = 'COMMIT'
-                        AND block_number >
-                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
-                        AND NOT EXISTS 
-                            (SELECT * FROM proofs WHERE block_number = o.block_number)
-                        AND NOT EXISTS
-                            (SELECT * FROM prover_runs 
-                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
-                )
-                SELECT min(block_number) AS integer_value FROM unsized_blocks
-                INNER JOIN blocks 
-                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = {}
-                ", prover_timeout.as_secs(), block_size))
-                .get_result::<Option<IntegerNumber>>(self.0.conn())?
-                .map(|i| i.integer_value as BlockNumber);
-            if let Some(block_number_) = job {
-                use crate::schema::prover_runs::dsl::*;
-                let inserted: ProverRun = insert_into(prover_runs)
-                    .values(&vec![(
-                        block_number.eq(i64::from(block_number_) ),
-                        worker.eq(worker_.to_string())
-                    )])
-                    .get_result(self.0.conn())?;
-                Ok(Some(inserted))
-            } else {
-                Ok(None)
-            }
-        })
+        let job: Option<BlockNumber> = self
+            .0
+            .conn()
+            .transaction(|| {
+                sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.0.conn())?;
+
+                let query = format!(" \
+                    WITH unsized_blocks AS ( \
+                        SELECT * FROM operations o \
+                        WHERE action_type = 'COMMIT' \
+                            AND block_number > \
+                                (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY') \
+                            AND NOT EXISTS \
+                                (SELECT * FROM proofs WHERE block_number = o.block_number) \
+                            AND NOT EXISTS \
+                                (SELECT * FROM prover_runs \
+                                    WHERE block_number = o.block_number AND (now() - updated_at) < interval '{prover_timeout_secs} seconds') \
+                    ) \
+                    SELECT min(block_number) AS integer_value FROM unsized_blocks \
+                    INNER JOIN blocks \
+                        ON unsized_blocks.block_number = blocks.number AND blocks.block_size = {block_size} \
+                    ",
+                    prover_timeout_secs=prover_timeout.as_secs(), block_size=block_size
+                );
+
+                diesel::sql_query(query).get_result::<Option<IntegerNumber>>(self.0.conn())
+            })?
+            .map(|i| i.integer_value as BlockNumber);
+
+        if let Some(block_number_) = job {
+            use crate::schema::prover_runs::dsl::*;
+            let inserted: ProverRun = insert_into(prover_runs)
+                .values(&vec![(
+                    block_number.eq(i64::from(block_number_)),
+                    worker.eq(worker_.to_string()),
+                )])
+                .get_result(self.0.conn())?;
+            Ok(Some(inserted))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn record_prover_is_working(&self, job_id: i32) -> QueryResult<()> {
@@ -87,6 +95,10 @@ impl<'a> ProverSchema<'a> {
     }
 
     pub fn record_prover_stop(&self, prover_id: i32) -> QueryResult<()> {
+        // FIXME(popzxc): It seems that it isn't actually checked if the prover has been stopped
+        // anywhere. And also it doesn't seem that prover can be restored from the stopped
+        // state.
+
         use crate::schema::active_provers::dsl::*;
 
         let target = active_provers.filter(id.eq(prover_id));
