@@ -157,9 +157,9 @@ impl RpcApp {
             .map_err(|_| Error::internal_error())
     }
 
-    /// Returns token symbol string of TokenId.
-    /// In case of failure, returns jsonrpc_core::Error,
-    /// making it convenient to use in rpc methods.
+    /// Returns the token symbol for a `TokenId` as a string.
+    /// In case of failure, returns `jsonrpc_core::Error`,
+    /// which makes it convenient to use in the RPC methods.
     fn token_symbol_from_id(&self, token: TokenId) -> Result<String> {
         self.access_storage()?
             .token_symbol_from_id(token)
@@ -171,9 +171,9 @@ impl RpcApp {
             })
     }
 
-    /// Returns message that user is to sign to send the transaction.
-    /// If the transaction doesn't need a message signature, returns None.
-    /// If any error is encountered during message generation, returns jsonrpc_core::Error
+    /// Returns a message that user has to sign to send the transaction.
+    /// If the transaction doesn't need a message signature, returns `None`.
+    /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
     fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
         match tx {
             FranklinTx::Transfer(tx) => {
@@ -207,12 +207,12 @@ impl RpcApp {
     /// Checks that tx info message signature is valid.
     ///
     /// Needed for two-step verification, where user has to sign human-readable
-    /// message with tx info with his eth signer in order to send transaction.
+    /// message with tx info with his ETH signer in order to send transaction.
     ///
-    /// If signature is correct, or tx doesn't need signature, returns Ok(())
+    /// If signature is correct, or tx doesn't need signature, returns `Ok(())`.
     ///
     /// If any error encountered during signature verification,
-    /// including incorrect signature, returns jsonrpc_core::Error
+    /// including incorrect signature, returns `jsonrpc_core::Error`.
     fn verify_tx_info_message_signature(
         &self,
         tx: &FranklinTx,
@@ -250,7 +250,7 @@ impl RpcApp {
                 if signer_account == tx.account() {
                     Ok(())
                 } else {
-                    Err(rpc_message("Signature incorrect"))
+                    Err(rpc_message("Signature is incorrect"))
                 }
             }
             None => Ok(()),

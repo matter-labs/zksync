@@ -45,7 +45,7 @@ mod test {
             ("20000000000000000000000", "20000.0"),
         ];
         for (input, output) in &vals {
-            assert_eq!(format_ether(input), output.to_owned());
+            assert_eq!(format_ether(input), *output);
         }
     }
 }
