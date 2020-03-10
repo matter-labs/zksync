@@ -9,7 +9,6 @@ use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::config_options::ThreadPanicNotify;
-use models::misc::constants::ETH_SIGNATURE_HEX_LENGTH;
 use models::misc::utils::format_ether;
 use models::node::tx::PackedEthSignature;
 use models::node::tx::TxHash;
@@ -129,7 +128,7 @@ pub trait Rpc {
     fn tx_submit(
         &self,
         tx: FranklinTx,
-        signature_string: Option<String>,
+        signature: Option<PackedEthSignature>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
@@ -176,38 +175,30 @@ impl RpcApp {
     /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
     fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
         match tx {
-            FranklinTx::Transfer(tx) => {
-                let token_symbol = self.token_symbol_from_id(tx.token)?;
-                Ok(Some(format!(
-                    "Transfer {} {}\nTo: {:?}\nNonce: {}\nFee: {} {}",
-                    format_ether(&tx.amount),
-                    &token_symbol,
-                    tx.to,
-                    tx.nonce,
-                    format_ether(&tx.fee),
-                    &token_symbol,
-                )))
-            }
-            FranklinTx::Withdraw(tx) => {
-                let token_symbol = self.token_symbol_from_id(tx.token)?;
-                Ok(Some(format!(
-                    "Withdraw {} {}\nTo: {:?}\nNonce: {}\nFee: {} {}",
-                    format_ether(&tx.amount),
-                    &token_symbol,
-                    tx.to,
-                    tx.nonce,
-                    format_ether(&tx.fee),
-                    &token_symbol,
-                )))
-            }
+            FranklinTx::Transfer(tx) => Ok(Some(format!(
+                "Transfer {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+                amount = format_ether(&tx.amount),
+                token = self.token_symbol_from_id(tx.token)?,
+                to = tx.to,
+                nonce = tx.nonce,
+                fee = format_ether(&tx.fee),
+            ))),
+            FranklinTx::Withdraw(tx) => Ok(Some(format!(
+                "Withdraw {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+                amount = format_ether(&tx.amount),
+                token = self.token_symbol_from_id(tx.token)?,
+                to = tx.to,
+                nonce = tx.nonce,
+                fee = format_ether(&tx.fee),
+            ))),
             _ => Ok(None),
         }
     }
 
     /// Checks that tx info message signature is valid.
     ///
-    /// Needed for two-step verification, where user has to sign human-readable
-    /// message with tx info with his ETH signer in order to send transaction.
+    /// Needed for two-step verification, where user has to sign predefined human-readable
+    /// message with his ETH signature in order to send a transaction.
     ///
     /// If signature is correct, or tx doesn't need signature, returns `Ok(())`.
     ///
@@ -216,7 +207,7 @@ impl RpcApp {
     fn verify_tx_info_message_signature(
         &self,
         tx: &FranklinTx,
-        signature_string: Option<String>,
+        signature: Option<PackedEthSignature>,
     ) -> Result<()> {
         fn rpc_message(message: impl ToString) -> Error {
             Error {
@@ -228,20 +219,8 @@ impl RpcApp {
 
         match self.get_tx_info_message_to_sign(&tx)? {
             Some(message_to_sign) => {
-                let packed_signature = signature_string
-                    .ok_or_else(|| rpc_message("Signature required"))
-                    .and_then(|s| {
-                        if s.len() != ETH_SIGNATURE_HEX_LENGTH {
-                            return Err(rpc_message(format!(
-                                "Signature must be {} character hex string",
-                                ETH_SIGNATURE_HEX_LENGTH
-                            )));
-                        }
-                        hex::decode(&s[2..]).map_err(rpc_message)
-                    })
-                    .and_then(|b| {
-                        PackedEthSignature::deserialize_packed(&b).map_err(rpc_message)
-                    })?;
+                let packed_signature =
+                    signature.ok_or_else(|| rpc_message("Signature required"))?;
 
                 let signer_account = packed_signature
                     .signature_recover_signer(message_to_sign.as_bytes())
@@ -369,7 +348,7 @@ impl Rpc for RpcApp {
     fn tx_submit(
         &self,
         tx: FranklinTx,
-        signature_string: Option<String>,
+        signature: Option<PackedEthSignature>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send> {
         if tx.is_close() {
             return Box::new(futures01::future::err(Error {
@@ -379,7 +358,7 @@ impl Rpc for RpcApp {
             }));
         }
 
-        if let Err(error) = self.verify_tx_info_message_signature(&tx, signature_string) {
+        if let Err(error) = self.verify_tx_info_message_signature(&tx, signature) {
             return Box::new(futures01::future::err(error));
         }
 
