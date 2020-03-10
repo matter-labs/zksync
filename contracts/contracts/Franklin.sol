@@ -29,6 +29,8 @@ contract Franklin is Storage, Config, Events {
 
     // mapping (uint32 => bool) tokenMigrated;
 
+    constructor() public {}
+
     /// @notice Franklin contract initialization
     /// @param initializationParameters Encoded representation of initialization parameters:
         /// _governanceAddress The address of Governance contract

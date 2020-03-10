@@ -122,7 +122,7 @@ impl RpcApp {
 impl RpcApp {
     fn access_storage(&self) -> Result<StorageProcessor> {
         self.connection_pool
-            .access_storage()
+            .access_storage_fragile()
             .map_err(|_| Error::internal_error())
     }
 }

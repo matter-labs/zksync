@@ -93,6 +93,7 @@ export default {
         props() {
             return [
                 { name: 'Block #',          value: `<b>${this.blockNumber}</b>`},
+                { name: 'Block Size',          value: `<b>${this.block_size}</b>`},
                 { name: 'New root hash',    value: `<code>${this.new_state_root}</code>`},
                 // { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
@@ -120,6 +121,7 @@ export default {
             this.committed_at    = block.committed_at;
             this.verified_at     = block.verified_at;
             this.status          = block.verified_at ? 'Verified' : 'Committed';
+            this.block_size      = block.block_size;
 
             const txs = await client.getBlockTransactions(this.blockNumber);
             const tokens = await client.tokensPromise;
@@ -144,8 +146,8 @@ export default {
                     case "Deposit":
                         from               = shortenHash(tx.priority_op.data.from, 'unknown sender');
                         to                 = shortenHash(tx.priority_op.data.to, 'unknown account');
-                        from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.sender}`;
-                        to_explorer_link   = `${this.routerBase}accounts/${tx.priority_op.data.account}`;
+                        from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.from}`;
+                        to_explorer_link   = `${this.routerBase}accounts/${tx.priority_op.data.to}`;
                         from_onchain_icon  = `<span class="onchain_icon">onchain</span>`;
                         to_onchain_icon    = '';
                         token              = tx.priority_op.data.token;
@@ -168,12 +170,19 @@ export default {
                     case "ChangePubKey":
                         from               = shortenHash(tx.tx.account, 'unknown account address');
                         to                 = shortenHash(tx.tx.newPkHash, 'unknown pubkey hash');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.tx.account}`;
+                        to_explorer_link   = ``;
+                        from_onchain_icon  = '';
+                        to_onchain_icon    = '';
+                        token              = '';
+                        amount             = '';
+                        fee                = '';
                         break;
                     case "Withdraw":
                         from               = shortenHash(tx.tx.from, 'unknown account');
                         to                 = shortenHash(tx.tx.to, 'unknown ethAddress');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.tx.account}`;
-                        to_explorer_link   = `${this.blockchain_explorer_address}/${tx.tx.ethAddress}`;
+                        from_explorer_link = `${this.routerBase}accounts/${tx.tx.from}`;
+                        to_explorer_link   = `${this.blockchain_explorer_address}/${tx.tx.to}`;
                         from_onchain_icon  = '';
                         to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
                         token              = tx.tx.token;
@@ -183,6 +192,11 @@ export default {
                         break;
                     case "FullExit":
                         from               = shortenHash(tx.priority_op.data.eth_address, 'unknown account address');
+                        to                 = shortenHash(tx.priority_op.data.eth_address, 'unknown account address');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.priority_op.data.eth_address}`;
+                        to_explorer_link   = `${this.blockchain_explorer_address}/${tx.priority_op.data.eth_address}`;
+                        from_onchain_icon  = '<span class="onchain_icon">onchain</span>';
+                        to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
                         token              = tx.priority_op.data.token;
                         token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.op.withdraw_amount, token)} ${token}`;

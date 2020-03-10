@@ -79,7 +79,8 @@ export default {
                 return;
             }
 
-            txData.tokenName = tokens[txData.token].syncSymbol;
+            txData.tokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
+            txData.amount = txData.amount == "unknown amount" ? "" : txData.amount;
             
             const block = await client.getBlock(txData.block_number);
             txData.status = block.verified_at ? `Verified`

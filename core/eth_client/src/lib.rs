@@ -20,7 +20,7 @@ pub struct ETHClient<T: Transport> {
     pub web3: Web3<T>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SignedCallResult {
     pub raw_tx: Vec<u8>,
     pub gas_price: U256,

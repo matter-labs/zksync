@@ -18,7 +18,13 @@ cp $IN_DIR/Ownable.sol $OUT_DIR/OwnableTest.sol
 cp $IN_DIR/Upgradeable.sol $OUT_DIR/UpgradeableTest.sol
 cp $IN_DIR/Proxy.sol $OUT_DIR/ProxyTest.sol
 cp $IN_DIR/UpgradeModule.sol $OUT_DIR/UpgradeModuleTest.sol
+cp $IN_DIR/Bytes.sol $OUT_DIR/Bytes.sol
+cp $IN_DIR/Events.sol $OUT_DIR/Events.sol
+cp $IN_DIR/Operations.sol $OUT_DIR/Operations.sol
+cp $IN_DIR/VerificationKey.sol $OUT_DIR/VerificationKey.sol
 
+# Change dependencies
+ssed 's/import "\.\./import "\.\.\/\.\./' -i $OUT_DIR/*.sol
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
 ssed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol

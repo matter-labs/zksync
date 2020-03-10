@@ -38,7 +38,7 @@ struct AppState {
 impl AppState {
     fn access_storage(&self) -> ActixResult<StorageProcessor> {
         self.connection_pool
-            .access_storage()
+            .access_storage_fragile()
             .map_err(|_| HttpResponse::RequestTimeout().finish().into())
     }
 

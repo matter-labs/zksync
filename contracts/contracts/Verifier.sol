@@ -12,6 +12,8 @@ contract Verifier is VerificationKey {
     /// @notice If this flag is true - dummy verification is used instead of full verifier
     bool constant DUMMY_VERIFIER = false;
 
+    constructor() public {}
+
     /// @notice Verifier contract initialization
     /// @param initializationParameters Encoded representation of initialization parameters
     function initialize(

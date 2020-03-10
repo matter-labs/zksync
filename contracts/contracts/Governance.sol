@@ -28,6 +28,8 @@ contract Governance is Config {
     /// @notice List of permitted validators
     mapping(address => bool) public validators;
 
+    constructor() public {}
+
     /// @notice Governance contract initialization
     /// @param initializationParameters Encoded representation of initialization parameters:
         /// _networkGovernor The address of network governor

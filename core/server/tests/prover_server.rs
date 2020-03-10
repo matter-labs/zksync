@@ -7,6 +7,7 @@ use futures::channel::mpsc;
 // Workspace deps
 use circuit::witness::deposit::apply_deposit_tx;
 use circuit::witness::deposit::calculate_deposit_operations_from_witness;
+use models::params::block_chunk_sizes;
 use prover::client;
 use prover::ApiClient;
 use server::prover_server;
@@ -39,6 +40,7 @@ fn client_with_empty_worker_name_panics() {
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
+    let block_size_chunks = block_chunk_sizes()[0];
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
     let client = client::ApiClient::new(
         &format!("http://{}", &addr),
@@ -46,7 +48,9 @@ fn api_client_register_start_and_stop_of_prover() {
         None,
         time::Duration::from_secs(1),
     );
-    let id = client.register_prover().expect("failed to register");
+    let id = client
+        .register_prover(block_size_chunks)
+        .expect("failed to register");
     let storage = access_storage();
     storage
         .prover_by_id(id)
@@ -66,6 +70,7 @@ fn api_client_simple_simulation() {
 
     let addr = spawn_server(prover_timeout, rounds_interval);
 
+    let block_size_chunks = block_chunk_sizes()[0];
     let client = client::ApiClient::new(
         &format!("http://{}", &addr),
         "foo",
@@ -75,13 +80,13 @@ fn api_client_simple_simulation() {
 
     // call block_to_prove and check its none
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to get block to prove");
     assert!(to_prove.is_none());
 
     let storage = access_storage();
 
-    let (op, wanted_prover_data) = test_operation_and_wanted_prover_data();
+    let (op, wanted_prover_data) = test_operation_and_wanted_prover_data(block_size_chunks);
 
     println!("inserting test operation");
     // write test commit operation to db
@@ -93,14 +98,14 @@ fn api_client_simple_simulation() {
 
     // should return block
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to bet block to prove");
     assert!(to_prove.is_some());
 
     // block is taken unless no heartbeat from prover within prover_timeout period
     // should return None at this moment
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to get block to prove");
     assert!(to_prove.is_none());
 
@@ -108,7 +113,7 @@ fn api_client_simple_simulation() {
     thread::sleep(prover_timeout * 10);
 
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to get block to prove");
     assert!(to_prove.is_some());
 
@@ -118,7 +123,7 @@ fn api_client_simple_simulation() {
     client.working_on(job).unwrap();
 
     let to_prove = client
-        .block_to_prove()
+        .block_to_prove(block_size_chunks)
         .expect("failed to get block to prove");
     assert!(to_prove.is_none());
 
@@ -134,6 +139,7 @@ fn api_client_simple_simulation() {
 }
 
 pub fn test_operation_and_wanted_prover_data(
+    block_size_chunks: usize,
 ) -> (models::Operation, prover::prover_data::ProverData) {
     let mut circuit_tree =
         models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
@@ -232,15 +238,15 @@ pub fn test_operation_and_wanted_prover_data(
         pub_data.extend(deposit_witness.get_pubdata());
     }
 
-    for _ in 0..models::params::block_size_chunks() - operations.len() {
+    for _ in 0..block_size_chunks - operations.len() {
         operations.push(circuit::witness::noop::noop_operation(
             &circuit_tree,
             block.fee_account,
         ));
         pub_data.extend(vec![false; 64]);
     }
-    assert_eq!(pub_data.len(), 64 * models::params::block_size_chunks());
-    assert_eq!(operations.len(), models::params::block_size_chunks());
+    assert_eq!(pub_data.len(), 64 * block_size_chunks);
+    assert_eq!(operations.len(), block_size_chunks);
 
     let validator_acc = circuit_tree
         .get(block.fee_account as u32)

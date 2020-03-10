@@ -8,7 +8,7 @@ use backoff::Operation;
 use crypto_exports::franklin_crypto::bellman::groth16;
 use failure::bail;
 use failure::format_err;
-use log::info;
+use log::*;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
@@ -18,6 +18,7 @@ use models::prover_utils::encode_proof;
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {
     pub name: String,
+    pub block_size: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -60,7 +61,7 @@ impl ApiClient {
         if worker == "" {
             panic!("worker name cannot be empty")
         }
-        ApiClient {
+        Self {
             register_url: format!("{}/register", base_url),
             block_to_prove_url: format!("{}/block_to_prove", base_url),
             working_on_url: format!("{}/working_on", base_url),
@@ -90,6 +91,10 @@ impl ApiClient {
             } else {
                 op().map_err(backoff::Error::Transient)
             }
+            .map_err(|e| {
+                error!("{}", e);
+                e
+            })
         };
 
         with_checking
@@ -107,7 +112,7 @@ impl ApiClient {
         backoff
     }
 
-    pub fn register_prover(&self) -> Result<i32, failure::Error> {
+    pub fn register_prover(&self, block_size: usize) -> Result<i32, failure::Error> {
         let op = || -> Result<i32, failure::Error> {
             info!("Registering prover...");
             let client = self.get_client()?;
@@ -115,6 +120,7 @@ impl ApiClient {
                 .post(&self.register_url)
                 .json(&client::ProverReq {
                     name: self.worker.clone(),
+                    block_size,
                 })
                 .send();
 
@@ -149,13 +155,15 @@ impl ApiClient {
 }
 
 impl crate::ApiClient for ApiClient {
-    fn block_to_prove(&self) -> Result<Option<(i64, i32)>, failure::Error> {
+    fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let op = || -> Result<Option<(i64, i32)>, failure::Error> {
+            trace!("sending block_to_prove");
             let client = self.get_client()?;
             let mut res = client
                 .get(&self.block_to_prove_url)
                 .json(&client::ProverReq {
                     name: self.worker.clone(),
+                    block_size,
                 })
                 .send()
                 .map_err(|e| format_err!("block to prove request failed: {}", e))?;
@@ -175,6 +183,7 @@ impl crate::ApiClient for ApiClient {
 
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
         let op = || -> Result<(), failure::Error> {
+            trace!("sending working_on {}", job_id);
             let client = self.get_client()?;
             let res = client
                 .post(&self.working_on_url)
@@ -196,6 +205,7 @@ impl crate::ApiClient for ApiClient {
     fn prover_data(&self, block: i64) -> Result<ProverData, failure::Error> {
         let client = self.get_client()?;
         let op = || -> Result<ProverData, failure::Error> {
+            trace!("sending prover_data");
             let mut res = client
                 .get(&self.prover_data_url)
                 .json(&block)
@@ -206,7 +216,7 @@ impl crate::ApiClient for ApiClient {
                 .map_err(|e| format_err!("failed to read prover data response: {}", e))?;
             let res: Option<ProverData> = serde_json::from_str(&text)
                 .map_err(|e| format_err!("failed to parse prover data response: {}", e))?;
-            Ok(res.ok_or_else(|| format_err!("couldn't get ProverData"))?)
+            Ok(res.ok_or_else(|| format_err!("couldn't get ProverData for block {}", block))?)
         };
 
         Ok(self.with_retries(&op)?)
@@ -218,10 +228,11 @@ impl crate::ApiClient for ApiClient {
         proof: groth16::Proof<models::node::Engine>,
     ) -> Result<(), failure::Error> {
         let op = || -> Result<(), failure::Error> {
+            trace!("Trying publish proof {}", block);
             let encoded = encode_proof(&proof);
 
             let client = self.get_client()?;
-            let res = client
+            let mut res = client
                 .post(&self.publish_url)
                 .json(&client::PublishReq {
                     block: block as u32,
@@ -230,10 +241,25 @@ impl crate::ApiClient for ApiClient {
                 .send()
                 .map_err(|e| format_err!("failed to send publish request: {}", e))?;
             if res.status() != reqwest::StatusCode::OK {
-                bail!("publish request failed with status: {}", res.status());
-            } else {
-                Ok(())
+                match res.text() {
+                    Ok(message) => {
+                        if message == "duplicate key" {
+                            warn!("proof for block {} already exists", block);
+                        } else {
+                            bail!(
+                                "publish request failed with status: {} and message: {}",
+                                res.status(),
+                                message
+                            );
+                        }
+                    }
+                    Err(_) => {
+                        bail!("publish request failed with status: {}", res.status());
+                    }
+                };
             }
+
+            Ok(())
         };
 
         Ok(self.with_retries(&op)?)

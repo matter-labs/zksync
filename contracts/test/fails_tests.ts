@@ -2,14 +2,8 @@ import {ethers} from "ethers";
 import {
     addTestERC20Token,
     addTestNotApprovedERC20Token,
-    deployFranklin,
-    deployGovernance,
-    deployVerifier,
-    franklinTestContractCode,
-    governanceTestContractCode,
     mintTestERC20Token,
-    verifierTestContractCode,
-    proxyTestContractCode,
+    Deployer,
 } from "../src.ts/deploy";
 import {expect, use} from "chai";
 const { createMockProvider, getWallets, solidity } = require("ethereum-waffle");
@@ -52,6 +46,7 @@ describe("PLANNED FAILS", function () {
     this.timeout(100000);
     provider.pollingInterval = 100; // faster deploys/txs on localhost
 
+    const deployer = new Deployer(wallet, true);
     let franklinDeployedContract;
     let governanceDeployedContract;
     let verifierDeployedContract;
@@ -59,40 +54,9 @@ describe("PLANNED FAILS", function () {
     let erc20DeployedToken2;
 
     beforeEach(async () => {
-        let verifierAddressDeployed;
-        [verifierDeployedContract, verifierAddressDeployed] = await deployVerifier(
-            wallet,
-            proxyTestContractCode,
-            verifierTestContractCode,
-            [],
-            [],
-        );
-        let governanceAddressDeployed;
-        [governanceDeployedContract, governanceAddressDeployed] = await deployGovernance(
-            wallet,
-            proxyTestContractCode,
-            governanceTestContractCode,
-            ["address"],
-            [wallet.address],
-        );
-        let franklinAddressDeployed;
-        [franklinDeployedContract, franklinAddressDeployed] = await deployFranklin(
-            wallet,
-            proxyTestContractCode,
-            franklinTestContractCode,
-            [
-                "address",
-                "address",
-                "address",
-                "bytes32",
-            ],
-            [
-                governanceDeployedContract.address,
-                verifierDeployedContract.address,
-                wallet.address,
-                ethers.constants.HashZero,
-            ],
-        );
+        verifierDeployedContract = await deployer.deployVerifier();
+        governanceDeployedContract = await deployer.deployGovernance();
+        franklinDeployedContract = await deployer.deployFranklin();
         await governanceDeployedContract.setValidator(wallet.address, true);
         erc20DeployedToken1 = await addTestERC20Token(wallet, governanceDeployedContract);
         erc20DeployedToken2 = await addTestNotApprovedERC20Token(wallet);

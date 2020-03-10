@@ -2,15 +2,11 @@ import { ethers } from "ethers";
 import {
     addTestERC20Token,
     mintTestERC20Token,
-    deployFranklin,
-    deployGovernance,
-    deployPriorityQueue,
-    deployVerifier,
     franklinTestContractCode,
     verifierTestContractCode,
     governanceTestContractCode,
     priorityQueueTestContractCode,
-    proxyTestContractCode,
+    Deployer,
 } from "../src.ts/deploy";
 
 import { expect, use } from "chai";
@@ -47,6 +43,7 @@ const dummyBlockProof = [0, 0, 0, 0, 0, 0, 0, 0];
 describe("Integration test", async function () {
     this.timeout(50000);
 
+    const deployer = new Deployer(wallet, true);
     let franklinDeployedContract;
     let governanceDeployedContract;
     let erc20DeployedToken;
@@ -55,50 +52,9 @@ describe("Integration test", async function () {
 
     before(async () => {
         //console.log("---\n");
-        let verifierAddressDeployed;
-        [verifierDeployedContract, verifierAddressDeployed] = await deployVerifier(
-            wallet,
-            proxyTestContractCode,
-            verifierTestContractCode,
-            [],
-            [],
-        );
-        let governanceAddressDeployed;
-        [governanceDeployedContract, governanceAddressDeployed] = await deployGovernance(
-            wallet,
-            proxyTestContractCode,
-            governanceTestContractCode,
-            ["address"],
-            [wallet.address],
-        );
-        let priorityQueueAddressDeployed;
-        [priorityQueueDeployedContract, priorityQueueAddressDeployed] = await deployPriorityQueue(
-            wallet,
-            proxyTestContractCode,
-            priorityQueueTestContractCode,
-            ["address"],
-            [governanceDeployedContract.address],
-        );
-        let franklinAddressDeployed;
-        [franklinDeployedContract, franklinAddressDeployed] = await deployFranklin(
-            wallet,
-            proxyTestContractCode,
-            franklinTestContractCode,
-            [
-                "address",
-                "address",
-                "address",
-                "address",
-                "bytes32",
-            ],
-            [
-                governanceDeployedContract.address,
-                verifierDeployedContract.address,
-                priorityQueueDeployedContract.address,
-                wallet.address,
-                ethers.constants.HashZero,
-            ],
-        );
+        verifierDeployedContract = await deployer.deployVerifier();
+        governanceDeployedContract = await deployer.deployGovernance();
+        franklinDeployedContract = await deployer.deployFranklin();
         await governanceDeployedContract.setValidator(wallet.address, true);
         erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
         await mintTestERC20Token(wallet, erc20DeployedToken);

@@ -1,4 +1,4 @@
-import {franklinContractCode} from "../src.ts/deploy";
+import {Deployer} from "../src.ts/deploy";
 import {parseEther} from "ethers/utils";
 import {Contract, ethers} from "ethers";
 
@@ -8,7 +8,8 @@ const franklinAddress = "010203040506070809101112131415161718192021222334252627"
 const franklinAddressBinary = Buffer.from(franklinAddress, "hex");
 
 async function main() {
-    const franklinDeployedContract = new Contract(process.env.CONTRACT_ADDR, franklinContractCode.interface, wallet);
+    const deployer = new Deployer(wallet, false);
+    const franklinDeployedContract = deployer.getDeployedContract('Franklin');
     const depositValue = parseEther("0.3");
     const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
     const receipt = await tx.wait();

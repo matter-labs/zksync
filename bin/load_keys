@@ -3,15 +3,19 @@ set -e
 
 DIR=$KEY_DIR/account-$ACCOUNT_TREE_DEPTH
 echo "Checking keys in $DIR"
-mkdir -p $DIR
 
-rm -rf $DIR/*
-mkdir -p $DIR/block-$BLOCK_SIZE_CHUNKS
+mkdir -p $DIR
+for b in `echo $BLOCK_CHUNK_SIZES | tr ',' ' '`; do
+    mkdir -p $DIR/block-$b
+done
 mkdir -p $DIR/exodus_key
 
-SPACE_LINK=$KEYS_SPACE_URL/account-$ACCOUNT_TREE_DEPTH
+SPACE_LINK=$KEYS_SPACE_URL/$KEY_DIR/account-$ACCOUNT_TREE_DEPTH
 
-KEY_FILES="block-$BLOCK_SIZE_CHUNKS/zksync_pk.key exodus_key/zksync_exit_pk.key VerificationKey.sol"
+KEY_FILES="exodus_key/zksync_exit_pk.key"
+for b in `echo $BLOCK_CHUNK_SIZES | tr ',' ' '`; do
+    KEY_FILES="$KEY_FILES block-$b/zksync_pk.key"
+done
 
 for i in $KEY_FILES; do
     if ! [ -f $DIR/$i ]; then

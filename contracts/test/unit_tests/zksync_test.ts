@@ -1,23 +1,20 @@
 import {
     addTestERC20Token, addTestNotApprovedERC20Token,
-    deployGovernance,
-    deployVerifier, franklinTestContractCode,
-    governanceTestContractCode, mintTestERC20Token, proxyTestContractCode,
-    verifierTestContractCode
+    mintTestERC20Token,
+    Deployer,
 } from "../../src.ts/deploy";
 import {BigNumber, bigNumberify, BigNumberish, parseEther} from "ethers/utils";
 import {ETHProxy} from "zksync";
 import {Address, TokenAddress} from "zksync/build/types";
 import {AddressZero} from "ethers/constants";
 import {Contract, ethers} from "ethers";
+import {deployContract} from "ethereum-waffle";
 
 const { expect } = require("chai")
-const { deployContract } = require("ethereum-waffle");
 const { wallet, exitWallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE} = require("./common");
 import * as zksync from "zksync";
 
 const TEST_PRIORITY_EXPIRATION = 16;
-
 
 describe("ZK Sync signature verification unit tests", function () {
     this.timeout(50000);
@@ -87,22 +84,9 @@ describe("ZK priority queue ops unit tests", function () {
     let ethProxy;
     let operationTestContract;
     before(async () => {
-        let verifierDeployedContract, verifierAddressDeployed;
-        [verifierDeployedContract, verifierAddressDeployed] = await deployVerifier(
-            wallet,
-            proxyTestContractCode,
-            verifierTestContractCode,
-            [],
-            [],
-        );
-        let governanceDeployedContract, governanceAddressDeployed;
-        [governanceDeployedContract, governanceAddressDeployed] = await deployGovernance(
-            wallet,
-            proxyTestContractCode,
-            governanceTestContractCode,
-            ["address"],
-            [wallet.address],
-        );
+        const deployer = new Deployer(wallet, true);
+        let verifierDeployedContract = await deployer.deployVerifier();
+        let governanceDeployedContract = await deployer.deployGovernance();
         zksyncContract = await deployContract(
             wallet,
             require('../../build/ZKSyncUnitTest'),
@@ -236,22 +220,9 @@ describe("ZK Sync withdraw unit tests", function () {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        let verifierDeployedContract, verifierAddressDeployed;
-        [verifierDeployedContract, verifierAddressDeployed] = await deployVerifier(
-            wallet,
-            proxyTestContractCode,
-            verifierTestContractCode,
-            [],
-            [],
-        );
-        let governanceDeployedContract, governanceAddressDeployed;
-        [governanceDeployedContract, governanceAddressDeployed] = await deployGovernance(
-            wallet,
-            proxyTestContractCode,
-            governanceTestContractCode,
-            ["address"],
-            [wallet.address],
-        );
+        const deployer = new Deployer(wallet, true);
+        let verifierDeployedContract = await deployer.deployVerifier();
+        let governanceDeployedContract = await deployer.deployGovernance();
         zksyncContract = await deployContract(
             wallet,
             require('../../build/ZKSyncUnitTest'),
@@ -387,22 +358,9 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        let verifierDeployedContract, verifierAddressDeployed;
-        [verifierDeployedContract, verifierAddressDeployed] = await deployVerifier(
-            wallet,
-            proxyTestContractCode,
-            verifierTestContractCode,
-            [],
-            [],
-        );
-        let governanceDeployedContract, governanceAddressDeployed;
-        [governanceDeployedContract, governanceAddressDeployed] = await deployGovernance(
-            wallet,
-            proxyTestContractCode,
-            governanceTestContractCode,
-            ["address"],
-            [wallet.address],
-        );
+        const deployer = new Deployer(wallet, true);
+        let verifierDeployedContract = await deployer.deployVerifier();
+        let governanceDeployedContract = await deployer.deployGovernance();
         zksyncContract = await deployContract(
             wallet,
             require('../../build/ZKSyncUnitTest'),
@@ -472,22 +430,9 @@ describe("ZK Sync test process next operation", function () {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        let verifierDeployedContract, verifierAddressDeployed;
-        [verifierDeployedContract, verifierAddressDeployed] = await deployVerifier(
-            wallet,
-            proxyTestContractCode,
-            verifierTestContractCode,
-            [],
-            [],
-        );
-        let governanceDeployedContract, governanceAddressDeployed;
-        [governanceDeployedContract, governanceAddressDeployed] = await deployGovernance(
-            wallet,
-            proxyTestContractCode,
-            governanceTestContractCode,
-            ["address"],
-            [wallet.address],
-        );
+        const deployer = new Deployer(wallet, true);
+        let verifierDeployedContract = await deployer.deployVerifier();
+        let governanceDeployedContract = await deployer.deployGovernance();
         zksyncContract = await deployContract(
             wallet,
             require('../../build/ZKSyncUnitTest'),
