@@ -2,6 +2,7 @@
 // External imports
 use diesel::dsl::max;
 use diesel::prelude::*;
+use diesel::result::Error as DieselError;
 use diesel::sql_types::Text;
 // Workspace imports
 use models::node::{
@@ -32,18 +33,18 @@ use crate::{
 mod conversion;
 pub mod records;
 
+/// Block schema is a primary sidechain storage controller.
+///
+/// Besides block getters/setters, it provides an `execute_operation` method,
+/// which is essential for the sidechain logic, as it causes the state updates in the chain.
 pub struct BlockSchema<'a>(pub &'a StorageProcessor);
 
-impl<'a> From<&'a StorageProcessor> for BlockSchema<'a> {
-    fn from(processor: &'a StorageProcessor) -> Self {
-        Self(processor)
-    }
-}
-
 impl<'a> BlockSchema<'a> {
-    /// Execute an operation: store op, modify state accordingly, load additional data and meta tx info
-    /// - Commit => store account updates
-    /// - Verify => apply account updates
+    /// Executes an operation:
+    /// 1. Store the operation.
+    /// 2. Modify the state according to the operation changes:
+    ///   - Commit => store account updates.
+    ///   - Verify => apply account updates.
     pub fn execute_operation(&self, op: Operation) -> QueryResult<Operation> {
         self.0.conn().transaction(|| {
             let block_number = op.block.block_number;
@@ -69,15 +70,18 @@ impl<'a> BlockSchema<'a> {
         })
     }
 
+    /// Given a block, stores its transactions in the database.
     pub(crate) fn save_block_transactions(&self, block: Block) -> QueryResult<()> {
         for block_tx in block.block_transactions.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
+                    // Copy the tx data.
                     let hash = tx.tx.hash().as_ref().to_vec();
                     let primary_account_address = tx.tx.account().as_bytes().to_vec();
                     let nonce = tx.tx.nonce() as i64;
                     let serialized_tx = serde_json::to_value(&tx.tx).unwrap_or_default();
 
+                    // Create records for `operations` and `mempool` tables.
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block.block_number);
                     let mempool_tx = InsertTx {
                         hash,
@@ -85,10 +89,15 @@ impl<'a> BlockSchema<'a> {
                         nonce,
                         tx: serialized_tx,
                     };
+
+                    // Store the transaction in `mempool` and `operations` tables.
+                    // Note that `mempool` table should be updated *first*, since hash there
+                    // is a foreign key in `operations` table.
                     MempoolSchema(self.0).insert_tx(mempool_tx)?;
                     OperationsSchema(self.0).store_executed_operation(new_tx)?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
+                    // For priority operation we should only store it in the Operations schema.
                     let new_priority_op = NewExecutedPriorityOperation::prepare_stored_priority_op(
                         *prior_op,
                         block.block_number,
@@ -100,7 +109,10 @@ impl<'a> BlockSchema<'a> {
         Ok(())
     }
 
+    /// Given the block number, attempts to retrieve it from the database.
+    /// Returns `None` if the block with provided number does not exist yet.
     pub fn get_block(&self, block: BlockNumber) -> QueryResult<Option<Block>> {
+        // Load block header.
         let stored_block = if let Some(block) = blocks::table
             .find(i64::from(block))
             .first::<StorageBlock>(self.0.conn())
@@ -111,12 +123,15 @@ impl<'a> BlockSchema<'a> {
             return Ok(None);
         };
 
+        // Load transactions for this block.
         let block_transactions = self.get_block_executed_ops(block)?;
 
+        // Change the root hash format from `sync-bl:FF..FF` to `0xFF..FF`.
         assert!(stored_block.root_hash.starts_with("sync-bl:"));
         let new_root_hash = fe_from_hex::<Fr>(&format!("0x{}", &stored_block.root_hash[8..]))
             .expect("Unparsable root hash");
 
+        // Return the obtained block in the expected format.
         Ok(Some(Block {
             block_number: block,
             new_root_hash,
@@ -129,6 +144,8 @@ impl<'a> BlockSchema<'a> {
         }))
     }
 
+    /// Same as `get_block_executed_ops`, but returns a vector of `FranklinOp` instead
+    /// of `ExecutedOperations`.
     pub fn get_block_operations(&self, block: BlockNumber) -> QueryResult<Vec<FranklinOp>> {
         let executed_ops = self.get_block_executed_ops(block)?;
         Ok(executed_ops
@@ -140,123 +157,148 @@ impl<'a> BlockSchema<'a> {
             .collect())
     }
 
+    /// Given the block number, loads all the operations that were executed in that block.
     pub fn get_block_executed_ops(
         &self,
         block: BlockNumber,
     ) -> QueryResult<Vec<ExecutedOperations>> {
-        self.0.conn().transaction(|| {
-            let mut executed_operations = Vec::new();
+        let mut executed_operations = Vec::new();
 
-            let stored_executed_txs: Vec<_> = executed_transactions::table
-                .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
-                .filter(executed_transactions::block_number.eq(i64::from(block)))
-                .load::<(StoredExecutedTransaction, Option<ReadTx>)>(self.0.conn())?;
-            let executed_txs = stored_executed_txs
-                .into_iter()
-                .filter_map(|(stored_exec, stored_tx)| stored_exec.into_executed_tx(stored_tx).ok())
-                .map(|tx| ExecutedOperations::Tx(Box::new(tx)));
-            executed_operations.extend(executed_txs);
+        // Load both executed transactions and executed priority operations
+        // from the database.
+        let (executed_ops, executed_priority_ops) =
+            self.0.conn().transaction::<_, DieselError, _>(|| {
+                // To load executed transactions, we join `executed_transactions` table (which
+                // contains the header of the transaction) and `mempool` which contains the
+                // transactions body.
+                let executed_ops = executed_transactions::table
+                    .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
+                    .filter(executed_transactions::block_number.eq(i64::from(block)))
+                    .load::<(StoredExecutedTransaction, Option<ReadTx>)>(self.0.conn())?;
 
-            let stored_executed_prior_ops: Vec<_> = executed_priority_operations::table
-                .filter(executed_priority_operations::block_number.eq(i64::from(block)))
-                .load::<StoredExecutedPriorityOperation>(self.0.conn())?;
-            let executed_prior_ops = stored_executed_prior_ops
-                .into_iter()
-                .map(|op| ExecutedOperations::PriorityOp(Box::new(op.into_executed())));
-            executed_operations.extend(executed_prior_ops);
+                // For priority operations, we simply load them from
+                // `executed_priority_operations` table.
+                let executed_priority_ops = executed_priority_operations::table
+                    .filter(executed_priority_operations::block_number.eq(i64::from(block)))
+                    .load::<StoredExecutedPriorityOperation>(self.0.conn())?;
 
-            executed_operations.sort_by_key(|exec_op| {
-                match exec_op {
-                    ExecutedOperations::Tx(tx) => {
-                        if let Some(idx) = tx.block_index {
-                            idx
-                        } else {
-                            // failed operations are at the end.
-                            u32::max_value()
-                        }
+                Ok((executed_ops, executed_priority_ops))
+            })?;
+
+        // Transform executed operations to be `ExecutedOperations`.
+        let executed_ops = executed_ops
+            .into_iter()
+            .filter_map(|(stored_exec, stored_tx)| stored_exec.into_executed_tx(stored_tx).ok())
+            .map(|tx| ExecutedOperations::Tx(Box::new(tx)));
+        executed_operations.extend(executed_ops);
+
+        // Transform executed priority operations to be `ExecutedOperations`.
+        let executed_priority_ops = executed_priority_ops
+            .into_iter()
+            .map(|op| ExecutedOperations::PriorityOp(Box::new(op.into_executed())));
+        executed_operations.extend(executed_priority_ops);
+
+        // Sort the operations, so all the failed operations will be at the very end
+        // of the list.
+        executed_operations.sort_by_key(|exec_op| {
+            match exec_op {
+                ExecutedOperations::Tx(tx) => {
+                    if let Some(idx) = tx.block_index {
+                        idx
+                    } else {
+                        // failed operations are at the end.
+                        u32::max_value()
                     }
-                    ExecutedOperations::PriorityOp(op) => op.block_index,
                 }
-            });
+                ExecutedOperations::PriorityOp(op) => op.block_index,
+            }
+        });
 
-            Ok(executed_operations)
-        })
+        Ok(executed_operations)
     }
 
+    /// Loads the block headers for the given amount of blocks.
     pub fn load_block_range(
         &self,
         max_block: BlockNumber,
         limit: u32,
     ) -> QueryResult<Vec<BlockDetails>> {
         let query = format!(
-            "
-            with eth_ops as (
-                select
-                    operations.block_number,
-                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
-                    operations.action_type,
-                    operations.created_at
-                from operations
-                    left join eth_operations on eth_operations.op_id = operations.id
-            )
-            select
-                blocks.number as block_number,
-                blocks.root_hash as new_state_root,
-                blocks.block_size as block_size,
-                commited.tx_hash as commit_tx_hash,
-                verified.tx_hash as verify_tx_hash,
-                commited.created_at as committed_at,
-                verified.created_at as verified_at
-            from blocks
-            inner join eth_ops commited on
-                commited.block_number = blocks.number and commited.action_type = 'COMMIT'
-            left join eth_ops verified on
-                verified.block_number = blocks.number and verified.action_type = 'VERIFY'
-            where
-                blocks.number <= {max_block}
-            order by blocks.number desc
-            limit {limit};
-        ",
+            " \
+            with eth_ops as ( \
+                select \
+                    operations.block_number, \
+                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash, \
+                    operations.action_type, \
+                    operations.created_at \
+                from operations \
+                    left join eth_operations on eth_operations.op_id = operations.id \
+            ) \
+            select \
+                blocks.number as block_number, \
+                blocks.root_hash as new_state_root, \
+                blocks.block_size as block_size, \
+                commited.tx_hash as commit_tx_hash, \
+                verified.tx_hash as verify_tx_hash, \
+                commited.created_at as committed_at, \
+                verified.created_at as verified_at \
+            from blocks \
+            inner join eth_ops commited on \
+                commited.block_number = blocks.number and commited.action_type = 'COMMIT' \
+            left join eth_ops verified on \
+                verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
+            where \
+                blocks.number <= {max_block} \
+            order by blocks.number desc \
+            limit {limit}; \
+            ",
             max_block = i64::from(max_block),
             limit = i64::from(limit)
         );
         diesel::sql_query(query).load(self.0.conn())
     }
 
-    pub fn handle_search(&self, query: String) -> Option<BlockDetails> {
+    /// Performs a database search with an uncertain query, which can be either of:
+    /// - Hash of the transaction included in the block.
+    /// - The root hash of the block.
+    /// - The number of the block.
+    ///
+    /// Will return `None` if the query is malformed or there is no block that matches
+    /// the query.
+    pub fn find_block_by_height_or_hash(&self, query: String) -> Option<BlockDetails> {
         let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
         let l_query = query.to_lowercase();
         let sql_query = format!(
-            "
-            with eth_ops as (
-                select
-                    operations.block_number,
-                    'sync-tx:' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash,
-                    operations.action_type,
-                    operations.created_at
-                from operations
-                    left join eth_operations on eth_operations.op_id = operations.id
-            )
-            select
-                blocks.number as block_number,
-                blocks.root_hash as new_state_root,
-                commited.tx_hash as commit_tx_hash,
-                verified.tx_hash as verify_tx_hash,
-                commited.created_at as committed_at,
-                verified.created_at as verified_at
-            from blocks
-            inner join eth_ops commited on
-                commited.block_number = blocks.number and commited.action_type = 'COMMIT'
-            left join eth_ops verified on
-                verified.block_number = blocks.number and verified.action_type = 'VERIFY'
-            where false
-                or lower(commited.tx_hash) = $1
-                or lower(verified.tx_hash) = $1
-                or lower(blocks.root_hash) = $1
-                or blocks.number = {block_number}
-            order by blocks.number desc
-            limit 1;
-        ",
+            " \
+            with eth_ops as ( \
+                select \
+                    operations.block_number, \
+                    'sync-tx:' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash, \
+                    operations.action_type, \
+                    operations.created_at \
+                from operations \
+                    left join eth_operations on eth_operations.op_id = operations.id \
+            ) \
+            select \
+                blocks.number as block_number, \
+                blocks.root_hash as new_state_root, \
+                commited.tx_hash as commit_tx_hash, \
+                verified.tx_hash as verify_tx_hash, \
+                commited.created_at as committed_at, \
+                verified.created_at as verified_at \
+            from blocks \
+            inner join eth_ops commited on \
+                commited.block_number = blocks.number and commited.action_type = 'COMMIT' \
+            left join eth_ops verified on \
+                verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
+            where false \
+                or lower(commited.tx_hash) = $1 \
+                or lower(verified.tx_hash) = $1 \
+                or lower(blocks.root_hash) = $1 \
+                or blocks.number = {block_number} \
+            order by blocks.number desc \
+            limit 1; \
+            ",
             block_number = block_number
         );
         diesel::sql_query(sql_query)

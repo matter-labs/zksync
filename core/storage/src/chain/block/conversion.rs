@@ -1,3 +1,7 @@
+//! Module with additional conversion methods for the storage records.
+//! These methods are only needed for the `block` module, so they're kept in a
+//! private module.
+
 // External imports
 // Workspace imports
 use diesel::prelude::*;
@@ -31,7 +35,6 @@ impl StoredOperation {
         let action = if self.action_type == ActionType::COMMIT.to_string() {
             Action::Commit
         } else if self.action_type == ActionType::VERIFY.to_string() {
-            // verify
             let proof = Box::new(ProverSchema(&conn).load_proof(block_number)?);
             Action::Verify { proof }
         } else {
@@ -41,6 +44,7 @@ impl StoredOperation {
         let block = BlockSchema(&conn)
             .get_block(block_number)?
             .expect("Block for action does not exist");
+
         let accounts_updated = StateSchema(&conn).load_state_diff_for_block(block_number)?;
         Ok(Operation {
             id,
