@@ -176,20 +176,30 @@ impl RpcApp {
     /// If any error is encountered during message generation, returns jsonrpc_core::Error
     fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
         match tx {
-            FranklinTx::Transfer(tx) => Ok(Some(format!(
-                "Transfer {} {}\nTo: {:?}\nNonce: {}",
-                format_ether(&tx.amount),
-                self.token_symbol_from_id(tx.token)?,
-                tx.to,
-                tx.nonce,
-            ))),
-            FranklinTx::Withdraw(tx) => Ok(Some(format!(
-                "Withdraw {} {}\nTo: {:?}\nNonce: {}",
-                format_ether(&tx.amount),
-                self.token_symbol_from_id(tx.token)?,
-                tx.to,
-                tx.nonce,
-            ))),
+            FranklinTx::Transfer(tx) => {
+                let token_symbol = self.token_symbol_from_id(tx.token)?;
+                Ok(Some(format!(
+                    "Transfer {} {}\nTo: {:?}\nNonce: {}\nFee: {} {}",
+                    format_ether(&tx.amount),
+                    &token_symbol,
+                    tx.to,
+                    tx.nonce,
+                    format_ether(&tx.fee),
+                    &token_symbol,
+                )))
+            }
+            FranklinTx::Withdraw(tx) => {
+                let token_symbol = self.token_symbol_from_id(tx.token)?;
+                Ok(Some(format!(
+                    "Withdraw {} {}\nTo: {:?}\nNonce: {}\nFee: {} {}",
+                    format_ether(&tx.amount),
+                    &token_symbol,
+                    tx.to,
+                    tx.nonce,
+                    format_ether(&tx.fee),
+                    &token_symbol,
+                )))
+            }
             _ => Ok(None),
         }
     }

@@ -85,12 +85,14 @@ export class Wallet {
         };
 
         const stringAmount = utils.formatEther(transfer.amount);
+        const stringFee = utils.formatEther(transfer.fee);
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             transfer.token
         );
         const humanReadableTxInfo = `Transfer ${stringAmount} ${stringToken}\n`
             + `To: ${transfer.to.toLowerCase()}\n`
-            + `Nonce: ${nonce}`;
+            + `Nonce: ${nonce}\n`
+            + `Fee: ${stringFee} ${stringToken}`;
 
         const txMessageEthSignature = await this.ethSigner.signMessage(humanReadableTxInfo);
 
@@ -137,12 +139,14 @@ export class Wallet {
         };
 
         const stringAmount = utils.formatEther(withdraw.amount);
+        const stringFee = utils.formatEther(withdraw.fee);
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             withdraw.token
         );
         const humanReadableTxInfo = `Withdraw ${stringAmount} ${stringToken}\n`
             + `To: ${withdraw.ethAddress.toLowerCase()}\n`
-            + `Nonce: ${nonce}`;
+            + `Nonce: ${nonce}\n`
+            + `Fee: ${stringFee} ${stringToken}`;
         
         const txMessageEthSignature = await this.ethSigner.signMessage(humanReadableTxInfo);
 

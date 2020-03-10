@@ -3,10 +3,10 @@ import BN = require("bn.js");
 import {
     closestPackableTransactionAmount,
     closestPackableTransactionFee,
-    TokenSet,
+    TokenSet
 } from "../src/utils";
 import { pedersenHash } from "../src/crypto";
-import { bigNumberify, formatEther } from "ethers/utils";
+import { bigNumberify } from "ethers/utils";
 
 describe("Packing and unpacking", function() {
     it("Test basic fee packing/unpacking", function() {
