@@ -53,6 +53,14 @@ contract Franklin is Storage, Config, Events {
         blocks[0].stateRoot = _genesisRoot;
     }
 
+    function registeredPriorityOperations() public view returns (uint64) {
+        return firstPriorityRequestId + totalOpenPriorityRequests;
+    }
+
+    function verifiedPriorityOperations() public view returns (uint64) {
+        return firstPriorityRequestId;
+    }
+
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external {
