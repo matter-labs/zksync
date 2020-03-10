@@ -13,6 +13,9 @@ use crate::StorageProcessor;
 
 pub mod records;
 
+/// Operations schema is capable of storing and loading the transactions.
+/// Every kind of transaction (non-executed, executed, and executed priority tx)
+/// can be either saved or loaded from the database.
 pub struct OperationsSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> OperationsSchema<'a> {
@@ -57,6 +60,9 @@ impl<'a> OperationsSchema<'a> {
             .get_result(self.0.conn())
     }
 
+    /// Stores the executed operation in the database.
+    /// Note: This method should only be called after the transaction is stored in
+    /// the `mempool` table, since `executed_transactions` has a foreign key relying on it.
     pub(crate) fn store_executed_operation(
         &self,
         operation: NewExecutedTransaction,
