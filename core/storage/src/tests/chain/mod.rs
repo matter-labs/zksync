@@ -1,18 +1,17 @@
 // External imports
-use diesel::Connection;
 // Workspace imports
-use crypto_exports::rand::{SeedableRng, XorShiftRng};
 use models::node::{apply_updates, AccountMap};
 use models::Action;
 // Local imports
 use self::utils::{acc_create_random_updates, get_operation};
+use crate::tests::{create_rng, prepare_db_for_test};
 use crate::{
     chain::{block::BlockSchema, state::StateSchema},
     prover::ProverSchema,
     ConnectionPool,
 };
 
-mod utils;
+pub mod utils;
 
 // Here we create updates for blocks 1,2,3 (commit 3 blocks)
 // We apply updates for blocks 1,2 (verify 2 blocks)
@@ -21,12 +20,11 @@ mod utils;
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn test_commit_rewind() {
     let _ = env_logger::try_init();
-
-    let mut rng = XorShiftRng::from_seed([0, 1, 2, 3]);
+    let mut rng = create_rng();
 
     let pool = ConnectionPool::new();
     let conn = pool.access_storage().unwrap();
-    conn.conn().begin_test_transaction().unwrap(); // this will revert db after test
+    prepare_db_for_test(conn.conn());
 
     let (accounts_block_1, updates_block_1) = {
         let mut accounts = AccountMap::default();

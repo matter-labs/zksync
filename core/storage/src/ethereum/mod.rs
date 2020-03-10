@@ -64,44 +64,6 @@ impl<'a> EthereumSchema<'a> {
             .collect())
     }
 
-    pub fn load_sent_unconfirmed_ops(
-        &self,
-    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
-        self.0.conn().transaction(|| {
-            let ops: Vec<_> = operations::table
-                .filter(eth_operations::confirmed.eq(false))
-                .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
-                .order(operations::id.asc())
-                .load::<(StoredOperation, StorageETHOperation)>(self.0.conn())?;
-            let mut ops_with_eth_actions = Vec::new();
-            for (op, eth_op) in ops.into_iter() {
-                ops_with_eth_actions.push((op.into_op(self.0)?, eth_op));
-            }
-            Ok(ops_with_eth_actions
-                .into_iter()
-                .group_by(|(o, _)| o.id.unwrap())
-                .into_iter()
-                .map(|(_op_id, group_iter)| {
-                    let fold_result = group_iter.fold(
-                        (None, Vec::new()),
-                        |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _),
-                         (op, eth_op)| {
-                            if let Some(accum_op) = accum_op.as_ref() {
-                                assert_eq!(accum_op.id, op.id);
-                            } else {
-                                accum_op = Some(op);
-                            }
-                            accum_eth_ops.push(eth_op);
-
-                            (accum_op, accum_eth_ops)
-                        },
-                    );
-                    (fold_result.0.unwrap(), fold_result.1)
-                })
-                .collect())
-        })
-    }
-
     pub fn save_operation_eth_tx(
         &self,
         op_id: i64,

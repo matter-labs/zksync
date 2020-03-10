@@ -5,7 +5,7 @@ use serde_derive::{Deserialize, Serialize};
 // Local imports
 use crate::schema::*;
 
-#[derive(Debug, Clone, Queryable, QueryableByName)]
+#[derive(Debug, Clone, Queryable, QueryableByName, PartialEq)]
 #[table_name = "eth_operations"]
 pub struct StorageETHOperation {
     pub id: i64,
@@ -18,7 +18,7 @@ pub struct StorageETHOperation {
     pub raw_tx: Vec<u8>,
 }
 
-#[derive(Debug, Insertable)]
+#[derive(Debug, Insertable, PartialEq)]
 #[table_name = "eth_operations"]
 pub struct NewETHOperation {
     pub op_id: i64,
@@ -29,13 +29,13 @@ pub struct NewETHOperation {
     pub raw_tx: Vec<u8>,
 }
 
-#[derive(Insertable)]
+#[derive(Debug, Insertable, PartialEq)]
 #[table_name = "data_restore_last_watched_eth_block"]
 pub struct NewLastWatchedEthBlockNumber {
     pub block_number: String,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, Queryable, QueryableByName)]
+#[derive(Debug, Serialize, Deserialize, Clone, Queryable, QueryableByName, PartialEq)]
 #[table_name = "data_restore_last_watched_eth_block"]
 pub struct StoredLastWatchedEthBlockNumber {
     pub id: i32,
