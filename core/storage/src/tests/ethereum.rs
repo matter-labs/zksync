@@ -10,7 +10,12 @@ use models::{
 use crate::tests::prepare_db_for_test;
 use crate::{
     chain::block::BlockSchema,
-    ethereum::{records::StorageETHOperation, EthereumSchema},
+    ethereum::{
+        records::{
+            NewLastWatchedEthBlockNumber, StorageETHOperation, StoredLastWatchedEthBlockNumber,
+        },
+        EthereumSchema,
+    },
     ConnectionPool,
 };
 
@@ -163,4 +168,58 @@ fn ethereum_storage() {
         .load_unconfirmed_operations()
         .expect("Unconfirmed operations query failed");
     assert!(unconfirmed_operations.is_empty());
+}
+
+/// Checks that storing and loading the last watched block number
+/// works as expected.
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn last_watched_block() {
+    let pool = ConnectionPool::new();
+    let conn = pool.access_storage().unwrap();
+    prepare_db_for_test(conn.conn());
+
+    // Check that by default we can't obtain the block number.
+    let last_watched_block_number = EthereumSchema(&conn).load_last_watched_block_number();
+    assert!(
+        last_watched_block_number.is_err(),
+        "There should be no stored block number in the database"
+    );
+
+    // Store the block number.
+    EthereumSchema(&conn)
+        .update_last_watched_block_number(&NewLastWatchedEthBlockNumber {
+            block_number: "0".into(),
+        })
+        .expect("Can't update the last watched block number");
+
+    // Load it again.
+    let last_watched_block_number = EthereumSchema(&conn)
+        .load_last_watched_block_number()
+        .expect("Can't load the stored last watched block number");
+
+    assert_eq!(
+        last_watched_block_number,
+        StoredLastWatchedEthBlockNumber {
+            id: 1,
+            block_number: "0".into()
+        }
+    );
+
+    // Repeat save/load with other values.
+    EthereumSchema(&conn)
+        .update_last_watched_block_number(&NewLastWatchedEthBlockNumber {
+            block_number: "1".into(),
+        })
+        .expect("Can't update the last watched block number");
+    let last_watched_block_number = EthereumSchema(&conn)
+        .load_last_watched_block_number()
+        .expect("Can't load the stored last watched block number");
+    assert_eq!(
+        last_watched_block_number,
+        StoredLastWatchedEthBlockNumber {
+            id: 2,
+            block_number: "1".into()
+        }
+    );
 }
