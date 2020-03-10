@@ -12,10 +12,25 @@ mod ethereum;
 mod prover;
 mod tokens;
 
-/// Makes all the changes performed in database
-/// temporary, so they will be reverted right after test.
-pub fn prepare_db_for_test<Conn: Connection>(conn: &Conn) {
-    conn.begin_test_transaction().unwrap();
+/// Runs the database test content within the test transaction, which provides an isolation
+/// for several tests running at the same time.
+#[cfg(feature = "db_test")]
+pub fn db_test<Conn, F, T>(conn: &Conn, f: F)
+where
+    Conn: Connection,
+    F: FnOnce() -> diesel::QueryResult<T>,
+{
+    conn.test_transaction(f);
+}
+
+/// Without `db_test` attribute we don't want to run any tests, so we skip them.
+#[cfg(not(feature = "db_test"))]
+pub fn db_test<Conn, F, T>(_conn: &Conn, _f: F)
+where
+    Conn: Connection,
+    F: FnOnce() -> diesel::QueryResult<T>,
+{
+    // Do nothing
 }
 
 /// Creates a fixed-seed RNG for tests.

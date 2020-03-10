@@ -183,19 +183,6 @@ impl<'a> BlockSchema<'a> {
         })
     }
 
-    pub fn load_stored_op_with_block_number(
-        &self,
-        block_number: BlockNumber,
-        action_type: ActionType,
-    ) -> Option<StoredOperation> {
-        use crate::schema::operations::dsl;
-        dsl::operations
-            .filter(dsl::block_number.eq(i64::from(block_number)))
-            .filter(dsl::action_type.eq(action_type.to_string().as_str()))
-            .get_result(self.0.conn())
-            .ok()
-    }
-
     pub fn load_block_range(
         &self,
         max_block: BlockNumber,
@@ -279,7 +266,7 @@ impl<'a> BlockSchema<'a> {
     }
 
     pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
-        let op = self.load_stored_op_with_block_number(block_number, ActionType::COMMIT);
+        let op = OperationsSchema(self.0).get_operation(block_number, ActionType::COMMIT);
         op.and_then(|r| r.into_op(self.0).ok())
     }
 

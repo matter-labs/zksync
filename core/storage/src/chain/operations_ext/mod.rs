@@ -31,14 +31,14 @@ impl<'a> OperationsExtSchema<'a> {
             let tx = OperationsSchema(self.0).get_executed_operation(hash)?;
 
             if let Some(tx) = tx {
-                let commited = operations::table
+                let committed = operations::table
                     .filter(operations::block_number.eq(tx.block_number))
                     .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
                     .first::<StoredOperation>(self.0.conn())
                     .optional()?
                     .is_some();
 
-                if !commited {
+                if !committed {
                     return Ok(None);
                 }
 

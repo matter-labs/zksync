@@ -7,7 +7,7 @@ use models::{
     Action, Operation,
 };
 // Local imports
-use crate::tests::prepare_db_for_test;
+use crate::tests::db_test;
 use crate::{
     chain::block::BlockSchema,
     ethereum::{
@@ -16,18 +16,18 @@ use crate::{
         },
         EthereumSchema,
     },
-    ConnectionPool,
+    StorageProcessor,
 };
 
 /// Creates a sample operation to be stored in `operations` table.
 /// This function is required since `eth_operations` table is linked to
 /// the `operations` table by the operation id.
-pub fn get_operation(id: i64) -> Operation {
+pub fn get_operation(block_number: BlockNumber) -> Operation {
     Operation {
-        id: Some(id),
+        id: None,
         action: Action::Commit,
         block: Block {
-            block_number: id as BlockNumber,
+            block_number,
             new_root_hash: Fr::default(),
             fee_account: 0,
             block_transactions: Vec::new(),
@@ -76,16 +76,16 @@ impl EthereumTxParams {
 
 /// Verifies that on a fresh database no bogus operations are loaded.
 #[test]
-#[cfg_attr(not(feature = "db_test"), ignore)]
 fn ethereum_empty_load() {
-    let pool = ConnectionPool::new();
-    let conn = pool.access_storage().unwrap();
-    prepare_db_for_test(conn.conn());
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        let unconfirmed_operations = EthereumSchema(&conn)
+            .load_unconfirmed_operations()
+            .expect("Unconfirmed operations query failed");
+        assert!(unconfirmed_operations.is_empty());
 
-    let unconfirmed_operations = EthereumSchema(&conn)
-        .load_unconfirmed_operations()
-        .expect("Unconfirmed operations query failed");
-    assert!(unconfirmed_operations.is_empty());
+        Ok(())
+    });
 }
 
 /// Checks the basic Ethereum storage workflow:
@@ -97,129 +97,129 @@ fn ethereum_empty_load() {
 /// - Make the operation as completed.
 /// - Check that now txs aren't loaded.
 #[test]
-#[cfg_attr(not(feature = "db_test"), ignore)]
 fn ethereum_storage() {
-    let pool = ConnectionPool::new();
-    let conn = pool.access_storage().unwrap();
-    prepare_db_for_test(conn.conn());
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        let unconfirmed_operations = EthereumSchema(&conn)
+            .load_unconfirmed_operations()
+            .expect("Unconfirmed operations query failed");
+        assert!(unconfirmed_operations.is_empty());
 
-    let unconfirmed_operations = EthereumSchema(&conn)
-        .load_unconfirmed_operations()
-        .expect("Unconfirmed operations query failed");
-    assert!(unconfirmed_operations.is_empty());
+        // Store operation with ID 1.
+        let block_number = 1;
+        let operation = get_operation(block_number);
+        let operation = BlockSchema(&conn)
+            .execute_operation(operation.clone())
+            .expect("Commit block 1");
 
-    // Store operation with ID 1.
-    let operation_id = 1;
-    let operation = get_operation(operation_id);
-    BlockSchema(&conn)
-        .execute_operation(operation.clone())
-        .expect("Commit block 1");
+        // Store the Ethereum transaction.
+        let params = EthereumTxParams::new(operation.id.unwrap(), 1);
+        EthereumSchema(&conn)
+            .save_operation_eth_tx(
+                params.op_id,
+                params.hash,
+                params.deadline_block,
+                params.nonce,
+                params.gas_price.clone(),
+                params.raw_tx.clone(),
+            )
+            .expect("Can't save Ethereum operation 1");
 
-    // Store the Ethereum transaction.
-    let params = EthereumTxParams::new(operation_id, 1);
-    EthereumSchema(&conn)
-        .save_operation_eth_tx(
-            params.op_id,
-            params.hash,
-            params.deadline_block,
-            params.nonce,
-            params.gas_price.clone(),
-            params.raw_tx.clone(),
-        )
-        .expect("Can't save Ethereum operation 1");
+        // Check that it can be loaded.
+        let unconfirmed_operations = EthereumSchema(&conn)
+            .load_unconfirmed_operations()
+            .expect("Unconfirmed operations query failed");
+        assert_eq!(unconfirmed_operations[0].0.id, operation.id);
+        assert_eq!(unconfirmed_operations[0].1, vec![params.to_eth_op(1)]);
 
-    // Check that it can be loaded.
-    let unconfirmed_operations = EthereumSchema(&conn)
-        .load_unconfirmed_operations()
-        .expect("Unconfirmed operations query failed");
-    assert_eq!(unconfirmed_operations[0].0.id, operation.id);
-    assert_eq!(unconfirmed_operations[0].1, vec![params.to_eth_op(1)]);
+        // Create one more Ethereum transaction.
+        let params_2 = EthereumTxParams::new(operation.id.unwrap(), 2);
+        EthereumSchema(&conn)
+            .save_operation_eth_tx(
+                params_2.op_id,
+                params_2.hash,
+                params_2.deadline_block,
+                params_2.nonce,
+                params_2.gas_price.clone(),
+                params_2.raw_tx.clone(),
+            )
+            .expect("Can't save Ethereum operation 2");
 
-    // Create one more Ethereum transaction.
-    let params_2 = EthereumTxParams::new(operation_id, 2);
-    EthereumSchema(&conn)
-        .save_operation_eth_tx(
-            params_2.op_id,
-            params_2.hash,
-            params_2.deadline_block,
-            params_2.nonce,
-            params_2.gas_price.clone(),
-            params_2.raw_tx.clone(),
-        )
-        .expect("Can't save Ethereum operation 2");
+        // Check that we now can load two operations.
+        let unconfirmed_operations = EthereumSchema(&conn)
+            .load_unconfirmed_operations()
+            .expect("Unconfirmed operations query failed");
+        assert_eq!(unconfirmed_operations[0].0.id, operation.id);
+        assert_eq!(
+            unconfirmed_operations[0].1,
+            vec![params.to_eth_op(1), params_2.to_eth_op(2)]
+        );
 
-    // Check that we now can load two operations.
-    let unconfirmed_operations = EthereumSchema(&conn)
-        .load_unconfirmed_operations()
-        .expect("Unconfirmed operations query failed");
-    assert_eq!(unconfirmed_operations[0].0.id, operation.id);
-    assert_eq!(
-        unconfirmed_operations[0].1,
-        vec![params.to_eth_op(1), params_2.to_eth_op(2)]
-    );
+        // Make the transaction as completed.
+        EthereumSchema(&conn)
+            .confirm_eth_tx(&params_2.hash)
+            .expect("Can't confirm Ethereum tx");
 
-    // Make the transaction as completed.
-    EthereumSchema(&conn)
-        .confirm_eth_tx(&params_2.hash)
-        .expect("Can't confirm Ethereum tx");
+        // Now there should be no unconfirmed transactions.
+        let unconfirmed_operations = EthereumSchema(&conn)
+            .load_unconfirmed_operations()
+            .expect("Unconfirmed operations query failed");
+        assert!(unconfirmed_operations.is_empty());
 
-    // Now there should be no unconfirmed transactions.
-    let unconfirmed_operations = EthereumSchema(&conn)
-        .load_unconfirmed_operations()
-        .expect("Unconfirmed operations query failed");
-    assert!(unconfirmed_operations.is_empty());
+        Ok(())
+    });
 }
 
 /// Checks that storing and loading the last watched block number
 /// works as expected.
 #[test]
-#[cfg_attr(not(feature = "db_test"), ignore)]
 fn last_watched_block() {
-    let pool = ConnectionPool::new();
-    let conn = pool.access_storage().unwrap();
-    prepare_db_for_test(conn.conn());
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        // Check that by default we can't obtain the block number.
+        let last_watched_block_number = EthereumSchema(&conn).load_last_watched_block_number();
+        assert!(
+            last_watched_block_number.is_err(),
+            "There should be no stored block number in the database"
+        );
 
-    // Check that by default we can't obtain the block number.
-    let last_watched_block_number = EthereumSchema(&conn).load_last_watched_block_number();
-    assert!(
-        last_watched_block_number.is_err(),
-        "There should be no stored block number in the database"
-    );
+        // Store the block number.
+        EthereumSchema(&conn)
+            .update_last_watched_block_number(&NewLastWatchedEthBlockNumber {
+                block_number: "0".into(),
+            })
+            .expect("Can't update the last watched block number");
 
-    // Store the block number.
-    EthereumSchema(&conn)
-        .update_last_watched_block_number(&NewLastWatchedEthBlockNumber {
-            block_number: "0".into(),
-        })
-        .expect("Can't update the last watched block number");
+        // Load it again.
+        let last_watched_block_number = EthereumSchema(&conn)
+            .load_last_watched_block_number()
+            .expect("Can't load the stored last watched block number");
 
-    // Load it again.
-    let last_watched_block_number = EthereumSchema(&conn)
-        .load_last_watched_block_number()
-        .expect("Can't load the stored last watched block number");
+        assert_eq!(
+            last_watched_block_number,
+            StoredLastWatchedEthBlockNumber {
+                id: 1,
+                block_number: "0".into()
+            }
+        );
 
-    assert_eq!(
-        last_watched_block_number,
-        StoredLastWatchedEthBlockNumber {
-            id: 1,
-            block_number: "0".into()
-        }
-    );
+        // Repeat save/load with other values.
+        EthereumSchema(&conn)
+            .update_last_watched_block_number(&NewLastWatchedEthBlockNumber {
+                block_number: "1".into(),
+            })
+            .expect("Can't update the last watched block number");
+        let last_watched_block_number = EthereumSchema(&conn)
+            .load_last_watched_block_number()
+            .expect("Can't load the stored last watched block number");
+        assert_eq!(
+            last_watched_block_number,
+            StoredLastWatchedEthBlockNumber {
+                id: 2,
+                block_number: "1".into()
+            }
+        );
 
-    // Repeat save/load with other values.
-    EthereumSchema(&conn)
-        .update_last_watched_block_number(&NewLastWatchedEthBlockNumber {
-            block_number: "1".into(),
-        })
-        .expect("Can't update the last watched block number");
-    let last_watched_block_number = EthereumSchema(&conn)
-        .load_last_watched_block_number()
-        .expect("Can't load the stored last watched block number");
-    assert_eq!(
-        last_watched_block_number,
-        StoredLastWatchedEthBlockNumber {
-            id: 2,
-            block_number: "1".into()
-        }
-    );
+        Ok(())
+    });
 }

@@ -2,6 +2,7 @@
 // External imports
 use diesel::prelude::*;
 // Workspace imports
+use models::{node::BlockNumber, ActionType};
 // Local imports
 use self::records::{
     NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
@@ -15,6 +16,19 @@ pub mod records;
 pub struct OperationsSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> OperationsSchema<'a> {
+    pub fn get_operation(
+        &self,
+        block_number: BlockNumber,
+        action_type: ActionType,
+    ) -> Option<StoredOperation> {
+        use crate::schema::operations::dsl;
+        dsl::operations
+            .filter(dsl::block_number.eq(i64::from(block_number)))
+            .filter(dsl::action_type.eq(action_type.to_string().as_str()))
+            .get_result(self.0.conn())
+            .ok()
+    }
+
     pub fn get_executed_operation(
         &self,
         op_hash: &[u8],

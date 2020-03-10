@@ -7,7 +7,7 @@ use models::node::{AccountId, BlockNumber, FranklinOp};
 // Local imports
 use crate::schema::*;
 
-#[derive(Debug, Insertable)]
+#[derive(Debug, Clone, Insertable)]
 #[table_name = "executed_priority_operations"]
 pub struct NewExecutedPriorityOperation {
     pub block_number: i64,
@@ -19,7 +19,7 @@ pub struct NewExecutedPriorityOperation {
     pub eth_hash: Vec<u8>,
 }
 
-#[derive(Debug, Insertable)]
+#[derive(Debug, Clone, Insertable)]
 #[table_name = "operations"]
 pub struct NewOperation {
     pub block_number: i64,
@@ -36,7 +36,7 @@ pub struct StoredOperation {
     pub confirmed: bool,
 }
 
-#[derive(Debug, Queryable, QueryableByName)]
+#[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "executed_priority_operations"]
 pub struct StoredExecutedPriorityOperation {
     pub id: i32,
@@ -63,7 +63,7 @@ impl StoredFranklinOp {
         serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db")
     }
 }
-#[derive(Debug, Insertable)]
+#[derive(Debug, Clone, Insertable)]
 #[table_name = "rollup_ops"]
 pub struct NewFranklinOp {
     pub block_num: i64,
@@ -85,7 +85,7 @@ impl NewFranklinOp {
     }
 }
 
-#[derive(Debug, Queryable, QueryableByName)]
+#[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "executed_transactions"]
 pub struct StoredExecutedTransaction {
     pub id: i32,
@@ -97,7 +97,7 @@ pub struct StoredExecutedTransaction {
     pub block_index: Option<i32>,
 }
 
-#[derive(Debug, Insertable)]
+#[derive(Debug, Clone, Insertable)]
 #[table_name = "executed_transactions"]
 pub struct NewExecutedTransaction {
     pub block_number: i64,
