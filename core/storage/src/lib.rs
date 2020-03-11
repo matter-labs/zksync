@@ -96,32 +96,32 @@ impl StorageProcessor {
     }
 
     /// Gains access to the `Chain` schemas.
-    pub fn chain<'a>(&'a self) -> chain::ChainIntermediator<'a> {
+    pub fn chain(&self) -> chain::ChainIntermediator<'_> {
         chain::ChainIntermediator(self)
     }
 
     /// Gains access to the `Config` schema.
-    pub fn config_schema<'a>(&'a self) -> config::ConfigSchema<'a> {
+    pub fn config_schema(&self) -> config::ConfigSchema<'_> {
         config::ConfigSchema(self)
     }
 
     /// Gains access to the `DataRestore` schema.
-    pub fn data_restore_schema<'a>(&'a self) -> data_restore::DataRestoreSchema<'a> {
+    pub fn data_restore_schema(&self) -> data_restore::DataRestoreSchema<'_> {
         data_restore::DataRestoreSchema(self)
     }
 
     /// Gains access to the `Ethereum` schema.
-    pub fn ethereum_schema<'a>(&'a self) -> ethereum::EthereumSchema<'a> {
+    pub fn ethereum_schema(&self) -> ethereum::EthereumSchema<'_> {
         ethereum::EthereumSchema(self)
     }
 
     /// Gains access to the `Prover` schema.
-    pub fn prover_schema<'a>(&'a self) -> prover::ProverSchema<'a> {
+    pub fn prover_schema(&self) -> prover::ProverSchema<'_> {
         prover::ProverSchema(self)
     }
 
     /// Gains access to the `Tokens` schema.
-    pub fn tokens_schema<'a>(&'a self) -> tokens::TokensSchema<'a> {
+    pub fn tokens_schema(&self) -> tokens::TokensSchema<'_> {
         tokens::TokensSchema(self)
     }
 
