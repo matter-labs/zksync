@@ -24,6 +24,7 @@ use crate::{
 /// `load_committed_state(None)` will not work (since this method will attempt to
 /// look into `blocks` table to get the most recent block number.)
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn low_level_commit_verify_state() {
     let mut rng = create_rng();
 
@@ -97,6 +98,7 @@ fn low_level_commit_verify_state() {
 }
 
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn state_diff() {
     fn check_diff_applying(
         conn: &StorageProcessor,

@@ -9,6 +9,7 @@
 //!
 //! ```ignore
 //! #[test]
+//! #[cfg_attr(not(feature = "db_test"), ignore)]
 //! fn some_test() {
 //!     let conn = StorageProcessor::establish_connection().unwrap();
 //!     db_test(conn.conn(), || {

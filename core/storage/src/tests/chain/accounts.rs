@@ -13,6 +13,7 @@ use crate::{
 
 /// Checks that stored accounts can be obtained once they're committed.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn stored_accounts() {
     let _ = env_logger::try_init();
     let mut rng = create_rng();

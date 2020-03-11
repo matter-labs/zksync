@@ -34,6 +34,7 @@ pub fn apply_random_updates(
 /// We apply updates for blocks 1,2 (verify 2 blocks)
 /// Make sure that we can get state for all blocks.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn test_commit_rewind() {
     let _ = env_logger::try_init();
     let mut rng = create_rng();

@@ -74,6 +74,7 @@ impl EthereumTxParams {
 
 /// Verifies that on a fresh database no bogus operations are loaded.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn ethereum_empty_load() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
@@ -93,6 +94,7 @@ fn ethereum_empty_load() {
 /// - Make the operation as completed.
 /// - Check that now txs aren't loaded.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn ethereum_storage() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
@@ -158,6 +160,7 @@ fn ethereum_storage() {
 /// Checks that storing and loading the last watched block number
 /// works as expected.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn last_watched_block() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {

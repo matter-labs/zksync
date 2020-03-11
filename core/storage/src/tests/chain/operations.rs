@@ -17,6 +17,7 @@ use crate::{
 
 /// Checks the save&load routine for unconfirmed operations.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn operations() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
@@ -41,6 +42,7 @@ fn operations() {
 
 /// Checks the save&load routine for executed operations.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn executed_operations() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
@@ -82,6 +84,7 @@ fn executed_operations() {
 
 /// Checks the save&load routine for executed priority operations.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn executed_priority_operations() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {

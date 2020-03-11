@@ -9,6 +9,7 @@ use crate::{
 
 /// Verifies the token save & load mechanism.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn tokens_storage() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {

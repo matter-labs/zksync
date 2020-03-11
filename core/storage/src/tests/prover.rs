@@ -9,6 +9,7 @@ use crate::{chain::block::BlockSchema, prover::ProverSchema, StorageProcessor};
 
 /// Checks that the proof can be stored and loaded.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn test_store_proof() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
@@ -32,6 +33,7 @@ fn test_store_proof() {
 /// Checks the prover registration workflow, including
 /// adding a new prover, stopping and resuming it.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn prover_registration() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
@@ -79,6 +81,7 @@ fn prover_registration() {
 /// - Check that we won't create another prover run for that block once it's verified.
 /// - Create a new block & obtain a prover run for it.
 #[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
 fn prover_run() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
