@@ -44,10 +44,16 @@ where
     Conn: Connection,
     F: FnOnce() -> diesel::QueryResult<T>,
 {
-    conn.begin_test_transaction()
-        .expect("Can't start a test transaction");
-
-    f().expect("Test body returned an error:");
+    // It seems that `test_transaction` not completely isolate the performed changes,
+    // since assigned ID can change between launches. Thus it is not recommended to compare
+    // against the object database ID in tests.
+    conn.test_transaction::<_, diesel::result::Error, _>(|| {
+        // We have to introduce an additional closure,
+        // since `test_transaction` panics upon encountering an error without
+        // displaying the occurred error.
+        f().expect("Test body returned an error:");
+        Ok(())
+    });
 }
 
 /// Without `db_test` attribute we don't want to run any tests, so we skip them.

@@ -11,9 +11,7 @@ use crate::tests::db_test;
 use crate::{
     chain::block::BlockSchema,
     ethereum::{
-        records::{
-            NewLastWatchedEthBlockNumber, StorageETHOperation, StoredLastWatchedEthBlockNumber,
-        },
+        records::{NewLastWatchedEthBlockNumber, StorageETHOperation},
         EthereumSchema,
     },
     StorageProcessor,
@@ -120,7 +118,10 @@ fn ethereum_storage() {
         // Check that it can be loaded.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
         assert_eq!(unconfirmed_operations[0].0.id, operation.id);
-        assert_eq!(unconfirmed_operations[0].1, vec![params.to_eth_op(1)]);
+        assert_eq!(unconfirmed_operations[0].1.len(), 1);
+        // Load the database ID, since we can't predict it for sure.
+        let db_id = unconfirmed_operations[0].1[0].id;
+        assert_eq!(unconfirmed_operations[0].1, vec![params.to_eth_op(db_id)]);
 
         // Create one more Ethereum transaction.
         let params_2 = EthereumTxParams::new(operation.id.unwrap(), 2);
@@ -136,9 +137,11 @@ fn ethereum_storage() {
         // Check that we now can load two operations.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
         assert_eq!(unconfirmed_operations[0].0.id, operation.id);
+        assert_eq!(unconfirmed_operations[0].1.len(), 2);
+        let db_id_2 = unconfirmed_operations[0].1[1].id;
         assert_eq!(
             unconfirmed_operations[0].1,
-            vec![params.to_eth_op(1), params_2.to_eth_op(2)]
+            vec![params.to_eth_op(db_id), params_2.to_eth_op(db_id_2)]
         );
 
         // Make the transaction as completed.
@@ -173,26 +176,14 @@ fn last_watched_block() {
         // Load it again.
         let last_watched_block_number = EthereumSchema(&conn).load_last_watched_block_number()?;
 
-        assert_eq!(
-            last_watched_block_number,
-            StoredLastWatchedEthBlockNumber {
-                id: 1,
-                block_number: "0".into()
-            }
-        );
+        assert_eq!(last_watched_block_number.block_number, "0");
 
         // Repeat save/load with other values.
         EthereumSchema(&conn).update_last_watched_block_number(&NewLastWatchedEthBlockNumber {
             block_number: "1".into(),
         })?;
         let last_watched_block_number = EthereumSchema(&conn).load_last_watched_block_number()?;
-        assert_eq!(
-            last_watched_block_number,
-            StoredLastWatchedEthBlockNumber {
-                id: 2,
-                block_number: "1".into()
-            }
-        );
+        assert_eq!(last_watched_block_number.block_number, "1");
 
         Ok(())
     });

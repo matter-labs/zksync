@@ -100,7 +100,6 @@ fn prover_run() {
             .expect("Prover run query failed");
         let run = maybe_run.expect("Can't get a prover run with a block committed");
 
-        assert_eq!(run.id, 1);
         assert_eq!(run.block_number, 1);
         assert_eq!(run.worker, Some(prover_name.into()));
         // Initially creation and update time should be equal.
@@ -139,7 +138,6 @@ fn prover_run() {
             .expect("Prover run query failed");
         let run = maybe_run.expect("Can't get a prover run with a block committed");
 
-        assert_eq!(run.id, 2);
         assert_eq!(run.block_number, 2);
         assert_eq!(run.worker, Some(prover_name.into()));
         assert_eq!(run.created_at, run.updated_at);
