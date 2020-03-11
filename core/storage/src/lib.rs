@@ -19,27 +19,27 @@ use diesel::prelude::*;
 use diesel::r2d2::{ConnectionManager, PooledConnection};
 // Workspace imports
 // Local imports
-use crate::recoverable_connection::RecoverableConnection;
+use crate::connection::{holder::ConnectionHolder, recoverable_connection::RecoverableConnection};
 
-mod recoverable_connection;
 mod schema;
 #[cfg(test)]
 mod tests;
 
 pub mod chain;
 pub mod config;
-pub mod connection_pool;
+pub mod connection;
 pub mod data_restore;
 pub mod diff;
 pub mod ethereum;
 pub mod prover;
 pub mod tokens;
 
-pub use crate::connection_pool::ConnectionPool;
+pub use crate::connection::ConnectionPool;
 
 /// Storage processor is the main storage interaction point.
 /// It holds down the connection (either direct or pooled) to the database
 /// and provide methods to obtain different storage schemas.
+#[derive(Debug)]
 pub struct StorageProcessor {
     conn: ConnectionHolder,
 }
@@ -97,9 +97,4 @@ impl StorageProcessor {
             ConnectionHolder::Direct(ref conn) => conn,
         }
     }
-}
-
-enum ConnectionHolder {
-    Pooled(PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>),
-    Direct(RecoverableConnection<PgConnection>),
 }

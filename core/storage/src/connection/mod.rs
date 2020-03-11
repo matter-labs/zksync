@@ -1,17 +1,27 @@
 // Built-in deps
 use std::env;
+use std::fmt;
 use std::ops::Deref;
 // External imports
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool, PoolError};
 // Local imports
-use crate::recoverable_connection::RecoverableConnection;
+use self::recoverable_connection::RecoverableConnection;
 use crate::StorageProcessor;
+
+pub mod holder;
+pub mod recoverable_connection;
 
 // TODO docstring
 #[derive(Clone)]
 pub struct ConnectionPool {
     pool: Pool<ConnectionManager<RecoverableConnection<PgConnection>>>,
+}
+
+impl fmt::Debug for ConnectionPool {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Recoverable connection")
+    }
 }
 
 impl ConnectionPool {
