@@ -52,6 +52,7 @@ table! {
         worker -> Text,
         created_at -> Timestamp,
         stopped_at -> Nullable<Timestamp>,
+        block_size -> Int8,
     }
 }
 
@@ -70,6 +71,7 @@ table! {
         fee_account_id -> Int8,
         unprocessed_prior_op_before -> Int8,
         unprocessed_prior_op_after -> Int8,
+        block_size -> Int8,
     }
 }
 
@@ -200,7 +202,7 @@ table! {
     tokens (id) {
         id -> Int4,
         address -> Text,
-        symbol -> Nullable<Text>,
+        symbol -> Text,
     }
 }
 

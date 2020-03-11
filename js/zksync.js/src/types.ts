@@ -1,10 +1,16 @@
 import { utils } from "ethers";
 
+// 0x-prefixed, hex encoded, ethereum account address
 export type Address = string;
+// sync:-prefixed, hex encoded, hash of the account public key
 export type PubKeyHash = string;
 
-// ETH or ERC20 address
-export type Token = "ETH" | string;
+// Symbol like "ETH" or "FAU" or token contract address(zero address is implied for "ETH").
+export type TokenLike = TokenSymbol | TokenAddress;
+// Token symbol (e.g. "ETH", "FAU", etc.)
+export type TokenSymbol = string;
+// Token address (e.g. 0xde..ad for ERC20, or 0x00.00 for "ETH")
+export type TokenAddress = string;
 
 export type Nonce = number | "committed";
 
@@ -13,6 +19,7 @@ export interface AccountState {
     id?: number;
     committed: {
         balances: {
+            // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: utils.BigNumberish;
         };
         nonce: number;
@@ -20,6 +27,7 @@ export interface AccountState {
     };
     verified: {
         balances: {
+            // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: utils.BigNumberish;
         };
         nonce: number;
@@ -85,9 +93,10 @@ export interface ContractAddress {
 }
 
 export interface Tokens {
+    // Tokens are indexed by their symbol (e.g. "ETH")
     [token: string]: {
         address: string;
         id: number;
-        symbol?: string;
+        symbol: string;
     };
 }

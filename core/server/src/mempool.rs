@@ -22,7 +22,7 @@ use models::node::{
     AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TransferOp,
     TransferToNewOp,
 };
-use models::params::block_size_chunks;
+use models::params::max_block_chunk_size;
 use std::collections::{HashMap, VecDeque};
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;
@@ -54,7 +54,6 @@ impl ProposedBlock {
 
 pub struct GetBlockRequest {
     pub last_priority_op_number: u64,
-    pub chunks: usize,
     pub response_sender: oneshot::Sender<ProposedBlock>,
 }
 
@@ -219,7 +218,7 @@ impl Mempool {
         ProposedBlock { priority_ops, txs }
     }
 
-    /// Returns: chunks left, ops selected
+    /// Returns: chunks left from max amount of chunks, ops selected
     async fn select_priority_ops(
         &self,
         current_unprocessed_priority_op: u64,
@@ -229,7 +228,7 @@ impl Mempool {
             .clone()
             .send(EthWatchRequest::GetPriorityQueueOps {
                 op_start_id: current_unprocessed_priority_op,
-                max_chunks: block_size_chunks(),
+                max_chunks: max_block_chunk_size(),
                 resp: eth_watch_resp.0,
             })
             .await
@@ -238,7 +237,7 @@ impl Mempool {
         let priority_ops = eth_watch_resp.1.await.expect("Err response from eth watch");
 
         (
-            block_size_chunks()
+            max_block_chunk_size()
                 - priority_ops
                     .iter()
                     .map(|op| op.data.chunks())
@@ -249,7 +248,7 @@ impl Mempool {
 
     fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<FranklinTx>) {
         let mut txs_for_commit = Vec::new();
-        let mut txs_for_reinsert = VecDeque::new();
+        let mut tx_for_reinsert = None;
 
         while let Some(tx) = self.mempool_state.ready_txs.pop_front() {
             let chunks_for_tx = self.mempool_state.chunks_for_tx(&tx);
@@ -257,12 +256,14 @@ impl Mempool {
                 txs_for_commit.push(tx);
                 chunks_left -= chunks_for_tx;
             } else {
-                txs_for_reinsert.push_back(tx);
+                tx_for_reinsert = Some(tx);
                 break;
             }
         }
 
-        self.mempool_state.ready_txs.append(&mut txs_for_reinsert);
+        if let Some(tx) = tx_for_reinsert {
+            self.mempool_state.ready_txs.push_front(tx);
+        }
 
         (chunks_left, txs_for_commit)
     }

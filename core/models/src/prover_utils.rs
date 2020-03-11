@@ -65,15 +65,15 @@ const VERIFY_KEY_FILENAME: &str = "GetVk.sol";
 
 pub fn get_keys_root_dir() -> PathBuf {
     let mut out_dir = PathBuf::new();
-    out_dir.push(&std::env::var("ZKSYNC_HOME").expect("ZKSYNC_HOME not set"));
+    out_dir.push(&std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));
     out_dir.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
     out_dir.push(&format!("account-{}", crate::params::account_tree_depth()));
     out_dir
 }
 
-pub fn get_block_proof_key_and_vk_path() -> (PathBuf, PathBuf) {
+pub fn get_block_proof_key_and_vk_path(block_size: usize) -> (PathBuf, PathBuf) {
     let mut out_dir = get_keys_root_dir();
-    out_dir.push(&format!("block-{}", crate::params::block_size_chunks()));
+    out_dir.push(&format!("block-{}", block_size));
 
     let mut key_file = out_dir.clone();
     key_file.push(KEY_FILENAME);

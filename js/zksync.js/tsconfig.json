@@ -1,9 +1,8 @@
 {
   "compilerOptions": {
     "esModuleInterop": true,
-    "lib": [ "es2015", "es5", "dom" ],
     "module": "commonjs",
-    "target": "es5",
+    "target": "es6",
     "moduleResolution": "node",
 
     "outDir": "./build",
@@ -11,10 +10,7 @@
     "declaration": true,
 
     "preserveSymlinks": true,
-
-    "preserveWatchOutput": true,
-    "pretty": false
-
+    "preserveWatchOutput": true
   },
   "files": [
     "./src/index.ts"

@@ -204,7 +204,7 @@ impl OperationNotifier {
             }
         }
 
-        let storage = self.db_pool.access_storage()?;
+        let storage = self.db_pool.access_storage_fragile()?;
         let executed_op = storage.get_executed_priority_op(serial_id as u32)?;
         if let Some(executed_op) = executed_op {
             let block_info = if let Some(block_with_op) =
@@ -312,7 +312,11 @@ impl OperationNotifier {
             }
         }
 
-        if let Some(receipt) = self.db_pool.access_storage()?.tx_receipt(hash.as_ref())? {
+        if let Some(receipt) = self
+            .db_pool
+            .access_storage_fragile()?
+            .tx_receipt(hash.as_ref())?
+        {
             let tx_info_resp = TransactionInfoResp {
                 executed: true,
                 success: Some(receipt.success),
@@ -360,7 +364,7 @@ impl OperationNotifier {
         action: ActionType,
         sub: Subscriber<ResponseAccountState>,
     ) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
+        let storage = self.db_pool.access_storage_fragile()?;
         let account_state = storage.account_state_by_address(&address)?;
 
         let account_id = if let Some(id) = account_state.committed.as_ref().map(|(id, _)| id) {
@@ -465,7 +469,7 @@ impl OperationNotifier {
     }
 
     fn handle_new_block(&mut self, op: Operation) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
+        let storage = self.db_pool.access_storage_fragile()?;
         let action = op.action.get_type();
 
         self.handle_executed_operations(

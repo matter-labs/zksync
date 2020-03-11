@@ -10,8 +10,7 @@
 
 #[macro_use]
 extern crate diesel;
-#[macro_use]
-extern crate log;
+use log::*;
 
 use bigdecimal::BigDecimal;
 use chrono::prelude::*;
@@ -26,10 +25,14 @@ use models::{fe_from_hex, fe_to_hex};
 use models::{Action, ActionType, EncodedProof, Operation, TokenAddedEvent};
 use serde_derive::{Deserialize, Serialize};
 use std::cmp;
+use std::ops::Deref;
 use std::time;
 use web3::types::H256;
 
+mod recoverable_connection;
 mod schema;
+
+use recoverable_connection::RecoverableConnection;
 
 use crate::schema::*;
 
@@ -50,15 +53,16 @@ use web3::types::Address;
 
 #[derive(Clone)]
 pub struct ConnectionPool {
-    pool: Pool<ConnectionManager<PgConnection>>,
+    pool: Pool<ConnectionManager<RecoverableConnection<PgConnection>>>,
 }
 
 impl ConnectionPool {
     pub fn new() -> Self {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let max_size = env::var("DB_POOL_SIZE").unwrap_or_else(|_| "10".to_string());
-        let max_size = max_size.parse().expect("DB_POOL_SIZE must be integer");
-        let manager = ConnectionManager::<PgConnection>::new(database_url);
+        let max_size = env::var("DB_POOL_SIZE")
+            .map(|size| size.parse().expect("DB_POOL_SIZE must be integer"))
+            .unwrap_or(10);
+        let manager = ConnectionManager::<RecoverableConnection<PgConnection>>::new(database_url);
         let pool = Pool::builder()
             .max_size(max_size)
             .build(manager)
@@ -67,8 +71,28 @@ impl ConnectionPool {
         Self { pool }
     }
 
+    /// Creates a `StorageProcessor` entity over a recoverable connection.
+    /// Upon a database outage connection will block the thread until
+    /// it will be able to recover the connection (or, if connection cannot
+    /// be restored after several retries, this will be considered as
+    /// irrecoverable database error and result in panic).
+    ///
+    /// This method is intended to be used in crucial contexts, where the
+    /// database access is must-have (e.g. block committer).
     pub fn access_storage(&self) -> Result<StorageProcessor, PoolError> {
         let connection = self.pool.get()?;
+        connection.deref().enable_retrying();
+
+        Ok(StorageProcessor::from_pool(connection))
+    }
+
+    /// Creates a `StorageProcessor` entity using non-recoverable connection, which
+    /// will not handle the database outages. This method is intended to be used in
+    /// non-crucial contexts, such as API endpoint handlers.
+    pub fn access_storage_fragile(&self) -> Result<StorageProcessor, PoolError> {
+        let connection = self.pool.get()?;
+        connection.deref().disable_retrying();
+
         Ok(StorageProcessor::from_pool(connection))
     }
 }
@@ -106,7 +130,7 @@ struct StorageBalance {
 pub struct Token {
     pub id: i32,
     pub address: String,
-    pub symbol: Option<String>,
+    pub symbol: String,
 }
 
 #[derive(Debug, Insertable)]
@@ -497,6 +521,7 @@ struct StorageBlock {
     fee_account_id: i64,
     unprocessed_prior_op_before: i64,
     unprocessed_prior_op_after: i64,
+    block_size: i64,
 }
 
 impl StoredOperation {
@@ -560,6 +585,7 @@ pub struct ActiveProver {
     pub worker: String,
     pub created_at: NaiveDateTime,
     pub stopped_at: Option<NaiveDateTime>,
+    pub block_size: i64,
 }
 
 #[derive(Debug, QueryableByName)]
@@ -583,6 +609,9 @@ pub struct BlockDetails {
 
     #[sql_type = "Text"]
     pub new_state_root: String,
+
+    #[sql_type = "BigInt"]
+    pub block_size: i64,
 
     #[sql_type = "Nullable<Text>"]
     pub commit_tx_hash: Option<String>,
@@ -713,8 +742,8 @@ pub struct AccountTransaction {
 }
 
 enum ConnectionHolder {
-    Pooled(PooledConnection<ConnectionManager<PgConnection>>),
-    Direct(PgConnection),
+    Pooled(PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>),
+    Direct(RecoverableConnection<PgConnection>),
 }
 
 pub struct StorageProcessor {
@@ -769,19 +798,21 @@ pub struct StoredAccountState {
 impl StorageProcessor {
     pub fn establish_connection() -> ConnectionResult<Self> {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let connection = PgConnection::establish(&database_url)?; //.expect(&format!("Error connecting to {}", database_url));
+        let connection = RecoverableConnection::establish(&database_url)?; //.expect(&format!("Error connecting to {}", database_url));
         Ok(Self {
             conn: ConnectionHolder::Direct(connection),
         })
     }
 
-    pub fn from_pool(conn: PooledConnection<ConnectionManager<PgConnection>>) -> Self {
+    pub fn from_pool(
+        conn: PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>,
+    ) -> Self {
         Self {
             conn: ConnectionHolder::Pooled(conn),
         }
     }
 
-    fn conn(&self) -> &PgConnection {
+    fn conn(&self) -> &RecoverableConnection<PgConnection> {
         match self.conn {
             ConnectionHolder::Pooled(ref conn) => conn,
             ConnectionHolder::Direct(ref conn) => conn,
@@ -826,6 +857,7 @@ impl StorageProcessor {
                 fee_account_id: i64::from(block.fee_account),
                 unprocessed_prior_op_before: block.processed_priority_ops.0 as i64,
                 unprocessed_prior_op_after: block.processed_priority_ops.1 as i64,
+                block_size: block.smallest_block_size() as i64,
             };
 
             diesel::insert_into(blocks::table)
@@ -934,11 +966,11 @@ impl StorageProcessor {
 
             let (tx_from, tx_to, tx_fee) = match tx_type {
                 "Withdraw" => (
-                    operation["tx"]["account"]
+                    operation["tx"]["from"]
                         .as_str()
                         .unwrap_or("unknown from")
                         .to_string(),
-                    operation["tx"]["ethAddress"]
+                    operation["tx"]["to"]
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
@@ -954,6 +986,17 @@ impl StorageProcessor {
                         .unwrap_or("unknown to")
                         .to_string(),
                     operation["tx"]["fee"].as_str().map(|v| v.to_string()),
+                ),
+                "ChangePubKeyOffchain" => (
+                    operation["tx"]["account"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["tx"]["newPkHash"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    None,
                 ),
                 &_ => (
                     "unknown from".to_string(),
@@ -999,11 +1042,11 @@ impl StorageProcessor {
 
             let (tx_from, tx_to, tx_fee) = match tx_type {
                 "Deposit" => (
-                    operation["priority_op"]["sender"]
+                    operation["priority_op"]["from"]
                         .as_str()
                         .unwrap_or("unknown from")
                         .to_string(),
-                    operation["priority_op"]["account"]
+                    operation["priority_op"]["to"]
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
@@ -1627,7 +1670,8 @@ impl StorageProcessor {
             )
             select
             	blocks.number as block_number,
-            	blocks.root_hash as new_state_root,
+                blocks.root_hash as new_state_root,
+                blocks.block_size as block_size,
             	commited.tx_hash as commit_tx_hash,
             	verified.tx_hash as verify_tx_hash,
             	commited.created_at as committed_at,
@@ -1834,31 +1878,35 @@ impl StorageProcessor {
 
     pub fn load_unverified_commits_after_block(
         &self,
-        block: i64,
+        block_size: usize,
+        block: BlockNumber,
         limit: i64,
     ) -> QueryResult<Vec<Operation>> {
         self.conn().transaction(|| {
             let ops: Vec<StoredOperation> = diesel::sql_query(format!(
                 "
-                SELECT * FROM operations
-                  WHERE action_type = 'COMMIT'
-                   AND block_number > (
-                     SELECT COALESCE(max(block_number), 0)
-                       FROM operations
-                       WHERE action_type = 'VERIFY'
-                   )
-                   AND block_number > {}
-                  LIMIT {}
-            ",
-                block, limit
+                WITH sized_operations AS (
+                    SELECT operations.* FROM operations
+                    LEFT JOIN blocks ON number = block_number
+                    LEFT JOIN proofs USING (block_number)
+                    WHERE proof IS NULL AND block_size = {}
+                )
+                SELECT * FROM sized_operations
+                WHERE action_type = 'COMMIT'
+                    AND block_number > (
+                        SELECT COALESCE(max(block_number), 0)
+                        FROM sized_operations
+                        WHERE action_type = 'VERIFY'
+                    )
+                    AND block_number > {}
+                ORDER BY block_number
+                LIMIT {}
+                ",
+                block_size, block, limit
             ))
             .load(self.conn())?;
             ops.into_iter().map(|o| o.into_op(self)).collect()
         })
-    }
-
-    pub fn load_unverified_commits(&self) -> QueryResult<Vec<Operation>> {
-        self.load_unverified_commits_after_block(0, 10e9 as i64)
     }
 
     fn get_account_and_last_block(
@@ -2056,20 +2104,26 @@ impl StorageProcessor {
         &self,
         worker_: &str,
         prover_timeout: time::Duration,
+        block_size: usize,
     ) -> QueryResult<Option<ProverRun>> {
         self.conn().transaction(|| {
             sql_query("LOCK TABLE prover_runs IN EXCLUSIVE MODE").execute(self.conn())?;
             let job: Option<BlockNumber> = diesel::sql_query(format!("
-                    SELECT min(block_number) as integer_value FROM operations o
+                WITH unsized_blocks AS (
+                    SELECT * FROM operations o
                     WHERE action_type = 'COMMIT'
-                    AND block_number >
-                        (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
-                    AND NOT EXISTS 
-                        (SELECT * FROM proofs WHERE block_number = o.block_number)
-                    AND NOT EXISTS
-                        (SELECT * FROM prover_runs 
-                            WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
-                ", prover_timeout.as_secs()))
+                        AND block_number >
+                            (SELECT COALESCE(max(block_number),0) FROM operations WHERE action_type = 'VERIFY')
+                        AND NOT EXISTS 
+                            (SELECT * FROM proofs WHERE block_number = o.block_number)
+                        AND NOT EXISTS
+                            (SELECT * FROM prover_runs 
+                                WHERE block_number = o.block_number AND (now() - updated_at) < interval '{} seconds')
+                )
+                SELECT min(block_number) AS integer_value FROM unsized_blocks
+                INNER JOIN blocks 
+                    ON unsized_blocks.block_number = blocks.number AND blocks.block_size = {}
+                ", prover_timeout.as_secs(), block_size))
                 .get_result::<Option<IntegerNumber>>(self.conn())?
                 .map(|i| i.integer_value as BlockNumber);
             if let Some(block_number_) = job {
@@ -2097,10 +2151,13 @@ impl StorageProcessor {
             .map(|_| ())
     }
 
-    pub fn register_prover(&self, worker_: &str) -> QueryResult<i32> {
+    pub fn register_prover(&self, worker_: &str, block_size_: usize) -> QueryResult<i32> {
         use crate::schema::active_provers::dsl::*;
         let inserted: ActiveProver = insert_into(active_provers)
-            .values(&vec![(worker.eq(worker_.to_string()))])
+            .values(&vec![(
+                worker.eq(worker_.to_string()),
+                block_size.eq(block_size_ as i64),
+            )])
             .get_result(self.conn())?;
         Ok(inserted.id)
     }
@@ -2146,11 +2203,11 @@ impl StorageProcessor {
         Ok(serde_json::from_value(stored.proof).unwrap())
     }
 
-    pub fn store_token(&self, id: TokenId, address: &str, symbol: Option<&str>) -> QueryResult<()> {
+    pub fn store_token(&self, id: TokenId, address: &str, symbol: &str) -> QueryResult<()> {
         let new_token = Token {
             id: i32::from(id),
             address: address.to_string(),
-            symbol: symbol.map(String::from),
+            symbol: symbol.to_string(),
         };
         diesel::insert_into(tokens::table)
             .values(&new_token)
@@ -2274,7 +2331,11 @@ impl StorageProcessor {
             self.update_block_events(block_events)?;
 
             for token in token_events.iter() {
-                self.store_token(token.id as u16, &format!("0x{:x}", token.address), None)?;
+                self.store_token(
+                    token.id as u16,
+                    &format!("0x{:x}", token.address),
+                    &format!("ERC20-{}", token.id),
+                )?;
             }
 
             self.update_last_watched_block_number(last_watched_eth_number)?;
