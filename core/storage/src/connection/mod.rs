@@ -12,7 +12,14 @@ use crate::StorageProcessor;
 pub mod holder;
 pub mod recoverable_connection;
 
-// TODO docstring
+/// Size of the pool to use in case of `DB_POOL_SIZE` variable not being set.
+const DEFAULT_POOL_SIZE: u32 = 10;
+
+/// `ConnectionPool` is a wrapper over a `diesel`s `Pool`, encapsulating
+/// the fixed size pool of connection to the database.
+///
+/// The size of the pool and the database URL are configured via environment
+/// variables `DB_POOL_SIZE` and `DATABASE_URL` respectively.
 #[derive(Clone)]
 pub struct ConnectionPool {
     pool: Pool<ConnectionManager<RecoverableConnection<PgConnection>>>,
@@ -25,11 +32,11 @@ impl fmt::Debug for ConnectionPool {
 }
 
 impl ConnectionPool {
+    /// Establishes a pool of the connections to the database and
+    /// creates a new `ConnectionPool` object.
     pub fn new() -> Self {
-        let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-        let max_size = env::var("DB_POOL_SIZE")
-            .map(|size| size.parse().expect("DB_POOL_SIZE must be integer"))
-            .unwrap_or(10);
+        let database_url = Self::get_database_url();
+        let max_size = Self::get_pool_max_size();
         let manager = ConnectionManager::<RecoverableConnection<PgConnection>>::new(database_url);
         let pool = Pool::builder()
             .max_size(max_size)
@@ -62,6 +69,19 @@ impl ConnectionPool {
         connection.deref().disable_retrying();
 
         Ok(StorageProcessor::from_pool(connection))
+    }
+
+    /// Obtains the database URL from the environment variable.
+    fn get_database_url() -> String {
+        env::var("DATABASE_URL").expect("DATABASE_URL must be set")
+    }
+
+    /// Obtains the pool max size from the environment variable (or uses
+    /// a default value, if the variable was not set).
+    fn get_pool_max_size() -> u32 {
+        env::var("DB_POOL_SIZE")
+            .map(|size| size.parse().expect("DB_POOL_SIZE must be integer"))
+            .unwrap_or(DEFAULT_POOL_SIZE)
     }
 }
 
