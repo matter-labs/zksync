@@ -114,11 +114,11 @@ export default {
                 return [];
 
             const link_from 
-                = this.txData.tx_type == 'Deposit' ? `${this.blockchain_explorer_address}/${this.txData.from}`
+                = this.txData.tx_type == 'Deposit' ? `${this.blockchainExplorerAddress}/${this.txData.from}`
                 : `${this.routerBase}accounts/${this.txData.from}`;
 
             const link_to 
-                = this.txData.tx_type == 'Withdraw' ? `${this.blockchain_explorer_address}/${this.txData.to}`
+                = this.txData.tx_type == 'Withdraw' ? `${this.blockchainExplorerAddress}/${this.txData.to}`
                 : `${this.routerBase}accounts/${this.txData.to}`;
 
             const onchain_from

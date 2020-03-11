@@ -1,13 +1,12 @@
 import config from './env-config';
-import constants from './constants';
+import * as constants from './constants';
 import { readableEther } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
 const zksync = require('zksync');   
-const ethers = require('ethers');
 import axios from 'axios';
 
 async function fetch(req) {
-    let r = await axios(req).catch(_ => ({}));
+    let r = await axios(req).catch(() => ({}));
     if (r.status == 200) {
         return r.data;
     } else {
@@ -48,6 +47,13 @@ export class Client {
         };
 
         return new Client(props);
+    }
+
+    async testnetConfig() {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/testnet_config`,
+        });
     }
 
     async status() {
@@ -183,8 +189,8 @@ export class Client {
                             { key: 'pq_id',       label: 'Priority op' },
                         ],
                         data: Object.assign(data, {
-                            from: tx.tx.priority_op.sender,
-                            to: tx.tx.priority_op.account,
+                            from: tx.tx.priority_op.from,
+                            to: tx.tx.priority_op.to,
                             pq_id: tx.pq_id,
                             token, amount,
                             hash,
@@ -237,8 +243,8 @@ export class Client {
                             { key: 'hash',        label: 'Tx hash' },
                         ],
                         data: Object.assign(data, {
-                            from: tx.tx.account,
-                            to: tx.tx.ethAddress,
+                            from: tx.tx.from,
+                            to: tx.tx.to,
                             token, amount,
                             hash: tx.hash,
                         }),

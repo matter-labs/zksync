@@ -51,7 +51,7 @@ new Vue({
                 })[currentNetwork]
                 || 'unknown';
 
-                let networkCorrect = this.config.ETH_NETWORK.toLowerCase() == net.toLowerCase();
+                let networkCorrect = this.currentLocationNetworkName.toLowerCase() == net.toLowerCase();
                 if (networkCorrect == false) {
                     if (router.currentRoute.path !== '/login') {
                         router.push('/login');

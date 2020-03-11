@@ -10,7 +10,6 @@
 node_modules
 yarn-error.log
 target
-env-config.js
 a.out 
 .gitconfig
 
