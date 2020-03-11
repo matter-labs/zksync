@@ -24,9 +24,6 @@ steps:
   settings:
     restore: true
     mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
 - name: init
@@ -60,7 +57,7 @@ steps:
   - zksync circuit-tests
   - zksync prover-tests
   - zksync db-test
-  - f cargo test
+  - f cargo test --release
   - cargo fmt -- --check
   - f cargo clippy --tests --benches -- -D warnings
   depends_on:
@@ -102,9 +99,6 @@ steps:
   settings:
     rebuild: true
     mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
   depends_on:
@@ -137,9 +131,6 @@ steps:
   settings:
     restore: true
     mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
 - name: preparations-for-integration-simple
@@ -229,9 +220,6 @@ steps:
   settings:
     restore: true
     mount:
-      - ./contracts/node_modules
-      - ./js/client/node_modules
-      - ./js/explorer/node_modules
       - ./target/cargo
       - ./keys
 

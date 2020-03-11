@@ -12,7 +12,7 @@ use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
     Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
 };
-use models::params::block_size_chunks;
+use models::params::max_block_chunk_size;
 use models::{ActionType, CommitRequest};
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
@@ -55,7 +55,7 @@ impl PendingBlock {
             success_operations: Vec::new(),
             failed_txs: Vec::new(),
             account_updates: Vec::new(),
-            chunks_left: block_size_chunks(),
+            chunks_left: max_block_chunk_size(),
             pending_op_block_index: 0,
             unprocessed_priority_op_before,
             pending_block_iteration: 0,
@@ -265,7 +265,7 @@ impl PlasmaStateKeeper {
         self.notify_executed_ops(&mut executed_ops).await;
     }
 
-    // None if there is no space in current block
+    // Err if there is no space in current block
     fn apply_priority_op(
         &mut self,
         priority_op: PriorityOp,
