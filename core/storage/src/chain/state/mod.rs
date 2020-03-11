@@ -30,6 +30,18 @@ pub mod records;
 /// This roughly includes the two main topics:
 /// - Account management (applying the diffs to the account map).
 /// - Block events (which blocks were committed/verified).
+///
+/// # Representation of the Sidechain State in the DB:
+///
+/// Saving state is done in two steps:
+/// 1. When the block is committed, we save all state updates
+///   (tables: `account_creates`, `account_balance_updates`)
+/// 2. Once the block is verified, we apply this updates to stored state snapshot
+///   (tables: `accounts`, `balances`)
+///
+/// This way we have the following advantages:
+/// - Easy access to state for any block (useful for provers which work on different blocks)
+/// - We can rewind any `committed` state (which is not final)
 #[derive(Debug)]
 pub struct StateSchema<'a>(pub &'a StorageProcessor);
 

@@ -1,12 +1,42 @@
-//! # Representation of the sidechain state in the DB:
+//! Storage crate provides the interfaces to interact with the database.
+//! The backend database used in this crate is `Postgres`, and interaction
+//! with it is based on the `diesel` crate.
 //!
-//! Saving state is done in two steps
-//! 1) When we commit block we save all state updates (tables: `account_creates`, `account_balance_updates`)
-//! 2) When we verify block we apply this updates to stored state snapshot (tables: `accounts`, `balances`)
+//! The essential structure of this crate is the `StorageProcessor`, which
+//! holds down the connection to the database and provides abstract interfaces
+//! to modify it (called `Schema`s).
 //!
-//! This way we have the following advantages:
-//! 1) Easy access to state for any block (useful for provers which work on different blocks)
-//! 2) We can rewind any `committed` state (which is not final)
+//! # Crate Architecture Overview
+//!
+//! This crate can be divided into three logical parts:
+//! - Connection utilities. Tools to establish connections to the database,
+//!   stored in the `connection` module.
+//! - `Schema`s. Schema is a logically extracted access to the part of
+//!   the database, e.g. `ethereum` (which contains methods to store the
+//!   information about interaction with the Ethereum blockchain).
+//! - `StorageProcessor`. A structure that connects the two points above
+//!   into one user-friendly interface.
+//!
+//! Most of schema modules contain at least two files:
+//! - `mod.rs`, which contains the schema itself.
+//! - `records.rs`, which contains the representation of the associated database
+//!   tables as structures.
+//!
+//! The latter ones usually don't contain any logic other than the structures
+//! declarations, and all the logic is contained in either schema (for most
+//! modules), or in an additional helper module (e.g. in the `chain/block` module).//!
+//!
+//! # Testing Approach
+//!
+//! Tests for the storage use the actual empty Postgres database.
+//! Because of that, these tests are disabled by default, to run them you must use
+//! `zksync db-test` (or `zksync db-test-no-reset`, if this is not a first run)
+//! command, which will setup the database and enable the tests by passing a feature flag.
+//!
+//! Tests are implemented in a form of "test transactions", which are database transactions
+//! that will never be committed. Thus it is not required to clear the database after running
+//! tests. Also the database used for tests is different than the database used for `server`,
+//! thus one should not fear to overwrite any important data by running the tests.
 
 #[macro_use]
 extern crate diesel;
@@ -45,6 +75,7 @@ pub struct StorageProcessor {
 }
 
 impl StorageProcessor {
+    /// Creates a `StorageProcessor` using an unique sole connection to the database.
     pub fn establish_connection() -> ConnectionResult<Self> {
         let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
         let connection = RecoverableConnection::establish(&database_url)?; //.expect(&format!("Error connecting to {}", database_url));
@@ -53,6 +84,9 @@ impl StorageProcessor {
         })
     }
 
+    /// Creates a `StorageProcessor` using a pool of connections.
+    /// This method borrows one of the connections from the pool, and releases it
+    /// after `drop`.
     pub fn from_pool(
         conn: PooledConnection<ConnectionManager<RecoverableConnection<PgConnection>>>,
     ) -> Self {
