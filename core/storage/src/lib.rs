@@ -24,7 +24,39 @@
 //!
 //! The latter ones usually don't contain any logic other than the structures
 //! declarations, and all the logic is contained in either schema (for most
-//! modules), or in an additional helper module (e.g. in the `chain/block` module).//!
+//! modules), or in an additional helper module (e.g. in the `chain/block` module).
+//!
+//! # Schema Hierarchy
+//!
+//! There are the following sets of schemas:
+//!
+//! - config, for the server config.
+//! - data_restore, for the data_restore crate.
+//! - ethereum, for the data associated with the Ethereum blockchain.
+//! - prover, for the data on prover jobs, proofs, etc.
+//! - tokens, for storing and loading known tokens.
+//! - chain - the biggest one, which includes several schemas for the ZKSync sidechain itself.
+//!
+//! The chain module includes the following schemas:
+//!
+//! - account, for storing and loading account data.
+//! - block, the main one, which implements the logic of the block creation.
+//! - mempool, the auxiliary wrapper over a mempool table.
+//! - operations, the transactions storage.
+//! - operations_ext, a set of getters for the operations, more specific and convenient to use than operations has.
+//! - state, basically the sidechain state manager (which includes the applying of the state changes).
+//! - stats, other auxiliary schema which provides additional getters for the database stats.
+//!
+//! If you have to add a method, and can't decide which schema it belongs to, use the following logic:
+//!
+//! 1. Will your method be used by different modules? If no (e.g. it'll be only used by `eth_sender` or `data_restore`),
+//!    then mind adding method to high-level schema (you may even create a new one, if it makes sense).
+//!    If yes, probably it affects the sidechain state, and you should choose one of the `chain` schemas.
+//! 2. Will your method be used by other schemas? If yes, choose one of the "low-level" schemas, like `operations,
+//!    or `account`.
+//! 3. Is your method is some form of convenient getter? If so, `operations_ext` may be suitable.
+//! 4. Otherwise, it probably should be in `block` (for high-level interaction), `state` (for ZKSync tables update that
+//!    are not low-level enough for other modules), or a new schema (if none of existing ones fit your needs).
 //!
 //! # Testing Approach
 //!
