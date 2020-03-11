@@ -44,7 +44,8 @@ where
     Conn: Connection,
     F: FnOnce() -> diesel::QueryResult<T>,
 {
-    conn.begin_test_transaction();
+    conn.begin_test_transaction()
+        .expect("Can't start a test transaction");
 
     f().expect("Test body returned an error:");
 }

@@ -31,7 +31,6 @@ fn operations() {
             .get_operation(block_number as u32, action_type)
             .expect("Can't get the operation");
 
-        assert_eq!(stored_operation.id, 1);
         assert_eq!(stored_operation.block_number, 1);
         assert_eq!(stored_operation.action_type, action_type.to_string());
         assert_eq!(stored_operation.confirmed, false);
@@ -70,7 +69,6 @@ fn executed_operations() {
             .get_executed_operation(executed_tx.tx_hash.as_ref())?
             .expect("No operation was found for a valid hash");
 
-        assert_eq!(stored_operation.id, 1);
         assert_eq!(stored_operation.block_number, executed_tx.block_number);
         assert_eq!(stored_operation.tx_hash, executed_tx.tx_hash);
         assert_eq!(stored_operation.operation, executed_tx.operation);
@@ -102,7 +100,6 @@ fn executed_priority_operations() {
             .get_executed_priority_operation(executed_tx.priority_op_serialid as u32)?
             .expect("No operation was found for a valid hash");
 
-        assert_eq!(stored_operation.id, 1);
         assert_eq!(stored_operation.block_number, executed_tx.block_number);
         assert_eq!(stored_operation.block_index, executed_tx.block_index);
         assert_eq!(stored_operation.operation, executed_tx.operation);
