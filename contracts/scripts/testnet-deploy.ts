@@ -33,25 +33,26 @@ async function main() {
 
     if (args.deploy) {
         let timer = Date.now();
-        await deployer.deployGovernance();
+        const governance = await deployer.deployGovernance();
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${governance.deployTransaction.hash}`);
+        console.log(`GOVERNANCE_ADDR=${governance.address}`);
         console.log(`Governance contract deployed, time: ${(Date.now() - timer) / 1000} secs`);
 
         timer = Date.now();
-        await deployer.deployPriorityQueue();
-        console.log(`Priority queue contract deployed, time: ${(Date.now() - timer) / 1000} secs`);
-
-        timer = Date.now();
-        await deployer.deployVerifier();
+        const verifier = await deployer.deployVerifier();
+        console.log(`VERIFIER_ADDR=${verifier.address}`);
         console.log(`Verifier contract deployed, time: ${(Date.now() - timer) / 1000} secs`);
 
         timer = Date.now();
-        await deployer.deployFranklin();
+        const mainContract = await deployer.deployFranklin();
+        console.log(`CONTRACT_GENESIS_TX_HASH=${mainContract.deployTransaction.hash}`);
+        console.log(`CONTRACT_ADDR=${mainContract.address}`);
         console.log(`Main contract deployed, time: ${(Date.now() - timer) / 1000} secs`);
 
-        const governance = await deployer.getDeployedContract('Governance');
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
 
         const erc20 = await addTestERC20Token(wallet, governance);
+        console.log("TEST_ERC20=" + erc20.address);
         await mintTestERC20Token(testWallet, erc20);
     }
 
@@ -60,14 +61,12 @@ async function main() {
             if (process.env.ETH_NETWORK === 'localhost') {
                 await Promise.all([
                     deployer.postContractToTesseracts("Governance"),
-                    deployer.postContractToTesseracts("PriorityQueue"),
                     deployer.postContractToTesseracts("Verifier"),
                     deployer.postContractToTesseracts("Franklin"),
                 ]);
             } else {
                 // sequentially, since etherscan has request limit
                 await deployer.publishSourceCodeToEtherscan("Governance");
-                await deployer.publishSourceCodeToEtherscan("PriorityQueue");
                 await deployer.publishSourceCodeToEtherscan("Verifier");
                 await deployer.publishSourceCodeToEtherscan("Franklin");
             }

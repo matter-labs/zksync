@@ -2533,22 +2533,6 @@ ethers@4.0.33, ethers@^4.0.0:
     uuid "2.0.1"
     xmlhttprequest "1.8.0"
 
-ethers@^4.0.33:
-  version "4.0.39"
-  resolved "https://registry.yarnpkg.com/ethers/-/ethers-4.0.39.tgz#5ce9dfffedb03936415743f63b37d96280886a47"
-  integrity sha512-QVtC8TTUgTrnlQjQvdFJ7fkSWKwp8HVTbKRmrdbVryrPzJHMTf3WSeRNvLF2enGyAFtyHJyFNnjN0fSshcEr9w==
-  dependencies:
-    "@types/node" "^10.3.2"
-    aes-js "3.0.0"
-    bn.js "^4.4.0"
-    elliptic "6.3.3"
-    hash.js "1.1.3"
-    js-sha3 "0.5.7"
-    scrypt-js "2.0.4"
-    setimmediate "1.0.4"
-    uuid "2.0.1"
-    xmlhttprequest "1.8.0"
-
 ethjs-abi@0.2.0:
   version "0.2.0"
   resolved "https://registry.yarnpkg.com/ethjs-abi/-/ethjs-abi-0.2.0.tgz#d3e2c221011520fc499b71682036c14fcc2f5b25"
@@ -7283,17 +7267,6 @@ yn@^3.0.0:
   resolved "https://registry.yarnpkg.com/yn/-/yn-3.1.1.tgz#1e87401a09d767c1d5eab26a6e4c185182d2eb50"
   integrity sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==
 
-zksync@^0.3.9:
-  version "0.3.10"
-  resolved "https://registry.yarnpkg.com/zksync/-/zksync-0.3.10.tgz#0666a2b2887c5ad84b777c4f1997392f17707eff"
-  integrity sha512-ZAsqo9FckFg2aSSVf/KqXZTlVX24rxF/edPDyrgOegqfILBLo3R9R650FlgMD12+/9R1BNjcEKT1fCA1DpvwbA==
-  dependencies:
-    axios "^0.19.0"
-    blake2b "^2.1.3"
-    bn.js "^5.0.0"
-    crypto-js "^3.1.9-1"
-    elliptic "^6.5.0"
-    ethers "^4.0.33"
-    js-sha256 "^0.9.0"
-    websocket "^1.0.30"
-    websocket-as-promised "^0.10.1"
+"zksync@link:../js/zksync.js":
+  version "0.0.0"
+  uid ""
