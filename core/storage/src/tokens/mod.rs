@@ -13,6 +13,7 @@ pub mod records;
 
 /// Tokens schema handles the `tokens` table, providing methods to
 /// get and store new tokens.
+#[derive(Debug)]
 pub struct TokensSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> TokensSchema<'a> {

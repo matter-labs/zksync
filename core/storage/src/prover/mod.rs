@@ -14,6 +14,7 @@ pub mod records;
 
 /// Prover schema is capable of handling the prover-related informations,
 /// such as started prover jobs, registered provers and proofs for blocks.
+#[derive(Debug)]
 pub struct ProverSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> ProverSchema<'a> {

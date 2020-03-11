@@ -27,6 +27,7 @@ pub mod records;
 /// which provides more getters for transactions.
 /// While `Operations` getters are very basic, `OperationsExt` schema can transform
 /// the data to be convenient for the caller.
+#[derive(Debug)]
 pub struct OperationsExtSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> OperationsExtSchema<'a> {

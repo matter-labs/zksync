@@ -30,6 +30,7 @@ pub mod records;
 /// This roughly includes the two main topics:
 /// - Account management (applying the diffs to the account map).
 /// - Block events (which blocks were committed/verified).
+#[derive(Debug)]
 pub struct StateSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> StateSchema<'a> {

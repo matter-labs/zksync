@@ -37,6 +37,7 @@ pub mod records;
 ///
 /// Besides block getters/setters, it provides an `execute_operation` method,
 /// which is essential for the sidechain logic, as it causes the state updates in the chain.
+#[derive(Debug)]
 pub struct BlockSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> BlockSchema<'a> {

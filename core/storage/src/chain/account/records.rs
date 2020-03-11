@@ -2,7 +2,7 @@
 use crate::schema::*;
 use bigdecimal::BigDecimal;
 
-#[derive(Identifiable, Insertable, QueryableByName, Queryable)]
+#[derive(Debug, Identifiable, Insertable, QueryableByName, Queryable)]
 #[table_name = "accounts"]
 pub struct StorageAccount {
     pub id: i64,
@@ -75,7 +75,7 @@ pub struct StorageAccountPubkeyUpdate {
     pub new_nonce: i64,
 }
 
-#[derive(Identifiable, Insertable, QueryableByName, Queryable, Associations)]
+#[derive(Debug, Identifiable, Insertable, QueryableByName, Queryable, Associations)]
 #[belongs_to(StorageAccount, foreign_key = "account_id")]
 #[primary_key(account_id, coin_id)]
 #[table_name = "balances"]

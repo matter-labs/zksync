@@ -16,6 +16,7 @@ pub mod records;
 /// Operations schema is capable of storing and loading the transactions.
 /// Every kind of transaction (non-executed, executed, and executed priority tx)
 /// can be either saved or loaded from the database.
+#[derive(Debug)]
 pub struct OperationsSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> OperationsSchema<'a> {

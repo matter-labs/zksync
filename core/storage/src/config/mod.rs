@@ -13,6 +13,7 @@ pub mod records;
 /// isn't expected to be writable within application.
 ///
 /// Currently config is added to ZKSync by the `db-insert-contract.sh` script.
+#[derive(Debug)]
 pub struct ConfigSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> ConfigSchema<'a> {

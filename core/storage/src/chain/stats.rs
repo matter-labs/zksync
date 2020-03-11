@@ -9,6 +9,7 @@ use crate::schema::*;
 use crate::StorageProcessor;
 
 /// Auxiliary schema encapsulating the stats counting logic for the storage tables.
+#[derive(Debug)]
 pub struct StatsSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> StatsSchema<'a> {

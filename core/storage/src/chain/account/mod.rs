@@ -19,6 +19,7 @@ pub use self::stored_state::StoredAccountState;
 
 /// Account schema contains interfaces to interact with the stored
 /// ZKSync accounts.
+#[derive(Debug)]
 pub struct AccountSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> AccountSchema<'a> {

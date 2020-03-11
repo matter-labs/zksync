@@ -21,6 +21,7 @@ pub mod records;
 /// Ethereum schema is capable of storing the information about the
 /// interaction with the Ethereum blockchain (mainly the list of sent
 /// Ethereum transactions).
+#[derive(Debug)]
 pub struct EthereumSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> EthereumSchema<'a> {
