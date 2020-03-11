@@ -1,6 +1,7 @@
 import BN = require("bn.js");
-import { utils, constants } from "ethers";
-import {TokenAddress, TokenLike, Tokens, TokenSymbol} from "./types";
+import {utils, constants, ethers} from "ethers";
+import {PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol} from "./types";
+import {serializeNonce} from "./signer";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -302,4 +303,10 @@ export class TokenSet {
     public resolveTokenSymbol(tokenLike: TokenLike): TokenSymbol {
         return this.resolveTokenObject(tokenLike).symbol;
     }
+}
+
+export async function signChangePubkeyMessage(signer: ethers.Signer, pubKeyHash: PubKeyHash, nonce: number): Promise<string> {
+    const msgNonce = serializeNonce(nonce).toString("hex").toLowerCase();
+    const message = `Register ZK Sync pubkey:\n\n${pubKeyHash.toLowerCase()} nonce: 0x${msgNonce}\n\nOnly sign this message for a trusted client!`;
+    return signer.signMessage(message);
 }

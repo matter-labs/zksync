@@ -19,6 +19,10 @@ contract BytesTest {
         bytes memory buf = Bytes.toBytesFromUInt24(x);
         (offset, r) = Bytes.readUInt24(buf, 0);
     }
-    
+
+    function bytesToHexConvert(bytes calldata _in) external pure returns (string memory) {
+        return string(Bytes.bytesToHexASCIIBytes(_in));
+    }
+
 }
 

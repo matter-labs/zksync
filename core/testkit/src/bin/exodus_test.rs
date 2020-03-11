@@ -348,19 +348,20 @@ fn exit_test() {
     );
     let verified_accounts_state = test_setup.get_accounts_state();
 
+    let expired_deposit_amount = parse_ether("0.3").unwrap();
     let expire_count_start_block = commit_deposit_to_expire(
         &mut test_setup,
         ETHAccountId(0),
         ZKSyncAccountId(1),
         Token(0),
-        &deposit_amount,
+        &expired_deposit_amount,
     );
     trigger_exodus(&test_setup, ETHAccountId(1), expire_count_start_block);
     cancel_outstanding_deposits(
         &test_setup,
         ETHAccountId(0),
         Token(0),
-        &deposit_amount,
+        &expired_deposit_amount,
         ETHAccountId(1),
     );
 
