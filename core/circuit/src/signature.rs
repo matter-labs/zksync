@@ -171,7 +171,7 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
     let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
     sig_msg_bits.resize(256, Boolean::constant(false));
 
-    let is_sig_verified = verify_sha256(
+    let is_sig_verified = is_sha256_signature_verified(
         cs.namespace(|| "musig sha256"),
         &sig_msg_bits,
         &signature,
@@ -179,7 +179,7 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         generator,
     )?;
 
-    //    let is_sig_verified = verify_pedersen(
+    //    let is_sig_verified = is_pedersen_signature_verified(
     //        cs.namespace(|| "musig pedersen"),
     //        &sig_msg_bits,
     //        &signature,
@@ -263,7 +263,7 @@ pub fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSyst
     Ok(is_serialized_transaction_correct)
 }
 
-pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
+pub fn is_pedersen_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     sig_data_bits: &[Boolean],
     signature: &EddsaSignature<E>,
@@ -336,7 +336,7 @@ pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(is_sig_verified)
 }
 
-pub fn verify_sha256<E: JubjubEngine, CS: ConstraintSystem<E>>(
+pub fn is_sha256_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     sig_data_bits: &[Boolean],
     signature: &EddsaSignature<E>,
