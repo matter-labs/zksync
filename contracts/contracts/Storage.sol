@@ -4,8 +4,7 @@ import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
 import "./Governance.sol";
 import "./Verifier.sol";
-import "./PriorityQueue.sol";
-
+import "./Operations.sol";
 
 /// @title zkSync storage contract
 /// @author Matter Labs

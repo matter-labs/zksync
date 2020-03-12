@@ -3,6 +3,8 @@ const { expect, use } = require("chai")
 const { createMockProvider, getWallets, solidity, deployContract } = require("ethereum-waffle");
 const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
 
+const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20");
+
 // For: geth
 
 // const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
@@ -28,12 +30,13 @@ async function deployTestContract(file) {
 
 async function getCallRevertReason(f) {
     let revertReason = "VM did not revert"
+    let result;
     try {
-        let r = await f()
+        result = await f();
     } catch(e) {
         revertReason = (e.reason && e.reason[0]) || e.results[e.hashes[0]].reason
     } 
-    return revertReason
+    return {revertReason, result};
 }
 
 module.exports = {
@@ -41,5 +44,6 @@ module.exports = {
     wallet,
     exitWallet,
     deployTestContract,
-    getCallRevertReason
+    getCallRevertReason,
+    IERC20_INTERFACE
 }

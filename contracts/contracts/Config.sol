@@ -36,7 +36,7 @@ contract Config {
     uint256 constant BASE_FULL_EXIT_GAS = 170000;
 
     /// @notice ETH blocks verification expectation
-    uint256 constant EXPECT_VERIFICATION_IN = 8 * 60 * 100;
+    uint256 constant EXPECT_VERIFICATION_IN = 2 * 4 * 60 * 24; // Two days
 
     /// @notice Max number of unverified blocks. To make sure that all reverted blocks can be copied under block gas limit!
     uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
@@ -55,6 +55,6 @@ contract Config {
     uint256 constant CHANGE_PUBKEY_BYTES = 6 * 8;
 
     /// @notice Expiration delta for priority request to be satisfied (in ETH blocks)
-    uint256 constant PRIORITY_EXPIRATION = 4 * 60 * 24; // One day
-
+    /// NOTE: Priority expiration should be > EXPECT_VERIFICATION_IN, otherwise incorrect block with priority op could not be reverted.
+    uint256 constant PRIORITY_EXPIRATION = 3 * 4 * 60 * 24; // Two days
 }
