@@ -274,7 +274,7 @@ impl<'a> BlockSchema<'a> {
             with eth_ops as ( \
                 select \
                     operations.block_number, \
-                    'sync-tx:' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash, \
+                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash, \
                     operations.action_type, \
                     operations.created_at \
                 from operations \
@@ -283,6 +283,7 @@ impl<'a> BlockSchema<'a> {
             select \
                 blocks.number as block_number, \
                 blocks.root_hash as new_state_root, \
+                blocks.block_size as block_size, \
                 committed.tx_hash as commit_tx_hash, \
                 verified.tx_hash as verify_tx_hash, \
                 committed.created_at as committed_at, \
