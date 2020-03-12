@@ -136,7 +136,6 @@ fn get_unique_operation(
     }
 }
 
-/*
 /// Checks that `find_block_by_height_or_hash` method allows
 /// to load the block details by either its height, hash of the included
 /// transaction, or the root hash of the block.
@@ -189,9 +188,10 @@ fn find_block_by_height_or_hash() {
             EthereumSchema(&conn).confirm_eth_tx(&eth_tx_hash)?;
 
             current_block_detail.block_number = operation.block.block_number as i64;
-            current_block_detail.new_state_root = operation.block.new_root_hash.to_hex();
+            current_block_detail.new_state_root =
+                format!("sync-bl:{}", operation.block.new_root_hash.to_hex());
             current_block_detail.block_size = operation.block.block_transactions.len() as i64;
-            current_block_detail.commit_tx_hash = Some(eth_tx_hash.to_string());
+            current_block_detail.commit_tx_hash = Some(format!("0x{}", hex::encode(eth_tx_hash)));
 
             if block_number <= n_verified {
                 ProverSchema(&conn).store_proof(block_number, &Default::default())?;
@@ -206,19 +206,20 @@ fn find_block_by_height_or_hash() {
 
                 let ethereum_op_id = verify_operation.id.unwrap() as i64;
                 let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
-                EthereumSchema(&conn).save_operation_eth_tx(
-                    ethereum_op_id,
-                    eth_tx_hash,
-                    100,
-                    100,
-                    100.into(),
-                    Default::default(),
-                )?;
 
                 // Do not add an ethereum confirmation for the last operation.
                 if block_number != n_verified {
+                    EthereumSchema(&conn).save_operation_eth_tx(
+                        ethereum_op_id,
+                        eth_tx_hash,
+                        100,
+                        100,
+                        100.into(),
+                        Default::default(),
+                    )?;
                     EthereumSchema(&conn).confirm_eth_tx(&eth_tx_hash)?;
-                    current_block_detail.verify_tx_hash = Some(eth_tx_hash.to_string());
+                    current_block_detail.verify_tx_hash =
+                        Some(format!("0x{}", hex::encode(eth_tx_hash)));
                 }
             }
 
@@ -270,7 +271,6 @@ fn find_block_by_height_or_hash() {
         Ok(())
     });
 }
-*/
 
 /// Checks that `load_block_range` method loads the range of blocks correctly.
 #[test]
@@ -280,7 +280,6 @@ fn block_range() {
     /// equal to the one obtained from `find_block_by_height_or_hash` method.
     fn check_block_range(
         conn: &StorageProcessor,
-        expected_outcome: &[BlockDetails],
         max_block: BlockNumber,
         limit: u32,
     ) -> diesel::QueryResult<()> {
@@ -292,12 +291,16 @@ fn block_range() {
         let block_range = BlockSchema(conn).load_block_range(max_block, limit)?;
         // Go in the reversed order, since the blocks themselves are ordered backwards.
         for (idx, block_number) in (start_block..=max_block).rev().enumerate() {
+            let expected = BlockSchema(&conn)
+                .find_block_by_height_or_hash(block_number.to_string())
+                .unwrap_or_else(|| {
+                    panic!(format!(
+                        "Can't load the existing block with the index {}",
+                        block_number
+                    ))
+                });
             let got = &block_range[idx];
-            let expected = &expected_outcome[block_number as usize - 1];
-            assert_eq!(got.block_number, expected.block_number);
-            assert_eq!(got.new_state_root, expected.new_state_root);
-            assert_eq!(got.commit_tx_hash, expected.commit_tx_hash);
-            assert_eq!(got.verify_tx_hash, expected.verify_tx_hash);
+            assert_eq!(got, &expected);
         }
 
         Ok(())
@@ -311,22 +314,8 @@ fn block_range() {
         let n_committed = 5;
         let n_verified = n_committed - 2;
 
-        let mut expected_outcome: Vec<BlockDetails> = Vec::new();
-
         // Create and apply several blocks to work with.
         for block_number in 1..=n_committed {
-            // Create blanked block detail object which we will fill
-            // with the relevant data and use for the comparison later.
-            let mut current_block_detail = BlockDetails {
-                block_number: 0,
-                new_state_root: Default::default(),
-                block_size: 0,
-                commit_tx_hash: None,
-                verify_tx_hash: None,
-                committed_at: chrono::NaiveDateTime::from_timestamp(0, 0),
-                verified_at: None,
-            };
-
             let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
             accounts_map = new_accounts_map;
 
@@ -345,12 +334,6 @@ fn block_range() {
                 100.into(),
                 Default::default(),
             )?;
-
-            current_block_detail.block_number = operation.block.block_number as i64;
-            current_block_detail.new_state_root =
-                format!("sync-bl:{}", operation.block.new_root_hash.to_hex());
-            current_block_detail.block_size = operation.block.block_transactions.len() as i64;
-            current_block_detail.commit_tx_hash = Some(format!("0x{}", hex::encode(eth_tx_hash)));
 
             if block_number <= n_verified {
                 ProverSchema(&conn).store_proof(block_number, &Default::default())?;
@@ -372,11 +355,7 @@ fn block_range() {
                     Default::default(),
                 )?;
                 EthereumSchema(&conn).confirm_eth_tx(&eth_tx_hash)?;
-                current_block_detail.verify_tx_hash =
-                    Some(format!("0x{}", hex::encode(eth_tx_hash)));
             }
-
-            expected_outcome.push(current_block_detail);
         }
 
         // Check the block range method given the various combinations of the limit and the end block.
@@ -391,7 +370,7 @@ fn block_range() {
         ];
 
         for (max_block, limit) in test_vector {
-            check_block_range(&conn, &expected_outcome, max_block, limit)?;
+            check_block_range(&conn, max_block, limit)?;
         }
 
         Ok(())
