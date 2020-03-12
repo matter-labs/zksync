@@ -1199,9 +1199,18 @@ impl<'a, E: JubjubEngine> FranklinCircuit<'a, E> {
             &cur.account.nonce,
             &op_data.pub_nonce,
         )?;
+        let no_nonce_overflow = no_nonce_overflow(
+            cs.namespace(|| "no nonce overflow"),
+            &cur.account.nonce.get_number(),
+        )?;
         let is_valid_first = multi_and(
             cs.namespace(|| "is_valid_first"),
-            &[tx_valid.clone(), is_first_chunk, is_pub_nonce_valid],
+            &[
+                tx_valid.clone(),
+                is_first_chunk,
+                is_pub_nonce_valid,
+                no_nonce_overflow,
+            ],
         )?;
 
         // update pub_key
