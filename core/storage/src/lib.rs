@@ -1110,7 +1110,7 @@ impl StorageProcessor {
                     on
                         tx_hash = hash
                     where
-                        'sync:' || encode(primary_account_address, 'hex') = '{address}'
+                        '0x:' || encode(primary_account_address, 'hex') = '{address}'
                         or
                         tx->>'to' = '{address}'
                     union all
@@ -1124,7 +1124,7 @@ impl StorageProcessor {
                     from 
                         executed_priority_operations
                     where 
-                        operation->'priority_op'->>'account' = '{address}') t
+                        operation->'priority_op'->>'from' = '{address}') t
                 order by
                     block_number desc
                 offset 
@@ -2224,6 +2224,14 @@ impl StorageProcessor {
             .order(tokens::id.asc())
             .load::<Token>(self.conn())?;
         Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
+    }
+
+    pub fn token_symbol_from_id(&self, token: TokenId) -> QueryResult<Option<String>> {
+        Ok(tokens::table
+            .find(i32::from(token))
+            .first::<Token>(self.conn())
+            .optional()?
+            .map(|t| t.symbol))
     }
 
     // Data restore part

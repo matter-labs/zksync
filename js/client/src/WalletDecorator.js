@@ -295,7 +295,7 @@ export class WalletDecorator {
     }
     async pendingWithdrawsAsRenderableList() {
         const contract = new Contract(
-            config.CONTRACT_ADDR, 
+            window.syncProvider.contractAddress.mainContract,
             franklin_abi.interface, 
             window.ethSigner
         );
@@ -420,7 +420,7 @@ export class WalletDecorator {
             yield info(`Transfer succeeded!`);
             return;
         } catch (e) {
-            console.log(e);
+            console.log(JSON.stringify(e, null, 2));
             yield error(`Sending transfer failed with ${e.message}`);
             return;
         }
@@ -454,7 +454,7 @@ export class WalletDecorator {
 
             yield info(`Withdraw succeeded!`);
         } catch (e) {
-            console.log('error in verboseWithdrawOffchain', e);
+            console.log(JSON.stringify(e, null, 2));
             yield combineMessages(
                 error(`Withdraw failed with ${e.message}`, { timeout: 7 }),
             );
@@ -471,7 +471,7 @@ export class WalletDecorator {
 
             yield info(`Completing withdraw...`);
             const contract = new Contract(
-                config.CONTRACT_ADDR, 
+                window.syncProvider.contractAddress.mainContract,
                 franklin_abi.interface, 
                 window.ethSigner
             );
