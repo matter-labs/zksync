@@ -330,7 +330,7 @@ fn block_range() {
             let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
             accounts_map = new_accounts_map;
 
-            let operation = BlockSchema(&conn).execute_operation(get_operation(
+            let operation = BlockSchema(&conn).execute_operation(get_unique_operation(
                 block_number,
                 Action::Commit,
                 updates,
@@ -354,7 +354,7 @@ fn block_range() {
 
             if block_number <= n_verified {
                 ProverSchema(&conn).store_proof(block_number, &Default::default())?;
-                let operation = BlockSchema(&conn).execute_operation(get_operation(
+                let operation = BlockSchema(&conn).execute_operation(get_unique_operation(
                     block_number,
                     Action::Verify {
                         proof: Default::default(),

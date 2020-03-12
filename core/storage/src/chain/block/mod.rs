@@ -239,13 +239,13 @@ impl<'a> BlockSchema<'a> {
                 blocks.number as block_number, \
                 blocks.root_hash as new_state_root, \
                 blocks.block_size as block_size, \
-                commited.tx_hash as commit_tx_hash, \
+                committed.tx_hash as commit_tx_hash, \
                 verified.tx_hash as verify_tx_hash, \
-                commited.created_at as committed_at, \
+                committed.created_at as committed_at, \
                 verified.created_at as verified_at \
             from blocks \
-            inner join eth_ops commited on \
-                commited.block_number = blocks.number and commited.action_type = 'COMMIT' \
+            inner join eth_ops committed on \
+                committed.block_number = blocks.number and committed.action_type = 'COMMIT' \
             left join eth_ops verified on \
                 verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
             where \
@@ -283,17 +283,17 @@ impl<'a> BlockSchema<'a> {
             select \
                 blocks.number as block_number, \
                 blocks.root_hash as new_state_root, \
-                commited.tx_hash as commit_tx_hash, \
+                committed.tx_hash as commit_tx_hash, \
                 verified.tx_hash as verify_tx_hash, \
-                commited.created_at as committed_at, \
+                committed.created_at as committed_at, \
                 verified.created_at as verified_at \
             from blocks \
-            inner join eth_ops commited on \
-                commited.block_number = blocks.number and commited.action_type = 'COMMIT' \
+            inner join eth_ops committed on \
+                committed.block_number = blocks.number and committed.action_type = 'COMMIT' \
             left join eth_ops verified on \
                 verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
             where false \
-                or lower(commited.tx_hash) = $1 \
+                or lower(committed.tx_hash) = $1 \
                 or lower(verified.tx_hash) = $1 \
                 or lower(blocks.root_hash) = $1 \
                 or blocks.number = {block_number} \
