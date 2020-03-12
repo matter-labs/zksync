@@ -142,6 +142,59 @@ fn get_unique_operation(
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn find_block_by_height_or_hash() {
+    /// The actual test check. It obtains the block details using
+    /// the `find_block_by_height_or_hash` method with different types of query,
+    /// and compares them against the provided sample.
+    fn check_find_block_by_height_or_hash(
+        conn: &StorageProcessor,
+        expected_block_detail: &BlockDetails,
+    ) -> diesel::QueryResult<()> {
+        let mut queries = vec![
+            expected_block_detail.block_number.to_string(),
+            expected_block_detail.new_state_root.clone(),
+            expected_block_detail
+                .commit_tx_hash
+                .as_ref()
+                .unwrap()
+                .clone(),
+        ];
+        if let Some(verify_tx_hash) = expected_block_detail.verify_tx_hash.as_ref() {
+            queries.push(verify_tx_hash.clone());
+        }
+
+        for query in queries {
+            let actual_block_detail = BlockSchema(&conn)
+                .find_block_by_height_or_hash(query.clone())
+                .unwrap_or_else(|| {
+                    panic!(format!(
+                        "Can't load the existing block with the index {} using query {}",
+                        expected_block_detail.block_number, query
+                    ))
+                });
+            assert_eq!(
+                actual_block_detail.block_number,
+                expected_block_detail.block_number
+            );
+            assert_eq!(
+                actual_block_detail.new_state_root,
+                expected_block_detail.new_state_root
+            );
+            assert_eq!(
+                actual_block_detail.commit_tx_hash,
+                expected_block_detail.commit_tx_hash
+            );
+            assert_eq!(
+                actual_block_detail.verify_tx_hash,
+                expected_block_detail.verify_tx_hash
+            );
+        }
+
+        Ok(())
+    }
+
+    // Below the initialization of the data for the test and collecting
+    // the reference block detail samples.
+
     let mut rng = create_rng();
 
     let conn = StorageProcessor::establish_connection().unwrap();
@@ -169,12 +222,15 @@ fn find_block_by_height_or_hash() {
             let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
             accounts_map = new_accounts_map;
 
+            // Store the operation in the block schema.
             let operation = BlockSchema(&conn).execute_operation(get_unique_operation(
                 block_number,
                 Action::Commit,
                 updates,
             ))?;
 
+            // Store & confirm the operation in the ethereum schema, as it's used for obtaining
+            // commit/verify hashes.
             let ethereum_op_id = operation.id.unwrap() as i64;
             let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
             EthereumSchema(&conn).save_operation_eth_tx(
@@ -187,12 +243,14 @@ fn find_block_by_height_or_hash() {
             )?;
             EthereumSchema(&conn).confirm_eth_tx(&eth_tx_hash)?;
 
+            // Initialize reference sample fields.
             current_block_detail.block_number = operation.block.block_number as i64;
             current_block_detail.new_state_root =
                 format!("sync-bl:{}", operation.block.new_root_hash.to_hex());
             current_block_detail.block_size = operation.block.block_transactions.len() as i64;
             current_block_detail.commit_tx_hash = Some(format!("0x{}", hex::encode(eth_tx_hash)));
 
+            // Add verification for the block if required.
             if block_number <= n_verified {
                 ProverSchema(&conn).store_proof(block_number, &Default::default())?;
                 let verify_operation =
@@ -223,50 +281,20 @@ fn find_block_by_height_or_hash() {
                 }
             }
 
+            // Store the sample.
             expected_outcome.push(current_block_detail);
         }
 
+        // Run the tests against the collected data.
         for expected_block_detail in expected_outcome {
-            let mut queries = vec![
-                expected_block_detail.block_number.to_string(),
-                expected_block_detail.new_state_root.clone(),
-                expected_block_detail
-                    .commit_tx_hash
-                    .as_ref()
-                    .unwrap()
-                    .clone(),
-            ];
-            if let Some(verify_tx_hash) = expected_block_detail.verify_tx_hash.as_ref() {
-                queries.push(verify_tx_hash.clone());
-            }
-
-            for query in queries {
-                let actual_block_detail = BlockSchema(&conn)
-                    .find_block_by_height_or_hash(query.clone())
-                    .unwrap_or_else(|| {
-                        panic!(format!(
-                            "Can't load the existing block with the index {} using query {}",
-                            expected_block_detail.block_number, query
-                        ))
-                    });
-                assert_eq!(
-                    actual_block_detail.block_number,
-                    expected_block_detail.block_number
-                );
-                assert_eq!(
-                    actual_block_detail.new_state_root,
-                    expected_block_detail.new_state_root
-                );
-                assert_eq!(
-                    actual_block_detail.commit_tx_hash,
-                    expected_block_detail.commit_tx_hash
-                );
-                assert_eq!(
-                    actual_block_detail.verify_tx_hash,
-                    expected_block_detail.verify_tx_hash
-                );
-            }
+            check_find_block_by_height_or_hash(&conn, &expected_block_detail)?;
         }
+
+        // Also check that we get `None` for non-existing block.
+        let query = 10000.to_string();
+        assert!(BlockSchema(&conn)
+            .find_block_by_height_or_hash(query)
+            .is_none());
 
         Ok(())
     });
@@ -306,6 +334,8 @@ fn block_range() {
         Ok(())
     }
 
+    // Below lies the initialization of the data for the test.
+
     let mut rng = create_rng();
 
     let conn = StorageProcessor::establish_connection().unwrap();
@@ -319,11 +349,15 @@ fn block_range() {
             let (new_accounts_map, updates) = apply_random_updates(accounts_map.clone(), &mut rng);
             accounts_map = new_accounts_map;
 
+            // Store the operation in the block schema.
             let operation = BlockSchema(&conn).execute_operation(get_unique_operation(
                 block_number,
                 Action::Commit,
                 updates,
             ))?;
+
+            // Store & confirm the operation in the ethereum schema, as it's used for obtaining
+            // commit/verify hashes.
             let ethereum_op_id = operation.id.unwrap() as i64;
             let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
             EthereumSchema(&conn).save_operation_eth_tx(
@@ -335,6 +369,7 @@ fn block_range() {
                 Default::default(),
             )?;
 
+            // Add verification for the block if required.
             if block_number <= n_verified {
                 ProverSchema(&conn).store_proof(block_number, &Default::default())?;
                 let operation = BlockSchema(&conn).execute_operation(get_unique_operation(
