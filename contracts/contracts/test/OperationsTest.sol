@@ -77,6 +77,18 @@ contract OperationsTest {
         require(x.tokenId == r.tokenId, "tokenId mismatch");
         require(x.amount == r.amount,   "amount mismatch");
     }
-    
+
+    function parseDepositFromPubdata(bytes calldata _pubdata) external pure returns (uint16 tokenId, uint128 amount, address owner) {
+        (, Operations.Deposit memory r) = Operations.readDepositPubdata(_pubdata, 0);
+        return (r.tokenId, r.amount, r.owner);
+    }
+
+    function parseFullExitFromPubdata(bytes calldata _pubdata) external pure returns (uint24 accountId, address owner, uint16 tokenId, uint128 amount) {
+        Operations.FullExit memory r = Operations.readFullExitPubdata(_pubdata, 0);
+        accountId = r.accountId;
+        owner = r.owner;
+        tokenId = r.tokenId;
+        amount = r.amount;
+    }
 }
 
