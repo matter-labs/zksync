@@ -87,6 +87,7 @@ describe("ZK priority queue ops unit tests", function () {
         const deployer = new Deployer(wallet, true);
         let verifierDeployedContract = await deployer.deployVerifier();
         let governanceDeployedContract = await deployer.deployGovernance();
+        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         zksyncContract = await deployContract(
             wallet,
             require('../../build/ZKSyncUnitTest'),
@@ -223,6 +224,7 @@ describe("ZK Sync withdraw unit tests", function () {
         const deployer = new Deployer(wallet, true);
         let verifierDeployedContract = await deployer.deployVerifier();
         let governanceDeployedContract = await deployer.deployGovernance();
+        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         zksyncContract = await deployContract(
             wallet,
             require('../../build/ZKSyncUnitTest'),
@@ -232,9 +234,11 @@ describe("ZK Sync withdraw unit tests", function () {
             });
         await governanceDeployedContract.setValidator(wallet.address, true);
         tokenContract = await addTestERC20Token(wallet, governanceDeployedContract);
-        incorrectTokenContract = await addTestNotApprovedERC20Token(wallet);
         await mintTestERC20Token(wallet, tokenContract);
         ethProxy = new ETHProxy(wallet.provider, {mainContract: zksyncContract.address, govContract: governanceDeployedContract.address});
+
+        incorrectTokenContract = await addTestNotApprovedERC20Token(wallet);
+        await mintTestERC20Token(wallet, tokenContract);
     });
 
     async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
@@ -355,12 +359,12 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
 
     let zksyncContract;
     let tokenContract;
-    let incorrectTokenContract;
     let ethProxy;
     before(async () => {
         const deployer = new Deployer(wallet, true);
         let verifierDeployedContract = await deployer.deployVerifier();
         let governanceDeployedContract = await deployer.deployGovernance();
+        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         zksyncContract = await deployContract(
             wallet,
             require('../../build/ZKSyncUnitTest'),
@@ -370,7 +374,6 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
             });
         await governanceDeployedContract.setValidator(wallet.address, true);
         tokenContract = await addTestERC20Token(wallet, governanceDeployedContract);
-        incorrectTokenContract = await addTestNotApprovedERC20Token(wallet);
         await mintTestERC20Token(wallet, tokenContract);
         ethProxy = new ETHProxy(wallet.provider, {mainContract: zksyncContract.address, govContract: governanceDeployedContract.address});
     });
@@ -433,6 +436,7 @@ describe("ZK Sync test process next operation", function () {
         const deployer = new Deployer(wallet, true);
         let verifierDeployedContract = await deployer.deployVerifier();
         let governanceDeployedContract = await deployer.deployGovernance();
+        process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         zksyncContract = await deployContract(
             wallet,
             require('../../build/ZKSyncUnitTest'),
@@ -442,7 +446,6 @@ describe("ZK Sync test process next operation", function () {
             });
         await governanceDeployedContract.setValidator(wallet.address, true);
         tokenContract = await addTestERC20Token(wallet, governanceDeployedContract);
-        incorrectTokenContract = await addTestNotApprovedERC20Token(wallet);
         await mintTestERC20Token(wallet, tokenContract);
         ethProxy = new ETHProxy(wallet.provider, {mainContract: zksyncContract.address, govContract: governanceDeployedContract.address});
     });

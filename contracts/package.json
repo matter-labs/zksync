@@ -32,7 +32,7 @@
     "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
     "itest": "yarn build && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
     "unit-test": "yarn build && mocha -r ts-node/register test/unit_tests/**/*",
-    "unit-test-watch": "yarn build && mocha -r ts-node/register test/unit_tests/**/* --watch --watch-extensions ts --watch-extensions 'js'",
+    "unit-test-watch": "waffle .waffle.json && mocha -r ts-node/register test/unit_tests/**/* --watch --watch-extensions ts --watch-extensions 'js'",
     "deploy": "yarn build && ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-no-build": "ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-test-no-build": "ts-node scripts/testnet-deploy.ts --deploy --test",
