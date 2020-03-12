@@ -74,8 +74,8 @@ contract Upgradeable is Ownable {
     /// @param newTargetInitializationParameters New target initialization parameters
     function finishTargetUpgrade(address newTarget, bytes calldata newTargetInitializationParameters) external {
         requireMaster(msg.sender);
-        setTarget(newTarget);
 
+        setTarget(newTarget);
         (bool initializationSuccess, ) = getTarget().delegatecall(
             abi.encodeWithSignature("initialize(bytes)", newTargetInitializationParameters)
         );

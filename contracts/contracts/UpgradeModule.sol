@@ -37,9 +37,9 @@ contract UpgradeModule is UpgradeEvents, Ownable {
         /// @dev Will store zero in case of not active upgrade mode
         address nextTarget;
 
-        /// @notice Number of priority requests that must be verified at the time of finishing upgrade
+        /// @notice Number of priority operations that must be verified at the time of finishing upgrade
         /// @dev Will store zero in case of not active finalize status of upgrade mode
-        uint64 priorityRequestsToProcessBeforeUpgrade;
+        uint64 priorityOperationsToProcessBeforeUpgrade;
     }
 
     /// @notice UpgradeInfo per each proxy
@@ -67,7 +67,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
         upgradeInfo[proxyAddress].upgradeStatus = UpgradeModule.UpgradeStatus.WaitUpgrade;
         upgradeInfo[proxyAddress].activationTime = now;
         upgradeInfo[proxyAddress].nextTarget = newTarget;
-        upgradeInfo[proxyAddress].priorityRequestsToProcessBeforeUpgrade = 0;
+        upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
 
         emit UpgradeModeActivated(proxyAddress, version[proxyAddress]);
     }
@@ -84,7 +84,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
         upgradeInfo[proxyAddress].upgradeStatus = UpgradeModule.UpgradeStatus.NotActive;
         upgradeInfo[proxyAddress].activationTime = 0;
         upgradeInfo[proxyAddress].nextTarget = address(0);
-        upgradeInfo[proxyAddress].priorityRequestsToProcessBeforeUpgrade = 0;
+        upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
 
         emit UpgradeCanceled(proxyAddress, version[proxyAddress]);
     }
@@ -113,7 +113,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
                 "uaf12"
             ); // uaf12 - main contract static call failed
             uint64 registeredPriorityOperations = abi.decode(encodedResult, (uint64));
-            upgradeInfo[proxyAddress].priorityRequestsToProcessBeforeUpgrade = registeredPriorityOperations;
+            upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = registeredPriorityOperations;
 
             emit UpgradeModeFinalizeStatusActivated(proxyAddress, version[proxyAddress]);
             return true;
@@ -143,7 +143,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
         uint64 verifiedPriorityOperations = abi.decode(encodedResult, (uint64));
 
         require(
-            verifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityRequestsToProcessBeforeUpgrade,
+            verifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade,
             "umf13"
         ); // umf13 - can't finish upgrade before verifing all priority operations received before start of finalize status
 
@@ -155,7 +155,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
         upgradeInfo[proxyAddress].upgradeStatus = UpgradeModule.UpgradeStatus.NotActive;
         upgradeInfo[proxyAddress].activationTime = 0;
         upgradeInfo[proxyAddress].nextTarget = address(0);
-        upgradeInfo[proxyAddress].priorityRequestsToProcessBeforeUpgrade = 0;
+        upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
     }
 
 }
