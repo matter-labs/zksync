@@ -260,8 +260,8 @@ impl<'a> BlockSchema<'a> {
     }
 
     /// Performs a database search with an uncertain query, which can be either of:
-    /// - Hash of the transaction included in the block.
-    /// - The root hash of the block.
+    /// - Hash of commit/verify Ethereum transaction for the block.
+    /// - The state root hash of the block.
     /// - The number of the block.
     ///
     /// Will return `None` if the query is malformed or there is no block that matches

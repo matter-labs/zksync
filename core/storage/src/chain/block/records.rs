@@ -17,7 +17,7 @@ pub struct StorageBlock {
     pub block_size: i64,
 }
 
-#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+#[derive(Debug, Serialize, Deserialize, QueryableByName, PartialEq)]
 pub struct BlockDetails {
     #[sql_type = "BigInt"]
     pub block_number: i64,
