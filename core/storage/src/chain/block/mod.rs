@@ -224,6 +224,12 @@ impl<'a> BlockSchema<'a> {
         max_block: BlockNumber,
         limit: u32,
     ) -> QueryResult<Vec<BlockDetails>> {
+        // This query does the following:
+        // - joins the `operations` and `eth_operations` tables to collect the data:
+        //   block number, ethereum transaction hash, action type and action creation timestamp;
+        // - joins the `blocks` table with result of the join twice: once for committed operations
+        //   and verified operations;
+        // - collects the {limit} blocks in the descending order with the data gathered above.
         let query = format!(
             " \
             with eth_ops as ( \
@@ -269,6 +275,16 @@ impl<'a> BlockSchema<'a> {
     pub fn find_block_by_height_or_hash(&self, query: String) -> Option<BlockDetails> {
         let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
         let l_query = query.to_lowercase();
+        // This query does the following:
+        // - joins the `operations` and `eth_operations` tables to collect the data:
+        //   block number, ethereum transaction hash, action type and action creation timestamp;
+        // - joins the `blocks` table with result of the join twice: once for committed operations
+        //   and verified operations;
+        // - takes the only block that satisfies one of the following criteria
+        //   + query equals to the ETH commit transaction hash (in form of `0x00{..}00`);
+        //   + query equals to the ETH verify transaction hash (in form of `0x00{..}00`);
+        //   + query equals to the state hash obtained in the block (in form of `sync-bl:00{..}00`);
+        //   + query equals to the number of the block.
         let sql_query = format!(
             " \
             with eth_ops as ( \
