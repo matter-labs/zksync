@@ -103,8 +103,7 @@ fn ethereum_storage() {
 
         // Store operation with ID 1.
         let block_number = 1;
-        let operation = get_operation(block_number);
-        let operation = BlockSchema(&conn).execute_operation(operation.clone())?;
+        let operation = BlockSchema(&conn).execute_operation(get_operation(block_number))?;
 
         // Store the Ethereum transaction.
         let params = EthereumTxParams::new(operation.id.unwrap(), 1);
