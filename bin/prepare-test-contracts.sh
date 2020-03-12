@@ -14,9 +14,6 @@ cp $IN_DIR/Verifier.sol $OUT_DIR/VerifierTest.sol
 cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTest.sol
 cp $IN_DIR/Storage.sol $OUT_DIR/StorageTest.sol
 cp $IN_DIR/Config.sol $OUT_DIR/ConfigTest.sol
-cp $IN_DIR/Ownable.sol $OUT_DIR/OwnableTest.sol
-cp $IN_DIR/Upgradeable.sol $OUT_DIR/UpgradeableTest.sol
-cp $IN_DIR/Proxy.sol $OUT_DIR/ProxyTest.sol
 cp $IN_DIR/UpgradeModule.sol $OUT_DIR/UpgradeModuleTest.sol
 cp $IN_DIR/Bytes.sol $OUT_DIR/Bytes.sol
 cp $IN_DIR/Events.sol $OUT_DIR/Events.sol
@@ -31,17 +28,7 @@ ssed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
 ssed 's/Franklin/FranklinTest/' -i $OUT_DIR/*.sol
 ssed 's/Storage/StorageTest/' -i $OUT_DIR/*.sol
 ssed 's/Config/ConfigTest/' -i $OUT_DIR/*.sol
-ssed 's/Ownable/OwnableTest/' -i $OUT_DIR/*.sol
-ssed 's/Upgradeable/UpgradeableTest/' -i $OUT_DIR/*.sol
-ssed 's/Proxy/ProxyTest/' -i $OUT_DIR/*.sol
 ssed 's/UpgradeModule/UpgradeModuleTest/' -i $OUT_DIR/*.sol
-# Workaround -> ownable and upgradeable has Storage in comments.
-ssed 's/StorageTest/Storage/' -i $OUT_DIR/OwnableTest.sol
-ssed 's/StorageTest/Storage/' -i $OUT_DIR/UpgradeableTest.sol
-# Workaround -> upgrade module has Proxy in method name.
-ssed 's/upgradeProxyTest/upgradeProxy/' -i $OUT_DIR/UpgradeModuleTest.sol
-ssed 's/cancelProxyTestUpgrade/cancelProxyUpgrade/' -i $OUT_DIR/UpgradeModuleTest.sol
-ssed 's/finishProxyTestUpgrade/finishProxyUpgrade/' -i $OUT_DIR/UpgradeModuleTest.sol
 
 
 # Changes solidity constant to provided value
