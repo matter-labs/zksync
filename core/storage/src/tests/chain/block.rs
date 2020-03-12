@@ -411,3 +411,70 @@ fn block_range() {
         Ok(())
     });
 }
+
+/// Tests for the `load_unverified_commits_after_block` method.
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn load_unverified_commits_after_block() {
+    let _ = env_logger::try_init();
+    let mut rng = create_rng();
+
+    let block_size = Block::smallest_block_size_for_chunks(0);
+
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        // Create the input data for three blocks.
+        // Data for the next block is based on previous block data.
+        let mut operations = Vec::new();
+        let mut accounts = AccountMap::default();
+        for block_id in 1..=3 {
+            let (new_accounts, updates) = apply_random_updates(accounts.clone(), &mut rng);
+            accounts = new_accounts;
+            let operation = BlockSchema(&conn).execute_operation(get_operation(
+                block_id,
+                Action::Commit,
+                updates,
+            ))?;
+
+            operations.push(operation);
+        }
+
+        // Add proofs for the first block.
+        ProverSchema(&conn).store_proof(1, &Default::default())?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            1,
+            Action::Verify {
+                proof: Default::default(),
+            },
+            Vec::new(),
+        ))?;
+
+        // Now test the method.
+        let empty_vec = vec![];
+        let test_vector = vec![
+            // Blocks 2 & 3.
+            ((1, 2), &operations[1..3]),
+            // Block 2.
+            ((1, 1), &operations[1..2]),
+            // Block 3.
+            ((2, 1), &operations[2..3]),
+            // No block (there are no unverified blocks AFTER block 3.
+            ((3, 1), &empty_vec),
+            // Obviously none.
+            ((4, 100), &empty_vec),
+        ];
+
+        for ((block, limit), expected_slice) in test_vector {
+            let unverified_commits =
+                BlockSchema(&conn).load_unverified_commits_after_block(block_size, block, limit)?;
+
+            assert_eq!(unverified_commits.len(), expected_slice.len());
+
+            for (expected, got) in expected_slice.iter().zip(unverified_commits) {
+                assert_eq!(expected.id, got.id);
+            }
+        }
+
+        Ok(())
+    });
+}
