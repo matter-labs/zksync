@@ -3,9 +3,7 @@ use crate::element::{CircuitElement, CircuitPubkey};
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::baby_eddsa::EddsaSignature;
-use crate::franklin_crypto::circuit::boolean::{
-    field_into_boolean_vec_le, le_bits_into_le_bytes, AllocatedBit, Boolean,
-};
+use crate::franklin_crypto::circuit::boolean::{le_bits_into_le_bytes, AllocatedBit, Boolean};
 use crate::franklin_crypto::circuit::ecc;
 use crate::operation::SignatureData;
 use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
@@ -15,7 +13,7 @@ use crate::franklin_crypto::circuit::pedersen_hash;
 use crate::franklin_crypto::circuit::sha256;
 use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::params as franklin_constants;
-use models::params::FR_BIT_WIDTH_PADDED;
+use models::params::{FR_BIT_WIDTH, FR_BIT_WIDTH_PADDED};
 
 /// Max len of message for signature, we use Pedersen hash to compress message to this len before signing.
 const MAX_SIGN_MESSAGE_BIT_WIDTH: usize = 256;
@@ -358,18 +356,18 @@ pub fn is_sha256_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
     let mut hash_input: Vec<Boolean> = vec![];
     {
-        let mut pk_x_serialized = field_into_boolean_vec_le(
-            cs.namespace(|| "pk_x_bits"),
-            signature.pk.get_x().get_value(),
-        )?;
+        let mut pk_x_serialized = signature
+            .pk
+            .get_x()
+            .into_bits_le_fixed(cs.namespace(|| "pk_x_bits"), FR_BIT_WIDTH)?;
         pk_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
         hash_input.extend(le_bits_into_le_bytes(pk_x_serialized));
     }
     {
-        let mut r_x_serialized = field_into_boolean_vec_le(
-            cs.namespace(|| "r_x_bits"),
-            signature.r.get_x().get_value(),
-        )?;
+        let mut r_x_serialized = signature
+            .r
+            .get_x()
+            .into_bits_le_fixed(cs.namespace(|| "r_x_bits"), FR_BIT_WIDTH)?;
         r_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
         hash_input.extend(le_bits_into_le_bytes(r_x_serialized));
     }
@@ -408,7 +406,9 @@ where
     // message is always padded to 256 bits in this gadget, but still checked on synthesis
     assert!(message.len() <= max_message_len * 8);
 
-    let scalar_bits = signature.s.into_bits_le(cs.namespace(|| "Get S bits"))?;
+    let scalar_bits = signature
+        .s
+        .into_bits_le_fixed(cs.namespace(|| "Get S bits"), E::Fs::NUM_BITS as usize)?;
 
     let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits, params)?;
 
