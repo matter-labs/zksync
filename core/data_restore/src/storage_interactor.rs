@@ -14,8 +14,7 @@ use models::TokenAddedEvent;
 use models::{Action, EncodedProof, Operation};
 use storage::{
     chain::state::records::{NewBlockEvent, StoredBlockEvent},
-    data_restore::records::StoredRollupOpsBlock,
-    ethereum::records::NewLastWatchedEthBlockNumber,
+    data_restore::records::{NewLastWatchedEthBlockNumber, StoredRollupOpsBlock},
     ConnectionPool,
 };
 
@@ -227,7 +226,7 @@ pub fn get_last_watched_block_number_from_storage(connection_pool: &ConnectionPo
     let storage = connection_pool.access_storage().expect("db failed");
 
     let last_watched_block_number_string = storage
-        .ethereum_schema()
+        .data_restore_schema()
         .load_last_watched_block_number()
         .expect("Cant load last watched block number")
         .block_number;
