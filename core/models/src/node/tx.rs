@@ -116,7 +116,7 @@ impl Transfer {
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
+        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -158,7 +158,7 @@ impl Withdraw {
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
+        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -186,7 +186,7 @@ impl Close {
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_pedersen(&self.get_bytes()) {
+        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None

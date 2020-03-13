@@ -83,12 +83,26 @@ export class Wallet {
             fee: transfer.fee,
             nonce
         };
+
+        const stringAmount = utils.formatEther(transfer.amount);
+        const stringFee = utils.formatEther(transfer.fee);
+        const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
+            transfer.token
+        );
+        const humanReadableTxInfo = `Transfer ${stringAmount} ${stringToken}\n`
+            + `To: ${transfer.to.toLowerCase()}\n`
+            + `Nonce: ${nonce}\n`
+            + `Fee: ${stringFee} ${stringToken}`;
+
+        const txMessageEthSignature = await this.ethSigner.signMessage(humanReadableTxInfo);
+
         const signedTransferTransaction = this.signer.signSyncTransfer(
             transactionData
         );
 
         const transactionHash = await this.provider.submitTx(
-            signedTransferTransaction
+            signedTransferTransaction,
+            txMessageEthSignature,
         );
         return new Transaction(
             signedTransferTransaction,
@@ -123,12 +137,26 @@ export class Wallet {
             fee: withdraw.fee,
             nonce
         };
+
+        const stringAmount = utils.formatEther(withdraw.amount);
+        const stringFee = utils.formatEther(withdraw.fee);
+        const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
+            withdraw.token
+        );
+        const humanReadableTxInfo = `Withdraw ${stringAmount} ${stringToken}\n`
+            + `To: ${withdraw.ethAddress.toLowerCase()}\n`
+            + `Nonce: ${nonce}\n`
+            + `Fee: ${stringFee} ${stringToken}`;
+        
+        const txMessageEthSignature = await this.ethSigner.signMessage(humanReadableTxInfo);
+
         const signedWithdrawTransaction = this.signer.signSyncWithdraw(
             transactionData
         );
 
         const submitResponse = await this.provider.submitTx(
-            signedWithdrawTransaction
+            signedWithdrawTransaction,
+            txMessageEthSignature,
         );
         return new Transaction(
             signedWithdrawTransaction,

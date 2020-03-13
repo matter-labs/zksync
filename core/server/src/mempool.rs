@@ -28,7 +28,7 @@ use storage::ConnectionPool;
 use tokio::runtime::Runtime;
 use web3::types::Address;
 
-#[derive(Debug, Serialize, Deserialize, Fail)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Fail)]
 pub enum TxAddError {
     #[fail(display = "Tx nonce is too low.")]
     NonceMismatch,

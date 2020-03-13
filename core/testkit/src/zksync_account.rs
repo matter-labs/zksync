@@ -83,7 +83,7 @@ impl ZksyncAccount {
             signature: TxSignature::default(),
         };
         transfer.signature =
-            TxSignature::sign_musig_pedersen(&self.private_key, &transfer.get_bytes());
+            TxSignature::sign_musig_sha256(&self.private_key, &transfer.get_bytes());
 
         if increment_nonce {
             *stored_nonce += 1;
@@ -111,7 +111,7 @@ impl ZksyncAccount {
             signature: TxSignature::default(),
         };
         withdraw.signature =
-            TxSignature::sign_musig_pedersen(&self.private_key, &withdraw.get_bytes());
+            TxSignature::sign_musig_sha256(&self.private_key, &withdraw.get_bytes());
 
         if increment_nonce {
             *stored_nonce += 1;

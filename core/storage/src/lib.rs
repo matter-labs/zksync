@@ -132,6 +132,14 @@ impl StorageProcessor {
         chain::ChainIntermediator(self)
     }
 
+    pub fn token_symbol_from_id(&self, token: TokenId) -> QueryResult<Option<String>> {
+        Ok(tokens::table
+            .find(i32::from(token))
+            .first::<Token>(self.conn())
+            .optional()?
+            .map(|t| t.symbol))
+    }
+
     /// Gains access to the `Config` schema.
     pub fn config_schema(&self) -> config::ConfigSchema<'_> {
         config::ConfigSchema(self)
