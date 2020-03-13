@@ -1,6 +1,5 @@
 // External imports
 use bigdecimal::BigDecimal;
-use serde_derive::{Deserialize, Serialize};
 // Workspace imports
 // Local imports
 use crate::schema::*;
@@ -27,17 +26,4 @@ pub struct NewETHOperation {
     pub gas_price: BigDecimal,
     pub tx_hash: Vec<u8>,
     pub raw_tx: Vec<u8>,
-}
-
-#[derive(Debug, Insertable, PartialEq)]
-#[table_name = "data_restore_last_watched_eth_block"]
-pub struct NewLastWatchedEthBlockNumber {
-    pub block_number: String,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, Queryable, QueryableByName, PartialEq)]
-#[table_name = "data_restore_last_watched_eth_block"]
-pub struct StoredLastWatchedEthBlockNumber {
-    pub id: i32,
-    pub block_number: String,
 }

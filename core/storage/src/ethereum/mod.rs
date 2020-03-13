@@ -8,10 +8,7 @@ use web3::types::H256;
 // Workspace imports
 use models::Operation;
 // Local imports
-use self::records::{
-    NewETHOperation, NewLastWatchedEthBlockNumber, StorageETHOperation,
-    StoredLastWatchedEthBlockNumber,
-};
+use self::records::{NewETHOperation, StorageETHOperation};
 use crate::chain::operations::records::StoredOperation;
 use crate::schema::*;
 use crate::StorageProcessor;
@@ -129,24 +126,5 @@ impl<'a> EthereumSchema<'a> {
                 .execute(self.0.conn())
                 .map(drop)
         })
-    }
-
-    /// Stores the last seen Ethereum block number.
-    pub(crate) fn update_last_watched_block_number(
-        &self,
-        number: &NewLastWatchedEthBlockNumber,
-    ) -> QueryResult<()> {
-        self.0.conn().transaction(|| {
-            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.0.conn())?;
-            diesel::insert_into(data_restore_last_watched_eth_block::table)
-                .values(number)
-                .execute(self.0.conn())?;
-            Ok(())
-        })
-    }
-
-    /// Loads the last seen Ethereum block number.
-    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
-        data_restore_last_watched_eth_block::table.first(self.0.conn())
     }
 }

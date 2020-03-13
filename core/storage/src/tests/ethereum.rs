@@ -10,10 +10,7 @@ use models::{
 use crate::tests::db_test;
 use crate::{
     chain::block::BlockSchema,
-    ethereum::{
-        records::{NewLastWatchedEthBlockNumber, StorageETHOperation},
-        EthereumSchema,
-    },
+    ethereum::{records::StorageETHOperation, EthereumSchema},
     StorageProcessor,
 };
 
@@ -151,41 +148,6 @@ fn ethereum_storage() {
         // Now there should be no unconfirmed transactions.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
         assert!(unconfirmed_operations.is_empty());
-
-        Ok(())
-    });
-}
-
-/// Checks that storing and loading the last watched block number
-/// works as expected.
-#[test]
-#[cfg_attr(not(feature = "db_test"), ignore)]
-fn last_watched_block() {
-    let conn = StorageProcessor::establish_connection().unwrap();
-    db_test(conn.conn(), || {
-        // Check that by default we can't obtain the block number.
-        let last_watched_block_number = EthereumSchema(&conn).load_last_watched_block_number();
-        assert!(
-            last_watched_block_number.is_err(),
-            "There should be no stored block number in the database"
-        );
-
-        // Store the block number.
-        EthereumSchema(&conn).update_last_watched_block_number(&NewLastWatchedEthBlockNumber {
-            block_number: "0".into(),
-        })?;
-
-        // Load it again.
-        let last_watched_block_number = EthereumSchema(&conn).load_last_watched_block_number()?;
-
-        assert_eq!(last_watched_block_number.block_number, "0");
-
-        // Repeat save/load with other values.
-        EthereumSchema(&conn).update_last_watched_block_number(&NewLastWatchedEthBlockNumber {
-            block_number: "1".into(),
-        })?;
-        let last_watched_block_number = EthereumSchema(&conn).load_last_watched_block_number()?;
-        assert_eq!(last_watched_block_number.block_number, "1");
 
         Ok(())
     });

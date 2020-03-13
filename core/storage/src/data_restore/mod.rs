@@ -7,7 +7,9 @@ use models::node::block::Block;
 use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp};
 use models::{Operation, TokenAddedEvent};
 // Local imports
-use self::records::StoredRollupOpsBlock;
+use self::records::{
+    NewLastWatchedEthBlockNumber, StoredLastWatchedEthBlockNumber, StoredRollupOpsBlock,
+};
 use crate::schema::*;
 use crate::StorageProcessor;
 use crate::{
@@ -17,7 +19,6 @@ use crate::{
         state::records::{NewBlockEvent, NewStorageState},
         state::StateSchema,
     },
-    ethereum::{records::NewLastWatchedEthBlockNumber, EthereumSchema},
     tokens::TokensSchema,
 };
 
@@ -69,7 +70,7 @@ impl<'a> DataRestoreSchema<'a> {
                 )?;
             }
 
-            EthereumSchema(self.0).update_last_watched_block_number(last_watched_eth_number)?;
+            self.update_last_watched_block_number(last_watched_eth_number)?;
             StateSchema(self.0).update_storage_state(self.new_storage_state("Events"))?;
 
             Ok(())
@@ -129,6 +130,25 @@ impl<'a> DataRestoreSchema<'a> {
             })
             .collect();
         Ok(ops_blocks)
+    }
+
+    /// Stores the last seen Ethereum block number.
+    pub(crate) fn update_last_watched_block_number(
+        &self,
+        number: &NewLastWatchedEthBlockNumber,
+    ) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
+            diesel::delete(data_restore_last_watched_eth_block::table).execute(self.0.conn())?;
+            diesel::insert_into(data_restore_last_watched_eth_block::table)
+                .values(number)
+                .execute(self.0.conn())?;
+            Ok(())
+        })
+    }
+
+    /// Loads the last seen Ethereum block number.
+    pub fn load_last_watched_block_number(&self) -> QueryResult<StoredLastWatchedEthBlockNumber> {
+        data_restore_last_watched_eth_block::table.first(self.0.conn())
     }
 
     fn new_storage_state(&self, state: impl ToString) -> NewStorageState {
