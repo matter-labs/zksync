@@ -8,7 +8,7 @@ describe("Ownable unit tests", function () {
 
     let testContract
     before(async () => {
-        testContract = await deployContract(wallet1, require('../../build/OwnableTest'), [], {
+        testContract = await deployContract(wallet1, require('../../build/Ownable'), [], {
             gasLimit: 6000000,
         })
     });

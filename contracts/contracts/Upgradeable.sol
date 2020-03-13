@@ -31,10 +31,7 @@ contract Upgradeable is Ownable {
         (bool initializationSuccess, ) = getTarget().delegatecall(
             abi.encodeWithSignature("initialize(bytes)", targetInitializationParameters)
         );
-        require(
-            initializationSuccess,
-            "uin11"
-        ); // uin11 - target initialization failed
+        require(initializationSuccess, "uin11"); // uin11 - target initialization failed
     }
 
     /// @notice Returns target of contract
@@ -55,34 +52,17 @@ contract Upgradeable is Ownable {
         }
     }
 
-    /// @notice Starts upgrade
-    /// @param newTarget New actual implementation address
-    function upgradeTarget(address newTarget) external view {
-        requireMaster(msg.sender);
-        require(
-            newTarget != address(0),
-            "uut11"
-        ); // uut11 - new actual implementation address can't be equal to zero
-        require(
-            getTarget() != newTarget,
-            "uut12"
-        ); // uut12 - new actual implementation address can't be equal to previous
-    }
-
-    /// @notice Finishes upgrade
+    /// @notice Upgrades target
     /// @param newTarget New target
     /// @param newTargetInitializationParameters New target initialization parameters
-    function finishTargetUpgrade(address newTarget, bytes calldata newTargetInitializationParameters) external {
+    function upgradeTarget(address newTarget, bytes calldata newTargetInitializationParameters) external {
         requireMaster(msg.sender);
 
         setTarget(newTarget);
         (bool initializationSuccess, ) = getTarget().delegatecall(
             abi.encodeWithSignature("initialize(bytes)", newTargetInitializationParameters)
         );
-        require(
-            initializationSuccess,
-            "ufu11"
-        ); // ufu11 - target initialization failed
+        require(initializationSuccess, "ufu11"); // ufu11 - target initialization failed
     }
 
 }

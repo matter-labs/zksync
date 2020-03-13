@@ -16,10 +16,7 @@ contract Ownable {
     /// @notice Check if specified address is master
     /// @param _address Address to check
     function requireMaster(address _address) internal view {
-        require(
-            _address == getMaster(),
-            "oro11"
-        ); // oro11 - only by master
+        require(_address == getMaster(), "oro11"); // oro11 - only by master
     }
 
     /// @notice Returns contract masters address
@@ -44,10 +41,7 @@ contract Ownable {
     /// @param _newMaster New masters address
     function transferMastership(address _newMaster) external {
         requireMaster(msg.sender);
-        require(
-            _newMaster != address(0),
-            "otp11"
-        ); // otp11 - new masters address can't be zero address
+        require(_newMaster != address(0), "otp11"); // otp11 - new masters address can't be zero address
         setMaster(_newMaster);
     }
 

@@ -16,9 +16,7 @@ contract Verifier is VerificationKey {
 
     /// @notice Verifier contract initialization
     /// @param initializationParameters Encoded representation of initialization parameters
-    function initialize(
-        bytes calldata initializationParameters
-    ) external {
+    function initialize(bytes calldata initializationParameters) external {
         // parameters are not used during initialization
     }
 

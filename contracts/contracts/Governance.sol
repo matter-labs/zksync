@@ -33,12 +33,8 @@ contract Governance is Config {
     /// @notice Governance contract initialization
     /// @param initializationParameters Encoded representation of initialization parameters:
         /// _networkGovernor The address of network governor
-    function initialize(
-        bytes calldata initializationParameters
-    ) external {
-        (
-        address _networkGovernor
-        ) = abi.decode(initializationParameters, (address));
+    function initialize(bytes calldata initializationParameters) external {
+        address _networkGovernor = abi.decode(initializationParameters, (address));
 
         networkGovernor = _networkGovernor;
         validators[_networkGovernor] = true;

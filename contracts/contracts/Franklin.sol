@@ -37,9 +37,7 @@ contract Franklin is Storage, Config, Events {
         /// _verifierAddress The address of Verifier contract
         /// _ // FIXME: remove _genesisAccAddress
         /// _genesisRoot Genesis blocks (first block) root
-    function initialize(
-        bytes calldata initializationParameters
-    ) external {
+    function initialize(bytes calldata initializationParameters) external {
         (
         address _governanceAddress,
         address _verifierAddress,

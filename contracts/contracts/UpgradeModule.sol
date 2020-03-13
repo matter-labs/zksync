@@ -57,12 +57,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
     /// @param newTarget New target
     function upgradeProxy(address proxyAddress, address newTarget) external {
         requireMaster(msg.sender);
-        require(
-            upgradeInfo[proxyAddress].upgradeStatus == UpgradeModule.UpgradeStatus.NotActive,
-            "upa11"
-        ); // upa11 - unable to activate active upgrade mode
-
-        Proxy(address(uint160(proxyAddress))).upgradeTarget(newTarget);
+        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeModule.UpgradeStatus.NotActive, "upa11"); // upa11 - unable to activate active upgrade mode
 
         upgradeInfo[proxyAddress].upgradeStatus = UpgradeModule.UpgradeStatus.WaitUpgrade;
         upgradeInfo[proxyAddress].activationTime = now;
@@ -76,10 +71,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
     /// @param proxyAddress Address of proxy to process
     function cancelProxyUpgrade(address proxyAddress) external {
         requireMaster(msg.sender);
-        require(
-            upgradeInfo[proxyAddress].upgradeStatus != UpgradeModule.UpgradeStatus.NotActive,
-            "umc11"
-        ); // umc11 - unable to cancel not active upgrade mode
+        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeModule.UpgradeStatus.NotActive, "umc11"); // umc11 - unable to cancel not active upgrade mode
 
         upgradeInfo[proxyAddress].upgradeStatus = UpgradeModule.UpgradeStatus.NotActive;
         upgradeInfo[proxyAddress].activationTime = 0;
@@ -93,10 +85,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
     /// @param proxyAddress Address of proxy to process
     /// @return Bool flag indicating that finalize status is active after this call
     function activeFinalizeStatusOfUpgrade(address proxyAddress) public returns (bool) {
-        require(
-            upgradeInfo[proxyAddress].upgradeStatus != UpgradeModule.UpgradeStatus.NotActive,
-            "uaf11"
-        ); // uaf11 - unable to activate finalize status in case of not active upgrade mode
+        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeModule.UpgradeStatus.NotActive, "uaf11"); // uaf11 - unable to activate finalize status in case of not active upgrade mode
 
         if (upgradeInfo[proxyAddress].upgradeStatus == UpgradeModule.UpgradeStatus.Finalize) {
             return true;
@@ -108,10 +97,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
             (bool callSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
                 abi.encodeWithSignature("registeredPriorityOperations()")
             );
-            require(
-                callSuccess,
-                "uaf12"
-            ); // uaf12 - main contract static call failed
+            require(callSuccess, "uaf12"); // uaf12 - main contract static call failed
             uint64 registeredPriorityOperations = abi.decode(encodedResult, (uint64));
             upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = registeredPriorityOperations;
 
@@ -128,26 +114,17 @@ contract UpgradeModule is UpgradeEvents, Ownable {
     /// @param newTargetInitializationParameters New target initialization parameters
     function finishProxyUpgrade(address proxyAddress, bytes calldata newTargetInitializationParameters) external {
         requireMaster(msg.sender);
-        require(
-            upgradeInfo[proxyAddress].upgradeStatus == UpgradeModule.UpgradeStatus.Finalize,
-            "umf11"
-        ); // umf11 - unable to finish upgrade without finalize status active
+        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeModule.UpgradeStatus.Finalize, "umf11"); // umf11 - unable to finish upgrade without finalize status active
 
         (bool callSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
             abi.encodeWithSignature("verifiedPriorityOperations()")
         );
-        require(
-            callSuccess,
-            "umf12"
-        ); // umf12 - main contract static call failed
+        require(callSuccess, "umf12"); // umf12 - main contract static call failed
         uint64 verifiedPriorityOperations = abi.decode(encodedResult, (uint64));
 
-        require(
-            verifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade,
-            "umf13"
-        ); // umf13 - can't finish upgrade before verifing all priority operations received before start of finalize status
+        require(verifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade, "umf13"); // umf13 - can't finish upgrade before verifing all priority operations received before start of finalize status
 
-        Proxy(address(uint160(proxyAddress))).finishTargetUpgrade(upgradeInfo[proxyAddress].nextTarget, newTargetInitializationParameters);
+        Proxy(address(uint160(proxyAddress))).upgradeTarget(upgradeInfo[proxyAddress].nextTarget, newTargetInitializationParameters);
 
         emit UpgradeCompleted(proxyAddress, version[proxyAddress], upgradeInfo[proxyAddress].nextTarget);
         version[proxyAddress]++;

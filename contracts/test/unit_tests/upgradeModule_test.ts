@@ -20,7 +20,7 @@ describe("UpgradeModule unit tests", function () {
     let DummyFirst
     let DummySecond
     before(async () => {
-        proxyTestContract = await deployTestContract('../../build/ProxyTest')
+        proxyTestContract = await deployTestContract('../../build/Proxy')
         proxyDummyInterface = new Contract(proxyTestContract.address, require('../../build/DummyTarget').interface, wallet);
         DummyFirst = await deployTestContract('../../build/DummyFirst')
         DummySecond = await deployTestContract('../../build/DummySecond')
@@ -53,8 +53,6 @@ describe("UpgradeModule unit tests", function () {
         expect((await getCallRevertReason( () => upgradeModuleContract.activeFinalizeStatusOfUpgrade(proxyTestContract.address) )).revertReason).equal("uaf11")
         expect((await getCallRevertReason( () => upgradeModuleContract.finishProxyUpgrade(proxyTestContract.address, []) )).revertReason).equal("umf11")
 
-        expect((await getCallRevertReason( () => upgradeModuleContract.upgradeProxy(proxyTestContract.address, AddressZero) )).revertReason).equal("uut11")
-        expect((await getCallRevertReason( () => upgradeModuleContract.upgradeProxy(proxyTestContract.address, DummyFirst.address) )).revertReason).equal("uut12")
         await expect(upgradeModuleContract.upgradeProxy(proxyTestContract.address, DummySecond.address))
             .to.emit(upgradeModuleContract, 'UpgradeModeActivated')
             .withArgs(proxyTestContract.address, 0)
@@ -118,7 +116,7 @@ describe("UpgradeModule unit tests", function () {
         // one more activate and cancel with version equal to 1
         await expect(upgradeModuleContract.upgradeProxy(proxyTestContract.address, DummyFirst.address))
             .to.emit(upgradeModuleContract, 'UpgradeModeActivated')
-            .withArgs(proxyTestContract.address, 1)
+            .withArgs(proxyTestContract.address, 1);
         await expect(upgradeModuleContract.cancelProxyUpgrade(proxyTestContract.address))
             .to.emit(upgradeModuleContract, 'UpgradeCanceled')
             .withArgs(proxyTestContract.address, 1);
