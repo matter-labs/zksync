@@ -207,7 +207,8 @@ export class Wallet {
     }
 
     async onchainAuthSigningKey(
-        nonce: Nonce = "committed"
+        nonce: Nonce = "committed",
+        ethTxOptions?: ethers.providers.TransactionRequest,
     ): Promise<ContractTransaction> {
         if (!this.signer) {
             throw new Error("ZKSync signer is required for current pubkey calculation.");
@@ -232,7 +233,8 @@ export class Wallet {
             newPubKeyHash.replace("sync:", "0x"),
             numNonce,
             {
-                gasLimit: utils.bigNumberify("200000")
+                gasLimit: utils.bigNumberify("200000"),
+                ...ethTxOptions,
             }
         );
 
@@ -299,6 +301,7 @@ export class Wallet {
         token: TokenLike;
         amount: utils.BigNumberish;
         maxFeeInETHToken?: utils.BigNumberish;
+        ethTxOptions?: ethers.providers.TransactionRequest;
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
 
@@ -333,7 +336,8 @@ export class Wallet {
                         .bigNumberify(deposit.amount)
                         .add(maxFeeInETHToken),
                     gasLimit: utils.bigNumberify("200000"),
-                    gasPrice
+                    gasPrice,
+                    ...deposit.ethTxOptions,
                 }
             );
         } else {
@@ -348,7 +352,10 @@ export class Wallet {
             );
             const approveTx = await erc20contract.approve(
                 this.provider.contractAddress.mainContract,
-                deposit.amount
+                deposit.amount,
+                {
+                    ...deposit.ethTxOptions,
+                }
             );
             ethTransaction = await mainZkSyncContract.depositERC20(
                 tokenAddress,
@@ -370,7 +377,7 @@ export class Wallet {
         token: TokenLike;
         maxFeeInETHToken?: utils.BigNumberish;
         accountId?: number;
-        nonce?: Nonce;
+        ethTxOptions?: ethers.providers.TransactionRequest;
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
         const ethProxy = new ETHProxy(
@@ -415,7 +422,8 @@ export class Wallet {
             {
                 gasLimit: utils.bigNumberify("500000"),
                 value: maxFeeInETHToken,
-                gasPrice
+                gasPrice,
+                ...withdraw.ethTxOptions,
             }
         );
 
@@ -459,6 +467,11 @@ class ETHOperation {
             this.priorityOpId.toNumber(),
             "COMMIT"
         );
+        
+        if (receipt.executed == false) {
+            throw receipt;
+        }
+
         this.state = "Committed";
         return receipt;
     }
@@ -471,6 +484,11 @@ class ETHOperation {
             this.priorityOpId.toNumber(),
             "VERIFY"
         );
+        
+        if (receipt.executed == false) {
+            throw receipt;
+        }
+
         this.state = "Verified";
         return receipt;
     }
@@ -495,6 +513,11 @@ class Transaction {
             "COMMIT"
         );
         this.state = "Committed";
+
+        if (!receipt.success) {
+            throw receipt;
+        }
+
         return receipt;
     }
 
@@ -505,6 +528,11 @@ class Transaction {
             "VERIFY"
         );
         this.state = "Verified";
+        
+        if (!receipt.success) {
+            throw receipt;
+        }
+        
         return receipt;
     }
 }
