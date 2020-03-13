@@ -43,4 +43,13 @@ impl<'a> TokensSchema<'a> {
             .load::<Token>(self.0.conn())?;
         Ok(tokens.into_iter().map(|t| (t.id as TokenId, t)).collect())
     }
+
+    /// Given the numeric token ID, returns it's string symbol.
+    pub fn token_symbol_from_id(&self, token: TokenId) -> QueryResult<Option<String>> {
+        Ok(tokens::table
+            .find(i32::from(token))
+            .first::<Token>(self.0.conn())
+            .optional()?
+            .map(|t| t.symbol))
+    }
 }

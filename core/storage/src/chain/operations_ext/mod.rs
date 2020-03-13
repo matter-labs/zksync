@@ -302,7 +302,7 @@ impl<'a> OperationsExtSchema<'a> {
                     on
                         tx_hash = hash
                     where
-                        'sync:' || encode(primary_account_address, 'hex') = '{address}'
+                        '0x:' || encode(primary_account_address, 'hex') = '{address}'
                         or
                         tx->>'to' = '{address}'
                     union all
@@ -316,7 +316,7 @@ impl<'a> OperationsExtSchema<'a> {
                     from 
                         executed_priority_operations
                     where 
-                        operation->'priority_op'->>'account' = '{address}') t
+                        operation->'priority_op'->>'from' = '{address}') t
                 order by
                     block_number desc
                 offset 

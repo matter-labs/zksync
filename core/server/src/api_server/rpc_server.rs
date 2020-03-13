@@ -160,6 +160,7 @@ impl RpcApp {
     /// which makes it convenient to use in the RPC methods.
     fn token_symbol_from_id(&self, token: TokenId) -> Result<String> {
         self.access_storage()?
+            .tokens_schema()
             .token_symbol_from_id(token)
             .map_err(|_| Error::internal_error())?
             .ok_or(Error {
