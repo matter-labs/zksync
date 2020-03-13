@@ -28,45 +28,35 @@ impl RollupOpsBlock {
     ) -> Result<Self, failure::Error> {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
-        let block_commitment_types = vec![
-            ethabi::ParamType::Uint(32),
-            ethabi::ParamType::Uint(24),
-            ethabi::ParamType::FixedBytes(32),
-            ethabi::ParamType::Bytes,
-            ethabi::ParamType::Bytes,
-            ethabi::ParamType::Array(Box::new(ethabi::ParamType::Uint(32))),
-        ];
 
-        let decoded_commitment_parameters;
-        if let Ok(parameters) = ethabi::decode(block_commitment_types.as_slice(), input_data.as_slice()) {
-            decoded_commitment_parameters = parameters;
+        let decoded_commitment_parameters = ethabi::decode(
+            vec![
+                ethabi::ParamType::Uint(32),
+                ethabi::ParamType::Uint(24),
+                ethabi::ParamType::FixedBytes(32),
+                ethabi::ParamType::Bytes,
+                ethabi::ParamType::Bytes,
+                ethabi::ParamType::Array(Box::new(ethabi::ParamType::Uint(32))),
+            ].as_slice(),
+            input_data.as_slice(),
+        ).map_err(|_| failure::Error::from_boxed_compat(
+            Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get decoded parameters from commitment transaction"))
+        ))?;
+
+        if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (&decoded_commitment_parameters[1], &decoded_commitment_parameters[3]) {
+            let ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
+            let fee_account = fee_acc.as_u32();
+
+            let block = RollupOpsBlock {
+                block_num: event_data.block_num,
+                ops,
+                fee_account,
+            };
+            Ok(block)
         }
         else {
-            return Result::Err(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get decoded parameters from commitment transaction").into());
+            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "can't parse commitment parameters").into())
         }
-
-        let ops;
-        if let Some(ethabi::Token::Bytes(public_data)) = decoded_commitment_parameters.get(3) {
-            ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
-        }
-        else {
-            return Result::Err(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get public data from decoded commitment parameters").into());
-        }
-
-        let fee_account;
-        if let Some(ethabi::Token::Uint(fee_acc)) = decoded_commitment_parameters.get(1) {
-            fee_account = fee_acc.as_u32();
-        }
-        else {
-            return Result::Err(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get fee_account address from decoded commitment parameters").into());
-        }
-
-        let block = RollupOpsBlock {
-            block_num: event_data.block_num,
-            ops,
-            fee_account,
-        };
-        Ok(block)
     }
 
     /// Returns a Rollup operations vector
