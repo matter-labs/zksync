@@ -52,6 +52,7 @@ fn main() {
         .access_storage()
         .expect("db connection failed for committer");
     let contract_addr: H160 = storage
+        .config_schema()
         .load_config()
         .expect("can not load server_config")
         .contract_addr

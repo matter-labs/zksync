@@ -15,8 +15,7 @@ use models::node::tx::TxHash;
 use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::string::ToString;
-use storage::{ConnectionPool, StorageProcessor, Token};
+use storage::{tokens::records::Token, ConnectionPool, StorageProcessor};
 use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -161,6 +160,7 @@ impl RpcApp {
     /// which makes it convenient to use in the RPC methods.
     fn token_symbol_from_id(&self, token: TokenId) -> Result<String> {
         self.access_storage()?
+            .tokens_schema()
             .token_symbol_from_id(token)
             .map_err(|_| Error::internal_error())?
             .ok_or(Error {
@@ -245,9 +245,14 @@ impl Rpc for RpcApp {
         let (account, tokens) = if let Ok((account, tokens)) = (|| -> Result<_> {
             let storage = self.access_storage()?;
             let account = storage
+                .chain()
+                .account_schema()
                 .account_state_by_address(&address)
                 .map_err(|_| Error::internal_error())?;
-            let tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
+            let tokens = storage
+                .tokens_schema()
+                .load_tokens()
+                .map_err(|_| Error::internal_error())?;
             Ok((account, tokens))
         })() {
             (account, tokens)
@@ -299,10 +304,15 @@ impl Rpc for RpcApp {
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
         let storage = self.access_storage()?;
         let executed_op = storage
-            .get_executed_priority_op(serial_id)
+            .chain()
+            .operations_schema()
+            .get_executed_priority_operation(serial_id)
             .map_err(|_| Error::internal_error())?;
         Ok(if let Some(executed_op) = executed_op {
-            let block = storage.handle_search(executed_op.block_number.to_string());
+            let block = storage
+                .chain()
+                .block_schema()
+                .find_block_by_height_or_hash(executed_op.block_number.to_string());
             ETHOpInfoResp {
                 executed: true,
                 block: Some(BlockInfo {
@@ -322,6 +332,8 @@ impl Rpc for RpcApp {
     fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
         let storage = self.access_storage()?;
         let stored_receipt = storage
+            .chain()
+            .operations_ext_schema()
             .tx_receipt(tx_hash.as_ref())
             .map_err(|_| Error::internal_error())?;
         Ok(if let Some(stored_receipt) = stored_receipt {
@@ -384,7 +396,10 @@ impl Rpc for RpcApp {
 
     fn contract_address(&self) -> Result<ContractAddressResp> {
         let storage = self.access_storage()?;
-        let config = storage.load_config().map_err(|_| Error::internal_error())?;
+        let config = storage
+            .config_schema()
+            .load_config()
+            .map_err(|_| Error::internal_error())?;
 
         Ok(ContractAddressResp {
             main_contract: config.contract_addr.expect("server config"),
@@ -394,7 +409,10 @@ impl Rpc for RpcApp {
 
     fn tokens(&self) -> Result<HashMap<String, Token>> {
         let storage = self.access_storage()?;
-        let mut tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
+        let mut tokens = storage
+            .tokens_schema()
+            .load_tokens()
+            .map_err(|_| Error::internal_error())?;
         Ok(tokens
             .drain()
             .map(|(id, token)| {

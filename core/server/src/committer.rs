@@ -34,7 +34,9 @@ async fn handle_new_commit_task(
                 block.block_number
             );
             storage
-                .save_block_transactions(&block)
+                .chain()
+                .block_schema()
+                .save_block_transactions(block)
                 .expect("committer failed tx save");
             continue;
         }
@@ -47,7 +49,9 @@ async fn handle_new_commit_task(
         };
         info!("commit block #{}", op.block.block_number);
         let op = storage
-            .execute_operation(&op)
+            .chain()
+            .block_schema()
+            .execute_operation(op.clone())
             .expect("committer must commit the op into db");
 
         tx_for_eth
@@ -75,7 +79,11 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
         let storage = pool
             .access_storage()
             .expect("db connection failed for committer");
-        storage.get_last_verified_block().expect("db failed")
+        storage
+            .chain()
+            .block_schema()
+            .get_last_verified_block()
+            .expect("db failed")
     };
 
     let mut timer = time::interval(PROOF_POLL_INTERVAL);
@@ -88,10 +96,12 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
 
         loop {
             let block_number = last_verified_block + 1;
-            let proof = storage.load_proof(block_number);
+            let proof = storage.prover_schema().load_proof(block_number);
             if let Ok(proof) = proof {
                 info!("New proof for block: {}", block_number);
                 let block = storage
+                    .chain()
+                    .block_schema()
                     .load_committed_block(block_number)
                     .unwrap_or_else(|| panic!("failed to load block #{}", block_number));
                 let op = Operation {
@@ -103,7 +113,9 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
                     id: None,
                 };
                 let op = storage
-                    .execute_operation(&op)
+                    .chain()
+                    .block_schema()
+                    .execute_operation(op.clone())
                     .expect("committer must commit the op into db");
                 tx_for_eth
                     .send(op)
