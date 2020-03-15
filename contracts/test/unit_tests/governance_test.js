@@ -9,7 +9,7 @@ describe("Governance unit tests", function () {
         let governanceAddressDeployed;
         [testContract, governanceAddressDeployed] = await deployProxyContract(
             wallet,
-            require('../../build/ProxyTest'),
+            require('../../build/Proxy'),
             require('../../build/GovernanceTest'),
             ["address"],
             [wallet.address],
