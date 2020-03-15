@@ -21,7 +21,6 @@ export const franklinContractCode = require(`../build/Franklin`);
 export const verifierContractCode = require(`../build/Verifier`);
 export const governanceContractCode = require(`../build/Governance`);
 
-export const proxyTestContractCode = require('../build/ProxyTest');
 export const franklinTestContractCode = require('../build/FranklinTest');
 export const verifierTestContractCode = require('../build/VerifierTest');
 export const governanceTestContractCode = require('../build/GovernanceTest');
@@ -69,9 +68,9 @@ export class Deployer {
             GovernanceTarget:    isTest ? governanceTestContractCode    : governanceContractCode,
             VerifierTarget:      isTest ? verifierTestContractCode      : verifierContractCode,
             FranklinTarget:      isTest ? franklinTestContractCode      : franklinContractCode,
-            Governance:          isTest ? proxyTestContractCode         : proxyContractCode,
-            Verifier:            isTest ? proxyTestContractCode         : proxyContractCode,
-            Franklin:            isTest ? proxyTestContractCode         : proxyContractCode,
+            Governance:          proxyContractCode,
+            Verifier:            proxyContractCode,
+            Franklin:            proxyContractCode,
         };
 
         this.addresses = {
