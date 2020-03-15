@@ -48,7 +48,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
     /// @notice Contract constructor
     /// @param _mainContractAddress Address of contract which processes priority operations
     /// @dev Calls Ownable contract constructor
-    constructor(address _mainContractAddress) Ownable() public {
+    constructor(address _mainContractAddress) Ownable(msg.sender) public {
         mainContractAddress = _mainContractAddress;
     }
 

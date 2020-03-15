@@ -12,7 +12,7 @@ contract Upgradeable is Ownable {
 
     /// @notice Contract constructor
     /// @dev Calls Ownable contract constructor
-    constructor() Ownable() public {
+    constructor() Ownable(msg.sender) public {
 
     }
 

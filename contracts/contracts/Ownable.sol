@@ -9,8 +9,9 @@ contract Ownable {
 
     /// @notice Contract constructor
     /// @dev Sets msg sender address as masters address
-    constructor() public {
-        setMaster(msg.sender);
+    /// @param masterAddress Master address
+    constructor(address masterAddress) public {
+        setMaster(masterAddress);
     }
 
     /// @notice Check if specified address is master
