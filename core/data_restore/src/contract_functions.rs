@@ -14,40 +14,36 @@ use web3::Transport;
 /// * `transaction` - Ethereum Rollup contract initialization transaction description
 ///
 pub fn get_genesis_account(genesis_transaction: &Transaction) -> Result<Account, failure::Error> {
-    // encoded target address and targetInitializationParameters
     let input_data = get_input_data_from_ethereum_transaction(&genesis_transaction)?;
-    // encoded targetInitializationParameters
-    let encoded_parameters;
-    if let Ok(parameters) = ethabi::decode(vec![ethabi::ParamType::Address, ethabi::ParamType::Bytes].as_slice(), input_data.as_slice()) {
-        if let ethabi::Token::Bytes(parameters) = &parameters.clone()[1] {
-            encoded_parameters = (*parameters).clone().to_vec();
-        }
-        else {
-            return Result::Err(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get encoded parameters from target initialization transaction").into());
-        }
-    }
-    else{
-        return Result::Err(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get encoded parameters from target initialization transaction").into());
-    }
+
+    // target address and targetInitializationParameters
+    let input_parameters = ethabi::decode(
+        vec![ethabi::ParamType::Address, ethabi::ParamType::Bytes].as_slice(),
+        input_data.as_slice()
+    ).map_err(|_| failure::Error::from_boxed_compat(
+        Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get input parameters from target initialization transaction"))
+    ))?;
+    let encoded_parameters = input_parameters[1].clone().to_bytes()
+        .ok_or_else(|| Err("Invalid token in parameters"))
+        .map_err(|_: Result::<Vec<u8>, _>| failure::Error::from_boxed_compat(
+            Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get initialization parameters from target initialization transaction"))
+        ))?;
+
     let input_types = vec![
         ethabi::ParamType::Address,
         ethabi::ParamType::Address,
         ethabi::ParamType::Address,
         ethabi::ParamType::FixedBytes(INPUT_DATA_ROOT_HASH_BYTES_WIDTH),
     ];
-    let decoded_parameters;
-    if let Ok(parameters) = ethabi::decode(input_types.as_slice(), encoded_parameters.as_slice()) {
-        decoded_parameters = parameters;
-    }
-    else{
-        return Result::Err(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get decode parameters of initialiation").into());
-    }
-    if let Some(ethabi::Token::Address(genesis_operator_address)) = decoded_parameters.get(2) {
-        Ok(Account::default_with_address(&genesis_operator_address))
-    }
-    else{
-        Result::Err(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get genesis operator address from decoded parameters").into())
-    }
+    let decoded_parameters = ethabi::decode(input_types.as_slice(), encoded_parameters.as_slice()).map_err(|_| failure::Error::from_boxed_compat(
+        Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get decoded parameters from target initialization transaction"))
+    ))?;
+    match &decoded_parameters[2] {
+        ethabi::Token::Address(genesis_operator_address) => Some(Account::default_with_address(&genesis_operator_address)),
+        _ => None
+    }.ok_or_else(|| Err("Invalid token in parameters")).map_err(|_: Result::<Account, _>| failure::Error::from_boxed_compat(
+        Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get decoded parameter from target initialization transaction"))
+    ))
 }
 
 /// Returns total number of verified blocks on Rollup contract
