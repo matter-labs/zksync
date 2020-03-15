@@ -37,13 +37,21 @@ impl RollupOpsBlock {
                 ethabi::ParamType::Bytes,
                 ethabi::ParamType::Bytes,
                 ethabi::ParamType::Array(Box::new(ethabi::ParamType::Uint(32))),
-            ].as_slice(),
+            ]
+            .as_slice(),
             input_data.as_slice(),
-        ).map_err(|_| failure::Error::from_boxed_compat(
-            Box::new(std::io::Error::new(std::io::ErrorKind::NotFound, "can't get decoded parameters from commitment transaction"))
-        ))?;
+        )
+        .map_err(|_| {
+            failure::Error::from_boxed_compat(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "can't get decoded parameters from commitment transaction",
+            )))
+        })?;
 
-        if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (&decoded_commitment_parameters[1], &decoded_commitment_parameters[3]) {
+        if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (
+            &decoded_commitment_parameters[1],
+            &decoded_commitment_parameters[3],
+        ) {
             let ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
             let fee_account = fee_acc.as_u32();
 
@@ -53,9 +61,12 @@ impl RollupOpsBlock {
                 fee_account,
             };
             Ok(block)
-        }
-        else {
-            Err(std::io::Error::new(std::io::ErrorKind::NotFound, "can't parse commitment parameters").into())
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "can't parse commitment parameters",
+            )
+            .into())
         }
     }
 
