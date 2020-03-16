@@ -480,6 +480,12 @@ mod test {
     #[test]
     // #[ignore]
     fn test_new_transpile_deposit_franklin_existing_account() {
+        const NUM_DEPOSITS: usize = 1;
+        println!(
+            "Testing for {} deposits {} chunks",
+            NUM_DEPOSITS,
+            DepositOp::CHUNKS * NUM_DEPOSITS
+        );
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
             "1111111111111111111111111111111111111111".parse().unwrap();
@@ -498,13 +504,14 @@ mod test {
             account_id: deposit_to_account_id,
         };
 
-        plasma_state.apply_deposit_op(&deposit_op);
+        for _ in 0..NUM_DEPOSITS {
+            plasma_state.apply_deposit_op(&deposit_op);
+            let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+            let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+            let pub_data_from_witness = deposit_witness.get_pubdata();
 
-        let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
-        let pub_data_from_witness = deposit_witness.get_pubdata();
-
-        witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+            witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+        }
         witness_accum.collect_fees(&Vec::new());
         witness_accum.calculate_pubdata_commitment();
 
@@ -519,11 +526,10 @@ mod test {
         use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
         // use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
         // use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
-        use crate::franklin_crypto::bellman::plonk::*;
         use crate::franklin_crypto::bellman::kate_commitment::*;
-        use crate::franklin_crypto::bellman::worker::Worker;
         use crate::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-
+        use crate::franklin_crypto::bellman::plonk::*;
+        use crate::franklin_crypto::bellman::worker::Worker;
 
         // let mut transpiler = Transpiler::new();
 
@@ -548,20 +554,24 @@ mod test {
 
         let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::crs_42(num_gates, &worker);
 
-        let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::from_powers(&key_monomial_form, num_gates, &worker);
+        let key_lagrange_form =
+            Crs::<Bn256, CrsForLagrangeForm>::from_powers(&key_monomial_form, num_gates, &worker);
 
         // let precomputation = make_precomputations(&setup);
-        let verification_key = make_verification_key(&setup, &key_monomial_form).expect("must make a verification key");
+        let verification_key = make_verification_key(&setup, &key_monomial_form)
+            .expect("must make a verification key");
 
         let proof = prove::<_, _, RollingKeccakTranscript<Fr>>(
-            c.clone(), 
-            &hints, 
-            &setup, 
+            c.clone(),
+            &hints,
+            &setup,
             &key_monomial_form,
-            &key_lagrange_form
-        ).expect("must make a proof");
+            &key_lagrange_form,
+        )
+        .expect("must make a proof");
 
-        let is_valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &verification_key).expect("must perform verification");
+        let is_valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &verification_key)
+            .expect("must perform verification");
         assert!(is_valid);
     }
 }
