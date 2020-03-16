@@ -46,10 +46,10 @@ set_constant MAX_AMOUNT_OF_REGISTERED_TOKENS 4 $OUT_DIR/ConfigTest.sol
 set_constant EXPECT_VERIFICATION_IN 8 $OUT_DIR/ConfigTest.sol
 set_constant MAX_UNVERIFIED_BLOCKS 4 $OUT_DIR/ConfigTest.sol
 set_constant PRIORITY_EXPIRATION 16 $OUT_DIR/ConfigTest.sol
-set_constant WAIT_UPGRADE_MODE_PERIOD 4 $OUT_DIR/UpgradeGatekeeperTest.sol
+set_constant NOTICE_PERIOD 4 $OUT_DIR/UpgradeGatekeeperTest.sol
 
 create_constant_getter MAX_AMOUNT_OF_REGISTERED_TOKENS $OUT_DIR/ConfigTest.sol
-create_constant_getter WAIT_UPGRADE_MODE_PERIOD $OUT_DIR/UpgradeGatekeeperTest.sol
+create_constant_getter NOTICE_PERIOD $OUT_DIR/UpgradeGatekeeperTest.sol
 
 # Verify always true
 set_constant DUMMY_VERIFIER true $OUT_DIR/VerifierTest.sol

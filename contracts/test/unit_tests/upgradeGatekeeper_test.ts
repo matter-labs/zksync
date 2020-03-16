@@ -73,7 +73,7 @@ describe("UpgradeGatekeeper unit tests", function () {
         let activated_time = performance.now();
 
         // wait and activate finalize status
-        let all_time_in_sec = parseInt(await UpgradeGatekeeperContract.get_WAIT_UPGRADE_MODE_PERIOD());
+        let all_time_in_sec = parseInt(await UpgradeGatekeeperContract.get_NOTICE_PERIOD());
         for (let step = 1; step <= 3; step++) {
             if (step != 3) {
                 while ((performance.now() - start_time) < Math.round(all_time_in_sec * 1000.0 * step / 10.0 + 10)) {

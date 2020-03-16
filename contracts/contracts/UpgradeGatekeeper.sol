@@ -9,8 +9,8 @@ import "./Proxy.sol";
 /// @author Matter Labs
 contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
-    /// @notice Waiting period to activate finalize status mode (in seconds)
-    uint256 constant WAIT_UPGRADE_MODE_PERIOD = 2 weeks;
+    /// @notice Notice period before activation finalize status mode (in seconds)
+    uint256 constant NOTICE_PERIOD = 2 weeks;
 
     /// @notice Versions of proxy contracts
     mapping(address => uint64) public version;
@@ -21,7 +21,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     /// @notice Upgrade mode statuses
     enum UpgradeStatus {
         NotActive,
-        WaitUpgrade,
+        NoticePeriod,
         Finalize
     }
 
@@ -29,7 +29,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     struct UpgradeInfo {
         UpgradeStatus upgradeStatus;
 
-        /// @notice Time of activating waiting upgrade mode
+        /// @notice Time of activating notice period
         /// @dev Will be equal to zero in case of not active mode
         uint256 activationTime;
 
@@ -52,14 +52,14 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         mainContractAddress = _mainContractAddress;
     }
 
-    /// @notice Activates wait upgrade status
+    /// @notice Activates notice period
     /// @param proxyAddress Address of proxy to process
     /// @param newTarget New target
     function upgradeProxy(address proxyAddress, address newTarget) external {
         requireMaster(msg.sender);
         require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.NotActive, "upa11"); // upa11 - unable to activate active upgrade mode
 
-        upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.WaitUpgrade;
+        upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.NoticePeriod;
         upgradeInfo[proxyAddress].activationTime = now;
         upgradeInfo[proxyAddress].nextTarget = newTarget;
         upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
@@ -91,7 +91,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
             return true;
         }
 
-        if (now >= upgradeInfo[proxyAddress].activationTime + WAIT_UPGRADE_MODE_PERIOD) {
+        if (now >= upgradeInfo[proxyAddress].activationTime + NOTICE_PERIOD) {
             upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Finalize;
 
             (bool callSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
