@@ -1,10 +1,10 @@
 //use log::*;
 
-use crate::eth_account::{parse_ether, EthereumAccount};
+use crate::eth_account::{parse_ether, ETHExecResult, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, Contracts};
 use crate::zksync_account::ZksyncAccount;
 use bigdecimal::BigDecimal;
-use failure::{bail, ensure};
+use failure::bail;
 use futures::{
     channel::{mpsc, oneshot},
     executor::block_on,
@@ -24,28 +24,28 @@ use std::thread::JoinHandle;
 use std::time::Instant;
 use tokio::runtime::Runtime;
 use web3::transports::Http;
-use web3::types::U64;
 use web3::Transport;
 
 pub mod eth_account;
 pub mod external_commands;
 pub mod zksync_account;
+use models::EncodedProof;
+use web3::types::U64;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ETHAccountId(usize);
+pub struct ETHAccountId(pub usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct ZKSyncAccountId(usize);
+pub struct ZKSyncAccountId(pub usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Token(TokenId);
+pub struct Token(pub TokenId);
 
 /// Account set is used to create transactions using stored account
-/// in a covenient way
+/// in a convenient way
 pub struct AccountSet<T: Transport> {
-    eth_accounts: Vec<EthereumAccount<T>>,
-    zksync_accounts: Vec<ZksyncAccount>,
-    fee_account_id: ZKSyncAccountId,
+    pub eth_accounts: Vec<EthereumAccount<T>>,
+    pub zksync_accounts: Vec<ZksyncAccount>,
+    pub fee_account_id: ZKSyncAccountId,
 }
-
 impl<T: Transport> AccountSet<T> {
     /// Create deposit from eth account to zksync account
     pub fn deposit(
@@ -62,7 +62,8 @@ impl<T: Transport> AccountSet<T> {
             block_on(from.deposit_erc20(address, amount, &to.address))
                 .expect("erc20 deposit should not fail")
         } else {
-            block_on(from.deposit_eth(amount, &to.address)).expect("eth deposit should not fail")
+            block_on(from.deposit_eth(amount, &to.address, None))
+                .expect("eth deposit should not fail")
         }
     }
 
@@ -70,7 +71,7 @@ impl<T: Transport> AccountSet<T> {
     /// `nonce` optional nonce override
     /// `increment_nonce` - flag for `from` account nonce increment
     #[allow(clippy::too_many_arguments)]
-    fn transfer(
+    pub fn transfer(
         &self,
         from: ZKSyncAccountId,
         to: ZKSyncAccountId,
@@ -172,7 +173,7 @@ impl<T: Transport> AccountSet<T> {
 }
 
 /// Initialize plasma state with one account - fee account.
-fn genesis_state(fee_account_address: &Address) -> PlasmaStateInitParams {
+pub fn genesis_state(fee_account_address: &Address) -> PlasmaStateInitParams {
     let mut accounts = AccountMap::default();
     let operator_account = Account::default_with_address(fee_account_address);
     accounts.insert(0, operator_account);
@@ -184,7 +185,7 @@ fn genesis_state(fee_account_address: &Address) -> PlasmaStateInitParams {
     }
 }
 
-async fn state_keeper_get_account(
+pub async fn state_keeper_get_account(
     mut sender: mpsc::Sender<StateKeeperRequest>,
     address: &Address,
 ) -> Option<(AccountId, Account)> {
@@ -196,13 +197,13 @@ async fn state_keeper_get_account(
     resp.1.await.expect("sk account resp recv")
 }
 
-struct StateKeeperChannels {
+pub struct StateKeeperChannels {
     requests: mpsc::Sender<StateKeeperRequest>,
     new_blocks: mpsc::Receiver<CommitRequest>,
 }
 
 // Thread join handle and stop channel sender.
-fn spawn_state_keeper(
+pub fn spawn_state_keeper(
     fee_account: &Address,
 ) -> (JoinHandle<()>, oneshot::Sender<()>, StateKeeperChannels) {
     let (proposed_blocks_sender, proposed_blocks_receiver) = mpsc::channel(256);
@@ -397,7 +398,7 @@ pub fn perform_basic_tests() {
 
 // Struct used to keep expected balance changes after transactions execution.
 #[derive(Default)]
-struct ExpectedAccountState {
+pub struct ExpectedAccountState {
     // First number is balance, second one is allowed error in balance(used for ETH because eth is used for transaction fees).
     eth_accounts_state: HashMap<(ETHAccountId, TokenId), (BigDecimal, BigDecimal)>,
     sync_accounts_state: HashMap<(ZKSyncAccountId, TokenId), BigDecimal>,
@@ -412,19 +413,19 @@ struct ExpectedAccountState {
 /// in order to execute unusual/failed transactions one should create it separately and commit to block
 /// using `execute_incorrect_tx`
 pub struct TestSetup {
-    state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
-    proposed_blocks_receiver: mpsc::Receiver<CommitRequest>,
+    pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    pub proposed_blocks_receiver: mpsc::Receiver<CommitRequest>,
 
-    accounts: AccountSet<Http>,
-    tokens: HashMap<TokenId, Address>,
+    pub accounts: AccountSet<Http>,
+    pub tokens: HashMap<TokenId, Address>,
 
-    expected_changes_for_current_block: ExpectedAccountState,
+    pub expected_changes_for_current_block: ExpectedAccountState,
 
-    commit_account: EthereumAccount<Http>,
+    pub commit_account: EthereumAccount<Http>,
 }
 
 impl TestSetup {
-    fn new(
+    pub fn new(
         sk_channels: StateKeeperChannels,
         accounts: AccountSet<Http>,
         deployed_contracts: &Contracts,
@@ -432,6 +433,7 @@ impl TestSetup {
     ) -> Self {
         let mut tokens = HashMap::new();
         tokens.insert(1, deployed_contracts.test_erc20_address.clone());
+        tokens.insert(0, Address::default());
         Self {
             state_keeper_request_sender: sk_channels.requests,
             proposed_blocks_receiver: sk_channels.new_blocks,
@@ -442,7 +444,7 @@ impl TestSetup {
         }
     }
 
-    fn get_expected_eth_account_balance(
+    pub fn get_expected_eth_account_balance(
         &self,
         account: ETHAccountId,
         token: TokenId,
@@ -454,7 +456,7 @@ impl TestSetup {
             .unwrap_or_else(|| (self.get_eth_balance(account, token), BigDecimal::from(0)))
     }
 
-    fn get_expected_zksync_account_balance(
+    pub fn get_expected_zksync_account_balance(
         &self,
         account: ZKSyncAccountId,
         token: TokenId,
@@ -466,7 +468,7 @@ impl TestSetup {
             .unwrap_or_else(|| self.get_zksync_balance(account, token))
     }
 
-    fn start_block(&mut self) {
+    pub fn start_block(&mut self) {
         self.expected_changes_for_current_block = ExpectedAccountState::default();
     }
 
@@ -548,6 +550,17 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
+    }
+
+    pub fn exit(
+        &mut self,
+        sending_account: ETHAccountId,
+        token_id: Token,
+        amount: &BigDecimal,
+        proof: EncodedProof,
+    ) -> ETHExecResult {
+        block_on(self.accounts.eth_accounts[sending_account.0].exit(token_id.0, amount, proof))
+            .expect("Failed to post exit tx")
     }
 
     pub fn full_exit(&mut self, post_by: ETHAccountId, from: ZKSyncAccountId, token: Token) {
@@ -677,6 +690,22 @@ impl TestSetup {
         self.execute_tx(withdraw);
     }
 
+    /// Should not be used execept special cases(when we want to commit but don't want to verify block)
+    pub fn execute_commit_block(&mut self) -> ETHExecResult {
+        let block_sender = async {
+            self.state_keeper_request_sender
+                .clone()
+                .send(StateKeeperRequest::SealBlock)
+                .await
+                .expect("sk receiver dropped");
+        };
+        block_on(block_sender);
+        let new_block =
+            block_on(self.proposed_blocks_receiver.next()).expect("State keeper channel closed");
+
+        block_on(self.commit_account.commit_block(&new_block.block)).expect("block commit fail")
+    }
+
     pub fn execute_commit_and_verify_block(&mut self) -> Result<(), failure::Error> {
         let block_sender = async {
             self.state_keeper_request_sender
@@ -686,35 +715,18 @@ impl TestSetup {
                 .expect("sk receiver dropped");
         };
         block_on(block_sender);
-        let new_block = block_on(async {
-            if let Some(op) = self.proposed_blocks_receiver.next().await {
-                op
-            } else {
-                panic!("State keeper channel closed");
-            }
-        });
+        let new_block =
+            block_on(self.proposed_blocks_receiver.next()).expect("State keeper channel closed");
 
-        let block_rec = block_on(self.commit_account.commit_block(&new_block.block))
-            .expect("block commit fail");
-        ensure!(
-            block_rec.status == Some(U64::from(1)),
-            "Block commit failed: {:?}",
-            block_rec.transaction_hash
-        );
-        let block_rec = block_on(self.commit_account.verify_block(&new_block.block))
-            .expect("block verify fail");
-        ensure!(
-            block_rec.status == Some(U64::from(1)),
-            "Block verify failed: {:?}",
-            block_rec.transaction_hash
-        );
-        let block_rec = block_on(self.commit_account.complete_withdrawals())
-            .expect("failed to complete pending withdrawals");
-        ensure!(
-            block_rec.status == Some(U64::from(1)),
-            "Block commit failed: {:?}",
-            block_rec.transaction_hash
-        );
+        block_on(self.commit_account.commit_block(&new_block.block))
+            .expect("block commit send tx")
+            .expect_success();
+        block_on(self.commit_account.verify_block(&new_block.block))
+            .expect("block verify send tx")
+            .expect_success();
+        block_on(self.commit_account.complete_withdrawals())
+            .expect("complete withdrawal send tx")
+            .expect_success();
 
         let mut block_checks_failed = false;
         for ((eth_account, token), (balance, allowed_margin)) in
@@ -786,5 +798,68 @@ impl TestSetup {
             block_on(account.erc20_balance(&self.tokens[&token]))
                 .expect("Failed to get erc20 balance")
         }
+    }
+
+    pub fn get_balance_to_withdraw(
+        &self,
+        eth_account_id: ETHAccountId,
+        token: Token,
+    ) -> BigDecimal {
+        block_on(self.accounts.eth_accounts[eth_account_id.0].balances_to_withdraw(token.0))
+            .expect("failed to query balance to withdraws")
+    }
+
+    pub fn is_exodus(&self) -> bool {
+        block_on(self.commit_account.is_exodus()).expect("Exodus query")
+    }
+
+    pub fn total_blocks_committed(&self) -> Result<u64, failure::Error> {
+        block_on(self.accounts.eth_accounts[0].total_blocks_committed())
+    }
+
+    pub fn eth_block_number(&self) -> u64 {
+        block_on(self.commit_account.eth_block_number()).expect("Block number query")
+    }
+
+    pub fn get_tokens(&self) -> Vec<Token> {
+        self.tokens.iter().map(|(id, _)| Token(*id)).collect()
+    }
+
+    pub fn trigger_exodus_if_needed(&self, eth_account: ETHAccountId) {
+        block_on(self.accounts.eth_accounts[eth_account.0].trigger_exodus_if_needed())
+            .expect("Trigger exodus if needed call");
+    }
+
+    pub fn cancel_outstanding_deposits(&self, eth_account: ETHAccountId) {
+        const DEPOSITS_TO_CANCEL: u64 = 100;
+        block_on(
+            self.accounts.eth_accounts[eth_account.0]
+                .cancel_outstanding_deposits_for_exodus_mode(DEPOSITS_TO_CANCEL),
+        )
+        .expect("Failed to cancel outstanding deposits");
+    }
+
+    pub fn get_accounts_state(&self) -> AccountMap {
+        let mut account_map = AccountMap::default();
+        for id in 0..self.accounts.zksync_accounts.len() {
+            if let Some((id, account)) =
+                self.get_zksync_account_committed_state(ZKSyncAccountId(id))
+            {
+                account_map.insert(id, account);
+            }
+        }
+        account_map
+    }
+
+    pub fn gen_exit_proof(
+        &self,
+        accounts: AccountMap,
+        fund_owner: ZKSyncAccountId,
+        token: Token,
+    ) -> (EncodedProof, BigDecimal) {
+        let owner_address = self.accounts.zksync_accounts[fund_owner.0].address;
+        // restore account state
+        prover::exit_proof::create_exit_proof(accounts, owner_address, token.0)
+            .expect("Failed to generate exit proof")
     }
 }

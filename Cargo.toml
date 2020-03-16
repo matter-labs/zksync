@@ -13,5 +13,6 @@ members = [
     "core/spec_test",
     "core/testhelper",
     "core/testkit",
+    "core/loadtest",
     "core/crypto_exports"
 ]

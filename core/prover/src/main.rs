@@ -1,20 +1,42 @@
 // Built-in deps
+use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::mpsc;
-use std::sync::{atomic::AtomicBool, Arc};
+use std::sync::Arc;
 use std::{env, thread, time};
 // External deps
+use clap::{App, Arg};
 use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use crypto_exports::franklin_crypto::bellman::groth16;
-use log::{debug, error, info};
+use log::*;
 use signal_hook::iterator::Signals;
 // Workspace deps
-use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_HEARTBEAT_INTERVAL};
-use models::node::Engine;
-use prover::client;
+use models::node::config::PROVER_HEARTBEAT_INTERVAL;
+use prover::{client, read_circuit_params};
 use prover::{start, BabyProver};
 
 fn main() {
+    let cli = App::new("Prover")
+        .author("Matter Labs")
+        .arg(
+            Arg::with_name("block_size_chunks")
+                .help("Size of blocks this prover deals with.")
+                .required(true)
+                .index(1),
+        )
+        .arg(
+            Arg::with_name("worker_name")
+                .help("Name of the worker. Must be unique!")
+                .required(true)
+                .index(2),
+        )
+        .get_matches();
+
+    let block_size_chunks = usize::from_str(cli.value_of("block_size_chunks").unwrap())
+        .expect("invalid block_size_chunks");
+    let worker_name = cli.value_of("worker_name").unwrap();
+
     env_logger::init();
+    const ABSENT_PROVER_ID: i32 = -1;
 
     // handle ctrl+c
     let stop_signal = Arc::new(AtomicBool::new(false));
@@ -25,86 +47,87 @@ fn main() {
     signal_hook::flag::register(signal_hook::SIGQUIT, Arc::clone(&stop_signal))
         .expect("Error setting SIGQUIT handler");
 
-    let worker_name = env::var("POD_NAME").expect("POD_NAME is missing");
-    let key_dir = env::var("KEY_DIR").expect("KEY_DIR not set");
     info!("creating prover, worker name: {}", worker_name);
 
     // Create client
     let api_url = env::var("PROVER_SERVER_URL").expect("PROVER_SERVER_URL is missing");
-    let api_client = client::ApiClient::new(&api_url, &worker_name);
+    let req_server_timeout = env::var("REQ_SERVER_TIMEOUT")
+        .expect("REQ_SERVER_TIMEOUT is missing")
+        .parse::<u64>()
+        .map(time::Duration::from_secs)
+        .expect("REQ_SERVER_TIMEOUT invalid value");
+    let api_client = client::ApiClient::new(
+        &api_url,
+        &worker_name,
+        Some(stop_signal.clone()),
+        req_server_timeout,
+    );
+    let prover_id_arc = Arc::new(AtomicI32::new(ABSENT_PROVER_ID));
+
+    // Handle termination requests.
+    {
+        let prover_id_arc = prover_id_arc.clone();
+        let api_client = api_client.clone();
+        thread::spawn(move || {
+            let signals = Signals::new(&[
+                signal_hook::SIGTERM,
+                signal_hook::SIGINT,
+                signal_hook::SIGQUIT,
+            ])
+            .expect("Signals::new() failed");
+            for _ in signals.forever() {
+                info!("Termination signal received.");
+                let prover_id = prover_id_arc.load(Ordering::SeqCst);
+                if prover_id != ABSENT_PROVER_ID {
+                    match api_client.prover_stopped(prover_id) {
+                        Ok(_) => {}
+                        Err(e) => error!("failed to send prover stop request: {}", e),
+                    }
+                }
+
+                std::process::exit(0);
+            }
+        });
+    }
+
     // Create prover
     let jubjub_params = AltJubjubBn256::new();
-    let circuit_params = read_from_key_dir(key_dir);
+    let circuit_params = read_circuit_params(block_size_chunks);
     let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
-    let prover_timeout = time::Duration::from_secs(PROVER_GONE_TIMEOUT as u64);
     let worker = BabyProver::new(
         circuit_params,
         jubjub_params,
-        api_client,
+        block_size_chunks,
+        api_client.clone(),
         heartbeat_interval,
-        prover_timeout,
         stop_signal,
     );
+
     // Register prover
-    let prover_id = client::ApiClient::new(&api_url, &worker_name)
-        .register_prover()
-        .expect("failed to register prover");
+    prover_id_arc.store(
+        api_client
+            .register_prover(block_size_chunks)
+            .expect("failed to register prover"),
+        Ordering::SeqCst,
+    );
+
     // Start prover
     let (exit_err_tx, exit_err_rx) = mpsc::channel();
-    thread::spawn(move || {
+    let jh = thread::spawn(move || {
         start(worker, exit_err_tx);
-    });
-
-    // Handle termination requests.
-    let prover_id_copy = prover_id;
-    let api_url_copy = api_url.clone();
-    let worker_name_copy = worker_name.clone();
-    thread::spawn(move || {
-        let signals = Signals::new(&[
-            signal_hook::SIGTERM,
-            signal_hook::SIGINT,
-            signal_hook::SIGQUIT,
-        ])
-        .expect("Signals::new() failed");
-        for _ in signals.forever() {
-            info!(
-                "Termination signal received. Prover will finish the job and shut down gracefully"
-            );
-            client::ApiClient::new(&api_url_copy, &worker_name_copy)
-                .prover_stopped(prover_id_copy)
-                .expect("failed to send prover stop request");
-        }
     });
 
     // Handle prover exit errors.
     let err = exit_err_rx.recv();
+    jh.join().expect("failed to join on worker thread");
     error!("prover exited with error: {:?}", err);
-    client::ApiClient::new(&api_url, &worker_name)
-        .prover_stopped(prover_id)
-        .expect("failed to send prover stop request");
-}
-
-fn read_from_key_dir(key_dir: String) -> groth16::Parameters<Engine> {
-    let path = {
-        let mut key_file_path = std::path::PathBuf::new();
-        key_file_path.push(&key_dir);
-        key_file_path.push(&format!("{}", models::params::block_size_chunks()));
-        key_file_path.push(&format!("{}", models::params::account_tree_depth()));
-        key_file_path.push(models::params::KEY_FILENAME);
-        key_file_path
-    };
-    debug!(
-        "Reading key from {}",
-        path.to_str().expect("failed to get keys location")
-    );
-    read_parameters(&path.to_str().expect("failed to get keys location"))
-}
-
-fn read_parameters(file_name: &str) -> groth16::Parameters<Engine> {
-    use std::fs::File;
-    use std::io::BufReader;
-
-    let f_r = File::open(file_name).expect("failed to open file");
-    let mut r = BufReader::new(f_r);
-    groth16::Parameters::<Engine>::read(&mut r, true).expect("failed to read circuit params")
+    {
+        let prover_id = prover_id_arc.load(Ordering::SeqCst);
+        if prover_id != ABSENT_PROVER_ID {
+            match api_client.prover_stopped(prover_id) {
+                Ok(_) => {}
+                Err(e) => error!("failed to send prover stop request: {}", e),
+            }
+        }
+    }
 }

@@ -38,5 +38,6 @@ export default {
 .tokenNameButton {
     display: inline-block;
     height: 2;
+    width: 7em;
 }
 </style>

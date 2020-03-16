@@ -23,7 +23,7 @@ pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
             acc
         })
 }
-pub fn sign_pedersen<E>(
+pub fn sign_sha256<E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
     p_g: FixedGenerators,
@@ -35,11 +35,11 @@ where
     let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
 
     let seed = Seed::deterministic_seed(&private_key, &message_bytes);
-    let signature = private_key.musig_pedersen_sign(&message_bytes, &seed, p_g, params);
+    let signature = private_key.musig_sha256_sign(&message_bytes, &seed, p_g, params);
 
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let _is_valid_signature =
-        pk.verify_musig_pedersen(&message_bytes, &signature.clone(), p_g, params);
+        pk.verify_musig_sha256(&message_bytes, &signature.clone(), p_g, params);
 
     // TODO: handle the case where it is not valid
     // if !is_valid_signature {
@@ -286,5 +286,5 @@ pub fn print_boolean_vec(bits: &[Boolean]) {
         bytes.push(b);
     }
 
-    println!("Hex: {}", hex::encode(&bytes));
+    debug!("Hex: {}", hex::encode(&bytes));
 }

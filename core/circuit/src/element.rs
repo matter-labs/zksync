@@ -99,21 +99,6 @@ impl<E: JubjubEngine> CircuitElement<E> {
         })
     }
 
-    // pub fn from_number<CS: ConstraintSystem<E>>(
-    //     mut cs: CS,
-    //     number: AllocatedNum<E>,
-    //     max_length: usize,
-    // ) -> Result<Self, SynthesisError> {
-    //     // let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
-    //     let mut bits = number.into_bits_le(cs.namespace(|| "into_bits_le_fixed"))?;
-    //     bits.truncate(max_length);
-    //     Ok(CircuitElement {
-    //         number,
-    //         bits_le: bits,
-    //         length: max_length,
-    //     })
-    // }
-
     pub fn from_number_with_known_length<CS: ConstraintSystem<E>>(
         mut cs: CS,
         number: AllocatedNum<E>,
@@ -169,7 +154,7 @@ impl<E: JubjubEngine> CircuitElement<E> {
         number: AllocatedNum<E>,
     ) -> Result<Self, SynthesisError> {
         let bits = number.into_bits_le(cs.namespace(|| "into_bits_le"))?;
-        assert!(bits.len() == E::Fr::NUM_BITS as usize);
+        assert_eq!(bits.len(), E::Fr::NUM_BITS as usize);
 
         let bits_len = bits.len();
 

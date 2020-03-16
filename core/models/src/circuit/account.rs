@@ -4,8 +4,10 @@ use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField, PrimeFieldRepr};
 
 use crate::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
+use crate::merkle_tree::hasher::Hasher;
 use crate::merkle_tree::{PedersenHasher, SparseMerkleTree};
 use crate::primitives::{GetBits, GetBitsFixed};
+
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
 pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, PedersenHasher<Bn256>>;
 pub struct CircuitAccount<E: JubjubEngine> {
@@ -28,15 +30,32 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
             self.address.get_bits_le_fixed(params::ADDRESS_WIDTH), //160
         );
 
-        let mut root_hash_bits = self
+        let mut balance_root_bits = self
             .subtree
             .root_hash()
             .get_bits_le_fixed(params::FR_BIT_WIDTH);
-        root_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false); //256
+        balance_root_bits.resize(params::FR_BIT_WIDTH_PADDED, false); //256
 
-        leaf_content.extend(root_hash_bits);
+        // In future some other subtree can be added here instead of the empty hash.
+        let state_root_bits = vec![false; params::FR_BIT_WIDTH_PADDED];
 
-        assert_eq!(leaf_content.len(), params::LEAF_DATA_BIT_WIDTH);
+        let mut subtree_hash_input_bits = Vec::with_capacity(params::FR_BIT_WIDTH_PADDED * 2);
+        subtree_hash_input_bits.extend(balance_root_bits.into_iter());
+        subtree_hash_input_bits.extend(state_root_bits.into_iter());
+
+        let mut state_tree_hash_bits = self
+            .subtree
+            .hasher
+            .hash_bits(subtree_hash_input_bits.into_iter())
+            .get_bits_le_fixed(params::FR_BIT_WIDTH);
+        state_tree_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false);
+
+        leaf_content.extend(state_tree_hash_bits.into_iter());
+        assert_eq!(
+            leaf_content.len(),
+            params::LEAF_DATA_BIT_WIDTH,
+            "Account bit width mismatch"
+        );
         leaf_content
     }
 }

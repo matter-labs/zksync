@@ -23,7 +23,6 @@ ERC20_ADDR_NEW_VALUE=`grep "TEST_ERC20" deploy.log`
 GOVERNANCE_GENESIS_TX_HASH_NEW_VALUE=`grep "GOVERNANCE_GENESIS_TX_HASH" deploy.log`
 GOVERNANCE_ADDR_NEW_VALUE=`grep "GOVERNANCE_ADDR" deploy.log`
 VERIFIER_ADDR_NEW_VALUE=`grep "VERIFIER_ADDR" deploy.log`
-PRIORITY_QUEUE_ADDR_NEW_VALUE=`grep "PRIORITY_QUEUE_ADDR" deploy.log`
 if [[ ! -z "$CONTRACT_ADDR_NEW_VALUE" ]]
 then
     export LABEL=$ZKSYNC_ENV-Contract_deploy-`date +%Y-%m-%d-%H%M%S`
@@ -37,7 +36,6 @@ then
     python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_GENESIS_TX_HASH_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $VERIFIER_ADDR_NEW_VALUE
-    python3 bin/replace-env-variable.py ./$ENV_FILE $PRIORITY_QUEUE_ADDR_NEW_VALUE
 else
     echo "Contract deployment failed"
     exit 1

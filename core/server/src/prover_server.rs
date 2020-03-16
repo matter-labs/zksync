@@ -10,6 +10,7 @@ use futures::channel::mpsc;
 use log::{error, info, trace};
 // Workspace deps
 use models::config_options::ThreadPanicNotify;
+use models::node::BlockNumber;
 use prover::client;
 
 struct AppState {
@@ -21,9 +22,13 @@ struct AppState {
 impl AppState {
     fn access_storage(&self) -> actix_web::Result<storage::StorageProcessor> {
         self.connection_pool
-            .access_storage()
+            .access_storage_fragile()
             .map_err(actix_web::error::ErrorInternalServerError)
     }
+}
+
+fn status() -> actix_web::Result<String> {
+    Ok("alive".into())
 }
 
 fn register(
@@ -36,7 +41,8 @@ fn register(
     }
     let storage = data.access_storage()?;
     let id = storage
-        .register_prover(&r.name)
+        .prover_schema()
+        .register_prover(&r.name, r.block_size)
         .map_err(actix_web::error::ErrorInternalServerError)?;
     Ok(id.to_string())
 }
@@ -51,12 +57,17 @@ fn block_to_prove(
     }
     let storage = data.access_storage()?;
     let ret = storage
-        .prover_run_for_next_commit(&r.name, data.prover_timeout)
+        .prover_schema()
+        .prover_run_for_next_commit(&r.name, data.prover_timeout, r.block_size)
         .map_err(|e| {
             error!("could not get next unverified commit operation: {}", e);
             actix_web::error::ErrorInternalServerError("storage layer error")
         })?;
     if let Some(prover_run) = ret {
+        info!(
+            "satisfied request block {} to prove from worker: {}",
+            prover_run.block_number, r.name
+        );
         Ok(HttpResponse::Ok().json(client::BlockToProveRes {
             prover_run_id: prover_run.id,
             block: prover_run.block_number,
@@ -71,21 +82,25 @@ fn block_to_prove(
 
 fn prover_data(
     data: web::Data<AppState>,
-    block: web::Json<i64>,
+    block: web::Json<BlockNumber>,
 ) -> actix_web::Result<HttpResponse> {
-    info!("requesting prover_data for block {}", *block);
+    trace!("requesting prover_data for block {}", *block);
     let data_pool = data
         .preparing_data_pool
         .read()
         .expect("failed to get read lock on data");
-    Ok(HttpResponse::Ok().json(data_pool.get(*block)))
+    let res = data_pool.get(*block);
+    if res.is_some() {
+        info!("Sent prover_data for block {}", *block);
+    }
+    Ok(HttpResponse::Ok().json(res))
 }
 
 fn working_on(
     data: web::Data<AppState>,
     r: web::Json<client::WorkingOnReq>,
 ) -> actix_web::Result<()> {
-    trace!(
+    info!(
         "working on request for prover_run with id: {}",
         r.prover_run_id
     );
@@ -94,6 +109,7 @@ fn working_on(
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
     storage
+        .prover_schema()
         .record_prover_is_working(r.prover_run_id)
         .map_err(|e| {
             error!("failed to record prover work in progress request: {}", e);
@@ -107,20 +123,23 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
         .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    match storage.store_proof(r.block, &r.proof) {
+    match storage.prover_schema().store_proof(r.block, &r.proof) {
         Ok(_) => {
             let mut data_pool = data
                 .preparing_data_pool
                 .write()
                 .expect("failed to get write lock on data");
-            data_pool.clean_up(r.block as i64);
+            data_pool.clean_up(r.block);
             Ok(())
         }
         Err(e) => {
             error!("failed to store received proof: {}", e);
-            Err(actix_web::error::ErrorInternalServerError(
-                "storage layer error",
-            ))
+            let message = if e.to_string().contains("duplicate key") {
+                "duplicate key"
+            } else {
+                "storage layer error"
+            };
+            Err(actix_web::error::ErrorInternalServerError(message))
         }
     }
 }
@@ -134,10 +153,13 @@ fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::R
         .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    storage.record_prover_stop(*prover_id).map_err(|e| {
-        error!("failed to record prover stop: {}", e);
-        actix_web::error::ErrorInternalServerError("storage layer error")
-    })
+    storage
+        .prover_schema()
+        .record_prover_stop(*prover_id)
+        .map_err(|e| {
+            error!("failed to record prover stop: {}", e);
+            actix_web::error::ErrorInternalServerError("storage layer error")
+        })
 }
 
 pub fn start_prover_server(
@@ -147,29 +169,30 @@ pub fn start_prover_server(
     rounds_interval: time::Duration,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    let panic_notify2 = panic_notify.clone();
     thread::Builder::new()
         .name("prover_server".to_string())
         .spawn(move || {
-            let _panic_sentinel = ThreadPanicNotify(panic_notify);
-            let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new()));
-            let data_pool_copy = Arc::clone(&data_pool);
-            let conn_pool_clone = connection_pool.clone();
-            thread::Builder::new()
-                .name("prover_server_pool".to_string())
-                .spawn(move || {
-                    let _panic_sentinel = ThreadPanicNotify(panic_notify2);
-                    pool::maintain(conn_pool_clone, data_pool_copy, rounds_interval);
-                })
-                .expect("failed to start provers server");
+            let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
+            let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new(10)));
+
+            // Start pool maintainer thread.
+            let pool_maintainer = pool::Maintainer::new(
+                connection_pool.clone(),
+                Arc::clone(&data_pool),
+                rounds_interval,
+            );
+            pool_maintainer.start(panic_notify);
+
+            // Start HTTP server.
             HttpServer::new(move || {
                 App::new()
                     .wrap(actix_web::middleware::Logger::default())
                     .data(AppState {
                         connection_pool: connection_pool.clone(),
-                        preparing_data_pool: Arc::clone(&data_pool),
+                        preparing_data_pool: data_pool.clone(),
                         prover_timeout,
                     })
+                    .route("/status", web::get().to(status))
                     .route("/register", web::post().to(register))
                     .route("/block_to_prove", web::get().to(block_to_prove))
                     .route("/working_on", web::post().to(working_on))

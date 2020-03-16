@@ -4,7 +4,7 @@ use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
     priv_key_from_fs, Address, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
-use std::cell::RefCell;
+use std::sync::Mutex;
 use web3::types::H256;
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
@@ -13,7 +13,7 @@ pub struct ZksyncAccount {
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
     pub eth_private_key: H256,
-    nonce: RefCell<Nonce>,
+    nonce: Mutex<Nonce>,
 }
 
 impl ZksyncAccount {
@@ -54,12 +54,13 @@ impl ZksyncAccount {
             private_key,
             pubkey_hash,
             eth_private_key,
-            nonce: RefCell::new(nonce),
+            nonce: Mutex::new(nonce),
         }
     }
 
     pub fn nonce(&self) -> Nonce {
-        *self.nonce.borrow()
+        let n = self.nonce.lock().unwrap();
+        *n
     }
 
     pub fn sign_transfer(
@@ -71,20 +72,21 @@ impl ZksyncAccount {
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> Transfer {
+        let mut stored_nonce = self.nonce.lock().unwrap();
         let mut transfer = Transfer {
             from: self.address,
             to: *to,
             token: token_id,
             amount,
             fee,
-            nonce: nonce.unwrap_or_else(|| *self.nonce.borrow()),
+            nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
         };
         transfer.signature =
-            TxSignature::sign_musig_pedersen(&self.private_key, &transfer.get_bytes());
+            TxSignature::sign_musig_sha256(&self.private_key, &transfer.get_bytes());
 
         if increment_nonce {
-            *self.nonce.borrow_mut() += 1;
+            *stored_nonce += 1;
         }
         transfer
     }
@@ -98,20 +100,21 @@ impl ZksyncAccount {
         nonce: Option<Nonce>,
         increment_nonce: bool,
     ) -> Withdraw {
+        let mut stored_nonce = self.nonce.lock().unwrap();
         let mut withdraw = Withdraw {
             from: self.address,
             to: *eth_address,
             token: token_id,
             amount,
             fee,
-            nonce: nonce.unwrap_or_else(|| *self.nonce.borrow()),
+            nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
         };
         withdraw.signature =
-            TxSignature::sign_musig_pedersen(&self.private_key, &withdraw.get_bytes());
+            TxSignature::sign_musig_sha256(&self.private_key, &withdraw.get_bytes());
 
         if increment_nonce {
-            *self.nonce.borrow_mut() += 1;
+            *stored_nonce += 1;
         }
         withdraw
     }
@@ -122,11 +125,13 @@ impl ZksyncAccount {
         increment_nonce: bool,
         auth_onchain: bool,
     ) -> ChangePubKey {
-        let nonce = nonce.unwrap_or_else(|| *self.nonce.borrow());
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let nonce = nonce.unwrap_or_else(|| *stored_nonce);
         let eth_signature = if auth_onchain {
             None
         } else {
-            let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash);
+            let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash)
+                .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
             Some(eth_signature)
@@ -146,7 +151,7 @@ impl ZksyncAccount {
         }
 
         if increment_nonce {
-            *self.nonce.borrow_mut() += 1;
+            *stored_nonce += 1;
         }
 
         change_pubkey

@@ -24,13 +24,14 @@
     "ts-node": "^8.3.0",
     "tslint": "^5.18.0",
     "typescript": "^3.5.3",
-    "zksync": "^0.3.9"
+    "zksync": "link:../js/zksync.js"
   },
   "scripts": {
-    "build": "waffle .waffle.json && waffle .waffle.config_flat.json",
-    "test": "waffle .waffle.json && mocha -r ts-node/register test/**/*.ts",
-    "itest": "waffle .waffle.json && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
-    "unit-test": "waffle .waffle.json && mocha test/unit_tests/**/*.js",
+    "build": "waffle .waffle.json",
+    "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
+    "itest": "yarn build && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
+    "unit-test": "yarn build && mocha -r ts-node/register test/unit_tests/**/*",
+    "unit-test-watch": "waffle .waffle.json && mocha -r ts-node/register test/unit_tests/**/* --watch --watch-extensions ts --watch-extensions 'js'",
     "deploy": "yarn build && ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-no-build": "ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-test-no-build": "ts-node scripts/testnet-deploy.ts --deploy --test",
