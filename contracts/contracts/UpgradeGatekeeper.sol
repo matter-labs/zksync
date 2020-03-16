@@ -103,8 +103,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
             emit UpgradeModeFinalizeStatusActivated(proxyAddress, version[proxyAddress]);
             return true;
-        }
-        else{
+        } else {
             return false;
         }
     }
