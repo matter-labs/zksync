@@ -5,9 +5,9 @@ import "./Ownable.sol";
 import "./Proxy.sol";
 
 
-/// @title Upgrade Module Contract
+/// @title Upgrade Gatekeeper Contract
 /// @author Matter Labs
-contract UpgradeModule is UpgradeEvents, Ownable {
+contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
     /// @notice Waiting period to activate finalize status mode (in seconds)
     uint256 constant WAIT_UPGRADE_MODE_PERIOD = 2 weeks;
@@ -57,9 +57,9 @@ contract UpgradeModule is UpgradeEvents, Ownable {
     /// @param newTarget New target
     function upgradeProxy(address proxyAddress, address newTarget) external {
         requireMaster(msg.sender);
-        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeModule.UpgradeStatus.NotActive, "upa11"); // upa11 - unable to activate active upgrade mode
+        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.NotActive, "upa11"); // upa11 - unable to activate active upgrade mode
 
-        upgradeInfo[proxyAddress].upgradeStatus = UpgradeModule.UpgradeStatus.WaitUpgrade;
+        upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.WaitUpgrade;
         upgradeInfo[proxyAddress].activationTime = now;
         upgradeInfo[proxyAddress].nextTarget = newTarget;
         upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
@@ -71,9 +71,9 @@ contract UpgradeModule is UpgradeEvents, Ownable {
     /// @param proxyAddress Address of proxy to process
     function cancelProxyUpgrade(address proxyAddress) external {
         requireMaster(msg.sender);
-        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeModule.UpgradeStatus.NotActive, "umc11"); // umc11 - unable to cancel not active upgrade mode
+        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeGatekeeper.UpgradeStatus.NotActive, "umc11"); // umc11 - unable to cancel not active upgrade mode
 
-        upgradeInfo[proxyAddress].upgradeStatus = UpgradeModule.UpgradeStatus.NotActive;
+        upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.NotActive;
         upgradeInfo[proxyAddress].activationTime = 0;
         upgradeInfo[proxyAddress].nextTarget = address(0);
         upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
@@ -85,14 +85,14 @@ contract UpgradeModule is UpgradeEvents, Ownable {
     /// @param proxyAddress Address of proxy to process
     /// @return Bool flag indicating that finalize status is active after this call
     function activeFinalizeStatusOfUpgrade(address proxyAddress) public returns (bool) {
-        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeModule.UpgradeStatus.NotActive, "uaf11"); // uaf11 - unable to activate finalize status in case of not active upgrade mode
+        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeGatekeeper.UpgradeStatus.NotActive, "uaf11"); // uaf11 - unable to activate finalize status in case of not active upgrade mode
 
-        if (upgradeInfo[proxyAddress].upgradeStatus == UpgradeModule.UpgradeStatus.Finalize) {
+        if (upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Finalize) {
             return true;
         }
 
         if (now >= upgradeInfo[proxyAddress].activationTime + WAIT_UPGRADE_MODE_PERIOD) {
-            upgradeInfo[proxyAddress].upgradeStatus = UpgradeModule.UpgradeStatus.Finalize;
+            upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Finalize;
 
             (bool callSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
                 abi.encodeWithSignature("registeredPriorityOperations()")
@@ -114,7 +114,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
     /// @param newTargetInitializationParameters New target initialization parameters
     function finishProxyUpgrade(address proxyAddress, bytes calldata newTargetInitializationParameters) external {
         requireMaster(msg.sender);
-        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeModule.UpgradeStatus.Finalize, "umf11"); // umf11 - unable to finish upgrade without finalize status active
+        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Finalize, "umf11"); // umf11 - unable to finish upgrade without finalize status active
 
         (bool callSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
             abi.encodeWithSignature("verifiedPriorityOperations()")
@@ -129,7 +129,7 @@ contract UpgradeModule is UpgradeEvents, Ownable {
         emit UpgradeCompleted(proxyAddress, version[proxyAddress], upgradeInfo[proxyAddress].nextTarget);
         version[proxyAddress]++;
 
-        upgradeInfo[proxyAddress].upgradeStatus = UpgradeModule.UpgradeStatus.NotActive;
+        upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.NotActive;
         upgradeInfo[proxyAddress].activationTime = 0;
         upgradeInfo[proxyAddress].nextTarget = address(0);
         upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
