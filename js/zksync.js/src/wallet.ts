@@ -96,7 +96,7 @@ export class Wallet {
 
         const txMessageEthSignature = await this.ethSigner.signMessage(humanReadableTxInfo);
 
-        const signedTransferTransaction = this.signer.signSyncTransfer(
+        const signedTransferTransaction = await this.signer.signSyncTransfer(
             transactionData
         );
 
@@ -150,7 +150,7 @@ export class Wallet {
         
         const txMessageEthSignature = await this.ethSigner.signMessage(humanReadableTxInfo);
 
-        const signedWithdrawTransaction = this.signer.signSyncWithdraw(
+        const signedWithdrawTransaction = await this.signer.signSyncWithdraw(
             transactionData
         );
 
@@ -170,7 +170,7 @@ export class Wallet {
             throw new Error("ZKSync signer is required for current pubkey calculation.");
         }
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const signerPubKeyHash = this.signer.pubKeyHash();
+        const signerPubKeyHash = await this.signer.pubKeyHash();
         return currentPubKeyHash === signerPubKeyHash;
     }
 
@@ -183,7 +183,7 @@ export class Wallet {
         }
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const newPubKeyHash = this.signer.pubKeyHash();
+        const newPubKeyHash = await this.signer.pubKeyHash();
 
         if (currentPubKeyHash == newPubKeyHash) {
             throw new Error("Current signing key is set already");
@@ -197,7 +197,7 @@ export class Wallet {
         const txData = {
             type: "ChangePubKey",
             account: this.address(),
-            newPkHash: this.signer.pubKeyHash(),
+            newPkHash: await this.signer.pubKeyHash(),
             nonce: numNonce,
             ethSignature
         };
@@ -215,7 +215,7 @@ export class Wallet {
         }
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const newPubKeyHash = this.signer.pubKeyHash();
+        const newPubKeyHash = await this.signer.pubKeyHash();
 
         if (currentPubKeyHash == newPubKeyHash) {
             throw new Error("Current PubKeyHash is the same as new");

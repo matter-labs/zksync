@@ -1,10 +1,8 @@
 import { curve } from "elliptic";
 import {
     privateKeyFromSeed,
-    privateKeyToPublicKey,
-    pubkeyToAddress,
-    serializePointPacked,
-    signTransactionBytes
+    signTransactionBytes,
+    privateKeyToPubKeyHash,
 } from "./crypto";
 import {ethers, utils} from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
@@ -16,25 +14,23 @@ const MAX_NUMBER_OF_ACCOUNTS = 1 << 24;
 
 export class Signer {
     readonly privateKey: BN;
-    readonly publicKey: curve.edwards.EdwardsPoint;
 
     private constructor(privKey: BN) {
         this.privateKey = privKey;
-        this.publicKey = privateKeyToPublicKey(this.privateKey);
     }
 
-    pubKeyHash(): PubKeyHash {
-        return `sync:${pubkeyToAddress(this.publicKey).toString("hex")}`;
+    async pubKeyHash(): Promise<PubKeyHash> {
+        return await privateKeyToPubKeyHash(this.privateKey);
     }
 
-    signSyncTransfer(transfer: {
+    async signSyncTransfer(transfer: {
         from: Address;
         to: Address;
         tokenId: number;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce: number;
-    }): Transfer {
+    }): Promise<Transfer> {
         const type = Buffer.from([5]); // tx type
         const from = serializeAddress(transfer.from);
         const to = serializeAddress(transfer.to);
@@ -52,7 +48,7 @@ export class Signer {
             nonce
         ]);
 
-        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.privateKey, msgBytes);
 
         return {
             type: "Transfer",
@@ -66,14 +62,14 @@ export class Signer {
         };
     }
 
-    signSyncWithdraw(withdraw: {
+    async signSyncWithdraw(withdraw: {
         from: Address;
         ethAddress: string;
         tokenId: number;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce: number;
-    }): Withdraw {
+    }): Promise<Withdraw> {
         const typeBytes = Buffer.from([3]);
         const accountBytes = serializeAddress(withdraw.from);
         const ethAddressBytes = serializeAddress(withdraw.ethAddress);
@@ -90,7 +86,7 @@ export class Signer {
             feeBytes,
             nonceBytes
         ]);
-        const signature = signTransactionBytes(this.privateKey, msgBytes);
+        const signature = await signTransactionBytes(this.privateKey, msgBytes);
         return {
             type: "Withdraw",
             from: withdraw.from,
@@ -107,14 +103,14 @@ export class Signer {
         return new Signer(pk);
     }
 
-    static fromSeed(seed: Buffer): Signer {
-        return new Signer(privateKeyFromSeed(seed));
+    static async fromSeed(seed: Buffer): Promise<Signer> {
+        return new Signer(await privateKeyFromSeed(seed));
     }
 
     static async fromETHSignature(ethSigner: ethers.Signer): Promise<Signer> {
         const sign = await ethSigner.signMessage("Access ZK Sync account.\n" + "\n" + "Only sign this message for a trusted client!");
         const seed = Buffer.from(sign.substr(2), "hex");
-        return  Signer.fromSeed(seed);
+        return await Signer.fromSeed(seed);
     }
 }
 
