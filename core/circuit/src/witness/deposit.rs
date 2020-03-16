@@ -509,7 +509,7 @@ mod test {
     }
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn test_new_transpile_deposit_franklin_existing_account() {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
@@ -558,31 +558,51 @@ mod test {
         );
 
         use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
-        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
-        use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
-        use crate::franklin_crypto::bellman::plonk::better_cs::test_assembly::*;
+        // use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
+        // use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
+        use crate::franklin_crypto::bellman::plonk::*;
+        use crate::franklin_crypto::bellman::kate_commitment::*;
+        use crate::franklin_crypto::bellman::worker::Worker;
+        use crate::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
 
-        use crate::franklin_crypto::bellman::Circuit;
 
-        let mut transpiler = Transpiler::new();
+        // let mut transpiler = Transpiler::new();
 
         let c = witness_accum.into_circuit_instance();
 
-        c.clone().synthesize(&mut transpiler).unwrap();
+        // c.clone().synthesize(&mut transpiler).unwrap();
+
+        let hints = transpile::<Bn256, _>(c.clone()).expect("transpilation is successful");
 
         println!("Done transpiling");
 
-        let hints = transpiler.into_hints();
+        is_satisfied(c.clone(), &hints).expect("must validate");
 
-        let adapted_curcuit = AdaptorCircuit::new(c.clone(), &hints);
+        println!("Done checking if satisfied");
 
-        let mut assembly = TestAssembly::<Bn256>::new();
-        adapted_curcuit.synthesize(&mut assembly).unwrap();
-        let num_gates = assembly.num_gates();
+        let setup = setup(c.clone(), &hints).expect("must make setup");
 
-        println!("Transpiled into {} gates", num_gates);
+        println!("Made into {} gates", setup.n);
+        let num_gates = setup.n.next_power_of_two();
 
-        println!("Check if satisfied");
-        assert!(assembly.is_satisfied(false));
+        let worker = Worker::new();
+
+        let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::crs_42(num_gates, &worker);
+
+        let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::from_powers(&key_monomial_form, num_gates, &worker);
+
+        // let precomputation = make_precomputations(&setup);
+        let verification_key = make_verification_key(&setup, &key_monomial_form).expect("must make a verification key");
+
+        let proof = prove::<_, _, RollingKeccakTranscript<Fr>>(
+            c.clone(), 
+            &hints, 
+            &setup, 
+            &key_monomial_form,
+            &key_lagrange_form
+        ).expect("must make a proof");
+
+        let is_valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &verification_key).expect("must perform verification");
+        assert!(is_valid);
     }
 }
