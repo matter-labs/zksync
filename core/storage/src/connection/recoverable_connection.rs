@@ -9,7 +9,10 @@ use diesel::query_builder::{AsQuery, QueryFragment, QueryId};
 use diesel::query_source::QueryableByName;
 use diesel::types::HasSqlType;
 
+/// Amount of attempts to re-establish the connection.
 const RETRIES_AMOUNT: usize = 10;
+/// Quantile of the interval between re-establishment attempts.
+/// This amount of time is increased after each unsuccessful attempt.
 const RETRY_QUANTILE: Duration = Duration::from_millis(200);
 
 /// `RecoverableConnection` is a generic wrapper over Diesel's connection types
@@ -149,7 +152,8 @@ where
             }
         }
 
-        // At this point we are sure that database is down, we cannot work without a database.
+        // At this point we are sure that either database is down
+        // or the query is incorrect; we cannot work without a database.
         panic!("Cannot connect to the database after several retries, it is probably down");
     }
 
