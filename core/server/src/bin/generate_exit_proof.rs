@@ -78,7 +78,10 @@ fn main() {
     let token_id = if target_token_address == "ETH" {
         0
     } else {
-        let tokens = storage.load_tokens().expect("Failed to load token");
+        let tokens = storage
+            .tokens_schema()
+            .load_tokens()
+            .expect("Failed to load token");
         tokens
             .into_iter()
             .find(|(_, token)| token.address == target_token_address)
@@ -86,6 +89,8 @@ fn main() {
             .0
     };
     let accounts = storage
+        .chain()
+        .state_schema()
         .load_verified_state()
         .expect("Failed to load verified state")
         .1;
