@@ -37,15 +37,13 @@ async function deployProxyContract(
     initArgsValues,
 ) {
     try {
-        const proxy = await deployContract(wallet, proxyCode, [], {
-            gasLimit: 3000000,
-        });
+        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
         const contract = await deployContract(wallet, contractCode, [], {
             gasLimit: 3000000,
         });
-        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const tx = await proxy.initializeTarget(contract.address, initArgsInBytes);
-        await tx.wait();
+        const proxy = await deployContract(wallet, proxyCode, [contract.address, initArgsInBytes], {
+            gasLimit: 3000000,
+        });
 
         const returnContract = new ethers.Contract(proxy.address, contractCode.interface, wallet);
         return [returnContract, contract.address];

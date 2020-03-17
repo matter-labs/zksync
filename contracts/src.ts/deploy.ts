@@ -61,7 +61,7 @@ async function getSolidityInput(contractPath) {
 export class Deployer {
     bytecodes: any;
     addresses: any;
-    initTxHash: any;
+    deployTransactionHash: any;
 
     constructor(public wallet: ethers.Wallet, isTest: boolean) {
         this.bytecodes = {
@@ -82,14 +82,14 @@ export class Deployer {
             Franklin: process.env.CONTRACT_ADDR,
         };
 
-        this.initTxHash = {
+        this.deployTransactionHash = {
             Governance: process.env.GOVERNANCE_GENESIS_TX_HASH,
             Franklin: process.env.CONTRACT_GENESIS_TX_HASH,
         };
     }
 
-    getInitTransactionHash(name) {
-        return this.initTxHash[name];
+    getDeployTransactionHash(name) {
+        return this.deployTransactionHash[name];
     }
 
     getDeployedContract(name) {
@@ -109,16 +109,6 @@ export class Deployer {
         }
     }
 
-    constructorArgs(contractName) {
-        return {
-            'GovernanceTarget': [],
-            'VerifierTarget': [],
-            'FranklinTarget': [],
-            'Governance': [],
-            'Verifier': [],
-            'Franklin': [],
-        }[contractName];
-    }
     initializationArgs(contractName) {
         return {
             'Governance': [["address"], [this.wallet.address]],
@@ -129,6 +119,20 @@ export class Deployer {
                 process.env.OPERATOR_FRANKLIN_ADDRESS,
                 process.env.GENESIS_ROOT || ethers.constants.HashZero,
             ]],
+        }[contractName];
+    }
+    encodedInitializationArgs(contractName) {
+        let [initArgs, initArgsValues] = this.initializationArgs(contractName);
+        return abi.rawEncode(initArgs, initArgsValues);
+    }
+    constructorArgs(contractName) {
+        return {
+            'GovernanceTarget': [],
+            'VerifierTarget': [],
+            'FranklinTarget': [],
+            'Governance': [this.addresses.GovernanceTarget, this.encodedInitializationArgs('Governance')],
+            'Verifier': [this.addresses.VerifierTarget, this.encodedInitializationArgs('Verifier')],
+            'Franklin': [this.addresses.FranklinTarget, this.encodedInitializationArgs('Franklin')],
         }[contractName];
     }
     encodedConstructorArgs(contractName) {
@@ -148,73 +152,61 @@ export class Deployer {
     }
 
     async deployGovernance() {
-        const proxy = await deployContract(
-            this.wallet,
-            this.bytecodes.Governance,
-            this.constructorArgs('Governance'),
-            { gasLimit: 3000000 },
-        );
         const target = await deployContract(
             this.wallet,
             this.bytecodes.GovernanceTarget,
             this.constructorArgs('GovernanceTarget'),
             { gasLimit: 3000000 },
         );
-        let [initArgs, initArgsValues] = this.initializationArgs('Governance');
-        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const tx = await proxy.initializeTarget(target.address, initArgsInBytes);
-        await tx.wait();
-
         this.addresses.GovernanceTarget = target.address;
+
+        const proxy = await deployContract(
+            this.wallet,
+            this.bytecodes.Governance,
+            this.constructorArgs('Governance'),
+            { gasLimit: 3000000 },
+        );
         this.addresses.Governance = proxy.address;
-        this.initTxHash.Governance = tx.hash;
+        this.deployTransactionHash.Governance = proxy.deployTransaction.hash;
         return new ethers.Contract(proxy.address, this.bytecodes.GovernanceTarget.interface, this.wallet);
     }
 
     async deployVerifier() {
-        const proxy = await deployContract(
-            this.wallet,
-            this.bytecodes.Verifier,
-            this.constructorArgs('Verifier'),
-            { gasLimit: 3000000 },
-        );
         const target = await deployContract(
             this.wallet,
             this.bytecodes.VerifierTarget,
             this.constructorArgs('VerifierTarget'),
             { gasLimit: 3000000 },
         );
-        let [initArgs, initArgsValues] = this.initializationArgs('Verifier');
-        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const tx = await proxy.initializeTarget(target.address, initArgsInBytes);
-        await tx.wait();
-
         this.addresses.VerifierTarget = target.address;
+
+        const proxy = await deployContract(
+            this.wallet,
+            this.bytecodes.Verifier,
+            this.constructorArgs('Verifier'),
+            { gasLimit: 3000000 },
+        );
         this.addresses.Verifier = proxy.address;
         return new ethers.Contract(proxy.address, this.bytecodes.VerifierTarget.interface, this.wallet);
     }
 
     async deployFranklin() {
-        const proxy = await deployContract(
-            this.wallet,
-            this.bytecodes.Franklin,
-            this.constructorArgs('Franklin'),
-            { gasLimit: 3000000 },
-        );
         const target = await deployContract(
             this.wallet,
             this.bytecodes.FranklinTarget,
             this.constructorArgs('FranklinTarget'),
             { gasLimit: 6500000 },
         );
-        let [initArgs, initArgsValues] = this.initializationArgs('Franklin');
-        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
-        const tx = await proxy.initializeTarget(target.address, initArgsInBytes);
-        await tx.wait();
-
         this.addresses.FranklinTarget = target.address;
+
+        const proxy = await deployContract(
+            this.wallet,
+            this.bytecodes.Franklin,
+            this.constructorArgs('Franklin'),
+            { gasLimit: 3000000 },
+        );
         this.addresses.Franklin = proxy.address;
-        this.initTxHash.Franklin = tx.hash;
+        this.deployTransactionHash.Franklin = proxy.deployTransaction.hash;
         return new ethers.Contract(proxy.address, this.bytecodes.FranklinTarget.interface, this.wallet);
     }
 

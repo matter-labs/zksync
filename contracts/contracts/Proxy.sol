@@ -9,7 +9,9 @@ contract Proxy is Upgradeable {
 
     /// @notice Contract constructor
     /// @dev Calls Upgradeable contract constructor
-    constructor() Upgradeable() public {}
+    /// @param target Initial implementation address
+    /// @param targetInitializationParameters Target initialization parameters
+    constructor(address target, bytes memory targetInitializationParameters) Upgradeable(target, targetInitializationParameters) public {}
 
     /// @notice Performs a delegatecall to the contract implementation
     /// @dev Fallback function allowing to perform a delegatecall to the given implementation

@@ -20,11 +20,12 @@ describe("UpgradeGatekeeper unit tests", function () {
     let DummyFirst
     let DummySecond
     before(async () => {
-        proxyTestContract = await deployTestContract('../../build/Proxy')
-        proxyDummyInterface = new Contract(proxyTestContract.address, require('../../build/DummyTarget').interface, wallet);
         DummyFirst = await deployTestContract('../../build/DummyFirst')
         DummySecond = await deployTestContract('../../build/DummySecond')
-        await proxyTestContract.initializeTarget(DummyFirst.address, [bytes[0], bytes[1]]);
+        proxyTestContract = await deployContract(wallet, require('../../build/Proxy'), [DummyFirst.address, [bytes[0], bytes[1]]], {
+            gasLimit: 6000000,
+        })
+        proxyDummyInterface = new Contract(proxyTestContract.address, require('../../build/DummyTarget').interface, wallet);
         UpgradeGatekeeperContract = await deployContract(wallet, require('../../build/UpgradeGatekeeperTest'), [proxyTestContract.address], {
             gasLimit: 6000000,
         })

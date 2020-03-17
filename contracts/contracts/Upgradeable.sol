@@ -11,27 +11,20 @@ contract Upgradeable is Ownable {
     bytes32 private constant targetPosition = keccak256("target");
 
     /// @notice Contract constructor
-    /// @dev Calls Ownable contract constructor
-    constructor() Ownable(msg.sender) public {
-
-    }
-
-    /// @notice Intercepts initialization calls
-    function initialize(bytes calldata) external pure {
-        revert("ini11"); // ini11 - interception of initialization call
-    }
-
-    /// @notice Upgradeable contract initialization
+    /// @dev Calls Ownable contract constructor and initialize target
     /// @param target Initial implementation address
     /// @param targetInitializationParameters Target initialization parameters
-    function initializeTarget(address target, bytes calldata targetInitializationParameters) external {
-        requireMaster(msg.sender);
-
+    constructor(address target, bytes memory targetInitializationParameters) Ownable(msg.sender) public {
         setTarget(target);
         (bool initializationSuccess, ) = getTarget().delegatecall(
             abi.encodeWithSignature("initialize(bytes)", targetInitializationParameters)
         );
         require(initializationSuccess, "uin11"); // uin11 - target initialization failed
+    }
+
+    /// @notice Intercepts initialization calls
+    function initialize(bytes calldata) external pure {
+        revert("ini11"); // ini11 - interception of initialization call
     }
 
     /// @notice Returns target of contract

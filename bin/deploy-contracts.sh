@@ -17,6 +17,9 @@ cd contracts;
 yarn deploy-no-build | tee ../deploy.log;
 cd ..;
 
+GOVERNANCE_TARGET_ADDR_NEW_VALUE=`grep "GOVERNANCE_TARGET_ADDR" deploy.log`
+VERIFIER_TARGET_ADDR_NEW_VALUE=`grep "VERIFIER_TARGET_ADDR" deploy.log`
+CONTRACT_TARGET_ADDR_NEW_VALUE=`grep "CONTRACT_TARGET_ADDR" deploy.log`
 CONTRACT_GENESIS_TX_HASH_NEW_VALUE=`grep "CONTRACT_GENESIS_TX_HASH" deploy.log`
 CONTRACT_ADDR_NEW_VALUE=`grep "CONTRACT_ADDR" deploy.log`
 ERC20_ADDR_NEW_VALUE=`grep "TEST_ERC20" deploy.log`
@@ -30,6 +33,9 @@ then
     cp ./$ENV_FILE logs/$LABEL/$ZKSYNC_ENV.bak
     cp deploy.log logs/$LABEL/
     echo $CONTRACT_ADDR_NEW_VALUE
+    python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_TARGET_ADDR_NEW_VALUE
+    python3 bin/replace-env-variable.py ./$ENV_FILE $VERIFIER_TARGET_ADDR_NEW_VALUE
+    python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_TARGET_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_GENESIS_TX_HASH_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_ADDR_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $ERC20_ADDR_NEW_VALUE

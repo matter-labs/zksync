@@ -35,7 +35,7 @@ async function main() {
         let timer = Date.now();
         await deployer.deployGovernance();
         console.log(`GOVERNANCE_TARGET_ADDR=${await deployer.getDeployedContract('GovernanceTarget').address}`);
-        console.log(`GOVERNANCE_GENESIS_TX_HASH=${await deployer.getInitTransactionHash('Governance')}`);
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${await deployer.getDeployTransactionHash('Governance')}`);
         console.log(`GOVERNANCE_ADDR=${await deployer.getDeployedContract('Governance').address}`);
         console.log(`Governance contract deployed, time: ${(Date.now() - timer) / 1000} secs`);
 
@@ -48,7 +48,7 @@ async function main() {
         timer = Date.now();
         await deployer.deployFranklin();
         console.log(`CONTRACT_TARGET_ADDR=${await deployer.getDeployedContract('FranklinTarget').address}`);
-        console.log(`CONTRACT_GENESIS_TX_HASH=${await deployer.getInitTransactionHash('Franklin')}`);
+        console.log(`CONTRACT_GENESIS_TX_HASH=${await deployer.getDeployTransactionHash('Franklin')}`);
         console.log(`CONTRACT_ADDR=${await deployer.getDeployedContract('Franklin').address}`);
         console.log(`Main contract deployed, time: ${(Date.now() - timer) / 1000} secs`);
 
