@@ -576,6 +576,10 @@ mod test {
 
         println!("Done transpiling");
 
+        is_satisfied_using_one_shot_check(c.clone(), &hints).expect("must validate");
+
+        println!("Done checking if satisfied using one-shot");
+
         is_satisfied(c.clone(), &hints).expect("must validate");
 
         println!("Done checking if satisfied");
@@ -583,21 +587,32 @@ mod test {
         let setup = setup(c.clone(), &hints).expect("must make setup");
 
         println!("Made into {} gates", setup.n);
-        let num_gates = setup.n.next_power_of_two();
+        let size = setup.n.next_power_of_two();
 
         let worker = Worker::new();
 
-        let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::crs_42(num_gates, &worker);
+        let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::crs_42(size, &worker);
+        let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::from_powers(&key_monomial_form, size, &worker);
 
-        let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::from_powers(&key_monomial_form, num_gates, &worker);
+        // let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::dummy_crs(size);
+        // let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::dummy_crs(size);
 
-        // let precomputation = make_precomputations(&setup);
         let verification_key = make_verification_key(&setup, &key_monomial_form).expect("must make a verification key");
 
-        let proof = prove::<_, _, RollingKeccakTranscript<Fr>>(
+        let precomputations = make_precomputations(&setup).expect("must make precomputations for proving");
+
+        use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
+
+        let omegas_bitreversed = BitReversedOmegas::<Fr>::new_for_domain_size(size);
+        let omegas_inv_bitreversed = <OmegasInvBitreversed::<Fr> as CTPrecomputations::<Fr>>::new_for_domain_size(size);
+
+        let proof = prove_from_recomputations::<_, _, RollingKeccakTranscript<Fr>, _, _>(
             c.clone(), 
             &hints, 
             &setup, 
+            &precomputations,
+            &omegas_bitreversed,
+            &omegas_inv_bitreversed,
             &key_monomial_form,
             &key_lagrange_form
         ).expect("must make a proof");
