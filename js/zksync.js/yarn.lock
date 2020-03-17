@@ -167,11 +167,6 @@ browser-stdout@1.3.1:
   resolved "https://registry.yarnpkg.com/browser-stdout/-/browser-stdout-1.3.1.tgz#baa559ee14ced73452229bad7326467c61fabd60"
   integrity sha512-qhAVI1+Av2X7qelOfAIYwXONood6XlZE/fXaBSmW/T5SzLAmCgzi+eiWE7fUvbHaeNBQH13UftjpXxsfLkMpgw==
 
-buffer-es6@^4.9.3:
-  version "4.9.3"
-  resolved "https://registry.yarnpkg.com/buffer-es6/-/buffer-es6-4.9.3.tgz#f26347b82df76fd37e18bcb5288c4970cfd5c404"
-  integrity sha1-8mNHuC33b9N+GLy1KIxJcM/VxAQ=
-
 buffer-from@^1.0.0:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/buffer-from/-/buffer-from-1.1.1.tgz#32713bc028f75c02fdb710d7c7bcec1f2c6070ef"
@@ -422,12 +417,6 @@ ethers@4.0.33:
     setimmediate "1.0.4"
     uuid "2.0.1"
     xmlhttprequest "1.8.0"
-
-example-node-wasm@../zksync-crypto:
-  version "0.0.0"
-  dependencies:
-    buffer-es6 "^4.9.3"
-    zksync-crypto "file:../../../../Library/Caches/Yarn/v6/npm-example-node-wasm-0.0.0-2163f48b-7e4c-44ee-acc1-d990808c92ae-1584117749254/node_modules/example-node-wasm/pkg"
 
 execa@^1.0.0:
   version "1.0.0"
@@ -1342,5 +1331,11 @@ yn@^3.0.0:
   resolved "https://registry.yarnpkg.com/yn/-/yn-3.1.0.tgz#fcbe2db63610361afcc5eb9e0ac91e976d046114"
   integrity sha512-kKfnnYkbTfrAdd0xICNFw7Atm8nKpLcLv9AZGEt+kczL/WQVai4e2V6ZN8U/O+iI6WrNuJjNNOyu4zfhl9D3Hg==
 
-zksync-crypto@../zksync-crypto/pkg, "zksync-crypto@file:../zksync-crypto/pkg":
+zksync-crypto-node@../zksync-crypto/nodejspgk:
+  version "0.1.0"
+
+zksync-crypto-web@../zksync-crypto/webpgk:
+  version "0.1.0"
+
+zksync-crypto@../zksync-crypto/pkg:
   version "0.1.0"

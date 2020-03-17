@@ -5,6 +5,7 @@ const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 
 const config = target => ({
     entry: './indexx.js',
+    // entry: `./index_${target}.js`,
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: `index.${target}.js`,
@@ -13,7 +14,11 @@ const config = target => ({
     plugins: [
         new HtmlWebpackPlugin(),
         new WasmPackPlugin({
-            crateDirectory: path.resolve(__dirname, ".")
+            crateDirectory: path.resolve(__dirname, "."),
+            extraArgs
+                : target == 'web'  ? ''
+                : target == 'node' ? '--target=nodejs'
+                : null,
         }),
         // Have this example work in Edge which doesn't ship `TextEncoder` or
         // `TextDecoder` at this time.
@@ -23,14 +28,6 @@ const config = target => ({
         })
     ],
     mode: 'development',
-    // module: {
-    //     rules: [
-    //         { test: /\.wasm$/, type: "webassembly/experimental" },
-    //     ],
-    // },
-    // devServer: {
-    //     mimeTypes: { 'text/html': ['wasm'] }
-    // },
 });
 
 module.exports = ['web', 'node'].map(target => ({...config(target), target}));

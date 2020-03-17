@@ -3,7 +3,6 @@ import { readableEther, sleep, isReadablyPrintable } from './utils';
 import timeConstants from './timeConstants';
 import { BlockExplorerClient } from './BlockExplorerClient';
 import config from './env-config';
-const zksync = require('zksync');
 const ethers = require('ethers');
 import franklin_abi from '../../../contracts/build/Franklin.json'
 import { Emitter } from './Emitter';

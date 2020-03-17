@@ -2,7 +2,7 @@ import config from './env-config';
 import * as constants from './constants';
 import { readableEther } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
-const zksync = require('zksync');   
+const zksync_promise = import('zksync');
 import axios from 'axios';
 
 async function fetch(req) {
@@ -23,6 +23,7 @@ export class Client {
     }
 
     static async new() {
+        const zksync = await zksync_promise;
         const syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
         const tokensPromise = syncProvider.getTokens()
             .then(tokens => {

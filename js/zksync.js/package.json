@@ -10,11 +10,12 @@
     "bn.js": "^5.0.0",
     "crypto-js": "^3.1.9-1",
     "elliptic": "^6.5.0",
-    "example-node-wasm": "../zksync-crypto",
     "js-sha256": "^0.9.0",
     "websocket": "^1.0.30",
     "websocket-as-promised": "^0.10.1",
-    "zksync-crypto": "../zksync-crypto/pkg"
+    "zksync-crypto": "../zksync-crypto/pkg",
+    "zksync-crypto-node": "../zksync-crypto/nodejspgk",
+    "zksync-crypto-web": "../zksync-crypto/webpgk"
   },
   "peerDependencies": {
     "ethers": "^4.0.33"
