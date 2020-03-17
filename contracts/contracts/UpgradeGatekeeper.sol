@@ -2,7 +2,6 @@ pragma solidity 0.5.16;
 
 import "./Events.sol";
 import "./Ownable.sol";
-import "./Proxy.sol";
 
 
 /// @title Upgrade Gatekeeper Contract
@@ -94,10 +93,10 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         if (now >= upgradeInfo[proxyAddress].activationTime + NOTICE_PERIOD) {
             upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Finalize;
 
-            (bool callSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
+            (bool mainContractCallSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
                 abi.encodeWithSignature("registeredPriorityOperations()")
             );
-            require(callSuccess, "uaf12"); // uaf12 - main contract static call failed
+            require(mainContractCallSuccess, "uaf12"); // uaf12 - main contract static call failed
             uint64 registeredPriorityOperations = abi.decode(encodedResult, (uint64));
             upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = registeredPriorityOperations;
 
@@ -115,15 +114,18 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         requireMaster(msg.sender);
         require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Finalize, "umf11"); // umf11 - unable to finish upgrade without finalize status active
 
-        (bool callSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
+        (bool mainContractCallSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
             abi.encodeWithSignature("verifiedPriorityOperations()")
         );
-        require(callSuccess, "umf12"); // umf12 - main contract static call failed
+        require(mainContractCallSuccess, "umf12"); // umf12 - main contract static call failed
         uint64 verifiedPriorityOperations = abi.decode(encodedResult, (uint64));
 
         require(verifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade, "umf13"); // umf13 - can't finish upgrade before verifing all priority operations received before start of finalize status
 
-        Proxy(address(uint160(proxyAddress))).upgradeTarget(upgradeInfo[proxyAddress].nextTarget, newTargetInitializationParameters);
+        (bool proxyUpgradeCallSuccess, ) = proxyAddress.call(
+            abi.encodeWithSignature("upgradeTarget(address,bytes)", upgradeInfo[proxyAddress].nextTarget, newTargetInitializationParameters)
+        );
+        require(proxyUpgradeCallSuccess, "umf14"); // umf14 - proxy contract call failed
 
         emit UpgradeCompleted(proxyAddress, version[proxyAddress], upgradeInfo[proxyAddress].nextTarget);
         version[proxyAddress]++;
