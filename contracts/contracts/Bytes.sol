@@ -261,4 +261,24 @@ library Bytes {
         return tempBytes;
     }
 
+    // Helper function for hex conversion.
+    function halfByteToHex(byte _byte) internal pure returns (byte _hexByte) {
+        uint8 numByte = uint8(_byte);
+        if (numByte >= 0 && numByte <= 9) {
+            return byte(0x30 + numByte); // ASCII 0-9
+        } else if (numByte <= 15) {
+            return byte(0x57 + numByte); // ASCII a-f
+        }
+    }
+
+    // Convert bytes to ASCII hex representation
+    function bytesToHexASCIIBytes(bytes memory  _input) internal pure returns (bytes memory _output) {
+        bytes memory outStringBytes = new bytes(_input.length * 2);
+        for (uint i = 0; i < _input.length; ++i) {
+            outStringBytes[i*2] = halfByteToHex(_input[i] >> 4);
+            outStringBytes[i*2+1] = halfByteToHex(_input[i] & 0x0f);
+        }
+        return outStringBytes;
+    }
+
 }

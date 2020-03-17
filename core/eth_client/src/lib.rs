@@ -20,7 +20,7 @@ pub struct ETHClient<T: Transport> {
     pub web3: Web3<T>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SignedCallResult {
     pub raw_tx: Vec<u8>,
     pub gas_price: U256,
@@ -55,6 +55,10 @@ impl<T: Transport> ETHClient<T> {
             .transaction_count(self.sender_account, Some(BlockNumber::Latest))
             .compat()
             .await
+    }
+
+    pub async fn block_number(&self) -> Result<U256, Error> {
+        self.web3.eth().block_number().compat().await
     }
 
     pub async fn pending_nonce(&self) -> Result<U256, Error> {

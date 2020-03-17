@@ -1,7 +1,6 @@
 #!/bin/bash
 
 mkdir -p etc/kube/gen/$ZKSYNC_ENV
-envsubst < etc/kube/prover.yaml > etc/kube/gen/$ZKSYNC_ENV/prover.yaml
 envsubst < etc/kube/server.yaml > etc/kube/gen/$ZKSYNC_ENV/server.yaml
 
 # Generate and apply secret for env config
@@ -9,4 +8,8 @@ envsubst < etc/kube/server.yaml > etc/kube/gen/$ZKSYNC_ENV/server.yaml
 
 # Apply cluster configuration
 kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/server.yaml
-kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/prover.yaml
+for BLOCK_SIZE_CHUNKS in $(echo $BLOCK_CHUNK_SIZES | sed "s/,/ /g"); do
+    export BLOCK_SIZE_CHUNKS=$BLOCK_SIZE_CHUNKS
+    envsubst < etc/kube/prover.yaml > etc/kube/gen/$ZKSYNC_ENV/prover.yaml
+    kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/prover.yaml
+done

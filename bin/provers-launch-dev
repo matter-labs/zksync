@@ -1,0 +1,23 @@
+#!/bin/bash
+
+. .setup_env
+
+pids=( ) # initialize an empty array to store PIDs
+
+for BLOCK_SIZE in $(echo $BLOCK_CHUNK_SIZES | sed "s/,/ /g"); do
+    echo "BLOCK_SIZE $BLOCK_SIZE"
+    cargo run --release --bin prover "$BLOCK_SIZE" "$POD_NAME$BLOCK_SIZE" > /dev/null & pid="$!"
+    pids+=( "$pid" )
+    echo "prover "$POD_NAME$BLOCK_SIZE" with pid $pid"
+    PIDS="$pid $PIDS"
+done
+
+trap ctrl_c INT
+
+function ctrl_c() {
+    echo "Killing $PIDS"
+    kill "${pids[@]}" # kill all instances started above
+    exit 0
+}
+
+sleep 1000000

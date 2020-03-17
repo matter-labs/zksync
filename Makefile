@@ -1,7 +1,7 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
-export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
+export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(ZKSYNC_ENV)-$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
@@ -15,9 +15,9 @@ init:
 	@bin/init
 
 yarn:
+	@cd js/zksync.js && yarn && yarn build
 	@cd js/client && yarn
 	@cd js/explorer && yarn
-	@cd js/zksync.js && yarn
 	@cd contracts && yarn
 	@cd js/tests && yarn
 
@@ -28,6 +28,10 @@ yarn:
 confirm_action:
 	@bin/.confirm_action
 
+rust-checks:
+	cargo fmt -- --check
+	@find core/ -type f -name "*.rs" -exec touch {} +
+	cargo clippy --tests --benches -- -D warnings
 
 # Database tools
 
@@ -65,20 +69,16 @@ genesis: confirm_action
 
 # Frontend clients
 
-dist-config:
-	bin/.gen_js_config > js/client/src/env-config.js
-	bin/.gen_js_config > js/explorer/src/env-config.js
-
 client:
 	@cd js/client && yarn serve
 
-explorer: dist-config
+explorer:
 	@cd js/explorer && yarn serve
 
 dist-client:
 	@cd js/client && yarn build
 
-dist-explorer: dist-config
+dist-explorer:
 	@cd js/explorer && yarn build
 
 image-nginx: dist-client dist-explorer
@@ -105,7 +105,7 @@ dummy-prover:
 	cargo run --bin dummy_prover
 
 prover:
-	@cargo run --release --bin prover
+	@bin/provers-launch-dev
 
 server:
 	@cargo run --bin server --release
@@ -141,27 +141,15 @@ deploy-contracts: confirm_action build-contracts
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
-build-contracts: confirm_action flatten
+build-contracts: confirm_action prepare-contracts
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
-define flatten_file
-	@cd contracts && scripts/solidityFlattener.pl --mainsol $(1) --outputsol flat/$(1);
-endef
-
-# Flatten contract source
-flatten: prepare-contracts
-	@mkdir -p contracts/flat
-	$(call flatten_file,Franklin.sol)
-	$(call flatten_file,Governance.sol)
-	$(call flatten_file,PriorityQueue.sol)
-	$(call flatten_file,Verifier.sol)
-
 gen-keys-if-not-present:
-	test -f ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/zksync_pk.key || gen-keys
+	test -f ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol || gen-keys
 
 prepare-contracts:
-	@cp ${KEY_DIR}/${BLOCK_SIZE_CHUNKS}/${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
 
 # testing
 
@@ -173,6 +161,7 @@ loadtest: confirm_action
 
 integration-testkit: build-contracts
 	cargo run --bin testkit --release
+	cargo run --bin exodus_test --release
 
 itest: # contracts simple integration tests
 	@bin/prepare-test-contracts.sh
@@ -213,6 +202,11 @@ deposit: confirm_action
 
 # Devops: main
 
+# Promote build
+
+promote-to-stage:
+	@bin/promote-to-stage.sh $(ci-build)
+
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-insert-contract
 
@@ -226,7 +220,7 @@ apply-kubeconfig:
 
 update-rust: push-image-rust apply-kubeconfig
 	@kubectl patch deployment $(ZKSYNC_ENV)-server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
-	@kubectl patch deployment $(ZKSYNC_ENV)-prover -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@bin/provers-patch-deployments
 
 update-nginx: push-image-nginx apply-kubeconfig
 	@kubectl patch deployment $(ZKSYNC_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
@@ -238,7 +232,7 @@ start-kube: apply-kubeconfig
 ifeq (dev,$(ZKSYNC_ENV))
 start: image-nginx image-rust start-local
 else
-start: apply-kubeconfig start-prover start-server start-nginx
+start: apply-kubeconfig start-provers start-server start-nginx
 endif
 
 ifeq (dev,$(ZKSYNC_ENV))
@@ -246,13 +240,13 @@ stop:
 else ifeq (ci,$(ZKSYNC_ENV))
 stop:
 else
-stop: confirm_action stop-prover stop-server stop-nginx
+stop: confirm_action stop-provers stop-server stop-nginx
 endif
 
 restart: stop start
 
-start-prover:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --replicas=1
+start-provers:
+	@bin/provers-scale 1
 
 start-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --replicas=1
@@ -260,8 +254,8 @@ start-nginx:
 start-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=1
 
-stop-prover:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --replicas=0
+stop-provers:
+	@bin/provers-scale 0
 
 stop-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=0
@@ -312,12 +306,7 @@ dev-build-geth:
 dev-push-geth:
 	@docker push "${GETH_DOCKER_IMAGE}"
 
-# Key generator 
-
-make-keys:
-	@cargo run -p key_generator --release --bin key_generator
-
- # Data Restore
+# Data Restore
 
 data-restore-setup-and-run: data-restore-build data-restore-restart
 

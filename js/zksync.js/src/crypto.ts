@@ -361,7 +361,7 @@ export function serializePointPacked(point: edwards.EdwardsPoint): Buffer {
 }
 
 export function signTransactionBytes(privKey: BN, bytes: Buffer): Signature {
-    return musigPedersen(privKey, bytes);
+    return musigSHA256(privKey, bytes);
 }
 
 export function privateKeyFromSeed(seed: Buffer): BN {

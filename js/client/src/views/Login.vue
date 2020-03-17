@@ -54,8 +54,7 @@ export default {
                 const ethProxy = new zksync.ETHProxy(ethersProvider, syncProvider.contractAddress);
                 
                 const signer = ethersProvider.getSigner();
-                const syncWallet = await zksync.Wallet.fromEthSigner(signer, syncProvider, ethProxy);
-
+                const syncWallet = await zksync.Wallet.fromEthSigner(signer, syncProvider);
                 window.ethProvider = ethersProvider;
                 window.ethSigner = signer;
                 window.syncWallet = syncWallet;

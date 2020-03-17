@@ -1,237 +1,383 @@
 // Built-in
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
 use std::{thread, time};
 // External
-use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
+use futures::channel::mpsc;
 use log::info;
 // Workspace deps
-use circuit::operation::SignatureData;
-use circuit::witness::change_pubkey_offchain::{
-    apply_change_pubkey_offchain_tx, calculate_change_pubkey_offchain_from_witness,
+use circuit::witness::{
+    change_pubkey_offchain::{
+        apply_change_pubkey_offchain_tx, calculate_change_pubkey_offchain_from_witness,
+    },
+    close_account::{apply_close_account_tx, calculate_close_account_operations_from_witness},
+    deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness},
+    full_exit::{apply_full_exit_tx, calculate_full_exit_operations_from_witness},
+    transfer::{apply_transfer_tx, calculate_transfer_operations_from_witness},
+    transfer_to_new::{
+        apply_transfer_to_new_tx, calculate_transfer_to_new_operations_from_witness,
+    },
+    utils::{prepare_sig_data, WitnessBuilder},
+    withdraw::{apply_withdraw_tx, calculate_withdraw_operations_from_witness},
 };
-use circuit::witness::full_exit::{
-    apply_full_exit_tx, calculate_full_exit_operations_from_witness,
+use models::{
+    circuit::{account::CircuitAccount, CircuitAccountTree},
+    config_options::ThreadPanicNotify,
+    node::{apply_updates, AccountMap, BlockNumber, Fr, FranklinOp},
+    Operation,
 };
-use circuit::witness::utils::prepare_sig_data;
-use models::merkle_tree::PedersenHasher;
-use models::node::{Engine, Fr};
-use models::primitives::pack_bits_into_bytes_in_order;
+use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
 
+#[derive(Debug, Clone)]
+struct BlockSizedOperationsQueue {
+    operations: VecDeque<Operation>,
+    last_loaded_block: BlockNumber,
+    block_size: usize,
+}
+
+impl BlockSizedOperationsQueue {
+    fn new(block_size: usize) -> Self {
+        Self {
+            operations: VecDeque::new(),
+            last_loaded_block: 0,
+            block_size,
+        }
+    }
+
+    /// Fills the operations queue if the amount of non-processed operations
+    /// is less than `limit`.
+    fn take_next_commits_if_needed(
+        &mut self,
+        conn_pool: &storage::ConnectionPool,
+        limit: i64,
+    ) -> Result<(), String> {
+        if self.operations.len() < limit as usize {
+            let storage = conn_pool.access_storage().expect("failed to connect to db");
+            let ops = storage
+                .chain()
+                .block_schema()
+                .load_unverified_commits_after_block(self.block_size, self.last_loaded_block, limit)
+                .map_err(|e| format!("failed to read commit operations: {}", e))?;
+
+            self.operations.extend(ops);
+
+            if let Some(op) = self.operations.back() {
+                self.last_loaded_block = op.block.block_number;
+            }
+
+            trace!(
+                "Operations size {}: {:?}",
+                self.block_size,
+                self.operations
+                    .iter()
+                    .map(|op| op.block.block_number)
+                    .collect::<Vec<_>>()
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Takes the oldest non-processed operation out of the queue.
+    /// Returns `None` if there are no non-processed operations.
+    fn take_next_operation(&mut self) -> Option<Operation> {
+        self.operations.pop_front()
+    }
+}
+
 pub struct ProversDataPool {
-    last_prepared: i64,
-    last_loaded: i64,
     limit: i64,
-    operations: HashMap<i64, models::Operation>,
-    prepared: HashMap<i64, ProverData>,
+    op_queues: HashMap<usize, BlockSizedOperationsQueue>,
+    prepared: HashMap<BlockNumber, ProverData>,
 }
 
 impl ProversDataPool {
-    pub fn new() -> Self {
-        ProversDataPool {
-            last_prepared: 0,
-            last_loaded: 0,
-            limit: 10,
-            operations: HashMap::new(),
+    pub fn new(limit: i64) -> Self {
+        let mut res = Self {
+            limit,
+            op_queues: HashMap::new(),
             prepared: HashMap::new(),
+        };
+
+        for block_size in models::params::block_chunk_sizes() {
+            res.op_queues
+                .insert(*block_size, BlockSizedOperationsQueue::new(*block_size));
         }
+
+        res
     }
 
-    pub fn get(&self, block: i64) -> Option<&ProverData> {
+    pub fn get(&self, block: BlockNumber) -> Option<&ProverData> {
         self.prepared.get(&block)
     }
 
-    pub fn clean_up(&mut self, block: i64) {
+    pub fn clean_up(&mut self, block: BlockNumber) {
         self.prepared.remove(&block);
     }
+}
 
-    fn has_capacity(&self) -> bool {
-        self.last_loaded - self.last_prepared + (self.prepared.len() as i64) < self.limit as i64
+/// `Maintainer` is a helper structure that maintains the
+/// prover data pool.
+///
+/// The essential part of this structure is `maintain` function
+/// which runs forever and adds data to the externally owned
+/// pool.
+///
+/// `migrate` function is private and is invoked by the
+/// public `start` function, which starts
+/// the named thread dedicated for that routine only.
+pub struct Maintainer {
+    /// Connection to the database.
+    conn_pool: storage::ConnectionPool,
+    /// Thread-safe reference to the data pool.
+    data: Arc<RwLock<ProversDataPool>>,
+    /// Routine refresh interval.
+    rounds_interval: time::Duration,
+    /// Cached account state.
+    ///
+    /// This field is initialized at the first iteration of `maintain`
+    /// routine, and is updated by applying the state diff after that.
+    account_state: Option<(u32, AccountMap)>,
+}
+
+impl Maintainer {
+    /// Creates a new `Maintainer` object.
+    pub fn new(
+        conn_pool: storage::ConnectionPool,
+        data: Arc<RwLock<ProversDataPool>>,
+        rounds_interval: time::Duration,
+    ) -> Self {
+        Self {
+            conn_pool,
+            data,
+            rounds_interval,
+            account_state: None,
+        }
     }
 
-    fn all_prepared(&self) -> bool {
-        self.last_loaded == self.last_prepared
+    /// Starts the thread running `maintain` method.
+    pub fn start(mut self, panic_notify: mpsc::Sender<bool>) {
+        thread::Builder::new()
+            .name("prover_server_pool".to_string())
+            .spawn(move || {
+                let _panic_sentinel = ThreadPanicNotify(panic_notify);
+                self.maintain();
+            })
+            .expect("failed to start provers server");
     }
 
-    fn store_to_prove(&mut self, op: models::Operation) {
-        let block = op.block.block_number as i64;
-        self.last_loaded = block;
-        self.operations.insert(block, op);
+    /// Updates the pool data in an infinite loop, awaiting `rounds_interval` time
+    /// between updates.
+    fn maintain(&mut self) {
+        info!("preparing prover data routine started");
+        loop {
+            self.take_next_commits_if_needed()
+                .expect("couldn't get next commits");
+            self.prepare_next().expect("couldn't prepare next commits");
+            thread::sleep(self.rounds_interval);
+        }
     }
 
-    fn take_next_to_prove(&mut self) -> Result<models::Operation, String> {
-        if self.last_prepared == 0 {
-            // Pool restart or first ever take.
-            // Handling restart case by setting proper value for `last_prepared`.
-            let mut first_from_loaded = 0;
-            for key in self.operations.keys() {
-                if first_from_loaded == 0 || *key < first_from_loaded {
-                    first_from_loaded = *key;
+    /// Loads the operations to process for every available prover queue.
+    fn take_next_commits_if_needed(&mut self) -> Result<(), String> {
+        // When updating this method, be sure to not hold lock longer than necessary,
+        // since it can cause provers to not be able to interact with the server.
+
+        // Clone the required data to process it without holding the lock.
+        let (mut queues, limit) = {
+            let pool = self.data.read().expect("failed to get write lock on data");
+            (pool.op_queues.clone(), pool.limit)
+        };
+
+        // Process every queue and fill it with data.
+        for queue in queues.values_mut() {
+            queue.take_next_commits_if_needed(&self.conn_pool, limit)?;
+        }
+
+        // Update the queues in pool.
+        // Since this structure is the only writer to the queues, it is guaranteed
+        // to not contain data that will be overwritten by the assignment.
+        let mut pool = self.data.write().expect("failed to get write lock on data");
+        pool.op_queues = queues;
+
+        Ok(())
+    }
+
+    /// Goes through existing queues of operations and builds a prover data for each of them.
+    fn prepare_next(&mut self) -> Result<(), String> {
+        // When updating this method, be sure to not hold lock longer than necessary,
+        // since it can cause provers to not be able to interact with the server.
+
+        // Clone the queues to process them without holding the lock.
+        let mut queues = {
+            let pool = self.data.read().expect("failed to get write lock on data");
+
+            pool.op_queues.clone()
+        };
+
+        // Create a storage for prepared data.
+        let mut prepared = HashMap::new();
+
+        // Go through every queue, take the next operation to process, and build the
+        // prover data for them.
+        // Empty queues are ignored.
+        for queue in queues.values_mut() {
+            let maybe_op = queue.take_next_operation();
+            if let Some(op) = maybe_op {
+                let storage = self
+                    .conn_pool
+                    .access_storage()
+                    .expect("failed to connect to db");
+                let pd = self.build_prover_data(&storage, &op)?;
+                prepared.insert(op.block.block_number, pd);
+            }
+        }
+
+        // Update the queues and prepared data in pool.
+        // Since this structure is the only writer to the queues, it is guaranteed
+        // to not contain data that will be overwritten by the assignment.
+        // Prepared data is appended to the existing one, thus we can not worry about
+        // synchronization as well.
+        let mut pool = self.data.write().expect("failed to get write lock on data");
+        pool.op_queues = queues;
+        pool.prepared.extend(prepared);
+
+        Ok(())
+    }
+
+    /// Updates stored account state, obtaining the state for the requested block.
+    ///
+    /// This method updates the stored version of state with a diff, or initializes
+    /// the state if it was not initialized yet.
+    fn update_account_state(
+        &mut self,
+        storage: &storage::StorageProcessor,
+        new_block: u32,
+    ) -> Result<(), String> {
+        match self.account_state {
+            Some((block, ref state)) => {
+                // State is initialized. We need to load diff (if any) and update
+                // the stored state.
+                let state_diff = storage
+                    .chain()
+                    .state_schema()
+                    .load_state_diff(block, Some(new_block))
+                    .map_err(|e| format!("failed to load committed state: {}", e))?;
+
+                if let Some((_, state_diff)) = state_diff {
+                    // Diff exists, update the state and return it.
+                    let mut new_state = state.clone();
+
+                    apply_updates(&mut new_state, state_diff);
+                    debug!("Prover state is updated ({} => {})", block, new_block);
+
+                    self.account_state = Some((new_block, new_state));
                 }
             }
-            self.last_prepared = first_from_loaded - 1
-        }
-        let next = self.last_prepared + 1;
-        match self.operations.remove(&next) {
-            Some(v) => Ok(v),
-            None => Err("data is inconsistent".to_owned()),
-        }
-    }
-}
+            None => {
+                // State is not initialized, load it.
+                let (block, accounts) = storage
+                    .chain()
+                    .state_schema()
+                    .load_committed_state(Some(new_block))
+                    .map_err(|e| format!("failed to load committed state: {}", e))?;
 
-pub fn maintain(
-    conn_pool: storage::ConnectionPool,
-    data: Arc<RwLock<ProversDataPool>>,
-    rounds_interval: time::Duration,
-) {
-    info!("preparing prover data routine started");
-    let phasher = PedersenHasher::<Engine>::default();
-    let params = AltJubjubBn256::new();
-    loop {
-        if has_capacity(&data) {
-            take_next_commits(&conn_pool, &data).expect("failed to get next commit operations");
-        }
-        if all_prepared(&data) {
-            thread::sleep(rounds_interval);
-        } else {
-            prepare_next(&conn_pool, &data, &phasher, &params)
-                .expect("failed to prepare prover data");
-        }
-    }
-}
+                debug!("Prover state is initialized");
 
-fn has_capacity(data: &Arc<RwLock<ProversDataPool>>) -> bool {
-    let d = data.write().expect("failed to acquire a lock");
-    d.has_capacity()
-}
-
-fn take_next_commits(
-    conn_pool: &storage::ConnectionPool,
-    data: &Arc<RwLock<ProversDataPool>>,
-) -> Result<(), String> {
-    let ops = {
-        let d = data.write().expect("failed to acquire a lock");
-        let storage = conn_pool.access_storage().expect("failed to connect to db");
-        storage
-            .load_unverified_commits_after_block(d.last_loaded, d.limit)
-            .map_err(|e| format!("failed to read commit operations: {}", e))?
-    };
-
-    if !ops.is_empty() {
-        let mut d = data.write().expect("failed to acquire a lock");
-        for op in ops.into_iter() {
-            (*d).store_to_prove(op)
-        }
-    }
-
-    Ok(())
-}
-
-fn all_prepared(data: &Arc<RwLock<ProversDataPool>>) -> bool {
-    let d = data.read().expect("failed to acquire a lock");
-    d.all_prepared()
-}
-
-fn prepare_next(
-    conn_pool: &storage::ConnectionPool,
-    data: &Arc<RwLock<ProversDataPool>>,
-    phasher: &PedersenHasher<Engine>,
-    params: &AltJubjubBn256,
-) -> Result<(), String> {
-    let op = {
-        let mut d = data.write().expect("failed to acquire a lock");
-        d.take_next_to_prove()?
-    };
-    let storage = conn_pool.access_storage().expect("failed to connect to db");
-    let pd = build_prover_data(&storage, &op, phasher, params)?;
-    let mut d = data.write().expect("failed to acquire a lock");
-    (*d).last_prepared += 1;
-    (*d).prepared.insert(op.block.block_number as i64, pd);
-    Ok(())
-}
-
-fn build_prover_data(
-    storage: &storage::StorageProcessor,
-    commit_operation: &models::Operation,
-    phasher: &PedersenHasher<Engine>,
-    params: &AltJubjubBn256,
-) -> Result<ProverData, String> {
-    info!(
-        "building prover data for block {}",
-        commit_operation.block.block_number
-    );
-
-    let block_number = commit_operation.block.block_number;
-
-    let (_, accounts) = storage
-        .load_committed_state(Some(block_number - 1))
-        .map_err(|e| format!("failed to load commited state: {}", e))?;
-    let mut accounts_tree =
-        models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
-    for acc in accounts {
-        let acc_number = acc.0;
-        let leaf_copy = models::circuit::account::CircuitAccount::from(acc.1.clone());
-        accounts_tree.insert(acc_number, leaf_copy);
-    }
-    let initial_root = accounts_tree.root_hash();
-    let ops = storage
-        .get_block_operations(block_number)
-        .map_err(|e| format!("failed to get block operations {}", e))?;
-
-    circuit::witness::utils::apply_fee(
-        &mut accounts_tree,
-        commit_operation.block.fee_account,
-        0,
-        0,
-    );
-    let mut operations = vec![];
-    let mut pub_data = vec![];
-    let mut fees = vec![];
-    for op in ops {
-        match op {
-            models::node::FranklinOp::Deposit(deposit) => {
-                let deposit_witness =
-                    circuit::witness::deposit::apply_deposit_tx(&mut accounts_tree, &deposit);
-
-                let deposit_operations =
-                    circuit::witness::deposit::calculate_deposit_operations_from_witness(
-                        &deposit_witness,
-                        &Fr::zero(),
-                        &Fr::zero(),
-                        &Fr::zero(),
-                        &SignatureData {
-                            r_packed: vec![Some(false); 256],
-                            s: vec![Some(false); 256],
-                        },
-                        &[Some(false); 256], //doesn't matter for deposit
-                    );
-                operations.extend(deposit_operations);
-                pub_data.extend(deposit_witness.get_pubdata());
+                self.account_state = Some((block, accounts));
             }
-            models::node::FranklinOp::Transfer(transfer) => {
-                let transfer_witness =
-                    circuit::witness::transfer::apply_transfer_tx(&mut accounts_tree, &transfer);
-                let sig_packed = match transfer.tx.signature.signature.serialize_packed() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(format!("failed to pack transaction signature {}", e));
-                    }
-                };
-                let (
-                    first_sig_msg,
-                    second_sig_msg,
-                    third_sig_msg,
-                    signature_data,
-                    signer_packed_key_bits,
-                ) = prepare_sig_data(
-                    &sig_packed,
-                    &transfer.tx.get_bytes(),
-                    &transfer.tx.signature.pub_key,
-                )?;
-                let transfer_operations =
-                    circuit::witness::transfer::calculate_transfer_operations_from_witness(
+        }
+
+        Ok(())
+    }
+
+    /// Builds an `CircutAccountTree` based on the stored account state.
+    ///
+    /// This method does not update the account state itself and expects
+    /// it to be up to date.
+    fn build_account_tree(&self) -> CircuitAccountTree {
+        assert!(
+            self.account_state.is_some(),
+            "There is no state to build a circuit account tree"
+        );
+
+        let mut account_tree = CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+
+        if let Some((_, ref state)) = self.account_state {
+            for (&account_id, account) in state {
+                let circuit_account = CircuitAccount::from(account.clone());
+                account_tree.insert(account_id, circuit_account);
+            }
+        }
+
+        account_tree
+    }
+
+    fn build_prover_data(
+        &mut self,
+        storage: &storage::StorageProcessor,
+        commit_operation: &models::Operation,
+    ) -> Result<ProverData, String> {
+        let block_number = commit_operation.block.block_number;
+        let block_size = commit_operation.block.smallest_block_size();
+
+        info!("building prover data for block {}", &block_number);
+
+        self.update_account_state(storage, block_number - 1)?;
+        let account_tree = self.build_account_tree();
+
+        let mut witness_accum = WitnessBuilder::new(
+            account_tree,
+            commit_operation.block.fee_account,
+            block_number,
+        );
+
+        let ops = storage
+            .chain()
+            .block_schema()
+            .get_block_operations(block_number)
+            .map_err(|e| format!("failed to get block operations {}", e))?;
+
+        let mut operations = vec![];
+        let mut pub_data = vec![];
+        let mut fees = vec![];
+        for op in ops {
+            match op {
+                FranklinOp::Deposit(deposit) => {
+                    let deposit_witness =
+                        apply_deposit_tx(&mut witness_accum.account_tree, &deposit);
+
+                    let deposit_operations =
+                        calculate_deposit_operations_from_witness(&deposit_witness);
+                    operations.extend(deposit_operations);
+                    pub_data.extend(deposit_witness.get_pubdata());
+                }
+                FranklinOp::Transfer(transfer) => {
+                    let transfer_witness =
+                        apply_transfer_tx(&mut witness_accum.account_tree, &transfer);
+
+                    let sig_packed = transfer
+                        .tx
+                        .signature
+                        .signature
+                        .serialize_packed()
+                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
+
+                    let (
+                        first_sig_msg,
+                        second_sig_msg,
+                        third_sig_msg,
+                        signature_data,
+                        signer_packed_key_bits,
+                    ) = prepare_sig_data(
+                        &sig_packed,
+                        &transfer.tx.get_bytes(),
+                        &transfer.tx.signature.pub_key,
+                    )?;
+
+                    let transfer_operations = calculate_transfer_operations_from_witness(
                         &transfer_witness,
                         &first_sig_msg,
                         &second_sig_msg,
@@ -239,70 +385,78 @@ fn build_prover_data(
                         &signature_data,
                         &signer_packed_key_bits,
                     );
-                operations.extend(transfer_operations);
-                fees.push((transfer.tx.fee, transfer.tx.token));
-                pub_data.extend(transfer_witness.get_pubdata());
-            }
-            models::node::FranklinOp::TransferToNew(transfer_to_new) => {
-                let transfer_to_new_witness =
-                    circuit::witness::transfer_to_new::apply_transfer_to_new_tx(
-                        &mut accounts_tree,
-                        &transfer_to_new,
-                    );
-                let sig_packed = match transfer_to_new.tx.signature.signature.serialize_packed() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(format!("failed to pack transaction signature {}", e));
-                    }
-                };
-                let (
-                    first_sig_msg,
-                    second_sig_msg,
-                    third_sig_msg,
-                    signature_data,
-                    signer_packed_key_bits,
-                ) = prepare_sig_data(
-                    &sig_packed,
-                    &transfer_to_new.tx.get_bytes(),
-                    &transfer_to_new.tx.signature.pub_key,
-                )?;
 
-                let transfer_to_new_operations =
-                    circuit::witness::transfer_to_new::calculate_transfer_to_new_operations_from_witness(
-                        &transfer_to_new_witness,
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature_data,
-                        &signer_packed_key_bits,
-                    );
-                operations.extend(transfer_to_new_operations);
-                fees.push((transfer_to_new.tx.fee, transfer_to_new.tx.token));
-                pub_data.extend(transfer_to_new_witness.get_pubdata());
-            }
-            models::node::FranklinOp::Withdraw(withdraw) => {
-                let withdraw_witness =
-                    circuit::witness::withdraw::apply_withdraw_tx(&mut accounts_tree, &withdraw);
-                let sig_packed = match withdraw.tx.signature.signature.serialize_packed() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(format!("failed to pack transaction signature {}", e));
-                    }
-                };
-                let (
-                    first_sig_msg,
-                    second_sig_msg,
-                    third_sig_msg,
-                    signature_data,
-                    signer_packed_key_bits,
-                ) = prepare_sig_data(
-                    &sig_packed,
-                    &withdraw.tx.get_bytes(),
-                    &withdraw.tx.signature.pub_key,
-                )?;
+                    operations.extend(transfer_operations);
+                    fees.push(CollectedFee {
+                        token: transfer.tx.token,
+                        amount: transfer.tx.fee,
+                    });
+                    pub_data.extend(transfer_witness.get_pubdata());
+                }
+                FranklinOp::TransferToNew(transfer_to_new) => {
+                    let transfer_to_new_witness =
+                        apply_transfer_to_new_tx(&mut witness_accum.account_tree, &transfer_to_new);
 
-                let withdraw_operations =
-                    circuit::witness::withdraw::calculate_withdraw_operations_from_witness(
+                    let sig_packed = transfer_to_new
+                        .tx
+                        .signature
+                        .signature
+                        .serialize_packed()
+                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
+
+                    let (
+                        first_sig_msg,
+                        second_sig_msg,
+                        third_sig_msg,
+                        signature_data,
+                        signer_packed_key_bits,
+                    ) = prepare_sig_data(
+                        &sig_packed,
+                        &transfer_to_new.tx.get_bytes(),
+                        &transfer_to_new.tx.signature.pub_key,
+                    )?;
+
+                    let transfer_to_new_operations =
+                        calculate_transfer_to_new_operations_from_witness(
+                            &transfer_to_new_witness,
+                            &first_sig_msg,
+                            &second_sig_msg,
+                            &third_sig_msg,
+                            &signature_data,
+                            &signer_packed_key_bits,
+                        );
+
+                    operations.extend(transfer_to_new_operations);
+                    fees.push(CollectedFee {
+                        token: transfer_to_new.tx.token,
+                        amount: transfer_to_new.tx.fee,
+                    });
+                    pub_data.extend(transfer_to_new_witness.get_pubdata());
+                }
+                FranklinOp::Withdraw(withdraw) => {
+                    let withdraw_witness =
+                        apply_withdraw_tx(&mut witness_accum.account_tree, &withdraw);
+
+                    let sig_packed = withdraw
+                        .tx
+                        .signature
+                        .signature
+                        .serialize_packed()
+                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
+
+                    let (
+                        first_sig_msg,
+                        second_sig_msg,
+                        third_sig_msg,
+                        signature_data,
+                        signer_packed_key_bits,
+                    ) = prepare_sig_data(
+                        &sig_packed,
+                        &withdraw.tx.get_bytes(),
+                        &withdraw.tx.signature.pub_key,
+                    )?;
+
+                    let withdraw_operations = calculate_withdraw_operations_from_witness(
                         &withdraw_witness,
                         &first_sig_msg,
                         &second_sig_msg,
@@ -310,35 +464,38 @@ fn build_prover_data(
                         &signature_data,
                         &signer_packed_key_bits,
                     );
-                operations.extend(withdraw_operations);
-                fees.push((withdraw.tx.fee, withdraw.tx.token));
-                pub_data.extend(withdraw_witness.get_pubdata());
-            }
-            models::node::FranklinOp::Close(close) => {
-                let close_account_witness = circuit::witness::close_account::apply_close_account_tx(
-                    &mut accounts_tree,
-                    &close,
-                );
-                let sig_packed = match close.tx.signature.signature.serialize_packed() {
-                    Ok(v) => v,
-                    Err(e) => {
-                        return Err(format!("failed to pack signature: {}", e));
-                    }
-                };
-                let (
-                    first_sig_msg,
-                    second_sig_msg,
-                    third_sig_msg,
-                    signature_data,
-                    signer_packed_key_bits,
-                ) = prepare_sig_data(
-                    &sig_packed,
-                    &close.tx.get_bytes(),
-                    &close.tx.signature.pub_key,
-                )?;
 
-                let close_account_operations =
-                    circuit::witness::close_account::calculate_close_account_operations_from_witness(
+                    operations.extend(withdraw_operations);
+                    fees.push(CollectedFee {
+                        token: withdraw.tx.token,
+                        amount: withdraw.tx.fee,
+                    });
+                    pub_data.extend(withdraw_witness.get_pubdata());
+                }
+                FranklinOp::Close(close) => {
+                    let close_account_witness =
+                        apply_close_account_tx(&mut witness_accum.account_tree, &close);
+
+                    let sig_packed = close
+                        .tx
+                        .signature
+                        .signature
+                        .serialize_packed()
+                        .map_err(|e| format!("failed to pack signature: {}", e))?;
+
+                    let (
+                        first_sig_msg,
+                        second_sig_msg,
+                        third_sig_msg,
+                        signature_data,
+                        signer_packed_key_bits,
+                    ) = prepare_sig_data(
+                        &sig_packed,
+                        &close.tx.get_bytes(),
+                        &close.tx.signature.pub_key,
+                    )?;
+
+                    let close_account_operations = calculate_close_account_operations_from_witness(
                         &close_account_witness,
                         &first_sig_msg,
                         &second_sig_msg,
@@ -346,114 +503,62 @@ fn build_prover_data(
                         &signature_data,
                         &signer_packed_key_bits,
                     );
-                operations.extend(close_account_operations);
-                pub_data.extend(close_account_witness.get_pubdata());
-            }
-            models::node::FranklinOp::FullExit(full_exit_op) => {
-                let success = full_exit_op.withdraw_amount.is_some();
-                let full_exit_witness =
-                    apply_full_exit_tx(&mut accounts_tree, &full_exit_op, success);
-                let full_exit_operations =
-                    calculate_full_exit_operations_from_witness(&full_exit_witness);
-                operations.extend(full_exit_operations);
-                pub_data.extend(full_exit_witness.get_pubdata());
-            }
-            models::node::FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
-                let change_pkhash_witness =
-                    apply_change_pubkey_offchain_tx(&mut accounts_tree, &change_pkhash_op);
-                let change_pkhash_operations =
-                    calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
-                operations.extend(change_pkhash_operations);
-                pub_data.extend(change_pkhash_witness.get_pubdata());
-            }
-            models::node::FranklinOp::Noop(_) => {} // Noops are handled below
-        }
-    }
-    if operations.len() < models::params::block_size_chunks() {
-        for _ in 0..models::params::block_size_chunks() - operations.len() {
-            let (signature, first_sig_msg, second_sig_msg, third_sig_msg, _sender_x, _sender_y) =
-                circuit::witness::utils::generate_dummy_sig_data(&[false], &phasher, &params);
-            operations.push(circuit::witness::noop::noop_operation(
-                &accounts_tree,
-                commit_operation.block.fee_account,
-                &first_sig_msg,
-                &second_sig_msg,
-                &third_sig_msg,
-                &signature,
-                &[Some(false); 256],
-            ));
-            pub_data.extend(vec![false; 64]);
-        }
-    }
-    assert_eq!(pub_data.len(), 64 * models::params::block_size_chunks());
-    assert_eq!(operations.len(), models::params::block_size_chunks());
 
-    debug!(
-        "Prover pubdata: {}",
-        hex::encode(pack_bits_into_bytes_in_order(pub_data.clone()))
-    );
-
-    let validator_acc = match accounts_tree.get(commit_operation.block.fee_account as u32) {
-        Some(v) => v,
-        None => return Err("validator account is absent in the tree".to_owned()),
-    };
-    let mut validator_balances = vec![];
-    for i in 0..1 << models::params::BALANCE_TREE_DEPTH {
-        let balance_value = match validator_acc.subtree.get(i as u32) {
-            None => Fr::zero(),
-            Some(bal) => bal.value,
-        };
-        validator_balances.push(Some(balance_value));
-    }
-    let _: Fr = accounts_tree.root_hash();
-    let (mut root_after_fee, mut validator_account_witness) = circuit::witness::utils::apply_fee(
-        &mut accounts_tree,
-        commit_operation.block.fee_account,
-        0,
-        0,
-    );
-    for (fee, token) in fees {
-        let (root, acc_witness) = circuit::witness::utils::apply_fee(
-            &mut accounts_tree,
-            commit_operation.block.fee_account,
-            u32::from(token),
-            match fee.to_string().parse() {
-                Ok(v) => v,
-                Err(e) => {
-                    return Err(format!("failed to parse fee: {}", e));
+                    operations.extend(close_account_operations);
+                    pub_data.extend(close_account_witness.get_pubdata());
                 }
-            },
+                FranklinOp::FullExit(full_exit_op) => {
+                    let success = full_exit_op.withdraw_amount.is_some();
+
+                    let full_exit_witness =
+                        apply_full_exit_tx(&mut witness_accum.account_tree, &full_exit_op, success);
+
+                    let full_exit_operations =
+                        calculate_full_exit_operations_from_witness(&full_exit_witness);
+
+                    operations.extend(full_exit_operations);
+                    pub_data.extend(full_exit_witness.get_pubdata());
+                }
+                FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
+                    let change_pkhash_witness = apply_change_pubkey_offchain_tx(
+                        &mut witness_accum.account_tree,
+                        &change_pkhash_op,
+                    );
+
+                    let change_pkhash_operations =
+                        calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
+
+                    operations.extend(change_pkhash_operations);
+                    pub_data.extend(change_pkhash_witness.get_pubdata());
+                }
+                FranklinOp::Noop(_) => {} // Noops are handled below
+            }
+        }
+
+        witness_accum.add_operation_with_pubdata(operations, pub_data);
+        witness_accum.extend_pubdata_with_noops();
+        assert_eq!(witness_accum.pubdata.len(), 64 * block_size);
+        assert_eq!(witness_accum.operations.len(), block_size);
+
+        witness_accum.collect_fees(&fees);
+        assert_eq!(
+            witness_accum
+                .root_after_fees
+                .expect("root_after_fees not present"),
+            commit_operation.block.new_root_hash
         );
-        root_after_fee = root;
-        validator_account_witness = acc_witness;
+        witness_accum.calculate_pubdata_commitment();
+
+        Ok(ProverData {
+            public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
+            old_root: witness_accum.initial_root_hash,
+            new_root: commit_operation.block.new_root_hash,
+            validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string())
+                .expect("failed to parse"),
+            operations: witness_accum.operations,
+            validator_balances: witness_accum.fee_account_balances.unwrap(),
+            validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),
+            validator_account: witness_accum.fee_account_witness.unwrap(),
+        })
     }
-
-    assert_eq!(root_after_fee, commit_operation.block.new_root_hash);
-    let (validator_audit_path, _) = circuit::witness::utils::get_audits(
-        &accounts_tree,
-        commit_operation.block.fee_account as u32,
-        0,
-    );
-
-    let public_data_commitment = circuit::witness::utils::public_data_commitment::<Engine>(
-        &pub_data,
-        Some(initial_root),
-        Some(root_after_fee),
-        Some(
-            Fr::from_str(&commit_operation.block.fee_account.to_string()).expect("failed to parse"),
-        ),
-        Some(Fr::from_str(&(block_number).to_string()).expect("failed to parse")),
-    );
-
-    Ok(ProverData {
-        public_data_commitment,
-        old_root: initial_root,
-        new_root: commit_operation.block.new_root_hash,
-        validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string())
-            .expect("failed to parse"),
-        operations,
-        validator_balances,
-        validator_audit_path,
-        validator_account: validator_account_witness,
-    })
 }

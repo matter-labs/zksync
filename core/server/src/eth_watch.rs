@@ -235,7 +235,11 @@ impl<T: Transport> EthWatch<T> {
             .access_storage()
             .map(|storage| {
                 for (id, address) in &self.eth_state.tokens {
-                    if let Err(e) = storage.store_token(*id, &format!("0x{:x}", address), None) {
+                    if let Err(e) = storage.tokens_schema().store_token(
+                        *id,
+                        &format!("0x{:x}", address),
+                        &format!("ERC20-{}", id),
+                    ) {
                         warn!("Failed to add token to db: {:?}", e);
                     }
                 }

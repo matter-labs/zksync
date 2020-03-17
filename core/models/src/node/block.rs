@@ -3,7 +3,7 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use crate::params::block_size_chunks;
+use crate::params::{block_chunk_sizes, max_block_chunk_size};
 use crate::serialization::*;
 use web3::types::H256;
 
@@ -40,19 +40,19 @@ impl ExecutedOperations {
 
     pub fn get_eth_public_data(&self) -> Vec<u8> {
         self.get_executed_op()
-            .map(|op| op.public_data())
+            .map(FranklinOp::public_data)
             .unwrap_or_default()
     }
 
     pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
-        self.get_executed_op().map(|op| op.eth_witness())
+        self.get_executed_op().map(FranklinOp::eth_witness)
     }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Block {
     pub block_number: BlockNumber,
-    #[serde(serialize_with = "fr_ser", deserialize_with = "fr_de")]
+    #[serde(with = "FrSerde")]
     pub new_root_hash: Fr,
     pub fee_account: AccountId,
     pub block_transactions: Vec<ExecutedOperations>,
@@ -73,44 +73,32 @@ impl Block {
         let mut executed_tx_pub_data = self
             .block_transactions
             .iter()
-            .map(|tx| tx.get_eth_public_data())
-            .fold(Vec::new(), |mut acc, pub_data| {
-                acc.extend(pub_data.into_iter());
-                acc
-            });
+            .filter_map(ExecutedOperations::get_executed_op)
+            .flat_map(FranklinOp::public_data)
+            .collect::<Vec<_>>();
 
         // Pad block with noops.
-        executed_tx_pub_data.resize(block_size_chunks() * 8, 0x00);
+        executed_tx_pub_data.resize(self.smallest_block_size() * 8, 0x00);
 
         executed_tx_pub_data
     }
 
     fn get_noops(&self) -> usize {
-        let used_chunks = self
-            .block_transactions
-            .iter()
-            .map(|op| {
-                op.get_executed_op()
-                    .map(|op| op.chunks())
-                    .unwrap_or_default()
-            })
-            .sum::<usize>();
-
-        block_size_chunks() - used_chunks
+        self.smallest_block_size() - self.chunks_used()
     }
 
     /// Returns eth_witness data and bytes used by each of the operations
     pub fn get_eth_witness_data(&self) -> (Vec<u8>, Vec<u64>) {
-        let (eth_witness, mut used_bytes) = self.block_transactions.iter().fold(
-            (Vec::new(), Vec::new()),
-            |(mut eth_witness, mut used_bytes), op| {
-                if let Some(witness_bytes) = op.get_eth_witness_bytes() {
-                    used_bytes.push(witness_bytes.len() as u64);
-                    eth_witness.extend(witness_bytes.into_iter());
-                }
-                (eth_witness, used_bytes)
-            },
-        );
+        let mut eth_witness = Vec::new();
+        let mut used_bytes = Vec::new();
+
+        for block_tx in &self.block_transactions {
+            if let Some(franklin_op) = block_tx.get_executed_op() {
+                let witness_bytes = franklin_op.eth_witness();
+                used_bytes.push(witness_bytes.len() as u64);
+                eth_witness.extend(witness_bytes.into_iter());
+            }
+        }
 
         for _ in 0..self.get_noops() {
             used_bytes.push(0);
@@ -121,5 +109,31 @@ impl Block {
 
     pub fn number_of_processed_prior_ops(&self) -> u64 {
         self.processed_priority_ops.1 - self.processed_priority_ops.0
+    }
+
+    pub fn chunks_used(&self) -> usize {
+        self.block_transactions
+            .iter()
+            .filter_map(ExecutedOperations::get_executed_op)
+            .map(FranklinOp::chunks)
+            .sum()
+    }
+
+    pub fn smallest_block_size(&self) -> usize {
+        let chunks_used = self.chunks_used();
+        Self::smallest_block_size_for_chunks(chunks_used)
+    }
+
+    pub fn smallest_block_size_for_chunks(chunks_used: usize) -> usize {
+        for &block_size in block_chunk_sizes() {
+            if block_size >= chunks_used {
+                return block_size;
+            }
+        }
+        panic!(
+            "Provided chunks amount ({}) cannot fit in one block, maximum available size is {}",
+            chunks_used,
+            max_block_chunk_size()
+        );
     }
 }

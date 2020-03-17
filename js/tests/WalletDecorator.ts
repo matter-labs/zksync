@@ -1,7 +1,6 @@
 import * as ethers from 'ethers';
 const zksync = require('zksync');
 import * as utils from './utils';
-import { Token } from 'zksync/build/types';
 import { sleep } from 'zksync/build/utils';
 const contractCode = require('../../contracts/flat_build/Franklin');
 const erc20ContractCode = require('openzeppelin-solidity/build/contracts/IERC20');
@@ -88,16 +87,21 @@ export class WalletDecorator {
         };
     }
 
-    static async revertReason(txHash) {
-        const tx = await ethersProvider.getTransaction(txHash);
-        if (tx == null) {
-            return 'tx null';
-        }
-        if (tx.blockNumber == null) {
-            return 'tx blocknumberless';
-        }
-        const code = await ethersProvider.call(tx, tx.blockNumber);
+    static async revertReason(hash) {
+        const tx = await ethersProvider.getTransaction(hash);
 
+        if (!tx) {
+            return "tx not found";
+        }
+        
+        const receipt = await ethersProvider.getTransactionReceipt(hash);
+    
+        if (receipt.status) {
+            return "tx success";
+        } 
+        
+        const code = await ethersProvider.call(tx, tx.blockNumber);
+    
         if (code == '0x') {
             return 'empty revert reason';
         }
@@ -168,6 +172,17 @@ export class WalletDecorator {
     async resetNonce() {
         this.syncNonce = await this.syncWallet.getNonce();
         this.ethNonce = await this.ethWallet.getTransactionCount();
+    }
+
+    async setCurrentPubkeyWithZksyncTx() {
+        if (await this.syncWallet.isSigningKeySet()) return;
+
+        const startTime = new Date().getTime();
+        await (await this.syncWallet.onchainAuthSigningKey(this.syncNonce++)).wait();
+        const changePubkeyHandle = await this.syncWallet.setSigningKey(this.syncNonce++, true);
+        console.log(`Change pubkey onchain posted: ${(new Date().getTime()) - startTime} ms`);
+        await changePubkeyHandle.awaitReceipt();
+        console.log(`Change pubkey onchain committed: ${(new Date().getTime()) - startTime} ms`);
     }
 
     async mainchainSendToMany(wallets, tokens, amounts) {
@@ -383,7 +398,7 @@ export class WalletDecorator {
             ...await Promise.all(
                 tokens.map(
                     async token => {
-                        const eth      = await zksync.getEthereumBalance(this.ethWallet, token).then(ethers.utils.formatEther);
+                        const eth      = await this.syncWallet.getEthereumBalance(token).then(ethers.utils.formatEther);
                         const sync     = await this.syncWallet.getBalance(token).then(ethers.utils.formatEther);
                         const withdraw = withdrawBalances[token];
                         return {

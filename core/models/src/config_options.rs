@@ -3,7 +3,6 @@ use futures::{channel::mpsc, executor::block_on, SinkExt};
 use std::env;
 use std::net::SocketAddr;
 use web3::types::{H160, H256};
-
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
 pub struct ThreadPanicNotify(pub mpsc::Sender<bool>);
 
@@ -13,6 +12,10 @@ impl Drop for ThreadPanicNotify {
             block_on(self.0.send(true)).unwrap();
         }
     }
+}
+
+fn get_env(name: &str) -> String {
+    env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e))
 }
 
 #[derive(Clone)]
@@ -25,7 +28,6 @@ pub struct ConfigurationOptions {
     pub web3_url: String,
     pub governance_eth_addr: H160,
     pub governance_genesis_tx_hash: H256,
-    pub priority_queue_eth_addr: H160,
     pub operator_franklin_addr: Address,
     pub operator_eth_addr: H160,
     pub operator_private_key: H256,
@@ -37,9 +39,6 @@ pub struct ConfigurationOptions {
 
 impl ConfigurationOptions {
     pub fn from_env() -> ConfigurationOptions {
-        let get_env =
-            |name| env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e));
-
         ConfigurationOptions {
             rest_api_server_address: get_env("REST_API_BIND")
                 .parse()
@@ -63,9 +62,6 @@ impl ConfigurationOptions {
             governance_genesis_tx_hash: get_env("GOVERNANCE_GENESIS_TX_HASH")[2..]
                 .parse()
                 .expect("Failed to parse GOVERNANCE_GENESIS_TX_HASH"),
-            priority_queue_eth_addr: get_env("PRIORITY_QUEUE_ADDR")[2..]
-                .parse()
-                .expect("Failed to parse PRIORITY_QUEUE_ADDR as ETH contract address"),
             operator_franklin_addr: get_env("OPERATOR_FRANKLIN_ADDRESS")[2..]
                 .parse()
                 .expect("Failed to parse OPERATOR_FRANKLIN_ADDRESS"),

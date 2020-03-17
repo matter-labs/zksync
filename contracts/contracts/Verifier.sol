@@ -16,12 +16,17 @@ contract Verifier is VerificationKey {
     /// @return bool flag that indicates if block proof is valid
     function verifyBlockProof(
         uint256[8] calldata _proof,
-        bytes32 _commitment
+        bytes32 _commitment,
+        uint32 _chunks
     ) external view returns (bool) {
+        if (DUMMY_VERIFIER) {
+            return true;
+        }
+
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
-        (vk, gammaABC) = getVk();
+        (vk, gammaABC) = getVkBlock(_chunks);
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(_commitment) & mask;
         return Verify(vk, gammaABC, _proof, inputs);
@@ -34,20 +39,20 @@ contract Verifier is VerificationKey {
     /// @param _proof Proof that user committed
     /// @return bool flag that indicates if exit proof is valid
     function verifyExitProof(
-        uint16 _tokenId,
+        bytes32 _root_hash,
         address _owner,
+        uint16 _tokenId,
         uint128 _amount,
         uint256[8] calldata _proof
     ) external view returns (bool) {
         bytes32 hash = sha256(
-            abi.encodePacked(uint256(_tokenId), uint256(_owner))
+            abi.encodePacked(_root_hash, _owner, _tokenId, _amount)
         );
-        hash = sha256(abi.encodePacked(hash, uint256(_amount)));
 
         uint256 mask = (~uint256(0)) >> 3;
         uint256[14] memory vk;
         uint256[] memory gammaABC;
-        (vk, gammaABC) = getVk();
+        (vk, gammaABC) = getVkExit();
         uint256[] memory inputs = new uint256[](1);
         inputs[0] = uint256(hash) & mask;
         return Verify(vk, gammaABC, _proof, inputs);
@@ -73,10 +78,6 @@ contract Verifier is VerificationKey {
         uint256[8] memory in_proof,
         uint256[] memory proof_inputs
     ) internal view returns (bool) {
-        if (DUMMY_VERIFIER) {
-            return true;
-        }
-
         // Start
         require(((vk_gammaABC.length / 2) - 1) == proof_inputs.length, "vvy11"); // Invalid number of public inputs
 

@@ -3,15 +3,20 @@ use crate::element::{CircuitElement, CircuitPubkey};
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::baby_eddsa::EddsaSignature;
-use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
+use crate::franklin_crypto::circuit::boolean::{le_bits_into_le_bytes, AllocatedBit, Boolean};
 use crate::franklin_crypto::circuit::ecc;
 use crate::operation::SignatureData;
 use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
 
 use crate::franklin_crypto::circuit::expression::Expression;
 use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::circuit::sha256;
 use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::params as franklin_constants;
+use models::params::{FR_BIT_WIDTH, FR_BIT_WIDTH_PADDED};
+
+/// Max len of message for signature, we use Pedersen hash to compress message to this len before signing.
+const MAX_SIGN_MESSAGE_BIT_WIDTH: usize = 256;
 
 pub struct AllocatedSignatureData<E: JubjubEngine> {
     pub eddsa: EddsaSignature<E>,
@@ -146,7 +151,10 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         temp_bits
     };
 
-    assert!(serialized_tx_bits.len() == franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert_eq!(
+        serialized_tx_bits.len(),
+        franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS
+    );
 
     // signature msg is the hash of serialized transaction
     let sig_msg = pedersen_hash::pedersen_hash(
@@ -161,22 +169,21 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
     let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
     sig_msg_bits.resize(256, Boolean::constant(false));
 
-    // signature.verify_sha256_musig(
-    //     cs.namespace(|| "verify_sha"),
-    //     self.params,
-    //     &sig_msg_bits,
-    //     generator,
-    // )?;
-
-    //TODO: put bits here
-
-    let is_sig_verified = verify_pedersen(
-        cs.namespace(|| "musig pedersen"),
+    let is_sig_verified = is_sha256_signature_verified(
+        cs.namespace(|| "musig sha256"),
         &sig_msg_bits,
         &signature,
         params,
         generator,
     )?;
+
+    //    let is_sig_verified = is_pedersen_signature_verified(
+    //        cs.namespace(|| "musig pedersen"),
+    //        &sig_msg_bits,
+    //        &signature,
+    //        params,
+    //        generator,
+    //    )?;
 
     debug!("is_sig_verified={:?}", is_sig_verified.get_value());
     debug!("is_sig_r_correct={:?}", is_sig_r_correct.get_value());
@@ -254,7 +261,7 @@ pub fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSyst
     Ok(is_serialized_transaction_correct)
 }
 
-pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
+pub fn is_pedersen_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     sig_data_bits: &[Boolean],
     signature: &EddsaSignature<E>,
@@ -262,7 +269,13 @@ pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
     generator: ecc::EdwardsPoint<E>,
 ) -> Result<Boolean, SynthesisError> {
     let mut sig_data_bits = sig_data_bits.to_vec();
-    sig_data_bits.resize(256, Boolean::constant(false));
+    assert!(
+        sig_data_bits.len() <= MAX_SIGN_MESSAGE_BIT_WIDTH,
+        "Signature message len is too big {}/{}",
+        sig_data_bits.len(),
+        MAX_SIGN_MESSAGE_BIT_WIDTH
+    );
+    sig_data_bits.resize(MAX_SIGN_MESSAGE_BIT_WIDTH, Boolean::constant(false));
 
     let mut first_round_bits: Vec<Boolean> = vec![];
 
@@ -271,14 +284,14 @@ pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
         .get_x()
         .clone()
         .into_bits_le(cs.namespace(|| "pk_x_bits"))?;
-    pk_x_serialized.resize(256, Boolean::constant(false));
+    pk_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
 
     let mut r_x_serialized = signature
         .r
         .get_x()
         .clone()
         .into_bits_le(cs.namespace(|| "r_x_bits"))?;
-    r_x_serialized.resize(256, Boolean::constant(false));
+    r_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
 
     first_round_bits.extend(pk_x_serialized);
     first_round_bits.extend(r_x_serialized);
@@ -292,7 +305,7 @@ pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
     let mut first_round_hash_bits = first_round_hash
         .get_x()
         .into_bits_le(cs.namespace(|| "first_round_hash_bits"))?;
-    first_round_hash_bits.resize(256, Boolean::constant(false));
+    first_round_hash_bits.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
 
     let mut second_round_bits = vec![];
     second_round_bits.extend(first_round_hash_bits);
@@ -321,6 +334,61 @@ pub fn verify_pedersen<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(is_sig_verified)
 }
 
+pub fn is_sha256_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    sig_data_bits: &[Boolean],
+    signature: &EddsaSignature<E>,
+    params: &E::Params,
+    generator: ecc::EdwardsPoint<E>,
+) -> Result<Boolean, SynthesisError> {
+    // this contant is also used inside franklin_crypto verify sha256(enforce version of this check)
+    const IPUT_PAD_LEN_FOR_SHA256: usize = 768;
+
+    let mut sig_data_bits = sig_data_bits.to_vec();
+    assert!(
+        sig_data_bits.len() <= MAX_SIGN_MESSAGE_BIT_WIDTH,
+        "Signature message len is too big {}/{}",
+        sig_data_bits.len(),
+        MAX_SIGN_MESSAGE_BIT_WIDTH
+    );
+    sig_data_bits.resize(MAX_SIGN_MESSAGE_BIT_WIDTH, Boolean::constant(false));
+    sig_data_bits = le_bits_into_le_bytes(sig_data_bits);
+
+    let mut hash_input: Vec<Boolean> = vec![];
+    {
+        let mut pk_x_serialized = signature
+            .pk
+            .get_x()
+            .into_bits_le_fixed(cs.namespace(|| "pk_x_bits"), FR_BIT_WIDTH)?;
+        pk_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
+        hash_input.extend(le_bits_into_le_bytes(pk_x_serialized));
+    }
+    {
+        let mut r_x_serialized = signature
+            .r
+            .get_x()
+            .into_bits_le_fixed(cs.namespace(|| "r_x_bits"), FR_BIT_WIDTH)?;
+        r_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
+        hash_input.extend(le_bits_into_le_bytes(r_x_serialized));
+    }
+    hash_input.extend(sig_data_bits);
+
+    hash_input.resize(IPUT_PAD_LEN_FOR_SHA256, Boolean::constant(false));
+    let h_bits = sha256::sha256(cs.namespace(|| "sha256"), &hash_input)?;
+
+    let max_message_len = 32 as usize; //since it is the result of sha256 hash
+
+    let is_sig_verified = is_verified_raw_message_signature(
+        signature,
+        cs.namespace(|| "verify transaction signature"),
+        params,
+        &le_bits_into_le_bytes(h_bits),
+        generator,
+        max_message_len,
+    )?;
+    Ok(is_sig_verified)
+}
+
 pub fn is_verified_raw_message_signature<CS, E>(
     signature: &EddsaSignature<E>,
     mut cs: CS,
@@ -338,7 +406,9 @@ where
     // message is always padded to 256 bits in this gadget, but still checked on synthesis
     assert!(message.len() <= max_message_len * 8);
 
-    let scalar_bits = signature.s.into_bits_le(cs.namespace(|| "Get S bits"))?;
+    let scalar_bits = signature
+        .s
+        .into_bits_le_fixed(cs.namespace(|| "Get S bits"), E::Fs::NUM_BITS as usize)?;
 
     let sb = generator.mul(cs.namespace(|| "S*B computation"), &scalar_bits, params)?;
 

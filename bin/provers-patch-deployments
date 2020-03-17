@@ -1,0 +1,5 @@
+#!/bin/bash
+
+for BLOCK_SIZE_CHUNKS in $(echo $BLOCK_CHUNK_SIZES | sed "s/,/ /g"); do
+    bin/kube patch deployment deployments/$ZKSYNC_ENV-prover-$BLOCK_SIZE_CHUNKS -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(date +%s)\"}}}}}"
+done
