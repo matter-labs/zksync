@@ -1,7 +1,13 @@
 import BN = require("bn.js");
-import {utils, constants, ethers} from "ethers";
-import {PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol} from "./types";
-import {serializeNonce} from "./signer";
+import { utils, constants, ethers } from "ethers";
+import {
+    PubKeyHash,
+    TokenAddress,
+    TokenLike,
+    Tokens,
+    TokenSymbol
+} from "./types";
+import { serializeNonce } from "./signer";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -16,6 +22,9 @@ export const SYNC_PRIOR_QUEUE_INTERFACE = new utils.Interface(
 export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(
     require("../abi/SyncGov.json").interface
 );
+
+export const MAX_ERC20_APPROVE_AMOUNT =
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935"; // 2^256 - 1
 
 const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
@@ -305,8 +314,14 @@ export class TokenSet {
     }
 }
 
-export async function signChangePubkeyMessage(signer: ethers.Signer, pubKeyHash: PubKeyHash, nonce: number): Promise<string> {
-    const msgNonce = serializeNonce(nonce).toString("hex").toLowerCase();
+export async function signChangePubkeyMessage(
+    signer: ethers.Signer,
+    pubKeyHash: PubKeyHash,
+    nonce: number
+): Promise<string> {
+    const msgNonce = serializeNonce(nonce)
+        .toString("hex")
+        .toLowerCase();
     const message = `Register ZK Sync pubkey:\n\n${pubKeyHash.toLowerCase()} nonce: 0x${msgNonce}\n\nOnly sign this message for a trusted client!`;
     return signer.signMessage(message);
 }

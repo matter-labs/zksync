@@ -1,7 +1,7 @@
 import {
     Wallet,
     Provider,
-    ETHProxy, getDefaultProvider, types,
+    ETHProxy, getDefaultProvider, types, utils as zkutils
 } from "zksync";
 // HACK: using require as type system work-around
 const franklin_abi = require('../../contracts/build/Franklin.json');
@@ -24,10 +24,42 @@ async function getOperatorBalance(token: types.TokenLike, type: "committed" | "v
     return utils.bigNumberify(balance);
 }
 
+async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumberish) {
+    const balanceBeforeDep = await syncWallet.getBalance(token);
+
+    const startTime = new Date().getTime();
+    const depositHandle = await depositWallet.depositToSyncFromEthereum(
+        {
+            depositTo: syncWallet.address(),
+            token: token,
+            amount,
+            approveDepositAmountForERC20: true,
+        });
+    console.log(`Deposit posted: ${(new Date().getTime()) - startTime} ms`);
+    await depositHandle.awaitReceipt();
+    console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
+    const balanceAfterDep = await syncWallet.getBalance(token);
+
+    if (!balanceAfterDep.sub(balanceBeforeDep).eq(amount)) {
+        throw new Error("Deposit checks failed");
+    }
+}
+
 async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumberish) {
     const balanceBeforeDep = await syncWallet.getBalance(token);
 
     const startTime = new Date().getTime();
+    if (!zkutils.isTokenETH(token)) {
+        if (await depositWallet.isERC20DepositsApproved(token)){
+            throw new Error("Token should not be approved");
+        }
+        const approveERC20 = await depositWallet.apporveERC20TokenDeposits(token);
+        await approveERC20.wait();
+        console.log(`Deposit approved: ${(new Date().getTime()) - startTime} ms`);
+        if (!await depositWallet.isERC20DepositsApproved(token)){
+            throw new Error("Token be approved");
+        }
+    }
     const depositHandle = await depositWallet.depositToSyncFromEthereum(
         {
             depositTo: syncWallet.address(),
@@ -143,8 +175,10 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     const withdrawFee = transfersAmount.div(20);
     const withdrawAmount = transfersAmount.sub(withdrawFee);
 
+    await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount);
+    console.log(`Auto approved deposit ok, Token: ${token}`);
     await testDeposit(depositWallet, syncWallet1, token, depositAmount);
-    console.log(`Deposit ok, Token: ${token}`);
+    console.log(`Forever approved deposit ok, Token: ${token}`);
     await testChangePubkeyOnchain(syncWallet1);
     console.log(`Change pubkey onchain ok`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, transfersFee);
