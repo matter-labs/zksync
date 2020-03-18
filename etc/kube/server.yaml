@@ -123,11 +123,3 @@ spec:
           env:
           - name: ZKSYNC_ENV
             value: "${ZKSYNC_ENV}"
-          - name: NODE_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.nodeName
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
