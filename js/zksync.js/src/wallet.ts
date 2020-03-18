@@ -16,6 +16,12 @@ import {
     SYNC_MAIN_CONTRACT_INTERFACE,
 } from "./utils";
 
+class ZKSyncTxError extends Error {
+    constructor(message: string, public value: PriorityOperationReceipt | TransactionReceipt) {
+        super(message);
+    }
+}
+
 export class Wallet {
     public provider: Provider;
 
@@ -468,11 +474,12 @@ class ETHOperation {
             "COMMIT"
         );
         
+        this.state = "Committed";
+
         if (receipt.executed == false) {
-            throw receipt;
+            throw new ZKSyncTxError("Priority operation failed", receipt);
         }
 
-        this.state = "Committed";
         return receipt;
     }
 
@@ -485,11 +492,12 @@ class ETHOperation {
             "VERIFY"
         );
         
+        this.state = "Verified";
+        
         if (receipt.executed == false) {
-            throw receipt;
+            throw new ZKSyncTxError("Priority operation failed", receipt);
         }
 
-        this.state = "Verified";
         return receipt;
     }
 }
@@ -514,8 +522,8 @@ class Transaction {
         );
         this.state = "Committed";
 
-        if (!receipt.success) {
-            throw receipt;
+        if (receipt.success == false) {
+            throw new ZKSyncTxError(`ZKSync transaction failed: ${receipt.failReason}`, receipt);
         }
 
         return receipt;
@@ -529,8 +537,8 @@ class Transaction {
         );
         this.state = "Verified";
         
-        if (!receipt.success) {
-            throw receipt;
+        if (receipt.success == false) {
+            throw new ZKSyncTxError(`ZKSync transaction failed: ${receipt.failReason}`, receipt);
         }
         
         return receipt;
