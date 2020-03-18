@@ -343,6 +343,7 @@ steps:
       from_secret: stage_k8s_user
     KUBE_TOKEN:
       from_secret: stage_k8s_token
+    KUBE_CONTEXT_NAMESPACE: stage
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
