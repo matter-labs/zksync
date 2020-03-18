@@ -226,17 +226,13 @@ steps:
 - name: init
   image: matterlabs/ci
   environment:
-    DB_URL:
-      from_secret: stage_db_url
-    WEB3_URL:
-      from_secret: stage_web3_url
-    CONTRACT_ADDR:
-      from_secret: stage_contract_addr
+    STAGE_ENV_BASE64:
+      from_secret: stage_env_base64
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - stage-prepare-env.sh $DB_URL $WEB3_URL $CONTRACT_ADDR
+  - echo -n $STAGE_ENV_BASE64| base64 --decode > $ZKSYNC_HOME/etc/env/stage.env
   - zksync env stage
   - zksync yarn
   - zksync gen-keys-if-not-present
