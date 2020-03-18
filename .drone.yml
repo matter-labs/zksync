@@ -231,7 +231,7 @@ steps:
     WEB3_URL:
       from_secret: stage_web3_url
     CONTRACT_ADDR:
-      from_secret: contract_addr
+      from_secret: stage_contract_addr
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
@@ -336,13 +336,13 @@ steps:
   image: matterlabs/ci
   environment:
     KUBE_CA_DATA:
-      from_secret: k8s_ca
+      from_secret: stage_k8s_ca
     KUBE_SERVER:
-      from_secret: k8s_server
+      from_secret: stage_k8s_server
     KUBE_USER:
-      from_secret: k8s_user
+      from_secret: stage_k8s_user
     KUBE_TOKEN:
-      from_secret: k8s_token
+      from_secret: stage_k8s_token
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
