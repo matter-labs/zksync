@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use itertools::Itertools;
 use serde_json::value::Value;
 // Workspace imports
-use models::node::PubKeyHash;
+use models::node::{Address, PubKeyHash};
 use models::ActionType;
 // Local imports
 use self::records::{
@@ -261,7 +261,7 @@ impl<'a> OperationsExtSchema<'a> {
     /// from the block with number $(offset) up to $(offset + limit).
     pub fn get_account_transactions_history(
         &self,
-        address: &PubKeyHash,
+        address: &Address,
         offset: i64,
         limit: i64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
@@ -341,7 +341,7 @@ impl<'a> OperationsExtSchema<'a> {
             using 
                 (block_number)
             ",
-            address = address.to_hex(),
+            address = format!("{:#?}", address),
             offset = offset,
             limit = limit
         );
