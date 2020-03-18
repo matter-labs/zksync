@@ -93,7 +93,7 @@ export class Deployer {
     }
 
     getDeployedContract(name) {
-        if (name == "Governance" || name == "Verifier" || name == "Franklin") {
+        if (["Governance", "Verifier", "Franklin"].includes(name)) {
             return new ethers.Contract(
                 this.addresses[name],
                 this.bytecodes[name+"Target"].interface,
