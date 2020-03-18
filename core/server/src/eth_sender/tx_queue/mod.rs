@@ -75,20 +75,21 @@ impl TxQueueBuilder {
 ///
 /// 1. If the amount of sent transactions is equal to the `MAX_PENDING_TXS` value,
 ///   no transaction is yielded until some of already sent ones are committed.
-/// 2. If `commit` queue contains elements, and `verify` queue does not, the `commit`
-///   operation is yielded.
-/// 3. If `verify` queue contains elements, and `commit` operation with corresponding
-///   ID is committed, the `verify` operation is yielded (meaning that `verify` operations
-///   are prioritized unless the amount of sent `commit` and `verify` operations is equal:
-///   if so, we should send the `commit` operation first).
-/// 4. If both queues are empty, no operation is yielded.
-///
-/// TODO: explain `withdraw` operations policy/priority.
+/// 2. Otherwise, transactions are yielded according to the following policy:
+///   - If `verify` queue contains elements, and `commit` operation with corresponding
+///     ID is committed, the `verify` operation is yielded (meaning that `verify` operations
+///     are prioritized unless the amount of sent `commit` and `verify` operations is equal:
+///     if so, we should send the `commit` operation first).
+///   - Otherwise, if `withdraw` queue contains elements, a `withdraw` operation is yielded.
+///   - Otherwise, if `commit` queue is not empty, a `commit` operation is yielded.
+/// 3. If all the queues are empty, no operation is returned.
 #[derive(Debug)]
 pub struct TxQueue {
     max_pending_txs: usize,
     sent_pending_txs: usize,
 
+    // TODO: SignedCallResult isn't appropriate, since it means an assigned nonce. We don't want
+    // to assign nonce until the actual tx send.
     commit_operations: CounterQueue<SignedCallResult>,
     verify_operations: SparseQueue<SignedCallResult>,
     withdraw_operations: CounterQueue<SignedCallResult>,
@@ -117,22 +118,23 @@ impl TxQueue {
         }
     }
 
-    pub fn set_pending_txs_count(&mut self, sent_pending_txs: usize) {
-        self.sent_pending_txs = sent_pending_txs;
-    }
-
+    /// Adds the `commit` operation to the queue.
     pub fn add_commit_operation(&mut self, commit_operation: SignedCallResult) {
         self.commit_operations.push_back(commit_operation);
     }
 
+    /// Adds the `verify` operation to the queue.
     pub fn add_verify_operation(&mut self, block_idx: usize, verify_operation: SignedCallResult) {
         self.verify_operations.insert(block_idx, verify_operation);
     }
 
+    /// Adds the `withdraw` operation to the queue.
     pub fn add_withdraw_operation(&mut self, withdraw_operation: SignedCallResult) {
         self.withdraw_operations.push_back(withdraw_operation);
     }
 
+    /// Gets the next transaction to send, according to the transaction sending policy.
+    /// For details, see the structure doc-comment.
     pub fn pop_front(&mut self) -> Option<SignedCallResult> {
         if self.sent_pending_txs >= self.max_pending_txs {
             return None;

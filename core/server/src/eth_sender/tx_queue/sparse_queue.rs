@@ -100,4 +100,29 @@ mod tests {
         assert!(queue.has_next());
         assert_eq!(queue.pop_front().unwrap(), "two");
     }
+
+    /// Checks that we can use the difference `current_idx` as the custom
+    /// queue start point.
+    #[test]
+    fn different_start_point() {
+        let mut queue: SparseQueue<String> = SparseQueue::new_from(10);
+
+        // Check that by default the queue is empty.
+        assert!(!queue.has_next());
+
+        // Insert the next element and obtain it.
+        queue.insert(10, "ten".into());
+        assert!(queue.has_next());
+        assert_eq!(queue.pop_front().unwrap(), "ten");
+    }
+
+    /// Checks that attempt to add the element with the index lower than
+    /// the current expected ID results in panic.
+    #[test]
+    #[should_panic]
+    fn add_out_of_order_element() {
+        let mut queue: SparseQueue<String> = SparseQueue::new_from(10);
+        // Insert the element with too low index.
+        queue.insert(0, "zero".into());
+    }
 }
