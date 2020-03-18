@@ -26,6 +26,7 @@ use self::transactions::*;
 mod database;
 mod ethereum_interface;
 mod transactions;
+mod tx_queue;
 
 #[cfg(test)]
 mod tests;
