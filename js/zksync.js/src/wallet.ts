@@ -333,7 +333,7 @@ export class Wallet {
             .eq(MAX_ERC20_APPROVE_AMOUNT);
     }
 
-    async apporveERC20TokenDeposits(
+    async approveERC20TokenDeposits(
         token: TokenLike
     ): Promise<ContractTransaction> {
         if (isTokenETH(token)) {

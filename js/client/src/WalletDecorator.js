@@ -527,6 +527,7 @@ export class WalletDecorator {
                 maxFeeInETHToken,
                 token,
                 amount,
+                approveDepositAmountForERC20: true,
             });
 
             await deposit.awaitEthereumTxCommit();
