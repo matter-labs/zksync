@@ -331,19 +331,12 @@ steps:
 - name: stage-deploy
   image: matterlabs/ci
   environment:
-    KUBE_CA_DATA:
-      from_secret: stage_k8s_ca
-    KUBE_SERVER:
-      from_secret: stage_k8s_server
-    KUBE_USER:
-      from_secret: stage_k8s_user
-    KUBE_TOKEN:
-      from_secret: stage_k8s_token
-    KUBE_CONTEXT_NAMESPACE: stage
+    KUBECONFIG_BASE64:
+      from_secret: stage_kubeconfig_base64
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - envsubst < `pwd`/etc/kube/kubeconfig-template.yaml > `pwd`/kubeconfig.yaml
+  - echo -n $KUBECONFIG_BASE64 | base64 --decode > `pwd`/kubeconfig.yaml
   - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/stage.env KUBECONFIG=`pwd`/kubeconfig.yaml
   - zksync apply-kubeconfig
   - zksync restart
