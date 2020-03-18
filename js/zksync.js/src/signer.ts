@@ -6,7 +6,7 @@ import {
     serializePointPacked,
     signTransactionBytes
 } from "./crypto";
-import {ethers, utils} from "ethers";
+import { ethers, utils } from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
 import BN = require("bn.js");
 import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw } from "./types";
@@ -112,17 +112,22 @@ export class Signer {
     }
 
     static async fromETHSignature(ethSigner: ethers.Signer): Promise<Signer> {
-        const sign = await ethSigner.signMessage("Access ZK Sync account.\n" + "\n" + "Only sign this message for a trusted client!");
+        const sign = await ethSigner.signMessage(
+            "Access ZK Sync account.\n" +
+                "\n" +
+                "Only sign this message for a trusted client!"
+        );
         const seed = Buffer.from(sign.substr(2), "hex");
-        return  Signer.fromSeed(seed);
+        return Signer.fromSeed(seed);
     }
 }
 
 // PubKeyHash or eth address
 export function serializeAddress(address: Address | PubKeyHash): Buffer {
-    const prefixlessAddress
-        = address.startsWith("0x")    ? address.substr(2)
-        : address.startsWith("sync:") ? address.substr(5)
+    const prefixlessAddress = address.startsWith("0x")
+        ? address.substr(2)
+        : address.startsWith("sync:")
+        ? address.substr(5)
         : null;
 
     if (prefixlessAddress === null) {
