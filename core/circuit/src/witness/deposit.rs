@@ -554,15 +554,36 @@ mod test {
         println!("Made into {} gates", setup.n);
         let size = setup.n.next_power_of_two();
 
-        let worker = Worker::new();
+        let mut monomial_form_reader = std::io::BufReader::with_capacity(
+            1 << 24, 
+            std::fs::File::open("/Users/alexvlasov/Downloads/setup/processed/setup_2^22.key").unwrap()
+        );
 
-        let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::crs_42(size, &worker);
-        let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::from_powers(&key_monomial_form, size, &worker);
+        let mut lagrange_form_reader = std::io::BufReader::with_capacity(
+            1 << 24, 
+            std::fs::File::open("/Users/alexvlasov/Downloads/setup/processed/setup_2^22_lagrange.key").unwrap()
+        );
+
+        let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::read(&mut monomial_form_reader).unwrap();
+        let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::read(&mut lagrange_form_reader).unwrap();
+
+        // let worker = Worker::new();
+
+        // let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::crs_42(size, &worker);
+        // let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::from_powers(&key_monomial_form, size, &worker);
 
         // let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::dummy_crs(size);
         // let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::dummy_crs(size);
 
         let verification_key = make_verification_key(&setup, &key_monomial_form).expect("must make a verification key");
+
+        let mut key_writer = std::io::BufWriter::with_capacity(
+            1 << 24, 
+            std::fs::File::create("./deposit_vk.key").unwrap()
+        );
+
+        verification_key.write(&mut key_writer).expect("must write a verification key");
+        drop(key_writer);
 
         let precomputations = make_precomputations(&setup).expect("must make precomputations for proving");
 
