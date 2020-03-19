@@ -49,6 +49,24 @@ impl<T: Transport> ETHClient<T> {
         }
     }
 
+    /// Returns the next *expected* nonce with respect to the transactions
+    /// in the mempool.
+    ///
+    /// Note that this method may be inconsistent if used with a cluster of nodes
+    /// (e.g. `infura`), since the consecutive tx send and attempt to get a pending
+    /// nonce may be routed to the different nodes in cluster, and the latter node
+    /// may not know about the send tx yet. Thus it is not recommended to rely on this
+    /// method as on the trusted source of the latest nonce.  
+    pub async fn pending_nonce(&self) -> Result<U256, Error> {
+        self.web3
+            .eth()
+            .transaction_count(self.sender_account, Some(BlockNumber::Pending))
+            .compat()
+            .await
+    }
+
+    /// Returns the account nonce based on the last *mined* block. Not mined transactions
+    /// (which are in mempool yet) are not taken into account by this method.
     pub async fn current_nonce(&self) -> Result<U256, Error> {
         self.web3
             .eth()
@@ -61,35 +79,30 @@ impl<T: Transport> ETHClient<T> {
         self.web3.eth().block_number().compat().await
     }
 
-    pub async fn pending_nonce(&self) -> Result<U256, Error> {
-        self.web3
-            .eth()
-            .transaction_count(self.sender_account, Some(BlockNumber::Pending))
-            .compat()
-            .await
-    }
-
     pub async fn get_gas_price(&self) -> Result<U256, failure::Error> {
         let mut network_gas_price = self.web3.eth().gas_price().compat().await?;
         network_gas_price *= U256::from(self.gas_price_factor);
         Ok(network_gas_price)
     }
 
-    /// Fills in gas/nonce if not supplied inside options.
-    pub async fn sign_call_tx<P: Tokenize>(
-        &self,
-        func: &str,
-        params: P,
-        options: Options,
-    ) -> Result<SignedCallResult, failure::Error> {
+    /// Encodes the transaction data (smart contract method and its input) to the bytes
+    /// without creating an actual transaction.
+    pub fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {
         let f = self
             .contract
             .function(func)
             .expect("failed to get function parameters");
-        let data = f
-            .encode_input(&params.into_tokens())
-            .expect("failed to encode parameters");
+        f.encode_input(&params.into_tokens())
+            .expect("failed to encode parameters")
+    }
 
+    /// Signs the transaction given the previously encoded data.
+    /// Fills in gas/nonce if not supplied inside options.
+    pub async fn sign_prepared_tx(
+        &self,
+        data: Vec<u8>,
+        options: Options,
+    ) -> Result<SignedCallResult, failure::Error> {
         // fetch current gas_price
         let gas_price = match options.gas_price {
             Some(gas_price) => gas_price,
@@ -128,6 +141,27 @@ impl<T: Transport> ETHClient<T> {
         })
     }
 
+    /// Encodes the transaction data and signs the transaction.
+    /// Fills in gas/nonce if not supplied inside options.
+    pub async fn sign_call_tx<P: Tokenize>(
+        &self,
+        func: &str,
+        params: P,
+        options: Options,
+    ) -> Result<SignedCallResult, failure::Error> {
+        let f = self
+            .contract
+            .function(func)
+            .expect("failed to get function parameters");
+        let data = f
+            .encode_input(&params.into_tokens())
+            .expect("failed to encode parameters");
+
+        self.sign_prepared_tx(data, options).await
+    }
+
+    /// Sends the transaction to the Ethereum blockchain.
+    /// Transaction is expected to be encoded as the byte sequence.
     pub async fn send_raw_tx(&self, tx: Vec<u8>) -> Result<H256, failure::Error> {
         Ok(self
             .web3
