@@ -36,9 +36,6 @@ pub(super) trait EthereumInterface {
     /// Gets the current gas price.
     fn gas_price(&self) -> Result<U256, failure::Error>;
 
-    /// Gets the current nonce to be used in the transactions.
-    fn current_nonce(&self) -> Result<U256, failure::Error>;
-
     /// Sends a signed transaction to the Ethereum blockchain.
     fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error>;
 
@@ -133,10 +130,6 @@ impl EthereumInterface for EthereumHttpClient {
 
     fn gas_price(&self) -> Result<U256, failure::Error> {
         block_on(self.eth_client.get_gas_price())
-    }
-
-    fn current_nonce(&self) -> Result<U256, failure::Error> {
-        block_on(self.eth_client.current_nonce()).map_err(From::from)
     }
 
     fn sign_call_tx<P: Tokenize>(

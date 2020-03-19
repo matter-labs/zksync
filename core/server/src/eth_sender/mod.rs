@@ -338,7 +338,10 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         let tx_options = if let Some(stuck_tx) = stuck_tx {
             self.tx_options_from_stuck_tx(stuck_tx)?
         } else {
-            Options::default()
+            let mut options = Options::default();
+            let nonce = self.db.next_nonce()?;
+            options.nonce = Some(nonce.into());
+            options
         };
 
         let signed_tx = self.sign_operation_tx(op, tx_options)?;
@@ -367,20 +370,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             U256::from_dec_str(&stuck_tx.signed_tx.gas_price.to_string()).unwrap();
 
         let new_gas_price = self.scale_gas(old_tx_gas_price)?;
-        let new_nonce = self.ethereum.current_nonce()?;
+        let nonce = stuck_tx.signed_tx.nonce;
 
         info!(
-            "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, old_nonce: {}, new_nonce: {}",
-            stuck_tx.signed_tx.hash,
-            old_tx_gas_price,
-            new_gas_price,
-            stuck_tx.signed_tx.nonce,
-            new_nonce
+            "Replacing tx: hash: {:#x}, old_gas: {}, new_gas: {}, used nonce: {}",
+            stuck_tx.signed_tx.hash, old_tx_gas_price, new_gas_price, nonce
         );
 
         Ok(Options::with(move |opt| {
             opt.gas_price = Some(new_gas_price);
-            opt.nonce = Some(new_nonce);
+            opt.nonce = Some(nonce);
         }))
     }
 
@@ -436,12 +435,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     fn call_complete_withdrawals(&self) -> Result<(), failure::Error> {
         // function completeWithdrawals(uint32 _n) external {
+        let mut options = Options::default();
+        let nonce = self.db.next_nonce()?;
+        options.nonce = Some(nonce.into());
+
         let tx = self
             .ethereum
             .sign_call_tx(
                 "completeWithdrawals",
                 config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
-                Options::default(),
+                options,
             )
             .map_err(|e| failure::format_err!("completeWithdrawals: {}", e))?;
         info!("Sending completeWithdrawals tx with hash: {:#?}", tx.hash);

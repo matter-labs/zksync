@@ -1,5 +1,7 @@
+// External uses
+use web3::contract::Options;
 // Local uses
-use self::mock::{default_eth_sender, restored_eth_sender};
+use self::mock::{create_signed_tx, default_eth_sender, restored_eth_sender};
 use super::{
     ethereum_interface::EthereumInterface,
     transactions::{ExecutedTxStatus, OperationETHState, TransactionETHState, TxCheckOutcome},
@@ -62,7 +64,7 @@ fn tx_creation() {
         test_data::verify_operation(0),
     ];
 
-    for operation in operations {
+    for (nonce, operation) in operations.iter().enumerate() {
         let actual_tx = eth_sender
             .sign_new_tx(
                 &operation,
@@ -70,7 +72,9 @@ fn tx_creation() {
                 None,
             )
             .unwrap();
-        let expected_tx = eth_sender.ethereum.create_signed_tx_replica(&operation);
+        let expected_tx = eth_sender
+            .ethereum
+            .create_signed_tx_replica(&operation, nonce as i64);
         assert_eq!(actual_tx.signed_tx, expected_tx);
     }
 }
@@ -201,7 +205,7 @@ fn operation_commitment_workflow() {
 
     let verify_operation_id = operations[1].id;
 
-    for operation in operations {
+    for (nonce, operation) in operations.iter().enumerate() {
         // Send an operation to `ETHSender`.
         sender.try_send(operation.clone()).unwrap();
 
@@ -210,13 +214,8 @@ fn operation_commitment_workflow() {
         eth_sender.proceed_next_operation();
 
         // Now we should see that transaction is stored in the database and sent to the Ethereum.
-        let expected_tx = eth_sender
-            .sign_new_tx(
-                &operation,
-                eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
-                None,
-            )
-            .unwrap();
+        let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+        let expected_tx = create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
         eth_sender.db.assert_stored(&expected_tx);
         eth_sender.ethereum.assert_sent(&expected_tx);
 
@@ -235,12 +234,15 @@ fn operation_commitment_workflow() {
     }
 
     // Check that `completeWithdrawals` transaction is sent.
+    let mut options = Options::default();
+    let nonce = operations.len().into();
+    options.nonce = Some(nonce);
     let tx = eth_sender
         .ethereum
         .sign_call_tx(
             "completeWithdrawals",
             models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
-            Default::default(),
+            options,
         )
         .unwrap();
     eth_sender.ethereum.assert_sent_by_hash(&tx.hash);
@@ -268,13 +270,9 @@ fn stuck_transaction() {
     eth_sender.retrieve_operations();
     eth_sender.proceed_next_operation();
 
-    let stuck_tx = eth_sender
-        .sign_new_tx(
-            &operation,
-            eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
-            None,
-        )
-        .unwrap();
+    let nonce = 0;
+    let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+    let stuck_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
 
     // Skip some blocks and expect sender to send a new tx.
     eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
@@ -312,27 +310,39 @@ fn operations_order() {
     // We send multiple the operations at once to the channel.
     let operations_count = 3;
     let mut operations = Vec::new();
-    operations.extend_from_slice(&test_data::COMMIT_OPERATIONS[..operations_count]);
-    operations.extend_from_slice(&test_data::VERIFY_OPERATIONS[..operations_count]);
+    let commit_operations = &test_data::COMMIT_OPERATIONS[..operations_count];
+    let verify_operations = &test_data::VERIFY_OPERATIONS[..operations_count];
+    operations.extend_from_slice(commit_operations);
+    operations.extend_from_slice(verify_operations);
 
     // Also we create the list of expected transactions.
     let mut expected_txs = Vec::new();
-    for (idx, operation) in operations.iter().enumerate() {
+    // Create expected txs from the commit operations.
+    for (idx, operation) in commit_operations.iter().enumerate() {
         // We start from the 1 block, and step logic is:
         // N blocks to confirm, repeated `idx` times.
         let start_block = 1 + super::WAIT_CONFIRMATIONS * idx as u64;
-        let expected_tx = eth_sender
-            .sign_new_tx(operation, eth_sender.get_deadline_block(start_block), None)
-            .unwrap();
+        let deadline_block = eth_sender.get_deadline_block(start_block);
+        let nonce = idx;
 
-        // Update nonce as well (it will be reset below).
-        eth_sender.ethereum.nonce += 1.into();
+        let expected_tx = create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
 
         expected_txs.push(expected_tx);
     }
 
-    // Reset nonce (it was affected by creating expected transactions).
-    eth_sender.ethereum.nonce = 0.into();
+    // Create expected txs from the verify operations.
+    for (idx, operation) in verify_operations.iter().enumerate() {
+        let start_block = 1 + super::WAIT_CONFIRMATIONS * (commit_operations.len() + idx) as u64;
+        let deadline_block = eth_sender.get_deadline_block(start_block);
+        // For verify operations the logic for nonce is slightly different:
+        // After each verify operation we send the withdraw operation as well,
+        // thus every verify operation increases the nonce by two.
+        let nonce = commit_operations.len() + idx * 2;
+
+        let expected_tx = create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
+
+        expected_txs.push(expected_tx);
+    }
 
     for operation in operations.iter() {
         sender.try_send(operation.clone()).unwrap();
@@ -374,13 +384,9 @@ fn transaction_failure() {
     let operation = test_data::commit_operation(0);
     sender.try_send(operation.clone()).unwrap();
 
-    let failing_tx = eth_sender
-        .sign_new_tx(
-            &operation,
-            eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
-            None,
-        )
-        .unwrap();
+    let nonce = 0;
+    let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+    let failing_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
 
     eth_sender.retrieve_operations();
     eth_sender.proceed_next_operation();
@@ -408,20 +414,15 @@ fn restore_state() {
 
     let (mut eth_sender, _, mut receiver) = restored_eth_sender(stored_operations);
 
-    for operation in operations {
+    for (nonce, operation) in operations.iter().enumerate() {
         // Note that we DO NOT send an operation to `ETHSender` and neither receive it.
 
         // We do process operations restored from the DB though.
         // The rest of this test is the same as in `operation_commitment_workflow`.
         eth_sender.proceed_next_operation();
 
-        let expected_tx = eth_sender
-            .sign_new_tx(
-                &operation,
-                eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
-                None,
-            )
-            .unwrap();
+        let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+        let expected_tx = create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
 
         eth_sender
             .ethereum
@@ -449,13 +450,9 @@ fn confirmations_independence() {
     eth_sender.retrieve_operations();
     eth_sender.proceed_next_operation();
 
-    let stuck_tx = eth_sender
-        .sign_new_tx(
-            &operation,
-            eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
-            None,
-        )
-        .unwrap();
+    let nonce = 0;
+    let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+    let stuck_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
 
     eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
     eth_sender.proceed_next_operation();

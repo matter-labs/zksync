@@ -1,7 +1,7 @@
 //! Mocking utilities for tests.
 
 // Built-in deps
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::{HashMap, VecDeque};
 // External uses
 use futures::channel::mpsc;
@@ -24,6 +24,7 @@ pub(super) struct MockDatabase {
     restore_state: VecDeque<OperationETHState>,
     unconfirmed_operations: RefCell<HashMap<H256, TransactionETHState>>,
     confirmed_operations: RefCell<HashMap<H256, TransactionETHState>>,
+    nonce: Cell<i64>,
 }
 
 impl MockDatabase {
@@ -108,13 +109,20 @@ impl DatabaseAccess for MockDatabase {
 
         Ok(())
     }
+
+    fn next_nonce(&self) -> Result<i64, failure::Error> {
+        let old_value = self.nonce.get();
+        let new_value = old_value + 1;
+        self.nonce.set(new_value);
+
+        Ok(old_value)
+    }
 }
 
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug)]
 pub(super) struct MockEthereum {
     pub block_number: u64,
-    pub nonce: U256,
     pub gas_price: U256,
     pub tx_statuses: RefCell<HashMap<H256, ExecutedTxStatus>>,
     pub sent_txs: RefCell<HashMap<H256, SignedCallResult>>,
@@ -124,7 +132,6 @@ impl Default for MockEthereum {
     fn default() -> Self {
         Self {
             block_number: 1,
-            nonce: Default::default(),
             gas_price: 100.into(),
             tx_statuses: Default::default(),
             sent_txs: Default::default(),
@@ -174,7 +181,6 @@ impl MockEthereum {
     /// as a success.
     pub fn add_successfull_execution(&mut self, tx: &TransactionETHState, confirmations: u64) {
         self.block_number += confirmations;
-        self.nonce += 1.into();
 
         let status = ExecutedTxStatus {
             confirmations,
@@ -189,7 +195,6 @@ impl MockEthereum {
     /// Same as `add_successfull_execution`, but marks the transaction as a failure.
     pub fn add_failed_execution(&mut self, tx: &TransactionETHState, confirmations: u64) {
         self.block_number += confirmations;
-        self.nonce += 1.into();
 
         let status = ExecutedTxStatus {
             confirmations,
@@ -202,7 +207,10 @@ impl MockEthereum {
     }
 
     /// Replicates the `ETHCLient::sign_operation_tx` method for testing.
-    pub fn create_signed_tx_replica(&self, op: &Operation) -> SignedCallResult {
+    pub fn create_signed_tx_replica(&self, op: &Operation, nonce: i64) -> SignedCallResult {
+        let mut options = Options::default();
+        options.nonce = Some(nonce.into());
+
         match &op.action {
             Action::Commit => {
                 let root = op.block.get_eth_encoded_root();
@@ -218,7 +226,7 @@ impl MockEthereum {
                         witness_data.0,
                         witness_data.1,
                     ),
-                    Options::default(),
+                    options,
                 )
                 .unwrap()
             }
@@ -226,7 +234,7 @@ impl MockEthereum {
                 .sign_call_tx(
                     "verifyBlock",
                     (u64::from(op.block.block_number), *proof.clone()),
-                    Options::default(),
+                    options,
                 )
                 .unwrap(),
         }
@@ -246,10 +254,6 @@ impl EthereumInterface for MockEthereum {
         Ok(self.gas_price)
     }
 
-    fn current_nonce(&self) -> Result<U256, failure::Error> {
-        Ok(self.nonce)
-    }
-
     fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error> {
         self.sent_txs
             .borrow_mut()
@@ -265,7 +269,7 @@ impl EthereumInterface for MockEthereum {
         options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
         let gas_price = options.gas_price.unwrap_or(self.gas_price);
-        let nonce = options.nonce.unwrap_or(self.nonce);
+        let nonce = options.nonce.expect("Nonce must be set for every tx");
 
         // Nonce and gas_price are appended to distinguish the same transactions
         // with different gas by their hash in tests.
@@ -313,4 +317,25 @@ pub(super) fn restored_eth_sender(
         operation_sender,
         notify_receiver,
     )
+}
+
+/// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.
+/// This method should be used to create expected tx copies which won't affect
+/// the internal `ETHSender` state.
+pub(super) fn create_signed_tx(
+    eth_sender: &ETHSender<MockEthereum, MockDatabase>,
+    operation: &Operation,
+    deadline_block: u64,
+    nonce: i64,
+) -> TransactionETHState {
+    let mut options = Options::default();
+    options.nonce = Some(nonce.into());
+
+    let signed_tx = eth_sender.sign_operation_tx(operation, options).unwrap();
+
+    TransactionETHState {
+        op_id: operation.id.unwrap(),
+        deadline_block,
+        signed_tx,
+    }
 }

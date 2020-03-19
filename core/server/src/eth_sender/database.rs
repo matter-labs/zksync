@@ -24,6 +24,9 @@ pub(super) trait DatabaseAccess {
 
     /// Marks an operation as completed in the database.
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error>;
+
+    /// Gets the next nonce to use from the database.
+    fn next_nonce(&self) -> Result<i64, failure::Error>;
 }
 
 /// The actual database wrapper.
@@ -73,5 +76,10 @@ impl DatabaseAccess for Database {
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
         Ok(storage.ethereum_schema().confirm_eth_tx(hash)?)
+    }
+
+    fn next_nonce(&self) -> Result<i64, failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+        Ok(storage.ethereum_schema().get_next_nonce()?)
     }
 }
