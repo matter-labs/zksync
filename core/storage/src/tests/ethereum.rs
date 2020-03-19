@@ -152,3 +152,19 @@ fn ethereum_storage() {
         Ok(())
     });
 }
+
+/// Check that stored nonce starts with 0 and is incremented after every getting.
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn eth_nonce() {
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        for expected_next_nonce in 0..5 {
+            let actual_next_nonce = EthereumSchema(&conn).get_next_nonce()?;
+
+            assert_eq!(actual_next_nonce, expected_next_nonce);
+        }
+
+        Ok(())
+    });
+}
