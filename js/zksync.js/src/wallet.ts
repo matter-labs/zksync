@@ -344,7 +344,7 @@ export class Wallet {
             .eq(MAX_ERC20_APPROVE_AMOUNT);
     }
 
-    async apporveERC20TokenDeposits(
+    async approveERC20TokenDeposits(
         token: TokenLike
     ): Promise<ContractTransaction> {
         if (isTokenETH(token)) {
@@ -553,7 +553,7 @@ class ETHOperation {
 
         this.state = "Committed";
 
-        if (receipt.executed == false) {
+        if (!receipt.executed) {
             throw new ZKSyncTxError("Priority operation failed", receipt);
         }
 
@@ -571,7 +571,7 @@ class ETHOperation {
 
         this.state = "Verified";
 
-        if (receipt.executed == false) {
+        if (!receipt.executed) {
             throw new ZKSyncTxError("Priority operation failed", receipt);
         }
 

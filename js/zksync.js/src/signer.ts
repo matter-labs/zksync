@@ -124,10 +124,10 @@ export class Signer {
 
 // PubKeyHash or eth address
 export function serializeAddress(address: Address | PubKeyHash): Buffer {
-    const prefixlessAddress = address.startsWith("0x")
-        ? address.substr(2)
-        : address.startsWith("sync:")
-        ? address.substr(5)
+    // prettier-ignore
+    const prefixlessAddress 
+        = address.startsWith("0x")    ? address.substr(2)
+        : address.startsWith("sync:") ? address.substr(5)
         : null;
 
     if (prefixlessAddress === null) {

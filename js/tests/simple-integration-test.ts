@@ -53,7 +53,7 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
         if (await depositWallet.isERC20DepositsApproved(token)){
             throw new Error("Token should not be approved");
         }
-        const approveERC20 = await depositWallet.apporveERC20TokenDeposits(token);
+        const approveERC20 = await depositWallet.approveERC20TokenDeposits(token);
         await approveERC20.wait();
         console.log(`Deposit approved: ${(new Date().getTime()) - startTime} ms`);
         if (!await depositWallet.isERC20DepositsApproved(token)){
