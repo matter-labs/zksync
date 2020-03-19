@@ -213,11 +213,11 @@ export default {
                     </code>`;                    
 
                     const link_from
-                        = tx.data.type == 'Deposit' ? `${this.blockchain_explorer_address}/${tx.data.from}`
+                        = tx.data.type == 'Deposit' ? `${this.blockchainExplorerAddress}/${tx.data.from}`
                         : `${this.routerBase}accounts/${tx.data.from}`;
 
                     const link_to
-                        = tx.data.type == 'Withdraw' ? `${this.blockchain_explorer_address}/${tx.data.to}`
+                        = tx.data.type == 'Withdraw' ? `${this.blockchainExplorerAddress}/${tx.data.to}`
                         : `${this.routerBase}accounts/${tx.data.to}`;
 
                     const target_from

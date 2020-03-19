@@ -4,16 +4,18 @@ use crate::state_keeper::StateKeeperRequest;
 use bigdecimal::BigDecimal;
 use futures::channel::{mpsc, oneshot};
 use futures::{FutureExt, SinkExt, TryFutureExt};
-use jsonrpc_core::{Error, Result};
+use jsonrpc_core::{Error, ErrorCode, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use models::config_options::ThreadPanicNotify;
+use models::misc::utils::format_ether;
+use models::node::tx::PackedEthSignature;
 use models::node::tx::TxHash;
 use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use storage::{ConnectionPool, StorageProcessor, Token};
+use storage::{tokens::records::Token, ConnectionPool, StorageProcessor};
 use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -84,6 +86,32 @@ pub struct ContractAddressResp {
     pub gov_contract: String,
 }
 
+enum RpcErrorCodes {
+    NonceMismatch = 101,
+    IncorrectTx = 103,
+    Other = 104,
+    ChangePkNotAuthorized = 105,
+    AccountCloseDisabled = 110,
+    IncorrectEthSignature = 121,
+}
+
+impl From<TxAddError> for RpcErrorCodes {
+    fn from(error: TxAddError) -> Self {
+        match error {
+            TxAddError::NonceMismatch => RpcErrorCodes::NonceMismatch,
+            TxAddError::IncorrectTx => RpcErrorCodes::IncorrectTx,
+            TxAddError::Other => RpcErrorCodes::Other,
+            TxAddError::ChangePkNotAuthorized => RpcErrorCodes::ChangePkNotAuthorized,
+        }
+    }
+}
+
+impl Into<ErrorCode> for RpcErrorCodes {
+    fn into(self) -> ErrorCode {
+        (self as i64).into()
+    }
+}
+
 #[rpc]
 pub trait Rpc {
     #[rpc(name = "account_info", returns = "AccountInfoResp")]
@@ -99,6 +127,7 @@ pub trait Rpc {
     fn tx_submit(
         &self,
         tx: FranklinTx,
+        signature: Option<PackedEthSignature>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
@@ -125,6 +154,87 @@ impl RpcApp {
             .access_storage_fragile()
             .map_err(|_| Error::internal_error())
     }
+
+    /// Returns the token symbol for a `TokenId` as a string.
+    /// In case of failure, returns `jsonrpc_core::Error`,
+    /// which makes it convenient to use in the RPC methods.
+    fn token_symbol_from_id(&self, token: TokenId) -> Result<String> {
+        self.access_storage()?
+            .tokens_schema()
+            .token_symbol_from_id(token)
+            .map_err(|_| Error::internal_error())?
+            .ok_or(Error {
+                code: RpcErrorCodes::IncorrectTx.into(),
+                message: "No such token registered".into(),
+                data: None,
+            })
+    }
+
+    /// Returns a message that user has to sign to send the transaction.
+    /// If the transaction doesn't need a message signature, returns `None`.
+    /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
+    fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
+        match tx {
+            FranklinTx::Transfer(tx) => Ok(Some(format!(
+                "Transfer {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+                amount = format_ether(&tx.amount),
+                token = self.token_symbol_from_id(tx.token)?,
+                to = tx.to,
+                nonce = tx.nonce,
+                fee = format_ether(&tx.fee),
+            ))),
+            FranklinTx::Withdraw(tx) => Ok(Some(format!(
+                "Withdraw {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+                amount = format_ether(&tx.amount),
+                token = self.token_symbol_from_id(tx.token)?,
+                to = tx.to,
+                nonce = tx.nonce,
+                fee = format_ether(&tx.fee),
+            ))),
+            _ => Ok(None),
+        }
+    }
+
+    /// Checks that tx info message signature is valid.
+    ///
+    /// Needed for two-step verification, where user has to sign predefined human-readable
+    /// message with his ETH signature in order to send a transaction.
+    ///
+    /// If signature is correct, or tx doesn't need signature, returns `Ok(())`.
+    ///
+    /// If any error encountered during signature verification,
+    /// including incorrect signature, returns `jsonrpc_core::Error`.
+    fn verify_tx_info_message_signature(
+        &self,
+        tx: &FranklinTx,
+        signature: Option<PackedEthSignature>,
+    ) -> Result<()> {
+        fn rpc_message(message: impl ToString) -> Error {
+            Error {
+                code: RpcErrorCodes::IncorrectEthSignature.into(),
+                message: message.to_string(),
+                data: None,
+            }
+        }
+
+        match self.get_tx_info_message_to_sign(&tx)? {
+            Some(message_to_sign) => {
+                let packed_signature =
+                    signature.ok_or_else(|| rpc_message("Signature required"))?;
+
+                let signer_account = packed_signature
+                    .signature_recover_signer(message_to_sign.as_bytes())
+                    .map_err(rpc_message)?;
+
+                if signer_account == tx.account() {
+                    Ok(())
+                } else {
+                    Err(rpc_message("Signature is incorrect"))
+                }
+            }
+            None => Ok(()),
+        }
+    }
 }
 
 impl Rpc for RpcApp {
@@ -135,9 +245,14 @@ impl Rpc for RpcApp {
         let (account, tokens) = if let Ok((account, tokens)) = (|| -> Result<_> {
             let storage = self.access_storage()?;
             let account = storage
+                .chain()
+                .account_schema()
                 .account_state_by_address(&address)
                 .map_err(|_| Error::internal_error())?;
-            let tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
+            let tokens = storage
+                .tokens_schema()
+                .load_tokens()
+                .map_err(|_| Error::internal_error())?;
             Ok((account, tokens))
         })() {
             (account, tokens)
@@ -189,10 +304,15 @@ impl Rpc for RpcApp {
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
         let storage = self.access_storage()?;
         let executed_op = storage
-            .get_executed_priority_op(serial_id)
+            .chain()
+            .operations_schema()
+            .get_executed_priority_operation(serial_id)
             .map_err(|_| Error::internal_error())?;
         Ok(if let Some(executed_op) = executed_op {
-            let block = storage.handle_search(executed_op.block_number.to_string());
+            let block = storage
+                .chain()
+                .block_schema()
+                .find_block_by_height_or_hash(executed_op.block_number.to_string());
             ETHOpInfoResp {
                 executed: true,
                 block: Some(BlockInfo {
@@ -212,6 +332,8 @@ impl Rpc for RpcApp {
     fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
         let storage = self.access_storage()?;
         let stored_receipt = storage
+            .chain()
+            .operations_ext_schema()
             .tx_receipt(tx_hash.as_ref())
             .map_err(|_| Error::internal_error())?;
         Ok(if let Some(stored_receipt) = stored_receipt {
@@ -238,13 +360,18 @@ impl Rpc for RpcApp {
     fn tx_submit(
         &self,
         tx: FranklinTx,
+        signature: Option<PackedEthSignature>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send> {
         if tx.is_close() {
             return Box::new(futures01::future::err(Error {
-                code: 110.into(),
+                code: RpcErrorCodes::AccountCloseDisabled.into(),
                 message: "Account close tx is disabled.".to_string(),
                 data: None,
             }));
+        }
+
+        if let Err(error) = self.verify_tx_info_message_signature(&tx, signature) {
+            return Box::new(futures01::future::err(error));
         }
 
         let mut mempool_sender = self.mempool_request_sender.clone();
@@ -257,18 +384,10 @@ impl Rpc for RpcApp {
                 .expect("mempool receiver dropped");
             let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
 
-            tx_add_result.map(|_| hash).map_err(|e| {
-                let code = match &e {
-                    TxAddError::NonceMismatch => 101,
-                    TxAddError::IncorrectTx => 103,
-                    TxAddError::Other => 104,
-                    TxAddError::ChangePkNotAuthorized => 105,
-                };
-                Error {
-                    code: code.into(),
-                    message: e.to_string(),
-                    data: None,
-                }
+            tx_add_result.map(|_| hash).map_err(|e| Error {
+                code: RpcErrorCodes::from(e).into(),
+                message: e.to_string(),
+                data: None,
             })
         };
 
@@ -277,7 +396,10 @@ impl Rpc for RpcApp {
 
     fn contract_address(&self) -> Result<ContractAddressResp> {
         let storage = self.access_storage()?;
-        let config = storage.load_config().map_err(|_| Error::internal_error())?;
+        let config = storage
+            .config_schema()
+            .load_config()
+            .map_err(|_| Error::internal_error())?;
 
         Ok(ContractAddressResp {
             main_contract: config.contract_addr.expect("server config"),
@@ -287,7 +409,10 @@ impl Rpc for RpcApp {
 
     fn tokens(&self) -> Result<HashMap<String, Token>> {
         let storage = self.access_storage()?;
-        let mut tokens = storage.load_tokens().map_err(|_| Error::internal_error())?;
+        let mut tokens = storage
+            .tokens_schema()
+            .load_tokens()
+            .map_err(|_| Error::internal_error())?;
         Ok(tokens
             .drain()
             .map(|(id, token)| {

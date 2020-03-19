@@ -3,14 +3,15 @@
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use crate::franklin_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
-use crate::franklin_crypto::alt_babyjubjub::{AltJubjubBn256, JubjubEngine};
+use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
 use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 
 use super::hasher::Hasher;
 use crate::primitives::BitIteratorLe;
+
 #[derive(Clone)]
 pub struct PedersenHasher<E: JubjubEngine> {
-    params: E::Params,
+    params: &'static E::Params,
 }
 
 impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
@@ -36,7 +37,7 @@ pub type BabyPedersenHasher = PedersenHasher<Bn256>;
 impl Default for PedersenHasher<Bn256> {
     fn default() -> Self {
         Self {
-            params: AltJubjubBn256::new(),
+            params: &crate::params::JUBJUB_PARAMS,
         }
     }
 }

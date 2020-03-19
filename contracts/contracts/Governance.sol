@@ -78,7 +78,7 @@ contract Governance is Config {
     /// @param _tokenId Token id
     /// @return bool flag that indicates if token id is less than total tokens amount
     function isValidTokenId(uint16 _tokenId) external view returns (bool) {
-        return _tokenId < totalTokens + 1;
+        return _tokenId <= totalTokens;
     }
 
     /// @notice Validate token address

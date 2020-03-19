@@ -92,10 +92,20 @@ impl PlasmaStateInitParams {
             .access_storage()
             .expect("db connection failed for state restore");
 
-        let (last_committed, accounts) = storage.load_committed_state(None).expect("db failed");
-        let last_verified = storage.get_last_verified_block().expect("db failed");
+        let (last_committed, accounts) = storage
+            .chain()
+            .state_schema()
+            .load_committed_state(None)
+            .expect("db failed");
+        let last_verified = storage
+            .chain()
+            .block_schema()
+            .get_last_verified_block()
+            .expect("db failed");
         let unprocessed_priority_op = storage
-            .load_stored_op_with_block_number(last_committed, ActionType::COMMIT)
+            .chain()
+            .operations_schema()
+            .get_operation(last_committed, ActionType::COMMIT)
             .map(|storage_op| {
                 storage_op
                     .into_op(&storage)
@@ -157,7 +167,11 @@ impl PlasmaStateKeeper {
             .access_storage()
             .expect("db connection failed for statekeeper");
 
-        let (last_committed, mut accounts) = storage.load_committed_state(None).expect("db failed");
+        let (last_committed, mut accounts) = storage
+            .chain()
+            .state_schema()
+            .load_committed_state(None)
+            .expect("db failed");
         // TODO: move genesis block creation to separate routine.
         assert!(
             last_committed == 0 && accounts.is_empty(),
@@ -171,9 +185,15 @@ impl PlasmaStateKeeper {
         };
         accounts.insert(0, fee_account);
         storage
+            .chain()
+            .state_schema()
             .commit_state_update(0, &[(0, db_account_update)])
             .expect("db fail");
-        storage.apply_state_update(0).expect("db fail");
+        storage
+            .chain()
+            .state_schema()
+            .apply_state_update(0)
+            .expect("db fail");
         let state = PlasmaState::new(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         info!("Genesis block created, state: {}", state.root_hash());

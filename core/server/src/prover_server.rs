@@ -41,6 +41,7 @@ fn register(
     }
     let storage = data.access_storage()?;
     let id = storage
+        .prover_schema()
         .register_prover(&r.name, r.block_size)
         .map_err(actix_web::error::ErrorInternalServerError)?;
     Ok(id.to_string())
@@ -56,6 +57,7 @@ fn block_to_prove(
     }
     let storage = data.access_storage()?;
     let ret = storage
+        .prover_schema()
         .prover_run_for_next_commit(&r.name, data.prover_timeout, r.block_size)
         .map_err(|e| {
             error!("could not get next unverified commit operation: {}", e);
@@ -107,6 +109,7 @@ fn working_on(
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
     storage
+        .prover_schema()
         .record_prover_is_working(r.prover_run_id)
         .map_err(|e| {
             error!("failed to record prover work in progress request: {}", e);
@@ -120,7 +123,7 @@ fn publish(data: web::Data<AppState>, r: web::Json<client::PublishReq>) -> actix
         .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    match storage.store_proof(r.block, &r.proof) {
+    match storage.prover_schema().store_proof(r.block, &r.proof) {
         Ok(_) => {
             let mut data_pool = data
                 .preparing_data_pool
@@ -150,10 +153,13 @@ fn stopped(data: web::Data<AppState>, prover_id: web::Json<i32>) -> actix_web::R
         .connection_pool
         .access_storage()
         .map_err(actix_web::error::ErrorInternalServerError)?;
-    storage.record_prover_stop(*prover_id).map_err(|e| {
-        error!("failed to record prover stop: {}", e);
-        actix_web::error::ErrorInternalServerError("storage layer error")
-    })
+    storage
+        .prover_schema()
+        .record_prover_stop(*prover_id)
+        .map_err(|e| {
+            error!("failed to record prover stop: {}", e);
+            actix_web::error::ErrorInternalServerError("storage layer error")
+        })
 }
 
 pub fn start_prover_server(

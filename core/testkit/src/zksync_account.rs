@@ -83,7 +83,7 @@ impl ZksyncAccount {
             signature: TxSignature::default(),
         };
         transfer.signature =
-            TxSignature::sign_musig_pedersen(&self.private_key, &transfer.get_bytes());
+            TxSignature::sign_musig_sha256(&self.private_key, &transfer.get_bytes());
 
         if increment_nonce {
             *stored_nonce += 1;
@@ -111,7 +111,7 @@ impl ZksyncAccount {
             signature: TxSignature::default(),
         };
         withdraw.signature =
-            TxSignature::sign_musig_pedersen(&self.private_key, &withdraw.get_bytes());
+            TxSignature::sign_musig_sha256(&self.private_key, &withdraw.get_bytes());
 
         if increment_nonce {
             *stored_nonce += 1;
@@ -130,7 +130,8 @@ impl ZksyncAccount {
         let eth_signature = if auth_onchain {
             None
         } else {
-            let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash);
+            let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash)
+                .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
             Some(eth_signature)

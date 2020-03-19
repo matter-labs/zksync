@@ -1,6 +1,2 @@
-import config from "./env-config";
-
-export default Object.freeze({
-    PAGE_SIZE: 20,
-    TX_BATCH_SIZE: config.TX_BATCH_SIZE,
-});
+export const PAGE_SIZE = 20;
+export const TX_BATCH_SIZE = 50;
