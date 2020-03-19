@@ -204,6 +204,13 @@ export class Wallet {
             throw new Error("Current signing key is set already");
         }
 
+        const isAccountInTheTree = await this.getAccountId();
+        if (isAccountInTheTree === undefined) {
+            throw new Error(
+                "Account should exits in the ZK Sync network before setting signing key"
+            );
+        }
+
         const numNonce = await this.getNonce(nonce);
         const ethSignature = onchainAuth
             ? null
@@ -272,6 +279,10 @@ export class Wallet {
         } else if (typeof nonce == "number") {
             return nonce;
         }
+    }
+
+    async getAccountId(): Promise<number | undefined> {
+        return (await this.provider.getState(this.address())).id;
     }
 
     address(): Address {

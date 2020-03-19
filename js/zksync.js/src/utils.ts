@@ -15,9 +15,6 @@ export const IERC20_INTERFACE = new utils.Interface(
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(
     require("../abi/SyncMain.json").interface
 );
-export const SYNC_PRIOR_QUEUE_INTERFACE = new utils.Interface(
-    require("../abi/SyncPriorityQueue.json").interface
-);
 
 export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(
     require("../abi/SyncGov.json").interface
@@ -220,6 +217,12 @@ export function closestPackableTransactionAmount(
     );
 }
 
+export function isTransactionAmountPackable(
+    amount: utils.BigNumberish
+): boolean {
+    return closestPackableTransactionAmount(amount).eq(amount);
+}
+
 /**
  * packs and unpacks the amount, returning the closest packed value.
  * e.g 1000000003 => 1000000000
@@ -238,6 +241,10 @@ export function closestPackableTransactionFee(
             10
         ).toString()
     );
+}
+
+export function isTransactionFeePackable(amount: utils.BigNumberish): boolean {
+    return closestPackableTransactionAmount(amount).eq(amount);
 }
 
 export function buffer2bitsLE(buff) {
