@@ -160,17 +160,22 @@ export class WalletDecorator {
 
     // #region renderable
     async transactionsAsRenderableList(offset, limit) {
-        if (!this.address) {
-            console.log(this.address);
+        const address = this.address;
+        if (!address) {
+            console.log(address);
             return [];
         }
-        let transactions = await this.blockExplorerClient.getAccountTransactions(this.address, offset, limit);
-        let res = transactions.map(async (tx, index) => {
-            let elem_id      = `history_${index}`;
-            let type         = tx.tx.type || '';
-            let hash         = tx.hash;
-            let direction    = 
-                (type == 'Deposit') || (type == 'Transfer' && tx.tx.to == this.address)
+        const transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
+        const res = transactions.map(async (tx, index) => {
+            const elem_id      = `history_${index}`;
+            const type         = tx.tx.type || '';
+            const hash         = tx.hash;
+
+            const receiver_address = type == 'Deposit'
+                ? tx.tx.priority_op.to
+                : tx.tx.to;
+
+            const direction = receiver_address == address
                 ? 'incoming' 
                 : 'outcoming';
 
@@ -181,7 +186,7 @@ export class WalletDecorator {
             // pub commited: bool,
             // pub verified: bool,
 
-            let status
+            const status
                 = tx.verified            ? `<span style="color: green">(verified)</span>`
                 : tx.success == null     ? `<span style="color: grey">(pending)</span>`
                 : tx.success == true     ? `<span style="color: grey">(succeeded)</span>`
@@ -189,61 +194,42 @@ export class WalletDecorator {
                 : tx.fail_reason != null ? `<span style="color: red">(failed)</span>`
                 : `<span style="color: red">(Unknown status)</span>`;
 
-            let row_status
+            const row_status
                 = tx.verified     ? `<span style="color: green">Verified</span>`
                 : tx.commited     ? `<span style="color: grey">Committed</span>`
                 : tx.fail_reason  ? `<span style="color: red">Failed with ${tx.fail_reason}</span>`
-                : `<span style="color: red">(Unknown status)</span>`
+                : `<span style="color: red">(Unknown status)</span>`;
 
             // here is common data to all tx types
-            let data = {
+            const data = {
                 elem_id,
                 type, direction,
                 status, row_status,
+                hash,
             };
 
             switch (true) {
                 case type == 'Deposit': {
-                    let token = this.tokenNameFromId(tx.tx.priority_op.token);
-                    let amount = isReadablyPrintable(token)
-                        ? readableEther(tx.tx.priority_op.amount) 
-                        : utils.bigNumberify(tx.tx.priority_op.amount);
+                    const token = await this.tokenNameFromId(tx.tx.priority_op.token);
+                    const amount = readableEther(tx.tx.priority_op.amount);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
                             { key: 'row_status',  label: 'Status' },
                             { key: 'pq_id',       label: 'Priority op' },
                         ],
-                        data: Object.assign(data, {
+                        data: {
+                            ...data,
+                            from: tx.tx.priority_op.from,
+                            to: tx.tx.priority_op.to,
                             pq_id: tx.pq_id,
                             token, amount,
-                        }),
+                        },
                     };
                 }
-                case type == 'Transfer' && direction == 'incoming': {
-                    let token = this.tokenNameFromId(tx.tx.token);
-                    let amount = isReadablyPrintable(token)
-                        ? readableEther(tx.tx.amount) 
-                        : utils.bigNumberify(tx.tx.amount);
-                    return {
-                        fields: [
-                            { key: 'amount',      label: 'Amount' },
-                            { key: 'from',        label: 'From' },
-                            { key: 'row_status',  label: 'Status' },
-                            { key: 'hash',        label: 'Tx hash' },
-                        ],
-                        data: Object.assign(data, {
-                            from: tx.tx.from,
-                            token, amount,
-                            hash: tx.hash,
-                        }),                    
-                    }
-                }
-                case type == 'Transfer' && direction == 'outcoming': {
-                    let token = this.tokenNameFromId(tx.tx.token);
-                    let amount = isReadablyPrintable(token)
-                        ? readableEther(tx.tx.amount) 
-                        : utils.bigNumberify(tx.tx.amount);
+                case type == 'Transfer': {
+                    const token = await this.tokenNameFromId(tx.tx.token);
+                    const amount = readableEther(tx.tx.amount);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -251,34 +237,36 @@ export class WalletDecorator {
                             { key: 'row_status',  label: 'Status' },
                             { key: 'hash',        label: 'Tx hash' },
                         ],
-                        data: Object.assign(data, {
+                        data: {
+                            ...data,
+                            from: tx.tx.from,
                             to: tx.tx.to,
                             token, amount,
-                            hash: tx.hash,
-                        }),
-                    }
+                        },
+                    };
                 }
                 case type == 'Withdraw': {
-                    let token = this.tokenNameFromId(tx.tx.token);
-                    let amount = isReadablyPrintable(token)
-                        ? readableEther(tx.tx.amount) 
-                        : utils.bigNumberify(tx.tx.amount);
+                    const token = await this.tokenNameFromId(tx.tx.token);
+                    const amount = readableEther(tx.tx.amount);   
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
                             { key: 'row_status',  label: 'Status' },
                             { key: 'hash',        label: 'Tx hash' },
                         ],
-                        data: Object.assign(data, {
+                        data: {
+                            ...data,
+                            from: tx.tx.from,
+                            to: tx.tx.to,
                             token, amount,
-                            hash: tx.hash,
-                        }),
-                    }
+                        },
+                    };
                 }
             }
         });
 
-        return await Promise.all(res);
+        const txs = await Promise.all(res);
+        return txs.filter(Boolean);
     }
     setPendingWithdrawStatus(withdrawTokenId, status) {
         let withdrawsStatusesDict = JSON.parse(localStorage.getItem('withdrawsStatusesDict') || "{}");
