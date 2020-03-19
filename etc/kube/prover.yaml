@@ -22,6 +22,7 @@ spec:
       - name: ${ZKSYNC_ENV}-prover-${BLOCK_SIZE_CHUNKS}
         image: matterlabs/prover:${IMAGE_TAG}
         imagePullPolicy: Always
+        resources: ${PROVER_CONTAINER_RESOURCES}
         volumeMounts:
         - name: keys-dir
           mountPath: /keys
