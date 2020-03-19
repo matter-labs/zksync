@@ -8,7 +8,7 @@ use web3::types::H256;
 // Workspace imports
 use models::Operation;
 // Local imports
-use self::records::{ETHNonce, NewETHNonce, NewETHOperation, StorageETHOperation};
+use self::records::{ETHNonce, NewETHOperation, StorageETHOperation};
 use crate::chain::operations::records::StoredOperation;
 use crate::schema::*;
 use crate::StorageProcessor;
@@ -128,34 +128,48 @@ impl<'a> EthereumSchema<'a> {
         })
     }
 
+    /// Obtains the next nonce to use and updates the corresponding entry in the database
+    /// for the next invocation.
+    ///
+    /// This method expects the database to be initially prepared with inserting the actual
+    /// nonce value. Currently the script `db-insert-eth-nonce.sh` is responsible for that
+    /// and it's invoked within `db-reset` subcommand.
     pub fn get_next_nonce(&self) -> QueryResult<i64> {
-        let nonce: Option<ETHNonce> = eth_nonce::table.first(self.0.conn()).optional()?;
+        let old_nonce: ETHNonce = eth_nonce::table.first(self.0.conn())?;
 
-        let old_nonce_value = if let Some(old_nonce) = nonce {
-            // There is a stored nonce. We take its value and update the entry with a new nonce.
-            let new_nonce_value = old_nonce.nonce + 1;
+        let new_nonce_value = old_nonce.nonce + 1;
 
-            update(eth_nonce::table.filter(eth_nonce::id.eq(true)))
-                .set(eth_nonce::nonce.eq(new_nonce_value))
-                .execute(self.0.conn())?;
+        update(eth_nonce::table.filter(eth_nonce::id.eq(true)))
+            .set(eth_nonce::nonce.eq(new_nonce_value))
+            .execute(self.0.conn())?;
 
-            old_nonce.nonce
-        } else {
-            // There is no stored value. We start with 0, and store the incremented nonce (1).
-            let old_nonce_value = 0;
-            let new_nonce_value = old_nonce_value + 1;
-            let new_nonce = NewETHNonce {
-                nonce: new_nonce_value,
-            };
-
-            insert_into(eth_nonce::table)
-                .values(new_nonce)
-                .execute(self.0.conn())
-                .map(drop)?;
-
-            old_nonce_value
-        };
+        let old_nonce_value = old_nonce.nonce;
 
         Ok(old_nonce_value)
+    }
+
+    /// Method that internally initializes the `eth_nonce` table.
+    /// Since in db tests the database is empty, we must provide a possibility
+    /// to initialize required db fields.
+    #[cfg(test)]
+    pub fn initialize_eth_nonce(&self) -> QueryResult<()> {
+        #[derive(Debug, Insertable)]
+        #[table_name = "eth_nonce"]
+        pub struct NewETHNonce {
+            pub nonce: i64,
+        }
+
+        let old_nonce: Option<ETHNonce> = eth_nonce::table.first(self.0.conn()).optional()?;
+
+        if old_nonce.is_none() {
+            // There is no nonce, we have to insert it manually.
+            let nonce = NewETHNonce { nonce: 0 };
+
+            insert_into(eth_nonce::table)
+                .values(&nonce)
+                .execute(self.0.conn())?;
+        }
+
+        Ok(())
     }
 }

@@ -265,8 +265,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         op.txs.push(new_tx.clone());
         info!(
-            "Sending tx for op, op_id: {} tx_hash: {:#x}",
-            new_tx.op_id, new_tx.signed_tx.hash
+            "Sending tx for op, op_id: {} tx_hash: {:#x}, nonce: {}",
+            new_tx.op_id, new_tx.signed_tx.hash, new_tx.signed_tx.nonce,
         );
         self.ethereum.send_tx(&new_tx.signed_tx)?;
 
@@ -276,7 +276,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// Handles a transaction execution failure by reporting the issue to the log
     /// and terminating the node.
     fn failure_handler(&self, receipt: &TransactionReceipt) -> ! {
-        info!(
+        error!(
             "Ethereum transaction unexpectedly failed. Receipt: {:#?}",
             receipt
         );

@@ -159,6 +159,8 @@ fn ethereum_storage() {
 fn eth_nonce() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
+        EthereumSchema(&conn).initialize_eth_nonce()?;
+
         for expected_next_nonce in 0..5 {
             let actual_next_nonce = EthereumSchema(&conn).get_next_nonce()?;
 
