@@ -49,7 +49,10 @@ db-setup:
 db-insert-contract:
 	@bin/db-insert-contract.sh
 
-db-reset: confirm_action db-wait db-drop db-setup db-insert-contract
+db-insert-eth-nonce:
+	@bin/db-insert-eth-nonce.sh
+
+db-reset: confirm_action db-wait db-drop db-setup db-insert-contract db-insert-eth-nonce
 	@echo database is ready
 
 db-migrate: confirm_action
