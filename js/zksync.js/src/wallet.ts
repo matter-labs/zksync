@@ -340,9 +340,7 @@ export class Wallet {
             this.address(),
             this.provider.contractAddress.mainContract
         );
-        return utils
-            .bigNumberify(currentAllowance)
-            .lte(ERC20_APPROVE_TRESHOLD);
+        return utils.bigNumberify(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
     }
 
     async approveERC20TokenDeposits(

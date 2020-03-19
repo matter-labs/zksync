@@ -5,8 +5,9 @@ import {
 } from "zksync";
 // HACK: using require as type system work-around
 const franklin_abi = require('../../contracts/build/Franklin.json');
-import { ethers, utils, Contract } from "ethers";
+import {ethers, utils, Contract} from "ethers";
 import {parseEther} from "ethers/utils";
+import {IERC20_INTERFACE} from "zksync/build/utils";
 
 
 let syncProvider: Provider;
@@ -181,9 +182,9 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     const withdrawFee = transfersAmount.div(20);
     const withdrawAmount = transfersAmount.sub(withdrawFee);
 
-    await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount);
+    await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
     console.log(`Auto approved deposit ok, Token: ${token}`);
-    await testDeposit(depositWallet, syncWallet1, token, depositAmount);
+    await testDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
     console.log(`Forever approved deposit ok, Token: ${token}`);
     await testChangePubkeyOnchain(syncWallet1);
     console.log(`Change pubkey onchain ok`);
@@ -216,7 +217,11 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
             MNEMONIC,
             "m/44'/60'/0'/0/0"
         ).connect(ethersProvider);
-        const syncWalletRich = await Wallet.fromEthSigner(ethWallet, syncProvider);
+        const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
+        await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("0.02")})).wait();
+        const erc20contract = new Contract(ERC_20TOKEN, IERC20_INTERFACE, ethWallet);
+        await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.02"))).wait();
+        const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
         await (await ethWallet.sendTransaction({to: syncWalletSigner.address, value: parseEther("0.01")}));
@@ -245,8 +250,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
             syncProvider,
         );
 
-        await moveFunds(contract, ethProxy, syncWalletRich, syncWallet, syncWallet2, ERC_20TOKEN, "0.018");
-        await moveFunds(contract, ethProxy, syncWalletRich, syncWallet, syncWallet3, "ETH", "0.018");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC_20TOKEN, "0.018");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.018");
 
         await syncProvider.disconnect();
     } catch (e) {
