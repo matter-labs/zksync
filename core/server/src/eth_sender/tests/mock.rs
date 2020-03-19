@@ -32,8 +32,11 @@ impl MockDatabase {
     pub fn with_restorable_state(
         restore_state: impl IntoIterator<Item = OperationETHState>,
     ) -> Self {
+        let restore_state: VecDeque<_> = restore_state.into_iter().collect();
+        let nonce = restore_state.iter().fold(0, |acc, op| acc + op.txs.len());
         Self {
-            restore_state: restore_state.into_iter().collect(),
+            restore_state,
+            nonce: Cell::new(nonce as i64),
             ..Default::default()
         }
     }
