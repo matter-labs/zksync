@@ -208,7 +208,7 @@ export class Wallet {
         const isAccountInTheTree = await this.getAccountId();
         if (isAccountInTheTree === undefined) {
             throw new Error(
-                "Account should exits in the ZK Sync network before setting signing key"
+                "Account should exist in the ZK Sync network before setting signing key"
             );
         }
 
