@@ -11,6 +11,7 @@ import {
     PubKeyHash
 } from "./types";
 import {
+    ERC20_APPROVE_TRESHOLD,
     IERC20_INTERFACE,
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
@@ -341,7 +342,7 @@ export class Wallet {
         );
         return utils
             .bigNumberify(currentAllowance)
-            .eq(MAX_ERC20_APPROVE_AMOUNT);
+            .lte(ERC20_APPROVE_TRESHOLD);
     }
 
     async approveERC20TokenDeposits(

@@ -71,6 +71,12 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
     console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
     const balanceAfterDep = await syncWallet.getBalance(token);
 
+    if (!zkutils.isTokenETH(token)) {
+        if (!await depositWallet.isERC20DepositsApproved(token)){
+            throw new Error("Token should still be approved");
+        }
+    }
+
     if (!balanceAfterDep.sub(balanceBeforeDep).eq(amount)) {
         throw new Error("Deposit checks failed");
     }
