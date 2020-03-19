@@ -11,6 +11,7 @@ import {
     PubKeyHash
 } from "./types";
 import {
+    ERC20_APPROVE_TRESHOLD,
     IERC20_INTERFACE,
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
@@ -204,6 +205,13 @@ export class Wallet {
             throw new Error("Current signing key is set already");
         }
 
+        const isAccountInTheTree = await this.getAccountId();
+        if (isAccountInTheTree === undefined) {
+            throw new Error(
+                "Account should exist in the ZK Sync network before setting signing key"
+            );
+        }
+
         const numNonce = await this.getNonce(nonce);
         const ethSignature = onchainAuth
             ? null
@@ -274,6 +282,10 @@ export class Wallet {
         }
     }
 
+    async getAccountId(): Promise<number | undefined> {
+        return (await this.provider.getState(this.address())).id;
+    }
+
     address(): Address {
         return this.cachedAddress;
     }
@@ -328,12 +340,10 @@ export class Wallet {
             this.address(),
             this.provider.contractAddress.mainContract
         );
-        return utils
-            .bigNumberify(currentAllowance)
-            .eq(MAX_ERC20_APPROVE_AMOUNT);
+        return utils.bigNumberify(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
     }
 
-    async apporveERC20TokenDeposits(
+    async approveERC20TokenDeposits(
         token: TokenLike
     ): Promise<ContractTransaction> {
         if (isTokenETH(token)) {
