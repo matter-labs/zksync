@@ -11,11 +11,11 @@
                 </template>
                 <template v-slot:cell(amount)="data">
                     <span style="vertical-align: middle;"> {{ data.item.amount }} </span>
-                    <CompleteOperationButton
+                    <!-- <CompleteOperationButton
                         v-if="data.item.op && data.item.op.status != 'hidden'"
                         :op="data.item.op"
                         v-on:withdrawOnchainEvent="withdrawOnchainEvent"
-                        ></CompleteOperationButton>
+                        ></CompleteOperationButton> -->
                 </template>
             </b-table>
             <span v-if="disabledReason == 'ETH or FAU missing'">
