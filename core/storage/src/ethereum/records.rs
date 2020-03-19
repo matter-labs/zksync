@@ -27,3 +27,16 @@ pub struct NewETHOperation {
     pub tx_hash: Vec<u8>,
     pub raw_tx: Vec<u8>,
 }
+
+#[derive(Debug, Insertable, PartialEq)]
+#[table_name = "eth_nonce"]
+pub struct NewETHNonce {
+    pub nonce: i64,
+}
+
+#[derive(Debug, Queryable, QueryableByName, PartialEq)]
+#[table_name = "eth_nonce"]
+pub struct ETHNonce {
+    pub id: bool,
+    pub nonce: i64,
+}

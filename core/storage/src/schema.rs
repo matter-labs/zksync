@@ -83,6 +83,13 @@ table! {
 }
 
 table! {
+    eth_nonce (id) {
+        id -> Bool,
+        nonce -> Int8,
+    }
+}
+
+table! {
     eth_operations (id) {
         id -> Int8,
         op_id -> Int8,
@@ -221,6 +228,7 @@ allow_tables_to_appear_in_same_query!(
     balances,
     blocks,
     data_restore_last_watched_eth_block,
+    eth_nonce,
     eth_operations,
     events_state,
     executed_priority_operations,
