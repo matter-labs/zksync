@@ -1,12 +1,40 @@
-// TODO: Remove me
-#![allow(dead_code)]
-
+// Workspace imports
+use models::Operation;
+// Local imports
 use self::{counter_queue::CounterQueue, sparse_queue::SparseQueue};
 
 mod counter_queue;
 mod sparse_queue;
 
 pub type RawTxData = Vec<u8>;
+
+#[derive(Debug)]
+pub struct TxData {
+    pub raw: RawTxData,
+    pub operation: Option<Operation>,
+}
+
+impl PartialEq for TxData {
+    fn eq(&self, other: &Self) -> bool {
+        self.raw == other.raw
+    }
+}
+
+impl TxData {
+    pub fn from_operation(operation: Operation, raw: RawTxData) -> Self {
+        Self {
+            raw,
+            operation: Some(operation),
+        }
+    }
+
+    pub fn from_raw(raw: RawTxData) -> Self {
+        Self {
+            raw,
+            operation: None,
+        }
+    }
+}
 
 /// `TxQueueBuilder` is a structure aiming to simplify the process
 /// of restoring of the `TxQueue` state after restart.
@@ -98,9 +126,9 @@ pub struct TxQueue {
     max_pending_txs: usize,
     sent_pending_txs: usize,
 
-    commit_operations: CounterQueue<RawTxData>,
-    verify_operations: SparseQueue<RawTxData>,
-    withdraw_operations: CounterQueue<RawTxData>,
+    commit_operations: CounterQueue<TxData>,
+    verify_operations: SparseQueue<TxData>,
+    withdraw_operations: CounterQueue<TxData>,
 }
 
 impl TxQueue {
@@ -116,34 +144,24 @@ impl TxQueue {
         }
     }
 
-    /// Creates a new empty transactions queue with the custom expected next ID
-    /// for the `Verify` operations queue.
-    /// This method is used to restore the state of the queue.
-    pub fn new_from(max_pending_txs: usize, idx: usize) -> Self {
-        Self {
-            verify_operations: SparseQueue::new_from(idx),
-            ..Self::new(max_pending_txs)
-        }
-    }
-
     /// Adds the `commit` operation to the queue.
-    pub fn add_commit_operation(&mut self, commit_operation: RawTxData) {
+    pub fn add_commit_operation(&mut self, commit_operation: TxData) {
         self.commit_operations.push_back(commit_operation);
     }
 
     /// Adds the `verify` operation to the queue.
-    pub fn add_verify_operation(&mut self, block_idx: usize, verify_operation: RawTxData) {
+    pub fn add_verify_operation(&mut self, block_idx: usize, verify_operation: TxData) {
         self.verify_operations.insert(block_idx, verify_operation);
     }
 
     /// Adds the `withdraw` operation to the queue.
-    pub fn add_withdraw_operation(&mut self, withdraw_operation: RawTxData) {
+    pub fn add_withdraw_operation(&mut self, withdraw_operation: TxData) {
         self.withdraw_operations.push_back(withdraw_operation);
     }
 
     /// Gets the next transaction to send, according to the transaction sending policy.
     /// For details, see the structure doc-comment.
-    pub fn pop_front(&mut self) -> Option<RawTxData> {
+    pub fn pop_front(&mut self) -> Option<TxData> {
         if self.sent_pending_txs >= self.max_pending_txs {
             return None;
         }
@@ -160,7 +178,7 @@ impl TxQueue {
 
     /// Obtains the next operation from the underlying queues.
     /// This method does not use/affect `sent_pending_tx` counter.
-    fn get_next_operation(&mut self) -> Option<RawTxData> {
+    fn get_next_operation(&mut self) -> Option<TxData> {
         // 1. Highest priority: verify operations.
 
         // If we've committed a corresponding `Commit` operation, and
@@ -220,27 +238,27 @@ mod tests {
         let mut queue = TxQueue::new(MAX_IN_FLY);
 
         // Add 2 commit, 2 verify and 2 withdraw operations.
-        queue.add_commit_operation(vec![COMMIT_MARK, 0]);
-        queue.add_commit_operation(vec![COMMIT_MARK, 1]);
-        queue.add_verify_operation(0, vec![VERIFY_MARK, 0]);
-        queue.add_verify_operation(1, vec![VERIFY_MARK, 1]);
-        queue.add_withdraw_operation(vec![WITHDRAW_MARK, 0]);
-        queue.add_withdraw_operation(vec![WITHDRAW_MARK, 1]);
+        queue.add_commit_operation(TxData::from_raw(vec![COMMIT_MARK, 0]));
+        queue.add_commit_operation(TxData::from_raw(vec![COMMIT_MARK, 1]));
+        queue.add_verify_operation(0, TxData::from_raw(vec![VERIFY_MARK, 0]));
+        queue.add_verify_operation(1, TxData::from_raw(vec![VERIFY_MARK, 1]));
+        queue.add_withdraw_operation(TxData::from_raw(vec![WITHDRAW_MARK, 0]));
+        queue.add_withdraw_operation(TxData::from_raw(vec![WITHDRAW_MARK, 1]));
 
         // Retrieve the next {MAX_IN_FLY} operations.
 
         // The first operation should be `commit`, since we can't send `verify` before the commitment.
         let op_1 = queue.pop_front().unwrap();
-        assert_eq!(op_1, vec![COMMIT_MARK, 0]);
+        assert_eq!(op_1.raw, vec![COMMIT_MARK, 0]);
 
         // The second operation should be `verify`, since it has the highest priority.
         let op_2 = queue.pop_front().unwrap();
-        assert_eq!(op_2, vec![VERIFY_MARK, 0]);
+        assert_eq!(op_2.raw, vec![VERIFY_MARK, 0]);
 
         // The third operation should be `withdraw`, since it has higher priority than `commit`, and we can't
         // send the `verify` before the corresponding `commit` operation.
         let op_3 = queue.pop_front().unwrap();
-        assert_eq!(op_3, vec![WITHDRAW_MARK, 0]);
+        assert_eq!(op_3.raw, vec![WITHDRAW_MARK, 0]);
 
         // After that we have {MAX_IN_FLY} operations, and `pop_front` should yield nothing.
         assert_eq!(queue.pop_front(), None);
@@ -250,7 +268,7 @@ mod tests {
 
         // Now we should obtain the next commit operation.
         let op_4 = queue.pop_front().unwrap();
-        assert_eq!(op_4, vec![COMMIT_MARK, 1]);
+        assert_eq!(op_4.raw, vec![COMMIT_MARK, 1]);
 
         // The limit should be met again, and nothing more should be yielded.
         assert_eq!(queue.pop_front(), None);
@@ -264,10 +282,10 @@ mod tests {
 
         // Pop remaining operations.
         let op_5 = queue.pop_front().unwrap();
-        assert_eq!(op_5, vec![VERIFY_MARK, 1]);
+        assert_eq!(op_5.raw, vec![VERIFY_MARK, 1]);
 
         let op_6 = queue.pop_front().unwrap();
-        assert_eq!(op_6, vec![WITHDRAW_MARK, 1]);
+        assert_eq!(op_6.raw, vec![WITHDRAW_MARK, 1]);
 
         // Though the limit is not met (2 txs in fly, and limit is 3), there should be no txs in the queue.
         assert_eq!(queue.pop_front(), None);

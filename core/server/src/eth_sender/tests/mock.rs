@@ -9,12 +9,14 @@ use web3::contract::{tokens::Tokenize, Options};
 use web3::types::{H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
-use models::{Action, Operation};
+use models::Operation;
 // Local uses
 use super::ETHSender;
 use crate::eth_sender::database::DatabaseAccess;
 use crate::eth_sender::ethereum_interface::EthereumInterface;
-use crate::eth_sender::transactions::{ExecutedTxStatus, OperationETHState, TransactionETHState};
+use crate::eth_sender::transactions::{
+    ETHStats, ExecutedTxStatus, OperationETHState, OperationType, TransactionETHState,
+};
 
 const CHANNEL_CAPACITY: usize = 16;
 
@@ -25,18 +27,21 @@ pub(super) struct MockDatabase {
     unconfirmed_operations: RefCell<HashMap<H256, TransactionETHState>>,
     confirmed_operations: RefCell<HashMap<H256, TransactionETHState>>,
     nonce: Cell<i64>,
+    stats: RefCell<ETHStats>,
 }
 
 impl MockDatabase {
     /// Creates a database with emulation of previously stored uncommitted requests.
     pub fn with_restorable_state(
         restore_state: impl IntoIterator<Item = OperationETHState>,
+        stats: ETHStats,
     ) -> Self {
         let restore_state: VecDeque<_> = restore_state.into_iter().collect();
         let nonce = restore_state.iter().fold(0, |acc, op| acc + op.txs.len());
         Self {
             restore_state,
             nonce: Cell::new(nonce as i64),
+            stats: RefCell::new(stats),
             ..Default::default()
         }
     }
@@ -120,6 +125,31 @@ impl DatabaseAccess for MockDatabase {
 
         Ok(old_value)
     }
+
+    fn load_stats(&self) -> Result<ETHStats, failure::Error> {
+        Ok(self.stats.borrow().clone())
+    }
+
+    fn report_created_operation(
+        &self,
+        operation_type: OperationType,
+    ) -> Result<(), failure::Error> {
+        let mut stats = self.stats.borrow_mut();
+
+        match operation_type {
+            OperationType::Commit => {
+                stats.commit_ops += 1;
+            }
+            OperationType::Verify => {
+                stats.verify_ops += 1;
+            }
+            OperationType::Withdraw => {
+                stats.withdraw_ops += 1;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
@@ -182,7 +212,7 @@ impl MockEthereum {
 
     /// Increments the blocks by a provided `confirmations` and marks the sent transaction
     /// as a success.
-    pub fn add_successfull_execution(&mut self, tx: &TransactionETHState, confirmations: u64) {
+    pub fn add_successfull_execution(&mut self, tx_hash: H256, confirmations: u64) {
         self.block_number += confirmations;
 
         let status = ExecutedTxStatus {
@@ -190,9 +220,7 @@ impl MockEthereum {
             success: true,
             receipt: None,
         };
-        self.tx_statuses
-            .borrow_mut()
-            .insert(tx.signed_tx.hash, status);
+        self.tx_statuses.borrow_mut().insert(tx_hash, status);
     }
 
     /// Same as `add_successfull_execution`, but marks the transaction as a failure.
@@ -207,41 +235,6 @@ impl MockEthereum {
         self.tx_statuses
             .borrow_mut()
             .insert(tx.signed_tx.hash, status);
-    }
-
-    /// Replicates the `ETHCLient::sign_operation_tx` method for testing.
-    pub fn create_signed_tx_replica(&self, op: &Operation, nonce: i64) -> SignedCallResult {
-        let mut options = Options::default();
-        options.nonce = Some(nonce.into());
-
-        match &op.action {
-            Action::Commit => {
-                let root = op.block.get_eth_encoded_root();
-                let public_data = op.block.get_eth_public_data();
-                let witness_data = op.block.get_eth_witness_data();
-                let raw_tx = self.encode_tx_data(
-                    "commitBlock",
-                    (
-                        u64::from(op.block.block_number),
-                        u64::from(op.block.fee_account),
-                        root,
-                        public_data,
-                        witness_data.0,
-                        witness_data.1,
-                    ),
-                );
-
-                self.sign_prepared_tx(raw_tx, options).unwrap()
-            }
-            Action::Verify { proof } => {
-                let raw_tx = self.encode_tx_data(
-                    "verifyBlock",
-                    (u64::from(op.block.block_number), *proof.clone()),
-                );
-
-                self.sign_prepared_tx(raw_tx, options).unwrap()
-            }
-        }
     }
 }
 
@@ -301,20 +294,21 @@ pub(super) fn default_eth_sender() -> (
     mpsc::Sender<Operation>,
     mpsc::Receiver<Operation>,
 ) {
-    restored_eth_sender(Vec::new())
+    restored_eth_sender(Vec::new(), Default::default())
 }
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and restores its state "from DB".
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
 pub(super) fn restored_eth_sender(
     restore_state: impl IntoIterator<Item = OperationETHState>,
+    stats: ETHStats,
 ) -> (
     ETHSender<MockEthereum, MockDatabase>,
     mpsc::Sender<Operation>,
     mpsc::Receiver<Operation>,
 ) {
     let ethereum = MockEthereum::default();
-    let db = MockDatabase::with_restorable_state(restore_state);
+    let db = MockDatabase::with_restorable_state(restore_state, stats);
 
     let (operation_sender, operation_receiver) = mpsc::channel(CHANNEL_CAPACITY);
     let (notify_sender, notify_receiver) = mpsc::channel(CHANNEL_CAPACITY);
@@ -338,7 +332,11 @@ pub(super) fn create_signed_tx(
     let mut options = Options::default();
     options.nonce = Some(nonce.into());
 
-    let signed_tx = eth_sender.sign_operation_tx(operation, options).unwrap();
+    let raw_tx = eth_sender.operation_to_raw_tx(&operation);
+    let signed_tx = eth_sender
+        .ethereum
+        .sign_prepared_tx(raw_tx, options)
+        .unwrap();
 
     TransactionETHState {
         op_id: operation.id.unwrap(),

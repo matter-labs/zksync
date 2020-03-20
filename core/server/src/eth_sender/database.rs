@@ -12,7 +12,7 @@ use web3::types::H256;
 // Workspace uses
 use storage::ConnectionPool;
 // Local uses
-use super::transactions::{OperationETHState, TransactionETHState};
+use super::transactions::{ETHStats, OperationETHState, OperationType, TransactionETHState};
 
 /// Abstract database access trait, optimized for the needs of `ETHSender`.
 pub(super) trait DatabaseAccess {
@@ -27,6 +27,20 @@ pub(super) trait DatabaseAccess {
 
     /// Gets the next nonce to use from the database.
     fn next_nonce(&self) -> Result<i64, failure::Error>;
+
+    /// Loads the stored Ethereum operations stats.
+    fn load_stats(&self) -> Result<ETHStats, failure::Error>;
+
+    /// Updates the stats counter with the new operation reported.
+    /// This method should be called once **per operation**. It means that if transaction
+    /// for some operation was stuck, and another transaction was created for it, this method
+    /// **should not** be invoked.
+    ///
+    /// This method expects the database to be initially prepared with inserting the actual
+    /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
+    /// and it's invoked within `db-reset` subcommand.
+    fn report_created_operation(&self, operation_type: OperationType)
+        -> Result<(), failure::Error>;
 }
 
 /// The actual database wrapper.
@@ -81,5 +95,21 @@ impl DatabaseAccess for Database {
     fn next_nonce(&self) -> Result<i64, failure::Error> {
         let storage = self.db_pool.access_storage()?;
         Ok(storage.ethereum_schema().get_next_nonce()?)
+    }
+
+    fn load_stats(&self) -> Result<ETHStats, failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+        let stats = storage.ethereum_schema().load_stats()?;
+        Ok(stats.into())
+    }
+
+    fn report_created_operation(
+        &self,
+        operation_type: OperationType,
+    ) -> Result<(), failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+        Ok(storage
+            .ethereum_schema()
+            .report_created_operation(operation_type)?)
     }
 }

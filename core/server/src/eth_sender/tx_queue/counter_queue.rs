@@ -1,6 +1,4 @@
-// TODO: Remove me
-#![allow(dead_code)]
-
+// Built-in imports
 use std::{collections::VecDeque, fmt};
 
 /// Counter queue is basically a queue which

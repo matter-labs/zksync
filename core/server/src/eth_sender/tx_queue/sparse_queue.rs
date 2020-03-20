@@ -1,6 +1,4 @@
-// TODO: Remove me
-#![allow(dead_code)]
-
+// Built-in imports
 use std::{collections::HashMap, fmt};
 
 /// Sparse queue is a sparse queue which allows inserting an element

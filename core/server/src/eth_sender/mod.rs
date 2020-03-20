@@ -13,7 +13,6 @@ use tokio::time;
 use web3::contract::Options;
 use web3::types::{TransactionReceipt, U256};
 // Workspace uses
-use eth_client::SignedCallResult;
 use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::config;
 use models::{Action, ActionType, Operation};
@@ -22,7 +21,7 @@ use storage::ConnectionPool;
 use self::database::{Database, DatabaseAccess};
 use self::ethereum_interface::{EthereumHttpClient, EthereumInterface};
 use self::transactions::*;
-use self::tx_queue::TxQueue;
+use self::tx_queue::{TxData, TxQueue, TxQueueBuilder};
 
 mod database;
 mod ethereum_interface;
@@ -71,8 +70,8 @@ const WAIT_CONFIRMATIONS: u64 = 1;
 /// erroneous conditions. Failure handling policy is determined by a corresponding callback,
 /// which can be changed if needed.
 struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
-    /// Unconfirmed operations queue.
-    unconfirmed_ops: VecDeque<OperationETHState>,
+    /// Ongoing operations queue.
+    ongoing_ops: VecDeque<OperationETHState>,
     /// Connection to the database.
     db: DB,
     /// Ethereum intermediator.
@@ -92,17 +91,26 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
-        const MAX_TXS_IN_FLIGHT: usize = 5; // TODO: Should be configurable.
+        const MAX_TXS_IN_FLIGHT: usize = 1; // TODO: Should be configurable.
 
-        let unconfirmed_ops = db
+        let ongoing_ops = db
             .restore_state()
             .expect("Failed loading unconfirmed operations from the storage");
 
-        let tx_queue = TxQueue::new(MAX_TXS_IN_FLIGHT);
+        let stats = db
+            .load_stats()
+            .expect("Failed loading ETH operations stats");
+
+        let tx_queue = TxQueueBuilder::new(MAX_TXS_IN_FLIGHT)
+            .with_sent_pending_txs(ongoing_ops.len())
+            .with_commit_operations_count(stats.commit_ops)
+            .with_verify_operations_count(stats.verify_ops)
+            .with_withdraw_operations_count(stats.withdraw_ops)
+            .build();
 
         Self {
             ethereum,
-            unconfirmed_ops,
+            ongoing_ops,
             db,
             rx_for_eth,
             op_notify,
@@ -120,47 +128,77 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             timer.tick().await;
 
             // ...and proceed them.
-            self.proceed_next_operation();
+            self.proceed_next_operations();
         }
     }
 
-    /// Obtains all the available operations to commit through the channel
-    /// and stores them within self for further processing.
     fn retrieve_operations(&mut self) {
         while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
-            self.unconfirmed_ops.push_back(OperationETHState {
-                operation,
-                txs: Vec::new(),
-            });
+            self.add_operation_to_queue(operation);
         }
     }
 
-    fn proceed_next_operation(&mut self) {
+    fn proceed_next_operations(&mut self) {
+        while let Some(tx) = self.tx_queue.pop_front() {
+            self.initialize_operation(tx).unwrap_or_else(|e| {
+                warn!("Error while trying to complete uncommitted op: {}", e);
+            });
+        }
+
         // Commit the next operation (if any).
-        if let Some(current_op) = self.unconfirmed_ops.pop_front() {
+        // TODO: should not be `if let`, but rather `while let`.
+        if let Some(current_op) = self.ongoing_ops.pop_front() {
             self.try_commit(current_op);
         }
     }
 
-    /// Attempts to commit the provided operation to the Ethereum blockchain.
-    ///
-    /// The strategy is the following:
-    /// - First we check the transactions associated with the operation.
-    ///   If there are none, we create and send one, storing it locally. No more
-    ///   processing at this step; we need to wait.
-    ///   If there are some transactions, we check their state. If one of them
-    ///   is committed and has enough approvals, we're all good.
-    ///   Otherwise, we check if the last pending transaction is "stuck", meaning
-    ///   that it is not being included in a block for a decent amount of time. If
-    ///   so, we create a new transaction (with increased gas) and send it.
-    /// - If there was no confirmation of a transaction in a previous step, we return
-    ///   the operation to the beginning of the unprocessed operations queue. We will
-    ///   check it again after some time.
-    /// - If transaction was confirmed, there may be two possible outcomes:
-    ///   1. Transaction is executed successfully. Desirable outcome, in which we
-    ///      consider the commitment completed and notify about it through the channel.
-    ///   2. Transaction erred. This should never happen, but if so, such an incident is
-    ///      reported according to the chosen failure report policy.
+    fn initialize_operation(&mut self, tx: TxData) -> Result<(), failure::Error> {
+        let current_block = self.ethereum.block_number()?;
+        let deadline_block = self.get_deadline_block(current_block);
+
+        if let Some(operation) = tx.operation {
+            let mut eth_op = OperationETHState {
+                operation,
+                txs: Vec::new(),
+            };
+
+            let new_tx =
+                self.sign_raw_tx(eth_op.operation.id.unwrap(), tx.raw, deadline_block, None)?;
+
+            self.db.save_unconfirmed_operation(&new_tx)?;
+            self.db.report_created_operation(
+                self.operation_type_for_action(&eth_op.operation.action),
+            )?;
+
+            eth_op.txs.push(new_tx.clone());
+            info!(
+                "Sending tx for op, op_id: {} tx_hash: {:#x}, nonce: {}",
+                new_tx.op_id, new_tx.signed_tx.hash, new_tx.signed_tx.nonce,
+            );
+            self.ethereum.send_tx(&new_tx.signed_tx)?;
+
+            self.ongoing_ops.push_back(eth_op);
+        } else {
+            let mut options = Options::default();
+            let nonce = self.db.next_nonce()?;
+            options.nonce = Some(nonce.into());
+
+            let tx = self
+                .ethereum
+                .sign_prepared_tx(tx.raw, options)
+                .map_err(|e| failure::format_err!("Failed to sign a prepared tx: {}", e))?;
+
+            // TODO: Operations w/o `Operation` field (e.g. withdrawals) should be stored to the DB as well.
+            // self.db
+            //     .report_created_operation(self.operation_type_for_action(&op.operation.action))?;
+
+            info!("Sending tx with hash: {:#?}", tx.hash);
+            self.ethereum.send_tx(&tx)?;
+        }
+
+        Ok(())
+    }
+
     fn try_commit(&mut self, mut operation: OperationETHState) {
         // Check the transactions associated with the operation, and send a new one if required.
 
@@ -185,6 +223,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                     operation.operation.block.block_number,
                 );
 
+                // Free a slot for the next tx in the queue.
+                self.tx_queue.report_commitment();
+
                 if operation.operation.action.get_type() == ActionType::VERIFY {
                     // We notify about verify only when commit is confirmed on the Ethereum.
                     self.op_notify
@@ -193,33 +234,25 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         .unwrap_or_default();
 
                     // Complete pending withdrawals after each verify.
-                    self.call_complete_withdrawals()
-                        .map_err(|e| {
-                            warn!("Error: {}", e);
-                        })
-                        .unwrap_or_default();
+                    self.add_complete_withdrawals_to_queue();
                 }
             }
             OperationCommitment::Pending => {
                 // Retry the operation again the next time.
-                self.unconfirmed_ops.push_front(operation);
+                self.ongoing_ops.push_front(operation);
             }
         }
     }
 
-    /// Checks the state of the operation commitment, choosing the necessary action to perform.
-    /// Initially this method sends the first transaction to the Ethereum blockchain.
-    /// Within next invocations for the same operation, state of sent transaction is checked.
-    /// If transaction(s) will be pending yet, this method won't do anything.
-    /// If one of transactions will be successfully confirmed on chain, the commitment will be considered
-    /// finished.
-    /// In case of stuck transaction, another transaction with increased gas limit will be sent.
-    /// In case of transaction failure, it will be reported and processed according to failure handling
-    /// policy.
     fn perform_commitment_step(
         &mut self,
         op: &mut OperationETHState,
     ) -> Result<OperationCommitment, failure::Error> {
+        assert!(
+            !op.txs.is_empty(),
+            "OperationETHState should have at least one transaction"
+        );
+
         let current_block = self.ethereum.block_number()?;
 
         // Check statuses of existing transactions.
@@ -262,23 +295,41 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             }
         }
 
-        // Reaching this point will mean that either there were no transactions to process,
-        // or the latest transaction got stuck.
-        // Either way we should create a new transaction (the approach is the same,
-        // `sign_new_tx` will adapt its logic based on `last_stuck_tx`).
+        // Reaching this point will mean that the latest transaction got stuck.
+        // We should create another tx based on it, and send it.
+        assert!(
+            last_stuck_tx.is_some(),
+            "Loop didn't exit without a stuck tx"
+        );
         let deadline_block = self.get_deadline_block(current_block);
-        let new_tx = self.sign_new_tx(&op.operation, deadline_block, last_stuck_tx)?;
+        // Raw tx contents are the same for every transaction, so we just
+        // clone them from the first tx.
+        let raw_tx = op.txs[0].signed_tx.raw_tx.clone();
+        let new_tx = self.sign_raw_tx(
+            op.operation.id.unwrap(),
+            raw_tx,
+            deadline_block,
+            last_stuck_tx,
+        )?;
         // New transaction should be persisted in the DB *before* sending it.
         self.db.save_unconfirmed_operation(&new_tx)?;
+        // Since we're processing the stuck operation, no need to invoke `report_created_operation`.
 
         op.txs.push(new_tx.clone());
         info!(
-            "Sending tx for op, op_id: {} tx_hash: {:#x}, nonce: {}",
+            "Stuck tx processing: sending tx for op, op_id: {} tx_hash: {:#x}, nonce: {}",
             new_tx.op_id, new_tx.signed_tx.hash, new_tx.signed_tx.nonce,
         );
         self.ethereum.send_tx(&new_tx.signed_tx)?;
 
         Ok(OperationCommitment::Pending)
+    }
+
+    fn operation_type_for_action(&self, action: &Action) -> OperationType {
+        match action {
+            Action::Commit => OperationType::Commit,
+            Action::Verify { .. } => OperationType::Verify,
+        }
     }
 
     /// Handles a transaction execution failure by reporting the issue to the log
@@ -337,9 +388,10 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Creates a new transaction. If stuck tx is provided, the new transaction will be
     /// and updated version of it; otherwise a brand new transaction will be created.
-    fn sign_new_tx(
+    fn sign_raw_tx(
         &self,
-        op: &Operation,
+        op_id: i64,
+        raw_tx: Vec<u8>,
         deadline_block: u64,
         stuck_tx: Option<&TransactionETHState>,
     ) -> Result<TransactionETHState, failure::Error> {
@@ -352,9 +404,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             options
         };
 
-        let signed_tx = self.sign_operation_tx(op, tx_options)?;
+        let signed_tx = self.ethereum.sign_prepared_tx(raw_tx, tx_options)?;
         Ok(TransactionETHState {
-            op_id: op.id.unwrap(),
+            op_id,
             deadline_block,
             signed_tx,
         })
@@ -391,13 +443,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         }))
     }
 
-    /// Creates a signed transaction according to the operation action.
-    fn sign_operation_tx(
-        &self,
-        op: &Operation,
-        tx_options: Options,
-    ) -> Result<SignedCallResult, failure::Error> {
-        let raw_tx = match &op.action {
+    fn operation_to_raw_tx(&self, op: &Operation) -> Vec<u8> {
+        match &op.action {
             Action::Commit => {
                 let root = op.block.get_eth_encoded_root();
 
@@ -431,33 +478,41 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             }
             Action::Verify { proof } => {
                 // function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof) external {
-                self.ethereum.encode_tx_data(
-                    "verifyBlock",
-                    (u64::from(op.block.block_number), *proof.clone()),
-                )
+                let block_number = op.block.block_number;
+                self.ethereum
+                    .encode_tx_data("verifyBlock", (u64::from(block_number), *proof.clone()))
             }
-        };
-
-        self.ethereum.sign_prepared_tx(raw_tx, tx_options)
+        }
     }
 
-    fn call_complete_withdrawals(&self) -> Result<(), failure::Error> {
-        // function completeWithdrawals(uint32 _n) external {
-        let mut options = Options::default();
-        let nonce = self.db.next_nonce()?;
-        options.nonce = Some(nonce.into());
+    fn add_operation_to_queue(&mut self, op: Operation) {
+        let raw_tx = self.operation_to_raw_tx(&op);
 
+        match &op.action {
+            Action::Commit => {
+                self.tx_queue
+                    .add_commit_operation(TxData::from_operation(op, raw_tx));
+            }
+            Action::Verify { proof } => {
+                let block_number = op.block.block_number;
+
+                self.tx_queue.add_verify_operation(
+                    block_number as usize,
+                    TxData::from_operation(op, raw_tx),
+                );
+            }
+        }
+    }
+
+    fn add_complete_withdrawals_to_queue(&mut self) {
+        // function completeWithdrawals(uint32 _n) external {
         let raw_tx = self.ethereum.encode_tx_data(
             "completeWithdrawals",
             config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
         );
 
-        let tx = self
-            .ethereum
-            .sign_prepared_tx(raw_tx, options)
-            .map_err(|e| failure::format_err!("completeWithdrawals: {}", e))?;
-        info!("Sending completeWithdrawals tx with hash: {:#?}", tx.hash);
-        self.ethereum.send_tx(&tx)
+        self.tx_queue
+            .add_withdraw_operation(TxData::from_raw(raw_tx));
     }
 }
 

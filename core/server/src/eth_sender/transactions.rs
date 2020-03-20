@@ -10,7 +10,33 @@ use web3::types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::Operation;
-use storage::ethereum::records::StorageETHOperation;
+use storage::ethereum::records::{ETHStats as StorageETHStats, StorageETHOperation};
+
+pub use storage::ethereum::OperationType;
+
+/// Collected statistics of the amount of operations sent to the Ethereum.
+/// This structure represents the count of **operations**, and not transactions.
+/// It means that if for some operation there were N txs sent, it will be counted as
+/// 1 operation anyway.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct ETHStats {
+    /// Amount of sent commit operations.
+    pub commit_ops: usize,
+    /// Amount of sent verify operations.
+    pub verify_ops: usize,
+    /// Amount of sent withdraw operations.
+    pub withdraw_ops: usize,
+}
+
+impl From<StorageETHStats> for ETHStats {
+    fn from(stored: StorageETHStats) -> Self {
+        Self {
+            commit_ops: stored.commit_ops as usize,
+            verify_ops: stored.verify_ops as usize,
+            withdraw_ops: stored.withdraw_ops as usize,
+        }
+    }
+}
 
 /// An intermediate state of the operation to be stored on
 /// the Ethereum chain.
