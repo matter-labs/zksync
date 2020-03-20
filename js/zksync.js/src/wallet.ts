@@ -515,7 +515,8 @@ export class Wallet {
 }
 
 class ETHOperation {
-    state: "Sent" | "Mined" | "Committed" | "Verified";
+    state: "Sent" | "Mined" | "Committed" | "Verified" | "Failed";
+    error?: ZKSyncTxError;
     priorityOpId?: utils.BigNumber;
 
     constructor(
@@ -544,6 +545,8 @@ class ETHOperation {
     }
 
     async awaitReceipt(): Promise<PriorityOperationReceipt> {
+        this.throwErrorIfFailedState();
+
         await this.awaitEthereumTxCommit();
         if (this.state != "Mined") return;
         const receipt = await this.zkSyncProvider.notifyPriorityOp(
@@ -551,12 +554,14 @@ class ETHOperation {
             "COMMIT"
         );
 
-        this.state = "Committed";
-
         if (!receipt.executed) {
-            throw new ZKSyncTxError("Priority operation failed", receipt);
+            this.setErrorState(
+                new ZKSyncTxError("Priority operation failed", receipt)
+            );
+            this.throwErrorIfFailedState();
         }
 
+        this.state = "Committed";
         return receipt;
     }
 
@@ -571,16 +576,22 @@ class ETHOperation {
 
         this.state = "Verified";
 
-        if (!receipt.executed) {
-            throw new ZKSyncTxError("Priority operation failed", receipt);
-        }
-
         return receipt;
+    }
+
+    private setErrorState(error: ZKSyncTxError) {
+        this.state = "Failed";
+        this.error = error;
+    }
+
+    private throwErrorIfFailedState() {
+        if (this.state == "Failed") throw this.error;
     }
 }
 
 class Transaction {
-    state: "Sent" | "Committed" | "Verified";
+    state: "Sent" | "Committed" | "Verified" | "Failed";
+    error?: ZKSyncTxError;
 
     constructor(
         public txData,
@@ -591,21 +602,26 @@ class Transaction {
     }
 
     async awaitReceipt(): Promise<TransactionReceipt> {
+        this.throwErrorIfFailedState();
+
         if (this.state !== "Sent") return;
 
         const receipt = await this.sidechainProvider.notifyTransaction(
             this.txHash,
             "COMMIT"
         );
-        this.state = "Committed";
 
-        if (receipt.success == false) {
-            throw new ZKSyncTxError(
-                `ZKSync transaction failed: ${receipt.failReason}`,
-                receipt
+        if (!receipt.success) {
+            this.setErrorState(
+                new ZKSyncTxError(
+                    `ZKSync transaction failed: ${receipt.failReason}`,
+                    receipt
+                )
             );
+            this.throwErrorIfFailedState();
         }
 
+        this.state = "Committed";
         return receipt;
     }
 
@@ -615,15 +631,17 @@ class Transaction {
             this.txHash,
             "VERIFY"
         );
+
         this.state = "Verified";
-
-        if (receipt.success == false) {
-            throw new ZKSyncTxError(
-                `ZKSync transaction failed: ${receipt.failReason}`,
-                receipt
-            );
-        }
-
         return receipt;
+    }
+
+    private setErrorState(error: ZKSyncTxError) {
+        this.state = "Failed";
+        this.error = error;
+    }
+
+    private throwErrorIfFailedState() {
+        if (this.state == "Failed") throw this.error;
     }
 }
