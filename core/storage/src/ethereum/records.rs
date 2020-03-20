@@ -34,3 +34,12 @@ pub struct ETHNonce {
     pub id: bool,
     pub nonce: i64,
 }
+
+#[derive(Debug, Queryable, QueryableByName, PartialEq)]
+#[table_name = "eth_stats"]
+pub struct ETHStats {
+    pub id: bool,
+    pub commit_ops: i64,
+    pub verify_ops: i64,
+    pub withdraw_ops: i64,
+}

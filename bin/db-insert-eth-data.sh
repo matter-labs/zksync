@@ -27,3 +27,10 @@ psql "$DATABASE_URL" -c "INSERT INTO eth_nonce (nonce) \
                          ON CONFLICT (id) DO UPDATE  \
                          SET nonce = '$NONCE'" || exit 1
 echo "successfully inserted the Ethereum nonce ($NONCE) into the database"
+
+psql "$DATABASE_URL" -c "INSERT INTO eth_stats (commit_ops, verify_ops, withdraw_ops) \
+                         VALUES (0, 0, 0) \
+                         ON CONFLICT (id) DO UPDATE  \
+                         SET (commit_ops, verify_ops, withdraw_ops) = (0, 0, 0)" || exit 1
+
+echo "successfully initialized the Ethereum stats"

@@ -22,6 +22,7 @@ use storage::ConnectionPool;
 use self::database::{Database, DatabaseAccess};
 use self::ethereum_interface::{EthereumHttpClient, EthereumInterface};
 use self::transactions::*;
+use self::tx_queue::TxQueue;
 
 mod database;
 mod ethereum_interface;
@@ -80,6 +81,8 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     rx_for_eth: mpsc::Receiver<Operation>,
     /// Channel to notify about committed operations.
     op_notify: mpsc::Sender<Operation>,
+    /// Queue for ordered transaction processing.
+    tx_queue: TxQueue,
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
@@ -89,9 +92,13 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
+        const MAX_TXS_IN_FLIGHT: usize = 5; // TODO: Should be configurable.
+
         let unconfirmed_ops = db
             .restore_state()
             .expect("Failed loading unconfirmed operations from the storage");
+
+        let tx_queue = TxQueue::new(MAX_TXS_IN_FLIGHT);
 
         Self {
             ethereum,
@@ -99,6 +106,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             db,
             rx_for_eth,
             op_notify,
+            tx_queue,
         }
     }
 

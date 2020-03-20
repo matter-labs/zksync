@@ -8,12 +8,19 @@ use web3::types::H256;
 // Workspace imports
 use models::Operation;
 // Local imports
-use self::records::{ETHNonce, NewETHOperation, StorageETHOperation};
+use self::records::{ETHNonce, ETHStats, NewETHOperation, StorageETHOperation};
 use crate::chain::operations::records::StoredOperation;
 use crate::schema::*;
 use crate::StorageProcessor;
 
 pub mod records;
+
+#[derive(Debug, Clone, Copy)]
+pub enum OperationType {
+    Commit,
+    Verify,
+    Withdraw,
+}
 
 /// Ethereum schema is capable of storing the information about the
 /// interaction with the Ethereum blockchain (mainly the list of sent
@@ -108,6 +115,49 @@ impl<'a> EthereumSchema<'a> {
             .map(drop)
     }
 
+    /// Updates the stats counter with the new operation reported.
+    /// This method should be called once **per operation**. It means that if transaction
+    /// for some operation was stuck, and another transaction was created for it, this method
+    /// **should not** be invoked.
+    ///
+    /// This method expects the database to be initially prepared with inserting the actual
+    /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
+    /// and it's invoked within `db-reset` subcommand.
+    pub fn report_operation_creates(&self, operation_type: OperationType) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
+            let mut current_stats: ETHStats = eth_stats::table.first(self.0.conn())?;
+
+            // Increase the only one type of operations.
+            match operation_type {
+                OperationType::Commit => {
+                    current_stats.commit_ops += 1;
+                }
+                OperationType::Verify => {
+                    current_stats.verify_ops += 1;
+                }
+                OperationType::Withdraw => {
+                    current_stats.withdraw_ops += 1;
+                }
+            };
+
+            // Update the stored stats.
+            update(eth_stats::table.filter(eth_stats::id.eq(true)))
+                .set((
+                    eth_stats::commit_ops.eq(current_stats.commit_ops),
+                    eth_stats::verify_ops.eq(current_stats.verify_ops),
+                    eth_stats::withdraw_ops.eq(current_stats.withdraw_ops),
+                ))
+                .execute(self.0.conn())?;
+
+            Ok(())
+        })
+    }
+
+    /// Loads the stored Ethereum operations stats.
+    pub fn load_stats(&self) -> QueryResult<ETHStats> {
+        eth_stats::table.first(self.0.conn())
+    }
+
     /// Marks the stored Ethereum transaction as confirmed (and thus the associated `Operation`
     /// is marked as confirmed as well).
     pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
@@ -132,7 +182,7 @@ impl<'a> EthereumSchema<'a> {
     /// for the next invocation.
     ///
     /// This method expects the database to be initially prepared with inserting the actual
-    /// nonce value. Currently the script `db-insert-eth-nonce.sh` is responsible for that
+    /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
     pub fn get_next_nonce(&self) -> QueryResult<i64> {
         let old_nonce: ETHNonce = eth_nonce::table.first(self.0.conn())?;
@@ -148,15 +198,23 @@ impl<'a> EthereumSchema<'a> {
         Ok(old_nonce_value)
     }
 
-    /// Method that internally initializes the `eth_nonce` table.
+    /// Method that internally initializes the `eth_nonce` and `eth_stats` tables.
     /// Since in db tests the database is empty, we must provide a possibility
     /// to initialize required db fields.
     #[cfg(test)]
-    pub fn initialize_eth_nonce(&self) -> QueryResult<()> {
+    pub fn initialize_eth_data(&self) -> QueryResult<()> {
         #[derive(Debug, Insertable)]
         #[table_name = "eth_nonce"]
         pub struct NewETHNonce {
             pub nonce: i64,
+        }
+
+        #[derive(Debug, Insertable)]
+        #[table_name = "eth_stats"]
+        pub struct NewETHStats {
+            pub commit_ops: i64,
+            pub verify_ops: i64,
+            pub withdraw_ops: i64,
         }
 
         let old_nonce: Option<ETHNonce> = eth_nonce::table.first(self.0.conn()).optional()?;
@@ -167,6 +225,20 @@ impl<'a> EthereumSchema<'a> {
 
             insert_into(eth_nonce::table)
                 .values(&nonce)
+                .execute(self.0.conn())?;
+        }
+
+        let old_stats: Option<ETHStats> = eth_stats::table.first(self.0.conn()).optional()?;
+
+        if old_stats.is_none() {
+            let stats = NewETHStats {
+                commit_ops: 0,
+                verify_ops: 0,
+                withdraw_ops: 0,
+            };
+
+            insert_into(eth_stats::table)
+                .values(&stats)
                 .execute(self.0.conn())?;
         }
 

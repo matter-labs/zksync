@@ -10,7 +10,7 @@ use models::{
 use crate::tests::db_test;
 use crate::{
     chain::block::BlockSchema,
-    ethereum::{records::StorageETHOperation, EthereumSchema},
+    ethereum::{records::StorageETHOperation, EthereumSchema, OperationType},
     StorageProcessor,
 };
 
@@ -159,13 +159,49 @@ fn ethereum_storage() {
 fn eth_nonce() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
-        EthereumSchema(&conn).initialize_eth_nonce()?;
+        EthereumSchema(&conn).initialize_eth_data()?;
 
         for expected_next_nonce in 0..5 {
             let actual_next_nonce = EthereumSchema(&conn).get_next_nonce()?;
 
             assert_eq!(actual_next_nonce, expected_next_nonce);
         }
+
+        Ok(())
+    });
+}
+
+/// Checks that Ethereum stats are incremented as expected.
+#[test]
+#[cfg_attr(not(feature = "db_test"), ignore)]
+fn eth_stats() {
+    let conn = StorageProcessor::establish_connection().unwrap();
+    db_test(conn.conn(), || {
+        EthereumSchema(&conn).initialize_eth_data()?;
+
+        let initial_stats = EthereumSchema(&conn).load_stats()?;
+
+        assert_eq!(initial_stats.commit_ops, 0);
+        assert_eq!(initial_stats.verify_ops, 0);
+        assert_eq!(initial_stats.withdraw_ops, 0);
+
+        let ops_to_add = vec![
+            (OperationType::Commit, 5),
+            (OperationType::Verify, 3),
+            (OperationType::Withdraw, 2),
+        ];
+
+        for (op, count) in ops_to_add.iter() {
+            for _ in 0..*count {
+                EthereumSchema(&conn).report_operation_creates(*op)?;
+            }
+        }
+
+        let updated_stats = EthereumSchema(&conn).load_stats()?;
+
+        assert_eq!(updated_stats.commit_ops, ops_to_add[0].1);
+        assert_eq!(updated_stats.verify_ops, ops_to_add[1].1);
+        assert_eq!(updated_stats.withdraw_ops, ops_to_add[2].1);
 
         Ok(())
     });

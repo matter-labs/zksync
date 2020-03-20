@@ -103,6 +103,15 @@ table! {
 }
 
 table! {
+    eth_stats (id) {
+        id -> Bool,
+        commit_ops -> Int8,
+        verify_ops -> Int8,
+        withdraw_ops -> Int8,
+    }
+}
+
+table! {
     events_state (id) {
         id -> Int4,
         block_type -> Text,
@@ -230,6 +239,7 @@ allow_tables_to_appear_in_same_query!(
     data_restore_last_watched_eth_block,
     eth_nonce,
     eth_operations,
+    eth_stats,
     events_state,
     executed_priority_operations,
     executed_transactions,
