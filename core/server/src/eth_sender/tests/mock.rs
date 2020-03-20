@@ -219,7 +219,7 @@ impl MockEthereum {
                 let root = op.block.get_eth_encoded_root();
                 let public_data = op.block.get_eth_public_data();
                 let witness_data = op.block.get_eth_witness_data();
-                self.sign_call_tx(
+                let raw_tx = self.encode_tx_data(
                     "commitBlock",
                     (
                         u64::from(op.block.block_number),
@@ -229,17 +229,18 @@ impl MockEthereum {
                         witness_data.0,
                         witness_data.1,
                     ),
-                    options,
-                )
-                .unwrap()
+                );
+
+                self.sign_prepared_tx(raw_tx, options).unwrap()
             }
-            Action::Verify { proof } => self
-                .sign_call_tx(
+            Action::Verify { proof } => {
+                let raw_tx = self.encode_tx_data(
                     "verifyBlock",
                     (u64::from(op.block.block_number), *proof.clone()),
-                    options,
-                )
-                .unwrap(),
+                );
+
+                self.sign_prepared_tx(raw_tx, options).unwrap()
+            }
         }
     }
 }
@@ -265,10 +266,13 @@ impl EthereumInterface for MockEthereum {
         Ok(())
     }
 
-    fn sign_call_tx<P: Tokenize>(
+    fn encode_tx_data<P: Tokenize>(&self, _func: &str, params: P) -> Vec<u8> {
+        ethabi::encode(params.into_tokens().as_ref())
+    }
+
+    fn sign_prepared_tx(
         &self,
-        _func: &str,
-        params: P,
+        raw_tx: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
         let gas_price = options.gas_price.unwrap_or(self.gas_price);
@@ -276,10 +280,10 @@ impl EthereumInterface for MockEthereum {
 
         // Nonce and gas_price are appended to distinguish the same transactions
         // with different gas by their hash in tests.
-        let mut raw_tx = ethabi::encode(params.into_tokens().as_ref());
-        raw_tx.append(&mut ethabi::encode(gas_price.into_tokens().as_ref()));
-        raw_tx.append(&mut ethabi::encode(nonce.into_tokens().as_ref()));
-        let hash = Self::fake_sha256(raw_tx.as_ref()); // Okay for test purposes.
+        let mut data_for_hash = raw_tx.clone();
+        data_for_hash.append(&mut ethabi::encode(gas_price.into_tokens().as_ref()));
+        data_for_hash.append(&mut ethabi::encode(nonce.into_tokens().as_ref()));
+        let hash = Self::fake_sha256(data_for_hash.as_ref()); // Okay for test purposes.
 
         Ok(SignedCallResult {
             raw_tx,

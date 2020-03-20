@@ -237,13 +237,13 @@ fn operation_commitment_workflow() {
     let mut options = Options::default();
     let nonce = operations.len().into();
     options.nonce = Some(nonce);
+    let raw_tx = eth_sender.ethereum.encode_tx_data(
+        "completeWithdrawals",
+        models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+    );
     let tx = eth_sender
         .ethereum
-        .sign_call_tx(
-            "completeWithdrawals",
-            models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
-            options,
-        )
+        .sign_prepared_tx(raw_tx, options)
         .unwrap();
     eth_sender.ethereum.assert_sent_by_hash(&tx.hash);
 

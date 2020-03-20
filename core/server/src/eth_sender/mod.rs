@@ -389,7 +389,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         op: &Operation,
         tx_options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
-        match &op.action {
+        let raw_tx = match &op.action {
             Action::Commit => {
                 let root = op.block.get_eth_encoded_root();
 
@@ -409,7 +409,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 );
 
                 // function commitBlock(uint32 _blockNumber, uint24 _feeAccount, bytes32 _newRoot, bytes calldata _publicData)
-                self.ethereum.sign_call_tx(
+                self.ethereum.encode_tx_data(
                     "commitBlock",
                     (
                         u64::from(op.block.block_number),
@@ -419,18 +419,18 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                         witness_data.0,
                         witness_data.1,
                     ),
-                    tx_options,
                 )
             }
             Action::Verify { proof } => {
                 // function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof) external {
-                self.ethereum.sign_call_tx(
+                self.ethereum.encode_tx_data(
                     "verifyBlock",
                     (u64::from(op.block.block_number), *proof.clone()),
-                    tx_options,
                 )
             }
-        }
+        };
+
+        self.ethereum.sign_prepared_tx(raw_tx, tx_options)
     }
 
     fn call_complete_withdrawals(&self) -> Result<(), failure::Error> {
@@ -439,13 +439,14 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         let nonce = self.db.next_nonce()?;
         options.nonce = Some(nonce.into());
 
+        let raw_tx = self.ethereum.encode_tx_data(
+            "completeWithdrawals",
+            config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+        );
+
         let tx = self
             .ethereum
-            .sign_call_tx(
-                "completeWithdrawals",
-                config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
-                options,
-            )
+            .sign_prepared_tx(raw_tx, options)
             .map_err(|e| failure::format_err!("completeWithdrawals: {}", e))?;
         info!("Sending completeWithdrawals tx with hash: {:#?}", tx.hash);
         self.ethereum.send_tx(&tx)
