@@ -1859,11 +1859,6 @@ browserslist@^4.3.4:
     electron-to-chromium "^1.3.247"
     node-releases "^1.1.29"
 
-buffer-es6@^4.9.3:
-  version "4.9.3"
-  resolved "https://registry.yarnpkg.com/buffer-es6/-/buffer-es6-4.9.3.tgz#f26347b82df76fd37e18bcb5288c4970cfd5c404"
-  integrity sha1-8mNHuC33b9N+GLy1KIxJcM/VxAQ=
-
 buffer-from@^1.0.0:
   version "1.1.1"
   resolved "https://registry.yarnpkg.com/buffer-from/-/buffer-from-1.1.1.tgz#32713bc028f75c02fdb710d7c7bcec1f2c6070ef"
@@ -3705,12 +3700,6 @@ evp_bytestokey@^1.0.0, evp_bytestokey@^1.0.3:
   dependencies:
     md5.js "^1.3.4"
     safe-buffer "^5.1.1"
-
-example-node-wasm@../zksync-crypto:
-  version "0.0.0"
-  dependencies:
-    buffer-es6 "^4.9.3"
-    zksync-crypto "file:../../../../Library/Caches/Yarn/v6/npm-example-node-wasm-0.0.0-7801641d-ec0b-4594-a519-2b9a8eeb179e-1584117788720/node_modules/example-node-wasm/pkg"
 
 execa@^0.8.0:
   version "0.8.0"
@@ -9683,8 +9672,8 @@ yorkie@^2.0.0:
     normalize-path "^1.0.0"
     strip-indent "^2.0.0"
 
-zksync-crypto@../zksync-crypto/pkg, "zksync-crypto@file:../zksync-crypto/pkg":
-  version "0.1.0"
+zksync-crypto@../zksync-crypto:
+  version "0.0.0"
 
 "zksync@link:../zksync.js":
   version "0.0.0"

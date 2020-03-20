@@ -231,7 +231,7 @@ example-node-wasm@../zksync-crypto:
   version "0.0.0"
   dependencies:
     buffer-es6 "^4.9.3"
-    zksync-crypto "file:../../../../Library/Caches/Yarn/v6/npm-example-node-wasm-0.0.0-9a0cf1ac-bdad-461e-97bb-b869071b95cc-1584116293040/node_modules/example-node-wasm/pkg"
+    zksync-crypto "file:../../../../Library/Caches/Yarn/v6/npm-example-node-wasm-0.0.0-1da603b1-efda-4ef8-b578-586eccd35c48-1584708911723/node_modules/example-node-wasm/pkg"
 
 ext@^1.1.2:
   version "1.4.0"
@@ -545,8 +545,14 @@ yn@3.1.1:
   resolved "https://registry.yarnpkg.com/yn/-/yn-3.1.1.tgz#1e87401a09d767c1d5eab26a6e4c185182d2eb50"
   integrity sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==
 
-zksync-crypto@../zksync-crypto/pkg, "zksync-crypto@file:../zksync-crypto/pkg":
+zksync-crypto-node@../zksync-crypto/nodejspgk:
   version "0.1.0"
+
+zksync-crypto-web@../zksync-crypto/webpgk:
+  version "0.1.0"
+
+zksync-crypto@../zksync-crypto/pkg, "zksync-crypto@file:../zksync-crypto/pkg":
+  version "0.0.0"
 
 "zksync@link:../zksync.js":
   version "0.0.0"

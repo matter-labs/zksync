@@ -1,13 +1,7 @@
 import BN = require("bn.js");
 import { Signature } from "./types";
 
-const zksync_crypto = (async () => {
-    if (typeof window !== "undefined" && window.window === window) {
-        return await import("zksync-crypto");
-    } else {
-        return await import("zksync-crypto-node");
-    }
-})();
+const zksync_crypto = import("zksync-crypto");
 
 export async function signTransactionBytes(privKey: BN, bytes: Buffer): Promise<Signature> {
     const { sign_musig_sha256 } = await zksync_crypto;

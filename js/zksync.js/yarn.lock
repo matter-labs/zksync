@@ -1331,11 +1331,5 @@ yn@^3.0.0:
   resolved "https://registry.yarnpkg.com/yn/-/yn-3.1.0.tgz#fcbe2db63610361afcc5eb9e0ac91e976d046114"
   integrity sha512-kKfnnYkbTfrAdd0xICNFw7Atm8nKpLcLv9AZGEt+kczL/WQVai4e2V6ZN8U/O+iI6WrNuJjNNOyu4zfhl9D3Hg==
 
-zksync-crypto-node@../zksync-crypto/nodejspgk:
-  version "0.1.0"
-
-zksync-crypto-web@../zksync-crypto/webpgk:
-  version "0.1.0"
-
-zksync-crypto@../zksync-crypto/pkg:
-  version "0.1.0"
+zksync-crypto@../zksync-crypto:
+  version "0.0.0"

@@ -13,9 +13,7 @@
     "js-sha256": "^0.9.0",
     "websocket": "^1.0.30",
     "websocket-as-promised": "^0.10.1",
-    "zksync-crypto": "../zksync-crypto/pkg",
-    "zksync-crypto-node": "../zksync-crypto/nodejspgk",
-    "zksync-crypto-web": "../zksync-crypto/webpgk"
+    "zksync-crypto": "../zksync-crypto"
   },
   "peerDependencies": {
     "ethers": "^4.0.33"
