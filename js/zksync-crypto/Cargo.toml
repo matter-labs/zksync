@@ -7,7 +7,7 @@ authors = ["Vitalii Drohan <vitaliy.drogan@gmail.com>"]
 edition = "2018"
 
 [lib]
-crate-type = ["cdylib", "rlib"]
+crate-type = ["cdylib"]
 
 [features]
 default = ["console_error_panic_hook"]
