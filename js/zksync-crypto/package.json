@@ -1,10 +1,10 @@
 {
 	"name": "zksync-crypto",
 	"version": "0.0.0",
-	"browser": "pkg/web.js",
-	"main": "pkg/node.js",
+	"browser": "dist/web.js",
+	"main": "dist/node.js",
 	"scripts": {
-		"build": "wasm-pack build --out-name=web && wasm-pack build --target=nodejs --out-name=node && rm pkg/package.json",
+		"build": "./build.sh",
 		"test": "echo \"Error: no test specified\" && exit 1"
 	}
 }

@@ -30,7 +30,7 @@ pub fn init() {
     set_panic_hook();
 }
 
-#[wasm_bindgen]
+#[wasm_bindgen(js_name = privateKeyFromSeed)]
 pub fn private_key_from_seed(seed: &[u8]) -> Vec<u8> {
     if seed.len() < 32 {
         panic!("Seed is too short");
@@ -99,17 +99,3 @@ pub fn sign_musig_sha256(private_key: &[u8], msg: &[u8]) -> Vec<u8> {
     result.extend_from_slice(&packed_signature[..]);
     result
 }
-
-//#[test]
-//fn test_pub_key_hash() {
-//    let p_g = FixedGenerators::SpendingKeyGenerator;
-//
-//    let sk = {
-//        PrivateKey::<Engine>(Fs::from_str("5").unwrap())
-//    };
-//
-//    let pubkey = JUBJUB_PARAMS.with(|params| PublicKey::from_private(&sk, p_g, params));
-//    println!("{:?}", pubkey.0.into_xy());
-//    println!("{}",hex::encode(&pub_key_hash(&pubkey)));
-//    panic!()
-//}

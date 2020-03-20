@@ -9057,14 +9057,8 @@ yorkie@^2.0.0:
     normalize-path "^1.0.0"
     strip-indent "^2.0.0"
 
-zksync-crypto-node@../zksync-crypto/nodejspgk:
-  version "0.1.0"
-
-zksync-crypto-web@../zksync-crypto/webpgk:
-  version "0.1.0"
-
-zksync-crypto@../zksync-crypto/pkg:
-  version "0.1.0"
+zksync-crypto@../zksync-crypto:
+  version "0.0.0"
 
 "zksync@link:../zksync.js":
   version "0.0.0"

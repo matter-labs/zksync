@@ -1,25 +1,27 @@
 import BN = require("bn.js");
 import { Signature } from "./types";
 
-const zksync_crypto = import("zksync-crypto");
+import { private_key_to_pubkey_hash, sign_musig_sha256 } from "zksync-crypto";
 
-export async function signTransactionBytes(privKey: BN, bytes: Buffer): Promise<Signature> {
-    const { sign_musig_sha256 } = await zksync_crypto;
-    const signaturePacked = sign_musig_sha256(privKey.toArrayLike(Buffer), bytes);
-    const pubKey = Buffer.from(signaturePacked.slice(0,32)).toString("hex");
-    const signature = Buffer.from(signaturePacked.slice(32, 32 + 64)).toString("hex");
+export { privateKeyFromSeed } from "zksync-crypto";
+
+export function signTransactionBytes(
+    privKey: Uint8Array,
+    bytes: Uint8Array
+): Signature {
+    const signaturePacked = sign_musig_sha256(privKey, bytes);
+    const pubKey = Buffer.from(signaturePacked.slice(0, 32)).toString("hex");
+    const signature = Buffer.from(signaturePacked.slice(32, 32 + 64)).toString(
+        "hex"
+    );
     return {
         pubKey,
-        signature,
+        signature
     };
 }
 
-export async function privateKeyFromSeed(seed: Buffer): Promise<BN> {
-    const { private_key_from_seed } = await zksync_crypto;
-    return new BN(private_key_from_seed(seed)); 
-}
-
-export async function privateKeyToPubKeyHash(privateKey: BN): Promise<string> {
-    const { private_key_to_pubkey_hash } = await zksync_crypto;
-    return `sync:${Buffer.from(private_key_to_pubkey_hash(privateKey.toArrayLike(Buffer))).toString("hex")}`
+export function privateKeyToPubKeyHash(privateKey: Uint8Array): string {
+    return `sync:${Buffer.from(private_key_to_pubkey_hash(privateKey)).toString(
+        "hex"
+    )}`;
 }

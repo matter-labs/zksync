@@ -112,7 +112,7 @@ export class Wallet {
             humanReadableTxInfo
         );
 
-        const signedTransferTransaction = await this.signer.signSyncTransfer(
+        const signedTransferTransaction = this.signer.signSyncTransfer(
             transactionData
         );
 
@@ -171,7 +171,7 @@ export class Wallet {
             humanReadableTxInfo
         );
 
-        const signedWithdrawTransaction = await this.signer.signSyncWithdraw(
+        const signedWithdrawTransaction = this.signer.signSyncWithdraw(
             transactionData
         );
 
@@ -193,7 +193,7 @@ export class Wallet {
             );
         }
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const signerPubKeyHash = await this.signer.pubKeyHash();
+        const signerPubKeyHash = this.signer.pubKeyHash();
         return currentPubKeyHash === signerPubKeyHash;
     }
 
@@ -208,7 +208,7 @@ export class Wallet {
         }
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const newPubKeyHash = await this.signer.pubKeyHash();
+        const newPubKeyHash = this.signer.pubKeyHash();
 
         if (currentPubKeyHash == newPubKeyHash) {
             throw new Error("Current signing key is set already");
@@ -233,7 +233,7 @@ export class Wallet {
         const txData = {
             type: "ChangePubKey",
             account: this.address(),
-            newPkHash: await this.signer.pubKeyHash(),
+            newPkHash: this.signer.pubKeyHash(),
             nonce: numNonce,
             ethSignature
         };
@@ -253,7 +253,7 @@ export class Wallet {
         }
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
-        const newPubKeyHash = await this.signer.pubKeyHash();
+        const newPubKeyHash = this.signer.pubKeyHash();
 
         if (currentPubKeyHash == newPubKeyHash) {
             throw new Error("Current PubKeyHash is the same as new");

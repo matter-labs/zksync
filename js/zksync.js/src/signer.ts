@@ -19,18 +19,18 @@ export class Signer {
         this.privateKey = privKey;
     }
 
-    async pubKeyHash(): Promise<PubKeyHash> {
-        return await privateKeyToPubKeyHash(this.privateKey);
+    pubKeyHash(): PubKeyHash {
+        return privateKeyToPubKeyHash(this.privateKey);
     }
 
-    async signSyncTransfer(transfer: {
+    signSyncTransfer(transfer: {
         from: Address;
         to: Address;
         tokenId: number;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce: number;
-    }): Promise<Transfer> {
+    }): Transfer {
         const type = Buffer.from([5]); // tx type
         const from = serializeAddress(transfer.from);
         const to = serializeAddress(transfer.to);
@@ -48,7 +48,7 @@ export class Signer {
             nonce
         ]);
 
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+        const signature = signTransactionBytes(this.privateKey, msgBytes);
 
         return {
             type: "Transfer",
@@ -62,14 +62,14 @@ export class Signer {
         };
     }
 
-    async signSyncWithdraw(withdraw: {
+    signSyncWithdraw(withdraw: {
         from: Address;
         ethAddress: string;
         tokenId: number;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce: number;
-    }): Promise<Withdraw> {
+    }): Withdraw {
         const typeBytes = Buffer.from([3]);
         const accountBytes = serializeAddress(withdraw.from);
         const ethAddressBytes = serializeAddress(withdraw.ethAddress);
@@ -86,7 +86,7 @@ export class Signer {
             feeBytes,
             nonceBytes
         ]);
-        const signature = await signTransactionBytes(this.privateKey, msgBytes);
+        const signature = signTransactionBytes(this.privateKey, msgBytes);
         return {
             type: "Withdraw",
             from: withdraw.from,
@@ -103,7 +103,7 @@ export class Signer {
         return new Signer(pk);
     }
 
-    static async fromSeed(seed: Buffer): Promise<Signer> {
+    static fromSeed(seed: Buffer): Signer {
         return new Signer(privateKeyFromSeed(seed));
     }
 
@@ -114,7 +114,7 @@ export class Signer {
                 "Only sign this message for a trusted client!"
         );
         const seed = Buffer.from(sign.substr(2), "hex");
-        return await Signer.fromSeed(seed);
+        return Signer.fromSeed(seed);
     }
 }
 
