@@ -1,6 +1,7 @@
 //! Run external commands from `$ZKSYNC_HOME/bin`
 //!`$ZKSYNC_HOME/bin` should be in path.
 //!
+extern crate hex;
 use std::collections::HashMap;
 use std::process::Command;
 use std::str::FromStr;
@@ -13,6 +14,7 @@ pub struct Contracts {
     pub governance: Address,
     pub verifier: Address,
     pub contract: Address,
+    pub upgrade_gatekeeper: Address,
     pub test_erc20_address: Address,
 }
 
@@ -33,6 +35,12 @@ fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
         Some((
             String::from("CONTRACT_ADDR"),
             Address::from_str(&deploy_script_out["CONTRACT_ADDR=0x".len()..])
+                .expect("can't parse contract address"),
+        ))
+    } else if deploy_script_out.starts_with("UPGRADE_GATEKEEPER_ADDR=0x") {
+        Some((
+            String::from("UPGRADE_GATEKEEPER_ADDR"),
+            Address::from_str(&deploy_script_out["UPGRADE_GATEKEEPER_ADDR=0x".len()..])
                 .expect("can't parse contract address"),
         ))
     } else if deploy_script_out.starts_with("TEST_ERC20=0x") {
@@ -75,7 +83,24 @@ pub fn deploy_test_contracts() -> Contracts {
         contract: contracts
             .remove("CONTRACT_ADDR")
             .expect("CONTRACT_ADDR missing"),
+        upgrade_gatekeeper: contracts
+            .remove("UPGRADE_GATEKEEPER_ADDR")
+            .expect("UPGRADE_GATEKEEPER_ADDR missing"),
         test_erc20_address: contracts.remove("TEST_ERC20").expect("TEST_ERC20 missing"),
+    }
+}
+pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_address: Address) {
+    let result = Command::new("sh")
+        .arg("test-upgrade-franklin.sh")
+        .arg(String::from("0x") + &hex::encode(franklin_address.as_bytes()))
+        .arg(String::from("0x") + &hex::encode(upgrade_gatekeeper_address.as_bytes()))
+        .output()
+        .expect("failed to execute test upgrade franklin script");
+    if !result.status.success() {
+        panic!("test upgrade franklin script failed")
+    }
+    if !result.stderr.is_empty() {
+        panic!("test upgrade franklin script failed with error")
     }
 }
 
