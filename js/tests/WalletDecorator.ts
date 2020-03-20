@@ -261,7 +261,6 @@ export class WalletDecorator {
                         depositTo: this.syncWallet.address(),
                         token,
                         amount,
-                        // maxFeeInETHToken: bigNumberify(0),
                         ethTxOptions: {
                             nonce,
                         },

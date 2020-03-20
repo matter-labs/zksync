@@ -2,9 +2,9 @@ import { curve } from "elliptic";
 import {
     privateKeyFromSeed,
     signTransactionBytes,
-    privateKeyToPubKeyHash,
+    privateKeyToPubKeyHash
 } from "./crypto";
-import {ethers, utils} from "ethers";
+import { ethers, utils } from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
 import BN = require("bn.js");
 import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw } from "./types";
@@ -13,9 +13,9 @@ const MAX_NUMBER_OF_TOKENS = 4096;
 const MAX_NUMBER_OF_ACCOUNTS = 1 << 24;
 
 export class Signer {
-    readonly privateKey: BN;
+    readonly privateKey: Uint8Array;
 
-    private constructor(privKey: BN) {
+    private constructor(privKey: Uint8Array) {
         this.privateKey = privKey;
     }
 
@@ -99,33 +99,38 @@ export class Signer {
         };
     }
 
-    static fromPrivateKey(pk: BN): Signer {
+    static fromPrivateKey(pk: Uint8Array): Signer {
         return new Signer(pk);
     }
 
     static async fromSeed(seed: Buffer): Promise<Signer> {
-        return new Signer(await privateKeyFromSeed(seed));
+        return new Signer(privateKeyFromSeed(seed));
     }
 
     static async fromETHSignature(ethSigner: ethers.Signer): Promise<Signer> {
-        const sign = await ethSigner.signMessage("Access ZK Sync account.\n" + "\n" + "Only sign this message for a trusted client!");
+        const sign = await ethSigner.signMessage(
+            "Access ZK Sync account.\n" +
+                "\n" +
+                "Only sign this message for a trusted client!"
+        );
         const seed = Buffer.from(sign.substr(2), "hex");
         return await Signer.fromSeed(seed);
     }
 }
 
+function removeAddressPrefix(address: Address | PubKeyHash): string {
+    if (address.startsWith("0x")) return address.substr(2);
+
+    if (address.startsWith("sync:")) return address.substr(5);
+
+    throw new Error(
+        "ETH address must start with '0x' and PubKeyHash must start with 'sync:'"
+    );
+}
+
 // PubKeyHash or eth address
 export function serializeAddress(address: Address | PubKeyHash): Buffer {
-    const prefixlessAddress
-        = address.startsWith("0x")    ? address.substr(2)
-        : address.startsWith("sync:") ? address.substr(5)
-        : null;
-
-    if (prefixlessAddress === null) {
-        throw new Error(
-            "ETH address must start with '0x' and PubKeyHash must start with 'sync:'"
-        );
-    }
+    const prefixlessAddress = removeAddressPrefix(address);
 
     const addressBytes = Buffer.from(prefixlessAddress, "hex");
     if (addressBytes.length != 20) {

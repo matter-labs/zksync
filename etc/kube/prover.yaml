@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ${ZKSYNC_ENV}-prover-${BLOCK_SIZE_CHUNKS}
+  namespace: ${ZKSYNC_ENV}
   labels:
     app: ${ZKSYNC_ENV}-prover-${BLOCK_SIZE_CHUNKS}
 spec:

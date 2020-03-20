@@ -11,10 +11,22 @@ import {
     PubKeyHash
 } from "./types";
 import {
+    ERC20_APPROVE_TRESHOLD,
     IERC20_INTERFACE,
-    isTokenETH, signChangePubkeyMessage,
-    SYNC_MAIN_CONTRACT_INTERFACE,
+    isTokenETH,
+    MAX_ERC20_APPROVE_AMOUNT,
+    signChangePubkeyMessage,
+    SYNC_MAIN_CONTRACT_INTERFACE
 } from "./utils";
+
+class ZKSyncTxError extends Error {
+    constructor(
+        message: string,
+        public value: PriorityOperationReceipt | TransactionReceipt
+    ) {
+        super(message);
+    }
+}
 
 export class Wallet {
     public provider: Provider;
@@ -22,7 +34,7 @@ export class Wallet {
     private constructor(
         public ethSigner: ethers.Signer,
         public cachedAddress: Address,
-        public signer?: Signer,
+        public signer?: Signer
     ) {}
 
     connect(provider: Provider) {
@@ -35,24 +47,23 @@ export class Wallet {
         provider: Provider,
         signer?: Signer
     ): Promise<Wallet> {
-        const walletSigner = signer ? signer : await Signer.fromETHSignature(ethWallet);
+        const walletSigner = signer
+            ? signer
+            : await Signer.fromETHSignature(ethWallet);
         const wallet = new Wallet(
             ethWallet,
             await ethWallet.getAddress(),
-            walletSigner,
-    );
+            walletSigner
+        );
         wallet.connect(provider);
         return wallet;
     }
 
     static async fromEthSignerNoKeys(
         ethWallet: ethers.Signer,
-        provider: Provider,
+        provider: Provider
     ): Promise<Wallet> {
-        const wallet = new Wallet(
-            ethWallet,
-            await ethWallet.getAddress()
-        );
+        const wallet = new Wallet(ethWallet, await ethWallet.getAddress());
         wallet.connect(provider);
         return wallet;
     }
@@ -65,7 +76,9 @@ export class Wallet {
         nonce?: Nonce;
     }): Promise<Transaction> {
         if (!this.signer) {
-            throw new Error("ZKSync signer is required for sending zksync transactions.");
+            throw new Error(
+                "ZKSync signer is required for sending zksync transactions."
+            );
         }
 
         const tokenId = await this.provider.tokenSet.resolveTokenId(
@@ -89,12 +102,15 @@ export class Wallet {
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             transfer.token
         );
-        const humanReadableTxInfo = `Transfer ${stringAmount} ${stringToken}\n`
-            + `To: ${transfer.to.toLowerCase()}\n`
-            + `Nonce: ${nonce}\n`
-            + `Fee: ${stringFee} ${stringToken}`;
+        const humanReadableTxInfo =
+            `Transfer ${stringAmount} ${stringToken}\n` +
+            `To: ${transfer.to.toLowerCase()}\n` +
+            `Nonce: ${nonce}\n` +
+            `Fee: ${stringFee} ${stringToken}`;
 
-        const txMessageEthSignature = await this.ethSigner.signMessage(humanReadableTxInfo);
+        const txMessageEthSignature = await this.ethSigner.signMessage(
+            humanReadableTxInfo
+        );
 
         const signedTransferTransaction = await this.signer.signSyncTransfer(
             transactionData
@@ -102,7 +118,7 @@ export class Wallet {
 
         const transactionHash = await this.provider.submitTx(
             signedTransferTransaction,
-            txMessageEthSignature,
+            txMessageEthSignature
         );
         return new Transaction(
             signedTransferTransaction,
@@ -119,7 +135,9 @@ export class Wallet {
         nonce?: Nonce;
     }): Promise<Transaction> {
         if (!this.signer) {
-            throw new Error("ZKSync signer is required for sending zksync transactions.");
+            throw new Error(
+                "ZKSync signer is required for sending zksync transactions."
+            );
         }
 
         const tokenId = await this.provider.tokenSet.resolveTokenId(
@@ -143,12 +161,15 @@ export class Wallet {
         const stringToken = await this.provider.tokenSet.resolveTokenSymbol(
             withdraw.token
         );
-        const humanReadableTxInfo = `Withdraw ${stringAmount} ${stringToken}\n`
-            + `To: ${withdraw.ethAddress.toLowerCase()}\n`
-            + `Nonce: ${nonce}\n`
-            + `Fee: ${stringFee} ${stringToken}`;
-        
-        const txMessageEthSignature = await this.ethSigner.signMessage(humanReadableTxInfo);
+        const humanReadableTxInfo =
+            `Withdraw ${stringAmount} ${stringToken}\n` +
+            `To: ${withdraw.ethAddress.toLowerCase()}\n` +
+            `Nonce: ${nonce}\n` +
+            `Fee: ${stringFee} ${stringToken}`;
+
+        const txMessageEthSignature = await this.ethSigner.signMessage(
+            humanReadableTxInfo
+        );
 
         const signedWithdrawTransaction = await this.signer.signSyncWithdraw(
             transactionData
@@ -156,7 +177,7 @@ export class Wallet {
 
         const submitResponse = await this.provider.submitTx(
             signedWithdrawTransaction,
-            txMessageEthSignature,
+            txMessageEthSignature
         );
         return new Transaction(
             signedWithdrawTransaction,
@@ -167,7 +188,9 @@ export class Wallet {
 
     async isSigningKeySet(): Promise<boolean> {
         if (!this.signer) {
-            throw new Error("ZKSync signer is required for current pubkey calculation.");
+            throw new Error(
+                "ZKSync signer is required for current pubkey calculation."
+            );
         }
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const signerPubKeyHash = await this.signer.pubKeyHash();
@@ -179,7 +202,9 @@ export class Wallet {
         onchainAuth = false
     ): Promise<Transaction> {
         if (!this.signer) {
-            throw new Error("ZKSync signer is required for current pubkey calculation.");
+            throw new Error(
+                "ZKSync signer is required for current pubkey calculation."
+            );
         }
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
@@ -189,10 +214,21 @@ export class Wallet {
             throw new Error("Current signing key is set already");
         }
 
+        const isAccountInTheTree = await this.getAccountId();
+        if (isAccountInTheTree === undefined) {
+            throw new Error(
+                "Account should exist in the ZK Sync network before setting signing key"
+            );
+        }
+
         const numNonce = await this.getNonce(nonce);
         const ethSignature = onchainAuth
             ? null
-            : await signChangePubkeyMessage(this.ethSigner, newPubKeyHash, numNonce);
+            : await signChangePubkeyMessage(
+                  this.ethSigner,
+                  newPubKeyHash,
+                  numNonce
+              );
 
         const txData = {
             type: "ChangePubKey",
@@ -208,10 +244,12 @@ export class Wallet {
 
     async onchainAuthSigningKey(
         nonce: Nonce = "committed",
-        ethTxOptions?: ethers.providers.TransactionRequest,
+        ethTxOptions?: ethers.providers.TransactionRequest
     ): Promise<ContractTransaction> {
         if (!this.signer) {
-            throw new Error("ZKSync signer is required for current pubkey calculation.");
+            throw new Error(
+                "ZKSync signer is required for current pubkey calculation."
+            );
         }
 
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
@@ -234,7 +272,7 @@ export class Wallet {
             numNonce,
             {
                 gasLimit: utils.bigNumberify("200000"),
-                ...ethTxOptions,
+                ...ethTxOptions
             }
         );
 
@@ -255,10 +293,13 @@ export class Wallet {
         }
     }
 
+    async getAccountId(): Promise<number | undefined> {
+        return (await this.provider.getState(this.address())).id;
+    }
+
     address(): Address {
         return this.cachedAddress;
     }
-
 
     async getAccountState(): Promise<AccountState> {
         return this.provider.getState(this.address());
@@ -296,12 +337,49 @@ export class Wallet {
         return balance;
     }
 
+    async isERC20DepositsApproved(token: TokenLike): Promise<boolean> {
+        if (isTokenETH(token)) {
+            throw Error("ETH token does not need approval.");
+        }
+        const tokenAddress = this.provider.tokenSet.resolveTokenAddress(token);
+        const erc20contract = new Contract(
+            tokenAddress,
+            IERC20_INTERFACE,
+            this.ethSigner
+        );
+        const currentAllowance = await erc20contract.allowance(
+            this.address(),
+            this.provider.contractAddress.mainContract
+        );
+        return utils.bigNumberify(currentAllowance).gte(ERC20_APPROVE_TRESHOLD);
+    }
+
+    async approveERC20TokenDeposits(
+        token: TokenLike
+    ): Promise<ContractTransaction> {
+        if (isTokenETH(token)) {
+            throw Error("ETH token does not need approval.");
+        }
+        const tokenAddress = this.provider.tokenSet.resolveTokenAddress(token);
+        const erc20contract = new Contract(
+            tokenAddress,
+            IERC20_INTERFACE,
+            this.ethSigner
+        );
+
+        return erc20contract.approve(
+            this.provider.contractAddress.mainContract,
+            MAX_ERC20_APPROVE_AMOUNT
+        );
+    }
+
     async depositToSyncFromEthereum(deposit: {
         depositTo: Address;
         token: TokenLike;
         amount: utils.BigNumberish;
         maxFeeInETHToken?: utils.BigNumberish;
         ethTxOptions?: ethers.providers.TransactionRequest;
+        approveDepositAmountForERC20?: boolean;
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
 
@@ -337,7 +415,7 @@ export class Wallet {
                         .add(maxFeeInETHToken),
                     gasLimit: utils.bigNumberify("200000"),
                     gasPrice,
-                    ...deposit.ethTxOptions,
+                    ...deposit.ethTxOptions
                 }
             );
         } else {
@@ -350,24 +428,39 @@ export class Wallet {
                 IERC20_INTERFACE,
                 this.ethSigner
             );
-            const approveTx = await erc20contract.approve(
-                this.provider.contractAddress.mainContract,
-                deposit.amount,
-                {
-                    ...deposit.ethTxOptions,
+            if (deposit.approveDepositAmountForERC20) {
+                const approveTx = await erc20contract.approve(
+                    this.provider.contractAddress.mainContract,
+                    deposit.amount
+                );
+                ethTransaction = await mainZkSyncContract.depositERC20(
+                    tokenAddress,
+                    deposit.amount,
+                    deposit.depositTo,
+                    {
+                        gasLimit: utils.bigNumberify("250000"),
+                        value: maxFeeInETHToken,
+                        nonce: approveTx.nonce + 1,
+                        gasPrice,
+                        ...deposit.ethTxOptions
+                    }
+                );
+            } else {
+                if (!(await this.isERC20DepositsApproved(deposit.token))) {
+                    throw Error("ERC20 deposit should be approved.");
                 }
-            );
-            ethTransaction = await mainZkSyncContract.depositERC20(
-                tokenAddress,
-                deposit.amount,
-                deposit.depositTo,
-                {
-                    gasLimit: utils.bigNumberify("250000"),
-                    value: maxFeeInETHToken,
-                    nonce: approveTx.nonce + 1,
-                    gasPrice
-                }
-            );
+                ethTransaction = await mainZkSyncContract.depositERC20(
+                    tokenAddress,
+                    deposit.amount,
+                    deposit.depositTo,
+                    {
+                        gasLimit: utils.bigNumberify("250000"),
+                        value: maxFeeInETHToken,
+                        gasPrice,
+                        ...deposit.ethTxOptions
+                    }
+                );
+            }
         }
 
         return new ETHOperation(ethTransaction, this.provider);
@@ -423,7 +516,7 @@ export class Wallet {
                 gasLimit: utils.bigNumberify("500000"),
                 value: maxFeeInETHToken,
                 gasPrice,
-                ...withdraw.ethTxOptions,
+                ...withdraw.ethTxOptions
             }
         );
 
@@ -432,7 +525,8 @@ export class Wallet {
 }
 
 class ETHOperation {
-    state: "Sent" | "Mined" | "Committed" | "Verified";
+    state: "Sent" | "Mined" | "Committed" | "Verified" | "Failed";
+    error?: ZKSyncTxError;
     priorityOpId?: utils.BigNumber;
 
     constructor(
@@ -461,15 +555,20 @@ class ETHOperation {
     }
 
     async awaitReceipt(): Promise<PriorityOperationReceipt> {
+        this.throwErrorIfFailedState();
+
         await this.awaitEthereumTxCommit();
         if (this.state != "Mined") return;
         const receipt = await this.zkSyncProvider.notifyPriorityOp(
             this.priorityOpId.toNumber(),
             "COMMIT"
         );
-        
-        if (receipt.executed == false) {
-            throw receipt;
+
+        if (!receipt.executed) {
+            this.setErrorState(
+                new ZKSyncTxError("Priority operation failed", receipt)
+            );
+            this.throwErrorIfFailedState();
         }
 
         this.state = "Committed";
@@ -484,18 +583,25 @@ class ETHOperation {
             this.priorityOpId.toNumber(),
             "VERIFY"
         );
-        
-        if (receipt.executed == false) {
-            throw receipt;
-        }
 
         this.state = "Verified";
+
         return receipt;
+    }
+
+    private setErrorState(error: ZKSyncTxError) {
+        this.state = "Failed";
+        this.error = error;
+    }
+
+    private throwErrorIfFailedState() {
+        if (this.state == "Failed") throw this.error;
     }
 }
 
 class Transaction {
-    state: "Sent" | "Committed" | "Verified";
+    state: "Sent" | "Committed" | "Verified" | "Failed";
+    error?: ZKSyncTxError;
 
     constructor(
         public txData,
@@ -506,18 +612,26 @@ class Transaction {
     }
 
     async awaitReceipt(): Promise<TransactionReceipt> {
+        this.throwErrorIfFailedState();
+
         if (this.state !== "Sent") return;
 
         const receipt = await this.sidechainProvider.notifyTransaction(
             this.txHash,
             "COMMIT"
         );
-        this.state = "Committed";
 
         if (!receipt.success) {
-            throw receipt;
+            this.setErrorState(
+                new ZKSyncTxError(
+                    `ZKSync transaction failed: ${receipt.failReason}`,
+                    receipt
+                )
+            );
+            this.throwErrorIfFailedState();
         }
 
+        this.state = "Committed";
         return receipt;
     }
 
@@ -527,12 +641,17 @@ class Transaction {
             this.txHash,
             "VERIFY"
         );
+
         this.state = "Verified";
-        
-        if (!receipt.success) {
-            throw receipt;
-        }
-        
         return receipt;
+    }
+
+    private setErrorState(error: ZKSyncTxError) {
+        this.state = "Failed";
+        this.error = error;
+    }
+
+    private throwErrorIfFailedState() {
+        if (this.state == "Failed") throw this.error;
     }
 }
