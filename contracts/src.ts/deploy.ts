@@ -16,11 +16,13 @@ export const ERC20MintableContract = function () {
     return contract
 }();
 
-export const proxyContractCode = require(`../build/Proxy`);
+export const upgradeGatekeeperContractCode = require(`../build/UpgradeGatekeeper`);
 export const franklinContractCode = require(`../build/Franklin`);
 export const verifierContractCode = require(`../build/Verifier`);
 export const governanceContractCode = require(`../build/Governance`);
+export const proxyContractCode = require(`../build/Proxy`);
 
+export const upgradeGatekeeperTestContractCode = require(`../build/UpgradeGatekeeperTest`);
 export const franklinTestContractCode = require('../build/FranklinTest');
 export const verifierTestContractCode = require('../build/VerifierTest');
 export const governanceTestContractCode = require('../build/GovernanceTest');
@@ -65,12 +67,13 @@ export class Deployer {
 
     constructor(public wallet: ethers.Wallet, isTest: boolean) {
         this.bytecodes = {
-            GovernanceTarget:    isTest ? governanceTestContractCode    : governanceContractCode,
-            VerifierTarget:      isTest ? verifierTestContractCode      : verifierContractCode,
-            FranklinTarget:      isTest ? franklinTestContractCode      : franklinContractCode,
+            GovernanceTarget:    isTest ? governanceTestContractCode        : governanceContractCode,
+            VerifierTarget:      isTest ? verifierTestContractCode          : verifierContractCode,
+            FranklinTarget:      isTest ? franklinTestContractCode          : franklinContractCode,
             Governance:          proxyContractCode,
             Verifier:            proxyContractCode,
             Franklin:            proxyContractCode,
+            UpgradeGatekeeper:   isTest ? upgradeGatekeeperTestContractCode : upgradeGatekeeperContractCode,
         };
 
         this.addresses = {
@@ -80,6 +83,7 @@ export class Deployer {
             Governance: process.env.GOVERNANCE_ADDR,
             Verifier: process.env.VERIFIER_ADDR,
             Franklin: process.env.CONTRACT_ADDR,
+            UpgradeGatekeeper: process.env.UPGRADE_GATEKEEPER_ADDR,
         };
 
         this.deployTransactionHash = {
@@ -92,21 +96,20 @@ export class Deployer {
         return this.deployTransactionHash[name];
     }
 
+    getDeployedProxyContract(name) {
+        return new ethers.Contract(
+            this.addresses[name],
+            this.bytecodes[name+"Target"].interface,
+            this.wallet
+        );
+    }
+
     getDeployedContract(name) {
-        if (["Governance", "Verifier", "Franklin"].includes(name)) {
-            return new ethers.Contract(
-                this.addresses[name],
-                this.bytecodes[name+"Target"].interface,
-                this.wallet
-            );
-        }
-        else{
-            return new ethers.Contract(
-                this.addresses[name],
-                this.bytecodes[name].interface,
-                this.wallet
-            );
-        }
+        return new ethers.Contract(
+            this.addresses[name],
+            this.bytecodes[name].interface,
+            this.wallet
+        );
     }
 
     initializationArgs(contractName) {
@@ -133,6 +136,7 @@ export class Deployer {
             'Governance': [this.addresses.GovernanceTarget, this.encodedInitializationArgs('Governance')],
             'Verifier': [this.addresses.VerifierTarget, this.encodedInitializationArgs('Verifier')],
             'Franklin': [this.addresses.FranklinTarget, this.encodedInitializationArgs('Franklin')],
+            'UpgradeGatekeeper': [this.addresses.Franklin],
         }[contractName];
     }
     encodedConstructorArgs(contractName) {
@@ -208,6 +212,26 @@ export class Deployer {
         this.addresses.Franklin = proxy.address;
         this.deployTransactionHash.Franklin = proxy.deployTransaction.hash;
         return new ethers.Contract(proxy.address, this.bytecodes.FranklinTarget.interface, this.wallet);
+    }
+
+    async deployUpgradeGatekeeper() {
+        const contract = await deployContract(
+            this.wallet,
+            this.bytecodes.UpgradeGatekeeper,
+            this.constructorArgs('UpgradeGatekeeper'),
+            { gasLimit: 3000000 },
+        );
+        this.addresses.UpgradeGatekeeper = contract.address;
+
+        let transferMastershipTransaction;
+        transferMastershipTransaction = await this.getDeployedContract('Governance').transferMastership(contract.address);
+        await transferMastershipTransaction.wait();
+        transferMastershipTransaction = await this.getDeployedContract('Verifier').transferMastership(contract.address);
+        await transferMastershipTransaction.wait();
+        transferMastershipTransaction = await this.getDeployedContract('Franklin').transferMastership(contract.address);
+        await transferMastershipTransaction.wait();
+
+        return contract;
     }
 
     async postContractToTesseracts(contractName) {
