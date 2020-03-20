@@ -103,6 +103,9 @@ describe("UpgradeGatekeeper unit tests", function () {
             .to.emit(UpgradeGatekeeperContract, 'UpgradeCompleted')
             .withArgs(proxyTestContract.address, 0, DummySecond.address)
 
+        await expect(await proxyTestContract.getTarget())
+            .to.equal(DummySecond.address);
+
         // check dummy index and updated storage
         expect(await proxyDummyInterface.get_DUMMY_INDEX())
             .to.equal(2);
