@@ -193,7 +193,7 @@ fn eth_stats() {
 
         for (op, count) in ops_to_add.iter() {
             for _ in 0..*count {
-                EthereumSchema(&conn).report_operation_creates(*op)?;
+                EthereumSchema(&conn).report_created_operation(*op)?;
             }
         }
 

@@ -123,7 +123,7 @@ impl<'a> EthereumSchema<'a> {
     /// This method expects the database to be initially prepared with inserting the actual
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
-    pub fn report_operation_creates(&self, operation_type: OperationType) -> QueryResult<()> {
+    pub fn report_created_operation(&self, operation_type: OperationType) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             let mut current_stats: ETHStats = eth_stats::table.first(self.0.conn())?;
 
