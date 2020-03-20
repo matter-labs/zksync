@@ -91,7 +91,7 @@ push-image-nginx: image-nginx
 image-ci:
 	@docker build -t "${CI_DOCKER_IMAGE}" -f ./docker/ci/Dockerfile .
 
-push-image-ci:
+push-image-ci: image-ci
 	docker push "${CI_DOCKER_IMAGE}"
 
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder

@@ -1,6 +1,6 @@
 use crate::JUBJUB_PARAMS;
 use crate::{Engine, Fr};
-use franklin_crypto::{
+use crypto_exports::franklin_crypto::{
     bellman::{pairing::ff::PrimeField, BitIterator},
     eddsa::PublicKey,
     pedersen_hash::{baby_pedersen_hash, Personalization},

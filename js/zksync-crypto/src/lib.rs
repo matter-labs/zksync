@@ -1,6 +1,6 @@
 mod utils;
 
-pub use franklin_crypto::bellman::pairing::bn256::{Bn256 as Engine, Fr};
+pub use crypto_exports::franklin_crypto::bellman::pairing::bn256::{Bn256 as Engine, Fr};
 pub type Fs = <Engine as JubjubEngine>::Fs;
 thread_local! {
     pub static JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
@@ -8,7 +8,7 @@ thread_local! {
 
 use wasm_bindgen::prelude::*;
 
-use franklin_crypto::{
+use crypto_exports::franklin_crypto::{
     alt_babyjubjub::{fs::FsRepr, AltJubjubBn256, FixedGenerators},
     bellman::pairing::ff::{PrimeField, PrimeFieldRepr},
     eddsa::{PrivateKey, PublicKey, Seed},
