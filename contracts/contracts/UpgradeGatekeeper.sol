@@ -94,11 +94,11 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
             upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Finalize;
 
             (bool mainContractCallSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
-                abi.encodeWithSignature("registeredPriorityOperations()")
+                abi.encodeWithSignature("totalRegisteredPriorityOperations()")
             );
             require(mainContractCallSuccess, "uaf12"); // uaf12 - main contract static call failed
-            uint64 registeredPriorityOperations = abi.decode(encodedResult, (uint64));
-            upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = registeredPriorityOperations;
+            uint64 totalRegisteredPriorityOperations = abi.decode(encodedResult, (uint64));
+            upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = totalRegisteredPriorityOperations;
 
             emit UpgradeModeFinalizeStatusActivated(proxyAddress, version[proxyAddress]);
             return true;
