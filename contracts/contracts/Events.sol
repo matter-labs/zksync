@@ -69,8 +69,8 @@ contract UpgradeEvents {
         uint64 version
     );
 
-    /// @notice Upgrade mode finalize status event
-    event UpgradeModeFinalizeStatusActivated(
+    /// @notice Upgrade mode cleaning up status event
+    event UpgradeModeCleaningUpStatusActivated(
         address proxyAddress,
         uint64 version
     );
