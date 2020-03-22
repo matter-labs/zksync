@@ -32,7 +32,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         /// @dev Will be equal to zero in case of not active mode
         uint256 activationTime;
 
-        /// @notice Next target
+        /// @notice Address of the next version of the contract to be upgraded
         /// @dev Will store zero in case of not active upgrade mode
         address nextTarget;
 
