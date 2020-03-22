@@ -24,7 +24,7 @@ describe("Proxy unit tests", function () {
         expect((await getCallRevertReason( () => testContract_with_wallet2_signer.upgradeTarget(AddressZero, []) )).revertReason).equal("oro11")
     });
 
-    it("check Proxy reverts", async () => {
+    it("checking Proxy reverts", async () => {
         expect((await getCallRevertReason( () => proxyTestContract.initialize([]) )).revertReason).equal("ini11")
         expect((await getCallRevertReason( () => proxyTestContract.upgradeTarget(proxyTestContract.address, []) )).revertReason).equal("ufu11")
     });
