@@ -7,7 +7,7 @@
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
             <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">ZK Sync Wallet</b-nav-item>
-            <b-nav-item v-bind:href="`${blockchain_explorer_address}/${store.config.CONTRACT_ADDR}`" target="_blank" rel="noopener noreferrer">
+            <b-nav-item v-bind:href="`${blockchainExplorerAddress}/${contractAddress}`" target="_blank" rel="noopener noreferrer">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
         </b-navbar-nav>
@@ -55,7 +55,7 @@
 
 <script>
 import config from './env-config';
-import constants from './constants';
+import * as constants from './constants';
 import store from './store';
 import { Client, clientPromise } from './Client';
 import ClosableJumbotron from './ClosableJumbotron.vue';
@@ -73,7 +73,10 @@ function formatTime(timeStr) {
 
 export default {
     name: 'home',
-    created() {
+    async created() {
+        const client = await clientPromise;
+        const { contractAddress } = await client.testnetConfig();
+        this.contractAddress = contractAddress;
         this.update();
     },
     timers: {
@@ -86,11 +89,12 @@ export default {
             totalTransactions:  0,
             currentPage:        this.$route.query.page || 1,
             
-            txPerBlock:         config.TX_BATCH_SIZE,
+            txPerBlock:         constants.TX_BATCH_SIZE,
             blocks:             [],
             ready:              false,
 
             loading:            true,
+            contractAddress:    null,
 
             breadcrumbs: [
                 {

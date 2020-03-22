@@ -1,13 +1,12 @@
 import config from './env-config';
-import constants from './constants';
+import * as constants from './constants';
 import { readableEther } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
 const zksync = require('zksync');   
-const ethers = require('ethers');
 import axios from 'axios';
 
 async function fetch(req) {
-    let r = await axios(req).catch(_ => ({}));
+    let r = await axios(req).catch(() => ({}));
     if (r.status == 200) {
         return r.data;
     } else {
@@ -48,6 +47,13 @@ export class Client {
         };
 
         return new Client(props);
+    }
+
+    async testnetConfig() {
+        return fetch({
+            method:     'get',
+            url:        `${baseUrl()}/testnet_config`,
+        });
     }
 
     async status() {
@@ -134,13 +140,17 @@ export class Client {
             console.log(address);
             return [];
         }
-        let transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
-        let res = transactions.map(async (tx, index) => {
-            let elem_id      = `history_${index}`;
-            let type         = tx.tx.type || '';
-            let hash         = tx.hash;
-            let direction    = 
-                (type == 'Deposit') || (type == 'Transfer' && tx.tx.to == address)
+        const transactions = await this.blockExplorerClient.getAccountTransactions(address, offset, limit);
+        const res = transactions.map(async (tx, index) => {
+            const elem_id      = `history_${index}`;
+            const type         = tx.tx.type || '';
+            const hash         = tx.hash;
+
+            const receiver_address = type == 'Deposit'
+                ? tx.tx.priority_op.to
+                : tx.tx.to;
+
+            const direction = receiver_address == address
                 ? 'incoming' 
                 : 'outcoming';
 
@@ -151,7 +161,7 @@ export class Client {
             // pub commited: bool,
             // pub verified: bool,
 
-            let status
+            const status
                 = tx.verified            ? `<span style="color: green">(verified)</span>`
                 : tx.success == null     ? `<span style="color: grey">(pending)</span>`
                 : tx.success == true     ? `<span style="color: grey">(succeeded)</span>`
@@ -159,59 +169,42 @@ export class Client {
                 : tx.fail_reason != null ? `<span style="color: red">(failed)</span>`
                 : `<span style="color: red">(Unknown status)</span>`;
 
-            let row_status
+            const row_status
                 = tx.verified     ? `<span style="color: green">Verified</span>`
                 : tx.commited     ? `<span style="color: grey">Committed</span>`
                 : tx.fail_reason  ? `<span style="color: red">Failed with ${tx.fail_reason}</span>`
                 : `<span style="color: red">(Unknown status)</span>`;
 
             // here is common data to all tx types
-            let data = {
+            const data = {
                 elem_id,
                 type, direction,
                 status, row_status,
+                hash,
             };
 
             switch (true) {
                 case type == 'Deposit': {
-                    let token = await this.tokenNameFromId(tx.tx.priority_op.token);
-                    let amount = readableEther(tx.tx.priority_op.amount);
+                    const token = await this.tokenNameFromId(tx.tx.priority_op.token);
+                    const amount = readableEther(tx.tx.priority_op.amount);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
                             { key: 'row_status',  label: 'Status' },
                             { key: 'pq_id',       label: 'Priority op' },
                         ],
-                        data: Object.assign(data, {
-                            from: tx.tx.priority_op.sender,
-                            to: tx.tx.priority_op.account,
+                        data: {
+                            ...data,
+                            from: tx.tx.priority_op.from,
+                            to: tx.tx.priority_op.to,
                             pq_id: tx.pq_id,
                             token, amount,
-                            hash,
-                        }),
+                        },
                     };
                 }
-                case type == 'Transfer' && direction == 'incoming': {
-                    let token = await this.tokenNameFromId(tx.tx.token);
-                    let amount = readableEther(tx.tx.amount);
-                    return {
-                        fields: [
-                            { key: 'amount',      label: 'Amount' },
-                            { key: 'from',        label: 'From' },
-                            { key: 'row_status',  label: 'Status' },
-                            { key: 'hash',        label: 'Tx hash' },
-                        ],
-                        data: Object.assign(data, {
-                            from: tx.tx.from,
-                            to: tx.tx.to,
-                            token, amount,
-                            hash: tx.hash,
-                        }),                    
-                    };
-                }
-                case type == 'Transfer' && direction == 'outcoming': {
-                    let token = await this.tokenNameFromId(tx.tx.token);
-                    let amount = readableEther(tx.tx.amount);
+                case type == 'Transfer': {
+                    const token = await this.tokenNameFromId(tx.tx.token);
+                    const amount = readableEther(tx.tx.amount);
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
@@ -219,35 +212,36 @@ export class Client {
                             { key: 'row_status',  label: 'Status' },
                             { key: 'hash',        label: 'Tx hash' },
                         ],
-                        data: Object.assign(data, {
+                        data: {
+                            ...data,
                             from: tx.tx.from,
                             to: tx.tx.to,
                             token, amount,
-                            hash: tx.hash,
-                        }),
+                        },
                     };
                 }
                 case type == 'Withdraw': {
-                    let token = await this.tokenNameFromId(tx.tx.token);
-                    let amount = readableEther(tx.tx.amount);   
+                    const token = await this.tokenNameFromId(tx.tx.token);
+                    const amount = readableEther(tx.tx.amount);   
                     return {
                         fields: [
                             { key: 'amount',      label: 'Amount' },
                             { key: 'row_status',  label: 'Status' },
                             { key: 'hash',        label: 'Tx hash' },
                         ],
-                        data: Object.assign(data, {
-                            from: tx.tx.account,
-                            to: tx.tx.ethAddress,
+                        data: {
+                            ...data,
+                            from: tx.tx.from,
+                            to: tx.tx.to,
                             token, amount,
-                            hash: tx.hash,
-                        }),
+                        },
                     };
                 }
             }
         });
 
-        return await Promise.all(res);
+        const txs = await Promise.all(res);
+        return txs.filter(Boolean);
     }
 };
 

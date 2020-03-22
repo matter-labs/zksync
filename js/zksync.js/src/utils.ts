@@ -1,7 +1,13 @@
 import BN = require("bn.js");
-import {utils, constants, ethers} from "ethers";
-import {PubKeyHash, TokenAddress, TokenLike, Tokens, TokenSymbol} from "./types";
-import {serializeNonce} from "./signer";
+import { utils, constants, ethers } from "ethers";
+import {
+    PubKeyHash,
+    TokenAddress,
+    TokenLike,
+    Tokens,
+    TokenSymbol
+} from "./types";
+import { serializeNonce } from "./signer";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -9,13 +15,16 @@ export const IERC20_INTERFACE = new utils.Interface(
 export const SYNC_MAIN_CONTRACT_INTERFACE = new utils.Interface(
     require("../abi/SyncMain.json").interface
 );
-export const SYNC_PRIOR_QUEUE_INTERFACE = new utils.Interface(
-    require("../abi/SyncPriorityQueue.json").interface
-);
 
 export const SYNC_GOV_CONTRACT_INTERFACE = new utils.Interface(
     require("../abi/SyncGov.json").interface
 );
+
+export const MAX_ERC20_APPROVE_AMOUNT =
+    "115792089237316195423570985008687907853269984665640564039457584007913129639935"; // 2^256 - 1
+
+export const ERC20_APPROVE_TRESHOLD =
+    "57896044618658097711785492504343953926634992332820282019728792003956564819968"; // 2^255
 
 const AMOUNT_EXPONENT_BIT_WIDTH = 5;
 const AMOUNT_MANTISSA_BIT_WIDTH = 35;
@@ -211,6 +220,12 @@ export function closestPackableTransactionAmount(
     );
 }
 
+export function isTransactionAmountPackable(
+    amount: utils.BigNumberish
+): boolean {
+    return closestPackableTransactionAmount(amount).eq(amount);
+}
+
 /**
  * packs and unpacks the amount, returning the closest packed value.
  * e.g 1000000003 => 1000000000
@@ -229,6 +244,10 @@ export function closestPackableTransactionFee(
             10
         ).toString()
     );
+}
+
+export function isTransactionFeePackable(amount: utils.BigNumberish): boolean {
+    return closestPackableTransactionAmount(amount).eq(amount);
 }
 
 export function buffer2bitsLE(buff) {
@@ -305,8 +324,14 @@ export class TokenSet {
     }
 }
 
-export async function signChangePubkeyMessage(signer: ethers.Signer, pubKeyHash: PubKeyHash, nonce: number): Promise<string> {
-    const msgNonce = serializeNonce(nonce).toString("hex").toLowerCase();
+export async function signChangePubkeyMessage(
+    signer: ethers.Signer,
+    pubKeyHash: PubKeyHash,
+    nonce: number
+): Promise<string> {
+    const msgNonce = serializeNonce(nonce)
+        .toString("hex")
+        .toLowerCase();
     const message = `Register ZK Sync pubkey:\n\n${pubKeyHash.toLowerCase()} nonce: 0x${msgNonce}\n\nOnly sign this message for a trusted client!`;
     return signer.signMessage(message);
 }

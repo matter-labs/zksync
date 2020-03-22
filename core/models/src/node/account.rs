@@ -44,7 +44,7 @@ impl PubKeyHash {
     }
 
     pub fn from_hex(s: &str) -> Result<Self, failure::Error> {
-        ensure!(s.starts_with("sync:"), "Address should start with sync:");
+        ensure!(s.starts_with("sync:"), "PubKeyHash should start with sync:");
         let bytes = hex::decode(&s[5..])?;
         Self::from_bytes(&bytes)
     }

@@ -98,11 +98,11 @@ export default {
                 // { name: 'Transactions',     value: client.TX_PER_BLOCK(), },
                 { name: 'Status',           value: this.status, },
                 { name: 'Commit tx hash',   value: this.commit_tx_hash
-                    ? `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.commit_tx_hash}">${this.commit_tx_hash} <span class="onchain_icon">onchain</span></a></code>`
+                    ? `<code><a target="blanc" href="${this.blockchainExplorerTx}/${this.commit_tx_hash}">${this.commit_tx_hash} <span class="onchain_icon">onchain</span></a></code>`
                     : `<b>Not yet sent on the chain.</b>` },
                 { name: 'Committed at',     value: formatDate(this.committed_at)},
                 { name: 'Verify tx hash',   value: this.verify_tx_hash
-                    ? `<code><a target="blanc" href="${this.blockchain_explorer_tx}/${this.verify_tx_hash}">${this.verify_tx_hash} <span class="onchain_icon">onchain</span></a></code>`
+                    ? `<code><a target="blanc" href="${this.blockchainExplorerTx}/${this.verify_tx_hash}">${this.verify_tx_hash} <span class="onchain_icon">onchain</span></a></code>`
                     : `<b>Not yet sent on the chain.</b>` },
                 { name: 'Verified at',      value: formatDate(this.verified_at)},
             ];
@@ -146,7 +146,7 @@ export default {
                     case "Deposit":
                         from               = shortenHash(tx.priority_op.data.from, 'unknown sender');
                         to                 = shortenHash(tx.priority_op.data.to, 'unknown account');
-                        from_explorer_link = `${this.blockchain_explorer_address}/${tx.priority_op.data.from}`;
+                        from_explorer_link = `${this.blockchainExplorerAddress}/${tx.priority_op.data.from}`;
                         to_explorer_link   = `${this.routerBase}accounts/${tx.priority_op.data.to}`;
                         from_onchain_icon  = `<span class="onchain_icon">onchain</span>`;
                         to_onchain_icon    = '';
@@ -182,7 +182,7 @@ export default {
                         from               = shortenHash(tx.tx.from, 'unknown account');
                         to                 = shortenHash(tx.tx.to, 'unknown ethAddress');
                         from_explorer_link = `${this.routerBase}accounts/${tx.tx.from}`;
-                        to_explorer_link   = `${this.blockchain_explorer_address}/${tx.tx.to}`;
+                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.tx.to}`;
                         from_onchain_icon  = '';
                         to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
                         token              = tx.tx.token;
@@ -194,7 +194,7 @@ export default {
                         from               = shortenHash(tx.priority_op.data.eth_address, 'unknown account address');
                         to                 = shortenHash(tx.priority_op.data.eth_address, 'unknown account address');
                         from_explorer_link = `${this.routerBase}accounts/${tx.priority_op.data.eth_address}`;
-                        to_explorer_link   = `${this.blockchain_explorer_address}/${tx.priority_op.data.eth_address}`;
+                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.priority_op.data.eth_address}`;
                         from_onchain_icon  = '<span class="onchain_icon">onchain</span>';
                         to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
                         token              = tx.priority_op.data.token;

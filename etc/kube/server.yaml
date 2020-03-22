@@ -2,6 +2,7 @@ apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: api-ingress
+  namespace: ${ZKSYNC_ENV}
 spec:
   rules:
   - http:
@@ -24,6 +25,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ${ZKSYNC_ENV}-nginx
+  namespace: ${ZKSYNC_ENV}
   labels:
     app: ${ZKSYNC_ENV}-nginx
 spec:
@@ -40,6 +42,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: ${ZKSYNC_ENV}-server
+  namespace: ${ZKSYNC_ENV}
   labels:
     app: ${ZKSYNC_ENV}-server
 spec:
@@ -68,6 +71,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ${ZKSYNC_ENV}-nginx
+  namespace: ${ZKSYNC_ENV}
 spec:
   replicas: 1
   selector:
@@ -89,6 +93,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: ${ZKSYNC_ENV}-server
+  namespace: ${ZKSYNC_ENV}
 spec:
   strategy:
     type: Recreate
@@ -107,6 +112,7 @@ spec:
         - name: server
           image: matterlabs/server:${IMAGE_TAG}
           imagePullPolicy: Always
+          resources: ${SERVER_CONTAINER_RESOURCES}
           ports:
             - containerPort: 3000
             - containerPort: 3030
@@ -118,11 +124,3 @@ spec:
           env:
           - name: ZKSYNC_ENV
             value: "${ZKSYNC_ENV}"
-          - name: NODE_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: spec.nodeName
-          - name: POD_NAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name

@@ -28,7 +28,7 @@ use storage::ConnectionPool;
 use tokio::runtime::Runtime;
 use web3::types::Address;
 
-#[derive(Debug, Serialize, Deserialize, Fail)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Fail)]
 pub enum TxAddError {
     #[fail(display = "Tx nonce is too low.")]
     NonceMismatch,
@@ -91,6 +91,8 @@ impl MempoolState {
     fn restore_from_db(db_pool: &ConnectionPool) -> Self {
         let storage = db_pool.access_storage().expect("mempool db restore");
         let (_, accounts) = storage
+            .chain()
+            .state_schema()
             .load_committed_state(None)
             .expect("mempool account state load");
 
