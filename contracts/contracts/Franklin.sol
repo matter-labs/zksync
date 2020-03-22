@@ -55,7 +55,7 @@ contract Franklin is Storage, Config, Events {
         return firstPriorityRequestId + totalOpenPriorityRequests;
     }
 
-    function verifiedPriorityOperations() public view returns (uint64) {
+    function totalVerifiedPriorityOperations() public view returns (uint64) {
         return firstPriorityRequestId;
     }
 

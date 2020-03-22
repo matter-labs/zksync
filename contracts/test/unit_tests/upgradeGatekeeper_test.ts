@@ -30,9 +30,8 @@ describe("UpgradeGatekeeper unit tests", function () {
             gasLimit: 6000000,
         })
         proxyTestContract.transferMastership(UpgradeGatekeeperContract.address);
-    });
 
-    it("check initial dummy index and storage", async () => {
+        // check initial dummy index and storage
         expect(await proxyDummyInterface.get_DUMMY_INDEX())
             .to.equal(1);
 
@@ -49,7 +48,7 @@ describe("UpgradeGatekeeper unit tests", function () {
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.finishProxyUpgrade(AddressZero, []) )).revertReason).equal("oro11")
     });
 
-    it("check UpgradeGatekeeper reverts; activate and cancel upgrade", async () => {
+    it("checking UpgradeGatekeeper reverts; activation and cancelation upgrade", async () => {
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.cancelProxyUpgrade(proxyTestContract.address) )).revertReason).equal("umc11")
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.activateCleaningUpStatusOfUpgrade(proxyTestContract.address) )).revertReason).equal("uaf11")
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishProxyUpgrade(proxyTestContract.address, []) )).revertReason).equal("umf11")
@@ -124,6 +123,14 @@ describe("UpgradeGatekeeper unit tests", function () {
         await expect(UpgradeGatekeeperContract.cancelProxyUpgrade(proxyTestContract.address))
             .to.emit(UpgradeGatekeeperContract, 'UpgradeCanceled')
             .withArgs(proxyTestContract.address, 1);
+    });
+
+    it("checking the presence in the main contract functions that will be called from the gatekeeper", async () => {
+        let mainContract = await deployContract(wallet, require('../../build/Franklin'), [], {
+            gasLimit: 6000000,
+        });
+        await mainContract.totalRegisteredPriorityOperations();
+        await mainContract.totalVerifiedPriorityOperations();
     });
 
 });
