@@ -28,7 +28,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     struct UpgradeInfo {
         UpgradeStatus upgradeStatus;
 
-        /// @notice Time of activating notice period
+        /// @notice Notice period activation timestamp (in seconds)
         /// @dev Will be equal to zero in case of not active mode
         uint256 activationTime;
 
