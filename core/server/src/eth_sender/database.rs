@@ -47,6 +47,7 @@ impl DatabaseAccess for Database {
             .expect("Failed to access storage");
 
         let unconfirmed_ops = storage
+            .ethereum_schema()
             .load_unconfirmed_operations()?
             .into_iter()
             .map(|(operation, txs)| OperationETHState {
@@ -59,7 +60,7 @@ impl DatabaseAccess for Database {
 
     fn save_unconfirmed_operation(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
-        Ok(storage.save_operation_eth_tx(
+        Ok(storage.ethereum_schema().save_operation_eth_tx(
             tx.op_id,
             tx.signed_tx.hash,
             tx.deadline_block,
@@ -71,6 +72,6 @@ impl DatabaseAccess for Database {
 
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
-        Ok(storage.confirm_eth_tx(hash)?)
+        Ok(storage.ethereum_schema().confirm_eth_tx(hash)?)
     }
 }

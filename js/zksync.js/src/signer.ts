@@ -6,7 +6,7 @@ import {
     serializePointPacked,
     signTransactionBytes
 } from "./crypto";
-import {ethers, utils} from "ethers";
+import { ethers, utils } from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
 import BN = require("bn.js");
 import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw } from "./types";
@@ -112,14 +112,18 @@ export class Signer {
     }
 
     static async fromETHSignature(ethSigner: ethers.Signer): Promise<Signer> {
-        const sign = await ethSigner.signMessage("Access ZK Sync account.\n" + "\n" + "Only sign this message for a trusted client!");
+        const sign = await ethSigner.signMessage(
+            "Access ZK Sync account.\n" +
+                "\n" +
+                "Only sign this message for a trusted client!"
+        );
         const seed = Buffer.from(sign.substr(2), "hex");
-        return  Signer.fromSeed(seed);
+        return Signer.fromSeed(seed);
     }
 }
 
-// Sync or eth address
-export function serializeAddress(address: Address | string): Buffer {
+// PubKeyHash or eth address
+export function serializeAddress(address: Address | PubKeyHash): Buffer {
     const prefixlessAddress = address.startsWith("0x")
         ? address.substr(2)
         : address.startsWith("sync:")
@@ -128,7 +132,7 @@ export function serializeAddress(address: Address | string): Buffer {
 
     if (prefixlessAddress === null) {
         throw new Error(
-            "ETH address must start with '0x' and Sync address start with 'sync:'"
+            "ETH address must start with '0x' and PubKeyHash must start with 'sync:'"
         );
     }
 

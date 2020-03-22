@@ -8,7 +8,7 @@ interface DummyTarget {
 
     function verifiedPriorityOperations() external returns (uint64);
 
-    function registeredPriorityOperations() external returns (uint64);
+    function totalRegisteredPriorityOperations() external returns (uint64);
 
     function verifyPriorityOperation() external;
 
@@ -36,7 +36,7 @@ contract DummyFirst is DummyTarget {
         return _verifiedPriorityOperations;
     }
 
-    function registeredPriorityOperations() external returns (uint64){
+    function totalRegisteredPriorityOperations() external returns (uint64){
         return 1;
     }
 
@@ -68,7 +68,7 @@ contract DummySecond is DummyTarget {
         return _verifiedPriorityOperations;
     }
 
-    function registeredPriorityOperations() external returns (uint64){
+    function totalRegisteredPriorityOperations() external returns (uint64){
         return 0;
     }
 

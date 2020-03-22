@@ -7,6 +7,7 @@ pub mod abi;
 pub mod circuit;
 pub mod config_options;
 pub mod merkle_tree;
+pub mod misc;
 pub mod node;
 pub mod params;
 pub mod primitives;

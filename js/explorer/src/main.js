@@ -50,12 +50,12 @@ Vue.mixin({
         },
     },
     computed: {
-        blockchain_explorer_tx() {
+        blockchainExplorerTx() {
             return this.store.network === 'localhost' ? 'http://localhost:8000'
                  : this.store.network === 'mainnet'   ? `https://etherscan.io/tx`
                  : `https://${this.store.network}.etherscan.io/tx`;
         },
-        blockchain_explorer_address() {
+        blockchainExplorerAddress() {
             return this.store.network === 'localhost' ? 'http://localhost:8000'
                  : this.store.network === 'mainnet'   ? `https://etherscan.io/address`
                  : `https://${this.store.network}.etherscan.io/address`;

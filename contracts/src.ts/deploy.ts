@@ -223,13 +223,9 @@ export class Deployer {
         );
         this.addresses.UpgradeGatekeeper = contract.address;
 
-        let transferMastershipTransaction;
-        transferMastershipTransaction = await this.getDeployedContract('Governance').transferMastership(contract.address);
-        await transferMastershipTransaction.wait();
-        transferMastershipTransaction = await this.getDeployedContract('Verifier').transferMastership(contract.address);
-        await transferMastershipTransaction.wait();
-        transferMastershipTransaction = await this.getDeployedContract('Franklin').transferMastership(contract.address);
-        await transferMastershipTransaction.wait();
+        await (await this.getDeployedContract('Governance').transferMastership(contract.address)).wait();
+        await (await this.getDeployedContract('Verifier').transferMastership(contract.address)).wait();
+        await (await this.getDeployedContract('Franklin').transferMastership(contract.address)).wait();
 
         return contract;
     }

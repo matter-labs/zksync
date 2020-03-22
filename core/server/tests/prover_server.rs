@@ -53,10 +53,12 @@ fn api_client_register_start_and_stop_of_prover() {
         .expect("failed to register");
     let storage = access_storage();
     storage
+        .prover_schema()
         .prover_by_id(id)
         .expect("failed to select registered prover");
     client.prover_stopped(id).expect("unexpected error");
     let prover = storage
+        .prover_schema()
         .prover_by_id(id)
         .expect("failed to select registered prover");
     prover.stopped_at.expect("expected not empty");
@@ -91,7 +93,9 @@ fn api_client_simple_simulation() {
     println!("inserting test operation");
     // write test commit operation to db
     storage
-        .execute_operation(&op)
+        .chain()
+        .block_schema()
+        .execute_operation(op)
         .expect("failed to mock commit operation");
 
     thread::sleep(time::Duration::from_secs(10));
@@ -183,6 +187,8 @@ pub fn test_operation_and_wanted_prover_data(
     accounts_updated.append(&mut op_success.updates);
 
     storage
+        .chain()
+        .state_schema()
         .commit_state_update(
             0,
             &[(
@@ -194,7 +200,11 @@ pub fn test_operation_and_wanted_prover_data(
             )],
         )
         .unwrap();
-    storage.apply_state_update(0).unwrap();
+    storage
+        .chain()
+        .state_schema()
+        .apply_state_update(0)
+        .unwrap();
 
     ops.push(models::node::ExecutedOperations::PriorityOp(Box::new(
         models::node::ExecutedPriorityOp {

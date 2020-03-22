@@ -3,6 +3,8 @@ import BN = require("bn.js");
 import {
     closestPackableTransactionAmount,
     closestPackableTransactionFee,
+    isTransactionAmountPackable,
+    isTransactionFeePackable,
     TokenSet
 } from "../src/utils";
 import { pedersenHash } from "../src/crypto";
@@ -23,8 +25,16 @@ describe("Packing and unpacking", function() {
                 closestPackableTransactionFee(bigNumberAmount).toString()
             ).equal(bigNumberAmount.toString(), "fee packing");
             expect(
+                isTransactionAmountPackable(bigNumberAmount),
+                "check amount pack"
+            ).eq(true);
+            expect(
                 closestPackableTransactionAmount(bigNumberAmount).toString()
             ).equal(bigNumberAmount.toString(), "amount packing");
+            expect(
+                isTransactionFeePackable(bigNumberAmount),
+                "check fee pack"
+            ).eq(true);
         }
     });
 });

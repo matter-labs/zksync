@@ -51,7 +51,7 @@ contract Franklin is Storage, Config, Events {
         blocks[0].stateRoot = _genesisRoot;
     }
 
-    function registeredPriorityOperations() public view returns (uint64) {
+    function totalRegisteredPriorityOperations() public view returns (uint64) {
         return firstPriorityRequestId + totalOpenPriorityRequests;
     }
 

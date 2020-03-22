@@ -223,11 +223,11 @@ apply-kubeconfig:
 	@bin/k8s-apply
 
 update-rust: push-image-rust apply-kubeconfig
-	@kubectl patch deployment $(ZKSYNC_ENV)-server -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@kubectl patch deployment $(ZKSYNC_ENV)-server  --namespace $(ZKSYNC_ENV) -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 	@bin/provers-patch-deployments
 
 update-nginx: push-image-nginx apply-kubeconfig
-	@kubectl patch deployment $(ZKSYNC_ENV)-nginx -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+	@kubectl patch deployment $(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
 update-all: update-rust update-nginx apply-kubeconfig
 
@@ -253,19 +253,19 @@ start-provers:
 	@bin/provers-scale 1
 
 start-nginx:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --replicas=1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-server:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=1
 
 stop-provers:
 	@bin/provers-scale 0
 
 stop-server:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --replicas=0
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-nginx:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --replicas=0
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=0
 
 # Monitoring
 
@@ -273,15 +273,15 @@ status:
 	@curl $(API_SERVER)/api/v0.1/status; echo
 
 log-server:
-	kubectl logs -f deployments/$(ZKSYNC_ENV)-server
+	kubectl logs -f deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV)
 
 log-prover:
-	kubectl logs --tail 300 -f deployments/$(ZKSYNC_ENV)-prover
+	kubectl logs --tail 300 -f deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV)
 
 # Kubernetes: monitoring shortcuts
 
 pods:
-	kubectl get pods -o wide | grep -v Pending
+	kubectl get pods -o wide --namespace $(ZKSYNC_ENV) | grep -v Pending
 
 nodes:
 	kubectl get nodes -o wide
