@@ -12,7 +12,6 @@ crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
 eth_client = { path = "../eth_client", version = "0.1.0"  }
 
-hex = "0.4.2"
 tokio = { version = "0.2", features = ["full"] }
 futures = { version = "0.3", features = ["compat"] }
 log = "0.4"
