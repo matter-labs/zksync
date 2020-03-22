@@ -51,20 +51,14 @@ async function main() {
 
     let notice_period = parseInt(await upgradeGatekeeper.get_NOTICE_PERIOD());
 
-    const upgradeProxyTransaction = await upgradeGatekeeper.upgradeProxy(proxyContract.address, newTarget.address);
-    await upgradeProxyTransaction.wait();
-    let upgrade_start_time = performance.now();
+    await (await upgradeGatekeeper.upgradeProxy(proxyContract.address, newTarget.address)).wait();
 
     // wait notice period
-    while ((performance.now() - upgrade_start_time) < notice_period * 1000 + 10) {
-
-    }
+    await new Promise(r => setTimeout(r, notice_period * 1000 + 10));
 
     // finish upgrade
-    const finalizeStatusActivationTransaction = await upgradeGatekeeper.activeFinalizeStatusOfUpgrade(proxyContract.address);
-    await finalizeStatusActivationTransaction.wait();
-    const finishProxyUpgradeTransaction = await upgradeGatekeeper.finishProxyUpgrade(proxyContract.address, []);
-    await finishProxyUpgradeTransaction.wait();
+    await (await upgradeGatekeeper.activateCleaningUpStatusOfUpgrade(proxyContract.address)).wait();
+    await (await upgradeGatekeeper.finishProxyUpgrade(proxyContract.address, [])).wait();
 
     await expect(await proxyContract.getTarget())
         .to.equal(newTarget.address);
