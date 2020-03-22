@@ -92,8 +92,8 @@ pub fn deploy_test_contracts() -> Contracts {
 pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_address: Address) {
     let result = Command::new("sh")
         .arg("test-upgrade-franklin.sh")
-        .arg(String::from("0x") + &hex::encode(franklin_address.as_bytes()))
-        .arg(String::from("0x") + &hex::encode(upgrade_gatekeeper_address.as_bytes()))
+        .arg(format!("0x{:x}", franklin_address))
+        .arg(format!("0x{:x}", upgrade_gatekeeper_address))
         .output()
         .expect("failed to execute test upgrade franklin script");
     if !result.status.success() {
