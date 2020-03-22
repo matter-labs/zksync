@@ -6,7 +6,7 @@ interface DummyTarget {
 
     function initialize(bytes calldata initializationParameters) external;
 
-    function verifiedPriorityOperations() external returns (uint64);
+    function totalVerifiedPriorityOperations() external returns (uint64);
 
     function totalRegisteredPriorityOperations() external returns (uint64);
 
@@ -32,7 +32,7 @@ contract DummyFirst is DummyTarget {
         }
     }
 
-    function verifiedPriorityOperations() external returns (uint64){
+    function totalVerifiedPriorityOperations() external returns (uint64){
         return _verifiedPriorityOperations;
     }
 
@@ -64,7 +64,7 @@ contract DummySecond is DummyTarget {
         }
     }
 
-    function verifiedPriorityOperations() external returns (uint64){
+    function totalVerifiedPriorityOperations() external returns (uint64){
         return _verifiedPriorityOperations;
     }
 

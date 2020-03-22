@@ -115,12 +115,12 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.CleaningUp, "umf11"); // umf11 - unable to finish upgrade without cleaning up status active
 
         (bool mainContractCallSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
-            abi.encodeWithSignature("verifiedPriorityOperations()")
+            abi.encodeWithSignature("totalVerifiedPriorityOperations()")
         );
         require(mainContractCallSuccess, "umf12"); // umf12 - main contract static call failed
-        uint64 verifiedPriorityOperations = abi.decode(encodedResult, (uint64));
+        uint64 totalVerifiedPriorityOperations = abi.decode(encodedResult, (uint64));
 
-        require(verifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade, "umf13"); // umf13 - can't finish upgrade before verifing all priority operations received before start of cleaning up status
+        require(totalVerifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade, "umf13"); // umf13 - can't finish upgrade before verifing all priority operations received before start of cleaning up status
 
         (bool proxyUpgradeCallSuccess, ) = proxyAddress.call(
             abi.encodeWithSignature("upgradeTarget(address,bytes)", upgradeInfo[proxyAddress].nextTarget, newTargetInitializationParameters)
