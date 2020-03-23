@@ -36,7 +36,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         /// @dev Will store zero in case of not active upgrade mode
         address nextTarget;
 
-        /// @notice Number of priority operations that must be verified at the time of finishing upgrade
+        /// @notice Number of priority operations that must be verified by main contract at the time of finishing upgrade
         /// @dev Will store zero in case of not active cleaning up status of upgrade mode
         uint64 priorityOperationsToProcessBeforeUpgrade;
     }
