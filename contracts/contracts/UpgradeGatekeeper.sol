@@ -51,10 +51,10 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         mainContractAddress = _mainContractAddress;
     }
 
-    /// @notice Activates notice period
+    /// @notice Starts upgrade (activates notice period)
     /// @param proxyAddress Address of proxy to process
     /// @param newTarget New target
-    function upgradeProxy(address proxyAddress, address newTarget) external {
+    function startProxyUpgrade(address proxyAddress, address newTarget) external {
         requireMaster(msg.sender);
         require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Idle, "upa11"); // upa11 - unable to activate active upgrade mode
 
