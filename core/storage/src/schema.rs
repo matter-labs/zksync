@@ -92,13 +92,21 @@ table! {
 table! {
     eth_operations (id) {
         id -> Int8,
-        op_id -> Int8,
         nonce -> Int8,
         deadline_block -> Int8,
-        gas_price -> Numeric,
         tx_hash -> Bytea,
         confirmed -> Bool,
         raw_tx -> Bytea,
+        op_type -> Text,
+        last_used_gas_price -> Numeric,
+    }
+}
+
+table! {
+    eth_ops_binding (id) {
+        id -> Int8,
+        op_id -> Int8,
+        eth_op_id -> Int8,
     }
 }
 
@@ -225,7 +233,8 @@ table! {
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
-joinable!(eth_operations -> operations (op_id));
+joinable!(eth_ops_binding -> eth_operations (eth_op_id));
+joinable!(eth_ops_binding -> operations (op_id));
 joinable!(executed_transactions -> mempool (tx_hash));
 
 allow_tables_to_appear_in_same_query!(
@@ -239,6 +248,7 @@ allow_tables_to_appear_in_same_query!(
     data_restore_last_watched_eth_block,
     eth_nonce,
     eth_operations,
+    eth_ops_binding,
     eth_stats,
     events_state,
     executed_priority_operations,

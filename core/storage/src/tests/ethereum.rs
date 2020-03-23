@@ -35,6 +35,7 @@ pub fn get_operation(block_number: BlockNumber) -> Operation {
 /// Parameters for `EthereumSchema::save_operation_eth_tx` method.
 #[derive(Debug)]
 pub struct EthereumTxParams {
+    op_type: String,
     op_id: i64,
     hash: H256,
     deadline_block: u64,
@@ -44,8 +45,9 @@ pub struct EthereumTxParams {
 }
 
 impl EthereumTxParams {
-    pub fn new(op_id: i64, nonce: u32) -> Self {
+    pub fn new(op_type: String, op_id: i64, nonce: u32) -> Self {
         Self {
+            op_type,
             op_id,
             hash: H256::from_low_u64_ne(op_id as u64),
             deadline_block: 100,
@@ -58,10 +60,10 @@ impl EthereumTxParams {
     pub fn to_eth_op(&self, db_id: i64) -> StorageETHOperation {
         StorageETHOperation {
             id: db_id,
-            op_id: self.op_id,
+            op_type: self.op_type.clone(),
             nonce: self.nonce as i64,
             deadline_block: self.deadline_block as i64,
-            gas_price: self.gas_price.clone(),
+            last_used_gas_price: self.gas_price.clone(),
             tx_hash: self.hash.as_bytes().to_vec(),
             confirmed: false,
             raw_tx: self.raw_tx.clone(),
@@ -95,6 +97,8 @@ fn ethereum_empty_load() {
 fn ethereum_storage() {
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
+        EthereumSchema(&conn).initialize_eth_data()?;
+
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
         assert!(unconfirmed_operations.is_empty());
 
@@ -103,9 +107,10 @@ fn ethereum_storage() {
         let operation = BlockSchema(&conn).execute_operation(get_operation(block_number))?;
 
         // Store the Ethereum transaction.
-        let params = EthereumTxParams::new(operation.id.unwrap(), 1);
-        EthereumSchema(&conn).save_operation_eth_tx(
-            params.op_id,
+        let params = EthereumTxParams::new("commit".into(), operation.id.unwrap(), 1);
+        EthereumSchema(&conn).save_new_eth_tx(
+            OperationType::Commit,
+            Some(params.op_id),
             params.hash,
             params.deadline_block,
             params.nonce,
@@ -115,16 +120,24 @@ fn ethereum_storage() {
 
         // Check that it can be loaded.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
-        assert_eq!(unconfirmed_operations[0].0.id, operation.id);
-        assert_eq!(unconfirmed_operations[0].1.len(), 1);
+        let eth_op = unconfirmed_operations[0].0.clone();
+        let op = unconfirmed_operations[0]
+            .1
+            .clone()
+            .expect("No Operation entry");
+        assert_eq!(op.id, operation.id);
         // Load the database ID, since we can't predict it for sure.
-        let db_id = unconfirmed_operations[0].1[0].id;
-        assert_eq!(unconfirmed_operations[0].1, vec![params.to_eth_op(db_id)]);
+        assert_eq!(eth_op, params.to_eth_op(eth_op.id));
+
+        // Store operation with ID 2.
+        let block_number = 2;
+        let operation_2 = BlockSchema(&conn).execute_operation(get_operation(block_number))?;
 
         // Create one more Ethereum transaction.
-        let params_2 = EthereumTxParams::new(operation.id.unwrap(), 2);
-        EthereumSchema(&conn).save_operation_eth_tx(
-            params_2.op_id,
+        let params_2 = EthereumTxParams::new("commit".into(), operation_2.id.unwrap(), 2);
+        EthereumSchema(&conn).save_new_eth_tx(
+            OperationType::Commit,
+            Some(params_2.op_id),
             params_2.hash,
             params_2.deadline_block,
             params_2.nonce,
@@ -134,20 +147,28 @@ fn ethereum_storage() {
 
         // Check that we now can load two operations.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
-        assert_eq!(unconfirmed_operations[0].0.id, operation.id);
-        assert_eq!(unconfirmed_operations[0].1.len(), 2);
-        let db_id_2 = unconfirmed_operations[0].1[1].id;
-        assert_eq!(
-            unconfirmed_operations[0].1,
-            vec![params.to_eth_op(db_id), params_2.to_eth_op(db_id_2)]
-        );
+        assert_eq!(unconfirmed_operations.len(), 2);
+        let eth_op = unconfirmed_operations[1].0.clone();
+        let op = unconfirmed_operations[1]
+            .1
+            .clone()
+            .expect("No Operation entry");
+        assert_eq!(op.id, operation_2.id);
+        assert_eq!(eth_op, params_2.to_eth_op(eth_op.id));
 
         // Make the transaction as completed.
         EthereumSchema(&conn).confirm_eth_tx(&params_2.hash)?;
 
-        // Now there should be no unconfirmed transactions.
+        // Now there should be only one unconfirmed operation.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
-        assert!(unconfirmed_operations.is_empty());
+        assert_eq!(unconfirmed_operations.len(), 1);
+
+        // Check that stats are updated as well.
+        let updated_stats = EthereumSchema(&conn).load_stats()?;
+
+        assert_eq!(updated_stats.commit_ops, 2);
+        assert_eq!(updated_stats.verify_ops, 0);
+        assert_eq!(updated_stats.withdraw_ops, 0);
 
         Ok(())
     });
@@ -166,42 +187,6 @@ fn eth_nonce() {
 
             assert_eq!(actual_next_nonce, expected_next_nonce);
         }
-
-        Ok(())
-    });
-}
-
-/// Checks that Ethereum stats are incremented as expected.
-#[test]
-#[cfg_attr(not(feature = "db_test"), ignore)]
-fn eth_stats() {
-    let conn = StorageProcessor::establish_connection().unwrap();
-    db_test(conn.conn(), || {
-        EthereumSchema(&conn).initialize_eth_data()?;
-
-        let initial_stats = EthereumSchema(&conn).load_stats()?;
-
-        assert_eq!(initial_stats.commit_ops, 0);
-        assert_eq!(initial_stats.verify_ops, 0);
-        assert_eq!(initial_stats.withdraw_ops, 0);
-
-        let ops_to_add = vec![
-            (OperationType::Commit, 5),
-            (OperationType::Verify, 3),
-            (OperationType::Withdraw, 2),
-        ];
-
-        for (op, count) in ops_to_add.iter() {
-            for _ in 0..*count {
-                EthereumSchema(&conn).report_created_operation(*op)?;
-            }
-        }
-
-        let updated_stats = EthereumSchema(&conn).load_stats()?;
-
-        assert_eq!(updated_stats.commit_ops, ops_to_add[0].1);
-        assert_eq!(updated_stats.verify_ops, ops_to_add[1].1);
-        assert_eq!(updated_stats.withdraw_ops, ops_to_add[2].1);
 
         Ok(())
     });

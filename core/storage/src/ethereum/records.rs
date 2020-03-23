@@ -8,24 +8,39 @@ use crate::schema::*;
 #[table_name = "eth_operations"]
 pub struct StorageETHOperation {
     pub id: i64,
-    pub op_id: i64,
     pub nonce: i64,
     pub deadline_block: i64,
-    pub gas_price: BigDecimal,
     pub tx_hash: Vec<u8>,
     pub confirmed: bool,
     pub raw_tx: Vec<u8>,
+    pub op_type: String,
+    pub last_used_gas_price: BigDecimal,
 }
 
 #[derive(Debug, Insertable, PartialEq)]
 #[table_name = "eth_operations"]
 pub struct NewETHOperation {
-    pub op_id: i64,
     pub nonce: i64,
     pub deadline_block: i64,
-    pub gas_price: BigDecimal,
     pub tx_hash: Vec<u8>,
     pub raw_tx: Vec<u8>,
+    pub op_type: String,
+    pub last_used_gas_price: BigDecimal,
+}
+
+#[derive(Debug, Insertable, PartialEq)]
+#[table_name = "eth_ops_binding"]
+pub struct NewETHBinding {
+    pub op_id: i64,
+    pub eth_op_id: i64,
+}
+
+#[derive(Debug, Queryable, QueryableByName, PartialEq)]
+#[table_name = "eth_ops_binding"]
+pub struct ETHBinding {
+    pub id: i64,
+    pub op_id: i64,
+    pub eth_op_id: i64,
 }
 
 #[derive(Debug, Queryable, QueryableByName, PartialEq)]

@@ -3,12 +3,13 @@
 use bigdecimal::BigDecimal;
 use diesel::dsl::{insert_into, update};
 use diesel::prelude::*;
-use itertools::Itertools;
 use web3::types::H256;
 // Workspace imports
 use models::Operation;
 // Local imports
-use self::records::{ETHNonce, ETHStats, NewETHOperation, StorageETHOperation};
+use self::records::{
+    ETHBinding, ETHNonce, ETHStats, NewETHBinding, NewETHOperation, StorageETHOperation,
+};
 use crate::chain::operations::records::StoredOperation;
 use crate::schema::*;
 use crate::StorageProcessor;
@@ -20,6 +21,16 @@ pub enum OperationType {
     Commit,
     Verify,
     Withdraw,
+}
+
+impl OperationType {
+    pub fn to_string(&self) -> String {
+        match self {
+            Self::Commit => "commit".into(),
+            Self::Verify => "verify".into(),
+            Self::Withdraw => "withdraw".into(),
+        }
+    }
 }
 
 /// Ethereum schema is capable of storing the information about the
@@ -34,66 +45,52 @@ impl<'a> EthereumSchema<'a> {
     pub fn load_unconfirmed_operations(
         &self,
         // TODO: move Eth transaction state to models and add it here
-    ) -> QueryResult<Vec<(Operation, Vec<StorageETHOperation>)>> {
+    ) -> QueryResult<Vec<(StorageETHOperation, Option<Operation>)>> {
         // Load the operations with the associated Ethereum transactions
         // from the database.
-        // Here we obtain a sequence of one-to-one mappings (operation ID) -> (ETH operation).
-        // This means that operation ID may be encountered multiple times (if there was more than
-        // one transaction sent).
-        let ops: Vec<(StoredOperation, Option<StorageETHOperation>)> =
-            self.0.conn().transaction(|| {
-                operations::table
-                    .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
-                    .filter(operations::confirmed.eq(false))
-                    .order(operations::id.asc())
-                    .load(self.0.conn())
-            })?;
+        // Here we obtain a sequence of one-to-one mappings (ETH tx) -> (operation ID).
+        // Each Ethereum transaction can have no more than one associated operation, and each
+        // operation is associated with exactly one Ethereum transaction. Note that there may
+        // be ETH transactions without an operation (e.g. `completeWithdrawals` call), but for
+        // every operation always there is an ETH transaction.
+        let raw_ops: Vec<(
+            StorageETHOperation,
+            Option<ETHBinding>,
+            Option<StoredOperation>,
+        )> = self.0.conn().transaction(|| {
+            eth_operations::table
+                .left_join(
+                    eth_ops_binding::table.on(eth_operations::id.eq(eth_ops_binding::eth_op_id)),
+                )
+                .left_join(operations::table.on(operations::id.eq(eth_ops_binding::op_id)))
+                .filter(eth_operations::confirmed.eq(false))
+                .order(eth_operations::id.asc())
+                .load(self.0.conn())
+        })?;
+
+        // Create a vector for the expected output.
+        let mut ops: Vec<(StorageETHOperation, Option<Operation>)> =
+            Vec::with_capacity(raw_ops.len());
 
         // Transform the `StoredOperation` to `Operation`.
-        let mut ops = ops
-            .into_iter()
-            .map(|(op, eth_ops)| op.into_op(self.0).map(|op| (op, eth_ops)))
-            .collect::<QueryResult<Vec<_>>>()?;
+        for (eth_op, _, raw_op) in raw_ops {
+            let op = if let Some(raw_op) = raw_op {
+                Some(raw_op.into_op(self.0)?)
+            } else {
+                None
+            };
 
-        // Sort the operations and group them by key, so we will obtain the groups
-        // of Ethereum operations mapped to the operations as a many-to-one mapping.
-        ops.sort_by_key(|(op, _)| op.id.expect("Operations in the db MUST have and id"));
-        let grouped_operations = ops.into_iter().group_by(|(o, _)| o.id.unwrap());
+            ops.push((eth_op, op));
+        }
 
-        // Now go through the groups and collect all the Ethereum transactions to the vectors
-        // associated with a certain `Operation`.
-        let result = grouped_operations
-            .into_iter()
-            .map(|(_, group_iter)| {
-                // In this fold we have two accumulators:
-                // - operation (initialized at the first step, then just checked to be the same).
-                // - list of ETH txs (appended on each step).
-                let fold_result = group_iter.fold(
-                    (None, Vec::new()),
-                    |(mut accum_op, mut accum_eth_ops): (Option<Operation>, _), (op, eth_op)| {
-                        // Ensure that the grouping was done right and the operation is the same
-                        // across the group.
-                        assert_eq!(accum_op.get_or_insert_with(|| op.clone()).id, op.id);
-
-                        // Add the Ethereum operation to the list.
-                        if let Some(eth_op) = eth_op {
-                            accum_eth_ops.push(eth_op);
-                        }
-
-                        (accum_op, accum_eth_ops)
-                    },
-                );
-                (fold_result.0.unwrap(), fold_result.1)
-            })
-            .collect();
-
-        Ok(result)
+        Ok(ops)
     }
 
     /// Stores the sent (but not confirmed yet) Ethereum transaction in the database.
-    pub fn save_operation_eth_tx(
+    pub fn save_new_eth_tx(
         &self,
-        op_id: i64,
+        op_type: OperationType,
+        op_id: Option<i64>,
         hash: H256,
         deadline_block: u64,
         nonce: u32,
@@ -101,18 +98,47 @@ impl<'a> EthereumSchema<'a> {
         raw_tx: Vec<u8>,
     ) -> QueryResult<()> {
         let operation = NewETHOperation {
-            op_id,
+            op_type: op_type.to_string(),
             nonce: i64::from(nonce),
             deadline_block: deadline_block as i64,
-            gas_price,
+            last_used_gas_price: gas_price,
             tx_hash: hash.as_bytes().to_vec(),
             raw_tx,
         };
 
-        insert_into(eth_operations::table)
-            .values(&operation)
-            .execute(self.0.conn())
-            .map(drop)
+        self.0.conn().transaction(|| {
+            let inserted = insert_into(eth_operations::table)
+                .values(&operation)
+                .returning(eth_operations::id)
+                .get_results(self.0.conn())?;
+            assert_eq!(inserted.len(), 1, "Wrong amount of updated rows");
+
+            let eth_op_id = inserted[0];
+            if let Some(op_id) = op_id {
+                // If the operation ID was provided, we should also insert a binding entry.
+                let binding = NewETHBinding { op_id, eth_op_id };
+
+                insert_into(eth_ops_binding::table)
+                    .values(&binding)
+                    .execute(self.0.conn())?;
+            }
+
+            self.report_created_operation(op_type)?;
+
+            Ok(())
+        })
+    }
+
+    /// Changes the last used gas for a transaction. Since for every sent transaction the gas
+    /// is the only field changed, it makes no sense to duplicate many alike transactions for each
+    /// operation. Instead we enforce using exactly one tx for each operation and store only the last
+    /// used gas value (to increment later if we'll need to send the tx again).
+    pub fn update_eth_tx_gas(&self, hash: &H256, new_gas_value: BigDecimal) -> QueryResult<()> {
+        update(eth_operations::table.filter(eth_operations::tx_hash.eq(hash.as_bytes())))
+            .set(eth_operations::last_used_gas_price.eq(new_gas_value))
+            .execute(self.0.conn())?;
+
+        Ok(())
     }
 
     /// Updates the stats counter with the new operation reported.
@@ -123,7 +149,7 @@ impl<'a> EthereumSchema<'a> {
     /// This method expects the database to be initially prepared with inserting the actual
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
-    pub fn report_created_operation(&self, operation_type: OperationType) -> QueryResult<()> {
+    fn report_created_operation(&self, operation_type: OperationType) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             let mut current_stats: ETHStats = eth_stats::table.first(self.0.conn())?;
 
@@ -162,19 +188,37 @@ impl<'a> EthereumSchema<'a> {
     /// is marked as confirmed as well).
     pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
         self.0.conn().transaction(|| {
-            update(eth_operations::table.filter(eth_operations::tx_hash.eq(hash.as_bytes())))
-                .set(eth_operations::confirmed.eq(true))
-                .execute(self.0.conn())
-                .map(drop)?;
-            let (op, _) = operations::table
-                .inner_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
-                .filter(eth_operations::tx_hash.eq(hash.as_bytes()))
-                .first::<(StoredOperation, StorageETHOperation)>(self.0.conn())?;
+            let updated: Vec<i64> =
+                update(eth_operations::table.filter(eth_operations::tx_hash.eq(hash.as_bytes())))
+                    .set(eth_operations::confirmed.eq(true))
+                    .returning(eth_operations::id)
+                    .get_results(self.0.conn())?;
 
-            update(operations::table.filter(operations::id.eq(op.id)))
-                .set(operations::confirmed.eq(true))
-                .execute(self.0.conn())
-                .map(drop)
+            assert_eq!(
+                updated.len(),
+                1,
+                "Unexpected amount of operations were confirmed"
+            );
+
+            let eth_op_id = updated[0];
+
+            let binding: Option<ETHBinding> = eth_ops_binding::table
+                .filter(eth_ops_binding::eth_op_id.eq(eth_op_id))
+                .first::<ETHBinding>(self.0.conn())
+                .optional()?;
+
+            if let Some(binding) = binding {
+                let op = operations::table
+                    .filter(operations::id.eq(binding.op_id))
+                    .first::<StoredOperation>(self.0.conn())?;
+
+                update(operations::table.filter(operations::id.eq(op.id)))
+                    .set(operations::confirmed.eq(true))
+                    .execute(self.0.conn())
+                    .map(drop)?;
+            }
+
+            Ok(())
         })
     }
 
