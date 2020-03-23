@@ -239,6 +239,100 @@ pub fn spawn_state_keeper(
     )
 }
 
+pub fn perform_basic_operations(
+    token: u16,
+    test_setup: &mut TestSetup,
+    deposit_amount: BigDecimal,
+) {
+    // test deposit to other account
+    test_setup.start_block();
+    test_setup.deposit(
+        ETHAccountId(0),
+        ZKSyncAccountId(2),
+        Token(token),
+        deposit_amount.clone(),
+    );
+    test_setup
+        .execute_commit_and_verify_block()
+        .expect("Block execution failed");
+    println!("Deposit to other account test success, token_id: {}", token);
+
+    // test two deposits
+    test_setup.start_block();
+    test_setup.deposit(
+        ETHAccountId(0),
+        ZKSyncAccountId(1),
+        Token(token),
+        deposit_amount.clone(),
+    );
+    test_setup.deposit(
+        ETHAccountId(0),
+        ZKSyncAccountId(1),
+        Token(token),
+        deposit_amount.clone(),
+    );
+    test_setup
+        .execute_commit_and_verify_block()
+        .expect("Block execution failed");
+    println!("Deposit test success, token_id: {}", token);
+
+    // test transfers
+    test_setup.start_block();
+
+    test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
+
+    //should be executed as a transfer
+    test_setup.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(2),
+        Token(token),
+        &deposit_amount / &BigDecimal::from(4),
+        &deposit_amount / &BigDecimal::from(4),
+    );
+
+    let nonce = test_setup.accounts.zksync_accounts[1].nonce();
+    let incorrect_nonce_transfer = test_setup.accounts.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(0),
+        Token(token),
+        deposit_amount.clone(),
+        BigDecimal::from(0),
+        Some(nonce + 1),
+        false,
+    );
+    test_setup.execute_incorrect_tx(incorrect_nonce_transfer);
+
+    //should be executed as a transfer to new
+    test_setup.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(2),
+        Token(token),
+        &deposit_amount / &BigDecimal::from(4),
+        &deposit_amount / &BigDecimal::from(4),
+    );
+
+    test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
+
+    test_setup.withdraw(
+        ZKSyncAccountId(2),
+        ETHAccountId(0),
+        Token(token),
+        &deposit_amount / &BigDecimal::from(4),
+        &deposit_amount / &BigDecimal::from(4),
+    );
+    test_setup
+        .execute_commit_and_verify_block()
+        .expect("Block execution failed");
+    println!("Transfer test success, token_id: {}", token);
+
+    test_setup.start_block();
+    test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
+    test_setup
+        .execute_commit_and_verify_block()
+        .expect("Block execution failed");
+    println!("Full exit test success, token_id: {}", token);
+}
+
 pub fn perform_basic_tests() {
     let config = ConfigurationOptions::from_env();
 
@@ -303,93 +397,7 @@ pub fn perform_basic_tests() {
     let deposit_amount = parse_ether("1.0").unwrap();
 
     for token in 0..=1 {
-        // test deposit to other account
-        test_setup.start_block();
-        test_setup.deposit(
-            ETHAccountId(0),
-            ZKSyncAccountId(2),
-            Token(token),
-            deposit_amount.clone(),
-        );
-        test_setup
-            .execute_commit_and_verify_block()
-            .expect("Block execution failed");
-        println!("Deposit to other account test success, token_id: {}", token);
-
-        // test two deposits
-        test_setup.start_block();
-        test_setup.deposit(
-            ETHAccountId(0),
-            ZKSyncAccountId(1),
-            Token(token),
-            deposit_amount.clone(),
-        );
-        test_setup.deposit(
-            ETHAccountId(0),
-            ZKSyncAccountId(1),
-            Token(token),
-            deposit_amount.clone(),
-        );
-        test_setup
-            .execute_commit_and_verify_block()
-            .expect("Block execution failed");
-        println!("Deposit test success, token_id: {}", token);
-
-        // test transfers
-        test_setup.start_block();
-
-        test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
-
-        //should be executed as a transfer
-        test_setup.transfer(
-            ZKSyncAccountId(1),
-            ZKSyncAccountId(2),
-            Token(token),
-            &deposit_amount / &BigDecimal::from(4),
-            &deposit_amount / &BigDecimal::from(4),
-        );
-
-        let nonce = test_setup.accounts.zksync_accounts[1].nonce();
-        let incorrect_nonce_transfer = test_setup.accounts.transfer(
-            ZKSyncAccountId(1),
-            ZKSyncAccountId(0),
-            Token(token),
-            deposit_amount.clone(),
-            BigDecimal::from(0),
-            Some(nonce + 1),
-            false,
-        );
-        test_setup.execute_incorrect_tx(incorrect_nonce_transfer);
-
-        //should be executed as a transfer to new
-        test_setup.transfer(
-            ZKSyncAccountId(1),
-            ZKSyncAccountId(2),
-            Token(token),
-            &deposit_amount / &BigDecimal::from(4),
-            &deposit_amount / &BigDecimal::from(4),
-        );
-
-        test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
-
-        test_setup.withdraw(
-            ZKSyncAccountId(2),
-            ETHAccountId(0),
-            Token(token),
-            &deposit_amount / &BigDecimal::from(4),
-            &deposit_amount / &BigDecimal::from(4),
-        );
-        test_setup
-            .execute_commit_and_verify_block()
-            .expect("Block execution failed");
-        println!("Transfer test success, token_id: {}", token);
-
-        test_setup.start_block();
-        test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
-        test_setup
-            .execute_commit_and_verify_block()
-            .expect("Block execution failed");
-        println!("Full exit test success, token_id: {}", token);
+        perform_basic_operations(token, &mut test_setup, deposit_amount.clone());
     }
 
     stop_state_keeper_sender.send(()).expect("sk stop send");
@@ -600,7 +608,7 @@ impl TestSetup {
         self.execute_priority_op(full_exit);
     }
 
-    fn change_pubkey_with_tx(&mut self, zksync_signer: ZKSyncAccountId) {
+    pub fn change_pubkey_with_tx(&mut self, zksync_signer: ZKSyncAccountId) {
         let tx = self
             .accounts
             .change_pubkey_with_tx(zksync_signer, None, true);
@@ -608,7 +616,7 @@ impl TestSetup {
         self.execute_tx(tx);
     }
 
-    fn change_pubkey_with_onchain_auth(
+    pub fn change_pubkey_with_onchain_auth(
         &mut self,
         eth_account: ETHAccountId,
         zksync_signer: ZKSyncAccountId,
