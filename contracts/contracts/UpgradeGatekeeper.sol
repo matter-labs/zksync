@@ -28,16 +28,16 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     struct UpgradeInfo {
         UpgradeStatus upgradeStatus;
 
-        /// @notice Time of activating notice period
+        /// @notice Notice period activation timestamp (in seconds)
         /// @dev Will be equal to zero in case of not active mode
         uint256 activationTime;
 
-        /// @notice Next target
+        /// @notice Address of the next version of the contract to be upgraded
         /// @dev Will store zero in case of not active upgrade mode
         address nextTarget;
 
-        /// @notice Number of priority operations that must be verified at the time of finishing upgrade
-        /// @dev Will store zero in case of not active cleaning up status of upgrade mode
+        /// @notice Number of priority operations that must be verified by main contract at the time of finishing upgrade
+        /// @dev Will store zero in case of not active upgrade mode or not active cleaning up status of upgrade mode
         uint64 priorityOperationsToProcessBeforeUpgrade;
     }
 
@@ -51,10 +51,10 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         mainContractAddress = _mainContractAddress;
     }
 
-    /// @notice Activates notice period
+    /// @notice Starts upgrade (activates notice period)
     /// @param proxyAddress Address of proxy to process
     /// @param newTarget New target
-    function upgradeProxy(address proxyAddress, address newTarget) external {
+    function startProxyUpgrade(address proxyAddress, address newTarget) external {
         requireMaster(msg.sender);
         require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Idle, "upa11"); // upa11 - unable to activate active upgrade mode
 
