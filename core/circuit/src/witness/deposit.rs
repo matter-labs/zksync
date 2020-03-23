@@ -539,6 +539,33 @@ mod test {
 
         let hints = transpile::<Bn256, _>(c.clone()).expect("transpilation is successful");
 
+        let mut hints_hist = std::collections::HashMap::new();
+        hints_hist.insert("into addition gate".to_owned(), 0);
+        hints_hist.insert("merge LC".to_owned(), 0);
+        hints_hist.insert("into quadratic gate".to_owned(), 0);
+        hints_hist.insert("into multiplication gate".to_owned(), 0);
+
+        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
+
+        for (_, h) in hints.iter() {
+            match h {
+                TranspilationVariant::IntoQuadraticGate => {
+                    *hints_hist.get_mut(&"into quadratic gate".to_owned()).unwrap() += 1;
+                },
+                TranspilationVariant::MergeLinearCombinations(..) => {
+                    *hints_hist.get_mut(&"merge LC".to_owned()).unwrap() += 1;
+                },
+                TranspilationVariant::IntoAdditionGate(..) => {
+                    *hints_hist.get_mut(&"into addition gate".to_owned()).unwrap() += 1;
+                },
+                TranspilationVariant::IntoMultiplicationGate(..) => {
+                    *hints_hist.get_mut(&"into multiplication gate".to_owned()).unwrap() += 1;
+                }
+            }
+        }
+
+        println!("Transpilation hist = {:?}", hints_hist);
+
         println!("Done transpiling");
 
         is_satisfied_using_one_shot_check(c.clone(), &hints).expect("must validate");
