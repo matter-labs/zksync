@@ -51,7 +51,7 @@ async function main() {
 
     let notice_period = parseInt(await upgradeGatekeeper.get_NOTICE_PERIOD());
 
-    await (await upgradeGatekeeper.upgradeProxy(proxyContract.address, newTarget.address)).wait();
+    await (await upgradeGatekeeper.startProxyUpgrade(proxyContract.address, newTarget.address)).wait();
 
     // wait notice period
     await new Promise(r => setTimeout(r, notice_period * 1000 + 10));
