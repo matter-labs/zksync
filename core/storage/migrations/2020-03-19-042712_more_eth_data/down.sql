@@ -2,6 +2,7 @@
 DROP TABLE IF EXISTS eth_nonce CASCADE;
 DROP TABLE IF EXISTS eth_stats CASCADE;
 DROP TABLE IF EXISTS eth_ops_binding CASCADE;
+DROP TABLE IF EXISTS eth_tx_hashes CASCADE;
 
 ALTER TABLE eth_operations
     ADD COLUMN op_id bigserial REFERENCES operations (id),

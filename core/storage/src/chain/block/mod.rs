@@ -225,7 +225,7 @@ impl<'a> BlockSchema<'a> {
         limit: u32,
     ) -> QueryResult<Vec<BlockDetails>> {
         // This query does the following:
-        // - joins the `operations` and `eth_operations` (using the intermediate `eth_ops_binding` table)
+        // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
         //   tables to collect the data:
         //   block number, ethereum transaction hash, action type and action creation timestamp;
         // - joins the `blocks` table with result of the join twice: once for committed operations
@@ -236,12 +236,12 @@ impl<'a> BlockSchema<'a> {
             with eth_ops as ( \
                 select \
                     operations.block_number, \
-                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash, \
+                    '0x' || encode(eth_tx_hashes.tx_hash::bytea, 'hex') as tx_hash, \
                     operations.action_type, \
                     operations.created_at \
                 from operations \
                     left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
-                    left join eth_operations on eth_operations.id = eth_ops_binding.eth_op_id \
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
             ) \
             select \
                 blocks.number as block_number, \
@@ -278,7 +278,7 @@ impl<'a> BlockSchema<'a> {
         let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
         let l_query = query.to_lowercase();
         // This query does the following:
-        // - joins the `operations` and `eth_operations` (using the intermediate `eth_ops_binding` table)
+        // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
         //   tables to collect the data:
         //   block number, ethereum transaction hash, action type and action creation timestamp;
         // - joins the `blocks` table with result of the join twice: once for committed operations
@@ -293,12 +293,12 @@ impl<'a> BlockSchema<'a> {
             with eth_ops as ( \
                 select \
                     operations.block_number, \
-                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash, \
+                    '0x' || encode(eth_tx_hashes.tx_hash::bytea, 'hex') as tx_hash, \
                     operations.action_type, \
                     operations.created_at \
                 from operations \
                     left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
-                    left join eth_operations on eth_operations.id = eth_ops_binding.eth_op_id \
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
             ) \
             select \
                 blocks.number as block_number, \

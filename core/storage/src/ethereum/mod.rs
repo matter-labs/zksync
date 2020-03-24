@@ -8,7 +8,8 @@ use web3::types::H256;
 use models::Operation;
 // Local imports
 use self::records::{
-    ETHBinding, ETHNonce, ETHStats, NewETHBinding, NewETHOperation, StorageETHOperation,
+    ETHBinding, ETHNonce, ETHStats, ETHTxHash, NewETHBinding, NewETHOperation, NewETHTxHash,
+    StorageETHOperation,
 };
 use crate::chain::operations::records::StoredOperation;
 use crate::schema::*;
@@ -72,6 +73,8 @@ impl<'a> EthereumSchema<'a> {
         let mut ops: Vec<(StorageETHOperation, Option<Operation>)> =
             Vec::with_capacity(raw_ops.len());
 
+        // TODO: load tx hashes.
+
         // Transform the `StoredOperation` to `Operation`.
         for (eth_op, _, raw_op) in raw_ops {
             let op = if let Some(raw_op) = raw_op {
@@ -102,18 +105,34 @@ impl<'a> EthereumSchema<'a> {
             nonce: i64::from(nonce),
             deadline_block: deadline_block as i64,
             last_used_gas_price: gas_price,
-            tx_hash: hash.as_bytes().to_vec(),
             raw_tx,
         };
 
         self.0.conn().transaction(|| {
-            let inserted = insert_into(eth_operations::table)
+            let inserted_tx = insert_into(eth_operations::table)
                 .values(&operation)
                 .returning(eth_operations::id)
                 .get_results(self.0.conn())?;
-            assert_eq!(inserted.len(), 1, "Wrong amount of updated rows");
+            assert_eq!(
+                inserted_tx.len(),
+                1,
+                "Wrong amount of updated rows (eth_operations)"
+            );
 
-            let eth_op_id = inserted[0];
+            let eth_op_id = inserted_tx[0];
+
+            let hash_entry = NewETHTxHash {
+                eth_op_id,
+                tx_hash: hash.as_bytes().to_vec(),
+            };
+            let inserted_hashes_rows = insert_into(eth_tx_hashes::table)
+                .values(&hash_entry)
+                .execute(self.0.conn())?;
+            assert_eq!(
+                inserted_hashes_rows, 1,
+                "Wrong amount of updated rows (eth_tx_hashes)"
+            );
+
             if let Some(op_id) = op_id {
                 // If the operation ID was provided, we should also insert a binding entry.
                 let binding = NewETHBinding { op_id, eth_op_id };
@@ -129,16 +148,29 @@ impl<'a> EthereumSchema<'a> {
         })
     }
 
+    /// Retrieves the Ethereum operation ID given the tx hash.
+    fn get_eth_op_id(&self, hash: &H256) -> QueryResult<i64> {
+        let hash_entry = eth_tx_hashes::table
+            .filter(eth_tx_hashes::tx_hash.eq(hash.as_bytes()))
+            .first::<ETHTxHash>(self.0.conn())?;
+
+        Ok(hash_entry.eth_op_id)
+    }
+
     /// Changes the last used gas for a transaction. Since for every sent transaction the gas
     /// is the only field changed, it makes no sense to duplicate many alike transactions for each
     /// operation. Instead we enforce using exactly one tx for each operation and store only the last
     /// used gas value (to increment later if we'll need to send the tx again).
     pub fn update_eth_tx_gas(&self, hash: &H256, new_gas_value: BigDecimal) -> QueryResult<()> {
-        update(eth_operations::table.filter(eth_operations::tx_hash.eq(hash.as_bytes())))
-            .set(eth_operations::last_used_gas_price.eq(new_gas_value))
-            .execute(self.0.conn())?;
+        self.0.conn().transaction(|| {
+            let eth_op_id = self.get_eth_op_id(hash)?;
 
-        Ok(())
+            update(eth_operations::table.filter(eth_operations::id.eq(eth_op_id)))
+                .set(eth_operations::last_used_gas_price.eq(new_gas_value))
+                .execute(self.0.conn())?;
+
+            Ok(())
+        })
     }
 
     /// Updates the stats counter with the new operation reported.
@@ -188,8 +220,10 @@ impl<'a> EthereumSchema<'a> {
     /// is marked as confirmed as well).
     pub fn confirm_eth_tx(&self, hash: &H256) -> QueryResult<()> {
         self.0.conn().transaction(|| {
+            let eth_op_id = self.get_eth_op_id(hash)?;
+
             let updated: Vec<i64> =
-                update(eth_operations::table.filter(eth_operations::tx_hash.eq(hash.as_bytes())))
+                update(eth_operations::table.filter(eth_operations::id.eq(eth_op_id)))
                     .set(eth_operations::confirmed.eq(true))
                     .returning(eth_operations::id)
                     .get_results(self.0.conn())?;

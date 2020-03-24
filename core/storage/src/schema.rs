@@ -94,7 +94,6 @@ table! {
         id -> Int8,
         nonce -> Int8,
         deadline_block -> Int8,
-        tx_hash -> Bytea,
         confirmed -> Bool,
         raw_tx -> Bytea,
         op_type -> Text,
@@ -116,6 +115,14 @@ table! {
         commit_ops -> Int8,
         verify_ops -> Int8,
         withdraw_ops -> Int8,
+    }
+}
+
+table! {
+    eth_tx_hashes (id) {
+        id -> Int8,
+        eth_op_id -> Int8,
+        tx_hash -> Bytea,
     }
 }
 
@@ -235,6 +242,7 @@ joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
 joinable!(eth_ops_binding -> eth_operations (eth_op_id));
 joinable!(eth_ops_binding -> operations (op_id));
+joinable!(eth_tx_hashes -> eth_operations (eth_op_id));
 joinable!(executed_transactions -> mempool (tx_hash));
 
 allow_tables_to_appear_in_same_query!(
@@ -250,6 +258,7 @@ allow_tables_to_appear_in_same_query!(
     eth_operations,
     eth_ops_binding,
     eth_stats,
+    eth_tx_hashes,
     events_state,
     executed_priority_operations,
     executed_transactions,

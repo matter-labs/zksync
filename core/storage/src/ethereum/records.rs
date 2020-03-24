@@ -10,11 +10,25 @@ pub struct StorageETHOperation {
     pub id: i64,
     pub nonce: i64,
     pub deadline_block: i64,
-    pub tx_hash: Vec<u8>,
     pub confirmed: bool,
     pub raw_tx: Vec<u8>,
     pub op_type: String,
     pub last_used_gas_price: BigDecimal,
+}
+
+#[derive(Debug, Clone, Queryable, QueryableByName, PartialEq)]
+#[table_name = "eth_tx_hashes"]
+pub struct ETHTxHash {
+    pub id: i64,
+    pub eth_op_id: i64,
+    pub tx_hash: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Insertable, PartialEq)]
+#[table_name = "eth_tx_hashes"]
+pub struct NewETHTxHash {
+    pub eth_op_id: i64,
+    pub tx_hash: Vec<u8>,
 }
 
 #[derive(Debug, Insertable, PartialEq)]
@@ -22,7 +36,6 @@ pub struct StorageETHOperation {
 pub struct NewETHOperation {
     pub nonce: i64,
     pub deadline_block: i64,
-    pub tx_hash: Vec<u8>,
     pub raw_tx: Vec<u8>,
     pub op_type: String,
     pub last_used_gas_price: BigDecimal,

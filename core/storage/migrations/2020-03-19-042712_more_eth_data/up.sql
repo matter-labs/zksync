@@ -24,6 +24,14 @@ CREATE TABLE eth_ops_binding
     eth_op_id      bigserial NOT NULL REFERENCES eth_operations (id)
 );
 
+-- Table storing all the sent Ethereum transaction hashes.
+CREATE TABLE eth_tx_hashes
+(
+    id             bigserial PRIMARY KEY,
+    eth_op_id      bigserial NOT NULL REFERENCES eth_operations (id),
+    tx_hash        bytea   not null
+);
+
 ALTER TABLE eth_operations
     -- Add the operation type (`commit` / `verify` / `withdraw`).
     ADD COLUMN op_type text not null,
@@ -33,4 +41,6 @@ ALTER TABLE eth_operations
     -- Rename `gas_price` to `last_used_gas_price`, since it's the only field changed for resent txs
     -- and it makes no sense to store every sent transaction separately.
     DROP COLUMN gas_price CASCADE,
+    -- Different tx hashes are now stored in the `eth_tx_hashes` table, so this field isn't needed anymore.
+    DROP COLUMN tx_hash CASCADE,
     ADD COLUMN last_used_gas_price numeric not null

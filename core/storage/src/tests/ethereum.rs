@@ -64,7 +64,8 @@ impl EthereumTxParams {
             nonce: self.nonce as i64,
             deadline_block: self.deadline_block as i64,
             last_used_gas_price: self.gas_price.clone(),
-            tx_hash: self.hash.as_bytes().to_vec(),
+            // TODO: Hash should be used here
+            // tx_hash: self.hash.as_bytes().to_vec(),
             confirmed: false,
             raw_tx: self.raw_tx.clone(),
         }
