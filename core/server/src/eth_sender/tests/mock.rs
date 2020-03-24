@@ -2,118 +2,149 @@
 
 // Built-in deps
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 // External uses
 use futures::channel::mpsc;
 use web3::contract::{tokens::Tokenize, Options};
 use web3::types::{H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
-use models::{ethereum::ETHOperation, Operation};
+use models::{
+    ethereum::{ETHOperation, EthOpId},
+    Operation,
+};
 // Local uses
 use super::ETHSender;
 use crate::eth_sender::database::DatabaseAccess;
 use crate::eth_sender::ethereum_interface::EthereumInterface;
-use crate::eth_sender::transactions::{
-    ETHStats, ExecutedTxStatus, OperationETHState, OperationType, TransactionETHState,
-};
+use crate::eth_sender::transactions::{ETHStats, ExecutedTxStatus};
 
 const CHANNEL_CAPACITY: usize = 16;
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
 pub(super) struct MockDatabase {
-    restore_state: VecDeque<OperationETHState>,
-    unconfirmed_operations: RefCell<HashMap<H256, TransactionETHState>>,
-    confirmed_operations: RefCell<HashMap<H256, TransactionETHState>>,
+    restore_state: Vec<ETHOperation>,
+    unconfirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
+    confirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
     nonce: Cell<i64>,
+    pending_op_id: Cell<EthOpId>,
     stats: RefCell<ETHStats>,
 }
 
 impl MockDatabase {
     /// Creates a database with emulation of previously stored uncommitted requests.
     pub fn with_restorable_state(
-        restore_state: impl IntoIterator<Item = OperationETHState>,
+        restore_state: impl IntoIterator<Item = ETHOperation>,
         stats: ETHStats,
     ) -> Self {
-        let restore_state: VecDeque<_> = restore_state.into_iter().collect();
-        let nonce = restore_state.iter().fold(0, |acc, op| acc + op.txs.len());
+        let restore_state: Vec<_> = restore_state.into_iter().collect();
+        let nonce = restore_state
+            .iter()
+            .fold(0, |acc, op| acc + op.used_tx_hashes.len());
+        let pending_op_id = restore_state.len();
         Self {
             restore_state,
             nonce: Cell::new(nonce as i64),
+            pending_op_id: Cell::new(pending_op_id as EthOpId),
             stats: RefCell::new(stats),
             ..Default::default()
         }
     }
 
     /// Ensures that the provided transaction is stored in the database and not confirmed yet.
-    pub fn assert_stored(&self, tx: &TransactionETHState) {
-        assert_eq!(
-            self.unconfirmed_operations.borrow().get(&tx.signed_tx.hash),
-            Some(tx)
-        );
+    pub fn assert_stored(&self, id: i64, tx: &ETHOperation) {
+        assert_eq!(self.unconfirmed_operations.borrow().get(&id), Some(tx));
 
-        assert!(self
-            .confirmed_operations
-            .borrow()
-            .get(&tx.signed_tx.hash)
-            .is_none());
+        assert!(self.confirmed_operations.borrow().get(&id).is_none());
     }
 
     /// Ensures that the provided transaction is not stored in the database.
-    pub fn assert_not_stored(&self, tx: &TransactionETHState) {
-        assert!(self
-            .confirmed_operations
-            .borrow()
-            .get(&tx.signed_tx.hash)
-            .is_none());
+    pub fn assert_not_stored(&self, id: i64, tx: &ETHOperation) {
+        assert!(self.confirmed_operations.borrow().get(&id).is_none());
 
-        assert!(self
-            .unconfirmed_operations
-            .borrow()
-            .get(&tx.signed_tx.hash)
-            .is_none());
+        assert!(self.unconfirmed_operations.borrow().get(&id).is_none());
     }
 
     /// Ensures that the provided transaction is stored as confirmed.
-    pub fn assert_confirmed(&self, tx: &TransactionETHState) {
-        assert_eq!(
-            self.confirmed_operations.borrow().get(&tx.signed_tx.hash),
-            Some(tx)
-        );
+    pub fn assert_confirmed(&self, id: i64, tx: &ETHOperation) {
+        assert_eq!(self.confirmed_operations.borrow().get(&id), Some(tx));
 
-        assert!(self
-            .unconfirmed_operations
-            .borrow()
-            .get(&tx.signed_tx.hash)
-            .is_none());
+        assert!(self.unconfirmed_operations.borrow().get(&id).is_none());
     }
 }
 
 impl DatabaseAccess for MockDatabase {
-    fn restore_state(&self) -> Result<Vec<(ETHOperation, Option<Operation>)>, failure::Error> {
+    fn restore_state(&self) -> Result<Vec<ETHOperation>, failure::Error> {
         Ok(self.restore_state.clone())
     }
 
-    fn save_unconfirmed_operation(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
+    fn save_new_eth_tx(&self, op: &ETHOperation) -> Result<EthOpId, failure::Error> {
+        let id = self.pending_op_id.get();
+        let new_id = id + 1;
+        self.pending_op_id.set(new_id);
+
         self.unconfirmed_operations
             .borrow_mut()
-            .insert(tx.signed_tx.hash, tx.clone());
+            .insert(id, op.clone());
+
+        Ok(id)
+    }
+
+    fn update_eth_tx(
+        &self,
+        eth_op_id: EthOpId,
+        hash: &H256,
+        new_deadline_block: i64,
+        new_gas_value: U256,
+    ) -> Result<(), failure::Error> {
+        assert!(
+            self.unconfirmed_operations
+                .borrow()
+                .contains_key(&eth_op_id),
+            "Attempt to update tx that is not unconfirmed"
+        );
+
+        let mut op = self
+            .unconfirmed_operations
+            .borrow()
+            .get(&eth_op_id)
+            .unwrap()
+            .clone();
+
+        op.last_deadline_block = new_deadline_block as u64;
+        op.last_used_gas_price = new_gas_value;
+        op.used_tx_hashes.push(*hash);
+
+        self.unconfirmed_operations
+            .borrow_mut()
+            .insert(eth_op_id, op);
 
         Ok(())
     }
 
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error> {
         let mut unconfirmed_operations = self.unconfirmed_operations.borrow_mut();
+        let mut op_idx: Option<i64> = None;
+        for operation in unconfirmed_operations.values_mut() {
+            if operation.used_tx_hashes.contains(hash) {
+                operation.confirmed = true;
+                operation.final_hash = Some(*hash);
+                op_idx = Some(operation.id);
+                break;
+            }
+        }
+
         assert!(
-            unconfirmed_operations.contains_key(hash),
+            op_idx.is_some(),
             "Request to confirm operation that was not stored"
         );
+        let op_idx = op_idx.unwrap();
 
-        let operation = unconfirmed_operations.remove(hash).unwrap();
+        let operation = unconfirmed_operations.remove(&op_idx).unwrap();
         self.confirmed_operations
             .borrow_mut()
-            .insert(*hash, operation);
+            .insert(op_idx, operation);
 
         Ok(())
     }
@@ -128,27 +159,6 @@ impl DatabaseAccess for MockDatabase {
 
     fn load_stats(&self) -> Result<ETHStats, failure::Error> {
         Ok(self.stats.borrow().clone())
-    }
-
-    fn report_created_operation(
-        &self,
-        operation_type: OperationType,
-    ) -> Result<(), failure::Error> {
-        let mut stats = self.stats.borrow_mut();
-
-        match operation_type {
-            OperationType::Commit => {
-                stats.commit_ops += 1;
-            }
-            OperationType::Verify => {
-                stats.verify_ops += 1;
-            }
-            OperationType::Withdraw => {
-                stats.withdraw_ops += 1;
-            }
-        }
-
-        Ok(())
     }
 }
 
@@ -188,15 +198,7 @@ impl MockEthereum {
     }
 
     /// Checks that there was a request to send the provided transaction.
-    pub fn assert_sent(&self, tx: &TransactionETHState) {
-        assert_eq!(
-            self.sent_txs.borrow().get(&tx.signed_tx.hash),
-            Some(&tx.signed_tx)
-        );
-    }
-
-    /// Checks that there was a request to send a transaction with the provided hash.
-    pub fn assert_sent_by_hash(&self, hash: &H256) {
+    pub fn assert_sent(&self, hash: &H256) {
         assert!(
             self.sent_txs.borrow().get(hash).is_some(),
             format!("Transaction with hash {:?} was not sent", hash),
@@ -204,10 +206,8 @@ impl MockEthereum {
     }
 
     /// Adds an response for the sent transaction for `ETHSender` to receive.
-    pub fn add_execution(&mut self, tx: &TransactionETHState, status: &ExecutedTxStatus) {
-        self.tx_statuses
-            .borrow_mut()
-            .insert(tx.signed_tx.hash, status.clone());
+    pub fn add_execution(&mut self, hash: &H256, status: &ExecutedTxStatus) {
+        self.tx_statuses.borrow_mut().insert(*hash, status.clone());
     }
 
     /// Increments the blocks by a provided `confirmations` and marks the sent transaction
@@ -224,7 +224,7 @@ impl MockEthereum {
     }
 
     /// Same as `add_successfull_execution`, but marks the transaction as a failure.
-    pub fn add_failed_execution(&mut self, tx: &TransactionETHState, confirmations: u64) {
+    pub fn add_failed_execution(&mut self, hash: &H256, confirmations: u64) {
         self.block_number += confirmations;
 
         let status = ExecutedTxStatus {
@@ -232,9 +232,7 @@ impl MockEthereum {
             success: false,
             receipt: Some(Default::default()),
         };
-        self.tx_statuses
-            .borrow_mut()
-            .insert(tx.signed_tx.hash, status);
+        self.tx_statuses.borrow_mut().insert(*hash, status);
     }
 }
 
@@ -300,7 +298,7 @@ pub(super) fn default_eth_sender() -> (
 /// Creates an `ETHSender` with mock Ethereum connection/database and restores its state "from DB".
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
 pub(super) fn restored_eth_sender(
-    restore_state: impl IntoIterator<Item = OperationETHState>,
+    restore_state: impl IntoIterator<Item = ETHOperation>,
     stats: ETHStats,
 ) -> (
     ETHSender<MockEthereum, MockDatabase>,
@@ -320,27 +318,27 @@ pub(super) fn restored_eth_sender(
     )
 }
 
-/// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.
-/// This method should be used to create expected tx copies which won't affect
-/// the internal `ETHSender` state.
-pub(super) fn create_signed_tx(
-    eth_sender: &ETHSender<MockEthereum, MockDatabase>,
-    operation: &Operation,
-    deadline_block: u64,
-    nonce: i64,
-) -> TransactionETHState {
-    let mut options = Options::default();
-    options.nonce = Some(nonce.into());
+// /// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.
+// /// This method should be used to create expected tx copies which won't affect
+// /// the internal `ETHSender` state.
+// pub(super) fn create_signed_tx(
+//     eth_sender: &ETHSender<MockEthereum, MockDatabase>,
+//     operation: &Operation,
+//     deadline_block: u64,
+//     nonce: i64,
+// ) -> ETHOperation {
+//     let mut options = Options::default();
+//     options.nonce = Some(nonce.into());
 
-    let raw_tx = eth_sender.operation_to_raw_tx(&operation);
-    let signed_tx = eth_sender
-        .ethereum
-        .sign_prepared_tx(raw_tx, options)
-        .unwrap();
+//     let raw_tx = eth_sender.operation_to_raw_tx(&operation);
+//     let signed_tx = eth_sender
+//         .ethereum
+//         .sign_prepared_tx(raw_tx, options)
+//         .unwrap();
 
-    TransactionETHState {
-        op_id: operation.id.unwrap(),
-        deadline_block,
-        signed_tx,
-    }
-}
+//     TransactionETHState {
+//         op_id: operation.id.unwrap(),
+//         deadline_block,
+//         signed_tx,
+//     }
+// }
