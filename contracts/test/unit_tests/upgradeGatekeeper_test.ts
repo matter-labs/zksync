@@ -29,7 +29,9 @@ describe("UpgradeGatekeeper unit tests", function () {
         UpgradeGatekeeperContract = await deployContract(wallet, require('../../build/UpgradeGatekeeperTest'), [proxyTestContract.address], {
             gasLimit: 6000000,
         })
-        proxyTestContract.transferMastership(UpgradeGatekeeperContract.address);
+        await proxyTestContract.transferMastership(UpgradeGatekeeperContract.address);
+
+        await UpgradeGatekeeperContract.addProxyContract(proxyTestContract.address);
 
         // check initial dummy index and storage
         expect(await proxyDummyInterface.get_DUMMY_INDEX())
@@ -43,32 +45,30 @@ describe("UpgradeGatekeeper unit tests", function () {
 
     it("checking that requireMaster calls present", async () => {
         let UpgradeGatekeeperContract_with_wallet2_signer = await UpgradeGatekeeperContract.connect(wallet2);
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.startProxyUpgrade(AddressZero, AddressZero) )).revertReason).equal("oro11")
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.cancelProxyUpgrade(AddressZero) )).revertReason).equal("oro11")
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.finishProxyUpgrade(AddressZero, []) )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.clearProxyList() )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.startProxyUpgrade([]) )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.cancelProxyUpgrade() )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.finishProxyUpgrade([], []) )).revertReason).equal("oro11")
     });
 
     it("checking UpgradeGatekeeper reverts; activation and cancelation upgrade", async () => {
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.cancelProxyUpgrade(proxyTestContract.address) )).revertReason).equal("umc11")
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startPreparation(proxyTestContract.address) )).revertReason).equal("uaf11")
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishProxyUpgrade(proxyTestContract.address, []) )).revertReason).equal("umf11")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.cancelProxyUpgrade() )).revertReason).equal("cpu11")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startPreparation() )).revertReason).equal("ugp11")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishProxyUpgrade([], []) )).revertReason).equal("fpu11")
 
-        await expect(UpgradeGatekeeperContract.startProxyUpgrade(proxyTestContract.address, DummySecond.address))
+        await expect(UpgradeGatekeeperContract.startProxyUpgrade([DummySecond.address]))
             .to.emit(UpgradeGatekeeperContract, 'UpgradeModeActivated')
-            .withArgs(proxyTestContract.address, 0)
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startProxyUpgrade(proxyTestContract.address, DummySecond.address) )).revertReason).equal("upa11")
-        await expect(UpgradeGatekeeperContract.cancelProxyUpgrade(proxyTestContract.address))
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startProxyUpgrade([]) )).revertReason).equal("spu11")
+        await expect(UpgradeGatekeeperContract.cancelProxyUpgrade())
             .to.emit(UpgradeGatekeeperContract, 'UpgradeCanceled')
-            .withArgs(proxyTestContract.address, 0)
     });
 
     it("checking that the upgrade works correctly", async () => {
         let start_time = performance.now();
 
         // activate
-        await expect(UpgradeGatekeeperContract.startProxyUpgrade(proxyTestContract.address, DummySecond.address))
+        await expect(UpgradeGatekeeperContract.startProxyUpgrade([DummySecond.address]))
             .to.emit(UpgradeGatekeeperContract, 'UpgradeModeActivated')
-            .withArgs(proxyTestContract.address, 0)
 
         let activated_time = performance.now();
 
@@ -86,19 +86,18 @@ describe("UpgradeGatekeeper unit tests", function () {
             }
 
             if (step != 3) {
-                await UpgradeGatekeeperContract.startPreparation(proxyTestContract.address);
+                await UpgradeGatekeeperContract.startPreparation();
             } else {
-                await expect(UpgradeGatekeeperContract.startPreparation(proxyTestContract.address))
+                await expect(UpgradeGatekeeperContract.startPreparation())
                     .to.emit(UpgradeGatekeeperContract, 'UpgradeModePreparationStatusActivated')
-                    .withArgs(proxyTestContract.address, 0)
             }
         }
 
         // finish upgrade without verifying priority operations
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishProxyUpgrade(proxyTestContract.address, []) )).revertReason).equal("umf13")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishProxyUpgrade([bytes[2], bytes[3]], [2]) )).revertReason).equal("fpu14")
         // finish upgrade
         await proxyDummyInterface.verifyPriorityOperation();
-        await expect(UpgradeGatekeeperContract.finishProxyUpgrade(proxyTestContract.address, [bytes[2], bytes[3]]))
+        await expect(UpgradeGatekeeperContract.finishProxyUpgrade([bytes[2], bytes[3]], [2]))
             .to.emit(UpgradeGatekeeperContract, 'UpgradeCompleted')
             .withArgs(proxyTestContract.address, 0, DummySecond.address)
 
@@ -115,14 +114,6 @@ describe("UpgradeGatekeeper unit tests", function () {
             .to.equal(bytes[2]);
         expect(parseInt(await provider.getStorageAt(proxyTestContract.address, 3)))
             .to.equal(bytes[3]);
-
-        // one more activate and cancel with version equal to 1
-        await expect(UpgradeGatekeeperContract.startProxyUpgrade(proxyTestContract.address, DummyFirst.address))
-            .to.emit(UpgradeGatekeeperContract, 'UpgradeModeActivated')
-            .withArgs(proxyTestContract.address, 1);
-        await expect(UpgradeGatekeeperContract.cancelProxyUpgrade(proxyTestContract.address))
-            .to.emit(UpgradeGatekeeperContract, 'UpgradeCanceled')
-            .withArgs(proxyTestContract.address, 1);
     });
 
     it("checking the presence in the main contract functions that will be called from the gatekeeper", async () => {

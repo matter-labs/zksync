@@ -19,6 +19,7 @@ cp $IN_DIR/Bytes.sol $OUT_DIR/Bytes.sol
 cp $IN_DIR/Events.sol $OUT_DIR/Events.sol
 cp $IN_DIR/Operations.sol $OUT_DIR/Operations.sol
 cp $IN_DIR/VerificationKey.sol $OUT_DIR/VerificationKey.sol
+cp $IN_DIR/Governance.sol $OUT_DIR/GovernanceTestNoInit.sol
 cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTestNoInit.sol
 
 # Change dependencies
@@ -31,7 +32,8 @@ ssed 's/Storage/StorageTest/' -i $OUT_DIR/*.sol
 ssed 's/Config/ConfigTest/' -i $OUT_DIR/*.sol
 ssed 's/UpgradeGatekeeper/UpgradeGatekeeperTest/' -i $OUT_DIR/*.sol
 
-# Renaming contract in FranklinTestNoInit.sol
+# Renaming no init contracts
+ssed 's/contract GovernanceTest/contract GovernanceTestNoInit/' -i $OUT_DIR/GovernanceTestNoInit.sol
 ssed 's/contract FranklinTest/contract FranklinTestNoInit/' -i $OUT_DIR/FranklinTestNoInit.sol
 
 
@@ -58,5 +60,6 @@ create_constant_getter NOTICE_PERIOD $OUT_DIR/UpgradeGatekeeperTest.sol
 # Verify always true
 set_constant DUMMY_VERIFIER true $OUT_DIR/VerifierTest.sol
 
-# Make initialize function in FranklinTestNoInit to do nothing
+# Make initialize function in no init contracts to do nothing
+ssed -E "s/    function initialize(.*)/    function initialize\1\n        return;/" -i $OUT_DIR/GovernanceTestNoInit.sol
 ssed -E "s/    function initialize(.*)/    function initialize\1\n        return;/" -i $OUT_DIR/FranklinTestNoInit.sol

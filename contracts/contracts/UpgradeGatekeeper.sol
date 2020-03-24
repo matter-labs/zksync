@@ -2,6 +2,7 @@ pragma solidity 0.5.16;
 
 import "./Events.sol";
 import "./Ownable.sol";
+import "./Bytes.sol";
 
 
 /// @title Upgrade Gatekeeper Contract
@@ -9,13 +10,19 @@ import "./Ownable.sol";
 contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
     /// @notice Notice period before activation preparation status of upgrade mode (in seconds)
-    uint256 constant NOTICE_PERIOD = 2 weeks;
+    uint constant NOTICE_PERIOD = 2 weeks;
 
     /// @notice Versions of proxy contracts
     mapping(address => uint64) public version;
 
     /// @notice Contract which processes priority operations
     address public mainContractAddress;
+
+    /// @notice Number of proxy contracts managed by the gatekeeper
+    uint64 public numberOfProxies;
+
+    /// @notice Addresses of proxy contracts managed by the gatekeeper
+    mapping(uint64 => address) public proxyAddress;
 
     /// @notice Upgrade mode statuses
     enum UpgradeStatus {
@@ -24,25 +31,19 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         Preparation
     }
 
-    /// @notice Info for upgrade proxy
-    struct UpgradeInfo {
-        UpgradeStatus upgradeStatus;
+    UpgradeStatus upgradeStatus;
 
-        /// @notice Notice period activation timestamp (in seconds)
-        /// @dev Will be equal to zero in case of not active mode
-        uint256 activationTime;
+    /// @notice Notice period activation timestamp (in seconds)
+    /// @dev Will be equal to zero in case of not active mode
+    uint activationTime;
 
-        /// @notice Address of the next version of the contract to be upgraded
-        /// @dev Will store zero in case of not active upgrade mode
-        address nextTarget;
+    /// @notice Address of the next version of the contract to be upgraded per each proxy
+    /// @dev Will store zero in case of not active upgrade mode
+    mapping(address => address) nextTarget;
 
-        /// @notice Number of priority operations that must be verified by main contract at the time of finishing upgrade
-        /// @dev Will store zero in case of not active upgrade mode or not active preparation status of upgrade mode
-        uint64 priorityOperationsToProcessBeforeUpgrade;
-    }
-
-    /// @notice UpgradeInfo per each proxy
-    mapping(address => UpgradeInfo) public upgradeInfo;
+    /// @notice Number of priority operations that must be verified by main contract at the time of finishing upgrade
+    /// @dev Will store zero in case of not active upgrade mode or not active preparation status of upgrade mode
+    uint64 priorityOperationsToProcessBeforeUpgrade;
 
     /// @notice Contract constructor
     /// @param _mainContractAddress Address of contract which processes priority operations
@@ -51,56 +52,88 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         mainContractAddress = _mainContractAddress;
     }
 
-    /// @notice Starts upgrade (activates notice period)
-    /// @param proxyAddress Address of proxy to process
-    /// @param newTarget New target
-    function startProxyUpgrade(address proxyAddress, address newTarget) external {
+    /// @notice Clears list of proxies managed by the gatekeeper (for case of mistake when adding new proxies to the gatekeeper)
+    function clearProxyList() external {
         requireMaster(msg.sender);
-        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Idle, "upa11"); // upa11 - unable to activate active upgrade mode
 
-        upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.NoticePeriod;
-        upgradeInfo[proxyAddress].activationTime = now;
-        upgradeInfo[proxyAddress].nextTarget = newTarget;
-        upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
+        upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Idle;
+        activationTime = 0;
+        for (uint64 i = 0; i < numberOfProxies; i++) {
+            address proxy = proxyAddress[i];
+            nextTarget[proxy] = address(0);
+        }
+        priorityOperationsToProcessBeforeUpgrade = 0;
 
-        emit UpgradeModeActivated(proxyAddress, version[proxyAddress]);
+        numberOfProxies = 0;
+        emit ProxyListCleared();
+    }
+
+    /// @notice Adds a new proxy to the list of contracts managed by the gatekeeper
+    /// @param proxy Address of proxy to add
+    function addProxyContract(address proxy) external {
+        requireMaster(msg.sender);
+        require(upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Idle, "apc11"); /// apc11 - proxy can't be added during upgrade
+
+        proxyAddress[numberOfProxies] = proxy;
+        numberOfProxies++;
+
+        emit ProxyAdded(proxy);
+    }
+
+    /// @notice Starts upgrade (activates notice period)
+    /// @param newTargets New proxies targets
+    function startProxyUpgrade(address[] calldata newTargets) external {
+        requireMaster(msg.sender);
+        require(upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Idle, "spu11"); // spu11 - unable to activate active upgrade mode
+        require(newTargets.length == numberOfProxies, "spu12"); // spu12 - number of new targets must be equal to the number of proxies
+
+        upgradeStatus = UpgradeGatekeeper.UpgradeStatus.NoticePeriod;
+        activationTime = now;
+        for (uint64 i = 0; i < numberOfProxies; i++) {
+            address proxy = proxyAddress[i];
+            nextTarget[proxy] = newTargets[i];
+        }
+        priorityOperationsToProcessBeforeUpgrade = 0;
+
+        emit UpgradeModeActivated();
     }
 
     /// @notice Cancels upgrade
-    /// @param proxyAddress Address of proxy to process
-    function cancelProxyUpgrade(address proxyAddress) external {
+    function cancelProxyUpgrade() external {
         requireMaster(msg.sender);
-        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeGatekeeper.UpgradeStatus.Idle, "umc11"); // umc11 - unable to cancel not active upgrade mode
+        require(upgradeStatus != UpgradeGatekeeper.UpgradeStatus.Idle, "cpu11"); // cpu11 - unable to cancel not active upgrade mode
 
-        upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Idle;
-        upgradeInfo[proxyAddress].activationTime = 0;
-        upgradeInfo[proxyAddress].nextTarget = address(0);
-        upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
+        upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Idle;
+        activationTime = 0;
+        for (uint64 i = 0; i < numberOfProxies; i++) {
+            address proxy = proxyAddress[i];
+            nextTarget[proxy] = address(0);
+        }
+        priorityOperationsToProcessBeforeUpgrade = 0;
 
-        emit UpgradeCanceled(proxyAddress, version[proxyAddress]);
+        emit UpgradeCanceled();
     }
 
     /// @notice Checks that preparation status is active and activates it if needed
-    /// @param proxyAddress Address of proxy to process
     /// @return Bool flag indicating that preparation status is active after this call
-    function startPreparation(address proxyAddress) public returns (bool) {
-        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeGatekeeper.UpgradeStatus.Idle, "uaf11"); // uaf11 - unable to activate preparation status in case of not active upgrade mode
+    function startPreparation() public returns (bool) {
+        require(upgradeStatus != UpgradeGatekeeper.UpgradeStatus.Idle, "ugp11"); // ugp11 - unable to activate preparation status in case of not active upgrade mode
 
-        if (upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Preparation) {
+        if (upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Preparation) {
             return true;
         }
 
-        if (now >= upgradeInfo[proxyAddress].activationTime + NOTICE_PERIOD) {
-            upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Preparation;
+        if (now >= activationTime + NOTICE_PERIOD) {
+            upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Preparation;
 
             (bool mainContractCallSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
                 abi.encodeWithSignature("totalRegisteredPriorityOperations()")
             );
-            require(mainContractCallSuccess, "uaf12"); // uaf12 - main contract static call failed
+            require(mainContractCallSuccess, "ugp12"); // ugp12 - main contract static call failed
             uint64 totalRegisteredPriorityOperations = abi.decode(encodedResult, (uint64));
-            upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = totalRegisteredPriorityOperations;
+            priorityOperationsToProcessBeforeUpgrade = totalRegisteredPriorityOperations;
 
-            emit UpgradeModePreparationStatusActivated(proxyAddress, version[proxyAddress]);
+            emit UpgradeModePreparationStatusActivated();
             return true;
         } else {
             return false;
@@ -108,32 +141,51 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     }
 
     /// @notice Finishes upgrade
-    /// @param proxyAddress Address of proxy to process
-    /// @param newTargetInitializationParameters New target initialization parameters
-    function finishProxyUpgrade(address proxyAddress, bytes calldata newTargetInitializationParameters) external {
+    /// @param initParametersConcatenated New targets initialization parameters per each proxy (concatenated into one array)
+    /// @param sizeOfInitParameters Sizes of targets initialization parameters (in bytes)
+    function finishProxyUpgrade(bytes calldata initParametersConcatenated, uint[] calldata sizeOfInitParameters) external {
         requireMaster(msg.sender);
-        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Preparation, "umf11"); // umf11 - unable to finish upgrade without preparation status active
+        require(upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Preparation, "fpu11"); // fpu11 - unable to finish upgrade without preparation status active
+        require(sizeOfInitParameters.length == numberOfProxies, "fpu12"); // fpu12 - number of new targets initialization parameters must be equal to the number of proxies
 
         (bool mainContractCallSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
             abi.encodeWithSignature("totalVerifiedPriorityOperations()")
         );
-        require(mainContractCallSuccess, "umf12"); // umf12 - main contract static call failed
+        require(mainContractCallSuccess, "fpu13"); // fpu13 - main contract static call failed
         uint64 totalVerifiedPriorityOperations = abi.decode(encodedResult, (uint64));
 
-        require(totalVerifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade, "umf13"); // umf13 - can't finish upgrade before verifing all priority operations received before start of preparation status
+        require(totalVerifiedPriorityOperations >= priorityOperationsToProcessBeforeUpgrade, "fpu14"); // fpu14 - can't finish upgrade before verifying all priority operations received before start of preparation status
 
-        (bool proxyUpgradeCallSuccess, ) = proxyAddress.call(
-            abi.encodeWithSignature("upgradeTarget(address,bytes)", upgradeInfo[proxyAddress].nextTarget, newTargetInitializationParameters)
-        );
-        require(proxyUpgradeCallSuccess, "umf14"); // umf14 - proxy contract call failed
+        bytes memory initParametersConcatenated = initParametersConcatenated;
+        uint processedBytes = 0;
+        for (uint64 i = 0; i < numberOfProxies; i++) {
+            address proxy = proxyAddress[i];
+            bytes memory targetInitParameters;
 
-        emit UpgradeCompleted(proxyAddress, version[proxyAddress], upgradeInfo[proxyAddress].nextTarget);
-        version[proxyAddress]++;
+            // TODO: remove this when Bytes.slice function will be fixed
+            if (sizeOfInitParameters[i] == 0){
+                targetInitParameters = new bytes(0);
+            } else {
+                (processedBytes, targetInitParameters) = Bytes.read(initParametersConcatenated, processedBytes, sizeOfInitParameters[i]);
+            }
 
-        upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Idle;
-        upgradeInfo[proxyAddress].activationTime = 0;
-        upgradeInfo[proxyAddress].nextTarget = address(0);
-        upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = 0;
+            (bool proxyUpgradeCallSuccess, ) = proxy.call(
+                abi.encodeWithSignature("upgradeTarget(address,bytes)", nextTarget[proxy], targetInitParameters)
+            );
+            require(proxyUpgradeCallSuccess, "fpu15"); // fpu15 - proxy contract call failed
+
+            emit UpgradeCompleted(proxy, version[proxy], nextTarget[proxy]);
+            version[proxy]++;
+        }
+        require(processedBytes == initParametersConcatenated.length, "fpu16"); // fpu16 - all targets initialization parameters bytes must be processed
+
+        upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Idle;
+        activationTime = 0;
+        for (uint64 i = 0; i < numberOfProxies; i++) {
+            address proxy = proxyAddress[i];
+            nextTarget[proxy] = address(0);
+        }
+        priorityOperationsToProcessBeforeUpgrade = 0;
     }
 
 }

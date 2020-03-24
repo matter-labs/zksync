@@ -6,6 +6,7 @@ import {deployContract} from "ethereum-waffle";
 const {performance} = require('perf_hooks');
 const {expect} = require("chai")
 
+export const GovernanceTestNoInitContractCode = require(`../build/GovernanceTestNoInit`);
 export const FranklinTestNoInitContractCode = require(`../build/FranklinTestNoInit`);
 
 async function main() {
@@ -42,7 +43,13 @@ async function main() {
         wallet,
     );
 
-    const newTarget = await deployContract(
+    const newTargetGovernance = await deployContract(
+        wallet,
+        GovernanceTestNoInitContractCode,
+        [],
+        {gasLimit: 6500000},
+    );
+    const newTargetFranklin = await deployContract(
         wallet,
         FranklinTestNoInitContractCode,
         [],
@@ -51,17 +58,17 @@ async function main() {
 
     let notice_period = parseInt(await upgradeGatekeeper.get_NOTICE_PERIOD());
 
-    await (await upgradeGatekeeper.startProxyUpgrade(proxyContract.address, newTarget.address)).wait();
+    await (await upgradeGatekeeper.startProxyUpgrade([newTargetGovernance.address, newTargetFranklin.address])).wait();
 
     // wait notice period
     await new Promise(r => setTimeout(r, notice_period * 1000 + 10));
 
     // finish upgrade
-    await (await upgradeGatekeeper.startPreparation(proxyContract.address)).wait();
-    await (await upgradeGatekeeper.finishProxyUpgrade(proxyContract.address, [])).wait();
+    await (await upgradeGatekeeper.startPreparation()).wait();
+    await (await upgradeGatekeeper.finishProxyUpgrade([], [0, 0])).wait();
 
     await expect(await proxyContract.getTarget())
-        .to.equal(newTarget.address);
+        .to.equal(newTargetFranklin.address);
 }
 
 main();
