@@ -2,7 +2,12 @@
 // Built-in deps
 use std::str::FromStr;
 // External uses
+/// Local uses
+use crate::Operation;
 use web3::types::{H256, U256};
+
+/// Numerical identifier of the Ethereum operation.
+pub type EthOpId = i64;
 
 /// Type of the transactions sent to the Ethereum network.
 #[derive(Debug, Clone, PartialEq)]
@@ -41,12 +46,14 @@ impl FromStr for OperationType {
 }
 
 /// Stored Ethereum operation.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct ETHOperation {
     // Numeric ID of the operation.
     pub id: i64,
     /// Type of the operation.
     pub op_type: OperationType,
+    /// Optional ZKSync operation associated with Ethereum operation.
+    pub op: Option<Operation>,
     /// Used nonce (fixed for all the sent transactions).
     pub nonce: U256,
     /// Deadline block of the last sent transaction.
@@ -63,4 +70,19 @@ pub struct ETHOperation {
     /// Hash of the accepted Ethereum transaction (if operation
     /// is confirmed).
     pub final_hash: Option<H256>,
+}
+
+impl PartialEq for ETHOperation {
+    fn eq(&self, other: &Self) -> bool {
+        // We assume that there will be no two different `ETHOperation`s with
+        // the same identifiers.
+        // However, the volatile fields (e.g. `used_tx_hashes` and `confirmed`) may vary
+        // for the same operation in different states, so we compare them as well.
+        (self.id == other.id)
+            && (self.last_deadline_block == other.last_deadline_block)
+            && (self.last_used_gas_price == other.last_used_gas_price)
+            && (self.used_tx_hashes == other.used_tx_hashes)
+            && (self.confirmed == other.confirmed)
+            && (self.final_hash == other.final_hash)
+    }
 }

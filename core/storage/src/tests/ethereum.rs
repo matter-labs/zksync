@@ -35,7 +35,7 @@ pub fn get_operation(block_number: BlockNumber) -> Operation {
 #[derive(Debug)]
 pub struct EthereumTxParams {
     op_type: String,
-    op_id: i64,
+    op: Operation,
     hash: H256,
     deadline_block: u64,
     nonce: u32,
@@ -44,11 +44,12 @@ pub struct EthereumTxParams {
 }
 
 impl EthereumTxParams {
-    pub fn new(op_type: String, op_id: i64, nonce: u32) -> Self {
+    pub fn new(op_type: String, op: Operation, nonce: u32) -> Self {
+        let op_id = op.id.unwrap() as u64;
         Self {
             op_type,
-            op_id,
-            hash: H256::from_low_u64_ne(op_id as u64),
+            op,
+            hash: H256::from_low_u64_ne(op_id),
             deadline_block: 100,
             nonce,
             gas_price: 1000.into(),
@@ -65,6 +66,7 @@ impl EthereumTxParams {
         ETHOperation {
             id: db_id,
             op_type,
+            op: Some(self.op.clone()),
             nonce: self.nonce.into(),
             last_deadline_block: self.deadline_block,
             last_used_gas_price,
@@ -112,10 +114,10 @@ fn ethereum_storage() {
         let operation = BlockSchema(&conn).execute_operation(get_operation(block_number))?;
 
         // Store the Ethereum transaction.
-        let params = EthereumTxParams::new("commit".into(), operation.id.unwrap(), 1);
+        let params = EthereumTxParams::new("commit".into(), operation.clone(), 1);
         EthereumSchema(&conn).save_new_eth_tx(
             OperationType::Commit,
-            Some(params.op_id),
+            Some(params.op.id.unwrap()),
             params.hash,
             params.deadline_block,
             params.nonce,
@@ -125,11 +127,8 @@ fn ethereum_storage() {
 
         // Check that it can be loaded.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
-        let eth_op = unconfirmed_operations[0].0.clone();
-        let op = unconfirmed_operations[0]
-            .1
-            .clone()
-            .expect("No Operation entry");
+        let eth_op = unconfirmed_operations[0].clone();
+        let op = eth_op.op.clone().expect("No Operation entry");
         assert_eq!(op.id, operation.id);
         // Load the database ID, since we can't predict it for sure.
         assert_eq!(eth_op, params.to_eth_op(eth_op.id));
@@ -139,10 +138,10 @@ fn ethereum_storage() {
         let operation_2 = BlockSchema(&conn).execute_operation(get_operation(block_number))?;
 
         // Create one more Ethereum transaction.
-        let params_2 = EthereumTxParams::new("commit".into(), operation_2.id.unwrap(), 2);
+        let params_2 = EthereumTxParams::new("commit".into(), operation_2.clone(), 2);
         EthereumSchema(&conn).save_new_eth_tx(
             OperationType::Commit,
-            Some(params_2.op_id),
+            Some(params_2.op.id.unwrap()),
             params_2.hash,
             params_2.deadline_block,
             params_2.nonce,
@@ -153,11 +152,8 @@ fn ethereum_storage() {
         // Check that we now can load two operations.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
         assert_eq!(unconfirmed_operations.len(), 2);
-        let eth_op = unconfirmed_operations[1].0.clone();
-        let op = unconfirmed_operations[1]
-            .1
-            .clone()
-            .expect("No Operation entry");
+        let eth_op = unconfirmed_operations[1].clone();
+        let op = eth_op.op.clone().expect("No Operation entry");
         assert_eq!(op.id, operation_2.id);
         assert_eq!(eth_op, params_2.to_eth_op(eth_op.id));
 

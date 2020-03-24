@@ -6,10 +6,7 @@ use diesel::dsl::{insert_into, update};
 use diesel::prelude::*;
 use web3::types::{H256, U256};
 // Workspace imports
-use models::{
-    ethereum::{ETHOperation, OperationType},
-    Operation,
-};
+use models::ethereum::{ETHOperation, OperationType};
 // Local imports
 use self::records::{
     ETHBinding, ETHNonce, ETHStats, ETHTxHash, NewETHBinding, NewETHOperation, NewETHTxHash,
@@ -30,9 +27,7 @@ pub struct EthereumSchema<'a>(pub &'a StorageProcessor);
 impl<'a> EthereumSchema<'a> {
     /// Loads the list of operations that were not confirmed on Ethereum,
     /// each operation has a list of sent Ethereum transactions.
-    pub fn load_unconfirmed_operations(
-        &self,
-    ) -> QueryResult<Vec<(ETHOperation, Option<Operation>)>> {
+    pub fn load_unconfirmed_operations(&self) -> QueryResult<Vec<ETHOperation>> {
         // Load the operations with the associated Ethereum transactions
         // from the database.
         // Here we obtain a sequence of one-to-one mappings (ETH tx) -> (operation ID).
@@ -56,7 +51,7 @@ impl<'a> EthereumSchema<'a> {
         })?;
 
         // Create a vector for the expected output.
-        let mut ops: Vec<(ETHOperation, Option<Operation>)> = Vec::with_capacity(raw_ops.len());
+        let mut ops: Vec<ETHOperation> = Vec::with_capacity(raw_ops.len());
 
         // Transform the `StoredOperation` to `Operation` and `StoredETHOperation` to `ETHOperation`.
         for (eth_op, _, raw_op) in raw_ops {
@@ -90,6 +85,7 @@ impl<'a> EthereumSchema<'a> {
             let eth_op = ETHOperation {
                 id: eth_op.id,
                 op_type,
+                op,
                 nonce: eth_op.nonce.into(),
                 last_deadline_block: eth_op.last_deadline_block as u64,
                 last_used_gas_price,
@@ -99,7 +95,7 @@ impl<'a> EthereumSchema<'a> {
                 final_hash,
             };
 
-            ops.push((eth_op, op));
+            ops.push(eth_op);
         }
 
         Ok(ops)
@@ -115,7 +111,7 @@ impl<'a> EthereumSchema<'a> {
         nonce: u32,
         gas_price: BigDecimal,
         raw_tx: Vec<u8>,
-    ) -> QueryResult<()> {
+    ) -> QueryResult<i64> {
         let operation = NewETHOperation {
             op_type: op_type.to_string(),
             nonce: i64::from(nonce),
@@ -161,9 +157,10 @@ impl<'a> EthereumSchema<'a> {
                     .execute(self.0.conn())?;
             }
 
+            // Update the stored stats.
             self.report_created_operation(op_type)?;
 
-            Ok(())
+            Ok(eth_op_id)
         })
     }
 
