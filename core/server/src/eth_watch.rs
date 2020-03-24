@@ -1,9 +1,9 @@
-//! Ethereum watcher polls ethereum node for new events
+//! Ethereum watcher polls the Ethereum node for new events
 //! such as PriorityQueue events or NewToken events.
-//! New events are accepted to the ZK Sync network only after sufficient confirmations.
+//! New events are accepted to the ZK Sync network once they have the sufficient amount of confirmations.
 //!
-//! Poll interval is configured using `ETH_POLL_INTERVAL` constant.
-//! Number of confirmations are configured using `CONFIRMATIONS_FOR_ETH_EVENT`.
+//! Poll interval is configured using the `ETH_POLL_INTERVAL` constant.
+//! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` constant.
 //!
 
 // Built-in deps
@@ -50,7 +50,7 @@ pub enum EthWatchRequest {
 pub struct EthWatch<T: Transport> {
     gov_contract: (ethabi::Contract, Contract<T>),
     zksync_contract: (ethabi::Contract, Contract<T>),
-    /// The last block of the ethereum network known to ethereum watcher.
+    /// The last block of the Ethereum network known to the Ethereum watcher.
     last_ethereum_block: u64,
     eth_state: ETHState,
     web3: Web3<T>,
