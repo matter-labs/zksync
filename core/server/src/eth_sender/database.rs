@@ -4,23 +4,32 @@
 //! database to run, which is required for tests.
 
 // Built-in deps
-use std::collections::VecDeque;
 use std::str::FromStr;
 // External uses
 use bigdecimal::BigDecimal;
-use web3::types::H256;
+use web3::types::{H256, U256};
 // Workspace uses
+use models::ethereum::{ETHOperation, EthOpId};
 use storage::ConnectionPool;
 // Local uses
-use super::transactions::{ETHStats, OperationETHState, OperationType, TransactionETHState};
+use super::transactions::ETHStats;
 
 /// Abstract database access trait, optimized for the needs of `ETHSender`.
 pub(super) trait DatabaseAccess {
     /// Loads the unconfirmed operations from the database.
-    fn restore_state(&self) -> Result<VecDeque<OperationETHState>, failure::Error>;
+    fn restore_state(&self) -> Result<Vec<ETHOperation>, failure::Error>;
 
-    /// Saves an unconfirmed operation to the database.
-    fn save_unconfirmed_operation(&self, tx: &TransactionETHState) -> Result<(), failure::Error>;
+    /// Saves a new unconfirmed operation to the database.
+    fn save_new_eth_tx(&self, op: &ETHOperation) -> Result<EthOpId, failure::Error>;
+
+    /// Adds a new tx info to the previously started Ethereum operation.
+    fn update_eth_tx(
+        &self,
+        eth_op_id: EthOpId,
+        hash: &H256,
+        new_deadline_block: i64,
+        new_gas_value: U256,
+    ) -> Result<(), failure::Error>;
 
     /// Marks an operation as completed in the database.
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error>;
@@ -30,17 +39,6 @@ pub(super) trait DatabaseAccess {
 
     /// Loads the stored Ethereum operations stats.
     fn load_stats(&self) -> Result<ETHStats, failure::Error>;
-
-    /// Updates the stats counter with the new operation reported.
-    /// This method should be called once **per operation**. It means that if transaction
-    /// for some operation was stuck, and another transaction was created for it, this method
-    /// **should not** be invoked.
-    ///
-    /// This method expects the database to be initially prepared with inserting the actual
-    /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
-    /// and it's invoked within `db-reset` subcommand.
-    fn report_created_operation(&self, operation_type: OperationType)
-        -> Result<(), failure::Error>;
 }
 
 /// The actual database wrapper.
@@ -57,33 +55,49 @@ impl Database {
 }
 
 impl DatabaseAccess for Database {
-    fn restore_state(&self) -> Result<VecDeque<OperationETHState>, failure::Error> {
+    fn restore_state(&self) -> Result<Vec<ETHOperation>, failure::Error> {
         let storage = self
             .db_pool
             .access_storage()
             .expect("Failed to access storage");
 
-        let unconfirmed_ops = storage
-            .ethereum_schema()
-            .load_unconfirmed_operations()?
-            .into_iter()
-            .map(|(operation, txs)| OperationETHState {
-                operation,
-                txs: txs.into_iter().map(|tx| tx.into()).collect(),
-            })
-            .collect();
+        let unconfirmed_ops = storage.ethereum_schema().load_unconfirmed_operations()?;
         Ok(unconfirmed_ops)
     }
 
-    fn save_unconfirmed_operation(&self, tx: &TransactionETHState) -> Result<(), failure::Error> {
+    fn save_new_eth_tx(&self, op: &ETHOperation) -> Result<EthOpId, failure::Error> {
         let storage = self.db_pool.access_storage()?;
-        Ok(storage.ethereum_schema().save_operation_eth_tx(
-            tx.op_id,
-            tx.signed_tx.hash,
-            tx.deadline_block,
-            tx.signed_tx.nonce.as_u32(),
-            BigDecimal::from_str(&tx.signed_tx.gas_price.to_string()).unwrap(),
-            tx.signed_tx.raw_tx.clone(),
+
+        assert_eq!(
+            op.used_tx_hashes.len(),
+            1,
+            "For the new operation there should be exactly one tx hash"
+        );
+        let tx_hash = op.used_tx_hashes[0];
+        Ok(storage.ethereum_schema().save_new_eth_tx(
+            op.op_type.clone(),
+            op.op.clone().map(|op| op.id.unwrap()),
+            tx_hash,
+            op.last_deadline_block,
+            op.nonce.as_u32(),
+            BigDecimal::from_str(&op.last_used_gas_price.to_string()).unwrap(),
+            op.encoded_tx_data.clone(),
+        )?)
+    }
+
+    fn update_eth_tx(
+        &self,
+        eth_op_id: EthOpId,
+        hash: &H256,
+        new_deadline_block: i64,
+        new_gas_value: U256,
+    ) -> Result<(), failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+        Ok(storage.ethereum_schema().update_eth_tx(
+            eth_op_id,
+            hash,
+            new_deadline_block,
+            BigDecimal::from_str(&new_gas_value.to_string()).unwrap(),
         )?)
     }
 
@@ -101,15 +115,5 @@ impl DatabaseAccess for Database {
         let storage = self.db_pool.access_storage()?;
         let stats = storage.ethereum_schema().load_stats()?;
         Ok(stats.into())
-    }
-
-    fn report_created_operation(
-        &self,
-        operation_type: OperationType,
-    ) -> Result<(), failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        Ok(storage
-            .ethereum_schema()
-            .report_created_operation(operation_type)?)
     }
 }

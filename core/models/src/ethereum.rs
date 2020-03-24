@@ -3,7 +3,7 @@
 use std::str::FromStr;
 // External uses
 /// Local uses
-use crate::Operation;
+use crate::{Action, Operation};
 use web3::types::{H256, U256};
 
 /// Numerical identifier of the Ethereum operation.
@@ -70,6 +70,25 @@ pub struct ETHOperation {
     /// Hash of the accepted Ethereum transaction (if operation
     /// is confirmed).
     pub final_hash: Option<H256>,
+}
+
+impl ETHOperation {
+    /// Checks whether the transaction is considered "stuck".
+    /// "Stuck" transactions are ones that were not included into any block
+    /// within a desirable amount of time, and thus require re-sending with
+    /// increased gas amount.
+    pub fn is_stuck(&self, current_block: u64) -> bool {
+        current_block >= self.last_deadline_block
+    }
+
+    /// Checks whether this object relates to the `Verify` ZK Sync operation.
+    pub fn is_verify(&self) -> bool {
+        if let Some(op) = &self.op {
+            matches!(op.action, Action::Verify { .. })
+        } else {
+            false
+        }
+    }
 }
 
 impl PartialEq for ETHOperation {

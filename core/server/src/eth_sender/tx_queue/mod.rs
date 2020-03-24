@@ -1,5 +1,5 @@
 // Workspace imports
-use models::Operation;
+use models::{ethereum::OperationType, Operation};
 // Local imports
 use self::{counter_queue::CounterQueue, sparse_queue::SparseQueue};
 
@@ -10,6 +10,7 @@ pub type RawTxData = Vec<u8>;
 
 #[derive(Debug)]
 pub struct TxData {
+    pub op_type: OperationType,
     pub raw: RawTxData,
     pub operation: Option<Operation>,
 }
@@ -21,15 +22,17 @@ impl PartialEq for TxData {
 }
 
 impl TxData {
-    pub fn from_operation(operation: Operation, raw: RawTxData) -> Self {
+    pub fn from_operation(op_type: OperationType, operation: Operation, raw: RawTxData) -> Self {
         Self {
+            op_type,
             raw,
             operation: Some(operation),
         }
     }
 
-    pub fn from_raw(raw: RawTxData) -> Self {
+    pub fn from_raw(op_type: OperationType, raw: RawTxData) -> Self {
         Self {
+            op_type,
             raw,
             operation: None,
         }
@@ -238,12 +241,30 @@ mod tests {
         let mut queue = TxQueue::new(MAX_IN_FLY);
 
         // Add 2 commit, 2 verify and 2 withdraw operations.
-        queue.add_commit_operation(TxData::from_raw(vec![COMMIT_MARK, 0]));
-        queue.add_commit_operation(TxData::from_raw(vec![COMMIT_MARK, 1]));
-        queue.add_verify_operation(0, TxData::from_raw(vec![VERIFY_MARK, 0]));
-        queue.add_verify_operation(1, TxData::from_raw(vec![VERIFY_MARK, 1]));
-        queue.add_withdraw_operation(TxData::from_raw(vec![WITHDRAW_MARK, 0]));
-        queue.add_withdraw_operation(TxData::from_raw(vec![WITHDRAW_MARK, 1]));
+        queue.add_commit_operation(TxData::from_raw(
+            OperationType::Commit,
+            vec![COMMIT_MARK, 0],
+        ));
+        queue.add_commit_operation(TxData::from_raw(
+            OperationType::Commit,
+            vec![COMMIT_MARK, 1],
+        ));
+        queue.add_verify_operation(
+            0,
+            TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 0]),
+        );
+        queue.add_verify_operation(
+            1,
+            TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 1]),
+        );
+        queue.add_withdraw_operation(TxData::from_raw(
+            OperationType::Withdraw,
+            vec![WITHDRAW_MARK, 0],
+        ));
+        queue.add_withdraw_operation(TxData::from_raw(
+            OperationType::Withdraw,
+            vec![WITHDRAW_MARK, 1],
+        ));
 
         // Retrieve the next {MAX_IN_FLY} operations.
 
