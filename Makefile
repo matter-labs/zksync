@@ -129,9 +129,15 @@ image-prover: build-target
 
 image-rust: image-server image-prover
 
-push-image-rust: image-rust
+push-image-server:
 	docker push "${SERVER_DOCKER_IMAGE}"
+
+push-image-prover:
 	docker push "${PROVER_DOCKER_IMAGE}"
+
+push-image-rust: image-rust
+	push-image-server
+	push-image-prover
 
 # Contracts
 
@@ -215,14 +221,30 @@ init-deploy: confirm_action deploy-contracts db-insert-contract
 dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
 
-apply-kubeconfig:
-	@bin/k8s-apply
+apply-kubeconfig-server:
+	@bin/k8s-gen-resource-definitions
+	@bin/k8s-apply-server
 
-update-rust: push-image-rust apply-kubeconfig
+apply-kubeconfig-provers:
+	@bin/k8s-gen-resource-definitions
+	@bin/k8s-apply-provers
+
+apply-kubeconfig-nginx:
+	@bin/k8s-gen-resource-definitions
+	@bin/k8s-apply-nginx
+
+apply-kubeconfig:
+	apply-kubeconfig-server
+	apply-kubeconfig-provers
+	apply-kubeconfig-nginx
+
+update-provers: push-image-prover apply-kubeconfig-server
 	@kubectl patch deployment $(ZKSYNC_ENV)-server  --namespace $(ZKSYNC_ENV) -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+
+update-server: push-image-server apply-kubeconfig-provers
 	@bin/provers-patch-deployments
 
-update-nginx: push-image-nginx apply-kubeconfig
+update-nginx: push-image-nginx apply-kubeconfig-nginx
 	@kubectl patch deployment $(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
 update-all: update-rust update-nginx apply-kubeconfig
