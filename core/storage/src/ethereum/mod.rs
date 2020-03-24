@@ -55,9 +55,11 @@ impl<'a> EthereumSchema<'a> {
 
         // Transform the `StoredOperation` to `Operation` and `StoredETHOperation` to `ETHOperation`.
         for (eth_op, _, raw_op) in raw_ops {
-            // Load the stored txs hashes.
+            // Load the stored txs hashes ordered by their ID,
+            // so the latest added hash will be the last one in the list.
             let eth_tx_hashes: Vec<ETHTxHash> = eth_tx_hashes::table
                 .filter(eth_tx_hashes::eth_op_id.eq(eth_op.id))
+                .order_by(eth_tx_hashes::id.asc())
                 .load(self.0.conn())?;
             assert!(
                 eth_tx_hashes.len() >= 1,

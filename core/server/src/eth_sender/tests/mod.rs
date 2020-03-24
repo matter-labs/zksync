@@ -74,7 +74,10 @@ fn transaction_state() {
     ]
     .iter()
     .enumerate()
-    .map(|(nonce, op)| create_signed_tx(&eth_sender, op, deadline_block, nonce as i64))
+    .map(|(eth_op_id, op)| {
+        let nonce = eth_op_id as i64;
+        create_signed_tx(eth_op_id as i64, &eth_sender, op, deadline_block, nonce)
+    })
     .collect();
 
     // Committed operation.
@@ -207,7 +210,7 @@ fn operation_commitment_workflow() {
     let verify_operation_id = operations[1].id;
 
     for (eth_op_id, operation) in operations.iter().enumerate() {
-        let nonce = eth_op_id;
+        let nonce = eth_op_id as i64;
 
         // Send an operation to `ETHSender`.
         sender.try_send(operation.clone()).unwrap();
@@ -218,8 +221,13 @@ fn operation_commitment_workflow() {
 
         // Now we should see that transaction is stored in the database and sent to the Ethereum.
         let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-        let mut expected_tx =
-            create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
+        let mut expected_tx = create_signed_tx(
+            eth_op_id as i64,
+            &eth_sender,
+            operation,
+            deadline_block,
+            nonce,
+        );
         expected_tx.id = eth_op_id as i64; // We have to set the ID manually.
 
         eth_sender.db.assert_stored(&expected_tx);
@@ -281,9 +289,10 @@ fn stuck_transaction() {
     eth_sender.retrieve_operations();
     eth_sender.proceed_next_operations();
 
+    let eth_op_id = 0;
     let nonce = 0;
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-    let mut stuck_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
+    let mut stuck_tx = create_signed_tx(eth_op_id, &eth_sender, &operation, deadline_block, nonce);
 
     // Skip some blocks and expect sender to send a new tx.
     eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
@@ -339,22 +348,36 @@ fn stuck_transaction() {
 //         // Create the commit operation.
 //         let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3) as u64;
 //         let deadline_block = eth_sender.get_deadline_block(start_block);
-//         let nonce = idx * 3;
+//         let eth_op_idx = (idx * 3) as i64;
+//         let nonce = eth_op_idx;
 
-//         let commit_op_tx =
-//             create_signed_tx(&eth_sender, commit_operation, deadline_block, nonce as i64);
+//         let mut commit_op_tx = create_signed_tx(
+//             eth_op_idx,
+//             &eth_sender,
+//             commit_operation,
+//             deadline_block,
+//             nonce,
+//         );
 
 //         expected_txs.push(commit_op_tx);
 
 //         // Create the verify operation, as by priority it will be processed right after `commit`.
 //         let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3 + 1) as u64;
 //         let deadline_block = eth_sender.get_deadline_block(start_block);
-//         let nonce = idx * 3 + 1;
+//         let eth_op_idx = (idx * 3 + 1) as i64;
+//         let nonce = eth_op_idx;
 
-//         let verify_op_tx =
-//             create_signed_tx(&eth_sender, verify_operation, deadline_block, nonce as i64);
+//         let mut verify_op_tx = create_signed_tx(
+//             eth_op_idx,
+//             &eth_sender,
+//             verify_operation,
+//             deadline_block,
+//             nonce,
+//         );
 
 //         expected_txs.push(verify_op_tx);
+
+//         // Create the withdraw operation.
 //     }
 
 //     for operation in operations.iter() {
@@ -420,9 +443,10 @@ fn transaction_failure() {
     let operation = test_data::commit_operation(0);
     sender.try_send(operation.clone()).unwrap();
 
+    let eth_op_id = 0;
     let nonce = 0;
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-    let failing_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
+    let failing_tx = create_signed_tx(eth_op_id, &eth_sender, &operation, deadline_block, nonce);
 
     eth_sender.retrieve_operations();
     eth_sender.proceed_next_operations();
@@ -445,11 +469,10 @@ fn restore_state() {
         let verify_op = test_data::verify_operation(0);
 
         let deadline_block = eth_sender.get_deadline_block(1);
-        let commit_op_tx = create_signed_tx(&eth_sender, &commit_op, deadline_block, 0);
+        let commit_op_tx = create_signed_tx(0, &eth_sender, &commit_op, deadline_block, 0);
 
         let deadline_block = eth_sender.get_deadline_block(2);
-        let mut verify_op_tx = create_signed_tx(&eth_sender, &verify_op, deadline_block, 1);
-        verify_op_tx.id = 1;
+        let verify_op_tx = create_signed_tx(1, &eth_sender, &verify_op, deadline_block, 1);
 
         let operations = vec![commit_op.clone(), verify_op.clone()];
         let stored_operations = vec![commit_op_tx, verify_op_tx];
@@ -472,9 +495,14 @@ fn restore_state() {
         eth_sender.proceed_next_operations();
 
         let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-        let nonce = eth_op_id;
-        let mut expected_tx =
-            create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
+        let nonce = eth_op_id as i64;
+        let mut expected_tx = create_signed_tx(
+            eth_op_id as i64,
+            &eth_sender,
+            operation,
+            deadline_block,
+            nonce,
+        );
         expected_tx.id = eth_op_id as i64;
 
         eth_sender.db.assert_stored(&expected_tx);
@@ -508,9 +536,10 @@ fn confirmations_independence() {
     eth_sender.retrieve_operations();
     eth_sender.proceed_next_operations();
 
+    let eth_op_id = 0;
     let nonce = 0;
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-    let mut stuck_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
+    let mut stuck_tx = create_signed_tx(eth_op_id, &eth_sender, &operation, deadline_block, nonce);
 
     eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
     eth_sender.proceed_next_operations();

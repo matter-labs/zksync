@@ -331,6 +331,7 @@ pub(super) fn restored_eth_sender(
 /// This method should be used to create expected tx copies which won't affect
 /// the internal `ETHSender` state.
 pub(super) fn create_signed_tx(
+    id: i64,
     eth_sender: &ETHSender<MockEthereum, MockDatabase>,
     operation: &Operation,
     deadline_block: u64,
@@ -351,9 +352,44 @@ pub(super) fn create_signed_tx(
     };
 
     ETHOperation {
-        id: 0, // Will be initialized later.
+        id,
         op_type,
         op: Some(operation.clone()),
+        nonce: signed_tx.nonce,
+        last_deadline_block: deadline_block,
+        last_used_gas_price: signed_tx.gas_price,
+        used_tx_hashes: vec![signed_tx.hash],
+        encoded_tx_data: raw_tx,
+        confirmed: false,
+        final_hash: None,
+    }
+}
+
+/// Creates an `ETHOperation` object for a withdraw operation.
+pub(super) fn create_signed_withdraw_tx(
+    id: i64,
+    eth_sender: &ETHSender<MockEthereum, MockDatabase>,
+    deadline_block: u64,
+    nonce: i64,
+) -> ETHOperation {
+    let mut options = Options::default();
+    options.nonce = Some(nonce.into());
+
+    let raw_tx = eth_sender.ethereum.encode_tx_data(
+        "completeWithdrawals",
+        models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
+    );
+    let signed_tx = eth_sender
+        .ethereum
+        .sign_prepared_tx(raw_tx.clone(), options)
+        .unwrap();
+
+    let op_type = OperationType::Withdraw;
+
+    ETHOperation {
+        id,
+        op_type,
+        op: None,
         nonce: signed_tx.nonce,
         last_deadline_block: deadline_block,
         last_used_gas_price: signed_tx.gas_price,

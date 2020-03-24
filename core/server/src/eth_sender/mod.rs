@@ -156,6 +156,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     fn retrieve_operations(&mut self) {
         while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
+            info!(
+                "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
+                operation.id.expect("ID must be set"),
+                operation.action.to_string(),
+                operation.block.block_number
+            );
             self.add_operation_to_queue(operation);
         }
     }
@@ -185,8 +191,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         new_tx.id = op_id;
 
         info!(
-            "Sending ETH tx: ETH Operation {} ({:?}), ZKSync Operation {:?}",
-            new_tx.id, new_tx.op_type, new_tx.op,
+            "Sending new tx: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
+            new_tx.id, new_tx.op_type, new_tx.used_tx_hashes[0], self.zksync_operation_description(&new_tx),
         );
         self.ethereum.send_tx(&signed_tx)?;
 
@@ -212,11 +218,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         // Check if we've completed the commitment.
         match result {
             OperationCommitment::Committed => {
-                info!(
-                    "Confirmed: ETH Operation {} ({:?}), ZKSync Operation {:?}",
-                    operation.id, operation.op_type, operation.op,
-                );
-
                 // Free a slot for the next tx in the queue.
                 self.tx_queue.report_commitment();
 
@@ -235,6 +236,19 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 // Retry the operation again the next time.
                 self.ongoing_ops.push_front(operation);
             }
+        }
+    }
+
+    fn zksync_operation_description(&self, operation: &ETHOperation) -> String {
+        if let Some(op) = &operation.op {
+            format!(
+                "<id {}; action: {}; block: {}>",
+                op.id.expect("ID must be set"),
+                op.action.to_string(),
+                op.block.block_number
+            )
+        } else {
+            "<not applicable>".into()
         }
     }
 
@@ -266,8 +280,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 }
                 TxCheckOutcome::Committed => {
                     info!(
-                        "Eth operation {}, ZKSync operation {:?}, committed, tx: {:#x}",
-                        op.id, op.op, tx_hash,
+                        "Confirmed: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
+                        op.id, op.op_type, tx_hash, self.zksync_operation_description(op),
                     );
                     self.db.confirm_operation(tx_hash)?;
                     return Ok(OperationCommitment::Committed);
@@ -519,6 +533,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             "completeWithdrawals",
             config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
         );
+
+        info!("Adding withdraw operation to queue");
 
         self.tx_queue
             .add_withdraw_operation(TxData::from_raw(OperationType::Withdraw, raw_tx));

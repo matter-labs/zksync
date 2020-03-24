@@ -99,12 +99,15 @@ impl TxQueueBuilder {
 
     /// Finishes the queue building process.
     pub fn build(self) -> TxQueue {
+        // Block numbers are indexed starting from 1, so we have to increment.
+        let verify_operations_next_block = self.verify_operations_count + 1;
+
         TxQueue {
             max_pending_txs: self.max_pending_txs,
             sent_pending_txs: self.sent_pending_txs,
 
             commit_operations: CounterQueue::new_with_count(self.commit_operations_count),
-            verify_operations: SparseQueue::new_from(self.verify_operations_count),
+            verify_operations: SparseQueue::new_from(verify_operations_next_block),
             withdraw_operations: CounterQueue::new_with_count(self.withdraw_operations_count),
         }
     }
@@ -187,16 +190,16 @@ impl TxQueue {
         // If we've committed a corresponding `Commit` operation, and
         // there is a pending `verify` operation, chose it.
         let next_verify_op_id = self.verify_operations.next_id();
-        if next_verify_op_id < self.commit_operations.get_count()
-            && self.verify_operations.has_next()
-        {
+        let next_commit_op_id = self.commit_operations.get_count() + 1;
+        if next_verify_op_id < next_commit_op_id && self.verify_operations.has_next() {
             return Some(self.verify_operations.pop_front().unwrap());
         }
 
         // 2. After verify operations we should process withdraw operation.
 
         // We don't want to be ahead of the last verify operation.
-        if self.withdraw_operations.get_count() < next_verify_op_id {
+        let next_withdraw_op_id = self.withdraw_operations.get_count() + 1;
+        if next_withdraw_op_id < next_verify_op_id {
             if let Some(withdraw_operation) = self.withdraw_operations.pop_front() {
                 return Some(withdraw_operation);
             }
