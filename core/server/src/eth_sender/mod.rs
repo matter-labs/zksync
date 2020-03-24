@@ -41,6 +41,20 @@ const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
 const WAIT_CONFIRMATIONS: u64 = 1;
 
+/// `TxCheckMode` enum determines the policy on the obtaining the tx status.
+/// The latest sent transaction can be pending (we're still waiting for it),
+/// but if there is more than one tx for some Ethereum operation, it means that we
+/// already know that these transactions were considered stuck. Thus, lack of
+/// response (either successful or unsuccessful) for any of the old txs means
+/// that this transaction is still stuck.
+#[derive(Debug, Clone, PartialEq)]
+enum TxCheckMode {
+    /// Mode for the latest sent tx (pending state is allowed).
+    Latest,
+    /// Mode for the latest sent tx (pending state is not allowed).
+    Old,
+}
+
 /// `ETHSender` is a structure capable of anchoring
 /// the ZKSync operations to the Ethereum blockchain.
 ///
@@ -238,8 +252,14 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         // Check statuses of existing transactions.
         // Go through every transaction in a loop. We will exit this method early
         // if there will be discovered a pending or successfully committed transaction.
-        for tx_hash in &op.used_tx_hashes {
-            match self.check_transaction_state(op, tx_hash, current_block)? {
+        for (idx, tx_hash) in op.used_tx_hashes.iter().enumerate() {
+            let mode = if idx == op.used_tx_hashes.len() - 1 {
+                TxCheckMode::Latest
+            } else {
+                TxCheckMode::Old
+            };
+
+            match self.check_transaction_state(mode, op, tx_hash, current_block)? {
                 TxCheckOutcome::Pending => {
                     // Transaction is pending, nothing to do yet.
                     return Ok(OperationCommitment::Pending);
@@ -308,6 +328,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// and reduces it to the simpler `TxCheckOutcome` report.
     fn check_transaction_state(
         &self,
+        mode: TxCheckMode,
         op: &ETHOperation,
         tx_hash: &H256,
         current_block: u64,
@@ -337,8 +358,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             }
             // Stuck transaction.
             None if op.is_stuck(current_block) => TxCheckOutcome::Stuck,
-            // No status and not stuck yet, thus considered pending.
-            None => TxCheckOutcome::Pending,
+            // No status yet. If this is a latest transaction, it's pending.
+            // For an old tx it means that it's still stuck.
+            None => match mode {
+                TxCheckMode::Latest => TxCheckOutcome::Pending,
+                TxCheckMode::Old => TxCheckOutcome::Stuck,
+            },
         };
 
         Ok(outcome)

@@ -10,8 +10,8 @@ use web3::types::{H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
-    ethereum::{ETHOperation, EthOpId},
-    Operation,
+    ethereum::{ETHOperation, EthOpId, OperationType},
+    Action, Operation,
 };
 // Local uses
 use super::ETHSender;
@@ -53,24 +53,24 @@ impl MockDatabase {
     }
 
     /// Ensures that the provided transaction is stored in the database and not confirmed yet.
-    pub fn assert_stored(&self, id: i64, tx: &ETHOperation) {
-        assert_eq!(self.unconfirmed_operations.borrow().get(&id), Some(tx));
+    pub fn assert_stored(&self, tx: &ETHOperation) {
+        assert_eq!(self.unconfirmed_operations.borrow().get(&tx.id), Some(tx));
 
-        assert!(self.confirmed_operations.borrow().get(&id).is_none());
+        assert!(self.confirmed_operations.borrow().get(&tx.id).is_none());
     }
 
     /// Ensures that the provided transaction is not stored in the database.
-    pub fn assert_not_stored(&self, id: i64, tx: &ETHOperation) {
-        assert!(self.confirmed_operations.borrow().get(&id).is_none());
+    pub fn assert_not_stored(&self, tx: &ETHOperation) {
+        assert!(self.confirmed_operations.borrow().get(&tx.id).is_none());
 
-        assert!(self.unconfirmed_operations.borrow().get(&id).is_none());
+        assert!(self.unconfirmed_operations.borrow().get(&tx.id).is_none());
     }
 
     /// Ensures that the provided transaction is stored as confirmed.
-    pub fn assert_confirmed(&self, id: i64, tx: &ETHOperation) {
-        assert_eq!(self.confirmed_operations.borrow().get(&id), Some(tx));
+    pub fn assert_confirmed(&self, tx: &ETHOperation) {
+        assert_eq!(self.confirmed_operations.borrow().get(&tx.id), Some(tx));
 
-        assert!(self.unconfirmed_operations.borrow().get(&id).is_none());
+        assert!(self.unconfirmed_operations.borrow().get(&tx.id).is_none());
     }
 }
 
@@ -83,6 +83,10 @@ impl DatabaseAccess for MockDatabase {
         let id = self.pending_op_id.get();
         let new_id = id + 1;
         self.pending_op_id.set(new_id);
+
+        // Store with the assigned ID.
+        let mut op = op.clone();
+        op.id = id;
 
         self.unconfirmed_operations
             .borrow_mut()
@@ -318,27 +322,39 @@ pub(super) fn restored_eth_sender(
     )
 }
 
-// /// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.
-// /// This method should be used to create expected tx copies which won't affect
-// /// the internal `ETHSender` state.
-// pub(super) fn create_signed_tx(
-//     eth_sender: &ETHSender<MockEthereum, MockDatabase>,
-//     operation: &Operation,
-//     deadline_block: u64,
-//     nonce: i64,
-// ) -> ETHOperation {
-//     let mut options = Options::default();
-//     options.nonce = Some(nonce.into());
+/// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.
+/// This method should be used to create expected tx copies which won't affect
+/// the internal `ETHSender` state.
+pub(super) fn create_signed_tx(
+    eth_sender: &ETHSender<MockEthereum, MockDatabase>,
+    operation: &Operation,
+    deadline_block: u64,
+    nonce: i64,
+) -> ETHOperation {
+    let mut options = Options::default();
+    options.nonce = Some(nonce.into());
 
-//     let raw_tx = eth_sender.operation_to_raw_tx(&operation);
-//     let signed_tx = eth_sender
-//         .ethereum
-//         .sign_prepared_tx(raw_tx, options)
-//         .unwrap();
+    let raw_tx = eth_sender.operation_to_raw_tx(&operation);
+    let signed_tx = eth_sender
+        .ethereum
+        .sign_prepared_tx(raw_tx.clone(), options)
+        .unwrap();
 
-//     TransactionETHState {
-//         op_id: operation.id.unwrap(),
-//         deadline_block,
-//         signed_tx,
-//     }
-// }
+    let op_type = match operation.action {
+        Action::Commit => OperationType::Commit,
+        Action::Verify { .. } => OperationType::Verify,
+    };
+
+    ETHOperation {
+        id: 0, // Will be initialized later.
+        op_type,
+        op: Some(operation.clone()),
+        nonce: signed_tx.nonce,
+        last_deadline_block: deadline_block,
+        last_used_gas_price: signed_tx.gas_price,
+        used_tx_hashes: vec![signed_tx.hash],
+        encoded_tx_data: raw_tx,
+        confirmed: false,
+        final_hash: None,
+    }
+}

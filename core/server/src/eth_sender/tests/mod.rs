@@ -1,18 +1,18 @@
 // External uses
 use web3::contract::Options;
+// Workspace uses
+use models::ethereum::ETHOperation;
 // Local uses
-use self::mock::{default_eth_sender, restored_eth_sender};
+use self::mock::{create_signed_tx, default_eth_sender, restored_eth_sender};
 use super::{
     database::DatabaseAccess,
     ethereum_interface::EthereumInterface,
     transactions::{ETHStats, ExecutedTxStatus, TxCheckOutcome},
-    ETHSender,
+    ETHSender, TxCheckMode,
 };
 
 mod mock;
 mod test_data;
-
-/*
 
 /// Basic test that `ETHSender` creation does not panic and initializes correctly.
 #[test]
@@ -65,7 +65,7 @@ fn transaction_state() {
     let (mut eth_sender, _, _) = default_eth_sender();
     let current_block = eth_sender.ethereum.block_number;
     let deadline_block = eth_sender.get_deadline_block(current_block);
-    let operations: Vec<TransactionETHState> = vec![
+    let operations: Vec<ETHOperation> = vec![
         test_data::commit_operation(0), // Will be committed.
         test_data::commit_operation(1), // Will be pending because of not enough confirmations.
         test_data::commit_operation(2), // Will be failed.
@@ -85,7 +85,7 @@ fn transaction_state() {
     };
     eth_sender
         .ethereum
-        .add_execution(&operations[0], &committed_response);
+        .add_execution(&operations[0].used_tx_hashes[0], &committed_response);
 
     // Pending operation.
     let pending_response = ExecutedTxStatus {
@@ -95,7 +95,7 @@ fn transaction_state() {
     };
     eth_sender
         .ethereum
-        .add_execution(&operations[1], &pending_response);
+        .add_execution(&operations[1].used_tx_hashes[0], &pending_response);
 
     // Failed operation.
     let failed_response = ExecutedTxStatus {
@@ -105,7 +105,7 @@ fn transaction_state() {
     };
     eth_sender
         .ethereum
-        .add_execution(&operations[2], &failed_response);
+        .add_execution(&operations[2].used_tx_hashes[0], &failed_response);
 
     // Checks.
 
@@ -113,7 +113,9 @@ fn transaction_state() {
     assert_eq!(
         eth_sender
             .check_transaction_state(
+                TxCheckMode::Latest,
                 &operations[0],
+                &operations[0].used_tx_hashes[0],
                 current_block + committed_response.confirmations
             )
             .unwrap(),
@@ -124,7 +126,9 @@ fn transaction_state() {
     assert_eq!(
         eth_sender
             .check_transaction_state(
+                TxCheckMode::Latest,
                 &operations[1],
+                &operations[1].used_tx_hashes[0],
                 current_block + pending_response.confirmations
             )
             .unwrap(),
@@ -135,7 +139,9 @@ fn transaction_state() {
     assert_eq!(
         eth_sender
             .check_transaction_state(
+                TxCheckMode::Latest,
                 &operations[2],
+                &operations[2].used_tx_hashes[0],
                 current_block + failed_response.confirmations
             )
             .unwrap(),
@@ -146,7 +152,9 @@ fn transaction_state() {
     assert_eq!(
         eth_sender
             .check_transaction_state(
+                TxCheckMode::Latest,
                 &operations[3],
+                &operations[3].used_tx_hashes[0],
                 current_block + super::EXPECTED_WAIT_TIME_BLOCKS
             )
             .unwrap(),
@@ -157,11 +165,26 @@ fn transaction_state() {
     assert_eq!(
         eth_sender
             .check_transaction_state(
+                TxCheckMode::Latest,
                 &operations[4],
+                &operations[4].used_tx_hashes[0],
                 current_block + super::EXPECTED_WAIT_TIME_BLOCKS - 1
             )
             .unwrap(),
         TxCheckOutcome::Pending
+    );
+
+    // Pending old operation should be considered stuck.
+    assert_eq!(
+        eth_sender
+            .check_transaction_state(
+                TxCheckMode::Old,
+                &operations[4],
+                &operations[4].used_tx_hashes[0],
+                current_block + super::EXPECTED_WAIT_TIME_BLOCKS - 1
+            )
+            .unwrap(),
+        TxCheckOutcome::Stuck
     );
 }
 
@@ -183,7 +206,9 @@ fn operation_commitment_workflow() {
 
     let verify_operation_id = operations[1].id;
 
-    for (nonce, operation) in operations.iter().enumerate() {
+    for (eth_op_id, operation) in operations.iter().enumerate() {
+        let nonce = eth_op_id;
+
         // Send an operation to `ETHSender`.
         sender.try_send(operation.clone()).unwrap();
 
@@ -193,9 +218,14 @@ fn operation_commitment_workflow() {
 
         // Now we should see that transaction is stored in the database and sent to the Ethereum.
         let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-        let expected_tx = create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
+        let mut expected_tx =
+            create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
+        expected_tx.id = eth_op_id as i64; // We have to set the ID manually.
+
         eth_sender.db.assert_stored(&expected_tx);
-        eth_sender.ethereum.assert_sent(&expected_tx);
+        eth_sender
+            .ethereum
+            .assert_sent(&expected_tx.used_tx_hashes[0]);
 
         // No confirmation should be done yet.
         assert!(receiver.try_next().is_err());
@@ -204,10 +234,12 @@ fn operation_commitment_workflow() {
         // operation again.
         eth_sender
             .ethereum
-            .add_successfull_execution(expected_tx.signed_tx.hash, super::WAIT_CONFIRMATIONS);
+            .add_successfull_execution(expected_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
         eth_sender.proceed_next_operations();
 
         // Check that operation is confirmed.
+        expected_tx.confirmed = true;
+        expected_tx.final_hash = Some(expected_tx.used_tx_hashes[0]);
         eth_sender.db.assert_confirmed(&expected_tx);
     }
 
@@ -224,7 +256,7 @@ fn operation_commitment_workflow() {
         .ethereum
         .sign_prepared_tx(raw_tx, options)
         .unwrap();
-    eth_sender.ethereum.assert_sent_by_hash(&tx.hash);
+    eth_sender.ethereum.assert_sent(&tx.hash);
 
     // We should be notified about verify operation being completed.
     assert_eq!(
@@ -251,34 +283,33 @@ fn stuck_transaction() {
 
     let nonce = 0;
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-    let stuck_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
+    let mut stuck_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
 
     // Skip some blocks and expect sender to send a new tx.
     eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
     eth_sender.proceed_next_operations();
 
     // Check that new transaction is sent (and created based on the previous stuck tx).
-    let raw_tx = stuck_tx.signed_tx.raw_tx.clone();
-    let expected_tx = eth_sender
-        .sign_raw_tx(
-            stuck_tx.op_id,
-            raw_tx,
+    let expected_sent_tx = eth_sender
+        .create_supplement_tx(
             eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
-            Some(&stuck_tx),
+            &mut stuck_tx,
         )
         .unwrap();
-    eth_sender.db.assert_stored(&expected_tx);
-    eth_sender.ethereum.assert_sent(&expected_tx);
+    eth_sender.db.assert_stored(&stuck_tx);
+    eth_sender.ethereum.assert_sent(&expected_sent_tx.hash);
 
     // Increment block, make the transaction look successfully executed, and process the
     // operation again.
     eth_sender
         .ethereum
-        .add_successfull_execution(expected_tx.signed_tx.hash, super::WAIT_CONFIRMATIONS);
+        .add_successfull_execution(stuck_tx.used_tx_hashes[1], super::WAIT_CONFIRMATIONS);
     eth_sender.proceed_next_operations();
 
-    // Check that operation is confirmed.
-    eth_sender.db.assert_confirmed(&expected_tx);
+    // Check that operation is confirmed (we set the final hash to the second sent tx).
+    stuck_tx.confirmed = true;
+    stuck_tx.final_hash = Some(stuck_tx.used_tx_hashes[1]);
+    eth_sender.db.assert_confirmed(&stuck_tx);
 }
 
 // TODO: Restore once withdraw operations are fixed in `eth_sender`.
@@ -398,10 +429,11 @@ fn transaction_failure() {
 
     eth_sender
         .ethereum
-        .add_failed_execution(&failing_tx, super::WAIT_CONFIRMATIONS);
+        .add_failed_execution(&failing_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
     eth_sender.proceed_next_operations();
 }
 
+/*
 /// Check that after recovering state with several non-processed operations
 /// they will be processed normally.
 #[test]
@@ -471,6 +503,7 @@ fn restore_state() {
 
     assert!(receiver.try_next().unwrap().is_some());
 }
+*/
 
 /// Checks that even after getting the first transaction stuck and sending the next
 /// one, confirmation for the first (stuck) transaction is processed and leads
@@ -490,31 +523,28 @@ fn confirmations_independence() {
 
     let nonce = 0;
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-    let stuck_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
+    let mut stuck_tx = create_signed_tx(&eth_sender, &operation, deadline_block, nonce);
 
     eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
     eth_sender.proceed_next_operations();
 
-    let raw_tx = stuck_tx.signed_tx.raw_tx.clone();
     let next_tx = eth_sender
-        .sign_raw_tx(
-            stuck_tx.op_id,
-            raw_tx,
+        .create_supplement_tx(
             eth_sender.get_deadline_block(eth_sender.ethereum.block_number),
-            Some(&stuck_tx),
+            &mut stuck_tx,
         )
         .unwrap();
-    eth_sender.db.assert_stored(&next_tx);
-    eth_sender.ethereum.assert_sent(&next_tx);
+    eth_sender.db.assert_stored(&stuck_tx);
+    eth_sender.ethereum.assert_sent(&next_tx.hash);
 
     // Add a confirmation for a *stuck* transaction.
     eth_sender
         .ethereum
-        .add_successfull_execution(stuck_tx.signed_tx.hash, super::WAIT_CONFIRMATIONS);
+        .add_successfull_execution(stuck_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
     eth_sender.proceed_next_operations();
 
-    // Check that operation is confirmed.
+    // Check that operation is confirmed (we set the final hash to the *first* sent tx).
+    stuck_tx.confirmed = true;
+    stuck_tx.final_hash = Some(stuck_tx.used_tx_hashes[0]);
     eth_sender.db.assert_confirmed(&stuck_tx);
 }
-
-*/
