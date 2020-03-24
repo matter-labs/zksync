@@ -43,11 +43,16 @@ impl MockDatabase {
             .iter()
             .fold(0, |acc, op| acc + op.used_tx_hashes.len());
         let pending_op_id = restore_state.len();
+
+        let unconfirmed_operations: HashMap<i64, ETHOperation> =
+            restore_state.iter().map(|op| (op.id, op.clone())).collect();
+
         Self {
             restore_state,
             nonce: Cell::new(nonce as i64),
             pending_op_id: Cell::new(pending_op_id as EthOpId),
             stats: RefCell::new(stats),
+            unconfirmed_operations: RefCell::new(unconfirmed_operations),
             ..Default::default()
         }
     }

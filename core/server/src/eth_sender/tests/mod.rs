@@ -433,7 +433,6 @@ fn transaction_failure() {
     eth_sender.proceed_next_operations();
 }
 
-/*
 /// Check that after recovering state with several non-processed operations
 /// they will be processed normally.
 #[test]
@@ -447,22 +446,13 @@ fn restore_state() {
 
         let deadline_block = eth_sender.get_deadline_block(1);
         let commit_op_tx = create_signed_tx(&eth_sender, &commit_op, deadline_block, 0);
+
         let deadline_block = eth_sender.get_deadline_block(2);
-        let verify_op_tx = create_signed_tx(&eth_sender, &verify_op, deadline_block, 1);
+        let mut verify_op_tx = create_signed_tx(&eth_sender, &verify_op, deadline_block, 1);
+        verify_op_tx.id = 1;
 
         let operations = vec![commit_op.clone(), verify_op.clone()];
-
-        // Create `OperationETHState` objects from operations and restore state
-        let stored_operations = vec![
-            OperationETHState {
-                operation: commit_op,
-                txs: vec![commit_op_tx],
-            },
-            OperationETHState {
-                operation: verify_op,
-                txs: vec![verify_op_tx],
-            },
-        ];
+        let stored_operations = vec![commit_op_tx, verify_op_tx];
 
         (operations, stored_operations)
     };
@@ -470,21 +460,11 @@ fn restore_state() {
     let stats = ETHStats {
         commit_ops: 1,
         verify_ops: 1,
-        withdraw_ops: 1,
+        withdraw_ops: 0,
     };
     let (mut eth_sender, _, mut receiver) = restored_eth_sender(stored_operations.clone(), stats);
 
-    // We have to store txs in the database, since we've used them for the data restore.
-    eth_sender
-        .db
-        .save_unconfirmed_operation(&stored_operations[0].txs[0])
-        .unwrap();
-    eth_sender
-        .db
-        .save_unconfirmed_operation(&stored_operations[1].txs[0])
-        .unwrap();
-
-    for (nonce, operation) in operations.iter().enumerate() {
+    for (eth_op_id, operation) in operations.iter().enumerate() {
         // Note that we DO NOT send an operation to `ETHSender` and neither receive it.
 
         // We do process operations restored from the DB though.
@@ -492,18 +472,25 @@ fn restore_state() {
         eth_sender.proceed_next_operations();
 
         let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
-        let expected_tx = create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
+        let nonce = eth_op_id;
+        let mut expected_tx =
+            create_signed_tx(&eth_sender, operation, deadline_block, nonce as i64);
+        expected_tx.id = eth_op_id as i64;
+
+        eth_sender.db.assert_stored(&expected_tx);
 
         eth_sender
             .ethereum
-            .add_successfull_execution(expected_tx.signed_tx.hash, super::WAIT_CONFIRMATIONS);
+            .add_successfull_execution(expected_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
         eth_sender.proceed_next_operations();
+
+        expected_tx.confirmed = true;
+        expected_tx.final_hash = Some(expected_tx.used_tx_hashes[0]);
         eth_sender.db.assert_confirmed(&expected_tx);
     }
 
     assert!(receiver.try_next().unwrap().is_some());
 }
-*/
 
 /// Checks that even after getting the first transaction stuck and sending the next
 /// one, confirmation for the first (stuck) transaction is processed and leads
