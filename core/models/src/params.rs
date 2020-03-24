@@ -123,8 +123,6 @@ pub fn max_block_chunk_size() -> usize {
 /// Priority op should be executed for this number of eth blocks.
 pub const PRIORITY_EXPIRATION: u64 = 250;
 pub const FR_ADDRESS_LEN: usize = 20;
-/// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
-pub const CONFIRMATIONS_FOR_ETH_EVENT: u64 = 30;
 
 pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 

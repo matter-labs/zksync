@@ -3,8 +3,7 @@
 //! New events are accepted to the ZK Sync network once they have the sufficient amount of confirmations.
 //!
 //! Poll interval is configured using the `ETH_POLL_INTERVAL` constant.
-//! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` constant.
-//!
+//! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.
 
 // Built-in deps
 use std::collections::HashMap;
@@ -24,7 +23,7 @@ use web3::{Transport, Web3};
 use models::abi::{governance_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::node::{Nonce, PriorityOp, PubKeyHash, TokenId};
-use models::params::{CONFIRMATIONS_FOR_ETH_EVENT, PRIORITY_EXPIRATION};
+use models::params::PRIORITY_EXPIRATION;
 use models::TokenAddedEvent;
 use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
@@ -56,6 +55,8 @@ pub struct EthWatch<T: Transport> {
     web3: Web3<T>,
     _web3_event_loop_handle: EventLoopHandle,
     db_pool: ConnectionPool,
+    /// All ethereum events are accepted after sufficient confirmations to eliminate risk of block reorg.
+    number_of_confirmations_for_event: u64,
 
     eth_watch_req: mpsc::Receiver<EthWatchRequest>,
 }
@@ -79,6 +80,7 @@ impl<T: Transport> EthWatch<T> {
         db_pool: ConnectionPool,
         governance_addr: H160,
         zksync_contract_addr: H160,
+        number_of_confirmations_for_event: u64,
         eth_watch_req: mpsc::Receiver<EthWatchRequest>,
     ) -> Self {
         let gov_contract = {
@@ -107,6 +109,7 @@ impl<T: Transport> EthWatch<T> {
             _web3_event_loop_handle: web3_event_loop_handle,
             db_pool,
             eth_watch_req,
+            number_of_confirmations_for_event,
         }
     }
 
@@ -183,7 +186,7 @@ impl<T: Transport> EthWatch<T> {
 
     async fn restore_state_from_eth(&mut self, current_ethereum_block: u64) {
         let new_block_with_accepted_events =
-            current_ethereum_block.saturating_sub(CONFIRMATIONS_FOR_ETH_EVENT);
+            current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
             new_block_with_accepted_events.saturating_sub(PRIORITY_EXPIRATION);
 
@@ -221,9 +224,9 @@ impl<T: Transport> EthWatch<T> {
         debug_assert!(self.last_ethereum_block < current_eth_block);
 
         let previous_block_with_accepted_events =
-            (self.last_ethereum_block + 1).saturating_sub(CONFIRMATIONS_FOR_ETH_EVENT);
+            (self.last_ethereum_block + 1).saturating_sub(self.number_of_confirmations_for_event);
         let new_block_with_accepted_events =
-            current_eth_block.saturating_sub(CONFIRMATIONS_FOR_ETH_EVENT);
+            current_eth_block.saturating_sub(self.number_of_confirmations_for_event);
 
         let new_tokens = self
             .get_new_token_events(
@@ -322,7 +325,7 @@ impl<T: Transport> EthWatch<T> {
             .expect("Block number")
             .as_u64();
         self.last_ethereum_block = block;
-        self.restore_state_from_eth(block.saturating_sub(CONFIRMATIONS_FOR_ETH_EVENT as u64))
+        self.restore_state_from_eth(block.saturating_sub(self.number_of_confirmations_for_event))
             .await;
 
         while let Some(request) = self.eth_watch_req.next().await {
@@ -385,6 +388,7 @@ pub fn start_eth_watch(
         pool,
         config_options.governance_eth_addr,
         config_options.contract_eth_addr,
+        config_options.confirmations_for_eth_event,
         eth_req_receiver,
     );
     runtime.spawn(eth_watch.run());
