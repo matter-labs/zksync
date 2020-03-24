@@ -8,7 +8,7 @@ import "./Ownable.sol";
 /// @author Matter Labs
 contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
-    /// @notice Notice period before activation cleaning up status of upgrade mode (in seconds)
+    /// @notice Notice period before activation preparation status of upgrade mode (in seconds)
     uint256 constant NOTICE_PERIOD = 2 weeks;
 
     /// @notice Versions of proxy contracts
@@ -21,7 +21,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     enum UpgradeStatus {
         Idle,
         NoticePeriod,
-        CleaningUp
+        Preparation
     }
 
     /// @notice Info for upgrade proxy
@@ -37,7 +37,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         address nextTarget;
 
         /// @notice Number of priority operations that must be verified by main contract at the time of finishing upgrade
-        /// @dev Will store zero in case of not active upgrade mode or not active cleaning up status of upgrade mode
+        /// @dev Will store zero in case of not active upgrade mode or not active preparation status of upgrade mode
         uint64 priorityOperationsToProcessBeforeUpgrade;
     }
 
@@ -80,18 +80,18 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         emit UpgradeCanceled(proxyAddress, version[proxyAddress]);
     }
 
-    /// @notice Checks that cleaning up status is active and activates it if needed
+    /// @notice Checks that preparation status is active and activates it if needed
     /// @param proxyAddress Address of proxy to process
-    /// @return Bool flag indicating that cleaning up status is active after this call
-    function activateCleaningUpStatusOfUpgrade(address proxyAddress) public returns (bool) {
-        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeGatekeeper.UpgradeStatus.Idle, "uaf11"); // uaf11 - unable to activate cleaning up status in case of not active upgrade mode
+    /// @return Bool flag indicating that preparation status is active after this call
+    function startPreparation(address proxyAddress) public returns (bool) {
+        require(upgradeInfo[proxyAddress].upgradeStatus != UpgradeGatekeeper.UpgradeStatus.Idle, "uaf11"); // uaf11 - unable to activate preparation status in case of not active upgrade mode
 
-        if (upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.CleaningUp) {
+        if (upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Preparation) {
             return true;
         }
 
         if (now >= upgradeInfo[proxyAddress].activationTime + NOTICE_PERIOD) {
-            upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.CleaningUp;
+            upgradeInfo[proxyAddress].upgradeStatus = UpgradeGatekeeper.UpgradeStatus.Preparation;
 
             (bool mainContractCallSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
                 abi.encodeWithSignature("totalRegisteredPriorityOperations()")
@@ -100,7 +100,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
             uint64 totalRegisteredPriorityOperations = abi.decode(encodedResult, (uint64));
             upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade = totalRegisteredPriorityOperations;
 
-            emit UpgradeModeCleaningUpStatusActivated(proxyAddress, version[proxyAddress]);
+            emit UpgradeModePreparationStatusActivated(proxyAddress, version[proxyAddress]);
             return true;
         } else {
             return false;
@@ -112,7 +112,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     /// @param newTargetInitializationParameters New target initialization parameters
     function finishProxyUpgrade(address proxyAddress, bytes calldata newTargetInitializationParameters) external {
         requireMaster(msg.sender);
-        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.CleaningUp, "umf11"); // umf11 - unable to finish upgrade without cleaning up status active
+        require(upgradeInfo[proxyAddress].upgradeStatus == UpgradeGatekeeper.UpgradeStatus.Preparation, "umf11"); // umf11 - unable to finish upgrade without preparation status active
 
         (bool mainContractCallSuccess, bytes memory encodedResult) = mainContractAddress.staticcall(
             abi.encodeWithSignature("totalVerifiedPriorityOperations()")
@@ -120,7 +120,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         require(mainContractCallSuccess, "umf12"); // umf12 - main contract static call failed
         uint64 totalVerifiedPriorityOperations = abi.decode(encodedResult, (uint64));
 
-        require(totalVerifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade, "umf13"); // umf13 - can't finish upgrade before verifing all priority operations received before start of cleaning up status
+        require(totalVerifiedPriorityOperations >= upgradeInfo[proxyAddress].priorityOperationsToProcessBeforeUpgrade, "umf13"); // umf13 - can't finish upgrade before verifing all priority operations received before start of preparation status
 
         (bool proxyUpgradeCallSuccess, ) = proxyAddress.call(
             abi.encodeWithSignature("upgradeTarget(address,bytes)", upgradeInfo[proxyAddress].nextTarget, newTargetInitializationParameters)

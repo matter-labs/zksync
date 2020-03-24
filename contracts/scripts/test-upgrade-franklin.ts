@@ -57,7 +57,7 @@ async function main() {
     await new Promise(r => setTimeout(r, notice_period * 1000 + 10));
 
     // finish upgrade
-    await (await upgradeGatekeeper.activateCleaningUpStatusOfUpgrade(proxyContract.address)).wait();
+    await (await upgradeGatekeeper.startPreparation(proxyContract.address)).wait();
     await (await upgradeGatekeeper.finishProxyUpgrade(proxyContract.address, [])).wait();
 
     await expect(await proxyContract.getTarget())

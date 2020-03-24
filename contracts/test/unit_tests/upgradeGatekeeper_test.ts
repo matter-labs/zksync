@@ -50,7 +50,7 @@ describe("UpgradeGatekeeper unit tests", function () {
 
     it("checking UpgradeGatekeeper reverts; activation and cancelation upgrade", async () => {
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.cancelProxyUpgrade(proxyTestContract.address) )).revertReason).equal("umc11")
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.activateCleaningUpStatusOfUpgrade(proxyTestContract.address) )).revertReason).equal("uaf11")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startPreparation(proxyTestContract.address) )).revertReason).equal("uaf11")
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishProxyUpgrade(proxyTestContract.address, []) )).revertReason).equal("umf11")
 
         await expect(UpgradeGatekeeperContract.startProxyUpgrade(proxyTestContract.address, DummySecond.address))
@@ -72,7 +72,7 @@ describe("UpgradeGatekeeper unit tests", function () {
 
         let activated_time = performance.now();
 
-        // wait and activate cleaning up status
+        // wait and activate preparation status
         let all_time_in_sec = parseInt(await UpgradeGatekeeperContract.get_NOTICE_PERIOD());
         for (let step = 1; step <= 3; step++) {
             if (step != 3) {
@@ -86,10 +86,10 @@ describe("UpgradeGatekeeper unit tests", function () {
             }
 
             if (step != 3) {
-                await UpgradeGatekeeperContract.activateCleaningUpStatusOfUpgrade(proxyTestContract.address);
+                await UpgradeGatekeeperContract.startPreparation(proxyTestContract.address);
             } else {
-                await expect(UpgradeGatekeeperContract.activateCleaningUpStatusOfUpgrade(proxyTestContract.address))
-                    .to.emit(UpgradeGatekeeperContract, 'UpgradeModeCleaningUpStatusActivated')
+                await expect(UpgradeGatekeeperContract.startPreparation(proxyTestContract.address))
+                    .to.emit(UpgradeGatekeeperContract, 'UpgradeModePreparationStatusActivated')
                     .withArgs(proxyTestContract.address, 0)
             }
         }
