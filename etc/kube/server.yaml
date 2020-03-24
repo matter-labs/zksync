@@ -112,6 +112,7 @@ spec:
         - name: server
           image: matterlabs/server:${IMAGE_TAG}
           imagePullPolicy: Always
+          resources: ${SERVER_CONTAINER_RESOURCES}
           ports:
             - containerPort: 3000
             - containerPort: 3030
