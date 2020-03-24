@@ -145,7 +145,7 @@ impl TxQueue {
             sent_pending_txs: 0,
 
             commit_operations: CounterQueue::new(),
-            verify_operations: SparseQueue::new(),
+            verify_operations: SparseQueue::new_from(1), // Blocks are starting from the index 1.
             withdraw_operations: CounterQueue::new(),
         }
     }
@@ -253,11 +253,11 @@ mod tests {
             vec![COMMIT_MARK, 1],
         ));
         queue.add_verify_operation(
-            0,
+            1,
             TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 0]),
         );
         queue.add_verify_operation(
-            1,
+            2,
             TxData::from_raw(OperationType::Verify, vec![VERIFY_MARK, 1]),
         );
         queue.add_withdraw_operation(TxData::from_raw(

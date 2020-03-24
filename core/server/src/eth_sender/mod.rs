@@ -173,11 +173,51 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             });
         }
 
-        // Commit the next operation (if any).
-        // TODO: should not be `if let`, but rather `while let`.
-        if let Some(current_op) = self.ongoing_ops.pop_front() {
-            self.try_commit(current_op);
+        // Commit the next operations (if any).
+        let mut new_ongoing_ops = VecDeque::new();
+
+        while let Some(mut current_op) = self.ongoing_ops.pop_front() {
+            // We perform a commitment step here. In case of error, we suppose that this is some
+            // network issue which won't appear the next time, so we report the situation to the
+            // log and consider the operation pending (meaning that we won't process it on this
+            // step, but will try to do so on the next one).
+            let commitment = self
+                .perform_commitment_step(&mut current_op)
+                .map_err(|e| {
+                    warn!("Error while trying to complete uncommitted op: {}", e);
+                })
+                .unwrap_or(OperationCommitment::Pending);
+
+            match commitment {
+                OperationCommitment::Committed => {
+                    // Free a slot for the next tx in the queue.
+                    self.tx_queue.report_commitment();
+
+                    if current_op.is_verify() {
+                        // We notify about verify only when it's confirmed on the Ethereum.
+                        self.op_notify
+                            .try_send(current_op.op.expect("Should be verify operation"))
+                            .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
+                            .unwrap_or_default();
+
+                        // Complete pending withdrawals after each verify.
+                        self.add_complete_withdrawals_to_queue();
+                    }
+                }
+                OperationCommitment::Pending => {
+                    // Poll this operation on the next iteration.
+                    new_ongoing_ops.push_back(current_op);
+                }
+            }
         }
+
+        assert!(
+            self.ongoing_ops.is_empty(),
+            "Ongoing ops queue should be empty after draining"
+        );
+
+        // Store the ongoing operations for the next round.
+        self.ongoing_ops = new_ongoing_ops;
     }
 
     fn initialize_operation(&mut self, tx: TxData) -> Result<(), failure::Error> {
@@ -199,44 +239,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         self.ongoing_ops.push_back(new_tx);
 
         Ok(())
-    }
-
-    fn try_commit(&mut self, mut operation: ETHOperation) {
-        // Check the transactions associated with the operation, and send a new one if required.
-
-        // We perform a commitment step here. In case of error, we suppose that this is some
-        // network issue which won't appear the next time, so we report the situation to the
-        // log and consider the operation pending (meaning that we won't process it on this
-        // step, but will try to do so on the next one).
-        let result = self
-            .perform_commitment_step(&mut operation)
-            .map_err(|e| {
-                warn!("Error while trying to complete uncommitted op: {}", e);
-            })
-            .unwrap_or(OperationCommitment::Pending);
-
-        // Check if we've completed the commitment.
-        match result {
-            OperationCommitment::Committed => {
-                // Free a slot for the next tx in the queue.
-                self.tx_queue.report_commitment();
-
-                if operation.is_verify() {
-                    // We notify about verify only when commit is confirmed on the Ethereum.
-                    self.op_notify
-                        .try_send(operation.op.expect("Should be verify operation"))
-                        .map_err(|e| warn!("Failed notify about verify op confirmation: {}", e))
-                        .unwrap_or_default();
-
-                    // Complete pending withdrawals after each verify.
-                    self.add_complete_withdrawals_to_queue();
-                }
-            }
-            OperationCommitment::Pending => {
-                // Retry the operation again the next time.
-                self.ongoing_ops.push_front(operation);
-            }
-        }
     }
 
     fn zksync_operation_description(&self, operation: &ETHOperation) -> String {
