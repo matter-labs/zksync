@@ -1,11 +1,15 @@
 // Built-in deps
+use std::str::FromStr;
 // External imports
 use bigdecimal::BigDecimal;
 use diesel::dsl::{insert_into, update};
 use diesel::prelude::*;
-use web3::types::H256;
+use web3::types::{H256, U256};
 // Workspace imports
-use models::Operation;
+use models::{
+    ethereum::{ETHOperation, OperationType},
+    Operation,
+};
 // Local imports
 use self::records::{
     ETHBinding, ETHNonce, ETHStats, ETHTxHash, NewETHBinding, NewETHOperation, NewETHTxHash,
@@ -16,23 +20,6 @@ use crate::schema::*;
 use crate::StorageProcessor;
 
 pub mod records;
-
-#[derive(Debug, Clone, Copy)]
-pub enum OperationType {
-    Commit,
-    Verify,
-    Withdraw,
-}
-
-impl OperationType {
-    pub fn to_string(&self) -> String {
-        match self {
-            Self::Commit => "commit".into(),
-            Self::Verify => "verify".into(),
-            Self::Withdraw => "withdraw".into(),
-        }
-    }
-}
 
 /// Ethereum schema is capable of storing the information about the
 /// interaction with the Ethereum blockchain (mainly the list of sent
@@ -45,8 +32,7 @@ impl<'a> EthereumSchema<'a> {
     /// each operation has a list of sent Ethereum transactions.
     pub fn load_unconfirmed_operations(
         &self,
-        // TODO: move Eth transaction state to models and add it here
-    ) -> QueryResult<Vec<(StorageETHOperation, Option<Operation>)>> {
+    ) -> QueryResult<Vec<(ETHOperation, Option<Operation>)>> {
         // Load the operations with the associated Ethereum transactions
         // from the database.
         // Here we obtain a sequence of one-to-one mappings (ETH tx) -> (operation ID).
@@ -70,17 +56,47 @@ impl<'a> EthereumSchema<'a> {
         })?;
 
         // Create a vector for the expected output.
-        let mut ops: Vec<(StorageETHOperation, Option<Operation>)> =
-            Vec::with_capacity(raw_ops.len());
+        let mut ops: Vec<(ETHOperation, Option<Operation>)> = Vec::with_capacity(raw_ops.len());
 
-        // TODO: load tx hashes.
-
-        // Transform the `StoredOperation` to `Operation`.
+        // Transform the `StoredOperation` to `Operation` and `StoredETHOperation` to `ETHOperation`.
         for (eth_op, _, raw_op) in raw_ops {
+            // Load the stored txs hashes.
+            let eth_tx_hashes: Vec<ETHTxHash> = eth_tx_hashes::table
+                .filter(eth_tx_hashes::eth_op_id.eq(eth_op.id))
+                .load(self.0.conn())?;
+            assert!(
+                eth_tx_hashes.len() >= 1,
+                "No hashes stored for the Ethereum operation"
+            );
+
+            // If there is an operation, convert it to the `Operation` type.
             let op = if let Some(raw_op) = raw_op {
                 Some(raw_op.into_op(self.0)?)
             } else {
                 None
+            };
+
+            // Convert the fields into expected format.
+            let op_type = OperationType::from_str(eth_op.op_type.as_ref())
+                .expect("Stored operation type must have a valid value");
+            let last_used_gas_price =
+                U256::from_str(&eth_op.last_used_gas_price.to_string()).unwrap();
+            let used_tx_hashes = eth_tx_hashes
+                .iter()
+                .map(|entry| H256::from_slice(&entry.tx_hash))
+                .collect();
+            let final_hash = eth_op.final_hash.map(|hash| H256::from_slice(&hash));
+
+            let eth_op = ETHOperation {
+                id: eth_op.id,
+                op_type,
+                nonce: eth_op.nonce.into(),
+                last_deadline_block: eth_op.last_deadline_block,
+                last_used_gas_price,
+                used_tx_hashes,
+                encoded_tx_data: eth_op.raw_tx,
+                confirmed: eth_op.confirmed,
+                final_hash,
             };
 
             ops.push((eth_op, op));
@@ -103,12 +119,13 @@ impl<'a> EthereumSchema<'a> {
         let operation = NewETHOperation {
             op_type: op_type.to_string(),
             nonce: i64::from(nonce),
-            deadline_block: deadline_block as i64,
+            last_deadline_block: deadline_block as i64,
             last_used_gas_price: gas_price,
             raw_tx,
         };
 
         self.0.conn().transaction(|| {
+            // Insert the operation itself.
             let inserted_tx = insert_into(eth_operations::table)
                 .values(&operation)
                 .returning(eth_operations::id)
@@ -119,8 +136,10 @@ impl<'a> EthereumSchema<'a> {
                 "Wrong amount of updated rows (eth_operations)"
             );
 
+            // Obtain the operation ID for the follow-up queried.
             let eth_op_id = inserted_tx[0];
 
+            // Add a hash entry.
             let hash_entry = NewETHTxHash {
                 eth_op_id,
                 tx_hash: hash.as_bytes().to_vec(),
@@ -133,8 +152,8 @@ impl<'a> EthereumSchema<'a> {
                 "Wrong amount of updated rows (eth_tx_hashes)"
             );
 
+            // If the operation ID was provided, we should also insert a binding entry.
             if let Some(op_id) = op_id {
-                // If the operation ID was provided, we should also insert a binding entry.
                 let binding = NewETHBinding { op_id, eth_op_id };
 
                 insert_into(eth_ops_binding::table)
@@ -157,16 +176,36 @@ impl<'a> EthereumSchema<'a> {
         Ok(hash_entry.eth_op_id)
     }
 
-    /// Changes the last used gas for a transaction. Since for every sent transaction the gas
-    /// is the only field changed, it makes no sense to duplicate many alike transactions for each
-    /// operation. Instead we enforce using exactly one tx for each operation and store only the last
-    /// used gas value (to increment later if we'll need to send the tx again).
-    pub fn update_eth_tx_gas(&self, hash: &H256, new_gas_value: BigDecimal) -> QueryResult<()> {
+    /// Updates the Ethereum operation by adding a new tx data.
+    /// The new deadline block / gas value are placed instead of old values to the main entry,
+    /// and for hash a new `eth_tx_hashes` entry is added.
+    pub fn update_eth_tx(
+        &self,
+        eth_op_id: i64,
+        hash: &H256,
+        new_deadline_block: i64,
+        new_gas_value: BigDecimal,
+    ) -> QueryResult<()> {
         self.0.conn().transaction(|| {
-            let eth_op_id = self.get_eth_op_id(hash)?;
+            // Insert the new hash entry.
+            let hash_entry = NewETHTxHash {
+                eth_op_id,
+                tx_hash: hash.as_bytes().to_vec(),
+            };
+            let inserted_hashes_rows = insert_into(eth_tx_hashes::table)
+                .values(&hash_entry)
+                .execute(self.0.conn())?;
+            assert_eq!(
+                inserted_hashes_rows, 1,
+                "Wrong amount of updated rows (eth_tx_hashes)"
+            );
 
+            // Update the stored tx.
             update(eth_operations::table.filter(eth_operations::id.eq(eth_op_id)))
-                .set(eth_operations::last_used_gas_price.eq(new_gas_value))
+                .set((
+                    eth_operations::last_used_gas_price.eq(new_gas_value),
+                    eth_operations::last_deadline_block.eq(new_deadline_block),
+                ))
                 .execute(self.0.conn())?;
 
             Ok(())
@@ -222,9 +261,13 @@ impl<'a> EthereumSchema<'a> {
         self.0.conn().transaction(|| {
             let eth_op_id = self.get_eth_op_id(hash)?;
 
+            // Set the `confirmed` and `final_hash` field of the entry.
             let updated: Vec<i64> =
                 update(eth_operations::table.filter(eth_operations::id.eq(eth_op_id)))
-                    .set(eth_operations::confirmed.eq(true))
+                    .set((
+                        eth_operations::confirmed.eq(true),
+                        eth_operations::final_hash.eq(Some(hash.as_bytes().to_vec())),
+                    ))
                     .returning(eth_operations::id)
                     .get_results(self.0.conn())?;
 
@@ -241,6 +284,7 @@ impl<'a> EthereumSchema<'a> {
                 .first::<ETHBinding>(self.0.conn())
                 .optional()?;
 
+            // If there is a ZKSync operation, mark it as confirmed as well.
             if let Some(binding) = binding {
                 let op = operations::table
                     .filter(operations::id.eq(binding.op_id))

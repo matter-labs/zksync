@@ -3,6 +3,7 @@ use bigdecimal::BigDecimal;
 use web3::types::H256;
 // Workspace imports
 use models::{
+    ethereum::OperationType,
     node::{block::Block, BlockNumber, Fr},
     Action, Operation,
 };
@@ -10,7 +11,7 @@ use models::{
 use crate::tests::db_test;
 use crate::{
     chain::block::BlockSchema,
-    ethereum::{records::StorageETHOperation, EthereumSchema, OperationType},
+    ethereum::{records::StorageETHOperation, EthereumSchema},
     StorageProcessor,
 };
 
@@ -62,10 +63,9 @@ impl EthereumTxParams {
             id: db_id,
             op_type: self.op_type.clone(),
             nonce: self.nonce as i64,
-            deadline_block: self.deadline_block as i64,
+            last_deadline_block: self.deadline_block as i64,
             last_used_gas_price: self.gas_price.clone(),
-            // TODO: Hash should be used here
-            // tx_hash: self.hash.as_bytes().to_vec(),
+            final_hash: Some(self.hash.as_bytes().to_vec()),
             confirmed: false,
             raw_tx: self.raw_tx.clone(),
         }

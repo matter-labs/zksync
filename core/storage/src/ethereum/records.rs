@@ -9,10 +9,11 @@ use crate::schema::*;
 pub struct StorageETHOperation {
     pub id: i64,
     pub nonce: i64,
-    pub deadline_block: i64,
     pub confirmed: bool,
     pub raw_tx: Vec<u8>,
     pub op_type: String,
+    pub final_hash: Option<Vec<u8>>,
+    pub last_deadline_block: i64,
     pub last_used_gas_price: BigDecimal,
 }
 
@@ -35,9 +36,9 @@ pub struct NewETHTxHash {
 #[table_name = "eth_operations"]
 pub struct NewETHOperation {
     pub nonce: i64,
-    pub deadline_block: i64,
     pub raw_tx: Vec<u8>,
     pub op_type: String,
+    pub last_deadline_block: i64,
     pub last_used_gas_price: BigDecimal,
 }
 

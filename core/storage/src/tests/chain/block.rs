@@ -3,7 +3,7 @@ use web3::types::H256;
 // Workspace imports
 use crypto_exports::rand::XorShiftRng;
 use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, Fr};
-use models::{Action, Operation};
+use models::{ethereum::OperationType, Action, Operation};
 // Local imports
 use super::utils::{acc_create_random_updates, get_operation};
 use crate::tests::{create_rng, db_test};
@@ -12,7 +12,7 @@ use crate::{
         block::{records::BlockDetails, BlockSchema},
         state::StateSchema,
     },
-    ethereum::{EthereumSchema, OperationType},
+    ethereum::EthereumSchema,
     prover::ProverSchema,
     StorageProcessor,
 };

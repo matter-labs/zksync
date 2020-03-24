@@ -93,10 +93,11 @@ table! {
     eth_operations (id) {
         id -> Int8,
         nonce -> Int8,
-        deadline_block -> Int8,
         confirmed -> Bool,
         raw_tx -> Bytea,
         op_type -> Text,
+        final_hash -> Nullable<Bytea>,
+        last_deadline_block -> Int8,
         last_used_gas_price -> Numeric,
     }
 }

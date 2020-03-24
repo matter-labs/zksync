@@ -29,7 +29,7 @@ CREATE TABLE eth_tx_hashes
 (
     id             bigserial PRIMARY KEY,
     eth_op_id      bigserial NOT NULL REFERENCES eth_operations (id),
-    tx_hash        bytea   not null
+    tx_hash        bytea     NOT NULL
 );
 
 ALTER TABLE eth_operations
@@ -38,9 +38,14 @@ ALTER TABLE eth_operations
     -- Remove the `op_id` field, since `withdraw` operation does not have an associated operation.
     -- The `eth_ops_binding` table should be used since now.
     DROP COLUMN op_id CASCADE,
-    -- Rename `gas_price` to `last_used_gas_price`, since it's the only field changed for resent txs
-    -- and it makes no sense to store every sent transaction separately.
-    DROP COLUMN gas_price CASCADE,
     -- Different tx hashes are now stored in the `eth_tx_hashes` table, so this field isn't needed anymore.
     DROP COLUMN tx_hash CASCADE,
+    -- Add the field containing the final hash of the committed tx.
+    -- This field is `null` until tx has enough confirmations.
+    ADD COLUMN final_hash bytea default null,
+    -- Rename `deadline_block` to `last_deadline_block`
+    DROP COLUMN deadline_block CASCADE,
+    ADD COLUMN last_deadline_block bigint not null,
+    -- Rename `gas_price` to `last_used_gas_price`
+    DROP COLUMN gas_price CASCADE,
     ADD COLUMN last_used_gas_price numeric not null
