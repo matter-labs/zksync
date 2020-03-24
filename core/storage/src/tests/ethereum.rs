@@ -1,19 +1,17 @@
+// Built-in deps
+use std::str::FromStr;
 // External imports
 use bigdecimal::BigDecimal;
-use web3::types::H256;
+use web3::types::{H256, U256};
 // Workspace imports
 use models::{
-    ethereum::OperationType,
+    ethereum::{ETHOperation, OperationType},
     node::{block::Block, BlockNumber, Fr},
     Action, Operation,
 };
 // Local imports
 use crate::tests::db_test;
-use crate::{
-    chain::block::BlockSchema,
-    ethereum::{records::StorageETHOperation, EthereumSchema},
-    StorageProcessor,
-};
+use crate::{chain::block::BlockSchema, ethereum::EthereumSchema, StorageProcessor};
 
 /// Creates a sample operation to be stored in `operations` table.
 /// This function is required since `eth_operations` table is linked to
@@ -58,16 +56,22 @@ impl EthereumTxParams {
         }
     }
 
-    pub fn to_eth_op(&self, db_id: i64) -> StorageETHOperation {
-        StorageETHOperation {
+    pub fn to_eth_op(&self, db_id: i64) -> ETHOperation {
+        let op_type = OperationType::from_str(self.op_type.as_ref())
+            .expect("Stored operation type must have a valid value");
+        let last_used_gas_price = U256::from_str(&self.gas_price.to_string()).unwrap();
+        let used_tx_hashes = vec![self.hash.clone()];
+
+        ETHOperation {
             id: db_id,
-            op_type: self.op_type.clone(),
-            nonce: self.nonce as i64,
-            last_deadline_block: self.deadline_block as i64,
-            last_used_gas_price: self.gas_price.clone(),
-            final_hash: Some(self.hash.as_bytes().to_vec()),
+            op_type,
+            nonce: self.nonce.into(),
+            last_deadline_block: self.deadline_block,
+            last_used_gas_price,
+            used_tx_hashes,
+            encoded_tx_data: self.raw_tx.clone(),
             confirmed: false,
-            raw_tx: self.raw_tx.clone(),
+            final_hash: None,
         }
     }
 }

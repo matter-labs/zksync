@@ -50,7 +50,7 @@ pub struct ETHOperation {
     /// Used nonce (fixed for all the sent transactions).
     pub nonce: U256,
     /// Deadline block of the last sent transaction.
-    pub last_deadline_block: i64,
+    pub last_deadline_block: u64,
     /// Gas price used in the last sent transaction.
     pub last_used_gas_price: U256,
     /// Hashes of all the sent transactions.

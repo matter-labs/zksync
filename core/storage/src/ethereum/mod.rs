@@ -91,7 +91,7 @@ impl<'a> EthereumSchema<'a> {
                 id: eth_op.id,
                 op_type,
                 nonce: eth_op.nonce.into(),
-                last_deadline_block: eth_op.last_deadline_block,
+                last_deadline_block: eth_op.last_deadline_block as u64,
                 last_used_gas_price,
                 used_tx_hashes,
                 encoded_tx_data: eth_op.raw_tx,
