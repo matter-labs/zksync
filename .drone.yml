@@ -344,3 +344,49 @@ steps:
   - nginx-image-publish
   - server-image-publish
   - prover-image-publish
+
+---
+# This pipeline udpates testnet
+kind: pipeline
+type: docker
+name: update-testnet
+clone:
+    depth: 1
+
+volumes:
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  target:
+  - testnet
+  event:
+  - promote
+
+steps:
+- name: check-images-exist
+  image: matterlabs/ci
+  environment:
+    ENV_BASE64:
+      from_secret: testnet_env_base64
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/testnet.env
+  - zksync env testnet
+  - docker pull matterlabs/server:$(f echo -n $IMAGE_TAG)
+  - docker pull matterlabs/prover:$(f echo -n $IMAGE_TAG)
+  - docker pull matterlabs/nginx:$(f echo -n $IMAGE_TAG)
+- name: testnet-deploy
+  image: matterlabs/ci
+  environment:
+    KUBECONFIG_BASE64:
+      from_secret: stage_kubeconfig_base64
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - echo -n $KUBECONFIG_BASE64 | base64 --decode > `pwd`/kubeconfig.yaml
+  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/testnet.env KUBECONFIG=`pwd`/kubeconfig.yaml
+  - zksync apply-kubeconfig
+  - zksync restart
