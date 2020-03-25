@@ -374,6 +374,9 @@ steps:
   - docker pull matterlabs/server:${DRONE_COMMIT_SHA:0:8}
   - docker pull matterlabs/prover:${DRONE_COMMIT_SHA:0:8}
   - docker pull matterlabs/nginx:${DRONE_COMMIT_SHA:0:8}
+  volumes:
+  - name: docker-sock
+    path: /var/run/docker.sock
 - name: testnet-deploy
   image: matterlabs/ci
   environment:
