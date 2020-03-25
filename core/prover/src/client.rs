@@ -92,7 +92,7 @@ impl ApiClient {
                 op().map_err(backoff::Error::Transient)
             }
             .map_err(|e| {
-                error!("{}", e);
+                warn!("{}", e);
                 e
             })
         };

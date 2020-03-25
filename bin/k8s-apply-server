@@ -1,0 +1,3 @@
+#!/bin/bash
+kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/secret.yaml -n $ZKSYNC_ENV
+kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/server.yaml -n $ZKSYNC_ENV --record=true
