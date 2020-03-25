@@ -7,14 +7,14 @@ use actix_web::{
 };
 use futures::channel::mpsc;
 use models::config_options::ThreadPanicNotify;
-use models::node::{Account, AccountId, ExecutedOperations, PubKeyHash};
+use models::node::{Account, AccountId, Address, ExecutedOperations, PubKeyHash};
 use models::NetworkStatus;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
-use web3::types::{Address, H160};
+use web3::types::H160;
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
@@ -188,7 +188,7 @@ fn handle_get_account_transactions(
 
 fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
-    request_path: web::Path<(PubKeyHash, i64, i64)>,
+    request_path: web::Path<(Address, i64, i64)>,
 ) -> ActixResult<HttpResponse> {
     let (address, offset, limit) = request_path.into_inner();
 

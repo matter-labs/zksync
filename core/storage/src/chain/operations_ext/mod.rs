@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use itertools::Itertools;
 use serde_json::value::Value;
 // Workspace imports
-use models::node::PubKeyHash;
+use models::node::{Address, PubKeyHash};
 use models::ActionType;
 // Local imports
 use self::records::{
@@ -261,7 +261,7 @@ impl<'a> OperationsExtSchema<'a> {
     /// from the block with number $(offset) up to $(offset + limit).
     pub fn get_account_transactions_history(
         &self,
-        address: &PubKeyHash,
+        address: &Address,
         offset: i64,
         limit: i64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
@@ -302,7 +302,7 @@ impl<'a> OperationsExtSchema<'a> {
                     on
                         tx_hash = hash
                     where
-                        '0x:' || encode(primary_account_address, 'hex') = '{address}'
+                        tx->>'from' = '{address}'
                         or
                         tx->>'to' = '{address}'
                     union all
@@ -316,7 +316,9 @@ impl<'a> OperationsExtSchema<'a> {
                     from 
                         executed_priority_operations
                     where 
-                        operation->'priority_op'->>'from' = '{address}') t
+                        operation->'priority_op'->>'from' = '{address}'
+                        or
+                        operation->'priority_op'->>'to' = '{address}') t
                 order by
                     block_number desc
                 offset 
@@ -341,7 +343,7 @@ impl<'a> OperationsExtSchema<'a> {
             using 
                 (block_number)
             ",
-            address = address.to_hex(),
+            address = format!("{:#?}", address),
             offset = offset,
             limit = limit
         );
