@@ -1,4 +1,5 @@
 // Built-in deps
+use std::collections::VecDeque;
 use std::str::FromStr;
 // External imports
 use bigdecimal::BigDecimal;
@@ -6,7 +7,10 @@ use diesel::dsl::{insert_into, update};
 use diesel::prelude::*;
 use web3::types::{H256, U256};
 // Workspace imports
-use models::ethereum::{ETHOperation, OperationType};
+use models::{
+    ethereum::{ETHOperation, OperationType},
+    Operation,
+};
 // Local imports
 use self::records::{
     ETHBinding, ETHNonce, ETHStats, ETHTxHash, NewETHBinding, NewETHOperation, NewETHTxHash,
@@ -27,7 +31,7 @@ pub struct EthereumSchema<'a>(pub &'a StorageProcessor);
 impl<'a> EthereumSchema<'a> {
     /// Loads the list of operations that were not confirmed on Ethereum,
     /// each operation has a list of sent Ethereum transactions.
-    pub fn load_unconfirmed_operations(&self) -> QueryResult<Vec<ETHOperation>> {
+    pub fn load_unconfirmed_operations(&self) -> QueryResult<VecDeque<ETHOperation>> {
         // Load the operations with the associated Ethereum transactions
         // from the database.
         // Here we obtain a sequence of one-to-one mappings (ETH tx) -> (operation ID).
@@ -51,7 +55,7 @@ impl<'a> EthereumSchema<'a> {
         })?;
 
         // Create a vector for the expected output.
-        let mut ops: Vec<ETHOperation> = Vec::with_capacity(raw_ops.len());
+        let mut ops: VecDeque<ETHOperation> = VecDeque::with_capacity(raw_ops.len());
 
         // Transform the `StoredOperation` to `Operation` and `StoredETHOperation` to `ETHOperation`.
         for (eth_op, _, raw_op) in raw_ops {
@@ -97,10 +101,39 @@ impl<'a> EthereumSchema<'a> {
                 final_hash,
             };
 
-            ops.push(eth_op);
+            ops.push_back(eth_op);
         }
 
         Ok(ops)
+    }
+
+    /// Loads the operations which were stored in `operations` table, but not
+    /// in the `eth_operations`. This method is intended to be used after relaunch
+    /// to synchronize `eth_sender` state, as operations are sent to the `eth_sender`
+    /// only once.
+    pub fn load_unprocessed_operations(&self) -> QueryResult<Vec<Operation>> {
+        let raw_ops: Vec<(StoredOperation, Option<ETHBinding>)> =
+            self.0.conn().transaction(|| {
+                operations::table
+                    .left_join(eth_ops_binding::table.on(operations::id.eq(eth_ops_binding::op_id)))
+                    .filter(operations::confirmed.eq(false))
+                    .order(operations::id.asc())
+                    .load(self.0.conn())
+            })?;
+
+        let operations: Vec<Operation> = raw_ops
+            .into_iter()
+            .filter_map(|(raw_op, maybe_binding)| {
+                // We are only interested in operations unknown to `eth_operations` table.
+                if maybe_binding.is_some() {
+                    None
+                } else {
+                    Some(raw_op.into_op(self.0).expect("Can't convert the operation"))
+                }
+            })
+            .collect();
+
+        Ok(operations)
     }
 
     /// Stores the sent (but not confirmed yet) Ethereum transaction in the database.

@@ -4,20 +4,26 @@
 //! database to run, which is required for tests.
 
 // Built-in deps
+use std::collections::VecDeque;
 use std::str::FromStr;
 // External uses
 use bigdecimal::BigDecimal;
 use web3::types::{H256, U256};
 // Workspace uses
-use models::ethereum::{ETHOperation, EthOpId};
+use models::{
+    ethereum::{ETHOperation, EthOpId},
+    Operation,
+};
 use storage::ConnectionPool;
 // Local uses
 use super::transactions::ETHStats;
 
 /// Abstract database access trait, optimized for the needs of `ETHSender`.
 pub(super) trait DatabaseAccess {
-    /// Loads the unconfirmed operations from the database.
-    fn restore_state(&self) -> Result<Vec<ETHOperation>, failure::Error>;
+    /// Loads the unconfirmed and unprocessed operations from the database.
+    /// Unconfirmed operations are Ethereum operations that were started, but not confirmed yet.
+    /// Unprocessed operations are ZK Sync operations that were not started at all.
+    fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error>;
 
     /// Saves a new unconfirmed operation to the database.
     fn save_new_eth_tx(&self, op: &ETHOperation) -> Result<EthOpId, failure::Error>;
@@ -55,14 +61,15 @@ impl Database {
 }
 
 impl DatabaseAccess for Database {
-    fn restore_state(&self) -> Result<Vec<ETHOperation>, failure::Error> {
+    fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error> {
         let storage = self
             .db_pool
             .access_storage()
             .expect("Failed to access storage");
 
         let unconfirmed_ops = storage.ethereum_schema().load_unconfirmed_operations()?;
-        Ok(unconfirmed_ops)
+        let unprocessed_ops = storage.ethereum_schema().load_unprocessed_operations()?;
+        Ok((unconfirmed_ops, unprocessed_ops))
     }
 
     fn save_new_eth_tx(&self, op: &ETHOperation) -> Result<EthOpId, failure::Error> {

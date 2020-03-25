@@ -130,11 +130,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
-        let ongoing_ops: VecDeque<_> = db
-            .restore_state()
-            .expect("Failed loading unconfirmed operations from the storage")
-            .into_iter()
-            .collect();
+        let (ongoing_ops, unprocessed_ops) = db.restore_state().expect("Can't restore state");
 
         let stats = db
             .load_stats()
@@ -147,14 +143,27 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .with_withdraw_operations_count(stats.withdraw_ops)
             .build();
 
-        Self {
+        let mut sender = Self {
             ethereum,
             ongoing_ops,
             db,
             rx_for_eth,
             op_notify,
             tx_queue,
+        };
+
+        // Add all the unprocessed operations to the queue.
+        for operation in unprocessed_ops {
+            info!(
+                "Adding unprocessed ZKSync operation <id {}; action: {}; block: {}> to queue",
+                operation.id.expect("ID must be set"),
+                operation.action.to_string(),
+                operation.block.block_number
+            );
+            sender.add_operation_to_queue(operation);
         }
+
+        sender
     }
 
     /// Main routine of `ETHSender`.

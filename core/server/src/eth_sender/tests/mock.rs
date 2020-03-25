@@ -2,7 +2,7 @@
 
 // Built-in deps
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 // External uses
 use futures::channel::mpsc;
 use web3::contract::{tokens::Tokenize, Options};
@@ -24,7 +24,7 @@ const CHANNEL_CAPACITY: usize = 16;
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
 pub(super) struct MockDatabase {
-    restore_state: Vec<ETHOperation>,
+    restore_state: VecDeque<ETHOperation>,
     unconfirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
     confirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
     nonce: Cell<i64>,
@@ -38,7 +38,7 @@ impl MockDatabase {
         restore_state: impl IntoIterator<Item = ETHOperation>,
         stats: ETHStats,
     ) -> Self {
-        let restore_state: Vec<_> = restore_state.into_iter().collect();
+        let restore_state: VecDeque<_> = restore_state.into_iter().collect();
         let nonce = restore_state
             .iter()
             .fold(0, |acc, op| acc + op.used_tx_hashes.len());
@@ -73,8 +73,8 @@ impl MockDatabase {
 }
 
 impl DatabaseAccess for MockDatabase {
-    fn restore_state(&self) -> Result<Vec<ETHOperation>, failure::Error> {
-        Ok(self.restore_state.clone())
+    fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error> {
+        Ok((self.restore_state.clone(), Vec::new()))
     }
 
     fn save_new_eth_tx(&self, op: &ETHOperation) -> Result<EthOpId, failure::Error> {
