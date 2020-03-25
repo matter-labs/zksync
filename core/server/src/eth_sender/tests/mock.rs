@@ -294,7 +294,20 @@ pub(super) fn default_eth_sender() -> (
     mpsc::Sender<Operation>,
     mpsc::Receiver<Operation>,
 ) {
-    restored_eth_sender(Vec::new(), Default::default())
+    build_eth_sender(1, Vec::new(), Default::default())
+}
+
+/// Creates an `ETHSender` with mock Ethereum connection/database and no operations in DB
+/// which supports multiple transactions in flight.
+/// Returns the `ETHSender` itself along with communication channels to interact with it.
+pub(super) fn concurrent_eth_sender(
+    max_txs_in_flight: usize,
+) -> (
+    ETHSender<MockEthereum, MockDatabase>,
+    mpsc::Sender<Operation>,
+    mpsc::Receiver<Operation>,
+) {
+    build_eth_sender(max_txs_in_flight, Vec::new(), Default::default())
 }
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and restores its state "from DB".
@@ -309,6 +322,19 @@ pub(super) fn restored_eth_sender(
 ) {
     const MAX_TXS_IN_FLIGHT: usize = 1;
 
+    build_eth_sender(MAX_TXS_IN_FLIGHT, restore_state, stats)
+}
+
+/// Helper method for configurable creation of `ETHSender`.
+fn build_eth_sender(
+    max_txs_in_flight: usize,
+    restore_state: impl IntoIterator<Item = ETHOperation>,
+    stats: ETHStats,
+) -> (
+    ETHSender<MockEthereum, MockDatabase>,
+    mpsc::Sender<Operation>,
+    mpsc::Receiver<Operation>,
+) {
     let ethereum = MockEthereum::default();
     let db = MockDatabase::with_restorable_state(restore_state, stats);
 
@@ -316,7 +342,7 @@ pub(super) fn restored_eth_sender(
     let (notify_sender, notify_receiver) = mpsc::channel(CHANNEL_CAPACITY);
 
     let eth_sender = ETHSender::new(
-        MAX_TXS_IN_FLIGHT,
+        max_txs_in_flight,
         db,
         ethereum,
         operation_receiver,
