@@ -211,7 +211,10 @@ deposit: confirm_action
 # Promote build
 
 promote-to-stage:
-	@bin/promote-to-stage.sh $(ci-build)
+	@bin/promote-to.sh stage $(ci-build)
+
+promote-to-testnet:
+	@bin/promote-to.sh testnet $(ci-build)
 
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-insert-contract
