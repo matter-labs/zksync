@@ -61,7 +61,7 @@ impl EthereumTxParams {
         let op_type = OperationType::from_str(self.op_type.as_ref())
             .expect("Stored operation type must have a valid value");
         let last_used_gas_price = U256::from_str(&self.gas_price.to_string()).unwrap();
-        let used_tx_hashes = vec![self.hash.clone()];
+        let used_tx_hashes = vec![self.hash];
 
         ETHOperation {
             id: db_id,

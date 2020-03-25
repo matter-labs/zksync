@@ -86,9 +86,7 @@ impl DatabaseAccess for MockDatabase {
         let mut op = op.clone();
         op.id = id;
 
-        self.unconfirmed_operations
-            .borrow_mut()
-            .insert(id, op.clone());
+        self.unconfirmed_operations.borrow_mut().insert(id, op);
 
         Ok(id)
     }

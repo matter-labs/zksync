@@ -477,7 +477,7 @@ fn restore_state() {
         let deadline_block = eth_sender.get_deadline_block(2);
         let verify_op_tx = create_signed_tx(1, &eth_sender, &verify_op, deadline_block, 1);
 
-        let operations = vec![commit_op.clone(), verify_op.clone()];
+        let operations = vec![commit_op, verify_op];
         let stored_operations = vec![commit_op_tx, verify_op_tx];
 
         (operations, stored_operations)
@@ -488,7 +488,7 @@ fn restore_state() {
         verify_ops: 1,
         withdraw_ops: 0,
     };
-    let (mut eth_sender, _, mut receiver) = restored_eth_sender(stored_operations.clone(), stats);
+    let (mut eth_sender, _, mut receiver) = restored_eth_sender(stored_operations, stats);
 
     for (eth_op_id, operation) in operations.iter().enumerate() {
         // Note that we DO NOT send an operation to `ETHSender` and neither receive it.
@@ -660,7 +660,7 @@ fn concurrent_operations_order() {
         let mut withdraw_tx = txs[2].clone();
 
         // Check that commit/verify txs are sent and add the successful execution for them.
-        for tx in vec![commit_tx, verify_tx] {
+        for tx in &[commit_tx, verify_tx] {
             let current_tx_hash = tx.used_tx_hashes[0];
 
             // Check that current expected tx is stored.
@@ -676,7 +676,7 @@ fn concurrent_operations_order() {
         // Call `proceed_next_operations` again. Both txs should become confirmed.
         eth_sender.proceed_next_operations();
 
-        for tx in vec![commit_tx, verify_tx] {
+        for &tx in &[commit_tx, verify_tx] {
             let mut tx = tx.clone();
             let current_tx_hash = tx.used_tx_hashes[0];
 
