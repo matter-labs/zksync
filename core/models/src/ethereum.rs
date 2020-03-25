@@ -1,5 +1,6 @@
 //! Common primitives for the Ethereum network interaction.
 // Built-in deps
+use std::fmt;
 use std::str::FromStr;
 // External uses
 /// Local uses
@@ -20,12 +21,12 @@ pub enum OperationType {
     Withdraw,
 }
 
-impl OperationType {
-    pub fn to_string(&self) -> String {
+impl fmt::Display for OperationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Commit => "commit".into(),
-            Self::Verify => "verify".into(),
-            Self::Withdraw => "withdraw".into(),
+            Self::Commit => write!(f, "commit"),
+            Self::Verify => write!(f, "verify"),
+            Self::Withdraw => write!(f, "withdraw"),
         }
     }
 }
