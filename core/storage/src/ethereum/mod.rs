@@ -62,7 +62,7 @@ impl<'a> EthereumSchema<'a> {
                 .order_by(eth_tx_hashes::id.asc())
                 .load(self.0.conn())?;
             assert!(
-                eth_tx_hashes.len() >= 1,
+                !eth_tx_hashes.is_empty(),
                 "No hashes stored for the Ethereum operation"
             );
 
@@ -104,6 +104,7 @@ impl<'a> EthereumSchema<'a> {
     }
 
     /// Stores the sent (but not confirmed yet) Ethereum transaction in the database.
+    #[allow(clippy::too_many_arguments)] // OK for this particular method.
     pub fn save_new_eth_tx(
         &self,
         op_type: OperationType,
