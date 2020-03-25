@@ -382,7 +382,7 @@ steps:
   image: matterlabs/ci
   environment:
     KUBECONFIG_BASE64:
-      from_secret: stage_kubeconfig_base64
+      from_secret: testnet_kubeconfig_base64
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
