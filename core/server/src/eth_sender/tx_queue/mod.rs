@@ -8,10 +8,16 @@ mod sparse_queue;
 
 pub type RawTxData = Vec<u8>;
 
+/// Representation of the transaction data stored in the queue.
+/// This structure contains only essential fields required for the `eth_sender`
+/// to create an actual operation.
 #[derive(Debug)]
 pub struct TxData {
+    /// Type of the operation.
     pub op_type: OperationType,
+    /// Not signed raw tx payload.
     pub raw: RawTxData,
+    /// Optional ZK Sync operation.
     pub operation: Option<Operation>,
 }
 
@@ -22,6 +28,7 @@ impl PartialEq for TxData {
 }
 
 impl TxData {
+    /// Creates a new `TxData` object with the associated ZK Sync operation.
     pub fn from_operation(op_type: OperationType, operation: Operation, raw: RawTxData) -> Self {
         Self {
             op_type,
@@ -30,6 +37,7 @@ impl TxData {
         }
     }
 
+    /// Creates a new `TxData` object without associated ZK Sync operation.
     pub fn from_raw(op_type: OperationType, raw: RawTxData) -> Self {
         Self {
             op_type,

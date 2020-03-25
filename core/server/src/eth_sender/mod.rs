@@ -67,8 +67,11 @@ enum TxCheckMode {
 /// successfully included in blocks and executed.
 ///
 /// Also `ETHSender` preserves the order of operations: it guarantees that operations
-/// are committed in FIFO order, meaning that until the older operation is committed
-/// and has enough confirmations, no other operations will be committed.
+/// are committed in FIFO order, meaning that until the older operation of certain type (e.g.
+/// `commit`) will always be committed before the newer one.
+///
+/// However, multiple transaction can be "in flight" at the same time, see "Concurrent transaction
+/// sending" section for details.
 ///
 /// # Transaction sending policy
 ///
@@ -78,11 +81,25 @@ enum TxCheckMode {
 /// transaction and watch for its confirmations.
 ///
 /// If transaction is not confirmed for a while, we increase the gas price and do the same, but we
-/// keep the list of all sent transactions for one particular operations, since we can't be
+/// keep the list of all sent transaction hashes for one particular operations, since we can't be
 /// sure which one will be committed; thus we have to track all of them.
 ///
 /// Note: make sure to save signed tx to db before sending it to ETH, this way we can be sure
 /// that state is always recoverable.
+///
+/// # Concurrent transaction sending
+///
+/// `ETHSender` supports sending multiple transaction to the Ethereum at the same time.
+/// This can be configured by the constructor `max_txs_in_flight` parameter. The order of
+/// transaction is still guaranteed to be preserved, since every sent tx has the assigned nonce
+/// which makes it impossible to get sent transactions committed out of order.
+///
+/// Internally order of the transaction is determined by the underlying `TxQueue`, which provides
+/// transactions to send for `ETHSender` according to the following priority:
+///
+/// 1. Verify operations (only if the corresponding commit operation was sent)
+/// 2. Withdraw operations (only if both commit/verify for the same block operations were sent).
+/// 3. Commit operations.
 ///
 /// # Failure policy
 ///
@@ -154,6 +171,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         }
     }
 
+    /// Gets the incoming operations from the channel and adds them to the
+    /// transactions queue.
     fn retrieve_operations(&mut self) {
         while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
             info!(
@@ -166,6 +185,11 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         }
     }
 
+    /// This method does two main things:
+    ///
+    /// 1. Pops all the available transactions from the `TxQueue` and sends them.
+    /// 2. Sifts all the ongoing operations, filtering the completed ones and
+    ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
     fn proceed_next_operations(&mut self) {
         while let Some(tx) = self.tx_queue.pop_front() {
             self.initialize_operation(tx).unwrap_or_else(|e| {
@@ -220,6 +244,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         self.ongoing_ops = new_ongoing_ops;
     }
 
+    /// Stores the new operation in the database and sends the corresponding transaction.
     fn initialize_operation(&mut self, tx: TxData) -> Result<(), failure::Error> {
         let current_block = self.ethereum.block_number()?;
         let deadline_block = self.get_deadline_block(current_block);
@@ -241,6 +266,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         Ok(())
     }
 
+    /// Helper method to obtain the string representation of the ZK Sync operation.
+    /// Intended to be used for log entries.
     fn zksync_operation_description(&self, operation: &ETHOperation) -> String {
         if let Some(op) = &operation.op {
             format!(
@@ -254,6 +281,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         }
     }
 
+    /// Handles the ongoing operation by checking its state and doing the following:
+    /// - If the transaction is either pending or completed, stops the execution (as
+    ///   there is nothing to do with the operation yet).
+    /// - If the transaction is stuck, sends a supplement transaction for it.
+    /// - If the transaction is failed, handles the failure according to the failure
+    ///   processing policy.
     fn perform_commitment_step(
         &mut self,
         op: &mut ETHOperation,
@@ -465,6 +498,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         }))
     }
 
+    /// Encodes the operation data to the Ethereum tx payload (not signs it!).
     fn operation_to_raw_tx(&self, op: &Operation) -> Vec<u8> {
         match &op.action {
             Action::Commit => {
@@ -507,6 +541,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         }
     }
 
+    /// Encodes the ZK Sync operation to the tx payload and adds it to the queue.
     fn add_operation_to_queue(&mut self, op: Operation) {
         let raw_tx = self.operation_to_raw_tx(&op);
 
@@ -529,6 +564,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         }
     }
 
+    /// The same as `add_operation_to_queue`, but for the withdraw operation.
     fn add_complete_withdrawals_to_queue(&mut self) {
         // function completeWithdrawals(uint32 _n) external {
         let raw_tx = self.ethereum.encode_tx_data(
