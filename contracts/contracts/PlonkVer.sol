@@ -924,7 +924,7 @@ contract ConcreteVerifier is Plonk4VerifierWithAccessToDNext {
     function verify(
         uint256[] memory public_inputs, 
         uint256[] memory serialized_proof
-    ) public returns (bool) {
+    ) public view returns (bool) {
         VerificationKey memory vk = get_verification_key();
         uint256 expected_inputs = vk.num_inputs;
 
@@ -932,7 +932,6 @@ contract ConcreteVerifier is Plonk4VerifierWithAccessToDNext {
 
         bool valid = verify(proof, vk);
 
-        require(valid, "not valid");
         return valid;
     }  
 }
