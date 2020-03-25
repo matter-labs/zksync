@@ -106,9 +106,9 @@ impl TxQueueBuilder {
             max_pending_txs: self.max_pending_txs,
             sent_pending_txs: self.sent_pending_txs,
 
-            commit_operations: CounterQueue::new_with_count(self.commit_operations_count),
-            verify_operations: SparseQueue::new_from(verify_operations_next_block),
-            withdraw_operations: CounterQueue::new_with_count(self.withdraw_operations_count),
+            commit_operations: CounterQueue::new(self.commit_operations_count),
+            verify_operations: SparseQueue::new(verify_operations_next_block),
+            withdraw_operations: CounterQueue::new(self.withdraw_operations_count),
         }
     }
 }
@@ -138,18 +138,6 @@ pub struct TxQueue {
 }
 
 impl TxQueue {
-    /// Creates a new empty transactions queue.
-    pub fn new(max_pending_txs: usize) -> Self {
-        Self {
-            max_pending_txs,
-            sent_pending_txs: 0,
-
-            commit_operations: CounterQueue::new(),
-            verify_operations: SparseQueue::new_from(1), // Blocks are starting from the index 1.
-            withdraw_operations: CounterQueue::new(),
-        }
-    }
-
     /// Adds the `commit` operation to the queue.
     pub fn add_commit_operation(&mut self, commit_operation: TxData) {
         self.commit_operations.push_back(commit_operation);
@@ -241,7 +229,7 @@ mod tests {
         const VERIFY_MARK: u8 = 1;
         const WITHDRAW_MARK: u8 = 2;
 
-        let mut queue = TxQueue::new(MAX_IN_FLY);
+        let mut queue = TxQueueBuilder::new(MAX_IN_FLY).build();
 
         // Add 2 commit, 2 verify and 2 withdraw operations.
         queue.add_commit_operation(TxData::from_raw(

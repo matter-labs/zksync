@@ -314,17 +314,23 @@ pub(super) fn restored_eth_sender(
     mpsc::Sender<Operation>,
     mpsc::Receiver<Operation>,
 ) {
+    const MAX_TXS_IN_FLIGHT: usize = 1;
+
     let ethereum = MockEthereum::default();
     let db = MockDatabase::with_restorable_state(restore_state, stats);
 
     let (operation_sender, operation_receiver) = mpsc::channel(CHANNEL_CAPACITY);
     let (notify_sender, notify_receiver) = mpsc::channel(CHANNEL_CAPACITY);
 
-    (
-        ETHSender::new(db, ethereum, operation_receiver, notify_sender),
-        operation_sender,
-        notify_receiver,
-    )
+    let eth_sender = ETHSender::new(
+        MAX_TXS_IN_FLIGHT,
+        db,
+        ethereum,
+        operation_receiver,
+        notify_sender,
+    );
+
+    (eth_sender, operation_sender, notify_receiver)
 }
 
 /// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.

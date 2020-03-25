@@ -9,30 +9,24 @@ use std::{collections::HashMap, fmt};
 /// N and (N + 1) elements.
 #[derive(Debug)]
 pub struct SparseQueue<T: fmt::Debug> {
-    current_idx: usize,
+    next_expected_idx: usize,
     elements: HashMap<usize, T>,
 }
 
 impl<T: fmt::Debug> Default for SparseQueue<T> {
     fn default() -> Self {
         Self {
-            current_idx: 0,
+            next_expected_idx: 0,
             elements: HashMap::new(),
         }
     }
 }
 
 impl<T: fmt::Debug> SparseQueue<T> {
-    /// Creates a new empty sparse queue.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Creates a new empty sparse queue with the custom expected next ID.
-    /// This method is used to restore the state of the queue.
-    pub fn new_from(idx: usize) -> Self {
+    /// Creates a new empty sparse queue with the custom next expected element ID.
+    pub fn new(next_expected_idx: usize) -> Self {
         Self {
-            current_idx: idx,
+            next_expected_idx,
             ..Default::default()
         }
     }
@@ -40,7 +34,7 @@ impl<T: fmt::Debug> SparseQueue<T> {
     /// Inserts an element to the queue given its index.
     pub fn insert(&mut self, idx: usize, element: T) {
         assert!(
-            idx >= self.current_idx,
+            idx >= self.next_expected_idx,
             "Can't insert the element with index lower than the next expected one"
         );
         self.elements.insert(idx, element);
@@ -50,9 +44,9 @@ impl<T: fmt::Debug> SparseQueue<T> {
     /// if either the queue is empty, or the next expected element is yet
     /// missing in the queue.
     pub fn pop_front(&mut self) -> Option<T> {
-        match self.elements.remove(&self.current_idx) {
+        match self.elements.remove(&self.next_expected_idx) {
             Some(value) => {
-                self.current_idx += 1;
+                self.next_expected_idx += 1;
                 Some(value)
             }
             None => None,
@@ -63,12 +57,12 @@ impl<T: fmt::Debug> SparseQueue<T> {
     /// Returns `true` if the next expected element exists in the queue,
     /// and returns `false` otherwise.
     pub fn has_next(&self) -> bool {
-        self.elements.contains_key(&self.current_idx)
+        self.elements.contains_key(&self.next_expected_idx)
     }
 
     /// Returns the next expected element ID.
     pub fn next_id(&self) -> usize {
-        self.current_idx
+        self.next_expected_idx
     }
 }
 
@@ -79,7 +73,7 @@ mod tests {
     /// Checks the main operations of the queue: `insert`, `pop_front` and `has_next`.
     #[test]
     fn basic_operations() {
-        let mut queue: SparseQueue<String> = SparseQueue::new();
+        let mut queue: SparseQueue<String> = SparseQueue::new(0);
 
         // Insert the next element and obtain it.
         queue.insert(0, "zero".into());
@@ -99,11 +93,11 @@ mod tests {
         assert_eq!(queue.pop_front().unwrap(), "two");
     }
 
-    /// Checks that we can use the difference `current_idx` as the custom
+    /// Checks that we can use the difference `next_expected_idx` as the custom
     /// queue start point.
     #[test]
     fn different_start_point() {
-        let mut queue: SparseQueue<String> = SparseQueue::new_from(10);
+        let mut queue: SparseQueue<String> = SparseQueue::new(10);
 
         // Check that by default the queue is empty.
         assert!(!queue.has_next());
@@ -119,7 +113,7 @@ mod tests {
     #[test]
     #[should_panic]
     fn add_out_of_order_element() {
-        let mut queue: SparseQueue<String> = SparseQueue::new_from(10);
+        let mut queue: SparseQueue<String> = SparseQueue::new(10);
         // Insert the element with too low index.
         queue.insert(0, "zero".into());
     }

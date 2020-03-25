@@ -5,6 +5,7 @@
 
 // Built-in deps
 use std::collections::VecDeque;
+use std::str::FromStr;
 use std::time::Duration;
 // External uses
 use futures::channel::mpsc;
@@ -106,13 +107,12 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     pub fn new(
+        max_txs_in_flight: usize,
         db: DB,
         ethereum: ETH,
         rx_for_eth: mpsc::Receiver<Operation>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
-        const MAX_TXS_IN_FLIGHT: usize = 1; // TODO: Should be configurable.
-
         let ongoing_ops: VecDeque<_> = db
             .restore_state()
             .expect("Failed loading unconfirmed operations from the storage")
@@ -123,7 +123,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .load_stats()
             .expect("Failed loading ETH operations stats");
 
-        let tx_queue = TxQueueBuilder::new(MAX_TXS_IN_FLIGHT)
+        let tx_queue = TxQueueBuilder::new(max_txs_in_flight)
             .with_sent_pending_txs(ongoing_ops.len())
             .with_commit_operations_count(stats.commit_ops)
             .with_verify_operations_count(stats.verify_ops)
@@ -550,6 +550,11 @@ pub fn start_eth_sender(
     send_requst_receiver: mpsc::Receiver<Operation>,
     config_options: ConfigurationOptions,
 ) {
+    let max_txs_in_flight =
+        std::env::var("ETH_MAX_TXS_IN_FLIGHT").expect("ETH_MAX_TXS_IN_FLIGHT env variable missing");
+    let max_txs_in_flight = usize::from_str(&max_txs_in_flight)
+        .expect("ETH_MAX_TXS_IN_FLIGHT env variable has invalid value");
+
     std::thread::Builder::new()
         .name("eth_sender".to_string())
         .spawn(move || {
@@ -561,7 +566,13 @@ pub fn start_eth_sender(
             let db = Database::new(pool);
 
             let mut runtime = Runtime::new().expect("eth-sender-runtime");
-            let eth_sender = ETHSender::new(db, ethereum, send_requst_receiver, op_notify_sender);
+            let eth_sender = ETHSender::new(
+                max_txs_in_flight,
+                db,
+                ethereum,
+                send_requst_receiver,
+                op_notify_sender,
+            );
             runtime.block_on(eth_sender.run());
         })
         .expect("Eth sender thread");

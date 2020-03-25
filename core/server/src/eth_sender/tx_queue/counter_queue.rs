@@ -19,14 +19,8 @@ impl<T: fmt::Debug> Default for CounterQueue<T> {
 }
 
 impl<T: fmt::Debug> CounterQueue<T> {
-    /// Creates a new empty counter queue.
-    pub fn new() -> Self {
-        Self::default()
-    }
-
     /// Creates a new empty counter queue with the custom number of processed elements.
-    /// This method is used to restore the state of the queue.
-    pub fn new_with_count(counter: usize) -> Self {
+    pub fn new(counter: usize) -> Self {
         Self {
             counter,
             ..Default::default()
@@ -65,7 +59,7 @@ mod tests {
     /// Checks the main operations of the queue: `push_back`, `pop_front` and `get_count`.
     #[test]
     fn basic_operations() {
-        let mut queue: CounterQueue<String> = CounterQueue::new();
+        let mut queue: CounterQueue<String> = CounterQueue::new(0);
 
         // Check that by default the current count is 0.
         assert_eq!(queue.get_count(), 0);
