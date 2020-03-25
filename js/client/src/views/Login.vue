@@ -34,7 +34,7 @@ import { WalletDecorator } from '../WalletDecorator'
 export default {
     name: 'login',
     computed: {
-        ethereumSupported: () => typeof window.web3 !== 'undefined',
+        ethereumSupported: () => typeof window.ethereum !== 'undefined',
     },
     methods: {
         async login() {
