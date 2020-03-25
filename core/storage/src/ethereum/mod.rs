@@ -39,72 +39,72 @@ impl<'a> EthereumSchema<'a> {
         // operation is associated with exactly one Ethereum transaction. Note that there may
         // be ETH transactions without an operation (e.g. `completeWithdrawals` call), but for
         // every operation always there is an ETH transaction.
-        let raw_ops: Vec<(
-            StorageETHOperation,
-            Option<ETHBinding>,
-            Option<StoredOperation>,
-        )> = self.0.conn().transaction(|| {
-            eth_operations::table
+        self.0.conn().transaction(|| {
+            let raw_ops: Vec<(
+                StorageETHOperation,
+                Option<ETHBinding>,
+                Option<StoredOperation>,
+            )> = eth_operations::table
                 .left_join(
                     eth_ops_binding::table.on(eth_operations::id.eq(eth_ops_binding::eth_op_id)),
                 )
                 .left_join(operations::table.on(operations::id.eq(eth_ops_binding::op_id)))
                 .filter(eth_operations::confirmed.eq(false))
                 .order(eth_operations::id.asc())
-                .load(self.0.conn())
-        })?;
-
-        // Create a vector for the expected output.
-        let mut ops: VecDeque<ETHOperation> = VecDeque::with_capacity(raw_ops.len());
-
-        // Transform the `StoredOperation` to `Operation` and `StoredETHOperation` to `ETHOperation`.
-        for (eth_op, _, raw_op) in raw_ops {
-            // Load the stored txs hashes ordered by their ID,
-            // so the latest added hash will be the last one in the list.
-            let eth_tx_hashes: Vec<ETHTxHash> = eth_tx_hashes::table
-                .filter(eth_tx_hashes::eth_op_id.eq(eth_op.id))
-                .order_by(eth_tx_hashes::id.asc())
                 .load(self.0.conn())?;
-            assert!(
-                !eth_tx_hashes.is_empty(),
-                "No hashes stored for the Ethereum operation"
-            );
 
-            // If there is an operation, convert it to the `Operation` type.
-            let op = if let Some(raw_op) = raw_op {
-                Some(raw_op.into_op(self.0)?)
-            } else {
-                None
-            };
+            // Create a vector for the expected output.
+            let mut ops: VecDeque<ETHOperation> = VecDeque::with_capacity(raw_ops.len());
 
-            // Convert the fields into expected format.
-            let op_type = OperationType::from_str(eth_op.op_type.as_ref())
-                .expect("Stored operation type must have a valid value");
-            let last_used_gas_price =
-                U256::from_str(&eth_op.last_used_gas_price.to_string()).unwrap();
-            let used_tx_hashes = eth_tx_hashes
-                .iter()
-                .map(|entry| H256::from_slice(&entry.tx_hash))
-                .collect();
-            let final_hash = eth_op.final_hash.map(|hash| H256::from_slice(&hash));
+            // Transform the `StoredOperation` to `Operation` and `StoredETHOperation` to `ETHOperation`.
+            for (eth_op, _, raw_op) in raw_ops {
+                // Load the stored txs hashes ordered by their ID,
+                // so the latest added hash will be the last one in the list.
+                let eth_tx_hashes: Vec<ETHTxHash> = eth_tx_hashes::table
+                    .filter(eth_tx_hashes::eth_op_id.eq(eth_op.id))
+                    .order_by(eth_tx_hashes::id.asc())
+                    .load(self.0.conn())?;
+                assert!(
+                    !eth_tx_hashes.is_empty(),
+                    "No hashes stored for the Ethereum operation"
+                );
 
-            let eth_op = ETHOperation {
-                id: eth_op.id,
-                op_type,
-                op,
-                nonce: eth_op.nonce.into(),
-                last_deadline_block: eth_op.last_deadline_block as u64,
-                last_used_gas_price,
-                used_tx_hashes,
-                encoded_tx_data: eth_op.raw_tx,
-                confirmed: eth_op.confirmed,
-                final_hash,
-            };
+                // If there is an operation, convert it to the `Operation` type.
+                let op = if let Some(raw_op) = raw_op {
+                    Some(raw_op.into_op(self.0)?)
+                } else {
+                    None
+                };
 
-            ops.push_back(eth_op);
-        }
+                // Convert the fields into expected format.
+                let op_type = OperationType::from_str(eth_op.op_type.as_ref())
+                    .expect("Stored operation type must have a valid value");
+                let last_used_gas_price =
+                    U256::from_str(&eth_op.last_used_gas_price.to_string()).unwrap();
+                let used_tx_hashes = eth_tx_hashes
+                    .iter()
+                    .map(|entry| H256::from_slice(&entry.tx_hash))
+                    .collect();
+                let final_hash = eth_op.final_hash.map(|hash| H256::from_slice(&hash));
 
-        Ok(ops)
+                let eth_op = ETHOperation {
+                    id: eth_op.id,
+                    op_type,
+                    op,
+                    nonce: eth_op.nonce.into(),
+                    last_deadline_block: eth_op.last_deadline_block as u64,
+                    last_used_gas_price,
+                    used_tx_hashes,
+                    encoded_tx_data: eth_op.raw_tx,
+                    confirmed: eth_op.confirmed,
+                    final_hash,
+                };
+
+                ops.push_back(eth_op);
+            }
+
+            Ok(ops)
+        })
     }
 
     /// Loads the operations which were stored in `operations` table, but not
