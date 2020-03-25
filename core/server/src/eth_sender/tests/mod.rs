@@ -1,5 +1,4 @@
 // External uses
-use web3::contract::Options;
 // Workspace uses
 use models::ethereum::ETHOperation;
 // Local uses
@@ -7,7 +6,6 @@ use self::mock::{
     create_signed_tx, create_signed_withdraw_tx, default_eth_sender, restored_eth_sender,
 };
 use super::{
-    ethereum_interface::EthereumInterface,
     transactions::{ETHStats, ExecutedTxStatus, TxCheckOutcome},
     ETHSender, TxCheckMode,
 };
@@ -252,20 +250,30 @@ fn operation_commitment_workflow() {
         eth_sender.db.assert_confirmed(&expected_tx);
     }
 
-    // Process the next operation and check that `completeWithdrawals` transaction is sent.
+    // Process the next operation and check that `completeWithdrawals` transaction is stored and sent.
     eth_sender.proceed_next_operations();
-    let mut options = Options::default();
-    let nonce = operations.len().into();
-    options.nonce = Some(nonce);
-    let raw_tx = eth_sender.ethereum.encode_tx_data(
-        "completeWithdrawals",
-        models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
-    );
-    let tx = eth_sender
+
+    let eth_op_idx = operations.len() as i64;
+    let nonce = eth_op_idx;
+    let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
+    let mut withdraw_op_tx =
+        create_signed_withdraw_tx(eth_op_idx, &eth_sender, deadline_block, nonce);
+
+    eth_sender.db.assert_stored(&withdraw_op_tx);
+    eth_sender
         .ethereum
-        .sign_prepared_tx(raw_tx, options)
-        .unwrap();
-    eth_sender.ethereum.assert_sent(&tx.hash);
+        .assert_sent(&withdraw_op_tx.used_tx_hashes[0]);
+
+    // Mark `completeWithdrawals` as completed.
+    eth_sender
+        .ethereum
+        .add_successfull_execution(withdraw_op_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
+    eth_sender.proceed_next_operations();
+
+    // Check that `completeWithdrawals` is completed in the DB.
+    withdraw_op_tx.confirmed = true;
+    withdraw_op_tx.final_hash = Some(withdraw_op_tx.used_tx_hashes[0]);
+    eth_sender.db.assert_confirmed(&withdraw_op_tx);
 
     // We should be notified about verify operation being completed.
     assert_eq!(
