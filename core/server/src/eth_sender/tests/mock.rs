@@ -64,13 +64,6 @@ impl MockDatabase {
         assert!(self.confirmed_operations.borrow().get(&tx.id).is_none());
     }
 
-    /// Ensures that the provided transaction is not stored in the database.
-    pub fn assert_not_stored(&self, tx: &ETHOperation) {
-        assert!(self.confirmed_operations.borrow().get(&tx.id).is_none());
-
-        assert!(self.unconfirmed_operations.borrow().get(&tx.id).is_none());
-    }
-
     /// Ensures that the provided transaction is stored as confirmed.
     pub fn assert_confirmed(&self, tx: &ETHOperation) {
         assert_eq!(self.confirmed_operations.borrow().get(&tx.id), Some(tx));

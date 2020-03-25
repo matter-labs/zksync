@@ -3,9 +3,10 @@ use web3::contract::Options;
 // Workspace uses
 use models::ethereum::ETHOperation;
 // Local uses
-use self::mock::{create_signed_tx, default_eth_sender, restored_eth_sender};
+use self::mock::{
+    create_signed_tx, create_signed_withdraw_tx, default_eth_sender, restored_eth_sender,
+};
 use super::{
-    database::DatabaseAccess,
     ethereum_interface::EthereumInterface,
     transactions::{ETHStats, ExecutedTxStatus, TxCheckOutcome},
     ETHSender, TxCheckMode,
@@ -321,117 +322,110 @@ fn stuck_transaction() {
     eth_sender.db.assert_confirmed(&stuck_tx);
 }
 
-// TODO: Restore once withdraw operations are fixed in `eth_sender`.
-// Currently this test is too hard to implement, since withdraw txs are not stored in the database.
-// /// This test verifies that with multiple operations received all-together,
-// /// their order is respected and no processing of the next operation is started until
-// /// the previous one is committed.
-// #[test]
-// fn operations_order() {
-//     let (mut eth_sender, mut sender, mut receiver) = default_eth_sender();
+/// This test verifies that with multiple operations received all-together,
+/// their order is respected and no processing of the next operation is started until
+/// the previous one is committed.
+///
+/// This test includes all three operation types (commit, verify and withdraw).
+#[test]
+fn operations_order() {
+    let (mut eth_sender, mut sender, mut receiver) = default_eth_sender();
 
-//     // We send multiple the operations at once to the channel.
-//     let operations_count = 3;
-//     let mut operations = Vec::new();
-//     let commit_operations = &test_data::COMMIT_OPERATIONS[..operations_count];
-//     let verify_operations = &test_data::VERIFY_OPERATIONS[..operations_count];
-//     operations.extend_from_slice(commit_operations);
-//     operations.extend_from_slice(verify_operations);
+    // We send multiple the operations at once to the channel.
+    let operations_count = 3;
+    let mut operations = Vec::new();
+    let commit_operations = &test_data::COMMIT_OPERATIONS[..operations_count];
+    let verify_operations = &test_data::VERIFY_OPERATIONS[..operations_count];
+    operations.extend_from_slice(commit_operations);
+    operations.extend_from_slice(verify_operations);
 
-//     // Also we create the list of expected transactions.
-//     let mut expected_txs = Vec::new();
+    // Also we create the list of expected transactions.
+    let mut expected_txs = Vec::new();
 
-//     // Create expected txs from all the operations.
-//     for (idx, (commit_operation, verify_operation)) in
-//         commit_operations.iter().zip(verify_operations).enumerate()
-//     {
-//         // Create the commit operation.
-//         let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3) as u64;
-//         let deadline_block = eth_sender.get_deadline_block(start_block);
-//         let eth_op_idx = (idx * 3) as i64;
-//         let nonce = eth_op_idx;
+    // Create expected txs from all the operations.
+    // Since we create 3 operations at each cycle iteration,
+    // the logic of ID calculating is (i * 3), (i * 3 + 1), (i * 3 + 2).
+    // On the first iteration the indices 0, 1 and 2 will be taken, then it
+    // will be 3, 4 and 5, etc.
+    for (idx, (commit_operation, verify_operation)) in
+        commit_operations.iter().zip(verify_operations).enumerate()
+    {
+        // Create the commit operation.
+        let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3) as u64;
+        let deadline_block = eth_sender.get_deadline_block(start_block);
+        let eth_op_idx = (idx * 3) as i64;
+        let nonce = eth_op_idx;
 
-//         let mut commit_op_tx = create_signed_tx(
-//             eth_op_idx,
-//             &eth_sender,
-//             commit_operation,
-//             deadline_block,
-//             nonce,
-//         );
+        let commit_op_tx = create_signed_tx(
+            eth_op_idx,
+            &eth_sender,
+            commit_operation,
+            deadline_block,
+            nonce,
+        );
 
-//         expected_txs.push(commit_op_tx);
+        expected_txs.push(commit_op_tx);
 
-//         // Create the verify operation, as by priority it will be processed right after `commit`.
-//         let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3 + 1) as u64;
-//         let deadline_block = eth_sender.get_deadline_block(start_block);
-//         let eth_op_idx = (idx * 3 + 1) as i64;
-//         let nonce = eth_op_idx;
+        // Create the verify operation, as by priority it will be processed right after `commit`.
+        let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3 + 1) as u64;
+        let deadline_block = eth_sender.get_deadline_block(start_block);
+        let eth_op_idx = (idx * 3 + 1) as i64;
+        let nonce = eth_op_idx;
 
-//         let mut verify_op_tx = create_signed_tx(
-//             eth_op_idx,
-//             &eth_sender,
-//             verify_operation,
-//             deadline_block,
-//             nonce,
-//         );
+        let verify_op_tx = create_signed_tx(
+            eth_op_idx,
+            &eth_sender,
+            verify_operation,
+            deadline_block,
+            nonce,
+        );
 
-//         expected_txs.push(verify_op_tx);
+        expected_txs.push(verify_op_tx);
 
-//         // Create the withdraw operation.
-//     }
+        // Create the withdraw operation.
+        let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3 + 2) as u64;
+        let deadline_block = eth_sender.get_deadline_block(start_block);
+        let eth_op_idx = (idx * 3 + 2) as i64;
+        let nonce = eth_op_idx;
 
-//     for operation in operations.iter() {
-//         sender.try_send(operation.clone()).unwrap();
-//     }
-//     eth_sender.retrieve_operations();
+        let withdraw_op_tx =
+            create_signed_withdraw_tx(eth_op_idx, &eth_sender, deadline_block, nonce);
 
-//     // Then we go through the operations and check that the order of operations is preserved.
-//     for (idx, tx) in expected_txs.iter().enumerate() {
-//         eth_sender.proceed_next_operations();
+        expected_txs.push(withdraw_op_tx);
+    }
 
-//         // Check that current expected tx is stored, but the next ones are not.
-//         eth_sender.db.assert_stored(tx);
-//         eth_sender.ethereum.assert_sent(tx);
+    for operation in operations.iter() {
+        sender.try_send(operation.clone()).unwrap();
+    }
+    eth_sender.retrieve_operations();
 
-//         for following_tx in expected_txs[idx + 1..].iter() {
-//             eth_sender.db.assert_not_stored(following_tx)
-//         }
+    // Then we go through the operations and check that the order of operations is preserved.
+    for mut tx in expected_txs.into_iter() {
+        let current_tx_hash = tx.used_tx_hashes[0];
 
-//         eth_sender
-//             .ethereum
-//             .add_successfull_execution(tx.signed_tx.hash, super::WAIT_CONFIRMATIONS);
-//         eth_sender.proceed_next_operations();
-//         eth_sender.db.assert_confirmed(tx);
+        eth_sender.proceed_next_operations();
 
-//         if idx % 2 == 1 {
-//             // For every verify operation, we should also add a withdraw operation and process it.
-//             let raw_tx = eth_sender.ethereum.encode_tx_data(
-//                 "completeWithdrawals",
-//                 models::node::config::MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL,
-//             );
+        // Check that current expected tx is stored.
+        eth_sender.db.assert_stored(&tx);
+        eth_sender.ethereum.assert_sent(&current_tx_hash);
 
-//             let nonce = (idx / 2) * 3 + 2;
-//             let mut options = Options::default();
-//             options.nonce = Some(nonce.into());
+        // Mark the tx as successfully
+        eth_sender
+            .ethereum
+            .add_successfull_execution(current_tx_hash, super::WAIT_CONFIRMATIONS);
+        eth_sender.proceed_next_operations();
 
-//             let signed_tx = eth_sender
-//                 .ethereum
-//                 .sign_prepared_tx(raw_tx, options)
-//                 .unwrap();
+        // Update the fields in the tx and check if it's confirmed.
+        tx.confirmed = true;
+        tx.final_hash = Some(current_tx_hash);
+        eth_sender.db.assert_confirmed(&tx);
+    }
 
-//             eth_sender
-//                 .ethereum
-//                 .add_successfull_execution(signed_tx.hash, super::WAIT_CONFIRMATIONS);
-//             eth_sender.proceed_next_operations();
-//             eth_sender.proceed_next_operations();
-//         }
-//     }
-
-//     // We should be notified about all the verify operations being completed.
-//     for _ in 0..operations_count {
-//         assert!(receiver.try_next().unwrap().is_some());
-//     }
-// }
+    // We should be notified about all the verify operations being completed.
+    for _ in 0..operations_count {
+        assert!(receiver.try_next().unwrap().is_some());
+    }
+}
 
 /// Check that upon a transaction failure the incident causes a panic by default.
 #[test]
