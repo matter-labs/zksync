@@ -18,6 +18,7 @@ async function main() {
     console.log("tx: ", tx);
     const receipt = await tx.wait();
     console.log("receipt: ", receipt);
+    console.log("gas used: ", receipt.gasUsed.toNumber());
 
 }
 
