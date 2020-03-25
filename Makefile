@@ -233,10 +233,7 @@ apply-kubeconfig-nginx:
 	@bin/k8s-gen-resource-definitions
 	@bin/k8s-apply-nginx
 
-apply-kubeconfig:
-	apply-kubeconfig-server
-	apply-kubeconfig-provers
-	apply-kubeconfig-nginx
+apply-kubeconfig: apply-kubeconfig-server apply-kubeconfig-provers apply-kubeconfig-nginx
 
 update-provers: push-image-prover apply-kubeconfig-server
 	@kubectl patch deployment $(ZKSYNC_ENV)-server  --namespace $(ZKSYNC_ENV) -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
