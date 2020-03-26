@@ -5,6 +5,12 @@ pragma solidity 0.5.16;
 /// @author Matter Labs
 contract Config {
 
+    /// @notice Notice period before activation preparation status of upgrade mode (in seconds)
+    uint constant UPGRADE_NOTICE_PERIOD = 2 weeks;
+
+    /// @notice Period after the start of preparation when contract wouldn't register new priority operations (in seconds)
+    uint constant UPGRADE_PREPARATION_LOCK_PERIOD = 1 days;
+
     /// @notice zkSync address length
     uint8 constant ADDRESS_BYTES = 20;
 

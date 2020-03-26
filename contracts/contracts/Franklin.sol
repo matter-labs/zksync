@@ -14,6 +14,36 @@ import "./Operations.sol";
 /// @author Matter Labs
 contract Franklin is Storage, Config, Events {
 
+    // Upgrade functional
+
+    function upgradeNoticePeriod() external pure returns (uint) {
+        return UPGRADE_NOTICE_PERIOD;
+    }
+
+    /// @notice Notification that upgrade preparation status is activated
+    function upgradePreparationStarted() external {
+        upgradePreparation = true;
+        upgradePreparationActivationTime = now;
+    }
+
+    /// @notice Notification that upgrade canceled
+    function upgradeCanceled() external {
+        upgradePreparation = false;
+        upgradePreparationActivationTime = 0;
+    }
+
+    /// @notice Notification that upgrade finishes
+    function upgradeFinishes() external {
+        upgradePreparation = false;
+        upgradePreparationActivationTime = 0;
+    }
+
+    /// @notice Checks that contract is ready for upgrade
+    /// @return bool flag indicating that contract is ready for upgrade
+    function readyForUpgrade() external view returns (bool) {
+        return totalOpenPriorityRequests == 0;
+    }
+
     // // Migration
 
     // // Address of the new version of the contract to migrate accounts to
@@ -49,14 +79,6 @@ contract Franklin is Storage, Config, Events {
         governance = Governance(_governanceAddress);
 
         blocks[0].stateRoot = _genesisRoot;
-    }
-
-    function totalRegisteredPriorityOperations() public view returns (uint64) {
-        return firstPriorityRequestId + totalOpenPriorityRequests;
-    }
-
-    function totalVerifiedPriorityOperations() public view returns (uint64) {
-        return firstPriorityRequestId;
     }
 
     /// @notice executes pending withdrawals
@@ -696,6 +718,8 @@ contract Franklin is Storage, Config, Events {
         uint256 _fee,
         bytes memory _pubData
     ) internal {
+        require(!upgradePreparation || now >= upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD, "apr11"); // apr11 - priority request can't be added during lock period of preparation status of upgrade
+
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 

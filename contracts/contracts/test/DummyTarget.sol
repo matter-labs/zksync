@@ -2,19 +2,24 @@ pragma solidity 0.5.16;
 
 interface DummyTarget {
 
+    function upgradeNoticePeriod() external pure returns (uint);
+
     function get_DUMMY_INDEX() external pure returns (uint256);
 
     function initialize(bytes calldata initializationParameters) external;
 
-    function totalVerifiedPriorityOperations() external returns (uint64);
-
-    function totalRegisteredPriorityOperations() external returns (uint64);
-
     function verifyPriorityOperation() external;
+
+    function readyForUpgrade() external returns (bool);
 
 }
 
 contract DummyFirst is DummyTarget {
+
+    uint constant UPGRADE_NOTICE_PERIOD = 4;
+    function upgradeNoticePeriod() external pure returns (uint) {
+        return UPGRADE_NOTICE_PERIOD;
+    }
 
     uint256 private constant DUMMY_INDEX = 1;
     function get_DUMMY_INDEX() external pure returns (uint256) {
@@ -32,11 +37,11 @@ contract DummyFirst is DummyTarget {
         }
     }
 
-    function totalVerifiedPriorityOperations() external returns (uint64){
+    function totalVerifiedPriorityOperations() internal returns (uint64) {
         return _verifiedPriorityOperations;
     }
 
-    function totalRegisteredPriorityOperations() external returns (uint64){
+    function totalRegisteredPriorityOperations() internal returns (uint64) {
         return 1;
     }
 
@@ -44,9 +49,18 @@ contract DummyFirst is DummyTarget {
         _verifiedPriorityOperations++;
     }
 
+    function readyForUpgrade() external returns (bool) {
+        return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
+    }
+
 }
 
 contract DummySecond is DummyTarget {
+
+    uint constant UPGRADE_NOTICE_PERIOD = 4;
+    function upgradeNoticePeriod() external pure returns (uint) {
+        return UPGRADE_NOTICE_PERIOD;
+    }
 
     uint256 private constant DUMMY_INDEX = 2;
     function get_DUMMY_INDEX() external pure returns (uint256) {
@@ -64,16 +78,20 @@ contract DummySecond is DummyTarget {
         }
     }
 
-    function totalVerifiedPriorityOperations() external returns (uint64){
+    function totalVerifiedPriorityOperations() internal returns (uint64) {
         return _verifiedPriorityOperations;
     }
 
-    function totalRegisteredPriorityOperations() external returns (uint64){
+    function totalRegisteredPriorityOperations() internal returns (uint64) {
         return 0;
     }
 
     function verifyPriorityOperation() external {
         _verifiedPriorityOperations++;
+    }
+
+    function readyForUpgrade() external returns (bool) {
+        return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
 }

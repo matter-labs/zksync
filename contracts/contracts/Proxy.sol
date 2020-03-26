@@ -58,6 +58,30 @@ contract Proxy is Ownable {
         require(initializationSuccess, "ufu11"); // ufu11 - target initialization failed
     }
 
+    /// @notice Notifies proxy contract that notice period started
+    function upgradeNoticePeriodStarted() external {
+        requireMaster(msg.sender);
+        getTarget().delegatecall(abi.encodeWithSignature("upgradeNoticePeriodStarted()"));
+    }
+
+    /// @notice Notifies proxy contract that upgrade preparation status is activated
+    function upgradePreparationStarted() external {
+        requireMaster(msg.sender);
+        getTarget().delegatecall(abi.encodeWithSignature("upgradePreparationStarted()"));
+    }
+
+    /// @notice Notifies proxy contract that upgrade canceled
+    function upgradeCanceled() external {
+        requireMaster(msg.sender);
+        getTarget().delegatecall(abi.encodeWithSignature("upgradeCanceled()"));
+    }
+
+    /// @notice Notifies proxy contract that upgrade finishes
+    function upgradeFinishes() external {
+        requireMaster(msg.sender);
+        getTarget().delegatecall(abi.encodeWithSignature("upgradeFinishes()"));
+    }
+
     /// @notice Performs a delegatecall to the contract implementation
     /// @dev Fallback function allowing to perform a delegatecall to the given implementation
     /// This function will return whatever the implementation call returns

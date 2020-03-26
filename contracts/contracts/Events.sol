@@ -57,27 +57,25 @@ contract Events {
 /// @author Matter Labs
 contract UpgradeEvents {
 
-    /// @notice Event emitted when new proxy is added to upgrade gatekeeper
+    /// @notice Event emitted when new proxy is added to upgrade gatekeeper's list of managed contracts
     event ProxyAdded(
         address proxyAddress
     );
 
-    /// @notice Event emitted when list of proxies managed by the upgrade gatekeeper is cleared
-    event ProxyListCleared();
-
     /// @notice Upgrade mode enter event
-    event UpgradeModeActivated();
+    event NoticePeriodStarted(
+        address[] newTargets
+    );
 
     /// @notice Upgrade mode cancel event
     event UpgradeCanceled();
 
     /// @notice Upgrade mode preparation status event
-    event UpgradeModePreparationStatusActivated();
+    event PreparationStarted();
 
     /// @notice Upgrade mode complete event
     event UpgradeCompleted(
         address proxyAddress,
-        uint64 version,
         address newTargetAddress
     );
 

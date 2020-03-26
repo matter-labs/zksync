@@ -223,12 +223,13 @@ export class Deployer {
         );
         this.addresses.UpgradeGatekeeper = contract.address;
 
-        await (await contract.addProxyContract(this.getDeployedContract('Governance').address)).wait();
-        await (await contract.addProxyContract(this.getDeployedContract('Franklin').address)).wait();
-
         await (await this.getDeployedContract('Governance').transferMastership(contract.address)).wait();
         await (await this.getDeployedContract('Verifier').transferMastership(contract.address)).wait();
         await (await this.getDeployedContract('Franklin').transferMastership(contract.address)).wait();
+
+        await (await contract.addProxyContract(this.getDeployedContract('Governance').address)).wait();
+        await (await contract.addProxyContract(this.getDeployedContract('Verifier').address)).wait();
+        await (await contract.addProxyContract(this.getDeployedContract('Franklin').address)).wait();
 
         return contract;
     }

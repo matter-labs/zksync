@@ -2,11 +2,11 @@ import {ethers} from "ethers";
 import {ArgumentParser} from "argparse";
 import {proxyContractCode, upgradeGatekeeperTestContractCode} from "../src.ts/deploy";
 import {deployContract} from "ethereum-waffle";
+import {AddressZero} from "ethers/constants";
 
 const {performance} = require('perf_hooks');
 const {expect} = require("chai")
 
-export const GovernanceTestNoInitContractCode = require(`../build/GovernanceTestNoInit`);
 export const FranklinTestNoInitContractCode = require(`../build/FranklinTestNoInit`);
 
 async function main() {
@@ -43,12 +43,6 @@ async function main() {
         wallet,
     );
 
-    const newTargetGovernance = await deployContract(
-        wallet,
-        GovernanceTestNoInitContractCode,
-        [],
-        {gasLimit: 6500000},
-    );
     const newTargetFranklin = await deployContract(
         wallet,
         FranklinTestNoInitContractCode,
@@ -56,16 +50,16 @@ async function main() {
         {gasLimit: 6500000},
     );
 
-    let notice_period = parseInt(await upgradeGatekeeper.get_NOTICE_PERIOD());
+    let notice_period = parseInt(await newTargetFranklin.upgradeNoticePeriod()); // in tests notice period of FranklinTestNoInit will be equal to FranklinTest
 
-    await (await upgradeGatekeeper.startProxyUpgrade([newTargetGovernance.address, newTargetFranklin.address])).wait();
+    await (await upgradeGatekeeper.startUpgrade([AddressZero, AddressZero, newTargetFranklin.address])).wait();
 
     // wait notice period
     await new Promise(r => setTimeout(r, notice_period * 1000 + 10));
 
     // finish upgrade
     await (await upgradeGatekeeper.startPreparation()).wait();
-    await (await upgradeGatekeeper.finishProxyUpgrade([], [0, 0])).wait();
+    await (await upgradeGatekeeper.finishUpgrade([], [0, 0, 0])).wait();
 
     await expect(await proxyContract.getTarget())
         .to.equal(newTargetFranklin.address);
