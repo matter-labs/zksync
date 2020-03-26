@@ -16,6 +16,7 @@ contract Franklin is Storage, Config, Events {
 
     // Upgrade functional
 
+    /// @notice Notice period before activation preparation status of upgrade mode
     function upgradeNoticePeriod() external pure returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
     }
@@ -41,7 +42,7 @@ contract Franklin is Storage, Config, Events {
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
     function readyForUpgrade() external view returns (bool) {
-        return totalOpenPriorityRequests == 0;
+        return !exodusMode && totalOpenPriorityRequests == 0;
     }
 
     // // Migration
