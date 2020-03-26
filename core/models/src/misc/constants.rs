@@ -5,4 +5,4 @@ pub const ETH_SIGNATURE_LENGTH: usize = 65;
 pub const ETH_SIGNATURE_HEX_LENGTH: usize = (ETH_SIGNATURE_LENGTH * 2) + 2;
 
 /// EIP1271 isValidSignature return value
-pub const MAGICVALUE: [u8; 4] = [0x20, 0xc1, 0x3b, 0x0b];
+pub const EIP1271_SUCCESS_RETURN_VALUE: [u8; 4] = [0x20, 0xc1, 0x3b, 0x0b];

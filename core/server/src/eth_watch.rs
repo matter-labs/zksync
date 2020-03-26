@@ -15,7 +15,8 @@ use web3::{Transport, Web3};
 // Workspace deps
 use models::abi::{eip1271_contract, governance_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
-use models::misc::constants::MAGICVALUE;
+use models::misc::constants::EIP1271_SUCCESS_RETURN_VALUE;
+use models::node::tx::EIP1271Signature;
 use models::node::{Nonce, PriorityOp, PubKeyHash, TokenId};
 use models::params::PRIORITY_EXPIRATION;
 use models::TokenAddedEvent;
@@ -39,7 +40,7 @@ pub enum EthWatchRequest {
     CheckEIP1271Signature {
         address: Address,
         data: Vec<u8>,
-        signature: Vec<u8>,
+        signature: EIP1271Signature,
         resp: oneshot::Sender<bool>,
     },
 }
@@ -281,13 +282,13 @@ impl<T: Transport> EthWatch<T> {
         &self,
         address: Address,
         data: Vec<u8>,
-        signature: Vec<u8>,
+        signature: EIP1271Signature,
     ) -> Result<bool, failure::Error> {
         let received: [u8; 4] = self
             .get_eip1271_contract(address)
             .query(
                 "isValidSignature",
-                (data, signature),
+                (data, signature.0),
                 None,
                 Options::default(),
                 None,
@@ -296,7 +297,7 @@ impl<T: Transport> EthWatch<T> {
             .await
             .map_err(|e| format_err!("Failed to query contract isValidSignature: {}", e))?;
 
-        Ok(received == MAGICVALUE)
+        Ok(received == EIP1271_SUCCESS_RETURN_VALUE)
     }
 
     async fn is_new_pubkey_hash_authorized(
