@@ -19,6 +19,11 @@ import {
     SYNC_MAIN_CONTRACT_INTERFACE
 } from "./utils";
 
+// Our MetaMask users sometimes use custom gas price values,
+// which we can't know. We use this constant to assure that 
+// gasprice from our calculations isn't smaller than actually used one.
+const metamaskIncreaseGasPriceFactor = 10;
+
 class ZKSyncTxError extends Error {
     constructor(
         message: string,
@@ -396,6 +401,7 @@ export class Wallet {
                 deposit.token,
                 gasPrice
             );
+            maxFeeInETHToken = maxFeeInETHToken.mul(metamaskIncreaseGasPriceFactor);
         }
         const mainZkSyncContract = new Contract(
             this.provider.contractAddress.mainContract,
@@ -485,6 +491,7 @@ export class Wallet {
             maxFeeInETHToken = await ethProxy.estimateEmergencyWithdrawFeeInETHToken(
                 gasPrice
             );
+            maxFeeInETHToken = maxFeeInETHToken.mul(metamaskIncreaseGasPriceFactor);
         }
 
         let accountId;
