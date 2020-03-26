@@ -143,7 +143,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         for (uint64 i = 0; i < proxies.length; i++) {
             address proxy = proxies[i];
             address nextTarget = nextTargets[i];
-            if (nextTargets[i] == address(0)) {
+            if (nextTarget == address(0)) {
                 require(sizeOfInitParameters[i] == 0, "fpu14"); // fpu14 - there must be no init parameters bytes for proxy that wouldn't be upgraded
             } else {
                 bytes memory targetInitParameters;
