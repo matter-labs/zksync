@@ -15,10 +15,6 @@ cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTest.sol
 cp $IN_DIR/Storage.sol $OUT_DIR/StorageTest.sol
 cp $IN_DIR/Config.sol $OUT_DIR/ConfigTest.sol
 cp $IN_DIR/UpgradeGatekeeper.sol $OUT_DIR/UpgradeGatekeeperTest.sol
-cp $IN_DIR/Bytes.sol $OUT_DIR/Bytes.sol
-cp $IN_DIR/Events.sol $OUT_DIR/Events.sol
-cp $IN_DIR/Operations.sol $OUT_DIR/Operations.sol
-cp $IN_DIR/VerificationKey.sol $OUT_DIR/VerificationKey.sol
 cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTestNoInit.sol
 
 # Change dependencies
