@@ -11,7 +11,7 @@ use bigdecimal::BigDecimal;
 use web3::types::{H256, U256};
 // Workspace uses
 use models::{
-    ethereum::{ETHOperation, EthOpId},
+    ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Operation,
 };
 use storage::ConnectionPool;
@@ -26,22 +26,28 @@ pub(super) trait DatabaseAccess {
     fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error>;
 
     /// Saves a new unconfirmed operation to the database.
-    fn save_new_eth_tx(&self, op: &ETHOperation) -> Result<EthOpId, failure::Error>;
+    fn save_new_eth_tx(
+        &self,
+        op_type: OperationType,
+        op_id: Option<Operation>,
+        deadline_block: i64,
+        used_gas_price: U256,
+        raw_tx: Vec<u8>,
+    ) -> Result<InsertedOperationResponse, failure::Error>;
+
+    /// Adds a tx hash entry associated with some Ethereum operation to the database.
+    fn add_hash_entry(&self, eth_op_id: i64, hash: &H256) -> Result<(), failure::Error>;
 
     /// Adds a new tx info to the previously started Ethereum operation.
     fn update_eth_tx(
         &self,
         eth_op_id: EthOpId,
-        hash: &H256,
         new_deadline_block: i64,
         new_gas_value: U256,
     ) -> Result<(), failure::Error>;
 
     /// Marks an operation as completed in the database.
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error>;
-
-    /// Gets the next nonce to use from the database.
-    fn next_nonce(&self) -> Result<i64, failure::Error>;
 
     /// Loads the stored Ethereum operations stats.
     fn load_stats(&self) -> Result<ETHStats, failure::Error>;
@@ -72,37 +78,40 @@ impl DatabaseAccess for Database {
         Ok((unconfirmed_ops, unprocessed_ops))
     }
 
-    fn save_new_eth_tx(&self, op: &ETHOperation) -> Result<EthOpId, failure::Error> {
+    fn save_new_eth_tx(
+        &self,
+        op_type: OperationType,
+        op: Option<Operation>,
+        deadline_block: i64,
+        used_gas_price: U256,
+        raw_tx: Vec<u8>,
+    ) -> Result<InsertedOperationResponse, failure::Error> {
         let storage = self.db_pool.access_storage()?;
 
-        assert_eq!(
-            op.used_tx_hashes.len(),
-            1,
-            "For the new operation there should be exactly one tx hash"
-        );
-        let tx_hash = op.used_tx_hashes[0];
         Ok(storage.ethereum_schema().save_new_eth_tx(
-            op.op_type.clone(),
-            op.op.clone().map(|op| op.id.unwrap()),
-            tx_hash,
-            op.last_deadline_block,
-            op.nonce.as_u32(),
-            BigDecimal::from_str(&op.last_used_gas_price.to_string()).unwrap(),
-            op.encoded_tx_data.clone(),
+            op_type,
+            op.map(|op| op.id.unwrap()),
+            deadline_block,
+            BigDecimal::from_str(&used_gas_price.to_string()).unwrap(),
+            raw_tx,
         )?)
+    }
+
+    fn add_hash_entry(&self, eth_op_id: i64, hash: &H256) -> Result<(), failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+
+        Ok(storage.ethereum_schema().add_hash_entry(eth_op_id, hash)?)
     }
 
     fn update_eth_tx(
         &self,
         eth_op_id: EthOpId,
-        hash: &H256,
         new_deadline_block: i64,
         new_gas_value: U256,
     ) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
         Ok(storage.ethereum_schema().update_eth_tx(
             eth_op_id,
-            hash,
             new_deadline_block,
             BigDecimal::from_str(&new_gas_value.to_string()).unwrap(),
         )?)
@@ -111,11 +120,6 @@ impl DatabaseAccess for Database {
     fn confirm_operation(&self, hash: &H256) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage()?;
         Ok(storage.ethereum_schema().confirm_eth_tx(hash)?)
-    }
-
-    fn next_nonce(&self) -> Result<i64, failure::Error> {
-        let storage = self.db_pool.access_storage()?;
-        Ok(storage.ethereum_schema().get_next_nonce()?)
     }
 
     fn load_stats(&self) -> Result<ETHStats, failure::Error> {

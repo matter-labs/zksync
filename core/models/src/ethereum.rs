@@ -11,7 +11,7 @@ use web3::types::{H256, U256};
 pub type EthOpId = i64;
 
 /// Type of the transactions sent to the Ethereum network.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum OperationType {
     /// Commit action (`commitBlock` method of the smart contract).
     Commit,

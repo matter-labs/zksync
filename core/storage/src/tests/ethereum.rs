@@ -116,11 +116,11 @@ fn ethereum_storage() {
         let response = EthereumSchema(&conn).save_new_eth_tx(
             OperationType::Commit,
             Some(params.op.id.unwrap()),
-            params.hash,
             params.deadline_block as i64,
             params.gas_price.clone(),
             params.raw_tx.clone(),
         )?;
+        EthereumSchema(&conn).add_hash_entry(response.id, &params.hash)?;
 
         // Check that it can be loaded.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;
@@ -142,11 +142,11 @@ fn ethereum_storage() {
         let response_2 = EthereumSchema(&conn).save_new_eth_tx(
             OperationType::Commit,
             Some(params_2.op.id.unwrap()),
-            params_2.hash,
             params_2.deadline_block as i64,
             params_2.gas_price.clone(),
             params_2.raw_tx.clone(),
         )?;
+        EthereumSchema(&conn).add_hash_entry(response_2.id, &params_2.hash)?;
 
         // Check that we now can load two operations.
         let unconfirmed_operations = EthereumSchema(&conn).load_unconfirmed_operations()?;

@@ -236,14 +236,14 @@ fn find_block_by_height_or_hash() {
             // commit/verify hashes.
             let ethereum_op_id = operation.id.unwrap() as i64;
             let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
-            EthereumSchema(&conn).save_new_eth_tx(
+            let response = EthereumSchema(&conn).save_new_eth_tx(
                 OperationType::Commit,
                 Some(ethereum_op_id),
-                eth_tx_hash,
                 100,
                 100.into(),
                 Default::default(),
             )?;
+            EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
             EthereumSchema(&conn).confirm_eth_tx(&eth_tx_hash)?;
 
             // Initialize reference sample fields.
@@ -270,14 +270,14 @@ fn find_block_by_height_or_hash() {
 
                 // Do not add an ethereum confirmation for the last operation.
                 if block_number != n_verified {
-                    EthereumSchema(&conn).save_new_eth_tx(
+                    let response = EthereumSchema(&conn).save_new_eth_tx(
                         OperationType::Verify,
                         Some(ethereum_op_id),
-                        eth_tx_hash,
                         100,
                         100.into(),
                         Default::default(),
                     )?;
+                    EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
                     EthereumSchema(&conn).confirm_eth_tx(&eth_tx_hash)?;
                     current_block_detail.verify_tx_hash =
                         Some(format!("0x{}", hex::encode(eth_tx_hash)));
@@ -366,14 +366,14 @@ fn block_range() {
             // commit/verify hashes.
             let ethereum_op_id = operation.id.unwrap() as i64;
             let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
-            EthereumSchema(&conn).save_new_eth_tx(
+            let response = EthereumSchema(&conn).save_new_eth_tx(
                 OperationType::Commit,
                 Some(ethereum_op_id),
-                eth_tx_hash,
                 100,
                 100.into(),
                 Default::default(),
             )?;
+            EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
 
             // Add verification for the block if required.
             if block_number <= n_verified {
@@ -387,14 +387,14 @@ fn block_range() {
                 ))?;
                 let ethereum_op_id = operation.id.unwrap() as i64;
                 let eth_tx_hash = ethereum_tx_hash(ethereum_op_id);
-                EthereumSchema(&conn).save_new_eth_tx(
+                let response = EthereumSchema(&conn).save_new_eth_tx(
                     OperationType::Verify,
                     Some(ethereum_op_id),
-                    eth_tx_hash,
                     100,
                     100.into(),
                     Default::default(),
                 )?;
+                EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
                 EthereumSchema(&conn).confirm_eth_tx(&eth_tx_hash)?;
             }
         }

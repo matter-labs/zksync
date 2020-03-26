@@ -142,7 +142,6 @@ impl<'a> EthereumSchema<'a> {
         &self,
         op_type: OperationType,
         op_id: Option<i64>,
-        hash: H256,
         last_deadline_block: i64,
         last_used_gas_price: BigDecimal,
         raw_tx: Vec<u8>,
@@ -174,18 +173,18 @@ impl<'a> EthereumSchema<'a> {
             // Obtain the operation ID for the follow-up queried.
             let eth_op_id = inserted_tx[0];
 
-            // Add a hash entry.
-            let hash_entry = NewETHTxHash {
-                eth_op_id,
-                tx_hash: hash.as_bytes().to_vec(),
-            };
-            let inserted_hashes_rows = insert_into(eth_tx_hashes::table)
-                .values(&hash_entry)
-                .execute(self.0.conn())?;
-            assert_eq!(
-                inserted_hashes_rows, 1,
-                "Wrong amount of updated rows (eth_tx_hashes)"
-            );
+            // // Add a hash entry.
+            // let hash_entry = NewETHTxHash {
+            //     eth_op_id,
+            //     tx_hash: hash.as_bytes().to_vec(),
+            // };
+            // let inserted_hashes_rows = insert_into(eth_tx_hashes::table)
+            //     .values(&hash_entry)
+            //     .execute(self.0.conn())?;
+            // assert_eq!(
+            //     inserted_hashes_rows, 1,
+            //     "Wrong amount of updated rows (eth_tx_hashes)"
+            // );
 
             // If the operation ID was provided, we should also insert a binding entry.
             if let Some(op_id) = op_id {
@@ -218,16 +217,8 @@ impl<'a> EthereumSchema<'a> {
         Ok(hash_entry.eth_op_id)
     }
 
-    /// Updates the Ethereum operation by adding a new tx data.
-    /// The new deadline block / gas value are placed instead of old values to the main entry,
-    /// and for hash a new `eth_tx_hashes` entry is added.
-    pub fn update_eth_tx(
-        &self,
-        eth_op_id: i64,
-        hash: &H256,
-        new_deadline_block: i64,
-        new_gas_value: BigDecimal,
-    ) -> QueryResult<()> {
+    /// Adds a tx hash entry associated with some Ethereum operation to the database.
+    pub fn add_hash_entry(&self, eth_op_id: i64, hash: &H256) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             // Insert the new hash entry.
             let hash_entry = NewETHTxHash {
@@ -241,7 +232,19 @@ impl<'a> EthereumSchema<'a> {
                 inserted_hashes_rows, 1,
                 "Wrong amount of updated rows (eth_tx_hashes)"
             );
+            Ok(())
+        })
+    }
 
+    /// Updates the Ethereum operation by adding a new tx data.
+    /// The new deadline block / gas value are placed instead of old values to the main entry.
+    pub fn update_eth_tx(
+        &self,
+        eth_op_id: i64,
+        new_deadline_block: i64,
+        new_gas_value: BigDecimal,
+    ) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
             // Update the stored tx.
             update(eth_operations::table.filter(eth_operations::id.eq(eth_op_id)))
                 .set((

@@ -10,7 +10,7 @@ use web3::types::{H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
-    ethereum::{ETHOperation, EthOpId, OperationType},
+    ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Action, Operation,
 };
 // Local uses
@@ -70,6 +70,14 @@ impl MockDatabase {
 
         assert!(self.unconfirmed_operations.borrow().get(&tx.id).is_none());
     }
+
+    fn next_nonce(&self) -> Result<i64, failure::Error> {
+        let old_value = self.nonce.get();
+        let new_value = old_value + 1;
+        self.nonce.set(new_value);
+
+        Ok(old_value)
+    }
 }
 
 impl DatabaseAccess for MockDatabase {
@@ -77,24 +85,64 @@ impl DatabaseAccess for MockDatabase {
         Ok((self.restore_state.clone(), Vec::new()))
     }
 
-    fn save_new_eth_tx(&self, op: &ETHOperation) -> Result<EthOpId, failure::Error> {
+    fn save_new_eth_tx(
+        &self,
+        op_type: OperationType,
+        op: Option<Operation>,
+        deadline_block: i64,
+        used_gas_price: U256,
+        encoded_tx_data: Vec<u8>,
+    ) -> Result<InsertedOperationResponse, failure::Error> {
         let id = self.pending_op_id.get();
         let new_id = id + 1;
         self.pending_op_id.set(new_id);
 
+        let nonce = self.next_nonce()?;
+
         // Store with the assigned ID.
-        let mut op = op.clone();
-        op.id = id;
+        let state = ETHOperation {
+            id,
+            op_type,
+            op,
+            nonce: nonce.into(),
+            last_deadline_block: deadline_block as u64,
+            last_used_gas_price: used_gas_price,
+            used_tx_hashes: vec![],
+            encoded_tx_data,
+            confirmed: false,
+            final_hash: None,
+        };
 
-        self.unconfirmed_operations.borrow_mut().insert(id, op);
+        self.unconfirmed_operations.borrow_mut().insert(id, state);
 
-        Ok(id)
+        let response = InsertedOperationResponse {
+            id,
+            nonce: nonce.into(),
+        };
+
+        Ok(response)
+    }
+
+    /// Adds a tx hash entry associated with some Ethereum operation to the database.
+    fn add_hash_entry(&self, eth_op_id: i64, hash: &H256) -> Result<(), failure::Error> {
+        assert!(
+            self.unconfirmed_operations
+                .borrow()
+                .contains_key(&eth_op_id),
+            "Attempt to update tx that is not unconfirmed"
+        );
+
+        let mut ops = self.unconfirmed_operations.borrow_mut();
+        let mut op = ops[&eth_op_id].clone();
+        op.used_tx_hashes.push(*hash);
+        ops.insert(eth_op_id, op);
+
+        Ok(())
     }
 
     fn update_eth_tx(
         &self,
         eth_op_id: EthOpId,
-        hash: &H256,
         new_deadline_block: i64,
         new_gas_value: U256,
     ) -> Result<(), failure::Error> {
@@ -105,20 +153,11 @@ impl DatabaseAccess for MockDatabase {
             "Attempt to update tx that is not unconfirmed"
         );
 
-        let mut op = self
-            .unconfirmed_operations
-            .borrow()
-            .get(&eth_op_id)
-            .unwrap()
-            .clone();
-
+        let mut ops = self.unconfirmed_operations.borrow_mut();
+        let mut op = ops[&eth_op_id].clone();
         op.last_deadline_block = new_deadline_block as u64;
         op.last_used_gas_price = new_gas_value;
-        op.used_tx_hashes.push(*hash);
-
-        self.unconfirmed_operations
-            .borrow_mut()
-            .insert(eth_op_id, op);
+        ops.insert(eth_op_id, op);
 
         Ok(())
     }
@@ -147,14 +186,6 @@ impl DatabaseAccess for MockDatabase {
             .insert(op_idx, operation);
 
         Ok(())
-    }
-
-    fn next_nonce(&self) -> Result<i64, failure::Error> {
-        let old_value = self.nonce.get();
-        let new_value = old_value + 1;
-        self.nonce.set(new_value);
-
-        Ok(old_value)
     }
 
     fn load_stats(&self) -> Result<ETHStats, failure::Error> {
