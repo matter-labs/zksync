@@ -35,6 +35,7 @@ pub struct ConfigurationOptions {
     pub gas_price_factor: usize,
     pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
+    pub confirmations_for_eth_event: u64,
 }
 
 impl ConfigurationOptions {
@@ -81,6 +82,9 @@ impl ConfigurationOptions {
             prover_server_address: get_env("PROVER_SERVER_BIND")
                 .parse()
                 .expect("Failed to parse PROVER_SERVER_BIND bind address"),
+            confirmations_for_eth_event: get_env("CONFIRMATIONS_FOR_ETH_EVENT")
+                .parse()
+                .expect("Failed to parse CONFIRMATIONS_FOR_ETH_EVENT"),
         }
     }
 }
