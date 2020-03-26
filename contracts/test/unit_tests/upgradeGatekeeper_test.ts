@@ -56,6 +56,7 @@ describe("UpgradeGatekeeper unit tests", function () {
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startPreparation() )).revertReason).equal("ugp11")
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishUpgrade([], []) )).revertReason).equal("fpu11")
 
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startUpgrade([]) )).revertReason).equal("spu12")
         await expect(UpgradeGatekeeperContract.startUpgrade([DummySecond.address]))
             .to.emit(UpgradeGatekeeperContract, 'NoticePeriodStarted')
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startUpgrade([]) )).revertReason).equal("spu11")
@@ -93,6 +94,7 @@ describe("UpgradeGatekeeper unit tests", function () {
             }
         }
 
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishUpgrade([], []) )).revertReason).equal("fpu12")
         // finish upgrade without verifying priority operations
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishUpgrade([bytes[2], bytes[3]], [2]) )).revertReason).equal("fpu13")
         // finish upgrade

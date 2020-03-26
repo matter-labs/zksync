@@ -59,12 +59,12 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     /// @dev Will be equal to zero in case of not active upgrade mode
     uint noticePeriodActivationTime;
 
-    /// @notice Proxy which allows finish upgrade during preparation status of upgrade
-    MainContract mainContract;
-
     /// @notice Addresses of the next versions of the contracts to be upgraded (if element of this array is equal to zero address it means that this proxy will not be upgraded)
     /// @dev Will be empty in case of not active upgrade mode
     address[] nextTargets;
+
+    /// @notice Contract which allows finish upgrade during preparation status of upgrade
+    MainContract mainContract;
 
     /// @notice Contract constructor
     /// @param _mainContractAddress Address of contract which processes priority operations

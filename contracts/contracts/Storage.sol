@@ -15,7 +15,7 @@ contract Storage {
     /// @dev Will store false in case of not active upgrade mode
     bool public upgradePreparation;
 
-    /// @notice upgrade preparation activation timestamp (as seconds since unix epoch)
+    /// @notice Upgrade preparation activation timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
     uint public upgradePreparationActivationTime;
 

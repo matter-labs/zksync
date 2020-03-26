@@ -8,7 +8,7 @@ contract Config {
     /// @notice Notice period before activation preparation status of upgrade mode (in seconds)
     uint constant UPGRADE_NOTICE_PERIOD = 2 weeks;
 
-    /// @notice Period after the start of preparation when contract wouldn't register new priority operations (in seconds)
+    /// @notice Period after the start of preparation upgrade when contract wouldn't register new priority operations (in seconds)
     uint constant UPGRADE_PREPARATION_LOCK_PERIOD = 1 days;
 
     /// @notice zkSync address length
