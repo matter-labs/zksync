@@ -34,6 +34,10 @@ export interface AccountState {
         pubKeyHash: PubKeyHash;
     };
 }
+export interface TxEthSignature {
+    type: "EthereumSignature" | "EIP1271Signature";
+    signature: string;
+}
 
 export interface Signature {
     pubKey: string;

@@ -13,8 +13,9 @@ use web3::contract::{Contract, Options};
 use web3::types::{Address, BlockNumber, Filter, FilterBuilder, H160};
 use web3::{Transport, Web3};
 // Workspace deps
-use models::abi::{governance_contract, zksync_contract};
+use models::abi::{eip1271_contract, governance_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
+use models::misc::constants::MAGICVALUE;
 use models::node::{Nonce, PriorityOp, PubKeyHash, TokenId};
 use models::params::PRIORITY_EXPIRATION;
 use models::TokenAddedEvent;
@@ -34,6 +35,12 @@ pub enum EthWatchRequest {
         op_start_id: u64,
         max_chunks: usize,
         resp: oneshot::Sender<Vec<PriorityOp>>,
+    },
+    CheckEIP1271Signature {
+        address: Address,
+        data: Vec<u8>,
+        signature: Vec<u8>,
+        resp: oneshot::Sender<bool>,
     },
 }
 
@@ -97,6 +104,10 @@ impl<T: Transport> EthWatch<T> {
             db_pool,
             eth_watch_req,
         }
+    }
+
+    fn get_eip1271_contract(&self, address: Address) -> Contract<T> {
+        Contract::new(self.web3.eth(), address, eip1271_contract())
     }
 
     fn get_new_token_event_filter(&self, from: BlockNumber, to: BlockNumber) -> Filter {
@@ -266,6 +277,28 @@ impl<T: Transport> EthWatch<T> {
         res
     }
 
+    async fn is_eip1271_signature_correct(
+        &self,
+        address: Address,
+        data: Vec<u8>,
+        signature: Vec<u8>,
+    ) -> Result<bool, failure::Error> {
+        let received: [u8; 4] = self
+            .get_eip1271_contract(address)
+            .query(
+                "isValidSignature",
+                (data, signature),
+                None,
+                Options::default(),
+                None,
+            )
+            .compat()
+            .await
+            .map_err(|e| format_err!("Failed to query contract isValidSignature: {}", e))?;
+
+        Ok(received == MAGICVALUE)
+    }
+
     async fn is_new_pubkey_hash_authorized(
         &self,
         address: Address,
@@ -335,8 +368,20 @@ impl<T: Transport> EthWatch<T> {
                     let authorized = self
                         .is_new_pubkey_hash_authorized(address, nonce, &pubkey_hash)
                         .await
-                        .unwrap_or_default();
+                        .unwrap_or(false);
                     resp.send(authorized).unwrap_or_default();
+                }
+                EthWatchRequest::CheckEIP1271Signature {
+                    address,
+                    data,
+                    signature,
+                    resp,
+                } => {
+                    let signature_correct = self
+                        .is_eip1271_signature_correct(address, data, signature)
+                        .await
+                        .unwrap_or(false);
+                    resp.send(signature_correct).unwrap_or_default();
                 }
             }
         }

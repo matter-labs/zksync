@@ -15,12 +15,14 @@ use crate::franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed, Signature};
 use crate::franklin_crypto::jubjub::FixedGenerators;
+use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
 use ethsign::{SecretKey, Signature as ETHSignature};
 use failure::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
 use std::convert::TryInto;
 use std::str::FromStr;
 use web3::types::{Address, H256};
@@ -341,6 +343,34 @@ impl FranklinTx {
             _ => false,
         }
     }
+
+    /// Returns a message that user has to sign to send the transaction.
+    /// If the transaction doesn't need a message signature, returns `None`.
+    /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
+    pub fn get_tx_info_message_to_sign(
+        &self,
+        ids_to_symbols: &HashMap<TokenId, String>,
+    ) -> Result<Option<String>, &'static str> {
+        match self {
+            FranklinTx::Transfer(tx) => Ok(Some(format!(
+                "Transfer {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+                amount = format_ether(&tx.amount),
+                token = ids_to_symbols.get(&tx.token).ok_or("no such symbol")?, // TODO: jazzandrock better message | other error type
+                to = tx.to,
+                nonce = tx.nonce,
+                fee = format_ether(&tx.fee),
+            ))),
+            FranklinTx::Withdraw(tx) => Ok(Some(format!(
+                "Withdraw {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+                amount = format_ether(&tx.amount),
+                token = ids_to_symbols.get(&tx.token).ok_or("no such symbol")?, // TODO: jazzandrock better message | other error type
+                to = tx.to,
+                nonce = tx.nonce,
+                fee = format_ether(&tx.fee),
+            ))),
+            _ => Ok(None),
+        }
+    }
 }
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -542,6 +572,13 @@ impl<'de> Deserialize<'de> for PackedSignature {
             PackedSignature::deserialize_packed(&bytes).map_err(|e| Error::custom(e.to_string()))
         })
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "signature")]
+pub enum TxEthSignature {
+    EthereumSignature(PackedEthSignature),
+    EIP1271Signature(Vec<u8>),
 }
 
 /// Struct used for working with ethereum signatures created using eth_sign (using geth, ethers.js, etc)

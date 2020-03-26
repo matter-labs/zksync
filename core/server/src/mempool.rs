@@ -18,8 +18,9 @@ use crate::eth_watch::EthWatchRequest;
 use failure::Fail;
 use futures::channel::{mpsc, oneshot};
 use futures::{SinkExt, StreamExt};
+use models::node::tx::TxEthSignature;
 use models::node::{
-    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TransferOp,
+    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TokenId, TransferOp,
     TransferToNewOp,
 };
 use models::params::max_block_chunk_size;
@@ -34,6 +35,10 @@ pub enum TxAddError {
     NonceMismatch,
     #[fail(display = "Tx is incorrect")]
     IncorrectTx,
+    #[fail(display = "MissingEthSignature")]
+    MissingEthSignature,
+    #[fail(display = "Eth signature is incorrect")]
+    IncorrectEthSignature,
     #[fail(display = "Change pubkey tx is not authorized onchain")]
     ChangePkNotAuthorized,
     #[fail(display = "Internal error")]
@@ -60,7 +65,11 @@ pub struct GetBlockRequest {
 pub enum MempoolRequest {
     /// Add new transaction to mempool, check signature and correctness
     /// oneshot is used to receive tx add result.
-    NewTx(Box<FranklinTx>, oneshot::Sender<Result<(), TxAddError>>),
+    NewTx(
+        Box<FranklinTx>,
+        Box<Option<TxEthSignature>>,
+        oneshot::Sender<Result<(), TxAddError>>,
+    ),
     /// When block is committed, nonces of the account tree should be updated too.
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
@@ -133,10 +142,19 @@ struct Mempool {
     mempool_state: MempoolState,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
+
+    // TODO: jazzandrock find a better place to store such cached structs.
+    // Maybe, something like storage scheme but for hashmaps?
+    // if we plan to cache stuff like that more often
+    ids_to_symbols: HashMap<TokenId, String>,
 }
 
 impl Mempool {
-    async fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
+    async fn add_tx(
+        &mut self,
+        tx: FranklinTx,
+        signature: Option<TxEthSignature>,
+    ) -> Result<(), TxAddError> {
         if let FranklinTx::ChangePubKey(change_pk) = &tx {
             if change_pk.eth_signature.is_none() {
                 let eth_watch_resp = oneshot::channel();
@@ -158,14 +176,50 @@ impl Mempool {
             }
         }
 
+        if let Some(message_to_sign) = tx
+            .get_tx_info_message_to_sign(&self.ids_to_symbols)
+            .or(Err(TxAddError::IncorrectTx))?
+        {
+            let tx_eth_signature = signature.ok_or(TxAddError::MissingEthSignature)?;
+
+            match tx_eth_signature {
+                TxEthSignature::EthereumSignature(packed_signature) => {
+                    let signer_account = packed_signature
+                        .signature_recover_signer(message_to_sign.as_bytes())
+                        .or(Err(TxAddError::IncorrectEthSignature))?;
+
+                    if signer_account != tx.account() {
+                        return Err(TxAddError::IncorrectEthSignature);
+                    }
+                }
+                TxEthSignature::EIP1271Signature(signature) => {
+                    let eth_watch_resp = oneshot::channel();
+                    self.eth_watch_req
+                        .clone()
+                        .send(EthWatchRequest::CheckEIP1271Signature {
+                            address: tx.account(),
+                            data: message_to_sign.as_bytes().to_vec(),
+                            signature,
+                            resp: eth_watch_resp.0,
+                        })
+                        .await
+                        .expect("ETH watch req receiver dropped");
+
+                    if !eth_watch_resp.1.await.expect("Err response from eth watch") {
+                        return Err(TxAddError::IncorrectEthSignature);
+                    }
+                }
+            };
+        };
+
         self.mempool_state.add_tx(tx)
     }
 
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
             match request {
-                MempoolRequest::NewTx(tx, resp) => {
-                    let tx_add_result = self.add_tx(*tx).await;
+                MempoolRequest::NewTx(tx, signature, resp) => {
+                    let tx_add_result = self.add_tx(*tx, *signature).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
@@ -278,10 +332,23 @@ pub fn run_mempool_task(
     runtime: &Runtime,
 ) {
     let mempool_state = MempoolState::restore_from_db(&db_pool);
+
+    // TODO: jazzandrock
+    let ids_to_symbols = db_pool
+        .access_storage_fragile()
+        .expect("fragile enough")
+        .tokens_schema()
+        .load_tokens()
+        .expect("tokens load failed")
+        .into_iter()
+        .map(|(key, val)| (key, val.symbol))
+        .collect::<HashMap<_, _>>();
+
     let mempool = Mempool {
         mempool_state,
         requests,
         eth_watch_req,
+        ids_to_symbols,
     };
     runtime.spawn(mempool.run());
 }
