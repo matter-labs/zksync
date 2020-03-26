@@ -17,11 +17,19 @@ describe("Proxy unit tests", function () {
             gasLimit: 6000000,
         })
         proxyDummyInterface = new Contract(proxyTestContract.address, require('../../build/DummyTarget').interface, wallet);
+
+        // check delegatecall
+        expect(await proxyDummyInterface.get_DUMMY_INDEX())
+            .to.equal(1);
     });
 
     it("checking that requireMaster calls present", async () => {
         let testContract_with_wallet2_signer = await proxyTestContract.connect(wallet2);
         expect((await getCallRevertReason( () => testContract_with_wallet2_signer.upgradeTarget(AddressZero, []) )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.upgradeNoticePeriodStarted() )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.upgradePreparationStarted() )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.upgradeCanceled() )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => testContract_with_wallet2_signer.upgradeFinishes() )).revertReason).equal("oro11")
     });
 
     it("checking Proxy reverts", async () => {
