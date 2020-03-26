@@ -241,7 +241,6 @@ fn find_block_by_height_or_hash() {
                 Some(ethereum_op_id),
                 eth_tx_hash,
                 100,
-                100,
                 100.into(),
                 Default::default(),
             )?;
@@ -275,7 +274,6 @@ fn find_block_by_height_or_hash() {
                         OperationType::Verify,
                         Some(ethereum_op_id),
                         eth_tx_hash,
-                        100,
                         100,
                         100.into(),
                         Default::default(),
@@ -373,7 +371,6 @@ fn block_range() {
                 Some(ethereum_op_id),
                 eth_tx_hash,
                 100,
-                100,
                 100.into(),
                 Default::default(),
             )?;
@@ -394,7 +391,6 @@ fn block_range() {
                     OperationType::Verify,
                     Some(ethereum_op_id),
                     eth_tx_hash,
-                    100,
                     100,
                     100.into(),
                     Default::default(),

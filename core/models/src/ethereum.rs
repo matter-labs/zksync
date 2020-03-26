@@ -90,6 +90,12 @@ impl ETHOperation {
             false
         }
     }
+
+    /// Completes the object state with the data obtained from the database.
+    pub fn complete(&mut self, inserted_data: InsertedOperationResponse) {
+        self.id = inserted_data.id;
+        self.nonce = inserted_data.nonce;
+    }
 }
 
 impl PartialEq for ETHOperation {
@@ -105,4 +111,15 @@ impl PartialEq for ETHOperation {
             && (self.confirmed == other.confirmed)
             && (self.final_hash == other.final_hash)
     }
+}
+
+/// Structure representing the result of the insertion of the Ethereum
+/// operation into the database.
+/// Contains the assigned nonce and ID for the operation.
+pub struct InsertedOperationResponse {
+    /// Unique numeric identifier of the Ethereum operation.
+    pub id: i64,
+    /// Nonce assigned for the Ethereum operation. Meant to be used for all the
+    /// transactions sent within one particular Ethereum operation.
+    pub nonce: U256,
 }

@@ -8,7 +8,7 @@ use diesel::prelude::*;
 use web3::types::{H256, U256};
 // Workspace imports
 use models::{
-    ethereum::{ETHOperation, OperationType},
+    ethereum::{ETHOperation, InsertedOperationResponse, OperationType},
     Operation,
 };
 // Local imports
@@ -137,27 +137,30 @@ impl<'a> EthereumSchema<'a> {
     }
 
     /// Stores the sent (but not confirmed yet) Ethereum transaction in the database.
-    #[allow(clippy::too_many_arguments)] // OK for this particular method.
+    /// Returns the `ETHOperation` object containing the assigned nonce and operation ID.
     pub fn save_new_eth_tx(
         &self,
         op_type: OperationType,
         op_id: Option<i64>,
         hash: H256,
-        deadline_block: u64,
-        nonce: u32,
-        gas_price: BigDecimal,
+        last_deadline_block: i64,
+        last_used_gas_price: BigDecimal,
         raw_tx: Vec<u8>,
-    ) -> QueryResult<i64> {
-        let operation = NewETHOperation {
-            op_type: op_type.to_string(),
-            nonce: i64::from(nonce),
-            last_deadline_block: deadline_block as i64,
-            last_used_gas_price: gas_price,
-            raw_tx,
-        };
-
+    ) -> QueryResult<InsertedOperationResponse> {
         self.0.conn().transaction(|| {
-            // Insert the operation itself.
+            // It's important to assign nonce within the same db transaction
+            // as saving the operation to avoid the state divergence.
+            let nonce = self.get_next_nonce()?;
+
+            // Create and insert the operation.
+            let operation = NewETHOperation {
+                op_type: op_type.to_string(),
+                nonce,
+                last_deadline_block,
+                last_used_gas_price,
+                raw_tx,
+            };
+
             let inserted_tx = insert_into(eth_operations::table)
                 .values(&operation)
                 .returning(eth_operations::id)
@@ -196,7 +199,13 @@ impl<'a> EthereumSchema<'a> {
             // Update the stored stats.
             self.report_created_operation(op_type)?;
 
-            Ok(eth_op_id)
+            // Return the assigned ID and nonce.
+            let response = InsertedOperationResponse {
+                id: eth_op_id,
+                nonce: nonce.into(),
+            };
+
+            Ok(response)
         })
     }
 
@@ -339,7 +348,7 @@ impl<'a> EthereumSchema<'a> {
     /// This method expects the database to be initially prepared with inserting the actual
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
-    pub fn get_next_nonce(&self) -> QueryResult<i64> {
+    pub(crate) fn get_next_nonce(&self) -> QueryResult<i64> {
         let old_nonce: ETHNonce = eth_nonce::table.first(self.0.conn())?;
 
         let new_nonce_value = old_nonce.nonce + 1;
