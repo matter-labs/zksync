@@ -1,10 +1,7 @@
-use criterion::{criterion_group, criterion_main};
+use criterion::criterion_main;
 
-use crate::parallel_smt::bench_merkle_tree as parallel_smt_bench;
-use crate::sequential_smt::bench_merkle_tree as sequential_smt_bench;
+use merkle_tree::merkle_tree_benches;
 
-mod parallel_smt;
-mod sequential_smt;
+mod merkle_tree;
 
-criterion_group!(benches, sequential_smt_bench, parallel_smt_bench);
-criterion_main!(benches);
+criterion_main!(merkle_tree_benches);
