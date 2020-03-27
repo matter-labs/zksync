@@ -9672,6 +9672,11 @@ yorkie@^2.0.0:
     normalize-path "^1.0.0"
     strip-indent "^2.0.0"
 
+zksync-crypto@^0.0.2:
+  version "0.0.2"
+  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.0.2.tgz#a39925395b8a433e13b2742b8acea874d5e44656"
+  integrity sha512-dT6KnrNj8MtbhBRk41Xsr8S2DwSOgfWD0Ym8YmWi+gTHKF3l8/4dzCxRj4iTI8AClnhUv//FHnb6g2/ZeaaVGQ==
+
 "zksync@link:../zksync.js":
   version "0.0.0"
   uid ""

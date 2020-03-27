@@ -1,10 +1,8 @@
 import { curve } from "elliptic";
 import {
     privateKeyFromSeed,
-    privateKeyToPublicKey,
-    pubkeyToAddress,
-    serializePointPacked,
-    signTransactionBytes
+    signTransactionBytes,
+    privateKeyToPubKeyHash
 } from "./crypto";
 import { ethers, utils } from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
@@ -15,16 +13,14 @@ const MAX_NUMBER_OF_TOKENS = 4096;
 const MAX_NUMBER_OF_ACCOUNTS = 1 << 24;
 
 export class Signer {
-    readonly privateKey: BN;
-    readonly publicKey: curve.edwards.EdwardsPoint;
+    readonly privateKey: Uint8Array;
 
-    private constructor(privKey: BN) {
+    private constructor(privKey: Uint8Array) {
         this.privateKey = privKey;
-        this.publicKey = privateKeyToPublicKey(this.privateKey);
     }
 
     pubKeyHash(): PubKeyHash {
-        return `sync:${pubkeyToAddress(this.publicKey).toString("hex")}`;
+        return privateKeyToPubKeyHash(this.privateKey);
     }
 
     signSyncTransfer(transfer: {
@@ -103,7 +99,7 @@ export class Signer {
         };
     }
 
-    static fromPrivateKey(pk: BN): Signer {
+    static fromPrivateKey(pk: Uint8Array): Signer {
         return new Signer(pk);
     }
 
