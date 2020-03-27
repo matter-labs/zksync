@@ -33,7 +33,7 @@ spec:
     spec:
       containers:
         - name: ${ZKSYNC_ENV}-nginx
-          image: matterlabs/nginx:${ZKSYNC_ENV}-${IMAGE_TAG}
+          image: matterlabs/nginx:${IMAGE_TAG}
           imagePullPolicy: Always
           ports:
             - containerPort: 80
