@@ -9,9 +9,20 @@ use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 use super::hasher::Hasher;
 use crate::primitives::BitIteratorLe;
 
-#[derive(Clone)]
 pub struct PedersenHasher<E: JubjubEngine> {
     params: &'static E::Params,
+}
+
+// We have to implement `Clone` manually, since deriving it will depend on
+// the `Clone` implementation of `E::Params` (and will `.clone()` will not work
+// if `E::Params` are not `Clone`), which is redundant: we only hold a reference
+// and can just copy it.
+impl<E: JubjubEngine> Clone for PedersenHasher<E> {
+    fn clone(&self) -> Self {
+        Self {
+            params: self.params,
+        }
+    }
 }
 
 impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {

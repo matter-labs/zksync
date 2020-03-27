@@ -11,6 +11,7 @@ use crate::primitives::{GetBits, GetBitsFixed};
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
 pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, PedersenHasher<Bn256>>;
 
+#[derive(Clone)]
 pub struct CircuitAccount<E: JubjubEngine> {
     pub subtree: SparseMerkleTree<Balance<E>, E::Fr, PedersenHasher<E>>,
     pub nonce: E::Fr,
