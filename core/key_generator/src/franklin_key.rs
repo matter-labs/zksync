@@ -300,7 +300,6 @@ pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
     let size = setup.n.next_power_of_two();
     let power_of_two = size.trailing_zeros();
     println!("power of two {}", power_of_two);
-    panic!();
 
     let timer = Instant::now();
     let key_monomial_form = {
@@ -342,6 +341,13 @@ pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
     let timer = Instant::now();
     let precomputations =
         make_precomputations(&setup).expect("must make precomputations for proving");
+    precomputations
+        .write(std::io::BufWriter::with_capacity(
+            1 << 24,
+            std::fs::File::create("precomp").unwrap(),
+        ))
+        .expect("precomp write");
+
     println!("percomputation time: {}", timer.elapsed().as_secs());
 
     let timer = Instant::now();
@@ -355,15 +361,16 @@ pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
 
 #[test]
 fn run_make_circuit_parameters() {
-    let mut n_chunks = 96;
-    loop {
-        let power_of_two = estimate_power_of_two(n_chunks);
-        assert!(power_of_two <= 26, "too big");
-        println!("n_chunks: {} pow: {}", n_chunks, power_of_two);
-        n_chunks += 2;
-    }
+    let mut n_chunks = 6;
+    println!("n chunks {}", n_chunks);
+    // loop {
+    //     let power_of_two = estimate_power_of_two(n_chunks);
+    //     assert!(power_of_two <= 26, "too big");
+    //     println!("n_chunks: {} pow: {}", n_chunks, power_of_two);
+    //     n_chunks += 2;
+    // }
     // Vec::<[u8; 128]>::with_capacity(4341320977169282661);
-    // make_circuit_parameters(n_chunks);
+    make_circuit_parameters(n_chunks);
 }
 
 pub fn make_exit_circuit_parameters() -> Parameters<Bn256> {
