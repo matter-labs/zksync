@@ -59,7 +59,7 @@ async function main() {
 
     // finish upgrade
     await (await upgradeGatekeeper.startPreparation()).wait();
-    await (await upgradeGatekeeper.finishUpgrade([], [0, 0, 0])).wait();
+    await (await upgradeGatekeeper.finishUpgrade([[], [], []])).wait();
 
     await expect(await proxyContract.getTarget())
         .to.equal(newTargetFranklin.address);

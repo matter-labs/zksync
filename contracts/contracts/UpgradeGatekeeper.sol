@@ -1,8 +1,8 @@
 pragma solidity 0.5.16;
+pragma experimental ABIEncoderV2;
 
 import "./Events.sol";
 import "./Ownable.sol";
-import "./Bytes.sol";
 
 
 /// @title Interface of the main contract
@@ -129,30 +129,22 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     }
 
     /// @notice Finishes upgrade
-    /// @param initParametersConcatenated New targets initialization parameters per each proxy (concatenated into one array)
-    /// @param sizeOfInitParameters Sizes of targets initialization parameters (in bytes)
-    function finishUpgrade(bytes calldata initParametersConcatenated, uint[] calldata sizeOfInitParameters) external {
+    /// @param targetsInitializationParameters New targets initialization parameters per each proxy
+    function finishUpgrade(bytes[] calldata targetsInitializationParameters) external {
         requireMaster(msg.sender);
         require(upgradeStatus == UpgradeStatus.Preparation, "fpu11"); // fpu11 - unable to finish upgrade without preparation status active
-        require(sizeOfInitParameters.length == proxies.length, "fpu12"); // fpu12 - number of new targets initialization parameters must be equal to the number of proxies
+        require(targetsInitializationParameters.length == proxies.length, "fpu12"); // fpu12 - number of new targets initialization parameters must be equal to the number of proxies
         require(mainContract.readyForUpgrade(), "fpu13"); // fpu13 - main contract is not ready for upgrade
         mainContract.upgradeFinishes();
 
-        bytes memory initParametersConcatenated = initParametersConcatenated;
-        uint processedBytes = 0;
         for (uint64 i = 0; i < proxies.length; i++) {
             address proxy = proxies[i];
             address nextTarget = nextTargets[i];
-            if (nextTarget == address(0)) {
-                require(sizeOfInitParameters[i] == 0, "fpu14"); // fpu14 - there must be no init parameters bytes for proxy that wouldn't be upgraded
-            } else {
-                bytes memory targetInitParameters;
-                (processedBytes, targetInitParameters) = Bytes.read(initParametersConcatenated, processedBytes, sizeOfInitParameters[i]);
-                UpgradeableProxy(proxy).upgradeTarget(nextTarget, targetInitParameters);
+            if (nextTarget != address(0)) {
+                UpgradeableProxy(proxy).upgradeTarget(nextTarget, targetsInitializationParameters[i]);
                 emit UpgradeCompleted(proxy, nextTarget);
             }
         }
-        require(processedBytes == initParametersConcatenated.length, "fpu15"); // fpu15 - all targets initialization parameters bytes must be processed
 
         upgradeStatus = UpgradeStatus.Idle;
         noticePeriodActivationTime = 0;

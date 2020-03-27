@@ -96,10 +96,10 @@ describe("UpgradeGatekeeper unit tests", function () {
 
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishUpgrade([], []) )).revertReason).equal("fpu12")
         // finish upgrade without verifying priority operations
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishUpgrade([bytes[2], bytes[3]], [2]) )).revertReason).equal("fpu13")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract.finishUpgrade([[bytes[2], bytes[3]]]) )).revertReason).equal("fpu13")
         // finish upgrade
         await proxyDummyInterface.verifyPriorityOperation();
-        await expect(UpgradeGatekeeperContract.finishUpgrade([bytes[2], bytes[3]], [2]))
+        await expect(UpgradeGatekeeperContract.finishUpgrade([[bytes[2], bytes[3]]]))
             .to.emit(UpgradeGatekeeperContract, 'UpgradeCompleted')
             .withArgs(proxyTestContract.address, DummySecond.address)
 
