@@ -34,10 +34,10 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     UpgradeableMaster public mainContract;
 
     /// @notice Contract constructor
-    /// @param _upgradeableMasterAddress Address of contract which defines notice period duration and allows finish upgrade during preparation of it
+    /// @param _mainContract Contract which defines notice period duration and allows finish upgrade during preparation of it
     /// @dev Calls Ownable contract constructor
-    constructor(address _upgradeableMasterAddress) Ownable(msg.sender) public {
-        mainContract = UpgradeableMaster(_upgradeableMasterAddress);
+    constructor(UpgradeableMaster _mainContract) Ownable(msg.sender) public {
+        mainContract = _mainContract;
     }
 
     /// @notice Adds a new upgradeable contract to the list of contracts managed by the gatekeeper

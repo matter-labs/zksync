@@ -5,7 +5,7 @@ import "./Upgradeable.sol";
 
 
 /// @title Proxy Contract
-/// @dev NOTICE: Proxy must implement UpgradeableMaster to prevent calling some function of it not by master of proxy
+/// @dev NOTICE: Proxy must implement UpgradeableMaster interface to prevent calling some function of it not by master of proxy
 /// @author Matter Labs
 contract Proxy is Upgradeable, UpgradeableMaster, Ownable {
 
