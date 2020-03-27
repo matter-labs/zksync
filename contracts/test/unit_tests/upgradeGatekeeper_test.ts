@@ -31,7 +31,7 @@ describe("UpgradeGatekeeper unit tests", function () {
         })
         await proxyTestContract.transferMastership(UpgradeGatekeeperContract.address);
 
-        await UpgradeGatekeeperContract.addProxyContract(proxyTestContract.address);
+        await UpgradeGatekeeperContract.addUpgradeable(proxyTestContract.address);
 
         // check initial dummy index and storage
         expect(await proxyDummyInterface.get_DUMMY_INDEX())
@@ -45,7 +45,7 @@ describe("UpgradeGatekeeper unit tests", function () {
 
     it("checking that requireMaster calls present", async () => {
         let UpgradeGatekeeperContract_with_wallet2_signer = await UpgradeGatekeeperContract.connect(wallet2);
-        expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.addProxyContract(AddressZero) )).revertReason).equal("oro11")
+        expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.addUpgradeable(AddressZero) )).revertReason).equal("oro11")
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.startUpgrade([]) )).revertReason).equal("oro11")
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.cancelUpgrade() )).revertReason).equal("oro11")
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract_with_wallet2_signer.finishUpgrade([], []) )).revertReason).equal("oro11")
@@ -74,14 +74,14 @@ describe("UpgradeGatekeeper unit tests", function () {
         let activated_time = performance.now();
 
         // wait and activate preparation status
-        let all_time_in_sec = parseInt(await DummyFirst.upgradeNoticePeriod());
+        let notice_period = parseInt(await DummyFirst.get_UPGRADE_NOTICE_PERIOD());
         for (let step = 1; step <= 3; step++) {
             if (step != 3) {
-                while ((performance.now() - start_time) < Math.round(all_time_in_sec * 1000.0 * step / 10.0 + 10)) {
+                while ((performance.now() - start_time) < Math.round(notice_period * 1000.0 * step / 10.0 + 10)) {
                     // wait
                 }
             } else {
-                while ((performance.now() - activated_time) < all_time_in_sec * 1000 + 10) {
+                while ((performance.now() - activated_time) < notice_period * 1000 + 10) {
                     // wait
                 }
             }

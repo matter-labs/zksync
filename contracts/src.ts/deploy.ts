@@ -227,9 +227,9 @@ export class Deployer {
         await (await this.getDeployedContract('Verifier').transferMastership(contract.address)).wait();
         await (await this.getDeployedContract('Franklin').transferMastership(contract.address)).wait();
 
-        await (await contract.addProxyContract(this.getDeployedContract('Governance').address)).wait();
-        await (await contract.addProxyContract(this.getDeployedContract('Verifier').address)).wait();
-        await (await contract.addProxyContract(this.getDeployedContract('Franklin').address)).wait();
+        await (await contract.addUpgradeable(this.getDeployedContract('Governance').address)).wait();
+        await (await contract.addUpgradeable(this.getDeployedContract('Verifier').address)).wait();
+        await (await contract.addUpgradeable(this.getDeployedContract('Franklin').address)).wait();
 
         return contract;
     }

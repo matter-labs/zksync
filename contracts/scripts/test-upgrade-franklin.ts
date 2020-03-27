@@ -50,15 +50,15 @@ async function main() {
         {gasLimit: 6500000},
     );
 
-    let notice_period = parseInt(await newTargetFranklin.upgradeNoticePeriod()); // in tests notice period of FranklinTestNoInit will be equal to FranklinTest
-
     await (await upgradeGatekeeper.startUpgrade([AddressZero, AddressZero, newTargetFranklin.address])).wait();
 
     // wait notice period
-    await new Promise(r => setTimeout(r, notice_period * 1000 + 10));
+    while (parseInt(await upgradeGatekeeper.upgradeStatus()) !== 2/*Preparation*/) {
+        await new Promise(r => setTimeout(r, 1000));
+        await (await upgradeGatekeeper.startPreparation()).wait();
+    }
 
     // finish upgrade
-    await (await upgradeGatekeeper.startPreparation()).wait();
     await (await upgradeGatekeeper.finishUpgrade([[], [], []])).wait();
 
     await expect(await proxyContract.getTarget())

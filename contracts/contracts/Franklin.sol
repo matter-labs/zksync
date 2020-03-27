@@ -2,6 +2,7 @@ pragma solidity 0.5.16;
 
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
+import "./Upgradeable.sol";
 import "./Storage.sol";
 import "./Config.sol";
 import "./Events.sol";
@@ -12,13 +13,18 @@ import "./Operations.sol";
 
 /// @title zkSync main contract
 /// @author Matter Labs
-contract Franklin is Storage, Config, Events {
+contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
     // Upgrade functional
 
     /// @notice Notice period before activation preparation status of upgrade mode
-    function upgradeNoticePeriod() external pure returns (uint) {
+    function upgradeNoticePeriod() external returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
+    }
+
+    /// @notice Notification that upgrade notice period started
+    function upgradeNoticePeriodStarted() external {
+
     }
 
     /// @notice Notification that upgrade preparation status is activated
@@ -41,7 +47,7 @@ contract Franklin is Storage, Config, Events {
 
     /// @notice Checks that contract is ready for upgrade
     /// @return bool flag indicating that contract is ready for upgrade
-    function readyForUpgrade() external view returns (bool) {
+    function readyForUpgrade() external returns (bool) {
         return !exodusMode && totalOpenPriorityRequests == 0;
     }
 

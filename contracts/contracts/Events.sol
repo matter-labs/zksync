@@ -1,5 +1,7 @@
 pragma solidity 0.5.16;
 
+import "./Upgradeable.sol";
+
 
 /// @title zkSync events
 /// @author Matter Labs
@@ -57,9 +59,9 @@ contract Events {
 /// @author Matter Labs
 contract UpgradeEvents {
 
-    /// @notice Event emitted when new proxy is added to upgrade gatekeeper's list of managed contracts
-    event ProxyAdded(
-        address proxyAddress
+    /// @notice Event emitted when new upgradeable contract is added to upgrade gatekeeper's list of managed contracts
+    event UpgradeableAdded(
+        Upgradeable upgradeable
     );
 
     /// @notice Upgrade mode enter event
@@ -75,7 +77,7 @@ contract UpgradeEvents {
 
     /// @notice Upgrade mode complete event
     event UpgradeCompleted(
-        address proxyAddress,
+        Upgradeable upgradeable,
         address newTargetAddress
     );
 

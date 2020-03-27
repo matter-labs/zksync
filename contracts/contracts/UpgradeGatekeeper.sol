@@ -3,48 +3,15 @@ pragma experimental ABIEncoderV2;
 
 import "./Events.sol";
 import "./Ownable.sol";
+import "./Upgradeable.sol";
 
-
-/// @title Interface of the main contract
-interface MainContract {
-
-    /// @notice Notice period before activation preparation status of upgrade mode
-    function upgradeNoticePeriod() external pure returns (uint);
-
-    /// @notice Notifies proxy contract that notice period started
-    function upgradeNoticePeriodStarted() external;
-
-    /// @notice Notifies proxy contract that upgrade preparation status is activated
-    function upgradePreparationStarted() external;
-
-    /// @notice Notifies proxy contract that upgrade canceled
-    function upgradeCanceled() external;
-
-    /// @notice Notifies proxy contract that upgrade finishes
-    function upgradeFinishes() external;
-
-    /// @notice Checks that contract is ready for upgrade
-    /// @return bool flag indicating that contract is ready for upgrade
-    function readyForUpgrade() external view returns (bool);
-
-}
-
-/// @title Interface of the proxy contract
-interface UpgradeableProxy {
-
-    /// @notice Upgrades target of upgradeable contract
-    /// @param newTarget New target
-    /// @param newTargetInitializationParameters New target initialization parameters
-    function upgradeTarget(address newTarget, bytes calldata newTargetInitializationParameters) external;
-
-}
 
 /// @title Upgrade Gatekeeper Contract
 /// @author Matter Labs
 contract UpgradeGatekeeper is UpgradeEvents, Ownable {
 
-    /// @notice Array of addresses of proxy contracts managed by the gatekeeper
-    address[] public proxies;
+    /// @notice Array of addresses of upgradeable contracts managed by the gatekeeper
+    Upgradeable[] public managedContracts;
 
     /// @notice Upgrade mode statuses
     enum UpgradeStatus {
@@ -53,42 +20,42 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         Preparation
     }
 
-    UpgradeStatus upgradeStatus;
+    UpgradeStatus public upgradeStatus;
 
     /// @notice Notice period activation timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
-    uint noticePeriodActivationTime;
+    uint public noticePeriodActivationTime;
 
-    /// @notice Addresses of the next versions of the contracts to be upgraded (if element of this array is equal to zero address it means that this proxy will not be upgraded)
+    /// @notice Addresses of the next versions of the contracts to be upgraded (if element of this array is equal to zero address it means that appropriate upgradeable contract wouldn't be upgraded this time)
     /// @dev Will be empty in case of not active upgrade mode
-    address[] nextTargets;
+    address[] public nextTargets;
 
-    /// @notice Contract which allows finish upgrade during preparation status of upgrade
-    MainContract mainContract;
+    /// @notice Contract which defines notice period duration and allows finish upgrade during preparation of it
+    UpgradeableMaster public mainContract;
 
     /// @notice Contract constructor
-    /// @param _mainContractAddress Address of contract which processes priority operations
-    /// @dev Calls Ownable contract constructor and adds _mainContractAddress to the list of contracts managed by the gatekeeper
-    constructor(address _mainContractAddress) Ownable(msg.sender) public {
-        mainContract = MainContract(_mainContractAddress);
+    /// @param _upgradeableMasterAddress Address of contract which defines notice period duration and allows finish upgrade during preparation of it
+    /// @dev Calls Ownable contract constructor
+    constructor(address _upgradeableMasterAddress) Ownable(msg.sender) public {
+        mainContract = UpgradeableMaster(_upgradeableMasterAddress);
     }
 
-    /// @notice Adds a new proxy to the list of contracts managed by the gatekeeper
-    /// @param proxy Address of proxy to add
-    function addProxyContract(address proxy) external {
+    /// @notice Adds a new upgradeable contract to the list of contracts managed by the gatekeeper
+    /// @param addr Address of upgradeable contract to add
+    function addUpgradeable(address addr) external {
         requireMaster(msg.sender);
-        require(upgradeStatus == UpgradeStatus.Idle, "apc11"); /// apc11 - proxy can't be added during upgrade
+        require(upgradeStatus == UpgradeStatus.Idle, "apc11"); /// apc11 - upgradeable contract can't be added during upgrade
 
-        proxies.push(proxy);
-        emit ProxyAdded(proxy);
+        managedContracts.push(Upgradeable(addr));
+        emit UpgradeableAdded(Upgradeable(addr));
     }
 
     /// @notice Starts upgrade (activates notice period)
-    /// @param newTargets New proxies targets (if element of this array is equal to zero address it means that this proxy will not be upgraded)
+    /// @param newTargets New managed contracts targets (if element of this array is equal to zero address it means that appropriate upgradeable contract wouldn't be upgraded this time)
     function startUpgrade(address[] calldata newTargets) external {
         requireMaster(msg.sender);
         require(upgradeStatus == UpgradeStatus.Idle, "spu11"); // spu11 - unable to activate active upgrade mode
-        require(newTargets.length == proxies.length, "spu12"); // spu12 - number of new targets must be equal to the number of proxies
+        require(newTargets.length == managedContracts.length, "spu12"); // spu12 - number of new targets must be equal to the number of managed contracts
 
         mainContract.upgradeNoticePeriodStarted();
         upgradeStatus = UpgradeStatus.NoticePeriod;
@@ -129,20 +96,19 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
     }
 
     /// @notice Finishes upgrade
-    /// @param targetsInitializationParameters New targets initialization parameters per each proxy
+    /// @param targetsInitializationParameters New targets initialization parameters per each upgradeable contract
     function finishUpgrade(bytes[] calldata targetsInitializationParameters) external {
         requireMaster(msg.sender);
         require(upgradeStatus == UpgradeStatus.Preparation, "fpu11"); // fpu11 - unable to finish upgrade without preparation status active
-        require(targetsInitializationParameters.length == proxies.length, "fpu12"); // fpu12 - number of new targets initialization parameters must be equal to the number of proxies
+        require(targetsInitializationParameters.length == managedContracts.length, "fpu12"); // fpu12 - number of new targets initialization parameters must be equal to the number of managed contracts
         require(mainContract.readyForUpgrade(), "fpu13"); // fpu13 - main contract is not ready for upgrade
         mainContract.upgradeFinishes();
 
-        for (uint64 i = 0; i < proxies.length; i++) {
-            address proxy = proxies[i];
-            address nextTarget = nextTargets[i];
-            if (nextTarget != address(0)) {
-                UpgradeableProxy(proxy).upgradeTarget(nextTarget, targetsInitializationParameters[i]);
-                emit UpgradeCompleted(proxy, nextTarget);
+        for (uint64 i = 0; i < managedContracts.length; i++) {
+            address newTarget = nextTargets[i];
+            if (newTarget != address(0)) {
+                managedContracts[i].upgradeTarget(newTarget, targetsInitializationParameters[i]);
+                emit UpgradeCompleted(managedContracts[i], newTarget);
             }
         }
 

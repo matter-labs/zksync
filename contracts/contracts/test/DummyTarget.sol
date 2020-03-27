@@ -1,8 +1,9 @@
 pragma solidity 0.5.16;
 
-interface DummyTarget {
+import "../Upgradeable.sol";
 
-    function upgradeNoticePeriod() external pure returns (uint);
+
+interface DummyTarget {
 
     function get_DUMMY_INDEX() external pure returns (uint256);
 
@@ -10,15 +11,29 @@ interface DummyTarget {
 
     function verifyPriorityOperation() external;
 
-    function readyForUpgrade() external returns (bool);
-
 }
 
-contract DummyFirst is DummyTarget {
+contract DummyFirst is UpgradeableMaster, DummyTarget {
 
     uint constant UPGRADE_NOTICE_PERIOD = 4;
-    function upgradeNoticePeriod() external pure returns (uint) {
+    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
+    }
+
+    function upgradeNoticePeriod() external returns (uint) {
+        return UPGRADE_NOTICE_PERIOD;
+    }
+
+    function upgradeNoticePeriodStarted() external {}
+
+    function upgradePreparationStarted() external {}
+
+    function upgradeCanceled() external {}
+
+    function upgradeFinishes() external {}
+
+    function readyForUpgrade() external returns (bool) {
+        return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
     uint256 private constant DUMMY_INDEX = 1;
@@ -49,17 +64,29 @@ contract DummyFirst is DummyTarget {
         _verifiedPriorityOperations++;
     }
 
-    function readyForUpgrade() external returns (bool) {
-        return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
-    }
-
 }
 
-contract DummySecond is DummyTarget {
+contract DummySecond is UpgradeableMaster, DummyTarget {
 
     uint constant UPGRADE_NOTICE_PERIOD = 4;
-    function upgradeNoticePeriod() external pure returns (uint) {
+    function get_UPGRADE_NOTICE_PERIOD() external pure returns (uint) {
         return UPGRADE_NOTICE_PERIOD;
+    }
+
+    function upgradeNoticePeriod() external returns (uint) {
+        return UPGRADE_NOTICE_PERIOD;
+    }
+
+    function upgradeNoticePeriodStarted() external {}
+
+    function upgradePreparationStarted() external {}
+
+    function upgradeCanceled() external {}
+
+    function upgradeFinishes() external {}
+
+    function readyForUpgrade() external returns (bool) {
+        return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
     uint256 private constant DUMMY_INDEX = 2;
@@ -88,10 +115,6 @@ contract DummySecond is DummyTarget {
 
     function verifyPriorityOperation() external {
         _verifiedPriorityOperations++;
-    }
-
-    function readyForUpgrade() external returns (bool) {
-        return totalVerifiedPriorityOperations() >= totalRegisteredPriorityOperations();
     }
 
 }
