@@ -258,8 +258,8 @@ steps:
   image: docker
   commands:
   - docker login -u $USERNAME -p $PASSWORD
-  - docker build -t $REPO:stage-${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
-  - docker push $REPO:stage-${DRONE_COMMIT_SHA:0:8}
+  - docker build -t $REPO:${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
+  - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
   environment:
     USERNAME:
       from_secret: docker_username
@@ -344,3 +344,57 @@ steps:
   - nginx-image-publish
   - server-image-publish
   - prover-image-publish
+
+---
+# This pipeline udpates testnet
+kind: pipeline
+type: docker
+name: update-testnet
+clone:
+    depth: 1
+
+volumes:
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  target:
+  - testnet
+  event:
+  - promote
+
+steps:
+- name: check-images-exist
+  image: docker
+  environment:
+    USERNAME:
+      from_secret: docker_username
+    PASSWORD:
+      from_secret: docker_password
+    ENV_BASE64:
+      from_secret: testnet_env_base64
+  commands:
+  - docker login -u $USERNAME -p $PASSWORD
+  - docker pull matterlabs/server:${DRONE_COMMIT_SHA:0:8}
+  - docker pull matterlabs/prover:${DRONE_COMMIT_SHA:0:8}
+  - docker pull matterlabs/nginx:${DRONE_COMMIT_SHA:0:8}
+  volumes:
+  - name: docker-sock
+    path: /var/run/docker.sock
+- name: testnet-deploy
+  image: matterlabs/ci
+  environment:
+    ENV_BASE64:
+      from_secret: testnet_env_base64
+    KUBECONFIG_BASE64:
+      from_secret: testnet_kubeconfig_base64
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/testnet.env
+  - zksync env testnet
+  - echo -n $KUBECONFIG_BASE64 | base64 --decode > `pwd`/kubeconfig.yaml
+  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/testnet.env KUBECONFIG=`pwd`/kubeconfig.yaml
+  - zksync apply-kubeconfig
+  - zksync restart
