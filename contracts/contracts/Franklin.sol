@@ -670,6 +670,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         totalCommittedPriorityRequests -= _reverted.priorityOperations;
     }
 
+    /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)
     function upgradePreparationLockStatus() public returns (bool) {
         return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;
     }
