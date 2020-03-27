@@ -1,0 +1,15 @@
+{
+	"name": "zksync-crypto",
+	"version": "0.0.2",
+	"browser": "dist/web.js",
+	"main": "dist/node.js",
+	"files": [
+		"dist/*.ts",
+		"dist/*.wasm",
+		"dist/*.js"
+	],
+	"scripts": {
+		"build": "./build.sh",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	}
+}
