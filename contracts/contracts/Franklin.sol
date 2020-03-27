@@ -670,6 +670,10 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         totalCommittedPriorityRequests -= _reverted.priorityOperations;
     }
 
+    function upgradePreparationLockStatus() public returns (bool) {
+        return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;
+    }
+
     /// @notice Checks that current state not is exodus mode
     function requireActive() internal view {
         require(!exodusMode, "fre11"); // exodus mode activated
@@ -725,7 +729,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         uint256 _fee,
         bytes memory _pubData
     ) internal {
-        require(!upgradePreparationActive || now >= upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD, "apr11"); // apr11 - priority request can't be added during lock period of preparation status of upgrade
+        require(!upgradePreparationLockStatus(), "apr11"); // apr11 - priority request can't be added during lock period of preparation of upgrade
 
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
