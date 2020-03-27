@@ -523,6 +523,7 @@ mod test {
         witness_accum.collect_fees(&Vec::new());
         witness_accum.calculate_pubdata_commitment();
 
+        println!("pubdata commitment: {:?}", witness_accum.pubdata_commitment);
         assert_eq!(
             plasma_state.root_hash(),
             witness_accum
@@ -532,7 +533,7 @@ mod test {
         );
 
         use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
-        // use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
+        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
         // use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
         use crate::franklin_crypto::bellman::kate_commitment::*;
         use crate::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
@@ -545,7 +546,10 @@ mod test {
 
         // c.clone().synthesize(&mut transpiler).unwrap();
 
-        let hints = transpile::<Bn256, _>(c.clone()).expect("transpilation is successful");
+        let mut hints = transpile::<Bn256, _>(c.clone()).expect("transpilation is successful");
+        let mut tmp_buff = Vec::new();
+        write_transpilation_hints(&hints, &mut tmp_buff).expect("hint write");
+        hints = read_transpilation_hints(tmp_buff.as_slice()).expect("hint read");
 
         let mut hints_hist = std::collections::HashMap::new();
         hints_hist.insert("into addition gate".to_owned(), 0);
@@ -590,11 +594,10 @@ mod test {
 
         println!("Done checking if satisfied");
 
-        let setup = setup(c.clone(), &hints).expect("must make setup");
-
-        setup
-            .write(std::fs::File::create(format!("{}/setup", &param_save_path)).unwrap())
-            .expect("setup write");
+        let mut setup = setup(c.clone(), &hints).expect("must make setup");
+        tmp_buff = Vec::new();
+        setup.write(&mut tmp_buff).expect("setup write");
+        setup = SetupPolynomials::read(tmp_buff.as_slice()).expect("setup read");
 
         println!("Made into {} gates", setup.n);
         let size = setup.n.next_power_of_two();
@@ -623,21 +626,23 @@ mod test {
         // let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::dummy_crs(size);
         // let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::dummy_crs(size);
 
-        let verification_key = make_verification_key(&setup, &key_monomial_form)
+        let mut verification_key = make_verification_key(&setup, &key_monomial_form)
             .expect("must make a verification key");
-
-        let mut key_writer = std::io::BufWriter::with_capacity(
-            1 << 24,
-            std::fs::File::create(format!("{}/deposit_vk.key", param_save_path)).unwrap(),
-        );
-
+        tmp_buff = Vec::new();
         verification_key
-            .write(&mut key_writer)
-            .expect("must write a verification key");
-        drop(key_writer);
+            .write(&mut tmp_buff)
+            .expect("verification key write");
+        verification_key =
+            VerificationKey::read(tmp_buff.as_slice()).expect("verification key read");
 
-        let precomputations =
+        let mut precomputations =
             make_precomputations(&setup).expect("must make precomputations for proving");
+        tmp_buff = Vec::new();
+        precomputations
+            .write(&mut tmp_buff)
+            .expect("precomputation write");
+        precomputations = SetupPolynomialsPrecomputations::read(tmp_buff.as_slice())
+            .expect("precomputation read");
 
         use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
 
@@ -645,7 +650,7 @@ mod test {
         let omegas_inv_bitreversed =
             <OmegasInvBitreversed<Fr> as CTPrecomputations<Fr>>::new_for_domain_size(size);
 
-        let proof = prove_from_recomputations::<_, _, RollingKeccakTranscript<Fr>, _, _>(
+        let mut proof = prove_from_recomputations::<_, _, RollingKeccakTranscript<Fr>, _, _>(
             c.clone(),
             &hints,
             &setup,
@@ -656,6 +661,10 @@ mod test {
             &key_lagrange_form,
         )
         .expect("must make a proof");
+
+        tmp_buff = Vec::new();
+        proof.write(&mut tmp_buff).expect("proof write");
+        proof = Proof::read(tmp_buff.as_slice()).expect("proof read");
 
         proof
             .write(
