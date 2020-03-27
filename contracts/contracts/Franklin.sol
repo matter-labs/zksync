@@ -29,19 +29,19 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
     /// @notice Notification that upgrade preparation status is activated
     function upgradePreparationStarted() external {
-        upgradePreparation = true;
+        upgradePreparationActive = true;
         upgradePreparationActivationTime = now;
     }
 
     /// @notice Notification that upgrade canceled
     function upgradeCanceled() external {
-        upgradePreparation = false;
+        upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
     }
 
     /// @notice Notification that upgrade finishes
     function upgradeFinishes() external {
-        upgradePreparation = false;
+        upgradePreparationActive = false;
         upgradePreparationActivationTime = 0;
     }
 
@@ -725,7 +725,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         uint256 _fee,
         bytes memory _pubData
     ) internal {
-        require(!upgradePreparation || now >= upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD, "apr11"); // apr11 - priority request can't be added during lock period of preparation status of upgrade
+        require(!upgradePreparationActive || now >= upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD, "apr11"); // apr11 - priority request can't be added during lock period of preparation status of upgrade
 
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;

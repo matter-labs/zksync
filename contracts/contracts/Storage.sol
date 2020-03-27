@@ -13,7 +13,7 @@ contract Storage {
 
     /// @notice Flag indicates that upgrade preparation status is active
     /// @dev Will store false in case of not active upgrade mode
-    bool public upgradePreparation;
+    bool public upgradePreparationActive;
 
     /// @notice Upgrade preparation activation timestamp (as seconds since unix epoch)
     /// @dev Will be equal to zero in case of not active upgrade mode
