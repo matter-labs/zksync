@@ -463,6 +463,7 @@ dependencies = [
 [[package]]
 name = "bellman_ce"
 version = "0.3.2"
+source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#0e500f633476265fe34772cb97e1d073386c9ad2"
 dependencies = [
  "bit-vec",
  "blake2s_const",
@@ -471,7 +472,7 @@ dependencies = [
  "cfg-if",
  "crossbeam",
  "futures 0.3.4",
- "hex 0.3.2",
+ "hex 0.4.2",
  "lazy_static",
  "num_cpus",
  "pairing_ce",
@@ -523,6 +524,7 @@ dependencies = [
 [[package]]
 name = "blake2s_const"
 version = "0.6.0"
+source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#0e500f633476265fe34772cb97e1d073386c9ad2"
 dependencies = [
  "arrayref",
  "arrayvec 0.5.1",
@@ -1233,6 +1235,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#6f33d778cfe2a5d889752902d1b077fdf2aa2de4"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -1240,6 +1243,9 @@ dependencies = [
  "byteorder",
  "digest 0.7.6",
  "hmac",
+ "num-bigint",
+ "num-integer",
+ "num-traits",
  "rand 0.4.6",
  "serde",
  "serde_derive",
@@ -3125,9 +3131,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.48"
+version = "1.0.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9371ade75d4c2d6cb154141b9752cf3781ec9c05e0e5cf35060e1e70ee7b9c25"
+checksum = "02044a6a92866fd61624b3db4d2c9dccc2feabbc6be490b87611bf285edbac55"
 dependencies = [
  "itoa",
  "ryu",
