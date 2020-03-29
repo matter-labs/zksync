@@ -95,6 +95,7 @@ pub mod diff;
 pub mod ethereum;
 pub mod prover;
 pub mod tokens;
+pub mod leader_election;
 
 pub use crate::connection::ConnectionPool;
 
@@ -163,6 +164,11 @@ impl StorageProcessor {
         F: FnOnce() -> Result<T, failure::Error>,
     {
         self.conn().transaction(|| f())
+    }
+
+    // Gains access to the `LeaderElection` schema.
+    pub fn leader_election_schema(&self) ->  leader_election::LeaderElectionSchema<'_> {
+        return leader_election::LeaderElectionSchema(self)
     }
 
     fn conn(&self) -> &RecoverableConnection<PgConnection> {

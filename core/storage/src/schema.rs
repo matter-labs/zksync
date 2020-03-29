@@ -238,6 +238,14 @@ table! {
     }
 }
 
+table! {
+    leader_election (id) {
+        id -> Bool,
+        name -> Text,
+        voted_at -> Timestamp,
+    }
+}
+
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
@@ -272,4 +280,5 @@ allow_tables_to_appear_in_same_query!(
     server_config,
     storage_state_update,
     tokens,
+    leader_election,
 );

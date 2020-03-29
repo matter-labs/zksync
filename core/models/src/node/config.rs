@@ -9,5 +9,7 @@ pub const PROVER_HEARTBEAT_INTERVAL: u64 = 5; // sec
 pub const PROVER_CYCLE_WAIT: u64 = 5; // sec
 pub const TX_MINIBATCH_CREATE_TIME: Duration = Duration::from_millis(100);
 pub const MAX_WITHDRAWALS_TO_COMPLETE_IN_A_CALL: u64 = 20;
+pub const LEADER_ELECTION_ITERVAL: Duration = Duration::from_secs(5);
+pub const LEADER_ELECTION_TIMEOUT: Duration = Duration::from_secs(10);
 
 pub const DEFAULT_KEYS_PATH: &str = "keys";

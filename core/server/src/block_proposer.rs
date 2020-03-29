@@ -9,7 +9,7 @@ use crate::mempool::{GetBlockRequest, MempoolRequest, ProposedBlock};
 use crate::state_keeper::StateKeeperRequest;
 use futures::channel::{mpsc, oneshot};
 use futures::SinkExt;
-use models::node::config::TX_MINIBATCH_CREATE_TIME;
+use models::node::config::{TX_MINIBATCH_CREATE_TIME, LEADER_ELECTION_ITERVAL, LEADER_ELECTION_TIMEOUT};
 use tokio::runtime::Runtime;
 use tokio::time;
 
@@ -86,6 +86,21 @@ pub fn run_block_proposer_task(
             timer.tick().await;
 
             block_proposer.commit_new_tx_mini_batch().await;
+        }
+    });
+}
+
+pub fn run_leader_election_task(
+    name: String,
+    connection_pool: storage::ConnectionPool,
+    runtime: &Runtime,
+) {
+    runtime.spawn(async move {
+        let mut timer = time::interval(LEADER_ELECTION_ITERVAL);
+        loop {
+            timer.tick().await;
+            let st = connection_pool.access_storage().expect("failed access db");
+            st.leader_election_schema().vote_for_leader(&name, LEADER_ELECTION_TIMEOUT).expect("failed to query leader");
         }
     });
 }
