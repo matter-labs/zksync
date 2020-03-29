@@ -463,7 +463,7 @@ dependencies = [
 [[package]]
 name = "bellman_ce"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#0e500f633476265fe34772cb97e1d073386c9ad2"
+source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#31c92e502863131a03c6aff1753b72d7d3b5e448"
 dependencies = [
  "bit-vec",
  "blake2s_const",
@@ -524,7 +524,7 @@ dependencies = [
 [[package]]
 name = "blake2s_const"
 version = "0.6.0"
-source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#0e500f633476265fe34772cb97e1d073386c9ad2"
+source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#31c92e502863131a03c6aff1753b72d7d3b5e448"
 dependencies = [
  "arrayref",
  "arrayvec 0.5.1",
@@ -1235,7 +1235,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#6f33d778cfe2a5d889752902d1b077fdf2aa2de4"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#5f5125bc96338644d03b3f1850662b0209418963"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -1866,6 +1866,7 @@ dependencies = [
  "hex 0.3.2",
  "log 0.4.8",
  "models",
+ "rayon",
  "rust-crypto",
  "time",
 ]
@@ -3131,9 +3132,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.49"
+version = "1.0.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "02044a6a92866fd61624b3db4d2c9dccc2feabbc6be490b87611bf285edbac55"
+checksum = "78a7a12c167809363ec3bd7329fc0a3369056996de43c4b37ef3cd54a6ce4867"
 dependencies = [
  "itoa",
  "ryu",
