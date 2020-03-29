@@ -630,6 +630,12 @@ mod test {
             &key_lagrange_form,
         )
         .expect("must make a proof");
+    
+        let mut proof_writer = std::io::BufWriter::with_capacity(
+            1<<24, 
+            std::fs::File::create("./deposit_proof.proof").unwrap()
+        );
+        proof.write(&mut proof_writer).unwrap();
 
         let is_valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &verification_key)
             .expect("must perform verification");
