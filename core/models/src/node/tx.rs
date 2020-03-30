@@ -122,6 +122,18 @@ impl Transfer {
             .as_ref()
             .map(PubKeyHash::from_pubkey)
     }
+
+    /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
+    pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
+        format!(
+            "Transfer {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+            amount = format_ether(&self.amount),
+            token = token_symbol,
+            to = self.to,
+            nonce = self.nonce,
+            fee = format_ether(&self.fee),
+        )
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -163,6 +175,18 @@ impl Withdraw {
         } else {
             None
         }
+    }
+
+    /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
+    pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
+        format!(
+            "Withdraw {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+            amount = format_ether(&self.amount),
+            token = token_symbol,
+            to = self.to,
+            nonce = self.nonce,
+            fee = format_ether(&self.fee),
+        )
     }
 }
 
@@ -340,34 +364,6 @@ impl FranklinTx {
         match self {
             FranklinTx::Close(_) => true,
             _ => false,
-        }
-    }
-
-    /// Returns a message that user has to sign to send the transaction.
-    /// If the transaction doesn't need a message signature, returns `None`.
-    /// If any error is encountered during the message generation, returns `failure::Error`
-    pub fn get_tx_info_message_to_sign(
-        &self,
-        get_token_symbol: &mut dyn FnMut(TokenId) -> Result<String, failure::Error>,
-    ) -> Result<Option<String>, failure::Error> {
-        match self {
-            FranklinTx::Transfer(tx) => Ok(Some(format!(
-                "Transfer {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
-                amount = format_ether(&tx.amount),
-                token = get_token_symbol(tx.token)?,
-                to = tx.to,
-                nonce = tx.nonce,
-                fee = format_ether(&tx.fee),
-            ))),
-            FranklinTx::Withdraw(tx) => Ok(Some(format!(
-                "Withdraw {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
-                amount = format_ether(&tx.amount),
-                token = get_token_symbol(tx.token)?,
-                to = tx.to,
-                nonce = tx.nonce,
-                fee = format_ether(&tx.fee),
-            ))),
-            _ => Ok(None),
         }
     }
 }

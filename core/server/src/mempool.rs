@@ -146,6 +146,13 @@ struct Mempool {
 }
 
 impl Mempool {
+    fn token_symbol_from_id(&mut self, token_id: TokenId) -> Result<String, TxAddError> {
+        self.token_cache
+            .token_symbol_from_id(token_id)
+            .or(Err(TxAddError::Other))?
+            .ok_or(TxAddError::IncorrectTx)
+    }
+
     async fn add_tx(
         &mut self,
         tx: FranklinTx,
@@ -172,13 +179,17 @@ impl Mempool {
             }
         }
 
-        let message_to_sign = tx
-            .get_tx_info_message_to_sign(&mut |token_id| {
-                self.token_cache
-                    .token_symbol_from_id(token_id)?
-                    .ok_or_else(|| format_err!("No symbol for TokenId {}", token_id))
-            })
-            .or(Err(TxAddError::IncorrectTx))?;
+        let message_to_sign = match &tx {
+            FranklinTx::Transfer(tx) => {
+                let token_symbol = self.token_symbol_from_id(tx.token)?;
+                Some(tx.get_ethereum_sign_message(&token_symbol))
+            }
+            FranklinTx::Withdraw(tx) => {
+                let token_symbol = self.token_symbol_from_id(tx.token)?;
+                Some(tx.get_ethereum_sign_message(&token_symbol))
+            }
+            _ => None,
+        };
 
         if let Some(message_to_sign) = message_to_sign {
             let tx_eth_signature = signature.ok_or(TxAddError::MissingEthSignature)?;
