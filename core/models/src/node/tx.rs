@@ -22,7 +22,6 @@ use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigde
 use ethsign::{SecretKey, Signature as ETHSignature};
 use failure::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::HashMap;
 use std::convert::TryInto;
 use std::str::FromStr;
 use web3::types::{Address, H256};
@@ -346,16 +345,16 @@ impl FranklinTx {
 
     /// Returns a message that user has to sign to send the transaction.
     /// If the transaction doesn't need a message signature, returns `None`.
-    /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
+    /// If any error is encountered during the message generation, returns `failure::Error`
     pub fn get_tx_info_message_to_sign(
         &self,
-        ids_to_symbols: &HashMap<TokenId, String>,
-    ) -> Result<Option<String>, &'static str> {
+        get_token_symbol: &mut dyn FnMut(TokenId) -> Result<String, failure::Error>,
+    ) -> Result<Option<String>, failure::Error> {
         match self {
             FranklinTx::Transfer(tx) => Ok(Some(format!(
                 "Transfer {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
                 amount = format_ether(&tx.amount),
-                token = ids_to_symbols.get(&tx.token).ok_or("no such symbol")?, // TODO: jazzandrock better message | other error type
+                token = get_token_symbol(tx.token)?,
                 to = tx.to,
                 nonce = tx.nonce,
                 fee = format_ether(&tx.fee),
@@ -363,7 +362,7 @@ impl FranklinTx {
             FranklinTx::Withdraw(tx) => Ok(Some(format!(
                 "Withdraw {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
                 amount = format_ether(&tx.amount),
-                token = ids_to_symbols.get(&tx.token).ok_or("no such symbol")?, // TODO: jazzandrock better message | other error type
+                token = get_token_symbol(tx.token)?,
                 to = tx.to,
                 nonce = tx.nonce,
                 fee = format_ether(&tx.fee),

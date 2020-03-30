@@ -15,7 +15,7 @@
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
 use crate::eth_watch::EthWatchRequest;
-use failure::Fail;
+use failure::{format_err, Fail};
 use futures::channel::{mpsc, oneshot};
 use futures::{SinkExt, StreamExt};
 use models::node::tx::TxEthSignature;
@@ -142,11 +142,7 @@ struct Mempool {
     mempool_state: MempoolState,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
-
-    // TODO: jazzandrock find a better place to store such cached structs.
-    // Maybe, something like storage scheme but for hashmaps?
-    // if we plan to cache stuff like that more often
-    ids_to_symbols: HashMap<TokenId, String>,
+    token_cache: TokenCache,
 }
 
 impl Mempool {
@@ -176,10 +172,15 @@ impl Mempool {
             }
         }
 
-        if let Some(message_to_sign) = tx
-            .get_tx_info_message_to_sign(&self.ids_to_symbols)
-            .or(Err(TxAddError::IncorrectTx))?
-        {
+        let message_to_sign = tx
+            .get_tx_info_message_to_sign(&mut |token_id| {
+                self.token_cache
+                    .token_symbol_from_id(token_id)?
+                    .ok_or_else(|| format_err!("No symbol for TokenId {}", token_id))
+            })
+            .or(Err(TxAddError::IncorrectTx))?;
+
+        if let Some(message_to_sign) = message_to_sign {
             let tx_eth_signature = signature.ok_or(TxAddError::MissingEthSignature)?;
 
             match tx_eth_signature {
@@ -325,6 +326,49 @@ impl Mempool {
     }
 }
 
+struct TokenCache {
+    db_pool: ConnectionPool,
+    ids_to_symbols: HashMap<TokenId, String>,
+}
+
+impl TokenCache {
+    pub fn new(db_pool: ConnectionPool) -> Self {
+        Self {
+            db_pool,
+            ids_to_symbols: HashMap::new(),
+        }
+    }
+
+    pub fn token_symbol_from_id(
+        &mut self,
+        token_id: TokenId,
+    ) -> Result<Option<String>, failure::Error> {
+        match self.ids_to_symbols.get(&token_id).cloned() {
+            Some(token_symbol) => Ok(Some(token_symbol)),
+            None => {
+                match self
+                    .db_pool
+                    .access_storage_fragile()
+                    .map_err(|e| format_err!("Failed to access storage: {}", e))?
+                    .tokens_schema()
+                    .load_tokens()
+                    .map_err(|e| format_err!("Tokens load failed: {}", e))?
+                    .get(&token_id)
+                    .cloned()
+                {
+                    Some(token_info) => Ok(Some(
+                        self.ids_to_symbols
+                            .entry(token_id)
+                            .or_insert(token_info.symbol)
+                            .clone(),
+                    )),
+                    None => Ok(None),
+                }
+            }
+        }
+    }
+}
+
 pub fn run_mempool_task(
     db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
@@ -333,22 +377,13 @@ pub fn run_mempool_task(
 ) {
     let mempool_state = MempoolState::restore_from_db(&db_pool);
 
-    // TODO: jazzandrock
-    let ids_to_symbols = db_pool
-        .access_storage_fragile()
-        .expect("fragile enough")
-        .tokens_schema()
-        .load_tokens()
-        .expect("tokens load failed")
-        .into_iter()
-        .map(|(key, val)| (key, val.symbol))
-        .collect::<HashMap<_, _>>();
+    let token_cache = TokenCache::new(db_pool);
 
     let mempool = Mempool {
         mempool_state,
         requests,
         eth_watch_req,
-        ids_to_symbols,
+        token_cache,
     };
     runtime.spawn(mempool.run());
 }
