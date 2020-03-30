@@ -19,6 +19,15 @@ import {
     SYNC_MAIN_CONTRACT_INTERFACE
 } from "./utils";
 
+class ZKSyncTxError extends Error {
+    constructor(
+        message: string,
+        public value: PriorityOperationReceipt | TransactionReceipt
+    ) {
+        super(message);
+    }
+}
+
 export class Wallet {
     public provider: Provider;
 
@@ -234,7 +243,8 @@ export class Wallet {
     }
 
     async onchainAuthSigningKey(
-        nonce: Nonce = "committed"
+        nonce: Nonce = "committed",
+        ethTxOptions?: ethers.providers.TransactionRequest
     ): Promise<ContractTransaction> {
         if (!this.signer) {
             throw new Error(
@@ -261,7 +271,8 @@ export class Wallet {
             newPubKeyHash.replace("sync:", "0x"),
             numNonce,
             {
-                gasLimit: utils.bigNumberify("200000")
+                gasLimit: utils.bigNumberify("200000"),
+                ...ethTxOptions
             }
         );
 
@@ -367,6 +378,7 @@ export class Wallet {
         token: TokenLike;
         amount: utils.BigNumberish;
         maxFeeInETHToken?: utils.BigNumberish;
+        ethTxOptions?: ethers.providers.TransactionRequest;
         approveDepositAmountForERC20?: boolean;
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
@@ -402,7 +414,8 @@ export class Wallet {
                         .bigNumberify(deposit.amount)
                         .add(maxFeeInETHToken),
                     gasLimit: utils.bigNumberify("200000"),
-                    gasPrice
+                    gasPrice,
+                    ...deposit.ethTxOptions
                 }
             );
         } else {
@@ -428,7 +441,8 @@ export class Wallet {
                         gasLimit: utils.bigNumberify("250000"),
                         value: maxFeeInETHToken,
                         nonce: approveTx.nonce + 1,
-                        gasPrice
+                        gasPrice,
+                        ...deposit.ethTxOptions
                     }
                 );
             } else {
@@ -442,7 +456,8 @@ export class Wallet {
                     {
                         gasLimit: utils.bigNumberify("250000"),
                         value: maxFeeInETHToken,
-                        gasPrice
+                        gasPrice,
+                        ...deposit.ethTxOptions
                     }
                 );
             }
@@ -455,7 +470,7 @@ export class Wallet {
         token: TokenLike;
         maxFeeInETHToken?: utils.BigNumberish;
         accountId?: number;
-        nonce?: Nonce;
+        ethTxOptions?: ethers.providers.TransactionRequest;
     }): Promise<ETHOperation> {
         const gasPrice = await this.ethSigner.provider.getGasPrice();
         const ethProxy = new ETHProxy(
@@ -500,7 +515,8 @@ export class Wallet {
             {
                 gasLimit: utils.bigNumberify("500000"),
                 value: maxFeeInETHToken,
-                gasPrice
+                gasPrice,
+                ...withdraw.ethTxOptions
             }
         );
 
@@ -509,7 +525,8 @@ export class Wallet {
 }
 
 class ETHOperation {
-    state: "Sent" | "Mined" | "Committed" | "Verified";
+    state: "Sent" | "Mined" | "Committed" | "Verified" | "Failed";
+    error?: ZKSyncTxError;
     priorityOpId?: utils.BigNumber;
 
     constructor(
@@ -538,12 +555,22 @@ class ETHOperation {
     }
 
     async awaitReceipt(): Promise<PriorityOperationReceipt> {
+        this.throwErrorIfFailedState();
+
         await this.awaitEthereumTxCommit();
         if (this.state != "Mined") return;
         const receipt = await this.zkSyncProvider.notifyPriorityOp(
             this.priorityOpId.toNumber(),
             "COMMIT"
         );
+
+        if (!receipt.executed) {
+            this.setErrorState(
+                new ZKSyncTxError("Priority operation failed", receipt)
+            );
+            this.throwErrorIfFailedState();
+        }
+
         this.state = "Committed";
         return receipt;
     }
@@ -556,13 +583,25 @@ class ETHOperation {
             this.priorityOpId.toNumber(),
             "VERIFY"
         );
+
         this.state = "Verified";
+
         return receipt;
+    }
+
+    private setErrorState(error: ZKSyncTxError) {
+        this.state = "Failed";
+        this.error = error;
+    }
+
+    private throwErrorIfFailedState() {
+        if (this.state == "Failed") throw this.error;
     }
 }
 
 class Transaction {
-    state: "Sent" | "Committed" | "Verified";
+    state: "Sent" | "Committed" | "Verified" | "Failed";
+    error?: ZKSyncTxError;
 
     constructor(
         public txData,
@@ -573,12 +612,25 @@ class Transaction {
     }
 
     async awaitReceipt(): Promise<TransactionReceipt> {
+        this.throwErrorIfFailedState();
+
         if (this.state !== "Sent") return;
 
         const receipt = await this.sidechainProvider.notifyTransaction(
             this.txHash,
             "COMMIT"
         );
+
+        if (!receipt.success) {
+            this.setErrorState(
+                new ZKSyncTxError(
+                    `ZKSync transaction failed: ${receipt.failReason}`,
+                    receipt
+                )
+            );
+            this.throwErrorIfFailedState();
+        }
+
         this.state = "Committed";
         return receipt;
     }
@@ -589,7 +641,17 @@ class Transaction {
             this.txHash,
             "VERIFY"
         );
+
         this.state = "Verified";
         return receipt;
+    }
+
+    private setErrorState(error: ZKSyncTxError) {
+        this.state = "Failed";
+        this.error = error;
+    }
+
+    private throwErrorIfFailedState() {
+        if (this.state == "Failed") throw this.error;
     }
 }
