@@ -262,35 +262,39 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         let deadline_block = self.get_deadline_block(current_block);
         let gas_price = self.ethereum.gas_price()?;
 
-        // First, we should store the operation in the database and obtain the assigned
-        // operation ID and nonce. Without them we won't be able to sign the transaction.
-        let assigned_data = self.db.save_new_eth_tx(
-            tx.op_type,
-            tx.operation.clone(),
-            deadline_block as i64,
-            gas_price,
-            tx.raw.clone(),
-        )?;
+        let (new_op, signed_tx) = self.db.transaction(|| {
+            // First, we should store the operation in the database and obtain the assigned
+            // operation ID and nonce. Without them we won't be able to sign the transaction.
+            let assigned_data = self.db.save_new_eth_tx(
+                tx.op_type,
+                tx.operation.clone(),
+                deadline_block as i64,
+                gas_price,
+                tx.raw.clone(),
+            )?;
 
-        let mut new_op = ETHOperation {
-            id: assigned_data.id,
-            op_type: tx.op_type,
-            op: tx.operation,
-            nonce: assigned_data.nonce,
-            last_deadline_block: deadline_block,
-            last_used_gas_price: gas_price,
-            used_tx_hashes: vec![], // No hash yet, will be added below.
-            encoded_tx_data: tx.raw,
-            confirmed: false,
-            final_hash: None,
-        };
+            let mut new_op = ETHOperation {
+                id: assigned_data.id,
+                op_type: tx.op_type,
+                op: tx.operation,
+                nonce: assigned_data.nonce,
+                last_deadline_block: deadline_block,
+                last_used_gas_price: gas_price,
+                used_tx_hashes: vec![], // No hash yet, will be added below.
+                encoded_tx_data: tx.raw,
+                confirmed: false,
+                final_hash: None,
+            };
 
-        // Sign the transaction.
-        let signed_tx = self.sign_new_tx(&new_op)?;
+            // Sign the transaction.
+            let signed_tx = Self::sign_new_tx(&self.ethereum, &new_op)?;
 
-        // With signed tx, update the hash in the operation entry and in the db.
-        new_op.used_tx_hashes.push(signed_tx.hash);
-        self.db.add_hash_entry(new_op.id, &signed_tx.hash)?;
+            // With signed tx, update the hash in the operation entry and in the db.
+            new_op.used_tx_hashes.push(signed_tx.hash);
+            self.db.add_hash_entry(new_op.id, &signed_tx.hash)?;
+
+            Ok((new_op, signed_tx))
+        })?;
 
         // We should store the operation as `ongoing` **before** sending it as well,
         // so if sending will fail, we won't forget about it.
@@ -386,9 +390,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         // create a new one from the old one with updated parameters.
         let new_tx = self.create_supplement_tx(deadline_block, op)?;
         // New transaction should be persisted in the DB *before* sending it.
-        self.db
-            .update_eth_tx(op.id, deadline_block as i64, new_tx.gas_price)?;
-        self.db.add_hash_entry(op.id, &new_tx.hash)?;
+        self.db.transaction(|| {
+            self.db
+                .update_eth_tx(op.id, deadline_block as i64, new_tx.gas_price)?;
+            self.db.add_hash_entry(op.id, &new_tx.hash)?;
+            Ok(())
+        })?;
 
         info!(
             "Stuck tx processing: sending tx for op, eth_op_id: {} tx_hash: {:#x}, nonce: {}",
@@ -460,7 +467,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     }
 
     /// Creates a new Ethereum operation.
-    fn sign_new_tx(&self, op: &ETHOperation) -> Result<SignedCallResult, failure::Error> {
+    fn sign_new_tx(ethereum: &ETH, op: &ETHOperation) -> Result<SignedCallResult, failure::Error> {
         let tx_options = {
             let mut options = Options::default();
             options.nonce = Some(op.nonce);
@@ -468,9 +475,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             options
         };
 
-        let signed_tx = self
-            .ethereum
-            .sign_prepared_tx(op.encoded_tx_data.clone(), tx_options)?;
+        let signed_tx = ethereum.sign_prepared_tx(op.encoded_tx_data.clone(), tx_options)?;
 
         Ok(signed_tx)
     }

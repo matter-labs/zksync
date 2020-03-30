@@ -51,10 +51,16 @@ pub(super) trait DatabaseAccess {
 
     /// Loads the stored Ethereum operations stats.
     fn load_stats(&self) -> Result<ETHStats, failure::Error>;
+
+    /// Performs several database operations within one database transaction.
+    fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
+    where
+        F: FnOnce() -> Result<T, failure::Error>;
 }
 
 /// The actual database wrapper.
 /// This structure uses `ConnectionPool` to interact with an existing database.
+#[derive(Debug, Clone)]
 pub struct Database {
     /// Connection to the database.
     db_pool: ConnectionPool,
@@ -126,5 +132,14 @@ impl DatabaseAccess for Database {
         let storage = self.db_pool.access_storage()?;
         let stats = storage.ethereum_schema().load_stats()?;
         Ok(stats.into())
+    }
+
+    fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
+    where
+        F: FnOnce() -> Result<T, failure::Error>,
+    {
+        let storage = self.db_pool.access_storage()?;
+
+        storage.transaction(|| f())
     }
 }

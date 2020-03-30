@@ -191,6 +191,13 @@ impl DatabaseAccess for MockDatabase {
     fn load_stats(&self) -> Result<ETHStats, failure::Error> {
         Ok(self.stats.borrow().clone())
     }
+
+    fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
+    where
+        F: FnOnce() -> Result<T, failure::Error>,
+    {
+        f()
+    }
 }
 
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
