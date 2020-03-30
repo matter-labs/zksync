@@ -31,6 +31,13 @@ impl<T: fmt::Debug> SparseQueue<T> {
         }
     }
 
+    /// Returns a previously popped element to the front of the queue.
+    pub fn return_popped(&mut self, element: T) {
+        let popped_index = self.next_expected_idx - 1;
+        self.elements.insert(popped_index, element);
+        self.next_expected_idx = popped_index;
+    }
+
     /// Inserts an element to the queue given its index.
     pub fn insert(&mut self, idx: usize, element: T) {
         assert!(
@@ -78,19 +85,30 @@ mod tests {
         // Insert the next element and obtain it.
         queue.insert(0, "zero".into());
         assert!(queue.has_next());
+        assert_eq!(queue.next_id(), 0);
         assert_eq!(queue.pop_front().unwrap(), "zero");
+        assert_eq!(queue.next_id(), 1);
 
         // Now insert an element with a gap, and check that it won't be yielded.
         queue.insert(2, "two".into());
         assert!(!queue.has_next());
+        assert_eq!(queue.next_id(), 1);
         assert!(queue.pop_front().is_none());
 
         // Now fill the gap and obtain both elements.
         queue.insert(1, "one".into());
         assert!(queue.has_next());
         assert_eq!(queue.pop_front().unwrap(), "one");
+        assert_eq!(queue.next_id(), 2);
         assert!(queue.has_next());
         assert_eq!(queue.pop_front().unwrap(), "two");
+        assert_eq!(queue.next_id(), 3);
+
+        // Return the popped element back.
+        queue.return_popped("two".into());
+        assert_eq!(queue.next_id(), 2);
+        assert_eq!(queue.pop_front().unwrap(), "two");
+        assert_eq!(queue.next_id(), 3);
     }
 
     /// Checks that we can use the difference `next_expected_idx` as the custom

@@ -27,6 +27,12 @@ impl<T: fmt::Debug> CounterQueue<T> {
         }
     }
 
+    /// Returns a previously popped element to the front of the queue.
+    pub fn return_popped(&mut self, element: T) {
+        self.elements.push_front(element);
+        self.counter -= 1;
+    }
+
     /// Inserts an element to the end of the queue.
     pub fn push_back(&mut self, element: T) {
         self.elements.push_back(element);
@@ -80,6 +86,12 @@ mod tests {
 
         // Now attempt take no value, and check that counter is not increased.
         assert_eq!(queue.pop_front(), None);
+        assert_eq!(queue.get_count(), 2);
+
+        // Return the popped element back.
+        queue.return_popped("two".into());
+        assert_eq!(queue.get_count(), 1);
+        assert_eq!(queue.pop_front().unwrap(), "two");
         assert_eq!(queue.get_count(), 2);
     }
 }

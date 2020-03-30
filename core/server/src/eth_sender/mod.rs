@@ -204,10 +204,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         let mut new_ongoing_ops = VecDeque::new();
 
         while let Some(tx) = self.tx_queue.pop_front() {
-            self.initialize_operation(tx).unwrap_or_else(|e| {
+            self.initialize_operation(tx.clone()).unwrap_or_else(|e| {
                 warn!("Error while trying to complete uncommitted op: {}", e);
 
-                // TODO: We should not forget about the tx here.
+                // Return the unperformed operation to the queue, since failing the
+                // operation initialization means that it was not stored in the database.
+                self.tx_queue.return_popped(tx);
             });
         }
 
@@ -305,7 +307,13 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             "Sending new tx: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
             new_op.id, new_op.op_type, signed_tx.hash, self.zksync_operation_description(&new_op),
         );
-        self.ethereum.send_tx(&signed_tx)?;
+        self.ethereum.send_tx(&signed_tx).unwrap_or_else(|e| {
+            // Sending tx error is not critical: this will result in transaction being considered stuck,
+            // and resent. We can't do anything about this failure either, since it's most probably is not
+            // related to the node logic, so we just log this error and pretend to have this operation
+            // processed.
+            warn!("Error while sending the operation: {}", e);
+        });
 
         Ok(())
     }

@@ -11,7 +11,7 @@ pub type RawTxData = Vec<u8>;
 /// Representation of the transaction data stored in the queue.
 /// This structure contains only essential fields required for the `eth_sender`
 /// to create an actual operation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TxData {
     /// Type of the operation.
     pub op_type: OperationType,
@@ -159,6 +159,21 @@ impl TxQueue {
     /// Adds the `withdraw` operation to the queue.
     pub fn add_withdraw_operation(&mut self, withdraw_operation: TxData) {
         self.withdraw_operations.push_back(withdraw_operation);
+    }
+
+    /// Returns a previously popped element to the front of the queue.
+    pub fn return_popped(&mut self, element: TxData) {
+        match &element.op_type {
+            OperationType::Commit => {
+                self.commit_operations.return_popped(element);
+            }
+            OperationType::Verify => {
+                self.verify_operations.return_popped(element);
+            }
+            OperationType::Withdraw => {
+                self.withdraw_operations.return_popped(element);
+            }
+        }
     }
 
     /// Gets the next transaction to send, according to the transaction sending policy.
@@ -309,5 +324,11 @@ mod tests {
 
         // Though the limit is not met (2 txs in fly, and limit is 3), there should be no txs in the queue.
         assert_eq!(queue.pop_front(), None);
+
+        // Return the operation to the queue.
+        queue.return_popped(op_6);
+
+        let op_6 = queue.pop_front().unwrap();
+        assert_eq!(op_6.raw, vec![WITHDRAW_MARK, 1]);
     }
 }
