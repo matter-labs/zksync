@@ -7,7 +7,7 @@ use crypto_exports::franklin_crypto::bellman::pairing::ff::Field;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::operations::{ChangePubKeyOp, FranklinOp};
 use models::node::priority_ops::PriorityOp;
-use models::node::{CloseOp, Deposit, DepositOp, Fr, TransferOp, WithdrawOp};
+use models::node::{CloseOp, Deposit, DepositOp, Fr, FullExit, FullExitOp, TransferOp, WithdrawOp};
 use testkit::zksync_account::ZksyncAccount;
 // Local imports
 use crate::tests::db_test;
@@ -57,6 +57,31 @@ fn get_account_transactions_history() {
         ExecutedOperations::PriorityOp(Box::new(executed_op))
     };
 
+    let executed_full_exit_op = {
+        let full_exit_op = FranklinOp::FullExit(Box::new(FullExitOp {
+            priority_op: FullExit {
+                account_id: from_account_id,
+                eth_address: from_account_address,
+                token,
+            },
+            withdraw_amount: Some(amount.clone()),
+        }));
+
+        let executed_op = ExecutedPriorityOp {
+            priority_op: PriorityOp {
+                serial_id: 0,
+                data: full_exit_op.try_get_priority_op().unwrap(),
+                deadline_block: 0,
+                eth_fee: 0.into(),
+                eth_hash: b"1234567890".to_vec(),
+            },
+            op: full_exit_op,
+            block_index: 31,
+        };
+
+        ExecutedOperations::PriorityOp(Box::new(executed_op))
+    };
+
     let executed_transfer_op = {
         let transfer_op = FranklinOp::Transfer(Box::new(TransferOp {
             tx: from_zksync_account.sign_transfer(
@@ -88,7 +113,7 @@ fn get_account_transactions_history() {
                 token,
                 amount.clone(),
                 BigDecimal::from(0),
-                &from_account_address,
+                &to_account_address,
                 None,
                 true,
             ),
@@ -146,6 +171,7 @@ fn get_account_transactions_history() {
         fee_account: 0,
         block_transactions: vec![
             executed_deposit_op,
+            executed_full_exit_op,
             executed_transfer_op,
             executed_withdraw_op,
             executed_close_op,
@@ -178,7 +204,7 @@ fn get_account_transactions_history() {
             "Withdraw",
             (
                 Some(from_account_address_string.as_str()),
-                Some(from_account_address_string.as_str()),
+                Some(to_account_address_string.as_str()),
                 Some(&token),
                 Some(amount.to_string()),
             ),
@@ -198,25 +224,24 @@ fn get_account_transactions_history() {
 
         for tx in &from_history {
             let tx_type: &str = tx.tx["type"].as_str().expect("no tx_type");
-            let (from, to, token, amount) = expected_behavior
-                .get(tx_type)
-                .expect("no expected behavior");
-
-            let tx_info = match tx_type {
-                "Deposit" => tx.tx["priority_op"].clone(),
-                _ => tx.tx.clone(),
-            };
-            let tx_from_addr = tx_info["from"].as_str();
-            let tx_to_addr = tx_info["to"].as_str();
-            let tx_token = tx_info["token"].as_u64().map(|x| x as u16);
-            let tx_amount = tx_info["amount"].as_str().map(String::from);
 
             assert!(tx.hash.is_some());
 
-            assert_eq!(tx_from_addr, *from);
-            assert_eq!(tx_to_addr, *to);
-            assert_eq!(tx_token, token.cloned());
-            assert_eq!(tx_amount, *amount);
+            if let Some((from, to, token, amount)) = expected_behavior.get(tx_type) {
+                let tx_info = match tx_type {
+                    "Deposit" => tx.tx["priority_op"].clone(),
+                    _ => tx.tx.clone(),
+                };
+                let tx_from_addr = tx_info["from"].as_str();
+                let tx_to_addr = tx_info["to"].as_str();
+                let tx_token = tx_info["token"].as_u64().map(|x| x as u16);
+                let tx_amount = tx_info["amount"].as_str().map(String::from);
+
+                assert_eq!(tx_from_addr, *from);
+                assert_eq!(tx_to_addr, *to);
+                assert_eq!(tx_token, token.cloned());
+                assert_eq!(tx_amount, *amount);
+            }
         }
 
         let to_history = conn
@@ -224,8 +249,8 @@ fn get_account_transactions_history() {
             .operations_ext_schema()
             .get_account_transactions_history(&to_account_address, 0, 10)?;
 
-        assert_eq!(from_history.len(), 3);
-        assert_eq!(to_history.len(), 2);
+        assert_eq!(from_history.len(), 6);
+        assert_eq!(to_history.len(), 3);
 
         Ok(())
     });

@@ -305,6 +305,8 @@ impl<'a> OperationsExtSchema<'a> {
                         tx->>'from' = '{address}'
                         or
                         tx->>'to' = '{address}'
+                        or
+                        tx->>'account' = '{address}'
                     union all
                     select
                         operation as tx,
@@ -318,7 +320,11 @@ impl<'a> OperationsExtSchema<'a> {
                     where 
                         operation->'priority_op'->>'from' = '{address}'
                         or
-                        operation->'priority_op'->>'to' = '{address}') t
+                        operation->'priority_op'->>'to' = '{address}'
+                        or
+                        operation->'priority_op'->>'account' = '{address}'
+                        or
+                        operation->'priority_op'->>'eth_address' = '{address}') t
                 order by
                     block_number desc
                 offset 
