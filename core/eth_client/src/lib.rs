@@ -1,6 +1,10 @@
 #[macro_use]
 extern crate serde_derive;
 
+// Built-in deps
+use std::fmt;
+
+// External uses
 use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
@@ -18,6 +22,19 @@ pub struct ETHClient<T: Transport> {
     pub chain_id: u8,
     pub gas_price_factor: usize,
     pub web3: Web3<T>,
+}
+
+impl<T: Transport> fmt::Debug for ETHClient<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // We do not want to have a private key in the debug representation.
+
+        f.debug_struct("ETHClient")
+            .field("sender_account", &self.sender_account)
+            .field("contract_addr", &self.contract_addr)
+            .field("chain_id", &self.chain_id)
+            .field("gas_price_factor", &self.gas_price_factor)
+            .finish()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

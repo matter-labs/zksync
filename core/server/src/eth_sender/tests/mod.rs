@@ -11,6 +11,9 @@ use super::{
     ETHSender, TxCheckMode,
 };
 
+const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
+const WAIT_CONFIRMATIONS: u64 = 1;
+
 mod mock;
 mod test_data;
 
@@ -46,13 +49,10 @@ fn scale_gas() {
 fn deadline_block() {
     let (eth_sender, _, _) = default_eth_sender();
 
-    assert_eq!(
-        eth_sender.get_deadline_block(0),
-        super::EXPECTED_WAIT_TIME_BLOCKS
-    );
+    assert_eq!(eth_sender.get_deadline_block(0), EXPECTED_WAIT_TIME_BLOCKS);
     assert_eq!(
         eth_sender.get_deadline_block(10),
-        10 + super::EXPECTED_WAIT_TIME_BLOCKS
+        10 + EXPECTED_WAIT_TIME_BLOCKS
     );
 }
 
@@ -82,7 +82,7 @@ fn transaction_state() {
 
     // Committed operation.
     let committed_response = ExecutedTxStatus {
-        confirmations: super::WAIT_CONFIRMATIONS,
+        confirmations: WAIT_CONFIRMATIONS,
         success: true,
         receipt: None,
     };
@@ -92,7 +92,7 @@ fn transaction_state() {
 
     // Pending operation.
     let pending_response = ExecutedTxStatus {
-        confirmations: super::WAIT_CONFIRMATIONS - 1,
+        confirmations: WAIT_CONFIRMATIONS - 1,
         success: true,
         receipt: None,
     };
@@ -102,7 +102,7 @@ fn transaction_state() {
 
     // Failed operation.
     let failed_response = ExecutedTxStatus {
-        confirmations: super::WAIT_CONFIRMATIONS,
+        confirmations: WAIT_CONFIRMATIONS,
         success: false,
         receipt: Some(Default::default()),
     };
@@ -158,7 +158,7 @@ fn transaction_state() {
                 TxCheckMode::Latest,
                 &operations[3],
                 &operations[3].used_tx_hashes[0],
-                current_block + super::EXPECTED_WAIT_TIME_BLOCKS
+                current_block + EXPECTED_WAIT_TIME_BLOCKS
             )
             .unwrap(),
         TxCheckOutcome::Stuck
@@ -171,7 +171,7 @@ fn transaction_state() {
                 TxCheckMode::Latest,
                 &operations[4],
                 &operations[4].used_tx_hashes[0],
-                current_block + super::EXPECTED_WAIT_TIME_BLOCKS - 1
+                current_block + EXPECTED_WAIT_TIME_BLOCKS - 1
             )
             .unwrap(),
         TxCheckOutcome::Pending
@@ -184,7 +184,7 @@ fn transaction_state() {
                 TxCheckMode::Old,
                 &operations[4],
                 &operations[4].used_tx_hashes[0],
-                current_block + super::EXPECTED_WAIT_TIME_BLOCKS - 1
+                current_block + EXPECTED_WAIT_TIME_BLOCKS - 1
             )
             .unwrap(),
         TxCheckOutcome::Stuck
@@ -242,7 +242,7 @@ fn operation_commitment_workflow() {
         // operation again.
         eth_sender
             .ethereum
-            .add_successfull_execution(expected_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
+            .add_successfull_execution(expected_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS);
         eth_sender.proceed_next_operations();
 
         // Check that operation is confirmed.
@@ -268,7 +268,7 @@ fn operation_commitment_workflow() {
     // Mark `completeWithdrawals` as completed.
     eth_sender
         .ethereum
-        .add_successfull_execution(withdraw_op_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
+        .add_successfull_execution(withdraw_op_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS);
     eth_sender.proceed_next_operations();
 
     // Check that `completeWithdrawals` is completed in the DB.
@@ -305,7 +305,7 @@ fn stuck_transaction() {
     let mut stuck_tx = create_signed_tx(eth_op_id, &eth_sender, &operation, deadline_block, nonce);
 
     // Skip some blocks and expect sender to send a new tx.
-    eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
+    eth_sender.ethereum.block_number += EXPECTED_WAIT_TIME_BLOCKS;
     eth_sender.proceed_next_operations();
 
     // Check that new transaction is sent (and created based on the previous stuck tx).
@@ -322,7 +322,7 @@ fn stuck_transaction() {
     // operation again.
     eth_sender
         .ethereum
-        .add_successfull_execution(stuck_tx.used_tx_hashes[1], super::WAIT_CONFIRMATIONS);
+        .add_successfull_execution(stuck_tx.used_tx_hashes[1], WAIT_CONFIRMATIONS);
     eth_sender.proceed_next_operations();
 
     // Check that operation is confirmed (we set the final hash to the second sent tx).
@@ -360,7 +360,7 @@ fn operations_order() {
         commit_operations.iter().zip(verify_operations).enumerate()
     {
         // Create the commit operation.
-        let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3) as u64;
+        let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3) as u64;
         let deadline_block = eth_sender.get_deadline_block(start_block);
         let eth_op_idx = (idx * 3) as i64;
         let nonce = eth_op_idx;
@@ -376,7 +376,7 @@ fn operations_order() {
         expected_txs.push(commit_op_tx);
 
         // Create the verify operation, as by priority it will be processed right after `commit`.
-        let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3 + 1) as u64;
+        let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3 + 1) as u64;
         let deadline_block = eth_sender.get_deadline_block(start_block);
         let eth_op_idx = (idx * 3 + 1) as i64;
         let nonce = eth_op_idx;
@@ -392,7 +392,7 @@ fn operations_order() {
         expected_txs.push(verify_op_tx);
 
         // Create the withdraw operation.
-        let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3 + 2) as u64;
+        let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3 + 2) as u64;
         let deadline_block = eth_sender.get_deadline_block(start_block);
         let eth_op_idx = (idx * 3 + 2) as i64;
         let nonce = eth_op_idx;
@@ -421,7 +421,7 @@ fn operations_order() {
         // Mark the tx as successfully
         eth_sender
             .ethereum
-            .add_successfull_execution(current_tx_hash, super::WAIT_CONFIRMATIONS);
+            .add_successfull_execution(current_tx_hash, WAIT_CONFIRMATIONS);
         eth_sender.proceed_next_operations();
 
         // Update the fields in the tx and check if it's confirmed.
@@ -456,7 +456,7 @@ fn transaction_failure() {
 
     eth_sender
         .ethereum
-        .add_failed_execution(&failing_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
+        .add_failed_execution(&failing_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS);
     eth_sender.proceed_next_operations();
 }
 
@@ -512,7 +512,7 @@ fn restore_state() {
 
         eth_sender
             .ethereum
-            .add_successfull_execution(expected_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
+            .add_successfull_execution(expected_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS);
         eth_sender.proceed_next_operations();
 
         expected_tx.confirmed = true;
@@ -544,7 +544,7 @@ fn confirmations_independence() {
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
     let mut stuck_tx = create_signed_tx(eth_op_id, &eth_sender, &operation, deadline_block, nonce);
 
-    eth_sender.ethereum.block_number += super::EXPECTED_WAIT_TIME_BLOCKS;
+    eth_sender.ethereum.block_number += EXPECTED_WAIT_TIME_BLOCKS;
     eth_sender.proceed_next_operations();
 
     let next_tx = eth_sender
@@ -559,7 +559,7 @@ fn confirmations_independence() {
     // Add a confirmation for a *stuck* transaction.
     eth_sender
         .ethereum
-        .add_successfull_execution(stuck_tx.used_tx_hashes[0], super::WAIT_CONFIRMATIONS);
+        .add_successfull_execution(stuck_tx.used_tx_hashes[0], WAIT_CONFIRMATIONS);
     eth_sender.proceed_next_operations();
 
     // Check that operation is confirmed (we set the final hash to the *first* sent tx).
@@ -572,7 +572,7 @@ fn confirmations_independence() {
 /// to use 3 transactions in flight, and checks that they are being sent concurrently.
 #[test]
 fn concurrent_operations_order() {
-    const MAX_TXS_IN_FLIGHT: usize = 3;
+    const MAX_TXS_IN_FLIGHT: u64 = 3;
     let (mut eth_sender, mut sender, mut receiver) = concurrent_eth_sender(MAX_TXS_IN_FLIGHT);
 
     // We send multiple the operations at once to the channel.
@@ -595,7 +595,7 @@ fn concurrent_operations_order() {
         // thus the deadline block is the same for them.
         // However, withdraw operation will be sent after these txs are confirmed,
         // so it will have a different deadline block,
-        let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3) as u64;
+        let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3) as u64;
         let deadline_block = eth_sender.get_deadline_block(start_block);
 
         // Create the commit operation.
@@ -627,7 +627,7 @@ fn concurrent_operations_order() {
         expected_txs.push(verify_op_tx);
 
         // Create the withdraw operation.
-        let start_block = 1 + super::WAIT_CONFIRMATIONS * (idx * 3 + 2) as u64;
+        let start_block = 1 + WAIT_CONFIRMATIONS * (idx * 3 + 2) as u64;
         let deadline_block = eth_sender.get_deadline_block(start_block);
         let eth_op_idx = (idx * 3 + 2) as i64;
         let nonce = eth_op_idx;
@@ -643,7 +643,7 @@ fn concurrent_operations_order() {
 
     // Then we go through the operations and check that the order of operations is preserved.
     // Here we take N txs at each interaction.
-    for txs in expected_txs.chunks(MAX_TXS_IN_FLIGHT) {
+    for txs in expected_txs.chunks(MAX_TXS_IN_FLIGHT as usize) {
         // We send operations by two, so the order will be "commit-verify-withdraw".
         // If we'll send all the operations together, the order will be "commit-verify-commit-verify-withdraw",
         // since withdraw is only sent after verify operation is confirmed.
@@ -670,7 +670,7 @@ fn concurrent_operations_order() {
             // Mark the tx as successfully
             eth_sender
                 .ethereum
-                .add_successfull_execution(current_tx_hash, super::WAIT_CONFIRMATIONS);
+                .add_successfull_execution(current_tx_hash, WAIT_CONFIRMATIONS);
         }
 
         // Call `proceed_next_operations` again. Both txs should become confirmed.
@@ -697,7 +697,7 @@ fn concurrent_operations_order() {
         // Mark the tx as successfully
         eth_sender
             .ethereum
-            .add_successfull_execution(withdraw_tx_hash, super::WAIT_CONFIRMATIONS);
+            .add_successfull_execution(withdraw_tx_hash, WAIT_CONFIRMATIONS);
 
         // Call `proceed_next_operations` again. Withdraw tx should become confirmed.
         eth_sender.proceed_next_operations();

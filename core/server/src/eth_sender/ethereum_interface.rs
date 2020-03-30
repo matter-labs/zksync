@@ -54,6 +54,7 @@ pub(super) trait EthereumInterface {
 
 /// Wrapper over `ETHClient` using `Http` transport.
 /// Supposed to be an actual Ethereum intermediator for the `ETHSender`.
+#[derive(Debug)]
 pub struct EthereumHttpClient {
     eth_client: ETHClient<Http>,
     // We have to prevent handle from drop, since it will cause event loop termination.

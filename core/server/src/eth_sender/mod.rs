@@ -5,8 +5,6 @@
 
 // Built-in deps
 use std::collections::VecDeque;
-use std::str::FromStr;
-use std::time::Duration;
 // External uses
 use futures::channel::mpsc;
 use tokio::runtime::Runtime;
@@ -16,7 +14,7 @@ use web3::types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
-    config_options::{ConfigurationOptions, ThreadPanicNotify},
+    config_options::{ConfigurationOptions, EthSenderOptions, ThreadPanicNotify},
     ethereum::{ETHOperation, OperationType},
     node::config,
     Action, Operation,
@@ -37,10 +35,6 @@ mod tx_queue;
 
 #[cfg(test)]
 mod tests;
-
-const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
-const TX_POLL_PERIOD: Duration = Duration::from_secs(5);
-const WAIT_CONFIRMATIONS: u64 = 1;
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
 /// The latest sent transaction can be pending (we're still waiting for it),
@@ -120,11 +114,13 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     op_notify: mpsc::Sender<Operation>,
     /// Queue for ordered transaction processing.
     tx_queue: TxQueue,
+    /// Settings for the `ETHSender`.
+    options: EthSenderOptions,
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     pub fn new(
-        max_txs_in_flight: usize,
+        options: EthSenderOptions,
         db: DB,
         ethereum: ETH,
         rx_for_eth: mpsc::Receiver<Operation>,
@@ -136,7 +132,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .load_stats()
             .expect("Failed loading ETH operations stats");
 
-        let tx_queue = TxQueueBuilder::new(max_txs_in_flight)
+        let tx_queue = TxQueueBuilder::new(options.max_txs_in_flight as usize)
             .with_sent_pending_txs(ongoing_ops.len())
             .with_commit_operations_count(stats.commit_ops)
             .with_verify_operations_count(stats.verify_ops)
@@ -150,6 +146,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             rx_for_eth,
             op_notify,
             tx_queue,
+            options,
         };
 
         // Add all the unprocessed operations to the queue.
@@ -168,7 +165,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
-        let mut timer = time::interval(TX_POLL_PERIOD);
+        let mut timer = time::interval(self.options.tx_poll_period);
 
         loop {
             // Update the incoming operations.
@@ -426,7 +423,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Helper method encapsulating the logic of determining the next deadline block.
     fn get_deadline_block(&self, current_block: u64) -> u64 {
-        current_block + EXPECTED_WAIT_TIME_BLOCKS
+        current_block + self.options.expected_wait_time_block
     }
 
     /// Looks up for a transaction state on the Ethereum chain
@@ -444,7 +441,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             // Successful execution.
             Some(status) if status.success => {
                 // Check if transaction has enough confirmations.
-                if status.confirmations >= WAIT_CONFIRMATIONS {
+                if status.confirmations >= self.options.wait_confirmations {
                     TxCheckOutcome::Committed
                 } else {
                     TxCheckOutcome::Pending
@@ -625,11 +622,6 @@ pub fn start_eth_sender(
     send_requst_receiver: mpsc::Receiver<Operation>,
     config_options: ConfigurationOptions,
 ) {
-    let max_txs_in_flight =
-        std::env::var("ETH_MAX_TXS_IN_FLIGHT").expect("ETH_MAX_TXS_IN_FLIGHT env variable missing");
-    let max_txs_in_flight = usize::from_str(&max_txs_in_flight)
-        .expect("ETH_MAX_TXS_IN_FLIGHT env variable has invalid value");
-
     std::thread::Builder::new()
         .name("eth_sender".to_string())
         .spawn(move || {
@@ -640,9 +632,11 @@ pub fn start_eth_sender(
 
             let db = Database::new(pool);
 
+            let eth_sender_options = EthSenderOptions::from_env();
+
             let mut runtime = Runtime::new().expect("eth-sender-runtime");
             let eth_sender = ETHSender::new(
-                max_txs_in_flight,
+                eth_sender_options,
                 db,
                 ethereum,
                 send_requst_receiver,

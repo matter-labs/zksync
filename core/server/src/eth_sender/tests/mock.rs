@@ -10,6 +10,7 @@ use web3::types::{H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
+    config_options::EthSenderOptions,
     ethereum::{ETHOperation, EthOpId, InsertedOperationResponse, OperationType},
     Action, Operation,
 };
@@ -337,7 +338,7 @@ pub(super) fn default_eth_sender() -> (
 /// which supports multiple transactions in flight.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
 pub(super) fn concurrent_eth_sender(
-    max_txs_in_flight: usize,
+    max_txs_in_flight: u64,
 ) -> (
     ETHSender<MockEthereum, MockDatabase>,
     mpsc::Sender<Operation>,
@@ -356,14 +357,14 @@ pub(super) fn restored_eth_sender(
     mpsc::Sender<Operation>,
     mpsc::Receiver<Operation>,
 ) {
-    const MAX_TXS_IN_FLIGHT: usize = 1;
+    const MAX_TXS_IN_FLIGHT: u64 = 1;
 
     build_eth_sender(MAX_TXS_IN_FLIGHT, restore_state, stats)
 }
 
 /// Helper method for configurable creation of `ETHSender`.
 fn build_eth_sender(
-    max_txs_in_flight: usize,
+    max_txs_in_flight: u64,
     restore_state: impl IntoIterator<Item = ETHOperation>,
     stats: ETHStats,
 ) -> (
@@ -377,13 +378,14 @@ fn build_eth_sender(
     let (operation_sender, operation_receiver) = mpsc::channel(CHANNEL_CAPACITY);
     let (notify_sender, notify_receiver) = mpsc::channel(CHANNEL_CAPACITY);
 
-    let eth_sender = ETHSender::new(
+    let options = EthSenderOptions {
         max_txs_in_flight,
-        db,
-        ethereum,
-        operation_receiver,
-        notify_sender,
-    );
+        expected_wait_time_block: super::EXPECTED_WAIT_TIME_BLOCKS,
+        wait_confirmations: super::WAIT_CONFIRMATIONS,
+        tx_poll_period: Default::default(),
+    };
+
+    let eth_sender = ETHSender::new(options, db, ethereum, operation_receiver, notify_sender);
 
     (eth_sender, operation_sender, notify_receiver)
 }
