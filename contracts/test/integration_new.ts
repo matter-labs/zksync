@@ -54,7 +54,6 @@ describe("Integration test", async function () {
         //console.log("---\n");
         verifierDeployedContract = await deployer.deployVerifier();
         governanceDeployedContract = await deployer.deployGovernance();
-        priorityQueueDeployedContract = await deployer.deployPriorityQueue();
         franklinDeployedContract = await deployer.deployFranklin();
         await governanceDeployedContract.setValidator(wallet.address, true);
         erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);

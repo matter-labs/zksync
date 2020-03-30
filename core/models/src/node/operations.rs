@@ -90,7 +90,7 @@ impl NoopOp {
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
             bytes == [0, 0, 0, 0, 0, 0, 0, 0],
-            "Wrong pubdata for noop operation"
+            format!("Wrong pubdata for noop operation {:?}", bytes)
         );
         Ok(Self {})
     }

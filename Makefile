@@ -172,6 +172,10 @@ loadtest: confirm_action
 integration-testkit: build-contracts
 	cargo run --bin testkit --release
 	cargo run --bin exodus_test --release
+	cargo run --bin migration_test --release
+
+migration-test: build-contracts
+	cargo run --bin migration_test --release
 
 itest: # contracts simple integration tests
 	@bin/prepare-test-contracts.sh
