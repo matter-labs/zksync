@@ -22,6 +22,7 @@ pub struct OpSuccess {
     pub executed_op: FranklinOp,
 }
 
+#[derive(Debug, Clone)]
 pub struct PlasmaState {
     /// Accounts stored in a sparse Merkle tree
     balance_tree: AccountTree,

@@ -1,5 +1,7 @@
 // Pedersen hash implementation of the Hasher trait
 
+use std::fmt;
+
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use crate::franklin_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
@@ -11,6 +13,12 @@ use crate::primitives::BitIteratorLe;
 
 pub struct PedersenHasher<E: JubjubEngine> {
     params: &'static E::Params,
+}
+
+impl<E: JubjubEngine> fmt::Debug for PedersenHasher<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PedersenHasher").finish()
+    }
 }
 
 // We have to implement `Clone` manually, since deriving it will depend on
