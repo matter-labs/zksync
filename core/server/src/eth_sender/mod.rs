@@ -200,15 +200,18 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// 2. Sifts all the ongoing operations, filtering the completed ones and
     ///   managing the rest (e.g. by sending a supplement txs for stuck operations).
     fn proceed_next_operations(&mut self) {
+        // Queue for storing all the operations that were not finished at this iteration.
+        let mut new_ongoing_ops = VecDeque::new();
+
         while let Some(tx) = self.tx_queue.pop_front() {
             self.initialize_operation(tx).unwrap_or_else(|e| {
                 warn!("Error while trying to complete uncommitted op: {}", e);
+
+                // TODO: We should not forget about the tx here.
             });
         }
 
         // Commit the next operations (if any).
-        let mut new_ongoing_ops = VecDeque::new();
-
         while let Some(mut current_op) = self.ongoing_ops.pop_front() {
             // We perform a commitment step here. In case of error, we suppose that this is some
             // network issue which won't appear the next time, so we report the situation to the
@@ -289,14 +292,16 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         new_op.used_tx_hashes.push(signed_tx.hash);
         self.db.add_hash_entry(new_op.id, &signed_tx.hash)?;
 
+        // We should store the operation as `ongoing` **before** sending it as well,
+        // so if sending will fail, we won't forget about it.
+        self.ongoing_ops.push_back(new_op.clone());
+
         // After storing all the tx data in the database, we can finally send the tx.
         info!(
             "Sending new tx: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
             new_op.id, new_op.op_type, signed_tx.hash, self.zksync_operation_description(&new_op),
         );
         self.ethereum.send_tx(&signed_tx)?;
-
-        self.ongoing_ops.push_back(new_op);
 
         Ok(())
     }
