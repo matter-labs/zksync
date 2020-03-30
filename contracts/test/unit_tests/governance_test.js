@@ -1,16 +1,19 @@
 const { expect } = require("chai")
-const { deployContract } = require("ethereum-waffle");
-const { wallet, deployTestContract, getCallRevertReason } = require("./common")
+const { wallet, deployProxyContract, getCallRevertReason } = require("./common")
 
-
-describe("Governance unit test", function () {
+describe("Governance unit tests", function () {
     this.timeout(50000);
 
     let testContract
     before(async () => {
-        testContract = await deployContract(wallet, require('../../build/GovernanceTest'), [wallet.address], {
-            gasLimit: 6000000,
-        });
+        let governanceAddressDeployed;
+        [testContract, governanceAddressDeployed] = await deployProxyContract(
+            wallet,
+            require('../../build/Proxy'),
+            require('../../build/GovernanceTest'),
+            ["address"],
+            [wallet.address],
+        );
     });
 
     it("checking correctness of using MAX_AMOUNT_OF_REGISTERED_TOKENS constant", async () => {
@@ -21,7 +24,7 @@ describe("Governance unit test", function () {
                 expect(revertReason).equal("VM did not revert")
             }
             else{
-                expect(revertReason).equal("gan12")
+                expect(revertReason).not.equal("VM did not revert")
             }
         }
     });

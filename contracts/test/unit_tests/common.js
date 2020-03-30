@@ -4,6 +4,7 @@ const { createMockProvider, getWallets, solidity, deployContract } = require("et
 const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
 
 const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20");
+const abi = require('ethereumjs-abi')
 
 // For: geth
 
@@ -14,7 +15,7 @@ const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20")
 // For: ganache
 
 const provider = createMockProvider() //{gasLimit: 7000000, gasPrice: 2000000000});
-const [wallet, exitWallet]  = getWallets(provider);
+const [wallet, wallet1, wallet2, exitWallet]  = getWallets(provider);
 
 use(solidity);
 
@@ -25,6 +26,29 @@ async function deployTestContract(file) {
         })
     } catch (err) {
         console.log('Error deploying', file, ': ', err)
+    }
+}
+
+async function deployProxyContract(
+    wallet,
+    proxyCode,
+    contractCode,
+    initArgs,
+    initArgsValues,
+) {
+    try {
+        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
+        const contract = await deployContract(wallet, contractCode, [], {
+            gasLimit: 3000000,
+        });
+        const proxy = await deployContract(wallet, proxyCode, [contract.address, initArgsInBytes], {
+            gasLimit: 3000000,
+        });
+
+        const returnContract = new ethers.Contract(proxy.address, contractCode.interface, wallet);
+        return [returnContract, contract.address];
+    } catch (err) {
+        console.log('Error deploying proxy contract: ', err)
     }
 }
 
@@ -42,8 +66,11 @@ async function getCallRevertReason(f) {
 module.exports = {
     provider,
     wallet,
+    wallet1,
+    wallet2,
     exitWallet,
     deployTestContract,
+    deployProxyContract,
     getCallRevertReason,
-    IERC20_INTERFACE
+    IERC20_INTERFACE,
 }

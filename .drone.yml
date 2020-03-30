@@ -179,6 +179,7 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - sleep 15
   - zksync integration-simple
   depends_on:
   - start-server-detached

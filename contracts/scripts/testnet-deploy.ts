@@ -1,6 +1,6 @@
 import {ethers} from "ethers";
 import {ArgumentParser} from "argparse";
-import { Deployer, addTestERC20Token, mintTestERC20Token } from "../src.ts/deploy";
+import {Deployer, addTestERC20Token, mintTestERC20Token} from "../src.ts/deploy";
 
 async function main() {
     const parser = new ArgumentParser({
@@ -33,22 +33,31 @@ async function main() {
 
     if (args.deploy) {
         let timer = Date.now();
-        const governance = await deployer.deployGovernance();
-        console.log(`GOVERNANCE_GENESIS_TX_HASH=${governance.deployTransaction.hash}`);
-        console.log(`GOVERNANCE_ADDR=${governance.address}`);
+        await deployer.deployGovernance();
+        console.log(`GOVERNANCE_TARGET_ADDR=${await deployer.getDeployedContract('GovernanceTarget').address}`);
+        console.log(`GOVERNANCE_GENESIS_TX_HASH=${await deployer.getDeployTransactionHash('Governance')}`);
+        console.log(`GOVERNANCE_ADDR=${await deployer.getDeployedProxyContract('Governance').address}`);
         console.log(`Governance contract deployed, time: ${(Date.now() - timer) / 1000} secs`);
 
         timer = Date.now();
-        const verifier = await deployer.deployVerifier();
-        console.log(`VERIFIER_ADDR=${verifier.address}`);
+        await deployer.deployVerifier();
+        console.log(`VERIFIER_TARGET_ADDR=${await deployer.getDeployedContract('VerifierTarget').address}`);
+        console.log(`VERIFIER_ADDR=${await deployer.getDeployedProxyContract('Verifier').address}`);
         console.log(`Verifier contract deployed, time: ${(Date.now() - timer) / 1000} secs`);
 
         timer = Date.now();
-        const mainContract = await deployer.deployFranklin();
-        console.log(`CONTRACT_GENESIS_TX_HASH=${mainContract.deployTransaction.hash}`);
-        console.log(`CONTRACT_ADDR=${mainContract.address}`);
+        await deployer.deployFranklin();
+        console.log(`CONTRACT_TARGET_ADDR=${await deployer.getDeployedContract('FranklinTarget').address}`);
+        console.log(`CONTRACT_GENESIS_TX_HASH=${await deployer.getDeployTransactionHash('Franklin')}`);
+        console.log(`CONTRACT_ADDR=${await deployer.getDeployedProxyContract('Franklin').address}`);
         console.log(`Main contract deployed, time: ${(Date.now() - timer) / 1000} secs`);
 
+        timer = Date.now();
+        await deployer.deployUpgradeGatekeeper();
+        console.log(`UPGRADE_GATEKEEPER_ADDR=${await deployer.getDeployedContract('UpgradeGatekeeper').address}`);
+        console.log(`Upgrade gatekeeper deployed, time: ${(Date.now() - timer) / 1000} secs`);
+
+        const governance = await deployer.getDeployedProxyContract('Governance');
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
 
         const erc20 = await addTestERC20Token(wallet, governance);
@@ -60,15 +69,23 @@ async function main() {
         try {
             if (process.env.ETH_NETWORK === 'localhost') {
                 await Promise.all([
+                    deployer.postContractToTesseracts("GovernanceTarget"),
+                    deployer.postContractToTesseracts("VerifierTarget"),
+                    deployer.postContractToTesseracts("FranklinTarget"),
                     deployer.postContractToTesseracts("Governance"),
                     deployer.postContractToTesseracts("Verifier"),
                     deployer.postContractToTesseracts("Franklin"),
+                    deployer.postContractToTesseracts("UpgradeGatekeeper"),
                 ]);
             } else {
                 // sequentially, since etherscan has request limit
+                await deployer.publishSourceCodeToEtherscan("GovernanceTarget");
+                await deployer.publishSourceCodeToEtherscan("VerifierTarget");
+                await deployer.publishSourceCodeToEtherscan("FranklinTarget");
                 await deployer.publishSourceCodeToEtherscan("Governance");
                 await deployer.publishSourceCodeToEtherscan("Verifier");
                 await deployer.publishSourceCodeToEtherscan("Franklin");
+                await deployer.publishSourceCodeToEtherscan("UpgradeGatekeeper");
             }
         } catch (e) {
             console.error("Failed to post contract code: ", e.toString());
