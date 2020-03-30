@@ -18,9 +18,9 @@ pub struct LeaderElectionSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> LeaderElectionSchema<'a> {
     // Sets `name` as leader for next `election_timeout` if leader position is not occupied by someone else.
-    pub fn vote_for_leader(&self, name: &str, election_timeout: time::Duration) -> QueryResult<()> {
+    pub fn vote_for_leader(&self, name: &str, election_timeout: time::Duration) -> QueryResult<bool> {
         let name = name.to_owned();
-        self.0.conn().transaction::<_, DieselError, _>(move || {
+        self.0.conn().transaction::<bool, DieselError, _>(move || {
             let last_election = self.last_election()?;
             let now = Utc::now();
             let new_election = records::LeaderElection{
@@ -32,20 +32,21 @@ impl<'a> LeaderElectionSchema<'a> {
                 let since_last_election = time::Duration::from_millis((now.timestamp_millis() - last_election.voted_at.timestamp_millis()) as u64);
                 let last_election_timed_out = since_last_election > election_timeout;
                 if last_election.name == new_election.name || last_election_timed_out {
-                    return update(leader_election::table.filter(leader_election::id.eq(true)))
+                    update(leader_election::table.filter(leader_election::id.eq(true)))
                         .set((leader_election::voted_at.eq(new_election.voted_at), leader_election::name.eq(new_election.name)))
                         .execute(self.0.conn())
-                        .map(drop);
+                        .map(drop)?;
+                    return Ok(true)
                 }
-                Ok(())
+                return Ok(false);
             } else {
                 insert_into(leader_election::table)
                     .values(&new_election)
                     .execute(self.0.conn())
-                    .map(drop)
+                    .map(drop)?;
+                return Ok(true);
             }
-        })?;
-        Ok(())
+        })
     }
 
     // Returns last voted leader if any.
