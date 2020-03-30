@@ -5,9 +5,9 @@ use bigdecimal::BigDecimal;
 // Workspace imports
 use crypto_exports::franklin_crypto::bellman::pairing::ff::Field;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::operations::FranklinOp;
+use models::node::operations::{ChangePubKeyOp, FranklinOp};
 use models::node::priority_ops::PriorityOp;
-use models::node::{Deposit, DepositOp, Fr, TransferOp, WithdrawOp};
+use models::node::{CloseOp, Deposit, DepositOp, Fr, TransferOp, WithdrawOp};
 use testkit::zksync_account::ZksyncAccount;
 // Local imports
 use crate::tests::db_test;
@@ -106,6 +106,40 @@ fn get_account_transactions_history() {
         ExecutedOperations::Tx(Box::new(executed_withdraw_op))
     };
 
+    let executed_close_op = {
+        let close_op = FranklinOp::Close(Box::new(CloseOp {
+            tx: from_zksync_account.sign_close(None, false),
+            account_id: from_account_id,
+        }));
+
+        let executed_close_op = ExecutedTx {
+            tx: close_op.try_get_tx().unwrap(),
+            success: true,
+            op: Some(close_op),
+            fail_reason: None,
+            block_index: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_close_op))
+    };
+
+    let executed_change_pubkey_op = {
+        let change_pubkey_op = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
+            tx: from_zksync_account.create_change_pubkey_tx(None, false, false),
+            account_id: from_account_id,
+        }));
+
+        let executed_change_pubkey_op = ExecutedTx {
+            tx: change_pubkey_op.try_get_tx().unwrap(),
+            success: true,
+            op: Some(change_pubkey_op),
+            fail_reason: None,
+            block_index: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_change_pubkey_op))
+    };
+
     let block = Block {
         block_number: 1,
         new_root_hash: Fr::zero(),
@@ -114,6 +148,8 @@ fn get_account_transactions_history() {
             executed_deposit_op,
             executed_transfer_op,
             executed_withdraw_op,
+            executed_close_op,
+            executed_change_pubkey_op,
         ],
         processed_priority_ops: (0, 0), // Not important
     };
