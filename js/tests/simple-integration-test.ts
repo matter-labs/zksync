@@ -259,9 +259,9 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
             "m/44'/60'/0'/0/0"
         ).connect(ethersProvider);
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("0.02")})).wait();
+        await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("0.05")})).wait();
         const erc20contract = new Contract(ERC_20TOKEN, IERC20_INTERFACE, ethWallet);
-        await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.02"))).wait();
+        await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.05"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
