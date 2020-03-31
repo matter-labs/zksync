@@ -15,7 +15,7 @@ init:
 	@bin/init
 
 yarn:
-	@cd js/zksync-crypto && yarn build
+	@cd js/zksync-crypto
 	@cd js/zksync.js && yarn && yarn build
 	@cd js/client && yarn
 	@cd js/explorer && yarn
