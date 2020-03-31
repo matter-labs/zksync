@@ -4,7 +4,7 @@ use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion};
 use crypto_exports::rand::{thread_rng, Rng};
 use models::node::{
     account::{Account, PubKeyHash},
-    operations::TransferToNewOp,
+    operations::{TransferOp, TransferToNewOp},
     priv_key_from_fs,
     tx::{Transfer, TxSignature},
     AccountId, AccountMap, Address, BlockNumber, TokenId,
@@ -13,7 +13,7 @@ use models::node::{
 use plasma::state::PlasmaState;
 
 const ETH_TOKEN_ID: TokenId = 0x00;
-const ACCOUNTS_AMOUNT: AccountId = 1_000;
+const ACCOUNTS_AMOUNT: AccountId = 10;
 const CURRENT_BLOCK: BlockNumber = 1_000;
 
 fn generate_account() -> Account {
@@ -77,8 +77,44 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
     );
 }
 
+fn apply_transfer_op(b: &mut Bencher<'_>) {
+    let state = generate_state();
+
+    let from_account = state.get_account(0).expect("Can't get the account");
+    let to_account = state.get_account(1).expect("Can't get the account");
+
+    let transfer = Transfer {
+        from: from_account.address,
+        to: to_account.address,
+        token: ETH_TOKEN_ID,
+        amount: 10.into(),
+        fee: 1.into(),
+        nonce: 0,
+        signature: TxSignature::default(),
+    };
+
+    let transfer_op = TransferOp {
+        tx: transfer,
+        from: 0,
+        to: 1,
+    };
+
+    let setup = || (state.clone(), transfer_op.clone());
+
+    b.iter_batched(
+        setup,
+        |(mut state, transfer_op)| {
+            state
+                .apply_transfer_op(&black_box(transfer_op))
+                .expect("Failed transfer operation");
+        },
+        BatchSize::SmallInput,
+    );
+}
+
 pub fn bench_ops(c: &mut Criterion) {
     c.bench_function("apply_transfer_to_new_op bench", apply_transfer_to_new_op);
+    c.bench_function("apply_transfer_op bench", apply_transfer_op);
 }
 
 criterion_group!(ops_benches, bench_ops);
