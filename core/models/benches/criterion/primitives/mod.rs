@@ -113,6 +113,8 @@ pub fn bench_primitives(c: &mut Criterion) {
         bench_pack_bits_into_bytes_in_order,
     );
     group.bench_function("BitIterator::next", bench_bit_iterator_le_next);
+
+    group.finish();
 }
 
 criterion_group!(primitives_benches, bench_primitives);
