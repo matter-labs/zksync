@@ -1,5 +1,7 @@
+//! Benchmarks for the `PlasmaState` operations execution time.
+
 // External uses
-use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion};
+use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
 // Workspace uses
 use crypto_exports::rand::{thread_rng, Rng};
 use models::node::{
@@ -16,9 +18,12 @@ use models::node::{
 use plasma::state::PlasmaState;
 
 const ETH_TOKEN_ID: TokenId = 0x00;
+// The amount is not important, since we always work with 1 account.
+// We use some small non-zero value, so the overhead for cloning will not be big.
 const ACCOUNTS_AMOUNT: AccountId = 10;
 const CURRENT_BLOCK: BlockNumber = 1_000;
 
+/// Creates a random ZKSync account.
 fn generate_account() -> Account {
     let default_balance = 1_000_000.into();
 
@@ -46,6 +51,7 @@ fn generate_state() -> PlasmaState {
     PlasmaState::new(accounts, CURRENT_BLOCK)
 }
 
+/// Bench for `PlasmaState::apply_transfer_to_new_op`.
 fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
     let state = generate_state();
 
@@ -80,6 +86,7 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
     );
 }
 
+/// Bench for `PlasmaState::apply_transfer_op`.
 fn apply_transfer_op(b: &mut Bencher<'_>) {
     let state = generate_state();
 
@@ -115,6 +122,7 @@ fn apply_transfer_op(b: &mut Bencher<'_>) {
     );
 }
 
+/// Bench for `PlasmaState::apply_full_exit_op`.
 fn apply_full_exit_op(b: &mut Bencher<'_>) {
     let state = generate_state();
 
@@ -142,6 +150,7 @@ fn apply_full_exit_op(b: &mut Bencher<'_>) {
     );
 }
 
+/// Bench for `PlasmaState::apply_deposit_op`.
 fn apply_deposit_op(b: &mut Bencher<'_>) {
     let state = generate_state();
 
@@ -170,6 +179,7 @@ fn apply_deposit_op(b: &mut Bencher<'_>) {
     );
 }
 
+/// Bench for `PlasmaState::apply_withdraw_op`.
 fn apply_withdraw_op(b: &mut Bencher<'_>) {
     let state = generate_state();
 
@@ -201,6 +211,7 @@ fn apply_withdraw_op(b: &mut Bencher<'_>) {
     );
 }
 
+/// Bench for `PlasmaState::apply_close_op`.
 fn apply_close_op(b: &mut Bencher<'_>) {
     let mut state = generate_state();
 
@@ -232,6 +243,7 @@ fn apply_close_op(b: &mut Bencher<'_>) {
     );
 }
 
+/// Bench for `PlasmaState::apply_change_pubkey_op`.
 fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     let state = generate_state();
 
@@ -263,6 +275,10 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     );
 }
 
+/// Bench for `PlasmaState::insert_account`.
+///
+/// While this method is not directly performing an operation, it is used in every operation,
+/// and it seems to be the most expensive part of all the methods above.
 fn insert_account(b: &mut Bencher<'_>) {
     let state = generate_state();
 
@@ -279,20 +295,29 @@ fn insert_account(b: &mut Bencher<'_>) {
 }
 
 pub fn bench_ops(c: &mut Criterion) {
-    c.bench_function(
+    const INPUT_SIZE: Throughput = Throughput::Elements(1);
+
+    let mut group = c.benchmark_group("PlasmaState operations");
+
+    // Setup the input size so the throughput will be reported.
+    group.throughput(INPUT_SIZE);
+
+    group.bench_function(
         "PlasmaState::apply_transfer_to_new_op bench",
         apply_transfer_to_new_op,
     );
-    c.bench_function("PlasmaState::apply_transfer_op bench", apply_transfer_op);
-    c.bench_function("PlasmaState::apply_withdraw_op bench", apply_withdraw_op);
-    c.bench_function("PlasmaState::apply_apply_close_op bench", apply_close_op);
-    c.bench_function(
+    group.bench_function("PlasmaState::apply_transfer_op bench", apply_transfer_op);
+    group.bench_function("PlasmaState::apply_withdraw_op bench", apply_withdraw_op);
+    group.bench_function("PlasmaState::apply_apply_close_op bench", apply_close_op);
+    group.bench_function(
         "PlasmaState::apply_change_pubkey_op bench",
         apply_change_pubkey_op,
     );
-    c.bench_function("PlasmaState::apply_deposit_op bench", apply_deposit_op);
-    c.bench_function("PlasmaState::apply_full_exit_op bench", apply_full_exit_op);
-    c.bench_function("PlasmaState::insert_account bench", insert_account);
+    group.bench_function("PlasmaState::apply_deposit_op bench", apply_deposit_op);
+    group.bench_function("PlasmaState::apply_full_exit_op bench", apply_full_exit_op);
+    group.bench_function("PlasmaState::insert_account bench", insert_account);
+
+    group.finish();
 }
 
 criterion_group!(ops_benches, bench_ops);
