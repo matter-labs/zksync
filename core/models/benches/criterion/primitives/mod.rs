@@ -88,8 +88,8 @@ fn bench_bit_iterator_le_next(b: &mut Bencher<'_>) {
 
     b.iter_batched(
         setup,
-        |mut bit_iterator| {
-            while let Some(_) = bit_iterator.next() {
+        |bit_iterator| {
+            for _ in bit_iterator {
                 // Do nothing, we're just draining the iterator.
             }
         },
