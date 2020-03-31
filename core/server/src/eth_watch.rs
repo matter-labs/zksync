@@ -50,7 +50,7 @@ pub enum EthWatchRequest {
         address: Address,
         data: Vec<u8>,
         signature: EIP1271Signature,
-        resp: oneshot::Sender<bool>,
+        resp: oneshot::Sender<Result<bool, failure::Error>>,
     },
 }
 
@@ -408,8 +408,8 @@ impl<T: Transport> EthWatch<T> {
                 } => {
                     let signature_correct = self
                         .is_eip1271_signature_correct(address, data, signature)
-                        .await
-                        .unwrap_or(false);
+                        .await;
+
                     resp.send(signature_correct).unwrap_or_default();
                 }
             }

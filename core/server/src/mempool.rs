@@ -33,14 +33,22 @@ use web3::types::Address;
 pub enum TxAddError {
     #[fail(display = "Tx nonce is too low.")]
     NonceMismatch,
+
     #[fail(display = "Tx is incorrect")]
     IncorrectTx,
+
+    #[fail(display = "EIP1271 signature could not be verified")]
+    EIP1271SignatureVerificationFail,
+
     #[fail(display = "MissingEthSignature")]
     MissingEthSignature,
+
     #[fail(display = "Eth signature is incorrect")]
     IncorrectEthSignature,
+
     #[fail(display = "Change pubkey tx is not authorized onchain")]
     ChangePkNotAuthorized,
+
     #[fail(display = "Internal error")]
     Other,
 }
@@ -217,8 +225,15 @@ impl Mempool {
                         .await
                         .expect("ETH watch req receiver dropped");
 
-                    if !eth_watch_resp.1.await.expect("Err response from eth watch") {
-                        return Err(TxAddError::IncorrectEthSignature);
+                    let signature_correct = eth_watch_resp
+                        .1
+                        .await
+                        .expect("Failed receiving response from eth watch")
+                        .map_err(|e| warn!("Err in eth watch: {}", e))
+                        .or(Err(TxAddError::EIP1271SignatureVerificationFail))?;
+
+                    if !signature_correct {
+                        return Err(TxAddError::IncorrectTx);
                     }
                 }
             };
@@ -337,11 +352,13 @@ impl Mempool {
     }
 }
 
+#[derive(Debug)]
 struct TokenCache {
     db_pool: ConnectionPool,
     ids_to_symbols: HashMap<TokenId, String>,
 }
 
+// TODO: delete tokens from cache after timeout
 impl TokenCache {
     pub fn new(db_pool: ConnectionPool) -> Self {
         Self {
@@ -357,22 +374,23 @@ impl TokenCache {
         match self.ids_to_symbols.get(&token_id).cloned() {
             Some(token_symbol) => Ok(Some(token_symbol)),
             None => {
-                match self
+                let storage = self
                     .db_pool
                     .access_storage_fragile()
-                    .map_err(|e| format_err!("Failed to access storage: {}", e))?
+                    .map_err(|e| format_err!("Failed to access storage: {}", e))?;
+
+                let loaded_tokens = storage
                     .tokens_schema()
                     .load_tokens()
-                    .map_err(|e| format_err!("Tokens load failed: {}", e))?
-                    .get(&token_id)
-                    .cloned()
-                {
-                    Some(token_info) => Ok(Some(
-                        self.ids_to_symbols
-                            .entry(token_id)
-                            .or_insert(token_info.symbol)
-                            .clone(),
-                    )),
+                    .map_err(|e| format_err!("Tokens load failed: {}", e))?;
+
+                let symbol_from_db = loaded_tokens.get(&token_id).map(|t| t.symbol.clone());
+
+                match symbol_from_db {
+                    Some(symbol) => {
+                        self.ids_to_symbols.insert(token_id, symbol.clone());
+                        Ok(Some(symbol))
+                    }
                     None => Ok(None),
                 }
             }

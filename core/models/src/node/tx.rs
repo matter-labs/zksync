@@ -23,6 +23,7 @@ use ethsign::{SecretKey, Signature as ETHSignature};
 use failure::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
+use std::fmt;
 use std::str::FromStr;
 use web3::types::{Address, H256};
 
@@ -126,7 +127,10 @@ impl Transfer {
     /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
     pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
         format!(
-            "Transfer {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+            "Transfer {amount} {token}\n\
+            To: {to:?}\n\
+            Nonce: {nonce}\n\
+            Fee: {fee} {token}",
             amount = format_ether(&self.amount),
             token = token_symbol,
             to = self.to,
@@ -180,7 +184,10 @@ impl Withdraw {
     /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
     pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
         format!(
-            "Withdraw {amount} {token}\nTo: {to:?}\nNonce: {nonce}\nFee: {fee} {token}",
+            "Withdraw {amount} {token}\n\
+            To: {to:?}\n\
+            Nonce: {nonce}\n\
+            Fee: {fee} {token}",
             amount = format_ether(&self.amount),
             token = token_symbol,
             to = self.to,
@@ -580,6 +587,12 @@ pub enum TxEthSignature {
 
 #[derive(Debug, Clone)]
 pub struct EIP1271Signature(pub Vec<u8>);
+
+impl fmt::Display for EIP1271Signature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EIP1271Signature 0x{}", hex::encode(&self.0.as_slice()))
+    }
+}
 
 impl<'de> Deserialize<'de> for EIP1271Signature {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>

@@ -88,22 +88,26 @@ pub struct ContractAddressResp {
 enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
-    MissingEthSignature = 104,
-    IncorrectEthSignature = 105,
-    Other = 106,
-    ChangePkNotAuthorized = 107,
-    AccountCloseDisabled = 110,
+
+    MissingEthSignature = 200,
+    EIP1271SignatureVerificationFail = 201,
+    IncorrectEthSignature = 202,
+    ChangePkNotAuthorized = 203,
+
+    Other = 300,
+    AccountCloseDisabled = 301,
 }
 
 impl From<TxAddError> for RpcErrorCodes {
     fn from(error: TxAddError) -> Self {
         match error {
-            TxAddError::NonceMismatch => RpcErrorCodes::NonceMismatch,
-            TxAddError::IncorrectTx => RpcErrorCodes::IncorrectTx,
-            TxAddError::MissingEthSignature => RpcErrorCodes::MissingEthSignature,
-            TxAddError::IncorrectEthSignature => RpcErrorCodes::IncorrectEthSignature,
-            TxAddError::ChangePkNotAuthorized => RpcErrorCodes::ChangePkNotAuthorized,
-            TxAddError::Other => RpcErrorCodes::Other,
+            TxAddError::NonceMismatch => Self::NonceMismatch,
+            TxAddError::IncorrectTx => Self::IncorrectTx,
+            TxAddError::MissingEthSignature => Self::MissingEthSignature,
+            TxAddError::EIP1271SignatureVerificationFail => Self::EIP1271SignatureVerificationFail,
+            TxAddError::IncorrectEthSignature => Self::IncorrectEthSignature,
+            TxAddError::ChangePkNotAuthorized => Self::ChangePkNotAuthorized,
+            TxAddError::Other => Self::Other,
         }
     }
 }
