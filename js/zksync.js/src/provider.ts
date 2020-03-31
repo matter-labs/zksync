@@ -12,7 +12,8 @@ import {
     PriorityOperationReceipt,
     ContractAddress,
     Tokens,
-    TokenAddress
+    TokenAddress,
+    TxEthSignature
 } from "./types";
 import {
     isTokenETH,
@@ -69,7 +70,7 @@ export class Provider {
     }
 
     // return transaction hash (e.g. sync-tx:dead..beef)
-    async submitTx(tx: any, signature?: string): Promise<string> {
+    async submitTx(tx: any, signature?: TxEthSignature): Promise<string> {
         return await this.transport.request("tx_submit", [tx, signature]);
     }
 

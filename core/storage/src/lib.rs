@@ -157,6 +157,14 @@ impl StorageProcessor {
         tokens::TokensSchema(self)
     }
 
+    /// Performs several database operations within one database transaction.
+    pub fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
+    where
+        F: FnOnce() -> Result<T, failure::Error>,
+    {
+        self.conn().transaction(|| f())
+    }
+
     fn conn(&self) -> &RecoverableConnection<PgConnection> {
         match self.conn {
             ConnectionHolder::Pooled(ref conn) => conn,

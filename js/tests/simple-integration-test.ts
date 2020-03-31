@@ -10,6 +10,15 @@ import {parseEther} from "ethers/utils";
 import {IERC20_INTERFACE} from "zksync/build/utils";
 
 
+const WEB3_URL = process.env.WEB3_URL;
+// Mnemonic for eth wallet.
+const MNEMONIC = process.env.TEST_MNEMONIC;
+const ERC_20TOKEN = process.env.TEST_ERC20;
+
+const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
+console.log("Running integration test on the ", network, " network");
+const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
+
 let syncProvider: Provider;
 
 async function getOperatorBalance(token: types.TokenLike, type: "committed" | "verified" = "committed") {
@@ -172,6 +181,47 @@ async function testChangePubkeyOffchain(syncWallet: Wallet) {
     }
 }
 
+async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
+    let testPassed = true;
+
+    const ethWallet = ethers.Wallet.createRandom().connect(ethersProvider);
+    const syncWallet = await Wallet.fromEthSigner(
+        ethWallet,
+        syncProvider,
+    );
+
+    try {
+        const tx = await zksyncDepositorWallet.depositToSyncFromEthereum({
+            depositTo: syncWallet.address(),
+            token: "ETH",
+            amount: utils.parseEther('0.01'),
+            maxFeeInETHToken: utils.parseEther('0'),
+            approveDepositAmountForERC20: true,
+        });
+        await tx.awaitVerifyReceipt();
+        testPassed = false;
+    } catch (e) {
+        console.log(`Error (expected) on priorityop fail:${e}`.slice(0,50));
+    }
+    
+    try {
+        const tx = await syncWallet.syncTransfer({
+            to: zksyncDepositorWallet.address(),
+            token: "ETH",
+            amount: utils.parseEther('0.01'),
+            fee: utils.parseEther('10'),
+        });
+        await tx.awaitVerifyReceipt();
+        testPassed = false;
+    } catch (e) {
+        console.log('Error (expected) on sync tx fail:', e);
+    }
+
+    if (!testPassed) {
+        throw new Error("testThrowingErrorOnTxFail failed");
+    }
+}
+
 async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: Wallet, syncWallet1: Wallet, syncWallet2: Wallet, token: types.TokenLike, depositAmountETH: string) {
     const depositAmount = utils.parseEther(depositAmountETH);
 
@@ -200,17 +250,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
 (async () => {
     try {
-        const WEB3_URL = process.env.WEB3_URL;
-        // Mnemonic for eth wallet.
-        const MNEMONIC = process.env.TEST_MNEMONIC;
-        const ERC_20TOKEN = process.env.TEST_ERC20;
-
-        const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
-        console.log("Running integration test on the ", network, " network");
-
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
 
-        const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
         const ethWallet = ethers.Wallet.fromMnemonic(
@@ -218,9 +259,9 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
             "m/44'/60'/0'/0/0"
         ).connect(ethersProvider);
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("0.02")})).wait();
+        await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("0.05")})).wait();
         const erc20contract = new Contract(ERC_20TOKEN, IERC20_INTERFACE, ethWallet);
-        await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.02"))).wait();
+        await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.05"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -249,6 +290,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
             ethWallet3,
             syncProvider,
         );
+
+        await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC_20TOKEN, "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.018");

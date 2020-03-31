@@ -27,13 +27,13 @@ export function readableEther(wei) {
 }
 
 export function getDisplayableBalanceDict(dict) {
-    let res = Object.assign({}, dict);
-    for (let token of readablyPrintableTokens) {
-        if (res[token] != undefined) {
-            res[token] = readableEther(dict[token]);
-        }
-    }
-    return res;
+    return Object.assign({}, 
+        ...Object.entries(dict).map(
+            ([token, balance]) => ({
+                [token]: readableEther(balance),
+            })
+        )
+    );
 }
 
 export function getDisplayableBalanceList(list) {

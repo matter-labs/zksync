@@ -236,12 +236,18 @@ export default {
 
                     const To = `<code>
                         <a href="${link_to}" ${target_to}>
-                            ${shortenHash(tx.data.to, 'unknown! to')}
+                            ${
+                                tx.data.type == "ChangePubKey" 
+                                    ? ''
+                                    : shortenHash(tx.data.to, 'unknown! to')
+                            }
                         </a>
                     </code>`;
 
                     const Type = `<b>${tx.data.type}</b>`;
-                    const Amount = `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
+                    const Amount 
+                        = tx.data.type == "ChangePubKey" ? ''
+                        : `<b>${tx.data.token}</b> <span>${tx.data.amount}</span>`;
 
                     return {
                         Type,
