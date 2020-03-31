@@ -263,6 +263,21 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     );
 }
 
+fn insert_account(b: &mut Bencher<'_>) {
+    let state = generate_state();
+
+    let to_insert = generate_account();
+    let setup = || (state.clone(), to_insert.clone());
+
+    b.iter_batched(
+        setup,
+        |(mut state, to_insert)| {
+            state.insert_account(black_box(ACCOUNTS_AMOUNT), to_insert);
+        },
+        BatchSize::SmallInput,
+    );
+}
+
 pub fn bench_ops(c: &mut Criterion) {
     c.bench_function(
         "PlasmaState::apply_transfer_to_new_op bench",
@@ -277,6 +292,7 @@ pub fn bench_ops(c: &mut Criterion) {
     );
     c.bench_function("PlasmaState::apply_deposit_op bench", apply_deposit_op);
     c.bench_function("PlasmaState::apply_full_exit_op bench", apply_full_exit_op);
+    c.bench_function("PlasmaState::insert_account bench", insert_account);
 }
 
 criterion_group!(ops_benches, bench_ops);
