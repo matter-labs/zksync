@@ -1,4 +1,5 @@
 use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField};
+use crate::franklin_crypto::bellman::pairing::{Engine};
 use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 
 use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
@@ -133,7 +134,8 @@ where
         s: sigs_converted,
     })
 }
-pub fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
+
+pub fn multi_and<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     x: &[Boolean],
 ) -> Result<Boolean, SynthesisError> {
@@ -150,7 +152,7 @@ pub fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(result)
 }
 
-pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
+pub fn allocate_sum<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     a: &AllocatedNum<E>,
     b: &AllocatedNum<E>,
@@ -170,7 +172,7 @@ pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(sum)
 }
 
-pub fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
+pub fn pack_bits_to_element<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     bits: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError> {
@@ -201,7 +203,7 @@ pub fn count_number_of_ones<E, CS>(
     a: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError>
 where
-    E: JubjubEngine,
+    E: Engine,
     CS: ConstraintSystem<E>,
 {
     let mut counter = Num::zero();
@@ -228,7 +230,7 @@ pub fn allocate_numbers_vec<E, CS>(
     audit_path: &[Option<E::Fr>],
 ) -> Result<Vec<AllocatedNum<E>>, SynthesisError>
 where
-    E: JubjubEngine,
+    E: Engine,
     CS: ConstraintSystem<E>,
 {
     let mut allocated = vec![];
@@ -248,7 +250,7 @@ pub fn allocate_bits_vector<E, CS>(
     bits: &[Option<bool>],
 ) -> Result<Vec<Boolean>, SynthesisError>
 where
-    E: JubjubEngine,
+    E: Engine,
     CS: ConstraintSystem<E>,
 {
     let mut allocated = vec![];

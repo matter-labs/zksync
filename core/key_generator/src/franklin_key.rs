@@ -84,7 +84,8 @@ pub fn make_exodus_key() {
 
 fn estimate_power_of_two(block_size: usize) -> u32 {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
-    let params = &params::JUBJUB_PARAMS;
+    let jubjub_params = &params::JUBJUB_PARAMS;
+    let rescue_params = &params::RESCUE_PARAMS;
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
     let empty_operation = Operation {
@@ -141,7 +142,8 @@ fn estimate_power_of_two(block_size: usize) -> u32 {
     };
 
     let instance_for_generation: FranklinCircuit<'_, Bn256> = FranklinCircuit {
-        params,
+        rescue_params,
+        jubjub_params,
         operation_batch_size: block_size,
         old_root: None,
         new_root: None,
@@ -184,7 +186,8 @@ fn estimate_power_of_two(block_size: usize) -> u32 {
 
 pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
-    let params = &params::JUBJUB_PARAMS;
+    let jubjub_params = &params::JUBJUB_PARAMS;
+    let rescue_params = &params::RESCUE_PARAMS;
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
     let empty_operation = Operation {
@@ -241,7 +244,8 @@ pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
     };
 
     let instance_for_generation: FranklinCircuit<'_, Bn256> = FranklinCircuit {
-        params,
+        rescue_params,
+        jubjub_params,
         operation_batch_size: block_size,
         old_root: None,
         new_root: None,
@@ -409,7 +413,8 @@ pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
 
 pub fn make_circuit_parameters_plonk(block_size: usize) {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
-    let params = &params::JUBJUB_PARAMS;
+    let jubjub_params = &params::JUBJUB_PARAMS;
+    let rescue_params = &params::RESCUE_PARAMS;
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
 
     let empty_operation = Operation {
@@ -466,7 +471,8 @@ pub fn make_circuit_parameters_plonk(block_size: usize) {
     };
 
     let instance_for_generation: FranklinCircuit<'_, Bn256> = FranklinCircuit {
-        params,
+        rescue_params,
+        jubjub_params,
         operation_batch_size: block_size,
         old_root: None,
         new_root: None,
@@ -637,11 +643,12 @@ fn run_make_circuit_parameters() {
 
 pub fn make_exit_circuit_parameters() -> Parameters<Bn256> {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
-    let params = &params::JUBJUB_PARAMS;
+    let jubjub_params = &params::JUBJUB_PARAMS;
+    let rescue_params = &params::RESCUE_PARAMS;
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let rng = &mut OsRng::new().unwrap();
     let exit_circuit_instance = ZksyncExitCircuit::<'_, Bn256> {
-        params,
+        params: rescue_params,
         pub_data_commitment: None,
         root_hash: None,
         account_audit_data: OperationBranch {

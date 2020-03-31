@@ -42,6 +42,7 @@ pub struct AllocatedSignerPubkey<E: JubjubEngine> {
     pub r_y_bits: Vec<Boolean>,
     pub r_x_bit: Boolean,
 }
+
 pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     packed_key: &[Option<bool>],
@@ -153,7 +154,7 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
     assert_eq!(
         serialized_tx_bits.len(),
-        franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS
+        franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS
     );
 
     // signature msg is the hash of serialized transaction
@@ -216,10 +217,10 @@ pub fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSyst
     mut serialized_tx_bits: Vec<Boolean>,
     op_data: &AllocatedOperationData<E>,
 ) -> Result<Boolean, SynthesisError> {
-    assert!(serialized_tx_bits.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(serialized_tx_bits.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
 
     serialized_tx_bits.resize(
-        franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS,
+        franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS,
         Boolean::constant(false),
     );
     let (first_sig_part_bits, remaining) = serialized_tx_bits.split_at(E::Fr::CAPACITY as usize);

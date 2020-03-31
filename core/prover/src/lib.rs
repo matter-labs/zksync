@@ -17,9 +17,10 @@ use crypto_exports::rand;
 use models::node::Engine;
 use models::prover_utils::{get_block_proof_key_and_vk_path, read_circuit_proving_parameters};
 
-pub struct BabyProver<C: ApiClient> {
+pub struct BabyProver<'a, C: ApiClient> {
     circuit_params: groth16::Parameters<Engine>,
-    jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
+    rescue_params: &'a franklin_crypto::rescue::bn256::Bn256RescueParams,
+    jubjub_params: &'a franklin_crypto::alt_babyjubjub::AltJubjubBn256,
     block_size: usize,
     api_client: C,
     heartbeat_interval: time::Duration,
@@ -56,7 +57,7 @@ impl fmt::Display for BabyProverError {
 }
 
 pub fn start<C: 'static + Sync + Send + ApiClient>(
-    prover: BabyProver<C>,
+    prover: BabyProver<'static, C>,
     exit_err_tx: mpsc::Sender<BabyProverError>,
 ) {
     let (tx_block_start, rx_block_start) = mpsc::channel();
@@ -77,10 +78,11 @@ pub fn start<C: 'static + Sync + Send + ApiClient>(
         .expect("failed to join on running rounds thread");
 }
 
-impl<C: ApiClient> BabyProver<C> {
+impl<'a, C: ApiClient> BabyProver<'a, C> {
     pub fn new(
         circuit_params: groth16::Parameters<Engine>,
-        jubjub_params: franklin_crypto::alt_babyjubjub::AltJubjubBn256,
+        rescue_params: &'a franklin_crypto::rescue::bn256::Bn256RescueParams,
+        jubjub_params: &'a franklin_crypto::alt_babyjubjub::AltJubjubBn256,
         block_size: usize,
         api_client: C,
         heartbeat_interval: time::Duration,
@@ -88,6 +90,7 @@ impl<C: ApiClient> BabyProver<C> {
     ) -> Self {
         BabyProver {
             circuit_params,
+            rescue_params,
             jubjub_params,
             block_size,
             api_client,
@@ -156,7 +159,8 @@ impl<C: ApiClient> BabyProver<C> {
         info!("starting to compute proof for block {}", block);
 
         let instance = circuit::circuit::FranklinCircuit {
-            params: &self.jubjub_params,
+            rescue_params: self.rescue_params,
+            jubjub_params: self.jubjub_params,
             operation_batch_size: self.block_size,
             old_root: Some(prover_data.old_root),
             new_root: Some(prover_data.new_root),

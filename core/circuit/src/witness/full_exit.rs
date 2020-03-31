@@ -3,6 +3,7 @@ use super::utils::*;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::RescueEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
 use models::circuit::account::CircuitAccountTree;
@@ -16,7 +17,8 @@ pub struct FullExitData {
     pub account_address: u32,
     pub eth_address: Fr,
 }
-pub struct FullExitWitness<E: JubjubEngine> {
+
+pub struct FullExitWitness<E: RescueEngine> {
     pub before: OperationBranch<E>,
     pub after: OperationBranch<E>,
     pub args: OperationArguments<E>,
@@ -24,7 +26,8 @@ pub struct FullExitWitness<E: JubjubEngine> {
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
-impl<E: JubjubEngine> FullExitWitness<E> {
+
+impl<E: RescueEngine> FullExitWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(

@@ -146,7 +146,8 @@ impl WitnessBuilder {
     pub fn into_circuit_instance(self) -> FranklinCircuit<'static, Engine> {
         let operation_batch_size = self.operations.len();
         FranklinCircuit {
-            params: &models::params::JUBJUB_PARAMS,
+            rescue_params: &models::params::RESCUE_PARAMS,
+            jubjub_params: &models::params::JUBJUB_PARAMS,
             operation_batch_size,
             old_root: Some(self.initial_root_hash),
             new_root: Some(self.root_after_fees.expect("root after fee not present")),
@@ -181,9 +182,9 @@ pub fn generate_dummy_sig_data(
     let sender_pk = PublicKey::from_private(&private_key, p_g, &params);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
@@ -213,9 +214,9 @@ pub fn generate_sig_witness(
     _params: &AltJubjubBn256,
 ) -> (Fr, Fr, Fr) {
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
@@ -232,9 +233,9 @@ pub fn generate_sig_data(
 ) -> (SignatureData, Fr, Fr, Fr) {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() <= franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(sig_bits_to_hash.len() <= franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
     debug!(
         "inside generation after resize: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits_to_hash))

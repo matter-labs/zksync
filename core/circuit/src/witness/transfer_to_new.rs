@@ -3,6 +3,7 @@ use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::circuit::float_point::convert_to_float;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::RescueEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
 use models::circuit::account::CircuitAccountTree;
@@ -20,7 +21,8 @@ pub struct TransferToNewData {
     pub to_account_address: u32,
     pub new_address: Fr,
 }
-pub struct TransferToNewWitness<E: JubjubEngine> {
+
+pub struct TransferToNewWitness<E: RescueEngine> {
     pub from_before: OperationBranch<E>,
     pub from_intermediate: OperationBranch<E>,
     pub from_after: OperationBranch<E>,
@@ -33,7 +35,8 @@ pub struct TransferToNewWitness<E: JubjubEngine> {
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
-impl<E: JubjubEngine> TransferToNewWitness<E> {
+
+impl<E: RescueEngine> TransferToNewWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
@@ -126,6 +129,7 @@ impl<E: JubjubEngine> TransferToNewWitness<E> {
         sig_bits
     }
 }
+
 pub fn apply_transfer_to_new_tx(
     tree: &mut CircuitAccountTree,
     transfer_to_new: &TransferToNewOp,

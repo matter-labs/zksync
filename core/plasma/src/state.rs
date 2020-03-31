@@ -380,7 +380,7 @@ impl PlasmaState {
                 new_nonce: old_nonce,
             },
         ));
-
+        
         updates
     }
 

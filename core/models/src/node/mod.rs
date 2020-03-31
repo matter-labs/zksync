@@ -1,4 +1,4 @@
-use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
+use super::merkle_tree::{PedersenHasher, SparseMerkleTree, RescueHasher};
 use super::params;
 use super::primitives::{pack_as_float, u128_to_bigdecimal, unpack_float};
 use crate::franklin_crypto::bellman::pairing::bn256;
@@ -31,7 +31,8 @@ pub type Fs = <Engine as JubjubEngine>::Fs;
 
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
-pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
+// pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
+pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
 
 pub type PrivateKey = PrivateKeyImport<Engine>;
 pub type PublicKey = PublicKeyImport<Engine>;

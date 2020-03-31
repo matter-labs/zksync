@@ -1,6 +1,7 @@
 use super::utils::*;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::RescueEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
 use crypto_exports::ff::{Field, PrimeField};
@@ -17,7 +18,8 @@ pub struct ChangePubkeyOffChainData {
     pub new_pubkey_hash: Fr,
     pub nonce: Fr,
 }
-pub struct ChangePubkeyOffChainWitness<E: JubjubEngine> {
+
+pub struct ChangePubkeyOffChainWitness<E: RescueEngine> {
     pub before: OperationBranch<E>,
     pub after: OperationBranch<E>,
     pub args: OperationArguments<E>,
@@ -26,7 +28,7 @@ pub struct ChangePubkeyOffChainWitness<E: JubjubEngine> {
     pub tx_type: Option<E::Fr>,
 }
 
-impl<E: JubjubEngine> ChangePubkeyOffChainWitness<E> {
+impl<E: RescueEngine> ChangePubkeyOffChainWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(

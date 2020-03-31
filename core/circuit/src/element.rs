@@ -6,17 +6,18 @@ use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
 use crate::franklin_crypto::circuit::expression::Expression;
 use crate::franklin_crypto::circuit::num::AllocatedNum;
 use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::bellman::pairing::Engine;
 use crate::franklin_crypto::jubjub::JubjubEngine;
 use models::params as franklin_constants;
 
 #[derive(Clone)]
-pub struct CircuitElement<E: JubjubEngine> {
+pub struct CircuitElement<E: Engine> {
     number: AllocatedNum<E>,
     bits_le: Vec<Boolean>,
     length: usize,
 }
 
-impl<E: JubjubEngine> CircuitElement<E> {
+impl<E: Engine> CircuitElement<E> {
     pub fn unsafe_empty_of_some_length(zero_num: AllocatedNum<E>, length: usize) -> Self {
         let bits = vec![Boolean::constant(false); length];
         CircuitElement {
@@ -269,6 +270,10 @@ impl<E: JubjubEngine> CircuitElement<E> {
 
     pub fn get_number(&self) -> AllocatedNum<E> {
         self.number.clone()
+    }
+
+    pub fn into_number(self) -> AllocatedNum<E> {
+        self.number
     }
 
     pub fn get_bits_le(&self) -> Vec<Boolean> {

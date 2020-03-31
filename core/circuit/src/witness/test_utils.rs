@@ -26,23 +26,25 @@ pub fn test_genesis_plasma_state(
         panic!("AccountId 0 is existing fee account");
     }
 
-    let fee_account_id = 0;
-    let validator_account = vec![(
-        fee_account_id,
-        Account::default_with_address(&Address::default()),
-    )]
-    .into_iter()
-    .chain(accounts.into_iter())
-    .collect();
-    let plasma_state = PlasmaState::new(validator_account, 1);
+    const FEE_ACCOUNT_ID: u32 = 0;
+    let validator_and_other_accounts : models::node::AccountMap = vec![(
+            FEE_ACCOUNT_ID,
+            Account::default_with_address(&Address::default()),
+        )]
+        .into_iter()
+        .chain(accounts.into_iter())
+        .collect();
+
+    let plasma_state = PlasmaState::new(validator_and_other_accounts, 1);
 
     let mut circuit_account_tree =
         CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+
     for (id, account) in plasma_state.get_accounts() {
         circuit_account_tree.insert(id, CircuitAccount::from(account))
     }
 
-    let witness_accum = WitnessBuilder::new(circuit_account_tree, fee_account_id, 1);
+    let witness_accum = WitnessBuilder::new(circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     (plasma_state, witness_accum)
 }

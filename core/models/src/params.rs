@@ -7,6 +7,8 @@ use lazy_static::lazy_static;
 // Workspace deps
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::node::TokenId;
+use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
+use crate::franklin_crypto::group_hash::{GroupHasher, BlakeHasher};
 
 static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 24;
 /// account_tree_depth.
@@ -64,7 +66,7 @@ pub const NONCE_BIT_WIDTH: usize = 32;
 //
 pub const CHUNK_BIT_WIDTH: usize = 64;
 
-pub const MAX_CIRCUIT_PEDERSEN_HASH_BITS: usize = 736;
+pub const MAX_CIRCUIT_MSG_HASH_BITS: usize = 736;
 
 pub const ETH_ADDRESS_BIT_WIDTH: usize = 160;
 /// Block number bit width
@@ -127,4 +129,5 @@ pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref PEDERSEN_HASHER: BabyPedersenHasher = BabyPedersenHasher::default();
+    pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_2_into_1::<BlakeHasher>();
 }

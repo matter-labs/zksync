@@ -32,12 +32,14 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     let stop_signal = Arc::new(AtomicBool::new(false));
     let stop_signal_ar = Arc::clone(&stop_signal);
     let circuit_parameters = read_circuit_params(block_size_chunks);
-    let jubjub_params = franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
+    let jubjub_params = &models::params::JUBJUB_PARAMS;
+    let rescue_params = &models::params::RESCUE_PARAMS;
     thread::spawn(move || {
         // Create channel for proofs, not using in this test.
         let (tx, _) = mpsc::channel();
         let p = prover::BabyProver::new(
             circuit_parameters,
+            rescue_params,
             jubjub_params,
             block_size_chunks,
             MockApiClient {
@@ -98,12 +100,14 @@ fn prover_proves_a_block_and_publishes_result() {
 
     // Run prover in separate thread.
     let stop_signal_ar = Arc::clone(&stop_signal);
-    let jubjub_params = franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
+    let jubjub_params = &models::params::JUBJUB_PARAMS;
+    let rescue_params = &models::params::RESCUE_PARAMS;
     thread::spawn(move || {
         // Work heartbeat channel, not used in this test.
         let (tx, _) = mpsc::channel();
         let p = prover::BabyProver::new(
             circuit_params,
+            rescue_params,
             jubjub_params,
             block_size_chunks,
             MockApiClient {

@@ -6,6 +6,7 @@ use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
 use crate::franklin_crypto::circuit::float_point::convert_to_float;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::RescueEngine;
 use crate::operation::SignatureData;
 use models::circuit::account::CircuitAccountTree;
 use models::circuit::utils::{
@@ -24,7 +25,7 @@ pub struct WithdrawData {
     pub account_address: u32,
     pub eth_address: Fr,
 }
-pub struct WithdrawWitness<E: JubjubEngine> {
+pub struct WithdrawWitness<E: RescueEngine> {
     pub before: OperationBranch<E>,
     pub after: OperationBranch<E>,
     pub args: OperationArguments<E>,
@@ -32,7 +33,7 @@ pub struct WithdrawWitness<E: JubjubEngine> {
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
-impl<E: JubjubEngine> WithdrawWitness<E> {
+impl<E: RescueEngine> WithdrawWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
@@ -71,6 +72,7 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
         pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
+
     pub fn get_sig_bits(&self) -> Vec<bool> {
         let mut sig_bits = vec![];
         append_be_fixed_width(
@@ -111,6 +113,7 @@ impl<E: JubjubEngine> WithdrawWitness<E> {
         sig_bits
     }
 }
+
 pub fn apply_withdraw_tx(
     tree: &mut CircuitAccountTree,
     withdraw: &WithdrawOp,

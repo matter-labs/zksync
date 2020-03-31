@@ -3,6 +3,7 @@ use super::utils::*;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::RescueEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
 use models::circuit::account::CircuitAccountTree;
@@ -18,7 +19,8 @@ pub struct DepositData {
     pub account_address: u32,
     pub address: Fr,
 }
-pub struct DepositWitness<E: JubjubEngine> {
+
+pub struct DepositWitness<E: RescueEngine> {
     pub before: OperationBranch<E>,
     pub after: OperationBranch<E>,
     pub args: OperationArguments<E>,
@@ -26,7 +28,8 @@ pub struct DepositWitness<E: JubjubEngine> {
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
-impl<E: JubjubEngine> DepositWitness<E> {
+
+impl<E: RescueEngine> DepositWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
@@ -298,6 +301,7 @@ pub fn calculate_deposit_operations_from_witness(
     ];
     operations
 }
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -479,6 +483,118 @@ mod test {
 
     #[test]
     // #[ignore]
+    fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
+        const NUM_DEPOSITS: usize = 60;
+        println!(
+            "Testing for {} deposits {} chunks",
+            NUM_DEPOSITS,
+            DepositOp::CHUNKS * NUM_DEPOSITS
+        );
+        let deposit_to_account_id = 1;
+        let deposit_to_account_address =
+            "1111111111111111111111111111111111111111".parse().unwrap();
+
+        // let deposit_to_account_address =
+        //         "0000000000000000000000000000000000000000".parse().unwrap();
+        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
+            deposit_to_account_id,
+            Account::default_with_address(&deposit_to_account_address),
+        )]);
+
+        let deposit_op = DepositOp {
+            priority_op: Deposit {
+                from: deposit_to_account_address,
+                token: 0,
+                amount: BigDecimal::from(1),
+                to: deposit_to_account_address,
+            },
+            account_id: deposit_to_account_id,
+        };
+
+        for _ in 0..NUM_DEPOSITS {
+            plasma_state.apply_deposit_op(&deposit_op);
+            let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+            let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+            let pub_data_from_witness = deposit_witness.get_pubdata();
+
+            witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
+        }
+        witness_accum.collect_fees(&Vec::new());
+        witness_accum.calculate_pubdata_commitment();
+
+        println!("pubdata commitment: {:?}", witness_accum.pubdata_commitment);
+        assert_eq!(
+            plasma_state.root_hash(),
+            witness_accum
+                .root_after_fees
+                .expect("witness accum after root hash empty"),
+            "root hash in state keeper and witness generation code mismatch"
+        );
+
+        use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
+        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
+        use crate::franklin_crypto::bellman::plonk::*;
+
+        // let mut transpiler = Transpiler::new();
+
+        let c = witness_accum.into_circuit_instance();
+
+        // c.clone().synthesize(&mut transpiler).unwrap();
+
+        println!("Start transpiling");
+        let (n, mut hints) = transpile_with_gates_count::<Bn256, _>(c.clone()).expect("transpilation is successful");
+        println!("Transpiled into {} gates", n);
+        let mut tmp_buff = Vec::new();
+        write_transpilation_hints(&hints, &mut tmp_buff).expect("hint write");
+        hints = read_transpilation_hints(tmp_buff.as_slice()).expect("hint read");
+
+        let mut hints_hist = std::collections::HashMap::new();
+        hints_hist.insert("into addition gate".to_owned(), 0);
+        hints_hist.insert("merge LC".to_owned(), 0);
+        hints_hist.insert("into quadratic gate".to_owned(), 0);
+        hints_hist.insert("into multiplication gate".to_owned(), 0);
+
+        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::TranspilationVariant;
+
+        for (_, h) in hints.iter() {
+            match h {
+                TranspilationVariant::IntoQuadraticGate => {
+                    *hints_hist
+                        .get_mut(&"into quadratic gate".to_owned())
+                        .unwrap() += 1;
+                }
+                TranspilationVariant::MergeLinearCombinations(..) => {
+                    *hints_hist.get_mut(&"merge LC".to_owned()).unwrap() += 1;
+                }
+                TranspilationVariant::IntoAdditionGate(..) => {
+                    *hints_hist
+                        .get_mut(&"into addition gate".to_owned())
+                        .unwrap() += 1;
+                }
+                TranspilationVariant::IntoMultiplicationGate(..) => {
+                    *hints_hist
+                        .get_mut(&"into multiplication gate".to_owned())
+                        .unwrap() += 1;
+                }
+            }
+        }
+
+        println!("Transpilation hist = {:?}", hints_hist);
+
+        println!("Done transpiling");
+
+        is_satisfied_using_one_shot_check(c.clone(), &hints).expect("must validate");
+
+        println!("Done checking if satisfied using one-shot");
+
+        is_satisfied(c.clone(), &hints).expect("must validate");
+
+        println!("Done checking if satisfied");
+
+    }
+
+    #[test]
+    #[ignore]
     fn test_new_transpile_deposit_franklin_existing_account() {
         let universal_setup_path: String = format!(
             "{}/keys/setup/",
@@ -546,7 +662,8 @@ mod test {
 
         // c.clone().synthesize(&mut transpiler).unwrap();
 
-        let mut hints = transpile::<Bn256, _>(c.clone()).expect("transpilation is successful");
+        let (n, mut hints) = transpile_with_gates_count::<Bn256, _>(c.clone()).expect("transpilation is successful");
+        println!("Transpiled into {} gates", n);
         let mut tmp_buff = Vec::new();
         write_transpilation_hints(&hints, &mut tmp_buff).expect("hint write");
         hints = read_transpilation_hints(tmp_buff.as_slice()).expect("hint read");

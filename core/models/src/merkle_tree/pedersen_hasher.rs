@@ -16,13 +16,26 @@ pub struct PedersenHasher<E: JubjubEngine> {
 
 impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
     fn hash_bits<I: IntoIterator<Item = bool>>(&self, input: I) -> E::Fr {
+        unreachable!("pedersen hash is deprecated");
         baby_pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params)
             .into_xy()
             .0
         // print!("Leaf hash = {}\n", hash.clone());
     }
 
+    fn hash_elements<I: IntoIterator<Item = E::Fr>>(&self, elements: I) -> E::Fr {
+        unreachable!("pedersen hash is deprecated");
+        let mut input = vec![];
+        for el in elements.into_iter() {
+            input.extend(BitIteratorLe::new(el.into_repr()).take(E::Fr::NUM_BITS as usize));
+        }
+        baby_pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params)
+            .into_xy()
+            .0
+    }
+
     fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {
+        unreachable!("pedersen hash is deprecated");
         let lhs = BitIteratorLe::new(lhs.into_repr()).take(E::Fr::NUM_BITS as usize);
         let rhs = BitIteratorLe::new(rhs.into_repr()).take(E::Fr::NUM_BITS as usize);
         let input = lhs.chain(rhs);
