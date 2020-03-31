@@ -264,13 +264,19 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
 }
 
 pub fn bench_ops(c: &mut Criterion) {
-    c.bench_function("apply_transfer_to_new_op bench", apply_transfer_to_new_op);
-    c.bench_function("apply_transfer_op bench", apply_transfer_op);
-    c.bench_function("apply_withdraw_op bench", apply_withdraw_op);
-    c.bench_function("apply_apply_close_op bench", apply_close_op);
-    c.bench_function("apply_change_pubkey_op bench", apply_change_pubkey_op);
-    c.bench_function("apply_deposit_op bench", apply_deposit_op);
-    c.bench_function("apply_full_exit_op bench", apply_full_exit_op);
+    c.bench_function(
+        "PlasmaState::apply_transfer_to_new_op bench",
+        apply_transfer_to_new_op,
+    );
+    c.bench_function("PlasmaState::apply_transfer_op bench", apply_transfer_op);
+    c.bench_function("PlasmaState::apply_withdraw_op bench", apply_withdraw_op);
+    c.bench_function("PlasmaState::apply_apply_close_op bench", apply_close_op);
+    c.bench_function(
+        "PlasmaState::apply_change_pubkey_op bench",
+        apply_change_pubkey_op,
+    );
+    c.bench_function("PlasmaState::apply_deposit_op bench", apply_deposit_op);
+    c.bench_function("PlasmaState::apply_full_exit_op bench", apply_full_exit_op);
 }
 
 criterion_group!(ops_benches, bench_ops);
