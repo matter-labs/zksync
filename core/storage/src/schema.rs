@@ -83,15 +83,47 @@ table! {
 }
 
 table! {
+    eth_nonce (id) {
+        id -> Bool,
+        nonce -> Int8,
+    }
+}
+
+table! {
     eth_operations (id) {
         id -> Int8,
-        op_id -> Int8,
         nonce -> Int8,
-        deadline_block -> Int8,
-        gas_price -> Numeric,
-        tx_hash -> Bytea,
         confirmed -> Bool,
         raw_tx -> Bytea,
+        op_type -> Text,
+        final_hash -> Nullable<Bytea>,
+        last_deadline_block -> Int8,
+        last_used_gas_price -> Numeric,
+    }
+}
+
+table! {
+    eth_ops_binding (id) {
+        id -> Int8,
+        op_id -> Int8,
+        eth_op_id -> Int8,
+    }
+}
+
+table! {
+    eth_stats (id) {
+        id -> Bool,
+        commit_ops -> Int8,
+        verify_ops -> Int8,
+        withdraw_ops -> Int8,
+    }
+}
+
+table! {
+    eth_tx_hashes (id) {
+        id -> Int8,
+        eth_op_id -> Int8,
+        tx_hash -> Bytea,
     }
 }
 
@@ -209,7 +241,9 @@ table! {
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
-joinable!(eth_operations -> operations (op_id));
+joinable!(eth_ops_binding -> eth_operations (eth_op_id));
+joinable!(eth_ops_binding -> operations (op_id));
+joinable!(eth_tx_hashes -> eth_operations (eth_op_id));
 joinable!(executed_transactions -> mempool (tx_hash));
 
 allow_tables_to_appear_in_same_query!(
@@ -221,7 +255,11 @@ allow_tables_to_appear_in_same_query!(
     balances,
     blocks,
     data_restore_last_watched_eth_block,
+    eth_nonce,
     eth_operations,
+    eth_ops_binding,
+    eth_stats,
+    eth_tx_hashes,
     events_state,
     executed_priority_operations,
     executed_transactions,

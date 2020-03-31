@@ -5,9 +5,11 @@ use bigdecimal::BigDecimal;
 // Workspace imports
 use crypto_exports::franklin_crypto::bellman::pairing::ff::Field;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
-use models::node::operations::FranklinOp;
+use models::node::operations::{ChangePubKeyOp, FranklinOp};
 use models::node::priority_ops::PriorityOp;
-use models::node::{Deposit, DepositOp, Fr, TransferOp, WithdrawOp};
+use models::node::{
+    CloseOp, Deposit, DepositOp, Fr, FullExit, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+};
 use testkit::zksync_account::ZksyncAccount;
 // Local imports
 use crate::tests::db_test;
@@ -57,6 +59,56 @@ fn get_account_transactions_history() {
         ExecutedOperations::PriorityOp(Box::new(executed_op))
     };
 
+    let executed_full_exit_op = {
+        let full_exit_op = FranklinOp::FullExit(Box::new(FullExitOp {
+            priority_op: FullExit {
+                account_id: from_account_id,
+                eth_address: from_account_address,
+                token,
+            },
+            withdraw_amount: Some(amount.clone()),
+        }));
+
+        let executed_op = ExecutedPriorityOp {
+            priority_op: PriorityOp {
+                serial_id: 0,
+                data: full_exit_op.try_get_priority_op().unwrap(),
+                deadline_block: 0,
+                eth_fee: 0.into(),
+                eth_hash: b"1234567890".to_vec(),
+            },
+            op: full_exit_op,
+            block_index: 31,
+        };
+
+        ExecutedOperations::PriorityOp(Box::new(executed_op))
+    };
+
+    let executed_transfer_to_new_op = {
+        let transfer_to_new_op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+            tx: from_zksync_account.sign_transfer(
+                token,
+                amount.clone(),
+                BigDecimal::from(0),
+                &to_account_address,
+                None,
+                true,
+            ),
+            from: from_account_id,
+            to: to_account_id,
+        }));
+
+        let executed_transfer_to_new_op = ExecutedTx {
+            tx: transfer_to_new_op.try_get_tx().unwrap(),
+            success: true,
+            op: Some(transfer_to_new_op),
+            fail_reason: None,
+            block_index: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_transfer_to_new_op))
+    };
+
     let executed_transfer_op = {
         let transfer_op = FranklinOp::Transfer(Box::new(TransferOp {
             tx: from_zksync_account.sign_transfer(
@@ -88,7 +140,7 @@ fn get_account_transactions_history() {
                 token,
                 amount.clone(),
                 BigDecimal::from(0),
-                &from_account_address,
+                &to_account_address,
                 None,
                 true,
             ),
@@ -106,14 +158,52 @@ fn get_account_transactions_history() {
         ExecutedOperations::Tx(Box::new(executed_withdraw_op))
     };
 
+    let executed_close_op = {
+        let close_op = FranklinOp::Close(Box::new(CloseOp {
+            tx: from_zksync_account.sign_close(None, false),
+            account_id: from_account_id,
+        }));
+
+        let executed_close_op = ExecutedTx {
+            tx: close_op.try_get_tx().unwrap(),
+            success: true,
+            op: Some(close_op),
+            fail_reason: None,
+            block_index: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_close_op))
+    };
+
+    let executed_change_pubkey_op = {
+        let change_pubkey_op = FranklinOp::ChangePubKeyOffchain(Box::new(ChangePubKeyOp {
+            tx: from_zksync_account.create_change_pubkey_tx(None, false, false),
+            account_id: from_account_id,
+        }));
+
+        let executed_change_pubkey_op = ExecutedTx {
+            tx: change_pubkey_op.try_get_tx().unwrap(),
+            success: true,
+            op: Some(change_pubkey_op),
+            fail_reason: None,
+            block_index: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_change_pubkey_op))
+    };
+
     let block = Block {
         block_number: 1,
         new_root_hash: Fr::zero(),
         fee_account: 0,
         block_transactions: vec![
             executed_deposit_op,
+            executed_full_exit_op,
+            executed_transfer_to_new_op,
             executed_transfer_op,
             executed_withdraw_op,
+            executed_close_op,
+            executed_change_pubkey_op,
         ],
         processed_priority_ops: (0, 0), // Not important
     };
@@ -142,7 +232,7 @@ fn get_account_transactions_history() {
             "Withdraw",
             (
                 Some(from_account_address_string.as_str()),
-                Some(from_account_address_string.as_str()),
+                Some(to_account_address_string.as_str()),
                 Some(&token),
                 Some(amount.to_string()),
             ),
@@ -162,25 +252,24 @@ fn get_account_transactions_history() {
 
         for tx in &from_history {
             let tx_type: &str = tx.tx["type"].as_str().expect("no tx_type");
-            let (from, to, token, amount) = expected_behavior
-                .get(tx_type)
-                .expect("no expected behavior");
-
-            let tx_info = match tx_type {
-                "Deposit" => tx.tx["priority_op"].clone(),
-                _ => tx.tx.clone(),
-            };
-            let tx_from_addr = tx_info["from"].as_str();
-            let tx_to_addr = tx_info["to"].as_str();
-            let tx_token = tx_info["token"].as_u64().map(|x| x as u16);
-            let tx_amount = tx_info["amount"].as_str().map(String::from);
 
             assert!(tx.hash.is_some());
 
-            assert_eq!(tx_from_addr, *from);
-            assert_eq!(tx_to_addr, *to);
-            assert_eq!(tx_token, token.cloned());
-            assert_eq!(tx_amount, *amount);
+            if let Some((from, to, token, amount)) = expected_behavior.get(tx_type) {
+                let tx_info = match tx_type {
+                    "Deposit" => tx.tx["priority_op"].clone(),
+                    _ => tx.tx.clone(),
+                };
+                let tx_from_addr = tx_info["from"].as_str();
+                let tx_to_addr = tx_info["to"].as_str();
+                let tx_token = tx_info["token"].as_u64().map(|x| x as u16);
+                let tx_amount = tx_info["amount"].as_str().map(String::from);
+
+                assert_eq!(tx_from_addr, *from);
+                assert_eq!(tx_to_addr, *to);
+                assert_eq!(tx_token, token.cloned());
+                assert_eq!(tx_amount, *amount);
+            }
         }
 
         let to_history = conn
@@ -188,8 +277,8 @@ fn get_account_transactions_history() {
             .operations_ext_schema()
             .get_account_transactions_history(&to_account_address, 0, 10)?;
 
-        assert_eq!(from_history.len(), 3);
-        assert_eq!(to_history.len(), 2);
+        assert_eq!(from_history.len(), 7);
+        assert_eq!(to_history.len(), 4);
 
         Ok(())
     });

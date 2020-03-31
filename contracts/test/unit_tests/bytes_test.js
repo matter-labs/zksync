@@ -2,7 +2,7 @@ const { expect } = require("chai")
 const { bigNumberify } = require("ethers/utils");
 const { provider, wallet, deployTestContract, getCallRevertReason } = require("./common")
 
-describe("Bytes unit test", function () {
+describe("Bytes unit tests", function () {
     this.timeout(50000);
 
     let bytesTestContract

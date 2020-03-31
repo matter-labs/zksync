@@ -1,15 +1,7 @@
 use crate::eth_tx_helpers::{get_ethereum_transaction, get_input_data_from_ethereum_transaction};
 use crate::events::BlockEvent;
-use failure::format_err;
 use models::node::operations::FranklinOp;
-use models::primitives::bytes_slice_to_uint32;
 use web3::{Transport, Web3};
-
-use models::params::{
-    INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH, INPUT_DATA_EMPTY_BYTES_WIDTH,
-    INPUT_DATA_FEE_ACC_BYTES_WIDTH, INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET,
-    INPUT_DATA_ROOT_BYTES_WIDTH,
-};
 
 /// Description of a Rollup operations block
 #[derive(Debug, Clone)]
@@ -36,18 +28,46 @@ impl RollupOpsBlock {
     ) -> Result<Self, failure::Error> {
         let transaction = get_ethereum_transaction(web3, &event_data.transaction_hash)?;
         let input_data = get_input_data_from_ethereum_transaction(&transaction)?;
-        let commitment_data = &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
-            + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
-            + INPUT_DATA_ROOT_BYTES_WIDTH
-            + INPUT_DATA_EMPTY_BYTES_WIDTH..];
-        let fee_account = RollupOpsBlock::get_fee_account_from_tx_input(&input_data)?;
-        let ops = RollupOpsBlock::get_rollup_ops_from_data(commitment_data)?;
-        let block = RollupOpsBlock {
-            block_num: event_data.block_num,
-            ops,
-            fee_account,
-        };
-        Ok(block)
+
+        let decoded_commitment_parameters = ethabi::decode(
+            vec![
+                ethabi::ParamType::Uint(32),
+                ethabi::ParamType::Uint(24),
+                ethabi::ParamType::FixedBytes(32),
+                ethabi::ParamType::Bytes,
+                ethabi::ParamType::Bytes,
+                ethabi::ParamType::Array(Box::new(ethabi::ParamType::Uint(32))),
+            ]
+            .as_slice(),
+            input_data.as_slice(),
+        )
+        .map_err(|_| {
+            failure::Error::from_boxed_compat(Box::new(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "can't get decoded parameters from commitment transaction",
+            )))
+        })?;
+
+        if let (ethabi::Token::Uint(fee_acc), ethabi::Token::Bytes(public_data)) = (
+            &decoded_commitment_parameters[1],
+            &decoded_commitment_parameters[3],
+        ) {
+            let ops = RollupOpsBlock::get_rollup_ops_from_data(public_data.as_slice())?;
+            let fee_account = fee_acc.as_u32();
+
+            let block = RollupOpsBlock {
+                block_num: event_data.block_num,
+                ops,
+                fee_account,
+            };
+            Ok(block)
+        } else {
+            Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "can't parse commitment parameters",
+            )
+            .into())
+        }
     }
 
     /// Returns a Rollup operations vector
@@ -73,23 +93,6 @@ impl RollupOpsBlock {
             current_pointer += pub_data_size;
         }
         Ok(ops)
-    }
-
-    /// Returns fee account from Ethereum transaction input data
-    ///
-    /// # Arguments
-    ///
-    /// * `input` - Ethereum transaction input
-    ///
-    fn get_fee_account_from_tx_input(input_data: &[u8]) -> Result<u32, failure::Error> {
-        Ok(bytes_slice_to_uint32(
-            &input_data[INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
-                + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET
-                - INPUT_DATA_FEE_ACC_BYTES_WIDTH
-                ..INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH
-                    + INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET],
-        )
-        .ok_or_else(|| format_err!("Cant convert bytes to fee account number"))?)
     }
 }
 

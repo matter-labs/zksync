@@ -62,7 +62,6 @@ async function testWrongETHWalletFullExit(ethWallet: ethers.Wallet, syncWallet: 
     syncWallet.ethSigner = ethWallet;
     const fullExit = await syncWallet.emergencyWithdraw({
         token,
-        nonce: 12341
     });
     await fullExit.awaitReceipt();
     syncWallet.ethSigner = oldWallet;

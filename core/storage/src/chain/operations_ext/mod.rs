@@ -218,11 +218,8 @@ impl<'a> OperationsExtSchema<'a> {
             let tx_token = operation["priority_op"]["token"]
                 .as_i64()
                 .expect("must be here");
-            let tx_amount = operation["priority_op"]["amount"]
-                .as_str()
-                .unwrap_or("unknown amount");
 
-            let (tx_from, tx_to, tx_fee) = match tx_type {
+            let (tx_from, tx_to, tx_fee, tx_amount) = match tx_type {
                 "Deposit" => (
                     operation["priority_op"]["from"]
                         .as_str()
@@ -235,11 +232,31 @@ impl<'a> OperationsExtSchema<'a> {
                     operation["priority_op"]["fee"]
                         .as_str()
                         .map(|v| v.to_string()),
+                    operation["priority_op"]["amount"]
+                        .as_str()
+                        .unwrap_or("unknown amount"),
+                ),
+                "FullExit" => (
+                    operation["priority_op"]["eth_address"]
+                        .as_str()
+                        .unwrap_or("unknown from")
+                        .to_string(),
+                    operation["priority_op"]["eth_address"]
+                        .as_str()
+                        .unwrap_or("unknown to")
+                        .to_string(),
+                    operation["priority_op"]["fee"]
+                        .as_str()
+                        .map(|v| v.to_string()),
+                    operation["withdraw_amount"]
+                        .as_str()
+                        .unwrap_or("unknown amount"),
                 ),
                 &_ => (
                     "unknown from".to_string(),
                     "unknown to".to_string(),
                     Some("unknown fee".to_string()),
+                    "unknown amount",
                 ),
             };
 
@@ -305,6 +322,8 @@ impl<'a> OperationsExtSchema<'a> {
                         tx->>'from' = '{address}'
                         or
                         tx->>'to' = '{address}'
+                        or
+                        tx->>'account' = '{address}'
                     union all
                     select
                         operation as tx,
@@ -318,7 +337,11 @@ impl<'a> OperationsExtSchema<'a> {
                     where 
                         operation->'priority_op'->>'from' = '{address}'
                         or
-                        operation->'priority_op'->>'to' = '{address}') t
+                        operation->'priority_op'->>'to' = '{address}'
+                        or
+                        operation->'priority_op'->>'account' = '{address}'
+                        or
+                        operation->'priority_op'->>'eth_address' = '{address}') t
                 order by
                     block_number desc
                 offset 

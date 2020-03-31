@@ -6,6 +6,7 @@ extern crate log;
 pub mod abi;
 pub mod circuit;
 pub mod config_options;
+pub mod ethereum;
 pub mod merkle_tree;
 pub mod misc;
 pub mod node;

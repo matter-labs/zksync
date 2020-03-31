@@ -2,6 +2,7 @@ pragma solidity 0.5.16;
 
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
+import "./Upgradeable.sol";
 import "./Storage.sol";
 import "./Config.sol";
 import "./Events.sol";
@@ -12,7 +13,43 @@ import "./Operations.sol";
 
 /// @title zkSync main contract
 /// @author Matter Labs
-contract Franklin is Storage, Config, Events {
+contract Franklin is UpgradeableMaster, Storage, Config, Events {
+
+    // Upgrade functional
+
+    /// @notice Notice period before activation preparation status of upgrade mode
+    function upgradeNoticePeriod() external returns (uint) {
+        return UPGRADE_NOTICE_PERIOD;
+    }
+
+    /// @notice Notification that upgrade notice period started
+    function upgradeNoticePeriodStarted() external {
+
+    }
+
+    /// @notice Notification that upgrade preparation status is activated
+    function upgradePreparationStarted() external {
+        upgradePreparationActive = true;
+        upgradePreparationActivationTime = now;
+    }
+
+    /// @notice Notification that upgrade canceled
+    function upgradeCanceled() external {
+        upgradePreparationActive = false;
+        upgradePreparationActivationTime = 0;
+    }
+
+    /// @notice Notification that upgrade finishes
+    function upgradeFinishes() external {
+        upgradePreparationActive = false;
+        upgradePreparationActivationTime = 0;
+    }
+
+    /// @notice Checks that contract is ready for upgrade
+    /// @return bool flag indicating that contract is ready for upgrade
+    function readyForUpgrade() external returns (bool) {
+        return !exodusMode && totalOpenPriorityRequests == 0;
+    }
 
     // // Migration
 
@@ -29,17 +66,22 @@ contract Franklin is Storage, Config, Events {
 
     // mapping (uint32 => bool) tokenMigrated;
 
-    /// @notice Constructs Franklin contract
-    /// @param _governanceAddress The address of Governance contract
-    /// @param _verifierAddress The address of Verifier contract
-    /// _genesisAccAddress The address of single account, that exists in genesis block
-    /// @param _genesisRoot Genesis blocks (first block) root
-    constructor(
+    constructor() public {}
+
+    /// @notice Franklin contract initialization
+    /// @param initializationParameters Encoded representation of initialization parameters:
+        /// _governanceAddress The address of Governance contract
+        /// _verifierAddress The address of Verifier contract
+        /// _ // FIXME: remove _genesisAccAddress
+        /// _genesisRoot Genesis blocks (first block) root
+    function initialize(bytes calldata initializationParameters) external {
+        (
         address _governanceAddress,
         address _verifierAddress,
-        address, // FIXME: remove _genesisAccAddress
+        ,
         bytes32 _genesisRoot
-    ) public {
+        ) = abi.decode(initializationParameters, (address, address, address, bytes32));
+
         verifier = Verifier(_verifierAddress);
         governance = Governance(_governanceAddress);
 
@@ -628,6 +670,11 @@ contract Franklin is Storage, Config, Events {
         totalCommittedPriorityRequests -= _reverted.priorityOperations;
     }
 
+    /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)
+    function upgradePreparationLockStatus() public returns (bool) {
+        return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;
+    }
+
     /// @notice Checks that current state not is exodus mode
     function requireActive() internal view {
         require(!exodusMode, "fre11"); // exodus mode activated
@@ -683,10 +730,12 @@ contract Franklin is Storage, Config, Events {
         uint256 _fee,
         bytes memory _pubData
     ) internal {
+        require(!upgradePreparationLockStatus(), "apr11"); // apr11 - priority request can't be added during lock period of preparation of upgrade
+
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
-        priorityRequests[firstPriorityRequestId+totalOpenPriorityRequests] = PriorityOperation({
+        priorityRequests[firstPriorityRequestId + totalOpenPriorityRequests] = PriorityOperation({
             opType: _opType,
             pubData: _pubData,
             expirationBlock: expirationBlock,
@@ -695,7 +744,7 @@ contract Franklin is Storage, Config, Events {
 
         emit NewPriorityRequest(
             msg.sender,
-            firstPriorityRequestId+totalOpenPriorityRequests,
+            firstPriorityRequestId + totalOpenPriorityRequests,
             uint8(_opType),
             _pubData,
             expirationBlock,

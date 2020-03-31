@@ -15,7 +15,6 @@ default = ["console_error_panic_hook"]
 [dependencies]
 wasm-bindgen = "0.2.59"
 crypto_exports = { path = "../../core/crypto_exports", version = "0.1.0" }
-ff = { package = "ff_ce", version = "0.6.0"}
 hex = "0.3"
 sha2 = "0.8"
 

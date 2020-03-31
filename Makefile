@@ -1,7 +1,7 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
-export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(ZKSYNC_ENV)-$(IMAGE_TAG)
+export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
@@ -50,7 +50,10 @@ db-setup:
 db-insert-contract:
 	@bin/db-insert-contract.sh
 
-db-reset: confirm_action db-wait db-drop db-setup db-insert-contract
+db-insert-eth-data:
+	@bin/db-insert-eth-data.sh
+
+db-reset: confirm_action db-wait db-drop db-setup db-insert-contract db-insert-eth-data
 	@echo database is ready
 
 db-migrate: confirm_action
@@ -130,9 +133,15 @@ image-prover: build-target
 
 image-rust: image-server image-prover
 
-push-image-rust: image-rust
+push-image-server:
 	docker push "${SERVER_DOCKER_IMAGE}"
+
+push-image-prover:
 	docker push "${PROVER_DOCKER_IMAGE}"
+
+push-image-rust: image-rust
+	push-image-server
+	push-image-prover
 
 # Contracts
 
@@ -163,6 +172,10 @@ loadtest: confirm_action
 integration-testkit: build-contracts
 	cargo run --bin testkit --release
 	cargo run --bin exodus_test --release
+	cargo run --bin migration_test --release
+
+migration-test: build-contracts
+	cargo run --bin migration_test --release
 
 itest: # contracts simple integration tests
 	@bin/prepare-test-contracts.sh
@@ -206,7 +219,10 @@ deposit: confirm_action
 # Promote build
 
 promote-to-stage:
-	@bin/promote-to-stage.sh $(ci-build)
+	@bin/promote-to.sh stage $(ci-build)
+
+promote-to-testnet:
+	@bin/promote-to.sh testnet $(ci-build)
 
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-insert-contract
@@ -216,14 +232,27 @@ init-deploy: confirm_action deploy-contracts db-insert-contract
 dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
 
-apply-kubeconfig:
-	@bin/k8s-apply
+apply-kubeconfig-server:
+	@bin/k8s-gen-resource-definitions
+	@bin/k8s-apply-server
 
-update-rust: push-image-rust apply-kubeconfig
+apply-kubeconfig-provers:
+	@bin/k8s-gen-resource-definitions
+	@bin/k8s-apply-provers
+
+apply-kubeconfig-nginx:
+	@bin/k8s-gen-resource-definitions
+	@bin/k8s-apply-nginx
+
+apply-kubeconfig: apply-kubeconfig-server apply-kubeconfig-provers apply-kubeconfig-nginx
+
+update-provers: push-image-prover apply-kubeconfig-server
 	@kubectl patch deployment $(ZKSYNC_ENV)-server  --namespace $(ZKSYNC_ENV) -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
+
+update-server: push-image-server apply-kubeconfig-provers
 	@bin/provers-patch-deployments
 
-update-nginx: push-image-nginx apply-kubeconfig
+update-nginx: push-image-nginx apply-kubeconfig-nginx
 	@kubectl patch deployment $(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) -p "{\"spec\":{\"template\":{\"metadata\":{\"labels\":{\"date\":\"$(shell date +%s)\"}}}}}"
 
 update-all: update-rust update-nginx apply-kubeconfig
