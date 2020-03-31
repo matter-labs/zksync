@@ -301,8 +301,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
         // After storing all the tx data in the database, we can finally send the tx.
         info!(
-            "Sending new tx: [ETH Operation <id: {}, type: {:?}>. Tx hash: <{:#x}>. ZKSync operation: {}]",
-            new_op.id, new_op.op_type, signed_tx.hash, self.zksync_operation_description(&new_op),
+            "Sending new tx: [ETH Operation <id: {}, type: {:?}>. ETH tx: {}. ZKSync operation: {}]",
+            new_op.id, new_op.op_type, self.eth_tx_description(&signed_tx), self.zksync_operation_description(&new_op),
         );
         self.ethereum.send_tx(&signed_tx).unwrap_or_else(|e| {
             // Sending tx error is not critical: this will result in transaction being considered stuck,
@@ -313,6 +313,17 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         });
 
         Ok(())
+    }
+
+    /// Helper method to obtain the string representation of the Ethereum transaction.
+    /// Intended to be used for log entries.
+    fn eth_tx_description(&self, tx: &SignedCallResult) -> String {
+        // Gas price in gwei (wei / 10^9).
+        let gas_price = tx.gas_price / (1_000_000_000);
+        format!(
+            "<hash: {:#x}; gas price: {} gwei; nonce: {}>",
+            tx.hash, gas_price, tx.nonce
+        )
     }
 
     /// Helper method to obtain the string representation of the ZK Sync operation.
@@ -403,8 +414,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         })?;
 
         info!(
-            "Stuck tx processing: sending tx for op, eth_op_id: {} tx_hash: {:#x}, nonce: {}",
-            op.id, new_tx.hash, new_tx.nonce,
+            "Stuck tx processing: sending tx for op, eth_op_id: {}; ETH tx: {}",
+            op.id,
+            self.eth_tx_description(&new_tx),
         );
         self.ethereum.send_tx(&new_tx)?;
 
