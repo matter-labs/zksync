@@ -36,23 +36,25 @@ pub(super) trait EthereumInterface {
     /// Gets the current gas price.
     fn gas_price(&self) -> Result<U256, failure::Error>;
 
-    /// Gets the current nonce to be used in the transactions.
-    fn current_nonce(&self) -> Result<U256, failure::Error>;
-
     /// Sends a signed transaction to the Ethereum blockchain.
     fn send_tx(&self, signed_tx: &SignedCallResult) -> Result<(), failure::Error>;
 
-    /// Creates a transaction based on the provided parameters and signs it.
-    fn sign_call_tx<P: Tokenize>(
+    /// Encodes the transaction data (smart contract method and its input) to the bytes
+    /// without creating an actual transaction.
+    fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8>;
+
+    /// Signs the transaction given the previously encoded data.
+    /// Fills in gas/nonce if not supplied inside options.
+    fn sign_prepared_tx(
         &self,
-        func: &str,
-        params: P,
+        data: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, failure::Error>;
 }
 
 /// Wrapper over `ETHClient` using `Http` transport.
 /// Supposed to be an actual Ethereum intermediator for the `ETHSender`.
+#[derive(Debug)]
 pub struct EthereumHttpClient {
     eth_client: ETHClient<Http>,
     // We have to prevent handle from drop, since it will cause event loop termination.
@@ -135,16 +137,15 @@ impl EthereumInterface for EthereumHttpClient {
         block_on(self.eth_client.get_gas_price())
     }
 
-    fn current_nonce(&self) -> Result<U256, failure::Error> {
-        block_on(self.eth_client.current_nonce()).map_err(From::from)
+    fn encode_tx_data<P: Tokenize>(&self, func: &str, params: P) -> Vec<u8> {
+        self.eth_client.encode_tx_data(func, params)
     }
 
-    fn sign_call_tx<P: Tokenize>(
+    fn sign_prepared_tx(
         &self,
-        func: &str,
-        params: P,
+        data: Vec<u8>,
         options: Options,
     ) -> Result<SignedCallResult, failure::Error> {
-        block_on(self.eth_client.sign_call_tx(func, params, options))
+        block_on(self.eth_client.sign_prepared_tx(data, options))
     }
 }

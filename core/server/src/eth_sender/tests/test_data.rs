@@ -23,13 +23,13 @@ fn get_operation(id: i64, block_number: u32, action: Action) -> Operation {
 }
 
 lazy_static! {
-    pub static ref COMMIT_OPERATIONS: Vec<Operation> = (1..7)
-        .map(|id| get_operation(id, (id - 1) as u32, Action::Commit))
+    pub static ref COMMIT_OPERATIONS: Vec<Operation> = (1..10)
+        .map(|id| get_operation(id, id as u32, Action::Commit))
         .collect();
-    pub static ref VERIFY_OPERATIONS: Vec<Operation> = (7..14)
+    pub static ref VERIFY_OPERATIONS: Vec<Operation> = (11..20)
         .map(|id| get_operation(
             id,
-            (id - 7) as u32,
+            (id - 10) as u32,
             Action::Verify {
                 proof: Default::default()
             }
