@@ -116,11 +116,10 @@ impl Transfer {
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
-            Some(PubKeyHash::from_pubkey(&pub_key))
-        } else {
-            None
-        }
+        self.signature
+            .verify_musig_sha256(&self.get_bytes())
+            .as_ref()
+            .map(PubKeyHash::from_pubkey)
     }
 }
 
@@ -352,13 +351,6 @@ pub struct TxSignature {
 }
 
 impl TxSignature {
-    pub fn default() -> Self {
-        Self {
-            pub_key: PackedPublicKey::deserialize_packed(&[0; 32]).unwrap(),
-            signature: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
-        }
-    }
-
     pub fn verify_musig_pedersen(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_pedersen(
@@ -426,6 +418,15 @@ impl TxSignature {
                 &JUBJUB_PARAMS,
             )),
             signature: PackedSignature(signature),
+        }
+    }
+}
+
+impl Default for TxSignature {
+    fn default() -> Self {
+        Self {
+            pub_key: PackedPublicKey::deserialize_packed(&[0; 32]).unwrap(),
+            signature: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
         }
     }
 }

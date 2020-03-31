@@ -147,11 +147,14 @@ export class Client {
             const type         = tx.tx.type || '';
             const hash         = tx.hash;
 
-            const receiver_address = type == 'Deposit'
-                ? tx.tx.priority_op.to
+            const to
+                = type == 'Deposit' ? tx.tx.priority_op.to
+                : type == 'FullExit' ? tx.tx.priority_op.eth_address
+                : type == 'Close' ? tx.tx.account
+                : type == 'ChangePubKey' ? tx.tx.account
                 : tx.tx.to;
 
-            const direction = receiver_address == address
+            const direction = to == address
                 ? 'incoming' 
                 : 'outcoming';
 
@@ -197,7 +200,26 @@ export class Client {
                         data: {
                             ...data,
                             from: tx.tx.priority_op.from,
-                            to: tx.tx.priority_op.to,
+                            to,
+                            pq_id: tx.pq_id,
+                            token, amount,
+                        },
+                    };
+                }
+                case type == 'FullExit': {
+                    console.log(tx);
+                    const token = await this.tokenNameFromId(tx.tx.priority_op.token);
+                    const amount = readableEther(tx.tx.withdraw_amount || 0);
+                    return {
+                        fields: [
+                            { key: 'amount',      label: 'Amount' },
+                            { key: 'row_status',  label: 'Status' },
+                            { key: 'pq_id',       label: 'Priority op' },
+                        ],
+                        data: {
+                            ...data,
+                            from: tx.tx.priority_op.eth_address,
+                            to,
                             pq_id: tx.pq_id,
                             token, amount,
                         },
@@ -216,7 +238,7 @@ export class Client {
                         data: {
                             ...data,
                             from: tx.tx.from,
-                            to: tx.tx.to,
+                            to,
                             token, amount,
                         },
                     };
@@ -233,8 +255,30 @@ export class Client {
                         data: {
                             ...data,
                             from: tx.tx.from,
-                            to: tx.tx.to,
+                            to,
                             token, amount,
+                        },
+                    };
+                }
+                case type == 'Close': {
+                    return {
+                        fields: [
+                        ],
+                        data: {
+                            ...data,
+                            from: tx.tx.account,
+                            to: '',
+                        },
+                    };
+                }
+                case type == 'ChangePubKey': {
+                    return {
+                        fields: [
+                        ],
+                        data: {
+                            ...data,
+                            from: tx.tx.account,
+                            to: '',
                         },
                     };
                 }
