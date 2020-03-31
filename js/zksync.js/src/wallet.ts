@@ -1,6 +1,6 @@
 import { Contract, ContractTransaction, ethers, utils } from "ethers";
 import { ETHProxy, Provider } from "./provider";
-import { serializeAddress, serializeNonce, Signer } from "./signer";
+import { Signer } from "./signer";
 import {
     AccountState,
     Address,
@@ -8,7 +8,8 @@ import {
     Nonce,
     PriorityOperationReceipt,
     TransactionReceipt,
-    PubKeyHash
+    PubKeyHash,
+    TxEthSignature
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -20,7 +21,7 @@ import {
 } from "./utils";
 
 // Our MetaMask users sometimes use custom gas price values,
-// which we can't know. We use this constant to assure that 
+// which we can't know. We use this constant to assure that
 // gasprice from our calculations isn't smaller than actually used one.
 const metamaskIncreaseGasPriceFactor = 10;
 
@@ -79,6 +80,7 @@ export class Wallet {
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce?: Nonce;
+        ethSignatureType?: "EthereumSignature" | "EIP1271Signature";
     }): Promise<Transaction> {
         if (!this.signer) {
             throw new Error(
@@ -113,9 +115,10 @@ export class Wallet {
             `Nonce: ${nonce}\n` +
             `Fee: ${stringFee} ${stringToken}`;
 
-        const txMessageEthSignature = await this.ethSigner.signMessage(
-            humanReadableTxInfo
-        );
+        const txMessageEthSignature: TxEthSignature = {
+            type: transfer.ethSignatureType || "EthereumSignature",
+            signature: await this.ethSigner.signMessage(humanReadableTxInfo)
+        };
 
         const signedTransferTransaction = this.signer.signSyncTransfer(
             transactionData
@@ -138,6 +141,7 @@ export class Wallet {
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce?: Nonce;
+        ethSignatureType?: "EthereumSignature" | "EIP1271Signature";
     }): Promise<Transaction> {
         if (!this.signer) {
             throw new Error(
@@ -172,9 +176,10 @@ export class Wallet {
             `Nonce: ${nonce}\n` +
             `Fee: ${stringFee} ${stringToken}`;
 
-        const txMessageEthSignature = await this.ethSigner.signMessage(
-            humanReadableTxInfo
-        );
+        const txMessageEthSignature: TxEthSignature = {
+            type: withdraw.ethSignatureType || "EthereumSignature",
+            signature: await this.ethSigner.signMessage(humanReadableTxInfo)
+        };
 
         const signedWithdrawTransaction = this.signer.signSyncWithdraw(
             transactionData
@@ -401,7 +406,9 @@ export class Wallet {
                 deposit.token,
                 gasPrice
             );
-            maxFeeInETHToken = maxFeeInETHToken.mul(metamaskIncreaseGasPriceFactor);
+            maxFeeInETHToken = maxFeeInETHToken.mul(
+                metamaskIncreaseGasPriceFactor
+            );
         }
         const mainZkSyncContract = new Contract(
             this.provider.contractAddress.mainContract,
@@ -491,7 +498,9 @@ export class Wallet {
             maxFeeInETHToken = await ethProxy.estimateEmergencyWithdrawFeeInETHToken(
                 gasPrice
             );
-            maxFeeInETHToken = maxFeeInETHToken.mul(metamaskIncreaseGasPriceFactor);
+            maxFeeInETHToken = maxFeeInETHToken.mul(
+                metamaskIncreaseGasPriceFactor
+            );
         }
 
         let accountId;
