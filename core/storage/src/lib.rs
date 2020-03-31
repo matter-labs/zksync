@@ -158,17 +158,17 @@ impl StorageProcessor {
         tokens::TokensSchema(self)
     }
 
+    // Gains access to the `LeaderElection` schema.
+    pub fn leader_election_schema(&self) ->  leader_election::LeaderElectionSchema<'_> {
+        leader_election::LeaderElectionSchema(self)
+    }
+
     /// Performs several database operations within one database transaction.
     pub fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
     where
         F: FnOnce() -> Result<T, failure::Error>,
     {
         self.conn().transaction(|| f())
-    }
-
-    // Gains access to the `LeaderElection` schema.
-    pub fn leader_election_schema(&self) ->  leader_election::LeaderElectionSchema<'_> {
-        return leader_election::LeaderElectionSchema(self)
     }
 
     fn conn(&self) -> &RecoverableConnection<PgConnection> {

@@ -5,13 +5,11 @@
 //!
 //! Right now logic of this actor is simple, but in future consensus will replace it using the same API.
 
-use std::time::Instant;
 use futures::channel::{mpsc, oneshot};
 use futures::SinkExt;
 use tokio::runtime::Runtime;
 use tokio::time;
-use log::error;
-use models::node::config::{TX_MINIBATCH_CREATE_TIME, LEADER_ELECTION_ITERVAL, LEADER_ELECTION_TIMEOUT};
+use models::node::config::TX_MINIBATCH_CREATE_TIME;
 use crate::mempool::{GetBlockRequest, MempoolRequest, ProposedBlock};
 use crate::state_keeper::StateKeeperRequest;
 
@@ -88,35 +86,6 @@ pub fn run_block_proposer_task(
             timer.tick().await;
 
             block_proposer.commit_new_tx_mini_batch().await;
-        }
-    });
-}
-
-pub fn run_leader_election_task(
-    name: String,
-    connection_pool: storage::ConnectionPool,
-    runtime: &Runtime,
-) {
-    runtime.spawn(async move {
-        let mut timer = time::interval(LEADER_ELECTION_ITERVAL);
-        let mut last_elected: Option<Instant> = None;
-        loop {
-            if let Some(t) = last_elected {
-                if t.elapsed() >= LEADER_ELECTION_TIMEOUT {
-                    let msg = "LEADER lost its elected position: timeout";
-                    error!("{}", msg);
-                    panic!("{}", msg);
-                }
-            }
-            timer.tick().await;
-            let st = connection_pool.access_storage().map_err(|e| error!("failed to access store: {}", e)).unwrap();
-            let elected_as_leader = st.leader_election_schema()
-                    .vote_for_leader(&name, LEADER_ELECTION_TIMEOUT)
-                    .map_err(|e| error!("failed to vote for leader: {}", e))
-                    .unwrap();
-            if elected_as_leader {
-                last_elected = Some(Instant::now());
-            }
         }
     });
 }
