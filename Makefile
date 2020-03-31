@@ -50,7 +50,10 @@ db-setup:
 db-insert-contract:
 	@bin/db-insert-contract.sh
 
-db-reset: confirm_action db-wait db-drop db-setup db-insert-contract
+db-insert-eth-data:
+	@bin/db-insert-eth-data.sh
+
+db-reset: confirm_action db-wait db-drop db-setup db-insert-contract db-insert-eth-data
 	@echo database is ready
 
 db-migrate: confirm_action

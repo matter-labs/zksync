@@ -250,7 +250,7 @@ impl<'a> OperationsExtSchema<'a> {
                         .map(|v| v.to_string()),
                     operation["withdraw_amount"]
                         .as_str()
-                        .unwrap_or("unknown amount")
+                        .unwrap_or("unknown amount"),
                 ),
                 &_ => (
                     "unknown from".to_string(),
