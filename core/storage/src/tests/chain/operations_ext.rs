@@ -7,7 +7,9 @@ use crypto_exports::franklin_crypto::bellman::pairing::ff::Field;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::operations::{ChangePubKeyOp, FranklinOp};
 use models::node::priority_ops::PriorityOp;
-use models::node::{CloseOp, Deposit, DepositOp, Fr, FullExit, FullExitOp, TransferOp, WithdrawOp};
+use models::node::{
+    CloseOp, Deposit, DepositOp, Fr, FullExit, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+};
 use testkit::zksync_account::ZksyncAccount;
 // Local imports
 use crate::tests::db_test;
@@ -80,6 +82,31 @@ fn get_account_transactions_history() {
         };
 
         ExecutedOperations::PriorityOp(Box::new(executed_op))
+    };
+
+    let executed_transfer_to_new_op = {
+        let transfer_to_new_op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
+            tx: from_zksync_account.sign_transfer(
+                token,
+                amount.clone(),
+                BigDecimal::from(0),
+                &to_account_address,
+                None,
+                true,
+            ),
+            from: from_account_id,
+            to: to_account_id,
+        }));
+
+        let executed_transfer_to_new_op = ExecutedTx {
+            tx: transfer_to_new_op.try_get_tx().unwrap(),
+            success: true,
+            op: Some(transfer_to_new_op),
+            fail_reason: None,
+            block_index: None,
+        };
+
+        ExecutedOperations::Tx(Box::new(executed_transfer_to_new_op))
     };
 
     let executed_transfer_op = {
@@ -172,6 +199,7 @@ fn get_account_transactions_history() {
         block_transactions: vec![
             executed_deposit_op,
             executed_full_exit_op,
+            executed_transfer_to_new_op,
             executed_transfer_op,
             executed_withdraw_op,
             executed_close_op,
@@ -249,8 +277,8 @@ fn get_account_transactions_history() {
             .operations_ext_schema()
             .get_account_transactions_history(&to_account_address, 0, 10)?;
 
-        assert_eq!(from_history.len(), 6);
-        assert_eq!(to_history.len(), 3);
+        assert_eq!(from_history.len(), 7);
+        assert_eq!(to_history.len(), 4);
 
         Ok(())
     });
