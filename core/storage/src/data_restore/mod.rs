@@ -63,11 +63,8 @@ impl<'a> DataRestoreSchema<'a> {
             StateSchema(self.0).update_block_events(block_events)?;
 
             for &TokenAddedEvent { id, address } in token_events.iter() {
-                TokensSchema(self.0).store_token(Token {
-                    id,
-                    address,
-                    symbol: format!("ERC20-{}", id),
-                })?;
+                let token = Token::new(id, address, &format!("ERC20-{}", id));
+                TokensSchema(self.0).store_token(token)?;
             }
 
             self.update_last_watched_block_number(last_watched_eth_number)?;

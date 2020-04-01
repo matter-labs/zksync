@@ -48,10 +48,24 @@ pub enum TokenLike {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+/// Token supported in ZK Sync protocol
 pub struct Token {
+    /// id is used for tx signature and serialization
     pub id: TokenId,
+    /// Contract address of ERC20 token or Address::zero() for "ETH"
     pub address: Address,
+    /// Token symbol (e.g. "ETH" or "USDC")
     pub symbol: String,
+}
+
+impl Token {
+    pub fn new(id: TokenId, address: Address, symbol: &str) -> Self {
+        Self {
+            id,
+            address,
+            symbol: symbol.to_string(),
+        }
+    }
 }
 
 pub fn priv_key_from_fs(fs: Fs) -> PrivateKey {

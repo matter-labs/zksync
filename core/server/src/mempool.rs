@@ -23,7 +23,7 @@ use models::node::{
     AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, Token, TokenId,
     TokenLike, TransferOp, TransferToNewOp,
 };
-use models::params::{max_block_chunk_size, MAX_SUPPORTED_TOKENS};
+use models::params::max_block_chunk_size;
 use std::collections::{HashMap, VecDeque};
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;
@@ -364,7 +364,7 @@ impl TokenDBCache {
     pub fn new(db_pool: ConnectionPool) -> Self {
         Self {
             db_pool,
-            tokens: HashMap::with_capacity(MAX_SUPPORTED_TOKENS),
+            tokens: HashMap::new(),
         }
     }
 
@@ -388,10 +388,10 @@ impl TokenDBCache {
                 .get_token(token_like)
                 .map_err(|e| format_err!("Tokens load failed: {}", e))?;
 
-            Ok(db_token.map(|t| {
-                self.tokens.insert(t.id, t.clone());
-                t
-            }))
+            if let Some(token) = &db_token {
+                self.tokens.insert(token.id, token.clone());
+            }
+            Ok(db_token)
         }
     }
 }

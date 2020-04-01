@@ -1,5 +1,6 @@
 // Built-in deps
 use std::convert::TryInto;
+use std::ops::Rem;
 use std::str::FromStr;
 // External deps
 use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
@@ -16,7 +17,6 @@ use web3::types::U256;
 use crate::circuit::utils::append_le_fixed_width;
 use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
 use crate::params;
-use failure::_core::ops::Rem;
 
 // TODO: replace Vec with Iterator?
 

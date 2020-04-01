@@ -3,28 +3,20 @@ use std::collections::HashMap;
 // External imports
 use diesel::prelude::*;
 // Workspace imports
-use models::node::{Address, Token, TokenId, TokenLike};
+use models::node::{Token, TokenId, TokenLike};
 // Local imports
 use self::records::DbToken;
 use crate::schema::*;
+use crate::tokens::utils::address_to_stored_string;
 use crate::StorageProcessor;
 
 pub mod records;
+mod utils;
 
 /// Tokens schema handles the `tokens` table, providing methods to
 /// get and store new tokens.
 #[derive(Debug)]
 pub struct TokensSchema<'a>(pub &'a StorageProcessor);
-
-pub(self) fn address_to_stored_string(address: &Address) -> String {
-    format!("0x{:x}", address)
-}
-
-pub(self) fn stored_str_address_to_address(address: &str) -> Address {
-    address[2..]
-        .parse()
-        .expect("failed to parse stored db address")
-}
 
 impl<'a> TokensSchema<'a> {
     /// Persists the token in the database.
@@ -73,18 +65,5 @@ impl<'a> TokensSchema<'a> {
                 .optional(),
         }?;
         Ok(db_token.map(|t| t.into()))
-    }
-}
-
-#[cfg(test)]
-pub mod test {
-    use crate::tokens::{address_to_stored_string, stored_str_address_to_address};
-    use models::node::Address;
-
-    #[test]
-    fn address_store_roundtrip() {
-        let address = Address::random();
-        let stored_address = address_to_stored_string(&address);
-        assert_eq!(address, stored_str_address_to_address(&stored_address));
     }
 }

@@ -3,6 +3,7 @@ use serde_derive::{Deserialize, Serialize};
 // Workspace imports
 // Local imports
 use crate::schema::*;
+use crate::tokens::utils::{address_to_stored_string, stored_str_address_to_address};
 use models::node::{Token, TokenId};
 
 #[derive(
@@ -28,7 +29,7 @@ impl From<Token> for DbToken {
     fn from(token: Token) -> Self {
         Self {
             id: token.id as i32,
-            address: super::address_to_stored_string(&token.address),
+            address: address_to_stored_string(&token.address),
             symbol: token.symbol,
         }
     }
@@ -38,7 +39,7 @@ impl Into<Token> for DbToken {
     fn into(self) -> Token {
         Token {
             id: self.id as TokenId,
-            address: super::stored_str_address_to_address(&self.address),
+            address: stored_str_address_to_address(&self.address),
             symbol: self.symbol,
         }
     }
