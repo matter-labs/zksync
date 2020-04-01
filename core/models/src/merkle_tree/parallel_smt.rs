@@ -4,19 +4,11 @@ use crate::primitives::GetBits;
 use fnv::FnvHashMap;
 use std::fmt::Debug;
 
-fn select<T>(condition: bool, a: T, b: T) -> (T, T) {
-    if condition {
-        (a, b)
-    } else {
-        (b, a)
-    }
-}
-
-/// Nodes enumarated starting with index(root) = 1
-/// We need 2 * TREE_HEIGHT bits
+/// Nodes are indexed starting with index(root) = 1
+/// To store the index, at least 2 * TREE_HEIGHT bits is required.
 type NodeIndex = u64;
 
-/// Lead index: 0 <= i < N (u64 to avoid conversions; 64 bit HW should be used anyway)
+/// Lead index: 0 <= i < N (u64 to avoid conversions; 64 bit HW should be used anyway).
 type ItemIndex = usize;
 
 /// Tree of depth 0: 1 item (which is root), level 0 only
@@ -24,18 +16,26 @@ type ItemIndex = usize;
 /// Tree of depth N: 2 ^ N items, 0 <= level < depth
 type Depth = usize;
 
-/// Index of the node in the vector; slightly inefficient, won't be needed when rust gets non-lexical timelines
+/// Index of the node in the vector; slightly inefficient, won't be needed when rust gets non-lexical lifetimes.
 type NodeRef = usize;
 
+/// Sparse Merkle tree with the support of the parallel hashes calculation.
+///
+/// Sparse Merkle tree is basically a [Merkle tree] which is allowed to have
+/// gapes between elements.
+///
+/// The essential operation of this structure is obtaining a root hash of the structure,
+/// which represents the state of all of the tree elements.
+///
+/// The sparseness of the tree is implementing through a "default leaf" - an item which
+/// hash will be used for the missing indices instead of the actual element hash.
+///
+/// Since this means that basically the tree is "full" all the time (all the empty indices
+/// are taken by the "default" element), the tree has fixed capacity and cannot be extended
+/// above that. The root hash is calculated for the full tree every time.
+///
+/// [Merkle tree]: https://en.wikipedia.org/wiki/Merkle_tree
 #[derive(Debug, Clone)]
-pub struct Node {
-    depth: Depth,
-    index: NodeIndex,
-    left: Option<NodeRef>,
-    right: Option<NodeRef>,
-}
-
-#[derive(Clone)]
 pub struct SparseMerkleTree<T, Hash, H>
 where
     T: GetBits + Default + Sync,
@@ -54,12 +54,65 @@ where
     cache: FnvHashMap<NodeIndex, Hash>,
 }
 
+/// Merkle Tree branch node.
+#[derive(Debug, Clone)]
+pub struct Node {
+    depth: Depth,
+    index: NodeIndex,
+    left: Option<NodeRef>,
+    right: Option<NodeRef>,
+}
+
+/// Child node direction relatively to its parent.
+#[derive(Debug, Clone, Copy)]
+enum NodeDirection {
+    Left,
+    Right,
+}
+
+impl NodeDirection {
+    /// Given the parent index, calculates the child index with respect to the child direction.
+    pub fn child_index(self, parent_idx: NodeIndex) -> NodeIndex {
+        // Given the parent index N, its child has indices (2*N) and (2*N + 1).
+        match self {
+            Self::Left => parent_idx * 2,
+            Self::Right => parent_idx * 2 + 1,
+        }
+    }
+
+    /// Creates a child node direction basing on its index.
+    pub fn from_idx(idx: NodeIndex) -> Self {
+        // Left nodes are always even, right nodes are always odd.
+        let is_left = (idx & 1) == 0;
+
+        if is_left {
+            Self::Left
+        } else {
+            Self::Right
+        }
+    }
+
+    /// Depending on the direction, orders the two elements: "primary" and the "secondary".
+    /// Direction is assumed to be related to the "primary" element. Thus,
+    /// for the `Left` direction, the order is ("primary", "secondary") - "primary" on the left,
+    /// for the `Right`, the order is ("secondary", "primary") - "primary" on the right.
+    pub fn order_elements<T>(self, primary_el: T, secondary_el: T) -> (T, T) {
+        match self {
+            Self::Left => (primary_el, secondary_el),
+            Self::Right => (secondary_el, primary_el),
+        }
+    }
+}
+
 impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
 where
     T: GetBits + Default + Sync,
     Hash: Clone + Debug + Sync + Send,
     H: Hasher<Hash> + Default + Sync,
 {
+    /// Creates a new tree of certain depth (which determines the
+    /// capacity of the tree, since the given height will not be
+    /// exceeded).
     pub fn new(tree_depth: Depth) -> Self {
         assert!(tree_depth > 1);
         let hasher = H::default();
@@ -94,7 +147,184 @@ where
         }
     }
 
-    #[inline(always)]
+    /// Obtains the element for a certain index.
+    pub fn get(&self, index: ItemIndex) -> Option<&T> {
+        self.items.get(&index)
+    }
+
+    /// Inserts an element to the tree.
+    pub fn insert(&mut self, item_index: ItemIndex, item: T) {
+        assert!(item_index < self.capacity());
+        let tree_depth = self.tree_depth;
+        let leaf_index: NodeIndex = ((1 << tree_depth) + item_index) as NodeIndex;
+
+        self.items.insert(item_index, item);
+
+        // Invalidate the root cache.
+        self.cache.remove(&1);
+
+        // Traverse the tree, starting from the root.
+        // Since our tree is "sparse", it can have gaps.
+        // Essentially this means that we should go down from the root node, calculating
+        // the expected direction, and find the node which does not have a child with this direction,
+        // and insert it.
+        //
+        // Schematic representation:
+        //
+        // ```text
+        //     __(1)__
+        //    |       |
+        //  _(2)_    (3)_
+        // |     |       |
+        // A     B       D
+        // ```
+        //
+        // 1 - Root node.
+        // 2 - Node with both left and right children.
+        // 3 - Node with only the right children.
+        //
+        // If we want to insert value C to the third position, we will start from (1), then go to the (3)
+        // and there insert the value as the left child:
+        //
+        // ```text
+        //     __(1)__
+        //    |       |
+        //  _(2)_   _(3)_
+        // |     | |     |
+        // A     B C     D
+        // ```
+        let mut current_node_ref = self.root;
+        loop {
+            let current_node = self.nodes[current_node_ref].clone();
+            let current_level = self.calculate_level(current_node.depth);
+
+            // We have the index of the child, and since at every level the index is
+            // divided by 2, to check the direction at some level we may just check
+            // the corresponding bit in the child index.
+            // Even value will mean the "left" direction, and the odd one will mean "right".
+            let going_right = (leaf_index & (1 << current_level)) > 0;
+            let (dir, child_ref) = if going_right {
+                (NodeDirection::Right, current_node.right)
+            } else {
+                (NodeDirection::Left, current_node.left)
+            };
+
+            if let Some(next_ref) = child_ref {
+                // Child exists. We must go further the tree.
+                let next = self.nodes[next_ref].clone();
+
+                // Normalized leaf index is basically an index of the node parent
+                // to our leaf on the current level.
+                let leaf_index_normalized = leaf_index >> (tree_depth - next.depth);
+
+                // Check if the `next` node is the node we should update.
+                if leaf_index_normalized == next.index {
+                    // Yep, we should update the `next` node.
+
+                    // Start from invalidating the cache for this node.
+                    self.wipe_cache(next.index, current_node.index);
+
+                    // We should go at least one full level deeper.
+                    if next.index == leaf_index {
+                        // We reached the leaf, no further updating required.
+                        // All the outdated caches are invalidated, and the leaf value
+                        // was inserted below.
+                        break;
+                    } else {
+                        // We didn't reach the leaf layer, thus we should keep going down the tree.
+                        current_node_ref = next_ref;
+                        continue;
+                    }
+                } else {
+                    // Next node is **not** the node we must update.
+                    // We have to insert one additional node which will have the
+                    // `next` node and our node as children.
+
+                    // Find the intersection point: the biggest index which will
+                    // be the parent for both of the nodes.
+                    let common_parent_index = {
+                        let mut first_node_idx = leaf_index_normalized;
+                        let mut second_node_idx = next.index;
+
+                        // As the index of the parent to the node can be calculated
+                        // by dividing it by two, we keep dividing both indices until
+                        // they are equal. Once they are equal, we've got the common parent index
+                        while first_node_idx != second_node_idx {
+                            first_node_idx >>= 1;
+                            second_node_idx >>= 1;
+                        }
+                        first_node_idx
+                    };
+
+                    // Invalidate the cache for the intersection point.
+                    self.wipe_cache(common_parent_index, current_node.index);
+
+                    // Insert the leaf node.
+                    let leaf_ref = self.insert_node(leaf_index, tree_depth, None, None);
+
+                    // Find the direction of our node relatively to the parent
+                    // and order "our" node, then order the references to match the directions.
+                    let direction = if leaf_index_normalized > next.index {
+                        NodeDirection::Right
+                    } else {
+                        NodeDirection::Left
+                    };
+
+                    let (lhs, rhs) = direction.order_elements(Some(leaf_ref), Some(next_ref));
+
+                    // Insert a split node and set it as a child for the current node.
+                    let split_depth = Self::depth(common_parent_index);
+                    let split_node_ref =
+                        self.insert_node(common_parent_index, split_depth, lhs, rhs);
+                    self.add_child_node(current_node_ref, dir, split_node_ref);
+                    break;
+                }
+            } else {
+                // There is no child within the direction of the node to insert.
+                // We must simply insert the leaf and make it a child of the latest
+                // existing parent node.
+                // No further processing is required.
+
+                let leaf_ref = self.insert_node(leaf_index, tree_depth, None, None);
+                self.add_child_node(current_node_ref, dir, leaf_ref);
+                break;
+            }
+        }
+    }
+
+    /// Removes an element with a given index, and returns the removed
+    /// element (if it existed in the tree).
+    pub fn remove(&mut self, index: ItemIndex) -> Option<T> {
+        let old = self.items.remove(&index);
+        let item = T::default();
+
+        self.insert(index, item);
+
+        old
+    }
+
+    /// Returns the Merkle root hash of the tree. This operation can cost up to O(N*logN):
+    /// the root hash is calculated in this method, and it will build the whole hash tree
+    /// if this method was not called. The intermediate calculation results are caches though,
+    /// thus follow-up invocations will cost less.
+    pub fn root_hash(&mut self) -> Hash {
+        const ROOT_ITEM_IDX: ItemIndex = 0;
+
+        let (root_hash, intermediate_hashes) = self.get_hash(ROOT_ITEM_IDX);
+
+        // Store all the intermediate hashes in the cache.
+        for (item_idx, hash) in intermediate_hashes {
+            self.cache.insert(item_idx, hash);
+        }
+        root_hash
+    }
+
+    /// Returns the capacity of the tree (how many items can the tree hold).
+    pub fn capacity(&self) -> usize {
+        1 << self.tree_depth
+    }
+
+    /// Calculates the depth ("layer") of the element with the provided index.
     fn depth(index: NodeIndex) -> Depth {
         let mut level: Depth = 0;
         let mut i = index;
@@ -105,21 +335,19 @@ where
         level
     }
 
-    // How many items can the tree hold
-    #[inline(always)]
-    pub fn capacity(&self) -> usize {
-        1 << self.tree_depth
-    }
-
-    // How many hashes can the tree hold
-    #[inline(always)]
+    // Returns the *hash* capacity of the tree (how many hashes can the tree hold)
     #[allow(dead_code)]
     fn nodes_capacity(&self) -> usize {
         (1 << (self.tree_depth + 1)) - 1
     }
 
+    /// Removes the entry with provided index from the hashes cache, as well
+    /// as its parent entries, limited by the `parent` index.
     fn wipe_cache(&mut self, child: NodeIndex, parent: NodeIndex) {
         if self.cache.remove(&child).is_some() {
+            // Item existed in cache, now we should go up the tree
+            // and remove parent hashes, until we reach the provided
+            // `parent` index.
             let mut i = child >> 1;
             while i > parent {
                 self.cache.remove(&i);
@@ -128,74 +356,7 @@ where
         }
     }
 
-    pub fn insert(&mut self, item_index: ItemIndex, item: T) {
-        assert!(item_index < self.capacity());
-        let tree_depth = self.tree_depth;
-        let leaf_index: NodeIndex = ((1 << tree_depth) + item_index) as NodeIndex;
-
-        self.items.insert(item_index, item);
-
-        // invalidate root cache
-        self.cache.remove(&1);
-
-        // traverse the tree
-        let mut cur_ref = self.root;
-        loop {
-            let cur = { self.nodes[cur_ref].clone() };
-
-            let dir = (leaf_index & (1 << (tree_depth - cur.depth - 1))) > 0;
-            let link = if dir { cur.right } else { cur.left };
-            if let Some(next_ref) = link {
-                let next = self.nodes[next_ref].clone();
-                let leaf_index_normalized = leaf_index >> (tree_depth - next.depth);
-
-                if leaf_index_normalized == next.index {
-                    // go at least one full level deeper
-                    self.wipe_cache(next.index, cur.index);
-                    if next.index == leaf_index {
-                        // we reached the leaf, exit
-                        break;
-                    } else {
-                        // follow the link
-                        cur_ref = next_ref;
-                        continue;
-                    }
-                } else {
-                    // find intersection
-                    let inter_index = {
-                        // intersection index is the longest common prefix
-                        let mut i = leaf_index_normalized;
-                        let mut j = next.index;
-                        while i != j {
-                            i >>= 1;
-                            j >>= 1;
-                        }
-                        i
-                    };
-
-                    self.wipe_cache(inter_index, cur.index);
-
-                    // add a split node at intersection and insert the leaf
-                    let leaf_ref = self.insert_node(leaf_index, tree_depth, None, None);
-                    let (lhs, rhs) = select(
-                        leaf_index_normalized > next.index,
-                        Some(next_ref),
-                        Some(leaf_ref),
-                    );
-                    let inter_ref =
-                        self.insert_node(inter_index, Self::depth(inter_index), lhs, rhs);
-                    self.add_child_node(cur_ref, dir, inter_ref);
-                    break;
-                }
-            } else {
-                // insert the leaf node and update cur
-                let leaf_ref = self.insert_node(leaf_index, tree_depth, None, None);
-                self.add_child_node(cur_ref, dir, leaf_ref);
-                break;
-            }
-        }
-    }
-
+    /// Inserts the node to the tree and returns it's position.
     fn insert_node(
         &mut self,
         index: NodeIndex,
@@ -212,166 +373,158 @@ where
         self.nodes.len() - 1
     }
 
-    fn add_child_node(&mut self, node_ref: NodeRef, dir: bool, child: NodeRef) {
+    /// Sets a child node for an existing node in the tree.
+    fn add_child_node(&mut self, node_ref: NodeRef, dir: NodeDirection, child: NodeRef) {
         let node = &mut self.nodes[node_ref];
-        if dir {
-            node.right = Some(child);
-        } else {
-            node.left = Some(child);
+
+        match dir {
+            NodeDirection::Left => node.left = Some(child),
+            NodeDirection::Right => node.right = Some(child),
         }
     }
 
-    fn get_hash_line(&self, child_ref: NodeRef, parent: &Node) -> (Hash, Vec<(NodeIndex, Hash)>) {
+    /// Finds the hash of the node's child, using one of the following strategy:
+    /// - If the hash exists in cache, the cached value is returned;
+    /// - If the element with the child's index absents in the tree, the precomputed hash
+    ///   for the corresponding layer is returned.
+    /// - Otherwise, the hash for the child is actually calculated using `calculate_child_hash`
+    ///   method.
+    fn get_child_hash(&self, parent: &Node, dir: NodeDirection) -> (Hash, Vec<(NodeIndex, Hash)>) {
+        let child_ref = match dir {
+            NodeDirection::Left => parent.left,
+            NodeDirection::Right => parent.right,
+        };
+
+        let child_index = dir.child_index(parent.index);
+
+        // Check if the child data exists in the cache.
+        if let Some(cached) = self.cache.get(&child_index) {
+            // Cache hit, no calculations required.
+            let updates = vec![];
+
+            (cached.clone(), updates)
+        } else {
+            match child_ref {
+                Some(child_ref) => {
+                    // Child exists in the tree, we must calculate the underlying hashes.
+                    self.calculate_child_hash(child_ref, parent)
+                }
+                None => {
+                    let default_hash_for_layer = self.prehashed[parent.depth + 1].clone();
+                    let updates = vec![];
+                    (default_hash_for_layer, updates)
+                }
+            }
+        }
+    }
+
+    /// Calculates the hash of the node's child given the parent node and the child direction.
+    fn calculate_child_hash(
+        &self,
+        child_ref: NodeRef,
+        parent: &Node,
+    ) -> (Hash, Vec<(NodeIndex, Hash)>) {
         let child = &self.nodes[child_ref];
 
-        let acc = self.get_hash(child_ref);
-        let mut cur_hash = acc.0;
-        let mut updates = acc.1;
+        // Get the hash of the child itself.
+        let (mut cur_hash, mut updates) = self.get_hash(child_ref);
 
+        // Now, we should fill the layer "gaps" between child and parent.
+        // This means that we should go through layers of the child and parent,
+        // and update the obtained hash with the precomputed hash for this layer.
         let mut cur_depth = child.depth - 1;
-        let mut cur_i = child.index;
+        let mut cur_idx = child.index;
 
+        // The topmost layer has depth 0, so we go from the higher layer to the lower one.
         while cur_depth > parent.depth {
-            unsafe {
-                HC += 1;
-            }
-            let swap = (cur_i & 1) == 0;
-            let (lhs, rhs) = select(swap, cur_hash, self.prehashed[cur_depth + 1].clone());
-            cur_hash = self
-                .hasher
-                .compress(&lhs, &rhs, self.tree_depth - cur_depth - 1);
+            // Before combining current hash with the precomputed one, we should determine the order
+            // (basically, the position of "our" hash relatively to the next-layer parent).
+            let direction = NodeDirection::from_idx(cur_idx);
+
+            let supplement_hash = self.prehashed[cur_depth + 1].clone();
+            let (lhs_hash, rhs_hash) = direction.order_elements(cur_hash, supplement_hash);
+
+            cur_hash = self.calculate_hash(cur_depth, &lhs_hash, &rhs_hash);
+
+            // At each iteration our index become 2 times smaller, and the depth is decremented by 1.
             cur_depth -= 1;
-            cur_i >>= 1;
-            //self.cache.insert(cur_i, cur_hash.clone());
-            updates.push((cur_i, cur_hash.clone()));
+            cur_idx >>= 1;
+
+            //self.cache.insert(cur_idx, cur_hash.clone());
+            updates.push((cur_idx, cur_hash.clone()));
         }
         (cur_hash, updates)
     }
 
-    fn get_child_hash(
-        &self,
-        child_ref: Option<NodeRef>,
-        parent: &Node,
-        dir: usize,
-    ) -> (Hash, Vec<(NodeIndex, Hash)>) {
-        let neighbour_index = parent.index * 2 + dir as NodeIndex;
-        match self.cache.get(&neighbour_index) {
-            Some(cached) => (
-                cached.clone(),
-                Vec::with_capacity((self.tree_depth + 1) * 2),
-            ),
-            None => match child_ref {
-                Some(child_ref) => self.get_hash_line(child_ref, parent),
-                None => (
-                    self.prehashed[parent.depth + 1].clone(),
-                    Vec::with_capacity((self.tree_depth + 1) * 2),
-                ),
-            },
-        }
-    }
-
+    /// Calculates the tree hash for the element given its position.
+    /// Returns the calculates hash and the list of updated underlying
+    /// hashes together with their positions.
     fn get_hash(&self, node_ref: NodeRef) -> (Hash, Vec<(NodeIndex, Hash)>) {
         let node = &self.nodes[node_ref].clone();
-        let mut acc = {
+
+        // Calculate the hash of this node, and collect the underlying updates.
+        // The updates list won't contain the current node, we will add it below.
+        let (hash, mut updates) = {
             if node.depth == self.tree_depth {
                 // leaf node: return item hash
                 let item_index: ItemIndex = (node.index - (1 << self.tree_depth)) as ItemIndex;
-                unsafe {
-                    HN += 1;
-                }
-                let item_hash = self.hasher.hash_bits(self.items[&item_index].get_bits_le());
-                (item_hash, vec![])
+
+                let item_bits = self.items[&item_index].get_bits_le();
+                let item_hash = self.hasher.hash_bits(item_bits);
+
+                // There are no underlying updates for leaf node.
+                let updates = vec![];
+
+                (item_hash, updates)
             } else {
-                let (hl, hr) = rayon::join(
-                    || self.get_child_hash(node.left, node, 0),
-                    || self.get_child_hash(node.right, node, 1),
+                // Not a leaf node: recursively calculate the hashes up to this node.
+
+                // Use `rayon` to calculate hashes in parallel.
+                let (left_hashes, right_hashes) = rayon::join(
+                    || self.get_child_hash(node, NodeDirection::Left),
+                    || self.get_child_hash(node, NodeDirection::Right),
                 );
 
-                // level is used by hasher for personalization
-                let level = self.tree_depth - node.depth - 1;
-                let hash = self.hasher.compress(&hl.0, &hr.0, level);
+                let (lhs_hash, lhs_updates) = left_hashes;
+                let (rhs_hash, rhs_updates) = right_hashes;
 
-                let mut updates = hl.1;
-                updates.extend(hr.1);
+                let hash = self.calculate_hash(node.depth, &lhs_hash, &rhs_hash);
+
+                // Merge left and right updates.
+                let mut updates = lhs_updates;
+                updates.extend(rhs_updates);
                 (hash, updates)
             }
         };
-        acc.1.push((node.index, acc.0.clone()));
+
+        // Add the current node hash to the list of updates.
+        updates.push((node.index, hash.clone()));
+
         //self.cache.insert(node.index, hash.clone());
-        acc
+        (hash, updates)
     }
 
-    pub fn root_hash(&mut self) -> Hash {
-        let acc = self.get_hash(0);
-        for v in acc.1 {
-            self.cache.insert(v.0, v.1);
-        }
-        acc.0
+    fn calculate_hash(&self, cur_depth: usize, lhs_hash: &Hash, rhs_hash: &Hash) -> Hash {
+        // Level is used by hasher for personalization
+        let level = self.calculate_level(cur_depth);
+
+        // Calculate the hash of this node.
+        self.hasher.compress(lhs_hash, rhs_hash, level)
     }
 
-    pub fn reset_stats() {
-        unsafe {
-            HN = 0;
-            HC = 0;
-        }
-    }
-
-    pub fn print_stats() {
-        // unsafe {
-        //            debug!("leaf hashes: {}", HN);
-        //            debug!("tree hashes: {}", HC);
-        // }
-    }
-
-    pub fn make_a_future(&self) {
-
-        //        let pool = CpuPool::new_num_cpus();
-        //
-        //        let r = thread::scope(|scope| {
-        //            scope.spawn(move |_| {
-        //                debug!("Hello! {:?}", self.root_hash());
-        //                std::thread::sleep(Duration::from_millis(1400));
-        //                debug!("done");
-        //                3 + 5
-        //            });
-        //        }).unwrap();
-        //        debug!("r {:?}", r);
-
-        //        debug!("testing cpu");
-        //        crossbeam_utils::thread::scope(|scope| {
-        //            scope.spawn(move || {
-        //                debug!("begin");
-        //            })
-        //        });
-
-        //        Box::new(self.pool.spawn(future::lazy(move || {
-        //            debug!("begin");
-        //            let r = self.root_hash();
-        //            debug!("end: {:?}", r);
-        //            future::ok::<(), ()>(())
-        //        })))/*.then(|result| {
-        //            debug!("result {:?}", result);
-        //            future::ok::<(), ()>(())
-        //        }));*/
-        //f.wait();
+    fn calculate_level(&self, cur_depth: usize) -> usize {
+        self.tree_depth - cur_depth - 1
     }
 }
-
-// testing stats
-// TODO: remove this for production
-static mut HN: usize = 0;
-static mut HC: usize = 0;
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use log::debug;
-
     #[derive(Debug)]
-    struct TestHasher {}
+    struct TestHasher;
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
     struct TestLeaf(u64);
 
     impl Default for TestLeaf {
@@ -419,70 +572,42 @@ mod tests {
 
     type TestSMT = SparseMerkleTree<TestLeaf, u64, TestHasher>;
 
-    use crypto_exports::rand::{thread_rng, Rand};
-
     #[test]
-    fn test_batching_tree_insert1() {
-        let rng = &mut thread_rng();
-        //        tree.insert(0, TestLeaf(0));
-        //        tree.insert(3, TestLeaf(2));
-        //        tree.insert(1, TestLeaf(1));
-        //        tree.insert(3, TestLeaf(2));
-        //        tree.insert(5, TestLeaf(2));
-        //        tree.insert(7, TestLeaf(2));
-        //
-        //        for _ in 0..1000 {
-        //            let insert_into = usize::rand(rng) % capacity;
-        //            tree.insert(insert_into, TestLeaf(u64::rand(rng)));
-        //            tree.root_hash();
-        //        }
-        //        tree.insert(usize::rand(rng) % capacity, TestLeaf(2));
-        //        //debug!("{:?}\n", tree);
-
-        let mut n = 1000;
-        for _i in 0..3 {
-            let mut tree = TestSMT::new(24);
-            let capacity = tree.capacity();
-            unsafe {
-                HN = 0;
-                HC = 0;
-            }
-            for _j in 0..n {
-                let insert_into = usize::rand(rng) % capacity;
-                tree.insert(insert_into, TestLeaf(2));
-            }
-            tree.root_hash();
-            unsafe {
-                debug!("{}: HN = {}, HC = {}\n", n, HN, HC);
-            }
-            n *= 10;
-        }
-    }
-
-    #[test]
-    fn test_batching_tree_insert_comparative() {
+    fn test_merkle_tree_insert() {
         let mut tree = TestSMT::new(3);
+
+        assert_eq!(tree.capacity(), 8);
+
         tree.insert(0, TestLeaf(1));
         assert_eq!(tree.root_hash(), 697_516_875);
+
         tree.insert(0, TestLeaf(2));
         assert_eq!(tree.root_hash(), 741_131_083);
+
         tree.insert(3, TestLeaf(2));
         assert_eq!(tree.root_hash(), 793_215_819);
     }
 
+    /// Performs some basic insert/remove operations.
     #[test]
-    fn test_cpu_pool() {
-        let tree = TestSMT::new(3);
+    fn merkle_tree_workflow() {
+        let mut tree = TestSMT::new(3);
 
-        tree.make_a_future();
+        // Add one element with known-before hash.
+        tree.insert(0, TestLeaf(1));
+        assert_eq!(tree.root_hash(), 697_516_875);
 
-        //        tree.insert(0,  TestLeaf(1));
-        //        debug!("{}", tree.root_hash());
-        //        debug!("{:?}", tree.prehashed);
-        //        debug!("{:?}", tree.nodes);
-        //
-        //        tree.insert(0, TestLeaf(2));
-        //        debug!("{}", tree.root_hash());
-        //        debug!("{:?}", tree.nodes);
+        // Add more elements.
+        for idx in 1..8 {
+            tree.insert(idx, TestLeaf(idx as u64));
+        }
+
+        // Remove them (and check that within removing we can obtain them).
+        for idx in (1..8).rev() {
+            assert_eq!(tree.remove(idx), Some(TestLeaf(idx as u64)));
+        }
+
+        // The first element left only, hash should be the same as in the beginning.
+        assert_eq!(tree.root_hash(), 697_516_875);
     }
 }
