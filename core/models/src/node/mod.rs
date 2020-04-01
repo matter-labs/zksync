@@ -40,6 +40,7 @@ pub type Address = web3::types::Address;
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 #[serde(untagged)]
+/// Order of the fields are important (from more specific types to less specific types)
 pub enum TokenLike {
     Id(TokenId),
     Address(Address),
