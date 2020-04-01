@@ -107,7 +107,7 @@ steps:
 ---
 kind: pipeline
 type: docker
-name: integration-simple
+name: integration-simple-fullexit
 clone:
     depth: 10
 volumes:
@@ -181,6 +181,7 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - sleep 15
   - zksync integration-simple
+  - zksync integration-full-exit
   depends_on:
   - start-server-detached
   - start-prover-detached
