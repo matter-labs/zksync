@@ -342,15 +342,12 @@ mod tests {
         assert_eq!(tree.capacity(), 8);
 
         tree.insert(0, 1);
-        log::debug!("{:?}", tree);
         assert_eq!(tree.root_hash(), 697_516_875);
 
         tree.insert(0, 2);
-        log::debug!("{:?}", tree);
         assert_eq!(tree.root_hash(), 741_131_083);
 
         tree.insert(3, 2);
-        //log::debug!("{:?}", tree);
         assert_eq!(tree.root_hash(), 793_215_819);
     }
 
@@ -384,107 +381,5 @@ mod tests {
 
         // The first element left only, hash should be the same as in the beginning.
         assert_eq!(tree.root_hash(), 697_516_875);
-    }
-
-    /// A very simple benchmark for tree.
-    ///
-    /// This is a self-made benchmark. It is disabled by default, since it's a long-runner,
-    /// but in can be run as follows:
-    ///
-    /// ```text
-    /// f cargo test tree_bench --features=run_benches -- --nocapture
-    /// ```
-    ///
-    /// Note that you have to run it in the `models` directory, as cargo does not support
-    /// `--features` flag in virtual workspaces.
-    #[test]
-    #[cfg_attr(not(feature = "run_benches"), ignore)]
-    fn tree_bench() {
-        // Since this benchmark is temporary and will likely be replaced with a
-        // `criterion` benches or something similar, uses and internal functions
-        // are placed within this test to not interfere with other tests.
-        use std::time;
-
-        use crate::circuit::account::CircuitAccount;
-        use crate::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
-        use crate::merkle_tree::PedersenHasher;
-
-        /// A simple bench stats counter.
-        #[derive(Debug, Default)]
-        struct BenchStats {
-            min_time: Option<time::Duration>,
-            max_time: Option<time::Duration>,
-            overall: time::Duration,
-            n_samples: u32,
-        }
-
-        impl BenchStats {
-            pub fn add_time(&mut self, time: time::Duration) {
-                if self.min_time.unwrap_or(time) >= time {
-                    self.min_time = Some(time);
-                }
-                if self.max_time.unwrap_or(time) <= time {
-                    self.max_time = Some(time);
-                }
-
-                self.overall += time;
-                self.n_samples += 1;
-            }
-
-            pub fn average(&mut self) -> time::Duration {
-                self.overall / self.n_samples
-            }
-        }
-
-        /// Function to generate an unique account.
-        fn gen_account(id: u64) -> CircuitAccount<Bn256> {
-            let mut account = CircuitAccount::<Bn256>::default();
-
-            let id_hex = format!("{:064x}", id);
-            account.address = Fr::from_hex(id_hex.as_ref()).unwrap();
-
-            account
-        }
-
-        // In this bench we want "real-life" test, so we use the actual type of
-        // the SMT.
-        type RealSMT = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
-
-        let mut create_stats = BenchStats::default();
-        let mut insert_stats = BenchStats::default();
-
-        // Create SMT.
-        let start = time::Instant::now();
-        let mut tree = RealSMT::new(crate::params::account_tree_depth() as u32);
-        let end = time::Instant::now();
-        println!("RealSMT creation time: {}ms", (end - start).as_millis());
-
-        // Add several accounts to it and measure the account generation and
-        // the insertion times.
-        // We measure account generation time, since it contains a SMT inside and
-        // since it's a part of the actual accounts SMT interaction, we want to
-        // be sure that it's a fast operation.
-        let n_samples = 10;
-        for id in 0..n_samples {
-            let start = time::Instant::now();
-            let account = gen_account(id);
-            let end = time::Instant::now();
-            create_stats.add_time(end - start);
-
-            let start = time::Instant::now();
-            tree.insert(id as u32, account);
-            let end = time::Instant::now();
-            insert_stats.add_time(end - start);
-        }
-
-        println!("Bench stats <CREATE> ({} samples):", n_samples);
-        println!("Min time: {}ms", create_stats.min_time.unwrap().as_millis());
-        println!("Max time: {}ms", create_stats.max_time.unwrap().as_millis());
-        println!("Avg time: {}ms", create_stats.average().as_millis());
-
-        println!("Bench stats <INSERT> ({} samples):", n_samples);
-        println!("Min time: {}ms", insert_stats.min_time.unwrap().as_millis());
-        println!("Max time: {}ms", insert_stats.max_time.unwrap().as_millis());
-        println!("Avg time: {}ms", insert_stats.average().as_millis());
     }
 }
