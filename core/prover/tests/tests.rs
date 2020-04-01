@@ -13,6 +13,7 @@ use models::node::{Deposit, Engine, Fr};
 use models::params::block_chunk_sizes;
 use prover::prover_data::ProverData;
 use prover::read_circuit_params;
+use circuit::witness::utils::WitnessBuilder;
 
 #[test]
 #[cfg_attr(not(feature = "keys-required"), ignore)]
@@ -137,7 +138,9 @@ fn prover_proves_a_block_and_publishes_result() {
 
 fn new_test_data_for_prover() -> ProverData {
     use circuit::witness::test_utils::test_genesis_plasma_state;
-    let (_plasma_state, mut witness_accum) = test_genesis_plasma_state(Vec::new());
+    let fee_account_id = 0;
+    let (_plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(Vec::new(), fee_account_id);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let empty_account_id = 1;
     let empty_account_address = [7u8; 20].into();

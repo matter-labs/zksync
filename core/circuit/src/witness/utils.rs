@@ -29,8 +29,8 @@ use plasma::state::CollectedFee;
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
 /// used for testing
-pub struct WitnessBuilder {
-    pub account_tree: CircuitAccountTree,
+pub struct WitnessBuilder<'a> {
+    pub account_tree: &'a mut CircuitAccountTree,
     pub fee_account_id: AccountId,
     pub block_number: BlockNumber,
     pub initial_root_hash: Fr,
@@ -44,9 +44,9 @@ pub struct WitnessBuilder {
     pub pubdata_commitment: Option<Fr>,
 }
 
-impl WitnessBuilder {
+impl<'a> WitnessBuilder<'a> {
     pub fn new(
-        account_tree: CircuitAccountTree,
+        account_tree: &'a mut CircuitAccountTree,
         fee_account_id: AccountId,
         block_number: BlockNumber,
     ) -> WitnessBuilder {
