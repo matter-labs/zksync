@@ -11,6 +11,7 @@ use models::circuit::utils::{
 };
 use models::node::FullExitOp;
 use models::params as franklin_constants;
+
 pub struct FullExitData {
     pub token: u32,
     pub account_address: u32,
@@ -225,6 +226,7 @@ mod test {
         apply_full_exit_tx, calculate_full_exit_operations_from_witness,
     };
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
+    use crate::witness::utils::WitnessBuilder;
     use bigdecimal::BigDecimal;
     use models::node::{Account, FullExit, FullExitOp};
     use testkit::zksync_account::ZksyncAccount;
