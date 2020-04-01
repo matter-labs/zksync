@@ -1,5 +1,7 @@
 // Pedersen hash implementation of the Hasher trait
 
+use std::fmt;
+
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use crate::franklin_crypto::pedersen_hash::{baby_pedersen_hash, Personalization};
 
@@ -9,9 +11,26 @@ use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 use super::hasher::Hasher;
 use crate::primitives::BitIteratorLe;
 
-#[derive(Clone)]
 pub struct PedersenHasher<E: JubjubEngine> {
     params: &'static E::Params,
+}
+
+impl<E: JubjubEngine> fmt::Debug for PedersenHasher<E> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PedersenHasher").finish()
+    }
+}
+
+// We have to implement `Clone` manually, since deriving it will depend on
+// the `Clone` implementation of `E::Params` (and will `.clone()` will not work
+// if `E::Params` are not `Clone`), which is redundant: we only hold a reference
+// and can just copy it.
+impl<E: JubjubEngine> Clone for PedersenHasher<E> {
+    fn clone(&self) -> Self {
+        Self {
+            params: self.params,
+        }
+    }
 }
 
 impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
