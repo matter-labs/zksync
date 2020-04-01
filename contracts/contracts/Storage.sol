@@ -83,7 +83,7 @@ contract Storage {
     /// @notice User authenticated facts for some nonce.
     mapping(address => mapping(uint32 => bytes)) public authFacts;
 
-        /// @notice Priority Operation container
+    /// @notice Priority Operation container
     /// @member opType Priority operation type
     /// @member pubData Priority operation public data
     /// @member expirationBlock Expiration block number (ETH block) for this request (must be satisfied before)
