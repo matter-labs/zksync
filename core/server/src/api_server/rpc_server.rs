@@ -11,10 +11,14 @@ use jsonrpc_http_server::ServerBuilder;
 use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxEthSignature;
 use models::node::tx::TxHash;
-use models::node::{Account, AccountId, FranklinTx, Nonce, PubKeyHash, TokenId};
+use models::node::{
+    closest_packable_fee_amount, Account, AccountId, FranklinTx, Nonce, PubKeyHash, Token, TokenId,
+    TokenLike,
+};
+use models::primitives::floor_big_decimal;
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use storage::{tokens::records::Token, ConnectionPool, StorageProcessor};
+use storage::{ConnectionPool, StorageProcessor};
 use web3::types::Address;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -85,6 +89,12 @@ pub struct ContractAddressResp {
     pub gov_contract: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+pub enum TxFeeTypes {
+    Withdraw,
+    Transfer,
+}
+
 enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
@@ -140,6 +150,13 @@ pub trait Rpc {
     /// "ETH" | #ERC20_ADDRESS => {Token}
     #[rpc(name = "tokens")]
     fn tokens(&self) -> Result<HashMap<String, Token>>;
+    #[rpc(name = "get_tx_fee")]
+    fn get_tx_fee(
+        &self,
+        tx_type: TxFeeTypes,
+        amount: BigDecimal,
+        token_like: TokenLike,
+    ) -> Result<BigDecimal>;
 }
 
 pub struct RpcApp {
@@ -345,6 +362,18 @@ impl Rpc for RpcApp {
             })
             .collect())
     }
+
+    fn get_tx_fee(
+        &self,
+        _tx_type: TxFeeTypes,
+        amount: BigDecimal,
+        _token_like: TokenLike,
+    ) -> Result<BigDecimal> {
+        // first approximation - just give 1 percent
+        Ok(closest_packable_fee_amount(&floor_big_decimal(
+            &(amount / BigDecimal::from(100)),
+        )))
+    }
 }
 
 pub fn start_rpc_server(
@@ -372,4 +401,38 @@ pub fn start_rpc_server(
             server.wait();
         })
         .expect("JSON-RPC http thread");
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn tx_fee_type_serialization() {
+        #[derive(Debug, Serialize, Deserialize, PartialEq)]
+        struct Query {
+            tx_type: TxFeeTypes,
+        }
+
+        let cases = vec![
+            (
+                Query {
+                    tx_type: TxFeeTypes::Withdraw,
+                },
+                r#"{"tx_type":"Withdraw"}"#,
+            ),
+            (
+                Query {
+                    tx_type: TxFeeTypes::Transfer,
+                },
+                r#"{"tx_type":"Transfer"}"#,
+            ),
+        ];
+        for (query, json_str) in cases {
+            let ser = serde_json::to_string(&query).expect("ser");
+            assert_eq!(ser, json_str);
+            let de = serde_json::from_str::<Query>(&ser).expect("de");
+            assert_eq!(query, de);
+        }
+    }
 }
