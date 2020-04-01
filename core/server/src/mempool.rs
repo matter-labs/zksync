@@ -20,10 +20,10 @@ use futures::channel::{mpsc, oneshot};
 use futures::{SinkExt, StreamExt};
 use models::node::tx::TxEthSignature;
 use models::node::{
-    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TokenId, TransferOp,
-    TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, Token, TokenId,
+    TokenLike, TransferOp, TransferToNewOp,
 };
-use models::params::max_block_chunk_size;
+use models::params::{max_block_chunk_size, MAX_SUPPORTED_TOKENS};
 use std::collections::{HashMap, VecDeque};
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;
@@ -150,15 +150,16 @@ struct Mempool {
     mempool_state: MempoolState,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
-    token_cache: TokenCache,
+    token_cache: TokenDBCache,
 }
 
 impl Mempool {
     fn token_symbol_from_id(&mut self, token_id: TokenId) -> Result<String, TxAddError> {
         self.token_cache
-            .token_symbol_from_id(token_id)
+            .get_token(TokenLike::Id(token_id))
             .or(Err(TxAddError::Other))?
             .ok_or(TxAddError::IncorrectTx)
+            .map(|t| t.symbol)
     }
 
     async fn add_tx(
@@ -353,47 +354,44 @@ impl Mempool {
 }
 
 #[derive(Debug)]
-struct TokenCache {
+struct TokenDBCache {
     db_pool: ConnectionPool,
-    ids_to_symbols: HashMap<TokenId, String>,
+    // TODO: handle stale entries. (edge case when we rename token after adding it)
+    tokens: HashMap<TokenId, Token>,
 }
 
-// TODO: delete tokens from cache after timeout
-impl TokenCache {
+impl TokenDBCache {
     pub fn new(db_pool: ConnectionPool) -> Self {
         Self {
             db_pool,
-            ids_to_symbols: HashMap::new(),
+            tokens: HashMap::with_capacity(MAX_SUPPORTED_TOKENS),
         }
     }
 
-    pub fn token_symbol_from_id(
-        &mut self,
-        token_id: TokenId,
-    ) -> Result<Option<String>, failure::Error> {
-        match self.ids_to_symbols.get(&token_id).cloned() {
-            Some(token_symbol) => Ok(Some(token_symbol)),
-            None => {
-                let storage = self
-                    .db_pool
-                    .access_storage_fragile()
-                    .map_err(|e| format_err!("Failed to access storage: {}", e))?;
+    pub fn get_token(&mut self, token_like: TokenLike) -> Result<Option<Token>, failure::Error> {
+        let cached_value = match &token_like {
+            TokenLike::Id(token_id) => self.tokens.get(token_id),
+            TokenLike::Address(address) => self.tokens.values().find(|t| &t.address == address),
+            TokenLike::Symbol(symbol) => self.tokens.values().find(|t| &t.symbol == symbol),
+        };
 
-                let loaded_tokens = storage
-                    .tokens_schema()
-                    .load_tokens()
-                    .map_err(|e| format_err!("Tokens load failed: {}", e))?;
+        if let Some(cached_value) = cached_value {
+            Ok(Some(cached_value.clone()))
+        } else {
+            let storage = self
+                .db_pool
+                .access_storage_fragile()
+                .map_err(|e| format_err!("Failed to access storage: {}", e))?;
 
-                let symbol_from_db = loaded_tokens.get(&token_id).map(|t| t.symbol.clone());
+            let db_token = storage
+                .tokens_schema()
+                .get_token(token_like)
+                .map_err(|e| format_err!("Tokens load failed: {}", e))?;
 
-                match symbol_from_db {
-                    Some(symbol) => {
-                        self.ids_to_symbols.insert(token_id, symbol.clone());
-                        Ok(Some(symbol))
-                    }
-                    None => Ok(None),
-                }
-            }
+            Ok(db_token.map(|t| {
+                self.tokens.insert(t.id, t.clone());
+                t
+            }))
         }
     }
 }
@@ -406,7 +404,7 @@ pub fn run_mempool_task(
 ) {
     let mempool_state = MempoolState::restore_from_db(&db_pool);
 
-    let token_cache = TokenCache::new(db_pool);
+    let token_cache = TokenDBCache::new(db_pool);
 
     let mempool = Mempool {
         mempool_state,

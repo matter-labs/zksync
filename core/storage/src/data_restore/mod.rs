@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use itertools::Itertools;
 // Workspace imports
 use models::node::block::Block;
-use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp};
+use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
 use models::{Operation, TokenAddedEvent};
 // Local imports
 use self::records::{
@@ -62,12 +62,12 @@ impl<'a> DataRestoreSchema<'a> {
         self.0.conn().transaction(|| {
             StateSchema(self.0).update_block_events(block_events)?;
 
-            for token in token_events.iter() {
-                TokensSchema(self.0).store_token(
-                    token.id as u16,
-                    &format!("0x{:x}", token.address),
-                    &format!("ERC20-{}", token.id),
-                )?;
+            for &TokenAddedEvent { id, address } in token_events.iter() {
+                TokensSchema(self.0).store_token(Token {
+                    id,
+                    address,
+                    symbol: format!("ERC20-{}", id),
+                })?;
             }
 
             self.update_last_watched_block_number(last_watched_eth_number)?;

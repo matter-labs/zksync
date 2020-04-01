@@ -1,7 +1,7 @@
 import {
     Wallet,
     Provider,
-    ETHProxy, getDefaultProvider, types, utils as zkutils
+    ETHProxy, types, utils as zkutils
 } from "zksync";
 // HACK: using require as type system work-around
 const franklin_abi = require('../../contracts/build/Franklin.json');
@@ -13,7 +13,6 @@ import {IERC20_INTERFACE} from "zksync/build/utils";
 const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
 const MNEMONIC = process.env.TEST_MNEMONIC;
-const ERC_20TOKEN = process.env.TEST_ERC20;
 
 const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
 console.log("Running integration test on the ", network, " network");
@@ -226,11 +225,12 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     const depositAmount = utils.parseEther(depositAmountETH);
 
     // we do two transfers to test transfer to new and ordinary transfer.
-    const transfersFee = depositAmount.div(25);
-    const transfersAmount = depositAmount.div(2).sub(transfersFee);
+    const transfersAmount = depositAmount.div(3);
+    const transfersFee = await syncProvider.getTransactionFee("Transfer", transfersAmount, token);
 
-    const withdrawFee = transfersAmount.div(20);
-    const withdrawAmount = transfersAmount.sub(withdrawFee);
+
+    const withdrawAmount = transfersAmount.div(3);
+    const withdrawFee = await syncProvider.getTransactionFee("Withdraw", withdrawAmount, token);
 
     await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
     console.log(`Auto approved deposit ok, Token: ${token}`);
@@ -251,6 +251,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 (async () => {
     try {
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
+        const ERC20_ADDRESS = process.env.TEST_ERC20;
+        const ERC20_SYMBOL = syncProvider.tokenSet.resolveTokenSymbol(ERC20_ADDRESS);
 
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
@@ -259,13 +261,13 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
             "m/44'/60'/0'/0/0"
         ).connect(ethersProvider);
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("0.05")})).wait();
-        const erc20contract = new Contract(ERC_20TOKEN, IERC20_INTERFACE, ethWallet);
-        await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.05"))).wait();
+        await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("0.5")})).wait();
+        const erc20contract = new Contract(ERC20_ADDRESS, IERC20_INTERFACE, ethWallet);
+        await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.1"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: syncWalletSigner.address, value: parseEther("0.01")}));
+        await (await ethWallet.sendTransaction({to: syncWalletSigner.address, value: parseEther("0.05")}));
         const syncWallet = await Wallet.fromEthSigner(
             syncWalletSigner,
             syncProvider,
@@ -278,7 +280,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
         );
 
         const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-        await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.01")}));
+        await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.05")}));
         const syncWallet2 = await Wallet.fromEthSigner(
             ethWallet2,
             syncProvider,
@@ -293,7 +295,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
         await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC_20TOKEN, "0.018");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.018");
 
         await syncProvider.disconnect();

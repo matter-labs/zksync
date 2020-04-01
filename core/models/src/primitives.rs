@@ -16,6 +16,7 @@ use web3::types::U256;
 use crate::circuit::utils::append_le_fixed_width;
 use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
 use crate::params;
+use failure::_core::ops::Rem;
 
 // TODO: replace Vec with Iterator?
 
@@ -410,7 +411,17 @@ pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
 
 /// Its important to use this, instead of bit_decimal.to_u128()
 pub fn big_decimal_to_u128(big_decimal: &BigDecimal) -> u128 {
+    assert!(big_decimal.is_integer(), "big decimal should be integer");
     big_decimal.to_string().parse().unwrap()
+}
+
+// TODO: HACK remove after task #366
+pub fn floor_big_decimal(big_decimal: &BigDecimal) -> BigDecimal {
+    BigDecimal::from(
+        (big_decimal - big_decimal.rem(BigDecimal::from(1)))
+            .as_bigint_and_exponent()
+            .0,
+    )
 }
 
 /// Its important to use this, instead of BigDecimal::from_u128()

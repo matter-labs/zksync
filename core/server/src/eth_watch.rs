@@ -24,7 +24,7 @@ use models::abi::{eip1271_contract, governance_contract, zksync_contract};
 use models::config_options::ConfigurationOptions;
 use models::misc::constants::EIP1271_SUCCESS_RETURN_VALUE;
 use models::node::tx::EIP1271Signature;
-use models::node::{Nonce, PriorityOp, PubKeyHash, TokenId};
+use models::node::{Nonce, PriorityOp, PubKeyHash, Token, TokenId};
 use models::params::PRIORITY_EXPIRATION;
 use models::TokenAddedEvent;
 use storage::ConnectionPool;
@@ -273,12 +273,12 @@ impl<T: Transport> EthWatch<T> {
         self.db_pool
             .access_storage()
             .map(|storage| {
-                for (id, address) in &self.eth_state.tokens {
-                    if let Err(e) = storage.tokens_schema().store_token(
-                        *id,
-                        &format!("0x{:x}", address),
-                        &format!("ERC20-{}", id),
-                    ) {
+                for (&id, &address) in &self.eth_state.tokens {
+                    if let Err(e) = storage.tokens_schema().store_token(Token {
+                        id,
+                        address,
+                        symbol: format!("ERC20-{}", id),
+                    }) {
                         warn!("Failed to add token to db: {:?}", e);
                     }
                 }

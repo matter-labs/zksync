@@ -9,7 +9,6 @@ use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::node::TokenId;
 
 static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 0;
-// static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 24;
 /// account_tree_depth.
 /// Value must be specified as environment variable at compile time under `ACCOUNT_TREE_DEPTH_VALUE` key.
 pub fn account_tree_depth() -> usize {
@@ -47,7 +46,8 @@ pub const INPUT_DATA_EMPTY_BYTES_WIDTH: usize = 64;
 pub const INPUT_DATA_ROOT_HASH_BYTES_WIDTH: usize = 32;
 
 /// Balance tree depth
-pub const BALANCE_TREE_DEPTH: usize = 5;
+pub const BALANCE_TREE_DEPTH: usize = 8;
+pub const MAX_SUPPORTED_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const TOKEN_BIT_WIDTH: usize = 16;
 
 /// Account tree depth

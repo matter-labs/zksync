@@ -159,7 +159,7 @@ impl std::str::FromStr for ActionType {
 #[derive(Debug)]
 pub struct TokenAddedEvent {
     pub address: Address,
-    pub id: u32,
+    pub id: u16,
 }
 
 impl TryFrom<Log> for TokenAddedEvent {
@@ -174,7 +174,7 @@ impl TryFrom<Log> for TokenAddedEvent {
                 .remove(0)
                 .to_uint()
                 .as_ref()
-                .map(U256::as_u32)
+                .map(|id| id.as_u32() as u16)
                 .unwrap(),
         })
     }

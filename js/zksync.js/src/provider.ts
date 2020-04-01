@@ -163,6 +163,19 @@ export class Provider {
         }
     }
 
+    async getTransactionFee(
+        txType: "Withdraw" | "Transfer",
+        amount: utils.BigNumberish,
+        tokenLike: TokenLike
+    ): Promise<utils.BigNumber> {
+        const transactionFee = await this.transport.request("get_tx_fee", [
+            txType,
+            amount.toString(),
+            tokenLike
+        ]);
+        return utils.bigNumberify(transactionFee);
+    }
+
     async disconnect() {
         return await this.transport.disconnect();
     }
