@@ -245,7 +245,7 @@ impl Maintainer {
                     .conn_pool
                     .access_storage()
                     .expect("failed to connect to db");
-                self.init_account_tree(&storage, block_number-1)?;
+                self.init_account_tree(&storage, block_number - 1)?;
                 self.next_block_number = block_number;
             }
         }
@@ -288,9 +288,12 @@ impl Maintainer {
     }
 
     /// Returns min block number within all operations in all queues.
-    fn get_min_next_block_number(&self, queues: &HashMap<usize, BlockSizedOperationsQueue>) -> Option<u32> {
+    fn get_min_next_block_number(
+        &self,
+        queues: &HashMap<usize, BlockSizedOperationsQueue>,
+    ) -> Option<u32> {
         let mut next = None;
-        for (_, queue) in queues {
+        for queue in queues.values() {
             if let Some(num) = queue.next_block_number() {
                 if let Some(cur) = next {
                     if num < cur {
@@ -317,9 +320,10 @@ impl Maintainer {
                 .state_schema()
                 .load_committed_state(Some(new_block))
                 .map_err(|e| format!("failed to load committed state: {}", e))?;
-            
+
             for (k, v) in accounts.iter() {
-                self.account_tree.insert(*k, CircuitAccount::from(v.clone()));
+                self.account_tree
+                    .insert(*k, CircuitAccount::from(v.clone()));
             }
             debug!("Prover state is initialized");
         }
@@ -335,7 +339,7 @@ impl Maintainer {
         let block_size = commit_operation.block.smallest_block_size();
 
         info!("building prover data for block {}", &block_number);
-        
+
         let mut witness_accum = WitnessBuilder::new(
             &mut self.account_tree,
             commit_operation.block.fee_account,

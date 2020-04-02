@@ -290,7 +290,8 @@ mod test {
         let account_address = zksync_account.address;
 
         let fee_account_id = 0;
-        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(Vec::new(), fee_account_id);
+        let (mut plasma_state, mut circuit_account_tree) =
+            test_genesis_plasma_state(Vec::new(), fee_account_id);
         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let full_exit_op = FullExitOp {
