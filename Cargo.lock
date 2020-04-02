@@ -463,7 +463,7 @@ dependencies = [
 [[package]]
 name = "bellman_ce"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#31c92e502863131a03c6aff1753b72d7d3b5e448"
+source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#16d1747bba96d534f5b85522706afb2793814903"
 dependencies = [
  "bit-vec",
  "blake2s_const",
@@ -524,7 +524,7 @@ dependencies = [
 [[package]]
 name = "blake2s_const"
 version = "0.6.0"
-source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#31c92e502863131a03c6aff1753b72d7d3b5e448"
+source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#16d1747bba96d534f5b85522706afb2793814903"
 dependencies = [
  "arrayref",
  "arrayvec 0.5.1",
@@ -1235,7 +1235,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#ac546a008a30bfbd833d2566184ac6cc52d15f1e"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#d9144b3c51d735cfd830ea6bd051dbad78eb3381"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -3204,7 +3204,7 @@ dependencies = [
  "serde_json",
  "storage",
  "testhelper",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "web3",
 ]
 
@@ -3290,9 +3290,9 @@ checksum = "5c2fb2ec9bcd216a5b0d0ccf31ab17b5ed1d627960edff65bbe95d3ce221cefc"
 
 [[package]]
 name = "socket2"
-version = "0.3.11"
+version = "0.3.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8b74de517221a2cb01a53349cf54182acdc31a074727d3079068448c0676d85"
+checksum = "03088793f677dce356f3ccc2edb1b314ad191ab702a5de3faf49304f7e104918"
 dependencies = [
  "cfg-if",
  "libc",
@@ -3474,7 +3474,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "server",
- "tokio 0.2.13",
+ "tokio 0.2.14",
  "web3",
 ]
 
@@ -3551,9 +3551,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.13"
+version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0fa5e81d6bc4e67fe889d5783bd2a128ab2e0cfa487e0be16b6a8d177b101616"
+checksum = "2751672f9da075d045c67fdb0068be9850ab7b231fa77bb51d6fd35da9c0bb0d"
 dependencies = [
  "bytes 0.5.4",
  "fnv",

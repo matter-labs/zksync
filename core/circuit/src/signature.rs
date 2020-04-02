@@ -467,19 +467,38 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
 
     assert_eq!(hash_input.len(), 4, "multipacking of FS hash is expected to have length 4");
 
-    let mut sponge_output = rescue::rescue_hash(
+    let mut sponge = rescue::StatefulRescueGadget::new(rescue_params);
+
+    sponge.absorb(
         cs.namespace(|| "apply rescue hash on FS parameters"), 
         &hash_input,
         &rescue_params
     )?;
 
-    assert_eq!(sponge_output.len(), 1);
-
-    let hash = sponge_output.pop().expect("must get a single element");
-
-    let hash_bits = hash.into_bits_le(
-        cs.namespace(|| "make bits of FS challenge")
+    let s0 = sponge.squeeze_out_single(
+        cs.namespace(|| "squeeze first word form sponge"),
+        &rescue_params
     )?;
+
+    let s1 = sponge.squeeze_out_single(
+        cs.namespace(|| "squeeze second word form sponge"),
+        &rescue_params
+    )?;
+
+    let s0_bits = s0.into_bits_le(
+        cs.namespace(|| "make bits of first word for FS challenge")
+    )?;
+
+    let s1_bits = s1.into_bits_le(
+        cs.namespace(|| "make bits of second word for FS challenge")
+    )?;
+
+    let take_bits = (<E as JubjubEngine>::Fs::CAPACITY / 2) as usize;
+
+    let mut bits = Vec::with_capacity(<E as JubjubEngine>::Fs::CAPACITY as usize);
+    bits.extend_from_slice(&s0_bits[0..take_bits]);
+    bits.extend_from_slice(&s1_bits[0..take_bits]);
+    assert!(bits.len() == E::Fs::CAPACITY as usize);
 
     let max_message_len = 32 as usize; //since it is the result of sha256 hash
 
@@ -488,7 +507,7 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
         signature,
         cs.namespace(|| "verify transaction signature"),
         jubjub_params,
-        &hash_bits[0..(<E as JubjubEngine>::Fs::CAPACITY as usize)],
+        &bits,
         generator,
         max_message_len,
     )?;
