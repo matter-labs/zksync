@@ -87,13 +87,16 @@ impl Block {
         self.smallest_block_size() - self.chunks_used()
     }
 
-    /// Returns eth_witness data and bytes used by each of the operations
+    /// Returns eth_witness data and bytes used by each of the operations (except transfer: since there is no need for the eth witness, it is processed separately to reduce gas consumption)
     pub fn get_eth_witness_data(&self) -> (Vec<u8>, Vec<u64>) {
         let mut eth_witness = Vec::new();
         let mut used_bytes = Vec::new();
 
         for block_tx in &self.block_transactions {
             if let Some(franklin_op) = block_tx.get_executed_op() {
+                if let FranklinOp::Transfer(_) =  franklin_op { // skip transfer operations
+                    continue;
+                }
                 let witness_bytes = franklin_op.eth_witness();
                 used_bytes.push(witness_bytes.len() as u64);
                 eth_witness.extend(witness_bytes.into_iter());

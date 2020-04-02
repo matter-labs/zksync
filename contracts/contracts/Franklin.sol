@@ -356,7 +356,8 @@ contract Franklin is Storage, Config, Events {
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
     /// @param _publicData Operations packed in bytes array
     /// @param _ethWitness Eth witness that was posted with commit
-    /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
+    /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation
+    /// @dev for transfer operation _ethWitness and _ethWitnessSizes must no contain any appropriate value - it would be processed separately
     function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
         internal {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
@@ -367,6 +368,11 @@ contract Franklin is Storage, Config, Events {
         uint32 processedZKSyncOperation = 0;
 
         while (pubdataOffset < _publicData.length) {
+            if (uint8(_publicData[pubdataOffset]) == uint8(Operations.OpType.Transfer)) { // fast process transfer operation
+                pubdataOffset += TRANSFER_BYTES;
+                continue;
+            }
+
             require(processedZKSyncOperation < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
             bytes memory zksyncOperationETHWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedZKSyncOperation]);
 
@@ -423,7 +429,6 @@ contract Franklin is Storage, Config, Events {
 
         if (opType == uint8(Operations.OpType.Noop)) return NOOP_BYTES;
         if (opType == uint8(Operations.OpType.TransferToNew)) return TRANSFER_TO_NEW_BYTES;
-        if (opType == uint8(Operations.OpType.Transfer)) return TRANSFER_BYTES;
         if (opType == uint8(Operations.OpType.CloseAccount)) return CLOSE_ACCOUNT_BYTES;
 
         if (opType == uint8(Operations.OpType.Deposit)) {
