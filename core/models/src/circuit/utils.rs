@@ -2,21 +2,37 @@ use crate::params;
 
 use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
 use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField};
-
+use crate::franklin_crypto::bellman::pairing::Engine;
 use crate::franklin_crypto::eddsa::PublicKey;
 use crate::merkle_tree::hasher::Hasher;
 use crate::node::Fr;
 use web3::types::Address;
 
-fn pub_key_hash_bits<E: JubjubEngine, H: Hasher<E::Fr>>(
+// fn pub_key_hash_bits<E: JubjubEngine, H: Hasher<E::Fr>>(
+//     pub_key: &PublicKey<E>,
+//     hasher: &H,
+// ) -> Vec<bool> {
+//     let (pub_x, pub_y) = pub_key.0.into_xy();
+//     let mut pub_key_bits = vec![];
+//     append_le_fixed_width(&mut pub_key_bits, &pub_x, params::FR_BIT_WIDTH_PADDED);
+//     append_le_fixed_width(&mut pub_key_bits, &pub_y, params::FR_BIT_WIDTH_PADDED);
+//     let pub_key_hash = hasher.hash_bits(pub_key_bits);
+//     let mut pub_key_hash_bits = vec![];
+//     append_le_fixed_width(
+//         &mut pub_key_hash_bits,
+//         &pub_key_hash,
+//         params::NEW_PUBKEY_HASH_WIDTH,
+//     );
+//     pub_key_hash_bits
+// }
+
+fn pub_key_hash_self<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
     hasher: &H,
 ) -> Vec<bool> {
     let (pub_x, pub_y) = pub_key.0.into_xy();
-    let mut pub_key_bits = vec![];
-    append_le_fixed_width(&mut pub_key_bits, &pub_x, params::FR_BIT_WIDTH_PADDED);
-    append_le_fixed_width(&mut pub_key_bits, &pub_y, params::FR_BIT_WIDTH_PADDED);
-    let pub_key_hash = hasher.hash_bits(pub_key_bits);
+    let input = vec![pub_x, pub_y];
+    let pub_key_hash = hasher.hash_elements(input);
     let mut pub_key_hash_bits = vec![];
     append_le_fixed_width(
         &mut pub_key_hash_bits,
@@ -30,7 +46,7 @@ pub fn pub_key_hash_fe<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
     hasher: &H,
 ) -> E::Fr {
-    let pk_hash_bits = pub_key_hash_bits(pub_key, hasher);
+    let pk_hash_bits = pub_key_hash_self(pub_key, hasher);
     le_bit_vector_into_field_element(&pk_hash_bits)
 }
 
@@ -38,7 +54,7 @@ pub fn pub_key_hash_bytes<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
     hasher: &H,
 ) -> Vec<u8> {
-    let pk_hash_bits = pub_key_hash_bits(pub_key, hasher);
+    let pk_hash_bits = pub_key_hash_self(pub_key, hasher);
     le_bit_vector_into_bytes(&pk_hash_bits)
 }
 

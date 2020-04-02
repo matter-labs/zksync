@@ -2,6 +2,7 @@ use crate::account::*;
 
 use crate::circuit::FranklinCircuit;
 use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::Field;
 use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField, PrimeFieldRepr};
@@ -19,6 +20,7 @@ use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
 use models::circuit::utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element};
 use models::merkle_tree::hasher::Hasher;
 use models::merkle_tree::PedersenHasher;
+use models::merkle_tree::RescueHasher;
 use models::node::block::Block;
 use models::node::tx::PackedPublicKey;
 use models::node::{AccountId, BlockNumber, Engine, Fr};
@@ -173,13 +175,15 @@ impl WitnessBuilder {
 
 pub fn generate_dummy_sig_data(
     bits: &[bool],
-    phasher: &PedersenHasher<Bn256>,
-    params: &AltJubjubBn256,
+    // phasher: &PedersenHasher<Bn256>,
+    rescue_hasher: &RescueHasher<Bn256>,
+    rescue_params: &Bn256RescueParams,
+    jubjub_params: &AltJubjubBn256,
 ) -> (SignatureData, Fr, Fr, Fr, Fr, Fr) {
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let private_key = PrivateKey::<Bn256>(rng.gen());
-    let sender_pk = PublicKey::from_private(&private_key, p_g, &params);
+    let sender_pk = PublicKey::from_private(&private_key, p_g, &jubjub_params);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     let mut sig_bits_to_hash = bits.to_vec();
     assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
@@ -191,12 +195,14 @@ pub fn generate_dummy_sig_data(
     let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
     let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
     let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
-    let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+    // let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+    let sig_msg = rescue_hasher.hash_bits(sig_bits_to_hash.clone());
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
-    let signature_data = sign_sha256(&sig_bits, &private_key, p_g, params);
+    let signature_data = sign_rescue(&sig_bits, &private_key, p_g, rescue_params, jubjub_params);
+    // let signature_data = sign_sha256(&sig_bits, &private_key, p_g, params);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
     (
         signature_data,
@@ -225,11 +231,13 @@ pub fn generate_sig_witness(
     let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
     (first_sig_part, second_sig_part, third_sig_part)
 }
+
 pub fn generate_sig_data(
     bits: &[bool],
     phasher: &PedersenHasher<Bn256>,
     private_key: &PrivateKey<Bn256>,
-    params: &AltJubjubBn256,
+    rescue_params: &Bn256RescueParams,
+    jubjub_params: &AltJubjubBn256,
 ) -> (SignatureData, Fr, Fr, Fr) {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
@@ -257,7 +265,8 @@ pub fn generate_sig_data(
         "inside generation: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits))
     );
-    let signature_data = sign_sha256(&sig_bits, &private_key, p_g, params);
+    let signature_data = sign_rescue(&sig_bits, &private_key, p_g, rescue_params, jubjub_params);
+    // let signature_data = sign_sha256(&sig_bits, &private_key, p_g, jubjub_params);
     // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
 
     (

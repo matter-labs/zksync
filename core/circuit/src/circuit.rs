@@ -620,13 +620,15 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let signer_key = unpack_point_if_possible(
             cs.namespace(|| "unpack pubkey"),
             &op.signer_pub_key_packed,
-            self.jubjub_params,
+            self.rescue_params,
+            self.jubjub_params
         )?;
         let signature_data = verify_circuit_signature(
             cs.namespace(|| "verify circuit signature"),
             &op_data,
             &signer_key,
             op.signature_data.clone(),
+            self.rescue_params,
             self.jubjub_params,
             generator,
         )?;
@@ -731,18 +733,20 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             .enumerate()
             .take(1 << franklin_constants::BALANCE_TREE_DEPTH)
         {
-            let sum = Expression::from(&fee.clone()) + Expression::from(&op_data.fee.get_number());
+            let sum = Expression::from(&*fee) + Expression::from(&op_data.fee.get_number());
 
             let is_token_correct = Boolean::from(Expression::equals(
                 cs.namespace(|| format!("is token equal to number {}", i)),
                 &lhs.token.get_number(),
                 Expression::constant::<CS>(E::Fr::from_str(&i.to_string()).unwrap()),
             )?);
+
             let should_update = Boolean::and(
                 cs.namespace(|| format!("should update fee number {}", i)),
                 &is_token_correct,
                 &chunk_data.is_chunk_last.clone(),
             )?;
+
             *fee = Expression::conditionally_select(
                 cs.namespace(|| format!("update fee number {}", i)),
                 sum,

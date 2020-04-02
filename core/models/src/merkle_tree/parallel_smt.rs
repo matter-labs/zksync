@@ -411,7 +411,7 @@ mod tests {
             acc
         }
 
-        fn hash_elements<I: IntoIterator<Item = u64>>(&self, elements: I) -> E::Fr {
+        fn hash_elements<I: IntoIterator<Item = u64>>(&self, elements: I) -> u64 {
             unimplemented!()
         }
 

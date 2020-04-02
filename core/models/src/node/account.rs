@@ -17,6 +17,7 @@ use crate::circuit::utils::{eth_address_to_fr, pub_key_hash_bytes};
 use crate::franklin_crypto::eddsa::PublicKey;
 use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
+use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
 use crate::node::PrivateKey;
 use crate::params::JUBJUB_PARAMS;
 use web3::types::Address;
@@ -57,8 +58,10 @@ impl PubKeyHash {
     }
 
     pub fn from_pubkey(public_key: &PublicKey<Engine>) -> Self {
+        // let mut pk_hash =
+        //     pub_key_hash_bytes(public_key, &params::PEDERSEN_HASHER as &BabyPedersenHasher);
         let mut pk_hash =
-            pub_key_hash_bytes(public_key, &params::PEDERSEN_HASHER as &BabyPedersenHasher);
+            pub_key_hash_bytes(public_key, &params::RESCUE_HASHER as &BabyRescueHasher);
         pk_hash.reverse();
         Self::from_bytes(&pk_hash).expect("pk convert error")
     }

@@ -352,6 +352,7 @@ pub fn calculate_transfer_operations_from_witness(
     };
     vec![operation_zero, operation_one]
 }
+
 #[cfg(test)]
 mod test {
     use super::*;

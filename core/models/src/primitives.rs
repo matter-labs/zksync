@@ -9,12 +9,13 @@ use crate::franklin_crypto::bellman::pairing::ff::{
 };
 use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
 use crate::franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
+use crate::franklin_crypto::circuit::multipack;
 use bigdecimal::BigDecimal;
 use failure::bail;
 use web3::types::U256;
 // Workspace deps
 use crate::circuit::utils::append_le_fixed_width;
-use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
+use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher, rescue_hasher::BabyRescueHasher};
 use crate::params;
 
 // TODO: replace Vec with Iterator?
@@ -402,6 +403,16 @@ pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     let mut msg_bits = bytes_into_be_bits(msg);
     msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
     let hasher = &params::PEDERSEN_HASHER as &BabyPedersenHasher;
+    let hash_fr = hasher.hash_bits(msg_bits.into_iter());
+    let mut hash_bits = Vec::new();
+    append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
+    pack_bits_into_bytes(hash_bits)
+}
+
+pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
+    let mut msg_bits = bytes_into_be_bits(msg);
+    msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
+    let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
     let hash_fr = hasher.hash_bits(msg_bits.into_iter());
     let mut hash_bits = Vec::new();
     append_le_fixed_width(&mut hash_bits, &hash_fr, 256);

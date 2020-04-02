@@ -484,7 +484,7 @@ mod test {
     #[test]
     // #[ignore]
     fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
-        const NUM_DEPOSITS: usize = 60;
+        const NUM_DEPOSITS: usize = 50;
         println!(
             "Testing for {} deposits {} chunks",
             NUM_DEPOSITS,

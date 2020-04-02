@@ -15,9 +15,10 @@ use crate::franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed, Signature};
 use crate::franklin_crypto::jubjub::FixedGenerators;
+use crate::franklin_crypto::rescue::RescueEngine;
 use crate::node::operations::ChangePubKeyOp;
-use crate::params::JUBJUB_PARAMS;
-use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
+use crate::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
+use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, rescue_hash_tx_msg, u128_to_bigdecimal};
 use ethsign::{SecretKey, Signature as ETHSignature};
 use failure::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -416,6 +417,27 @@ impl TxSignature {
             &hashed_msg,
             &seed,
             FixedGenerators::SpendingKeyGenerator,
+            &JUBJUB_PARAMS,
+        );
+
+        Self {
+            pub_key: PackedPublicKey(PublicKey::from_private(
+                pk,
+                FixedGenerators::SpendingKeyGenerator,
+                &JUBJUB_PARAMS,
+            )),
+            signature: PackedSignature(signature),
+        }
+    }
+
+    pub fn sign_musig_rescue(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self where Engine: RescueEngine {
+        let hashed_msg = rescue_hash_tx_msg(msg);
+        let seed = Seed::deterministic_seed(&pk, &hashed_msg);
+        let signature = pk.musig_rescue_sign(
+            &hashed_msg,
+            &seed,
+            FixedGenerators::SpendingKeyGenerator,
+            &RESCUE_PARAMS,
             &JUBJUB_PARAMS,
         );
 

@@ -8,6 +8,7 @@ use crate::franklin_crypto::circuit::Assignment;
 use crate::franklin_crypto::eddsa::Signature;
 use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
 use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
+use crate::franklin_crypto::rescue::{RescueEngine};
 
 use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
@@ -24,6 +25,7 @@ pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
             acc
         })
 }
+
 pub fn sign_sha256<E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
@@ -41,6 +43,37 @@ where
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let _is_valid_signature =
         pk.verify_musig_sha256(&message_bytes, &signature.clone(), p_g, params);
+
+    // TODO: handle the case where it is not valid
+    // if !is_valid_signature {
+    //     return None;
+    // }
+    let (sig_r_x, sig_r_y) = signature.r.into_xy();
+    debug!("signature.s: {}", signature.s);
+    debug!("signature.r.x: {}", sig_r_x);
+    debug!("signature.r.y: {}", sig_r_y);
+
+    convert_signature_to_representation(signature)
+}
+
+pub fn sign_rescue<E>(
+    msg_data: &[bool],
+    private_key: &PrivateKey<E>,
+    p_g: FixedGenerators,
+    rescue_params: &<E as RescueEngine>::Params,
+    jubjub_params: &<E as JubjubEngine>::Params,
+) -> SignatureData
+where
+    E: RescueEngine + JubjubEngine,
+{
+    let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
+
+    let seed = Seed::deterministic_seed(&private_key, &message_bytes);
+    let signature = private_key.musig_rescue_sign(&message_bytes, &seed, p_g, rescue_params, jubjub_params);
+
+    let pk = PublicKey::from_private(&private_key, p_g, jubjub_params);
+    let _is_valid_signature =
+        pk.verify_musig_rescue(&message_bytes, &signature.clone(), p_g, rescue_params, jubjub_params);
 
     // TODO: handle the case where it is not valid
     // if !is_valid_signature {

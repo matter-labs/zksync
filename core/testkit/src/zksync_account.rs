@@ -82,8 +82,11 @@ impl ZksyncAccount {
             nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
         };
+        // transfer.signature =
+            // TxSignature::sign_musig_sha256(&self.private_key, &transfer.get_bytes());
+
         transfer.signature =
-            TxSignature::sign_musig_sha256(&self.private_key, &transfer.get_bytes());
+            TxSignature::sign_musig_rescue(&self.private_key, &transfer.get_bytes());
 
         if increment_nonce {
             *stored_nonce += 1;
