@@ -362,22 +362,72 @@ contract Franklin is Storage, Config, Events {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
 
         uint256 pubdataOffset = 0;
-
         uint64 ethWitnessOffset = 0;
-        uint32 processedZKSyncOperation = 0;
+        uint8 processedOperationsNeedsEthWitness = 0;
+        uint8 processedOnchainOpperations = 0;
 
         while (pubdataOffset < _publicData.length) {
-            require(processedZKSyncOperation < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
-            bytes memory zksyncOperationETHWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedZKSyncOperation]);
+            uint8 opType = uint8(_publicData[pubdataOffset]);
 
-            pubdataOffset += processNextOperation(
-                pubdataOffset,
-                _publicData,
-                zksyncOperationETHWitness
-            );
+            if (opType == uint8(Operations.OpType.Transfer)) {
+                pubdataOffset += TRANSFER_BYTES;
+            } else if (opType == uint8(Operations.OpType.Noop)) {
+                pubdataOffset += NOOP_BYTES;
+            } else if (opType == uint8(Operations.OpType.TransferToNew)) {
+                pubdataOffset += TRANSFER_TO_NEW_BYTES;
+            } else if (opType == uint8(Operations.OpType.CloseAccount)) {
+                pubdataOffset += CLOSE_ACCOUNT_BYTES;
+            } else if (opType == uint8(Operations.OpType.Deposit)) {
+                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
+                onchainOps[totalOnchainOps] = OnchainOperation(
+                    Operations.OpType.Deposit,
+                    pubData
+                );
+                verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
+                totalOnchainOps++;
 
-            ethWitnessOffset += _ethWitnessSizes[processedZKSyncOperation];
-            processedZKSyncOperation++;
+                pubdataOffset += DEPOSIT_BYTES;
+            } else if (opType == uint8(Operations.OpType.PartialExit)) {
+                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, PARTIAL_EXIT_BYTES - 1);
+                onchainOps[totalOnchainOps] = OnchainOperation(
+                    Operations.OpType.PartialExit,
+                    pubData
+                );
+                totalOnchainOps++;
+
+                pubdataOffset += PARTIAL_EXIT_BYTES;
+            } else if (opType == uint8(Operations.OpType.FullExit)) {
+                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
+                onchainOps[totalOnchainOps] = OnchainOperation(
+                    Operations.OpType.FullExit,
+                    pubData
+                );
+                verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
+                totalOnchainOps++;
+
+                pubdataOffset += FULL_EXIT_BYTES;
+            } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
+                Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
+
+                if (uint8(_ethWitness[ethWitnessOffset]) == processedOnchainOpperations) { // operation needs eth witness
+                    require(processedOperationsNeedsEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
+                    bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset + 1, _ethWitnessSizes[processedOperationsNeedsEthWitness]);
+
+                    bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
+                    require(valid, "fpp15"); // failed to verify change pubkey hash signature
+
+                    ethWitnessOffset += _ethWitnessSizes[processedOperationsNeedsEthWitness] + 1;
+                    processedOperationsNeedsEthWitness++;
+                } else {
+                    bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
+                    require(valid, "fpp16"); // new pub key hash is not authenticated properly
+                }
+
+                pubdataOffset += CHANGE_PUBKEY_BYTES;
+            } else {
+                revert("fpp14"); // unsupported op
+            }
+            processedOnchainOpperations++;
         }
         require(pubdataOffset == _publicData.length, "fcs12"); // last chunk exceeds pubdata
         require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
@@ -407,75 +457,6 @@ contract Franklin is Storage, Config, Events {
         signedMessage = abi.encodePacked(signedMessage, "Only sign this message for a trusted client!");
         address recoveredAddress = verifyEthereumSignature(_signature, signedMessage);
         return recoveredAddress == _ethAddress;
-    }
-
-    /// @notice On the first byte determines the type of operation, if it is an onchain operation - saves it in storage
-    /// @param _pubdataOffset Current offset in pubdata
-    /// @param _publicData Operation pubdata
-    /// @param _currentEthWitness current eth witness for operation
-    /// @return pubdata bytes processed
-    function processNextOperation(
-        uint256 _pubdataOffset,
-        bytes memory _publicData,
-        bytes memory _currentEthWitness
-    ) internal returns (uint256 _bytesProcessed) {
-        uint8 opType = uint8(_publicData[_pubdataOffset]);
-
-        if (opType == uint8(Operations.OpType.Noop)) return NOOP_BYTES;
-        if (opType == uint8(Operations.OpType.TransferToNew)) return TRANSFER_TO_NEW_BYTES;
-        if (opType == uint8(Operations.OpType.Transfer)) return TRANSFER_BYTES;
-        if (opType == uint8(Operations.OpType.CloseAccount)) return CLOSE_ACCOUNT_BYTES;
-
-        if (opType == uint8(Operations.OpType.Deposit)) {
-            bytes memory pubData = Bytes.slice(_publicData, _pubdataOffset + 1, DEPOSIT_BYTES - 1);
-            onchainOps[totalOnchainOps] = OnchainOperation(
-                Operations.OpType.Deposit,
-                pubData
-            );
-            verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
-
-            totalOnchainOps++;
-
-            return DEPOSIT_BYTES;
-        }
-
-        if (opType == uint8(Operations.OpType.PartialExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, _pubdataOffset + 1, PARTIAL_EXIT_BYTES - 1);
-            onchainOps[totalOnchainOps] = OnchainOperation(
-                Operations.OpType.PartialExit,
-                pubData
-            );
-            totalOnchainOps++;
-
-            return PARTIAL_EXIT_BYTES;
-        }
-
-        if (opType == uint8(Operations.OpType.FullExit)) {
-            bytes memory pubData = Bytes.slice(_publicData, _pubdataOffset + 1, FULL_EXIT_BYTES - 1);
-            onchainOps[totalOnchainOps] = OnchainOperation(
-                Operations.OpType.FullExit,
-                pubData
-            );
-
-            verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
-
-            totalOnchainOps++;
-            return FULL_EXIT_BYTES;
-        }
-
-        if (opType == uint8(Operations.OpType.ChangePubKey)) {
-            Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, _pubdataOffset + 1);
-            if (_currentEthWitness.length > 0) {
-                bool valid = verifyChangePubkeySignature(_currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
-                require(valid, "fpp15"); // failed to verify change pubkey hash signature
-            } else {
-                bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
-                require(valid, "fpp16"); // new pub key hash is not authenticated properly
-            }
-            return CHANGE_PUBKEY_BYTES;
-        }
-
-        revert("fpp14"); // unsupported op
     }
 
     /// @notice Creates block commitment from its data

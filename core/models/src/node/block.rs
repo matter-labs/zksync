@@ -87,16 +87,19 @@ impl Block {
         self.smallest_block_size() - self.chunks_used()
     }
 
-    /// Returns eth_witness data and bytes used by each of the operations
+    /// Returns eth_witness data and bytes used by each operation which needed them
     pub fn get_eth_witness_data(&self) -> (Vec<u8>, Vec<u64>) {
         let mut eth_witness = Vec::new();
         let mut used_bytes = Vec::new();
 
-        for block_tx in &self.block_transactions {
-            if let Some(franklin_op) = block_tx.get_executed_op() {
-                let witness_bytes = franklin_op.eth_witness();
-                used_bytes.push(witness_bytes.len() as u64);
-                eth_witness.extend(witness_bytes.into_iter());
+        for (index, block_tx) in self.block_transactions.iter().enumerate() {
+            if let Some(FranklinOp::ChangePubKeyOffchain(op)) = block_tx.get_executed_op() {
+                let witness_bytes = op.get_eth_witness();
+                if (!witness_bytes.is_empty()) {
+                    used_bytes.push(witness_bytes.len() as u64);
+                    eth_witness.push(index as u8);
+                    eth_witness.extend(witness_bytes.into_iter());
+                }
             }
         }
 
