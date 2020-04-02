@@ -6,9 +6,11 @@ use fnv::FnvHashMap;
 use std::fmt::Debug;
 use std::sync::RwLock;
 
-/// Nodes are indexed starting with index(root) = 1
+/// Nodes are indexed starting with index(root) = 0
 /// To store the index, at least 2 * TREE_HEIGHT bits is required.
-type NodeIndex = u64;
+/// Wrapper-structure is used to avoid mixing up with `ItemIndex` on the type level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+struct NodeIndex(pub u64);
 
 /// Lead index: 0 <= i < N.
 type ItemIndex = u64;
@@ -117,15 +119,15 @@ impl NodeDirection {
     pub fn child_index(self, parent_idx: NodeIndex) -> NodeIndex {
         // Given the parent index N, its child has indices (2*N) and (2*N + 1).
         match self {
-            Self::Left => parent_idx * 2,
-            Self::Right => parent_idx * 2 + 1,
+            Self::Left => NodeIndex(parent_idx.0 * 2),
+            Self::Right => NodeIndex(parent_idx.0 * 2 + 1),
         }
     }
 
     /// Creates a child node direction basing on its index.
     pub fn from_idx(idx: NodeIndex) -> Self {
         // Left nodes are always even, right nodes are always odd.
-        let is_left = (idx & 1) == 0;
+        let is_left = (idx.0 & 1) == 0;
 
         if is_left {
             Self::Left
@@ -161,7 +163,7 @@ where
         let items = FnvHashMap::default();
         let mut nodes = Vec::new();
         nodes.push(Node {
-            index: 1,
+            index: NodeIndex(1),
             depth: 0,
             left: None,
             right: None,
@@ -206,12 +208,15 @@ where
     pub fn insert(&mut self, item_index: ItemIndex, item: T) {
         assert!(item_index < self.capacity());
         let tree_depth = self.tree_depth;
-        let leaf_index: NodeIndex = ((1 << tree_depth) + item_index) as NodeIndex;
+        let leaf_index: NodeIndex = NodeIndex((1 << tree_depth) + item_index);
 
         self.items.insert(item_index, item);
 
         // Invalidate the root cache.
-        self.cache.write().expect("write lock").remove(&1);
+        self.cache
+            .write()
+            .expect("write lock")
+            .remove(&NodeIndex(1));
 
         // Traverse the tree, starting from the root.
         // Since our tree is "sparse", it can have gaps.
@@ -252,7 +257,7 @@ where
             // divided by 2, to check the direction at some level we may just check
             // the corresponding bit in the child index.
             // Even value will mean the "left" direction, and the odd one will mean "right".
-            let going_right = (leaf_index & (1 << current_level)) > 0;
+            let going_right = (leaf_index.0 & (1 << current_level)) > 0;
             let (dir, child_ref) = if going_right {
                 (NodeDirection::Right, current_node.right)
             } else {
@@ -265,7 +270,7 @@ where
 
                 // Normalized leaf index is basically an index of the node parent
                 // to our leaf on the current level.
-                let leaf_index_normalized = leaf_index >> (tree_depth - next.depth);
+                let leaf_index_normalized = NodeIndex(leaf_index.0 >> (tree_depth - next.depth));
 
                 // Check if the `next` node is the node we should update.
                 if leaf_index_normalized == next.index {
@@ -300,8 +305,8 @@ where
                         // by dividing it by two, we keep dividing both indices until
                         // they are equal. Once they are equal, we've got the common parent index
                         while first_node_idx != second_node_idx {
-                            first_node_idx >>= 1;
-                            second_node_idx >>= 1;
+                            first_node_idx.0 >>= 1;
+                            second_node_idx.0 >>= 1;
                         }
                         first_node_idx
                     };
@@ -386,19 +391,19 @@ where
         assert!(index < self.capacity());
 
         // Convert the leaf index into a local node index.
-        let leaf_index: NodeIndex = ((1 << self.tree_depth) + index) as NodeIndex;
+        let leaf_index: NodeIndex = NodeIndex((1 << self.tree_depth) + index);
         let (mut current_depth, mut current_idx) = (self.tree_depth, leaf_index);
 
         (0..self.tree_depth)
             .rev()
             .map(|_level| {
-                let dir = (current_idx & 1) > 0;
-                let proof_index = current_idx ^ 1;
+                let dir = (current_idx.0 & 1) > 0;
+                let proof_index = current_idx.0 ^ 1;
 
                 let (hash, _) = self.get_hash(proof_index as usize);
 
-                current_depth = current_depth - 1;
-                current_idx = current_idx >> 1;
+                current_depth -= 1;
+                current_idx.0 >>= 1;
                 (hash, dir)
             })
             .collect()
@@ -408,9 +413,9 @@ where
     fn depth(index: NodeIndex) -> Depth {
         let mut level: Depth = 0;
         let mut i = index;
-        while i > 1 {
+        while i.0 > 1 {
             level += 1;
-            i >>= 1;
+            i.0 >>= 1;
         }
         level
     }
@@ -429,10 +434,10 @@ where
             // Item existed in cache, now we should go up the tree
             // and remove parent hashes, until we reach the provided
             // `parent` index.
-            let mut i = child >> 1;
+            let mut i = NodeIndex(child.0 >> 1);
             while i > parent {
                 cache.remove(&i);
-                i >>= 1;
+                i.0 >>= 1;
             }
         }
     }
@@ -529,7 +534,7 @@ where
 
             // At each iteration our index become 2 times smaller, and the depth is decremented by 1.
             cur_depth -= 1;
-            cur_idx >>= 1;
+            cur_idx.0 >>= 1;
 
             //self.cache.insert(cur_idx, cur_hash.clone());
             updates.push((cur_idx, cur_hash.clone()));
@@ -548,7 +553,7 @@ where
         let (hash, mut updates) = {
             if node.depth == self.tree_depth {
                 // leaf node: return item hash
-                let item_index: ItemIndex = (node.index - (1 << self.tree_depth)) as ItemIndex;
+                let item_index: ItemIndex = (node.index.0 - (1 << self.tree_depth)) as ItemIndex;
 
                 let item_bits = self.items[&item_index].get_bits_le();
                 let item_hash = self.hasher.hash_bits(item_bits);
