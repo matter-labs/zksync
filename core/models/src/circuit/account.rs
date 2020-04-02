@@ -65,7 +65,7 @@ impl<E: JubjubEngine> GetBits for CircuitAccount<E> {
 impl<E: JubjubEngine> CircuitAccount<E> {
     //we temporary pass it as repr. TODO: return Fr, when we could provide proper trait bound
     pub fn empty_balances_root_hash() -> Vec<u8> {
-        let balances_smt = CircuitBalanceTree::new(params::BALANCE_TREE_DEPTH as u32);
+        let balances_smt = CircuitBalanceTree::new(params::BALANCE_TREE_DEPTH);
         let mut tmp = [0u8; 32];
         balances_smt
             .root_hash()
@@ -83,7 +83,7 @@ impl std::default::Default for CircuitAccount<Bn256> {
             nonce: Fr::zero(),
             pub_key_hash: Fr::zero(),
             address: Fr::zero(),
-            subtree: SparseMerkleTree::new(params::BALANCE_TREE_DEPTH as u32),
+            subtree: SparseMerkleTree::new(params::BALANCE_TREE_DEPTH),
         }
     }
 }

@@ -15,6 +15,9 @@ pub struct PedersenHasher<E: JubjubEngine> {
     params: &'static E::Params,
 }
 
+unsafe impl<E: JubjubEngine> Send for PedersenHasher<E> {}
+unsafe impl<E: JubjubEngine> Sync for PedersenHasher<E> {}
+
 impl<E: JubjubEngine> fmt::Debug for PedersenHasher<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PedersenHasher").finish()

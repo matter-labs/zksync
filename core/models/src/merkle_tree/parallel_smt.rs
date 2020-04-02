@@ -49,7 +49,7 @@ where
     /// List of the stored items.
     items: FnvHashMap<ItemIndex, T>,
     /// Generic hasher for the hash calculation.
-    hasher: H,
+    pub hasher: H,
     /// Fixed depth of the tree, determining the overall tree capacity.
     tree_depth: Depth,
     // Local index of the root node.
@@ -71,9 +71,9 @@ where
 // and `Arc` is not a solution (it will lead to the shallow copies, while we need a deep ones).
 impl<T, Hash, H> Clone for SparseMerkleTree<T, Hash, H>
 where
-    T: GetBits + Clone + Default,
+    T: GetBits + Clone,
     Hash: Clone + Debug,
-    H: Hasher<Hash> + Clone + Default,
+    H: Hasher<Hash> + Clone,
 {
     fn clone(&self) -> Self {
         let items = self.items.clone();
