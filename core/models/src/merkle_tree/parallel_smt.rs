@@ -47,7 +47,7 @@ where
     H: Hasher<Hash>,
 {
     /// List of the stored items.
-    items: FnvHashMap<ItemIndex, T>,
+    pub items: FnvHashMap<ItemIndex, T>,
     /// Generic hasher for the hash calculation.
     pub hasher: H,
     /// Fixed depth of the tree, determining the overall tree capacity.
