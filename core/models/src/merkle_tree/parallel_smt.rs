@@ -2,14 +2,16 @@
 use super::hasher::Hasher;
 use crate::primitives::GetBits;
 use fnv::FnvHashMap;
+
 use std::fmt::Debug;
+use std::sync::RwLock;
 
 /// Nodes are indexed starting with index(root) = 1
 /// To store the index, at least 2 * TREE_HEIGHT bits is required.
 type NodeIndex = u64;
 
-/// Lead index: 0 <= i < N (u64 to avoid conversions; 64 bit HW should be used anyway).
-type ItemIndex = usize;
+/// Lead index: 0 <= i < N.
+type ItemIndex = u64;
 
 /// Tree of depth 0: 1 item (which is root), level 0 only
 /// Tree of depth 1: 2 items, levels 0 and 1
@@ -35,23 +37,63 @@ type NodeRef = usize;
 /// above that. The root hash is calculated for the full tree every time.
 ///
 /// [Merkle tree]: https://en.wikipedia.org/wiki/Merkle_tree
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct SparseMerkleTree<T, Hash, H>
 where
-    T: GetBits + Default + Sync,
-    Hash: Clone + Debug + Sync + Send,
-    H: Hasher<Hash> + Sync,
+    T: GetBits,
+    Hash: Clone + Debug,
+    H: Hasher<Hash>,
 {
-    pub items: FnvHashMap<ItemIndex, T>,
-
-    prehashed: Vec<Hash>,
-    tree_depth: Depth,
+    /// List of the stored items.
+    items: FnvHashMap<ItemIndex, T>,
+    /// Generic hasher for the hash calculation.
     hasher: H,
-
-    // intermediate nodes
+    /// Fixed depth of the tree, determining the overall tree capacity.
+    tree_depth: Depth,
+    // Local index of the root node.
     root: NodeRef,
+    // List of the intermediate nodes.
     nodes: Vec<Node>,
-    cache: FnvHashMap<NodeIndex, Hash>,
+    /// Cache of the hashes for the "default" nodes (e.g. ones that are absent in the tree).
+    prehashed: Vec<Hash>,
+    /// Cache storing the already calculated hashes for nodes
+    /// allowing us to avoid calculating the hash of the element more than once.
+    /// `RwLock` is required to fulfill the following criteria:
+    ///
+    /// - Make method `root_hash` immutable (as it's logically immutable).
+    /// - Keep the SMT `Sync` (required for the `rayon` parallelism).
+    cache: RwLock<FnvHashMap<NodeIndex, Hash>>,
+}
+
+// Manual implementation of `Clone` is required, since `RwLock` is not `Clone` by default,
+// and `Arc` is not a solution (it will lead to the shallow copies, while we need a deep ones).
+impl<T, Hash, H> Clone for SparseMerkleTree<T, Hash, H>
+where
+    T: GetBits + Clone + Default,
+    Hash: Clone + Debug,
+    H: Hasher<Hash> + Clone + Default,
+{
+    fn clone(&self) -> Self {
+        let items = self.items.clone();
+        let prehashed = self.prehashed.clone();
+        let tree_depth = self.tree_depth;
+        let hasher = self.hasher.clone();
+        let root = self.root;
+        let nodes = self.nodes.clone();
+
+        let cache_data = self.cache.read().expect("Read lock").clone();
+        let cache = RwLock::new(cache_data);
+
+        Self {
+            items,
+            prehashed,
+            tree_depth,
+            hasher,
+            root,
+            nodes,
+            cache,
+        }
+    }
 }
 
 /// Merkle Tree branch node.
@@ -106,9 +148,9 @@ impl NodeDirection {
 
 impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
 where
-    T: GetBits + Default + Sync,
-    Hash: Clone + Debug + Sync + Send,
-    H: Hasher<Hash> + Default + Sync,
+    T: GetBits + Default,
+    Hash: Clone + Debug,
+    H: Hasher<Hash> + Default,
 {
     /// Creates a new tree of certain depth (which determines the
     /// capacity of the tree, since the given height will not be
@@ -134,7 +176,7 @@ where
         }
         prehashed.reverse();
 
-        let cache = FnvHashMap::default();
+        let cache = RwLock::new(FnvHashMap::default());
 
         Self {
             tree_depth,
@@ -146,9 +188,17 @@ where
             root: 0,
         }
     }
+}
 
+impl<T, Hash, H> SparseMerkleTree<T, Hash, H>
+where
+    T: GetBits + Default + Sync,
+    Hash: Clone + Debug + Sync + Send,
+    H: Hasher<Hash> + Sync,
+{
     /// Obtains the element for a certain index.
-    pub fn get(&self, index: ItemIndex) -> Option<&T> {
+    pub fn get(&self, index: u32) -> Option<&T> {
+        let index = ItemIndex::from(index);
         self.items.get(&index)
     }
 
@@ -161,7 +211,7 @@ where
         self.items.insert(item_index, item);
 
         // Invalidate the root cache.
-        self.cache.remove(&1);
+        self.cache.write().expect("write lock").remove(&1);
 
         // Traverse the tree, starting from the root.
         // Since our tree is "sparse", it can have gaps.
@@ -307,21 +357,51 @@ where
     /// the root hash is calculated in this method, and it will build the whole hash tree
     /// if this method was not called. The intermediate calculation results are caches though,
     /// thus follow-up invocations will cost less.
-    pub fn root_hash(&mut self) -> Hash {
-        const ROOT_ITEM_IDX: ItemIndex = 0;
+    pub fn root_hash(&self) -> Hash {
+        const ROOT_ITEM_IDX: NodeRef = 0;
 
         let (root_hash, intermediate_hashes) = self.get_hash(ROOT_ITEM_IDX);
 
         // Store all the intermediate hashes in the cache.
         for (item_idx, hash) in intermediate_hashes {
-            self.cache.insert(item_idx, hash);
+            self.cache
+                .write()
+                .expect("write lock")
+                .insert(item_idx, hash);
         }
         root_hash
     }
 
     /// Returns the capacity of the tree (how many items can the tree hold).
-    pub fn capacity(&self) -> usize {
+    pub fn capacity(&self) -> u64 {
         1 << self.tree_depth
+    }
+
+    /// Creates a proof of existence for a certain element of the tree.
+    /// Returned value is a list of pairs, where the first element is
+    /// the aggregated coupling hash for current layer, and the second is
+    /// the direction.
+    pub fn merkle_path(&self, index: ItemIndex) -> Vec<(Hash, bool)> {
+        // print!("Making a proof for index {}\n", index);
+        assert!(index < self.capacity());
+
+        // Convert the leaf index into a local node index.
+        let leaf_index: NodeIndex = ((1 << self.tree_depth) + index) as NodeIndex;
+        let (mut current_depth, mut current_idx) = (self.tree_depth, leaf_index);
+
+        (0..self.tree_depth)
+            .rev()
+            .map(|_level| {
+                let dir = (current_idx & 1) > 0;
+                let proof_index = current_idx ^ 1;
+
+                let (hash, _) = self.get_hash(proof_index as usize);
+
+                current_depth = current_depth - 1;
+                current_idx = current_idx >> 1;
+                (hash, dir)
+            })
+            .collect()
     }
 
     /// Calculates the depth ("layer") of the element with the provided index.
@@ -344,13 +424,14 @@ where
     /// Removes the entry with provided index from the hashes cache, as well
     /// as its parent entries, limited by the `parent` index.
     fn wipe_cache(&mut self, child: NodeIndex, parent: NodeIndex) {
-        if self.cache.remove(&child).is_some() {
+        let mut cache = self.cache.write().expect("write lock");
+        if cache.remove(&child).is_some() {
             // Item existed in cache, now we should go up the tree
             // and remove parent hashes, until we reach the provided
             // `parent` index.
             let mut i = child >> 1;
             while i > parent {
-                self.cache.remove(&i);
+                cache.remove(&i);
                 i >>= 1;
             }
         }
@@ -398,7 +479,7 @@ where
         let child_index = dir.child_index(parent.index);
 
         // Check if the child data exists in the cache.
-        if let Some(cached) = self.cache.get(&child_index) {
+        if let Some(cached) = self.cache.read().expect("Read lock").get(&child_index) {
             // Cache hit, no calculations required.
             let updates = vec![];
 
