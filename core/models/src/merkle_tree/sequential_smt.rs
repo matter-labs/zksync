@@ -382,4 +382,86 @@ mod tests {
         // The first element left only, hash should be the same as in the beginning.
         assert_eq!(tree.root_hash(), 697_516_875);
     }
+
+    /// Checks the correctness of the built Merkle proofs
+    #[test]
+    fn merkle_path_test() {
+        // Test vector holds pairs (index, value).
+        let test_vector = [(0, 2), (3, 2)];
+        // Pre-calculated root hash for the test vector above.
+        let expected_root_hash = 793_215_819;
+
+        // Create the tree and fill it with values.
+        let mut tree = TestSMT::new(3);
+        assert_eq!(tree.capacity(), 8);
+        for &(idx, value) in &test_vector {
+            tree.insert(idx, value);
+        }
+        assert_eq!(tree.root_hash(), expected_root_hash);
+
+        // Check the proof for every element.
+        for &(idx, value) in &test_vector {
+            let merkle_proof = tree.merkle_path(idx);
+
+            let hasher = TestHasher::default();
+
+            // To check the proof, we fold it starting from the hash of the value
+            // and updating with the hashes from the proof.
+            // We should obtain the root hash at the end if the proof is correct.
+            let mut level = 0;
+            let mut proof_index: ItemIndex = 0;
+            let mut aggregated_hash = hasher.hash_bits(value.get_bits_le());
+            for (hash, dir) in merkle_proof {
+                let (lhs, rhs) = if dir {
+                    proof_index |= 1 << level;
+                    (hash, aggregated_hash)
+                } else {
+                    (aggregated_hash, hash)
+                };
+
+                aggregated_hash = hasher.compress(&lhs, &rhs, level as usize);
+
+                level += 1;
+            }
+
+            assert_eq!(level, tree.tree_depth);
+            assert_eq!(proof_index, idx);
+            assert_eq!(aggregated_hash, 793_215_819);
+        }
+
+        // Since sparse merkle tree is by default "filled" with default values,
+        // we can check the proofs for elements which we did not insert by ourselves.
+        // Given the tree depth 3, the tree capacity is 8 (2^3).
+        let absent_elements = [1, 2, 4, 5, 6, 7];
+        let default_value = 0;
+
+        for &idx in &absent_elements {
+            let merkle_proof = tree.merkle_path(idx);
+
+            let hasher = TestHasher::default();
+
+            // To check the proof, we fold it starting from the hash of the value
+            // and updating with the hashes from the proof.
+            // We should obtain the root hash at the end if the proof is correct.
+            let mut level = 0;
+            let mut proof_index: ItemIndex = 0;
+            let mut aggregated_hash = hasher.hash_bits(default_value.get_bits_le());
+            for (hash, dir) in merkle_proof {
+                let (lhs, rhs) = if dir {
+                    proof_index |= 1 << level;
+                    (hash, aggregated_hash)
+                } else {
+                    (aggregated_hash, hash)
+                };
+
+                aggregated_hash = hasher.compress(&lhs, &rhs, level as usize);
+
+                level += 1;
+            }
+
+            assert_eq!(level, tree.tree_depth);
+            assert_eq!(proof_index, idx);
+            assert_eq!(aggregated_hash, 793_215_819);
+        }
+    }
 }
