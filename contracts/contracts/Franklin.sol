@@ -49,7 +49,7 @@ contract Franklin is Storage, Config, Events {
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external {
-        // TODO: when switched to multi valiators model we need to add insentive mechanism to call complete.
+        // TODO: when switched to multi valiators model we need to add incentive mechanism to call complete.
         uint32 toProcess = _n;
         if (toProcess > numberOfPendingWithdrawals) {
             toProcess = numberOfPendingWithdrawals;
@@ -77,8 +77,9 @@ contract Franklin is Storage, Config, Events {
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
                     sent = toPayable.send(amount);
-                } else if (governance.isValidTokenId(tokenId)) {
+                } else {
                     address tokenAddr = governance.tokenAddresses(tokenId);
+                    require(tokenAddr != address(0), "cwd11"); // unknown tokenId
                     sent = IERC20(tokenAddr).transfer(to, amount);
                 }
                 if (!sent) {
@@ -362,7 +363,7 @@ contract Franklin is Storage, Config, Events {
 
         uint256 pubdataOffset = 0;
 
-        uint32 ethWitnessOffset = 0;
+        uint64 ethWitnessOffset = 0;
         uint32 processedZKSyncOperation = 0;
 
         while (pubdataOffset < _publicData.length) {
@@ -379,6 +380,7 @@ contract Franklin is Storage, Config, Events {
             processedZKSyncOperation++;
         }
         require(pubdataOffset == _publicData.length, "fcs12"); // last chunk exceeds pubdata
+        require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
     }
 
     /// @notice Verifies ethereum signature for given message and recovers address of the signer
@@ -624,7 +626,7 @@ contract Franklin is Storage, Config, Events {
     /// @param _reverted Reverted block
     function revertBlock(Block memory _reverted) internal {
         require(_reverted.committedAtBlock > 0, "frk11"); // block not found
-        revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
+//        revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
         totalCommittedPriorityRequests -= _reverted.priorityOperations;
     }
 
