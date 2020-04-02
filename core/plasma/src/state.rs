@@ -22,6 +22,7 @@ pub struct OpSuccess {
     pub executed_op: FranklinOp,
 }
 
+#[derive(Debug, Clone)]
 pub struct PlasmaState {
     /// Accounts stored in a sparse Merkle tree
     balance_tree: AccountTree,
@@ -342,7 +343,8 @@ impl PlasmaState {
         ))
     }
 
-    fn insert_account(&mut self, id: AccountId, account: Account) {
+    #[doc(hidden)] // Public for benches.
+    pub fn insert_account(&mut self, id: AccountId, account: Account) {
         self.account_id_by_address
             .insert(account.address.clone(), id);
         self.balance_tree.insert(id, account);

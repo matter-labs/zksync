@@ -308,6 +308,7 @@ mod test {
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use bigdecimal::BigDecimal;
     use models::node::{Account, Deposit};
+    use std::time::Instant;
 
     #[test]
     #[ignore]
@@ -542,7 +543,8 @@ mod test {
         // c.clone().synthesize(&mut transpiler).unwrap();
 
         println!("Start transpiling");
-        let (n, mut hints) = transpile_with_gates_count::<Bn256, _>(c.clone()).expect("transpilation is successful");
+        let (n, mut hints) =
+            transpile_with_gates_count::<Bn256, _>(c.clone()).expect("transpilation is successful");
         println!("Transpiled into {} gates", n);
         let mut tmp_buff = Vec::new();
         write_transpilation_hints(&hints, &mut tmp_buff).expect("hint write");
@@ -590,7 +592,6 @@ mod test {
         is_satisfied(c.clone(), &hints).expect("must validate");
 
         println!("Done checking if satisfied");
-
     }
 
     #[test]
@@ -662,11 +663,11 @@ mod test {
 
         // c.clone().synthesize(&mut transpiler).unwrap();
 
-        let (n, mut hints) = transpile_with_gates_count::<Bn256, _>(c.clone()).expect("transpilation is successful");
+        let timer = Instant::now();
+        let (n, mut hints) =
+            transpile_with_gates_count::<Bn256, _>(c.clone()).expect("transpilation is successful");
+        println!("Transpilation time: {}s", timer.elapsed().as_secs());
         println!("Transpiled into {} gates", n);
-        let mut tmp_buff = Vec::new();
-        write_transpilation_hints(&hints, &mut tmp_buff).expect("hint write");
-        hints = read_transpilation_hints(tmp_buff.as_slice()).expect("hint read");
 
         let mut hints_hist = std::collections::HashMap::new();
         hints_hist.insert("into addition gate".to_owned(), 0);
@@ -711,29 +712,38 @@ mod test {
 
         println!("Done checking if satisfied");
 
+        let timer = Instant::now();
         let mut setup = setup(c.clone(), &hints).expect("must make setup");
-        tmp_buff = Vec::new();
-        setup.write(&mut tmp_buff).expect("setup write");
-        setup = SetupPolynomials::read(tmp_buff.as_slice()).expect("setup read");
+        println!("Setup generated time: {}s", timer.elapsed().as_secs());
 
         println!("Made into {} gates", setup.n);
         let size = setup.n.next_power_of_two();
+        let size_log2 = size.trailing_zeros();
+        println!("Log pow2: {}", size_log2);
+        assert!(size_log2 <= 26, "power of two too big");
 
+        let timer = Instant::now();
         let mut monomial_form_reader = std::io::BufReader::with_capacity(
-            1 << 24,
-            std::fs::File::open(format!("{}/setup_2^22.key", universal_setup_path)).unwrap(),
+            1 << 29,
+            std::fs::File::open(format!(
+                "{}/setup_2^{}.key",
+                universal_setup_path, size_log2
+            ))
+            .unwrap(),
         );
-
         let mut lagrange_form_reader = std::io::BufReader::with_capacity(
-            1 << 24,
-            std::fs::File::open(format!("{}/setup_2^22_lagrange.key", universal_setup_path))
-                .unwrap(),
+            1 << 29,
+            std::fs::File::open(format!(
+                "{}/setup_2^{}_lagrange.key",
+                universal_setup_path, size_log2
+            ))
+            .unwrap(),
         );
-
         let key_monomial_form =
             Crs::<Bn256, CrsForMonomialForm>::read(&mut monomial_form_reader).unwrap();
         let key_lagrange_form =
             Crs::<Bn256, CrsForLagrangeForm>::read(&mut lagrange_form_reader).unwrap();
+        println!("Setup files read: {}s", timer.elapsed().as_secs());
 
         // let worker = Worker::new();
 
@@ -743,23 +753,23 @@ mod test {
         // let key_monomial_form = Crs::<Bn256, CrsForMonomialForm>::dummy_crs(size);
         // let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::dummy_crs(size);
 
+        let timer = Instant::now();
         let mut verification_key = make_verification_key(&setup, &key_monomial_form)
             .expect("must make a verification key");
-        tmp_buff = Vec::new();
-        verification_key
-            .write(&mut tmp_buff)
-            .expect("verification key write");
-        verification_key =
-            VerificationKey::read(tmp_buff.as_slice()).expect("verification key read");
+        println!("Verification key generated: {}s", timer.elapsed().as_secs());
 
+        // tmp_buff = Vec::new();
+        verification_key
+            .write(
+                std::fs::File::create(format!("{}/verification.key", param_save_path))
+                    .expect("ver key file create"),
+            )
+            .expect("ver key serialize");
+
+        let timer = Instant::now();
         let mut precomputations =
             make_precomputations(&setup).expect("must make precomputations for proving");
-        tmp_buff = Vec::new();
-        precomputations
-            .write(&mut tmp_buff)
-            .expect("precomputation write");
-        precomputations = SetupPolynomialsPrecomputations::read(tmp_buff.as_slice())
-            .expect("precomputation read");
+        println!("Precomputations generated: {}s", timer.elapsed().as_secs());
 
         use crate::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
 
@@ -767,6 +777,7 @@ mod test {
         let omegas_inv_bitreversed =
             <OmegasInvBitreversed<Fr> as CTPrecomputations<Fr>>::new_for_domain_size(size);
 
+        let timer = Instant::now();
         let mut proof = prove_from_recomputations::<_, _, RollingKeccakTranscript<Fr>, _, _>(
             c.clone(),
             &hints,
@@ -778,16 +789,7 @@ mod test {
             &key_lagrange_form,
         )
         .expect("must make a proof");
-    
-        let mut proof_writer = std::io::BufWriter::with_capacity(
-            1<<24, 
-            std::fs::File::create("./deposit_proof.proof").unwrap()
-        );
-        proof.write(&mut proof_writer).unwrap();
-
-        tmp_buff = Vec::new();
-        proof.write(&mut tmp_buff).expect("proof write");
-        proof = Proof::read(tmp_buff.as_slice()).expect("proof read");
+        println!("Proof generated: {}s", timer.elapsed().as_secs());
 
         proof
             .write(

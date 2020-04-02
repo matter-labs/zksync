@@ -16,13 +16,17 @@ use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed, Signature};
 use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::franklin_crypto::rescue::RescueEngine;
+use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
-use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, rescue_hash_tx_msg, u128_to_bigdecimal};
+use crate::primitives::{
+    big_decimal_to_u128, pedersen_hash_tx_msg, rescue_hash_tx_msg, u128_to_bigdecimal,
+};
 use ethsign::{SecretKey, Signature as ETHSignature};
 use failure::{ensure, format_err};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
+use std::fmt;
 use std::str::FromStr;
 use web3::types::{Address, H256};
 
@@ -111,17 +115,33 @@ impl Transfer {
 
     pub fn check_correctness(&self) -> bool {
         self.from != self.to
+            && self.amount.is_integer() // TODO: remove after # 366
+            && self.fee.is_integer()
             && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee)
             && self.verify_signature().is_some()
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
-            Some(PubKeyHash::from_pubkey(&pub_key))
-        } else {
-            None
-        }
+        self.signature
+            .verify_musig_sha256(&self.get_bytes())
+            .as_ref()
+            .map(PubKeyHash::from_pubkey)
+    }
+
+    /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
+    pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
+        format!(
+            "Transfer {amount} {token}\n\
+            To: {to:?}\n\
+            Nonce: {nonce}\n\
+            Fee: {fee} {token}",
+            amount = format_ether(&self.amount),
+            token = token_symbol,
+            to = self.to,
+            nonce = self.nonce,
+            fee = format_ether(&self.fee),
+        )
     }
 }
 
@@ -156,6 +176,8 @@ impl Withdraw {
         is_fee_amount_packable(&self.fee)
             && self.amount <= u128_to_bigdecimal(u128::max_value())
             && self.verify_signature().is_some()
+            && self.amount.is_integer() // TODO: remove after # 366
+            && self.fee.is_integer()
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
@@ -164,6 +186,21 @@ impl Withdraw {
         } else {
             None
         }
+    }
+
+    /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
+    pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
+        format!(
+            "Withdraw {amount} {token}\n\
+            To: {to:?}\n\
+            Nonce: {nonce}\n\
+            Fee: {fee} {token}",
+            amount = format_ether(&self.amount),
+            token = token_symbol,
+            to = self.to,
+            nonce = self.nonce,
+            fee = format_ether(&self.fee),
+        )
     }
 }
 
@@ -353,13 +390,6 @@ pub struct TxSignature {
 }
 
 impl TxSignature {
-    pub fn default() -> Self {
-        Self {
-            pub_key: PackedPublicKey::deserialize_packed(&[0; 32]).unwrap(),
-            signature: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
-        }
-    }
-
     pub fn verify_musig_pedersen(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_pedersen(
@@ -430,7 +460,10 @@ impl TxSignature {
         }
     }
 
-    pub fn sign_musig_rescue(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self where Engine: RescueEngine {
+    pub fn sign_musig_rescue(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self
+    where
+        Engine: RescueEngine,
+    {
         let hashed_msg = rescue_hash_tx_msg(msg);
         let seed = Seed::deterministic_seed(&pk, &hashed_msg);
         let signature = pk.musig_rescue_sign(
@@ -448,6 +481,15 @@ impl TxSignature {
                 &JUBJUB_PARAMS,
             )),
             signature: PackedSignature(signature),
+        }
+    }
+}
+
+impl Default for TxSignature {
+    fn default() -> Self {
+        Self {
+            pub_key: PackedPublicKey::deserialize_packed(&[0; 32]).unwrap(),
+            signature: PackedSignature::deserialize_packed(&[0; 64]).unwrap(),
         }
     }
 }
@@ -564,6 +606,48 @@ impl<'de> Deserialize<'de> for PackedSignature {
             let bytes = hex::decode(&string).map_err(|e| Error::custom(e.to_string()))?;
             PackedSignature::deserialize_packed(&bytes).map_err(|e| Error::custom(e.to_string()))
         })
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "signature")]
+pub enum TxEthSignature {
+    EthereumSignature(PackedEthSignature),
+    EIP1271Signature(EIP1271Signature),
+}
+
+#[derive(Debug, Clone)]
+pub struct EIP1271Signature(pub Vec<u8>);
+
+impl fmt::Display for EIP1271Signature {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EIP1271Signature 0x{}", hex::encode(&self.0.as_slice()))
+    }
+}
+
+impl<'de> Deserialize<'de> for EIP1271Signature {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use hex::FromHex;
+        use serde::de::Error;
+
+        let string = String::deserialize(deserializer)?;
+
+        if !string.starts_with("0x") {
+            return Err(Error::custom("Packed eth signature should start with 0x"));
+        }
+
+        Vec::from_hex(&string[2..])
+            .map(Self)
+            .map_err(|err| Error::custom(err.to_string()))
+    }
+}
+
+impl Serialize for EIP1271Signature {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&format!("0x{}", &hex::encode(self.0.as_slice())))
     }
 }
 

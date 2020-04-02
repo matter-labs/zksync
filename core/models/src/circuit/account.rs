@@ -2,12 +2,12 @@ use crate::params;
 
 use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField, PrimeFieldRepr};
-use crate::franklin_crypto::bellman::pairing::{Engine};
+use crate::franklin_crypto::bellman::pairing::Engine;
 
 use crate::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
-use crate::franklin_crypto::rescue::{RescueEngine};
+use crate::franklin_crypto::rescue::RescueEngine;
 use crate::merkle_tree::hasher::Hasher;
-use crate::merkle_tree::{PedersenHasher, SparseMerkleTree, RescueHasher};
+use crate::merkle_tree::{PedersenHasher, RescueHasher, SparseMerkleTree};
 use crate::primitives::{GetBits, GetBitsFixed};
 
 // pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
@@ -16,7 +16,7 @@ use crate::primitives::{GetBits, GetBitsFixed};
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, RescueHasher<Bn256>>;
 pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, RescueHasher<Bn256>>;
 
-
+#[derive(Clone)]
 pub struct CircuitAccount<E: RescueEngine> {
     // pub subtree: SparseMerkleTree<Balance<E>, E::Fr, PedersenHasher<E>>,
     pub subtree: SparseMerkleTree<Balance<E>, E::Fr, RescueHasher<E>>,
@@ -27,7 +27,11 @@ pub struct CircuitAccount<E: RescueEngine> {
 
 impl<E: RescueEngine> GetBits for CircuitAccount<E> {
     fn get_bits_le(&self) -> Vec<bool> {
-        debug_assert_eq!(params::FR_BIT_WIDTH, E::Fr::NUM_BITS as usize, "FR bit width is not equal to field bit width");
+        debug_assert_eq!(
+            params::FR_BIT_WIDTH,
+            E::Fr::NUM_BITS as usize,
+            "FR bit width is not equal to field bit width"
+        );
         let mut leaf_content = Vec::new();
 
         leaf_content.extend(self.nonce.get_bits_le_fixed(params::NONCE_BIT_WIDTH)); //32
@@ -65,7 +69,6 @@ impl<E: RescueEngine> GetBits for CircuitAccount<E> {
         //     .hash_bits(subtree_hash_input_bits.into_iter())
         //     .get_bits_le_fixed(params::FR_BIT_WIDTH);
 
-
         // state_tree_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false);
 
         let mut state_tree_hash_bits = state_root.get_bits_le_fixed(params::FR_BIT_WIDTH);
@@ -97,14 +100,11 @@ impl<E: RescueEngine> CircuitAccount<E> {
     // }
 
     fn get_state_root(&self) -> E::Fr {
-        let balance_root = self
-            .subtree
-            .root_hash();
+        let balance_root = self.subtree.root_hash();
 
         let state_root_padding = E::Fr::zero();
 
-        self
-            .subtree
+        self.subtree
             .hasher
             .hash_elements(vec![balance_root, state_root_padding])
     }
@@ -130,7 +130,8 @@ impl<E: Engine> GetBits for Balance<E> {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
         leaf_content.extend(self.value.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
-        assert!(params::BALANCE_BIT_WIDTH < E::Fr::CAPACITY as usize, 
+        assert!(
+            params::BALANCE_BIT_WIDTH < E::Fr::CAPACITY as usize,
             "due to algebraic nature of the hash we should not overflow the capacity"
         );
 

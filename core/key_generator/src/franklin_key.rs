@@ -82,7 +82,7 @@ pub fn make_exodus_key() {
     );
 }
 
-fn estimate_power_of_two(block_size: usize) -> u32 {
+fn estimate_power_of_two(block_size: usize) -> (usize, u32) {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
     let jubjub_params = &params::JUBJUB_PARAMS;
     let rescue_params = &params::RESCUE_PARAMS;
@@ -168,9 +168,10 @@ fn estimate_power_of_two(block_size: usize) -> u32 {
     use crypto_exports::franklin_crypto::bellman::plonk::better_cs::{adaptor::{TranspilationVariant, write_transpilation_hints}, cs::PlonkCsWidth4WithNextStepParams};
     use crypto_exports::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
 
-    let hints = transpile::<Bn256, _>(instance_for_generation.clone())
-        .expect("transpilation is successful");
-    let setup = setup(instance_for_generation.clone(), &hints).expect("must make setup");
+    let (size, _) = transpile_with_gates_count(instance_for_generation.clone()).expect("tranapoile with gates counts");
+    //let hints = transpile::<Bn256, _>(instance_for_generation.clone())
+     //   .expect("transpilation is successful");
+    //let setup = setup(instance_for_generation.clone(), &hints).expect("must make setup");
 
     // let timer = Instant::now();
     // let setup = SetupPolynomials::<_, PlonkCsWidth4WithNextStepParams>::read(
@@ -179,9 +180,8 @@ fn estimate_power_of_two(block_size: usize) -> u32 {
     // .expect("setup read");
     // println!("setup read: {}", timer.elapsed().as_secs());
 
-    let size = setup.n.next_power_of_two();
-    let power_of_two = size.trailing_zeros();
-    return power_of_two;
+    let power_of_two = size.next_power_of_two().trailing_zeros();
+    return (size, power_of_two);
 }
 
 pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
@@ -630,6 +630,25 @@ pub fn make_circuit_parameters_plonk(block_size: usize) {
     // let omegas_inv_bitreversed =
     //     <OmegasInvBitreversed<Fr> as CTPrecomputations<Fr>>::new_for_domain_size(size);
     // println!("omegas time: {}", timer.elapsed().as_secs());
+}
+
+#[test]
+fn run_estimate_power_of_two() {
+    use rayon::prelude::*;
+    println!("chunks,power_of_two,gates");
+    let testable_pows = (6..=180).step_by(2).collect::<Vec<usize>>();
+
+    let pows = testable_pows.into_par_iter().map(|c| {
+        let (gates, pow) = estimate_power_of_two(c); 
+        (c, pow, gates)
+    }).collect::<Vec<_>>();
+
+    for (c,pow,gates) in pows {
+        if pow > 26 {
+            break;
+        }
+        println!("{},{},{}",c, pow, gates);
+    }
 }
 
 #[test]

@@ -1,10 +1,8 @@
 import { curve } from "elliptic";
 import {
     privateKeyFromSeed,
-    privateKeyToPublicKey,
-    pubkeyToAddress,
-    serializePointPacked,
-    signTransactionBytes
+    signTransactionBytes,
+    privateKeyToPubKeyHash
 } from "./crypto";
 import { ethers, utils } from "ethers";
 import { packAmountChecked, packFeeChecked } from "./utils";
@@ -15,16 +13,14 @@ const MAX_NUMBER_OF_TOKENS = 4096;
 const MAX_NUMBER_OF_ACCOUNTS = 1 << 24;
 
 export class Signer {
-    readonly privateKey: BN;
-    readonly publicKey: curve.edwards.EdwardsPoint;
+    readonly privateKey: Uint8Array;
 
-    private constructor(privKey: BN) {
+    private constructor(privKey: Uint8Array) {
         this.privateKey = privKey;
-        this.publicKey = privateKeyToPublicKey(this.privateKey);
     }
 
     pubKeyHash(): PubKeyHash {
-        return `sync:${pubkeyToAddress(this.publicKey).toString("hex")}`;
+        return privateKeyToPubKeyHash(this.privateKey);
     }
 
     signSyncTransfer(transfer: {
@@ -103,7 +99,7 @@ export class Signer {
         };
     }
 
-    static fromPrivateKey(pk: BN): Signer {
+    static fromPrivateKey(pk: Uint8Array): Signer {
         return new Signer(pk);
     }
 
@@ -122,19 +118,19 @@ export class Signer {
     }
 }
 
+function removeAddressPrefix(address: Address | PubKeyHash): string {
+    if (address.startsWith("0x")) return address.substr(2);
+
+    if (address.startsWith("sync:")) return address.substr(5);
+
+    throw new Error(
+        "ETH address must start with '0x' and PubKeyHash must start with 'sync:'"
+    );
+}
+
 // PubKeyHash or eth address
 export function serializeAddress(address: Address | PubKeyHash): Buffer {
-    const prefixlessAddress = address.startsWith("0x")
-        ? address.substr(2)
-        : address.startsWith("sync:")
-        ? address.substr(5)
-        : null;
-
-    if (prefixlessAddress === null) {
-        throw new Error(
-            "ETH address must start with '0x' and PubKeyHash must start with 'sync:'"
-        );
-    }
+    const prefixlessAddress = removeAddressPrefix(address);
 
     const addressBytes = Buffer.from(prefixlessAddress, "hex");
     if (addressBytes.length != 20) {

@@ -24,6 +24,14 @@ futures = { version = "0.3", features = ["compat"] }
 ethsign = "0.7.3"
 tiny-keccak = "1.4.2"
 
+[dev-dependencies]
+criterion = "0.3.0"
+
+[[bench]]
+name = "criterion"
+harness = false
+path = "benches/criterion/lib.rs"
+
 [features]
 default=[]
 run_benches=[]
