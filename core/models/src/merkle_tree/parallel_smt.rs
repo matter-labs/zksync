@@ -198,6 +198,8 @@ where
     Hash: Clone + Debug + Sync + Send,
     H: Hasher<Hash> + Sync,
 {
+    const ROOT_ITEM_IDX: NodeRef = 0;
+
     /// Obtains the element for a certain index.
     pub fn get(&self, index: u32) -> Option<&T> {
         let index = ItemIndex::from(index);
@@ -367,9 +369,7 @@ where
     /// if this method was not called. The intermediate calculation results are caches though,
     /// thus follow-up invocations will cost less.
     pub fn root_hash(&self) -> Hash {
-        const ROOT_ITEM_IDX: NodeRef = 0;
-
-        let (root_hash, intermediate_hashes) = self.get_hash(ROOT_ITEM_IDX);
+        let (root_hash, intermediate_hashes) = self.get_hash(Self::ROOT_ITEM_IDX);
 
         // Store all the intermediate hashes in the cache.
         for (item_idx, hash) in intermediate_hashes {
@@ -391,28 +391,108 @@ where
     /// the aggregated coupling hash for current layer, and the second is
     /// the direction.
     pub fn merkle_path(&self, index: u32) -> Vec<(Hash, bool)> {
+        assert!((index as ItemIndex) < self.capacity());
+
         let index = index as ItemIndex;
 
-        // print!("Making a proof for index {}\n", index);
-        assert!(index < self.capacity());
+        let mut proof = Vec::new();
+        let mut current_node = Some(self.nodes[Self::ROOT_ITEM_IDX].clone());
+        let mut current_depth = 0;
+        while current_depth != self.tree_depth {
+            // Level bit mask is the bit we need to see for the direction on this level.
+            // For example, on the level 0 (root level) with the tree depth 3, we have to see
+            // the most significant bit, in our case it's the 3rd bit of the number.
+            // Given the tree depth 3 and current level 0, the shift is equal to 3 - 0 - 1 = 2,
+            // and the mask to check the MSB is (1 << 2) = 0b0100.
+            let level_bit_mask = 1 << (self.tree_depth - current_depth - 1);
 
-        // Convert the leaf index into a local node index.
-        let leaf_index: NodeIndex = NodeIndex((1 << self.tree_depth) + index);
-        let (mut current_depth, mut current_idx) = (self.tree_depth, leaf_index);
+            // If the corresponding bit is set within the number, the our node is in the right
+            // branch of the parent node. Otherwise, it's in the left branch.
+            let going_right = (index & level_bit_mask) != 0;
 
-        (0..self.tree_depth)
-            .rev()
-            .map(|_level| {
-                let dir = (current_idx.0 & 1) > 0;
-                let proof_index = current_idx.0 ^ 1;
+            // The neighbor node (which hash we should include in the proof) direction is
+            // opposite to the direction of our node.
+            let neighbor_direction = if going_right {
+                NodeDirection::Left
+            } else {
+                NodeDirection::Right
+            };
 
-                let (hash, _) = self.get_hash(proof_index as usize);
+            // Depending on existence of our node we may include different hashes:
+            // if current node is absent in the tree, we must include the precomputed
+            // hash (and since there is no current node, there will be no child nodes,
+            // so the rest of the proof will contain precomputed hashes only).
+            // Otherwise, we must include the hash of our neighbor (which also can be
+            // absent, and thus it also may be either hash of the actual node, or
+            // precomputed hash).
+            if let Some(node) = current_node.clone() {
+                let next_ref = if going_right { node.right } else { node.left };
 
-                current_depth -= 1;
-                current_idx.0 >>= 1;
-                (hash, dir)
-            })
-            .collect()
+                let (neighbor_hash, _) = self.get_child_hash(&node, neighbor_direction);
+
+                proof.push((neighbor_hash, going_right));
+
+                // After getting the neighbor hash we must go down the tree to obtain
+                // the next proof element.
+                // Note that if the reference on this iteration was `None`, it will
+                // remain `None` until we reach the very bottom of the tree.
+                current_node = next_ref.map(|next_ref| self.nodes[next_ref].clone());
+
+                current_depth += 1;
+
+                // Check if we've jumped through some levels.
+                // Since reference to the child can skip some "empty" levels,
+                // we have to manually check it and fill the gaps with precomputed hashes.
+                if let Some(current_node) = current_node.clone() {
+                    while current_depth != current_node.depth {
+                        let proof_step = self.get_intermediate_hash_to_proof(index, current_depth);
+                        proof.push(proof_step);
+
+                        current_depth += 1;
+                    }
+                }
+            } else {
+                let proof_step = self.get_intermediate_hash_to_proof(index, current_depth);
+                proof.push(proof_step);
+
+                current_depth += 1;
+            }
+        }
+
+        // Since we've come from the root of the tree to its bottom, we have to reverse the
+        // proof elements order, so the proof receiver will apply hashes in order of their
+        // appearance to (hopefully) get the correct tree root hash.
+        proof.into_iter().rev().collect()
+    }
+
+    /// Helper method for `merkle_path`.
+    /// Gets the hash of the tree node which does not have an allocated entry (which can be
+    /// either a "intermediate" precomputed hash, or the leaf node hash).
+    fn get_intermediate_hash_to_proof(
+        &self,
+        index: ItemIndex,
+        current_depth: usize,
+    ) -> (Hash, bool) {
+        let level_bit_mask = 1 << (self.tree_depth - current_depth - 1);
+        let going_right = (index & level_bit_mask) != 0;
+
+        let hash = if current_depth == self.tree_depth - 1 {
+            // We're getting the hash of the leaf, so we must check if this leaf exists in the
+            // tree. If so, we'll use its actual hash, otherwise we'll use a precomputed one.
+            let neighbor_leaf_index = index ^ 1;
+            match self.get(neighbor_leaf_index as u32) {
+                Some(value) => {
+                    let item_bits = value.get_bits_le();
+                    self.hasher.hash_bits(item_bits)
+                }
+                None => self.prehashed[self.tree_depth].clone(),
+            }
+        } else {
+            // Not a leaf level, so just use a precomputed hash.
+            self.prehashed[current_depth + 1].clone()
+        };
+
+        (hash, going_right)
     }
 
     /// Calculates the depth ("layer") of the element with the provided index.
@@ -701,5 +781,86 @@ mod tests {
 
         // The first element left only, hash should be the same as in the beginning.
         assert_eq!(tree.root_hash(), 697_516_875);
+    }
+
+    /// Checks the correctness of the built Merkle proofs
+    #[test]
+    fn merkle_path_test() {
+        // Test vector holds pairs (index, value).
+        let test_vector = [(0, 2), (3, 2)];
+        // Precomputed root hash for the test vector above.
+        let expected_root_hash = 793_215_819;
+
+        // Create the tree and fill it with values.
+        let mut tree = TestSMT::new(3);
+        assert_eq!(tree.capacity(), 8);
+        for &(idx, value) in &test_vector {
+            tree.insert(idx, TestLeaf(value));
+        }
+        assert_eq!(tree.root_hash(), expected_root_hash);
+
+        // Check the proof for every element.
+        for &(idx, value) in &test_vector[..] {
+            let merkle_proof = tree.merkle_path(idx);
+
+            let hasher = TestHasher::default();
+
+            // To check the proof, we fold it starting from the hash of the value
+            // and updating with the hashes from the proof.
+            // We should obtain the root hash at the end if the proof is correct.
+            let mut level = 0;
+            let mut proof_index: ItemIndex = 0;
+            let mut aggregated_hash = hasher.hash_bits(value.get_bits_le());
+            for (hash, dir) in merkle_proof {
+                let (lhs, rhs) = if dir {
+                    proof_index |= 1 << level;
+                    (hash, aggregated_hash)
+                } else {
+                    (aggregated_hash, hash)
+                };
+
+                aggregated_hash = hasher.compress(&lhs, &rhs, level);
+
+                level += 1;
+            }
+
+            assert_eq!(level, tree.tree_depth);
+            assert_eq!(proof_index, idx as u64);
+            assert_eq!(aggregated_hash, 793_215_819);
+        }
+        // Since sparse merkle tree is by default "filled" with default values,
+        // we can check the proofs for elements which we did not insert by ourselves.
+        // Given the tree depth 3, the tree capacity is 8 (2^3).
+        let absent_elements = [1, 2, 4, 5, 6, 7];
+        let default_value = 0;
+
+        for &idx in &absent_elements {
+            let merkle_proof = tree.merkle_path(idx);
+
+            let hasher = TestHasher::default();
+
+            // To check the proof, we fold it starting from the hash of the value
+            // and updating with the hashes from the proof.
+            // We should obtain the root hash at the end if the proof is correct.
+            let mut level = 0;
+            let mut proof_index: ItemIndex = 0;
+            let mut aggregated_hash = hasher.hash_bits(default_value.get_bits_le());
+            for (hash, dir) in merkle_proof {
+                let (lhs, rhs) = if dir {
+                    proof_index |= 1 << level;
+                    (hash, aggregated_hash)
+                } else {
+                    (aggregated_hash, hash)
+                };
+
+                aggregated_hash = hasher.compress(&lhs, &rhs, level as usize);
+
+                level += 1;
+            }
+
+            assert_eq!(level, tree.tree_depth);
+            assert_eq!(proof_index, idx as u64);
+            assert_eq!(aggregated_hash, 793_215_819);
+        }
     }
 }
