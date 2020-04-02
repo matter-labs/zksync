@@ -205,7 +205,9 @@ where
     }
 
     /// Inserts an element to the tree.
-    pub fn insert(&mut self, item_index: ItemIndex, item: T) {
+    pub fn insert(&mut self, item_index: u32, item: T) {
+        let item_index = item_index as ItemIndex;
+
         assert!(item_index < self.capacity());
         let tree_depth = self.tree_depth;
         let leaf_index: NodeIndex = NodeIndex((1 << tree_depth) + item_index);
@@ -349,11 +351,13 @@ where
 
     /// Removes an element with a given index, and returns the removed
     /// element (if it existed in the tree).
-    pub fn remove(&mut self, index: ItemIndex) -> Option<T> {
+    pub fn remove(&mut self, index: u32) -> Option<T> {
+        let index = index as ItemIndex;
+
         let old = self.items.remove(&index);
         let item = T::default();
 
-        self.insert(index, item);
+        self.insert(index as u32, item);
 
         old
     }
@@ -386,7 +390,9 @@ where
     /// Returned value is a list of pairs, where the first element is
     /// the aggregated coupling hash for current layer, and the second is
     /// the direction.
-    pub fn merkle_path(&self, index: ItemIndex) -> Vec<(Hash, bool)> {
+    pub fn merkle_path(&self, index: u32) -> Vec<(Hash, bool)> {
+        let index = index as ItemIndex;
+
         // print!("Making a proof for index {}\n", index);
         assert!(index < self.capacity());
 

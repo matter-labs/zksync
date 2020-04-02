@@ -155,7 +155,7 @@ impl From<Account> for CircuitAccount<super::Engine> {
             .collect();
 
         for (i, b) in balances.into_iter() {
-            circuit_account.subtree.insert(u64::from(i), b);
+            circuit_account.subtree.insert(u32::from(i), b);
         }
 
         circuit_account.nonce = Fr::from_str(&acc.nonce.to_string()).unwrap();

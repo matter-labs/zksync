@@ -146,7 +146,7 @@ pub fn test_operation_and_wanted_prover_data(
     block_size_chunks: usize,
 ) -> (models::Operation, prover::prover_data::ProverData) {
     let mut circuit_tree =
-        models::circuit::CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+        models::circuit::CircuitAccountTree::new(models::params::account_tree_depth());
     // insert account and its balance
     let storage = access_storage();
 

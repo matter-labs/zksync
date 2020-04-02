@@ -347,14 +347,14 @@ impl PlasmaState {
     pub fn insert_account(&mut self, id: AccountId, account: Account) {
         self.account_id_by_address
             .insert(account.address.clone(), id);
-        self.balance_tree.insert(id as u64, account);
+        self.balance_tree.insert(id, account);
     }
 
     #[allow(dead_code)]
     fn remove_account(&mut self, id: AccountId) {
         if let Some(account) = self.get_account(id) {
             self.account_id_by_address.remove(&account.address);
-            self.balance_tree.remove(id as u64);
+            self.balance_tree.remove(id);
         }
     }
 
