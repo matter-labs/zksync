@@ -8,7 +8,7 @@ use lazy_static::lazy_static;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::node::TokenId;
 
-static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 24;
+static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 0;
 /// account_tree_depth.
 /// Value must be specified as environment variable at compile time under `ACCOUNT_TREE_DEPTH_VALUE` key.
 pub fn account_tree_depth() -> usize {
@@ -17,25 +17,26 @@ pub fn account_tree_depth() -> usize {
     // and set environment value multuple times, which is ok.
 
     unsafe {
-        // if ACCOUNT_TREE_DEPTH_VALUE == 0 {
-        //     let value: &'static str = env!("ACCOUNT_TREE_DEPTH");
-        //     ACCOUNT_TREE_DEPTH_VALUE =
-        //         usize::from_str_radix(value, 10).expect("account tree depth value is invalid");
-        //     let runtime_value = env::var("ACCOUNT_TREE_DEPTH").expect("ACCOUNT_TREE_DEPTH missing");
-        //     let runtime_value =
-        //         usize::from_str(&runtime_value).expect("ACCOUNT_TREE_DEPTH invalid");
-        //     if runtime_value != ACCOUNT_TREE_DEPTH_VALUE {
-        //         panic!(
-        //             "ACCOUNT_TREE_DEPTH want runtime value: {}, got: {}",
-        //             ACCOUNT_TREE_DEPTH_VALUE, runtime_value
-        //         );
-        //     }
-        // }
+        if ACCOUNT_TREE_DEPTH_VALUE == 0 {
+            let value: &'static str = env!("ACCOUNT_TREE_DEPTH");
+            ACCOUNT_TREE_DEPTH_VALUE =
+                usize::from_str(value).expect("account tree depth value is invalid");
+            let runtime_value = env::var("ACCOUNT_TREE_DEPTH").expect("ACCOUNT_TREE_DEPTH missing");
+            let runtime_value =
+                usize::from_str(&runtime_value).expect("ACCOUNT_TREE_DEPTH invalid");
+            if runtime_value != ACCOUNT_TREE_DEPTH_VALUE {
+                panic!(
+                    "ACCOUNT_TREE_DEPTH want runtime value: {}, got: {}",
+                    ACCOUNT_TREE_DEPTH_VALUE, runtime_value
+                );
+            }
+        }
         ACCOUNT_TREE_DEPTH_VALUE
     }
 }
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 24;
 
+pub const INPUT_DATA_ADDRESS_BYTES_WIDTH: usize = 32;
 pub const INPUT_DATA_BLOCK_NUMBER_BYTES_WIDTH: usize = 32;
 pub const INPUT_DATA_FEE_ACC_BYTES_WIDTH_WITH_EMPTY_OFFSET: usize = 32;
 pub const INPUT_DATA_FEE_ACC_BYTES_WIDTH: usize = 3;
@@ -45,6 +46,7 @@ pub const INPUT_DATA_ROOT_HASH_BYTES_WIDTH: usize = 32;
 
 /// Balance tree depth
 pub const BALANCE_TREE_DEPTH: usize = 8;
+pub const MAX_SUPPORTED_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const TOKEN_BIT_WIDTH: usize = 16;
 
 /// Account tree depth

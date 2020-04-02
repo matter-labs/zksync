@@ -62,7 +62,6 @@ async function testWrongETHWalletFullExit(ethWallet: ethers.Wallet, syncWallet: 
     syncWallet.ethSigner = ethWallet;
     const fullExit = await syncWallet.emergencyWithdraw({
         token,
-        nonce: 12341
     });
     await fullExit.awaitReceipt();
     syncWallet.ethSigner = oldWallet;
@@ -75,45 +74,49 @@ async function testWrongETHWalletFullExit(ethWallet: ethers.Wallet, syncWallet: 
 }
 
 (async () => {
-    const WEB3_URL = process.env.WEB3_URL;
+    try {
+        const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
-    const MNEMONIC = process.env.MNEMONIC;
-    const ERC_20TOKEN = process.env.TEST_ERC20;
-    const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
-    console.log("Running integration test on the ", network, " network");
+        const MNEMONIC = process.env.MNEMONIC;
+        const ERC_20TOKEN = process.env.TEST_ERC20;
+        const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
+        console.log("Running integration test on the ", network, " network");
 
-    syncProvider = await getDefaultProvider(network);
+        syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
 
-    const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
+        const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
 
-    const ethWallet = ethers.Wallet.fromMnemonic(
-        MNEMONIC,
-        "m/44'/60'/0'/0/1"
-    ).connect(ethersProvider);
-    const depositWallet = await Wallet.fromEthSignerNoKeys(ethWallet, syncProvider);
+        const ethWallet = ethers.Wallet.fromMnemonic(
+            MNEMONIC,
+            "m/44'/60'/0'/0/1"
+        ).connect(ethersProvider);
+        const depositWallet = await Wallet.fromEthSignerNoKeys(ethWallet, syncProvider);
 
 
-    for (let token of ["ETH", ERC_20TOKEN]) {
-        let amount = utils.parseEther("0.089");
-        const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
-        const syncWallet2 = await Wallet.fromEthSigner(
-            ethWallet2,
-            syncProvider,
-        );
-        await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.5")})).wait();
+        for (let token of ["ETH", ERC_20TOKEN]) {
+            let amount = utils.parseEther("0.089");
+            const ethWallet2 = ethers.Wallet.createRandom().connect(ethersProvider);
+            const syncWallet2 = await Wallet.fromEthSigner(
+                ethWallet2,
+                syncProvider,
+            );
+            await (await ethWallet.sendTransaction({to: ethWallet2.address, value: parseEther("0.5")})).wait();
 
-        await testRandomAccountFullExit(syncWallet2, token);
-        const deposit = await depositWallet.depositToSyncFromEthereum({
-            depositTo: syncWallet2.address(),
-            token,
-            amount,
-        });
-        await deposit.awaitReceipt();
-        await testWrongETHWalletFullExit(ethWallet, syncWallet2, token);
-        await testNormalFullExit(syncWallet2, token);
-        await testEmptyBalanceFullExit(syncWallet2, token);
+            await testRandomAccountFullExit(syncWallet2, token);
+            const deposit = await depositWallet.depositToSyncFromEthereum({
+                depositTo: syncWallet2.address(),
+                token,
+                amount,
+                approveDepositAmountForERC20: true,
+            });
+            await deposit.awaitReceipt();
+            await testWrongETHWalletFullExit(ethWallet, syncWallet2, token);
+            await testNormalFullExit(syncWallet2, token);
+            await testEmptyBalanceFullExit(syncWallet2, token);
+        }
+        await syncProvider.disconnect();
+    } catch (e) {
+        console.error("Error:", e);
+        process.exit(1);
     }
-
-
-    await syncProvider.disconnect();
 })();

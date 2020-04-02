@@ -119,6 +119,7 @@ export default {
 
             const link_to 
                 = this.txData.tx_type == 'Withdraw' ? `${this.blockchainExplorerAddress}/${this.txData.to}`
+                : this.txData.tx_type == 'ChangePubKeyOffchain' ? ''
                 : `${this.routerBase}accounts/${this.txData.to}`;
 
             const onchain_from

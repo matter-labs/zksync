@@ -26,3 +26,4 @@ hex = "0.4"
 
 [dev-dependencies]
 env_logger = "0.6"
+testkit = { path = "../testkit" }

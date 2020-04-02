@@ -130,6 +130,53 @@ zksync dockerhub-push
   zksync db-tests
   ```
 
+## Testing
+
+- Running all the `rust` tests:
+  
+  ```sh
+  f cargo test
+  ```
+
+- Running the database tests:
+  
+  ```sh
+  zksync db-tests
+  ```
+- Running the integration test:
+  
+  ```sh
+  zksync server # Has to be run in the 1st terminal
+  zksync prover # Has to be run in the 2nd terminal
+  zksync integration-simple # Has to be run in the 3rd terminal
+  ```
+
+- Running the full integration tests (similar to `integration-simple`, but performs different full exits)
+  
+  ```sh
+  zksync server # Has to be run in the 1st terminal
+  zksync prover # Has to be run in the 2nd terminal
+  zksync integration-full-exit # Has to be run in the 3rd terminal
+  ```
+
+- Running the circuit tests:
+  
+  ```sh
+  zksync circuit-tests
+  ```
+
+- Running the prover tests:
+  
+  ```sh
+  zksync prover-tests
+  ```
+
+- Running the benchmarks:
+  
+  ```sh
+  f cargo bench
+  ```
+
 ## Generating keys
 
 To generate a proving key, from `server` dir run:
