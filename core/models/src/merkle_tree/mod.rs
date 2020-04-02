@@ -2,6 +2,8 @@ pub mod hasher;
 pub mod parallel_smt;
 pub mod pedersen_hasher;
 pub mod sequential_smt;
+#[cfg(test)]
+mod tests;
 
 pub type SparseMerkleTree<T, H, HH> = parallel_smt::SparseMerkleTree<T, H, HH>;
 pub type PedersenHasher<T> = pedersen_hasher::PedersenHasher<T>;
