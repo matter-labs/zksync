@@ -85,6 +85,20 @@ impl BlockSizedOperationsQueue {
     fn take_next_operation(&mut self) -> Option<Operation> {
         self.operations.pop_front()
     }
+
+    /// Return block number of the next operation to take.
+    fn next_block_number(&self) -> Option<u32> {
+        if self.operations.is_empty() {
+            None
+        } else {
+            Some(self.operations[0].block.block_number)
+        }
+    }
+
+    // Whether queue is empty or not.
+    fn is_empty(&self) -> bool {
+        self.operations.is_empty()
+    }
 }
 
 pub struct ProversDataPool {
@@ -140,7 +154,9 @@ pub struct Maintainer {
     /// This field is initialized at the first iteration of `maintain`
     /// routine, and is updated by applying the state diff after that.
     account_tree: CircuitAccountTree,
-    last_build_block: u32,
+    /// Maintainer prepared prover for blocks in order
+    /// `next_block_number` stores next block number to prepare data for.
+    next_block_number: u32,
 }
 
 impl Maintainer {
@@ -155,7 +171,7 @@ impl Maintainer {
             data,
             rounds_interval,
             account_tree: CircuitAccountTree::new(models::params::account_tree_depth() as u32),
-            last_build_block: 0,
+            next_block_number: 0,
         }
     }
 
@@ -222,18 +238,40 @@ impl Maintainer {
         // Create a storage for prepared data.
         let mut prepared = HashMap::new();
 
-        // Go through every queue, take the next operation to process, and build the
-        // prover data for them.
-        // Empty queues are ignored.
-        for queue in queues.values_mut() {
-            let maybe_op = queue.take_next_operation();
-            if let Some(op) = maybe_op {
+        // Initialize `next_block_number` and circuit tree. Done only once.
+        if self.next_block_number == 0 {
+            if let Some(block_number) = self.get_min_next_block_number(&queues) {
                 let storage = self
                     .conn_pool
                     .access_storage()
                     .expect("failed to connect to db");
-                let pd = self.build_prover_data(&storage, &op)?;
-                prepared.insert(op.block.block_number, pd);
+                self.init_account_tree(&storage, block_number-1)?;
+                self.next_block_number = block_number;
+            }
+        }
+
+        // Go through every queue, take the next operation to process, and build the
+        // prover data for them.
+        // Empty queues are ignored.
+        loop {
+            let mut all_empty = true;
+            for queue in queues.values_mut() {
+                if queue.next_block_number() == Some(self.next_block_number) {
+                    let maybe_op = queue.take_next_operation();
+                    if let Some(op) = maybe_op {
+                        let storage = self
+                            .conn_pool
+                            .access_storage()
+                            .expect("failed to connect to db");
+                        let pd = self.build_prover_data(&storage, &op)?;
+                        prepared.insert(op.block.block_number, pd);
+                        self.next_block_number = op.block.block_number + 1;
+                    }
+                }
+                all_empty = all_empty && queue.is_empty();
+            }
+            if all_empty {
+                break;
             }
         }
 
@@ -249,18 +287,32 @@ impl Maintainer {
         Ok(())
     }
 
-    /// Updates stored account state, obtaining the state for the requested block.
-    ///
-    /// This method updates the stored version of state with a diff, or initializes
-    /// the state if it was not initialized yet.
-    fn update_account_state(
+    /// Returns min block number within all operations in all queues.
+    fn get_min_next_block_number(&self, queues: &HashMap<usize, BlockSizedOperationsQueue>) -> Option<u32> {
+        let mut next = None;
+        for (_, queue) in queues {
+            if let Some(num) = queue.next_block_number() {
+                if let Some(cur) = next {
+                    if num < cur {
+                        next = Some(num)
+                    }
+                } else {
+                    next = Some(num)
+                }
+            }
+        }
+        next
+    }
+
+    /// Initializes account tree, obtaining the state for the requested block.
+    fn init_account_tree(
         &mut self,
         storage: &storage::StorageProcessor,
         new_block: u32,
     ) -> Result<(), String> {
-        if self.last_build_block == 0 {
+        if self.next_block_number == 0 {
             // State is not initialized, load it.
-            let (block, accounts) = storage
+            let (_, accounts) = storage
                 .chain()
                 .state_schema()
                 .load_committed_state(Some(new_block))
@@ -269,34 +321,10 @@ impl Maintainer {
             for (k, v) in accounts.iter() {
                 self.account_tree.insert(*k, CircuitAccount::from(v.clone()));
             }
-            self.last_build_block = block;
-
             debug!("Prover state is initialized");
         }
         Ok(())
     }
-
-    // /// Builds an `CircutAccountTree` based on the stored account state.
-    // ///
-    // /// This method does not update the account state itself and expects
-    // /// it to be up to date.
-    // fn build_account_tree(&self) -> CircuitAccountTree {
-    //     assert!(
-    //         self.account_state.is_some(),
-    //         "There is no state to build a circuit account tree"
-    //     );
-
-    //     let mut account_tree = CircuitAccountTree::new(models::params::account_tree_depth() as u32);
-
-    //     if let Some((_, ref state)) = self.account_state {
-    //         for (&account_id, account) in state {
-    //             let circuit_account = CircuitAccount::from(account.clone());
-    //             account_tree.insert(account_id, circuit_account);
-    //         }
-    //     }
-
-    //     account_tree
-    // }
 
     fn build_prover_data(
         &mut self,
@@ -304,244 +332,241 @@ impl Maintainer {
         commit_operation: &models::Operation,
     ) -> Result<ProverData, String> {
         let block_number = commit_operation.block.block_number;
-        assert!(block_number <= self.last_build_block, "unexpected order of commit operations");
         let block_size = commit_operation.block.smallest_block_size();
 
         info!("building prover data for block {}", &block_number);
-
-        self.update_account_state(storage, block_number - 1)?;
         
-            let mut witness_accum = WitnessBuilder::new(
-                &mut self.account_tree,
-                commit_operation.block.fee_account,
-                block_number,
-            );
+        let mut witness_accum = WitnessBuilder::new(
+            &mut self.account_tree,
+            commit_operation.block.fee_account,
+            block_number,
+        );
 
-            let ops = storage
-                .chain()
-                .block_schema()
-                .get_block_operations(block_number)
-                .map_err(|e| format!("failed to get block operations {}", e))?;
+        let ops = storage
+            .chain()
+            .block_schema()
+            .get_block_operations(block_number)
+            .map_err(|e| format!("failed to get block operations {}", e))?;
 
-            let mut operations = vec![];
-            let mut pub_data = vec![];
-            let mut fees = vec![];
-            for op in ops {
-                match op {
-                    FranklinOp::Deposit(deposit) => {
-                        let deposit_witness =
-                            apply_deposit_tx(&mut witness_accum.account_tree, &deposit);
+        let mut operations = vec![];
+        let mut pub_data = vec![];
+        let mut fees = vec![];
+        for op in ops {
+            match op {
+                FranklinOp::Deposit(deposit) => {
+                    let deposit_witness =
+                        apply_deposit_tx(&mut witness_accum.account_tree, &deposit);
 
-                        let deposit_operations =
-                            calculate_deposit_operations_from_witness(&deposit_witness);
-                        operations.extend(deposit_operations);
-                        pub_data.extend(deposit_witness.get_pubdata());
-                    }
-                    FranklinOp::Transfer(transfer) => {
-                        let transfer_witness =
-                            apply_transfer_tx(&mut witness_accum.account_tree, &transfer);
-
-                        let sig_packed = transfer
-                            .tx
-                            .signature
-                            .signature
-                            .serialize_packed()
-                            .map_err(|e| format!("failed to pack transaction signature {}", e))?;
-
-                        let (
-                            first_sig_msg,
-                            second_sig_msg,
-                            third_sig_msg,
-                            signature_data,
-                            signer_packed_key_bits,
-                        ) = prepare_sig_data(
-                            &sig_packed,
-                            &transfer.tx.get_bytes(),
-                            &transfer.tx.signature.pub_key,
-                        )?;
-
-                        let transfer_operations = calculate_transfer_operations_from_witness(
-                            &transfer_witness,
-                            &first_sig_msg,
-                            &second_sig_msg,
-                            &third_sig_msg,
-                            &signature_data,
-                            &signer_packed_key_bits,
-                        );
-
-                        operations.extend(transfer_operations);
-                        fees.push(CollectedFee {
-                            token: transfer.tx.token,
-                            amount: transfer.tx.fee,
-                        });
-                        pub_data.extend(transfer_witness.get_pubdata());
-                    }
-                    FranklinOp::TransferToNew(transfer_to_new) => {
-                        let transfer_to_new_witness =
-                            apply_transfer_to_new_tx(&mut witness_accum.account_tree, &transfer_to_new);
-
-                        let sig_packed = transfer_to_new
-                            .tx
-                            .signature
-                            .signature
-                            .serialize_packed()
-                            .map_err(|e| format!("failed to pack transaction signature {}", e))?;
-
-                        let (
-                            first_sig_msg,
-                            second_sig_msg,
-                            third_sig_msg,
-                            signature_data,
-                            signer_packed_key_bits,
-                        ) = prepare_sig_data(
-                            &sig_packed,
-                            &transfer_to_new.tx.get_bytes(),
-                            &transfer_to_new.tx.signature.pub_key,
-                        )?;
-
-                        let transfer_to_new_operations =
-                            calculate_transfer_to_new_operations_from_witness(
-                                &transfer_to_new_witness,
-                                &first_sig_msg,
-                                &second_sig_msg,
-                                &third_sig_msg,
-                                &signature_data,
-                                &signer_packed_key_bits,
-                            );
-
-                        operations.extend(transfer_to_new_operations);
-                        fees.push(CollectedFee {
-                            token: transfer_to_new.tx.token,
-                            amount: transfer_to_new.tx.fee,
-                        });
-                        pub_data.extend(transfer_to_new_witness.get_pubdata());
-                    }
-                    FranklinOp::Withdraw(withdraw) => {
-                        let withdraw_witness =
-                            apply_withdraw_tx(&mut witness_accum.account_tree, &withdraw);
-
-                        let sig_packed = withdraw
-                            .tx
-                            .signature
-                            .signature
-                            .serialize_packed()
-                            .map_err(|e| format!("failed to pack transaction signature {}", e))?;
-
-                        let (
-                            first_sig_msg,
-                            second_sig_msg,
-                            third_sig_msg,
-                            signature_data,
-                            signer_packed_key_bits,
-                        ) = prepare_sig_data(
-                            &sig_packed,
-                            &withdraw.tx.get_bytes(),
-                            &withdraw.tx.signature.pub_key,
-                        )?;
-
-                        let withdraw_operations = calculate_withdraw_operations_from_witness(
-                            &withdraw_witness,
-                            &first_sig_msg,
-                            &second_sig_msg,
-                            &third_sig_msg,
-                            &signature_data,
-                            &signer_packed_key_bits,
-                        );
-
-                        operations.extend(withdraw_operations);
-                        fees.push(CollectedFee {
-                            token: withdraw.tx.token,
-                            amount: withdraw.tx.fee,
-                        });
-                        pub_data.extend(withdraw_witness.get_pubdata());
-                    }
-                    FranklinOp::Close(close) => {
-                        let close_account_witness =
-                            apply_close_account_tx(&mut witness_accum.account_tree, &close);
-
-                        let sig_packed = close
-                            .tx
-                            .signature
-                            .signature
-                            .serialize_packed()
-                            .map_err(|e| format!("failed to pack signature: {}", e))?;
-
-                        let (
-                            first_sig_msg,
-                            second_sig_msg,
-                            third_sig_msg,
-                            signature_data,
-                            signer_packed_key_bits,
-                        ) = prepare_sig_data(
-                            &sig_packed,
-                            &close.tx.get_bytes(),
-                            &close.tx.signature.pub_key,
-                        )?;
-
-                        let close_account_operations = calculate_close_account_operations_from_witness(
-                            &close_account_witness,
-                            &first_sig_msg,
-                            &second_sig_msg,
-                            &third_sig_msg,
-                            &signature_data,
-                            &signer_packed_key_bits,
-                        );
-
-                        operations.extend(close_account_operations);
-                        pub_data.extend(close_account_witness.get_pubdata());
-                    }
-                    FranklinOp::FullExit(full_exit_op) => {
-                        let success = full_exit_op.withdraw_amount.is_some();
-
-                        let full_exit_witness =
-                            apply_full_exit_tx(&mut witness_accum.account_tree, &full_exit_op, success);
-
-                        let full_exit_operations =
-                            calculate_full_exit_operations_from_witness(&full_exit_witness);
-
-                        operations.extend(full_exit_operations);
-                        pub_data.extend(full_exit_witness.get_pubdata());
-                    }
-                    FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
-                        let change_pkhash_witness = apply_change_pubkey_offchain_tx(
-                            &mut witness_accum.account_tree,
-                            &change_pkhash_op,
-                        );
-
-                        let change_pkhash_operations =
-                            calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
-
-                        operations.extend(change_pkhash_operations);
-                        pub_data.extend(change_pkhash_witness.get_pubdata());
-                    }
-                    FranklinOp::Noop(_) => {} // Noops are handled below
+                    let deposit_operations =
+                        calculate_deposit_operations_from_witness(&deposit_witness);
+                    operations.extend(deposit_operations);
+                    pub_data.extend(deposit_witness.get_pubdata());
                 }
+                FranklinOp::Transfer(transfer) => {
+                    let transfer_witness =
+                        apply_transfer_tx(&mut witness_accum.account_tree, &transfer);
+
+                    let sig_packed = transfer
+                        .tx
+                        .signature
+                        .signature
+                        .serialize_packed()
+                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
+
+                    let (
+                        first_sig_msg,
+                        second_sig_msg,
+                        third_sig_msg,
+                        signature_data,
+                        signer_packed_key_bits,
+                    ) = prepare_sig_data(
+                        &sig_packed,
+                        &transfer.tx.get_bytes(),
+                        &transfer.tx.signature.pub_key,
+                    )?;
+
+                    let transfer_operations = calculate_transfer_operations_from_witness(
+                        &transfer_witness,
+                        &first_sig_msg,
+                        &second_sig_msg,
+                        &third_sig_msg,
+                        &signature_data,
+                        &signer_packed_key_bits,
+                    );
+
+                    operations.extend(transfer_operations);
+                    fees.push(CollectedFee {
+                        token: transfer.tx.token,
+                        amount: transfer.tx.fee,
+                    });
+                    pub_data.extend(transfer_witness.get_pubdata());
+                }
+                FranklinOp::TransferToNew(transfer_to_new) => {
+                    let transfer_to_new_witness =
+                        apply_transfer_to_new_tx(&mut witness_accum.account_tree, &transfer_to_new);
+
+                    let sig_packed = transfer_to_new
+                        .tx
+                        .signature
+                        .signature
+                        .serialize_packed()
+                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
+
+                    let (
+                        first_sig_msg,
+                        second_sig_msg,
+                        third_sig_msg,
+                        signature_data,
+                        signer_packed_key_bits,
+                    ) = prepare_sig_data(
+                        &sig_packed,
+                        &transfer_to_new.tx.get_bytes(),
+                        &transfer_to_new.tx.signature.pub_key,
+                    )?;
+
+                    let transfer_to_new_operations =
+                        calculate_transfer_to_new_operations_from_witness(
+                            &transfer_to_new_witness,
+                            &first_sig_msg,
+                            &second_sig_msg,
+                            &third_sig_msg,
+                            &signature_data,
+                            &signer_packed_key_bits,
+                        );
+
+                    operations.extend(transfer_to_new_operations);
+                    fees.push(CollectedFee {
+                        token: transfer_to_new.tx.token,
+                        amount: transfer_to_new.tx.fee,
+                    });
+                    pub_data.extend(transfer_to_new_witness.get_pubdata());
+                }
+                FranklinOp::Withdraw(withdraw) => {
+                    let withdraw_witness =
+                        apply_withdraw_tx(&mut witness_accum.account_tree, &withdraw);
+
+                    let sig_packed = withdraw
+                        .tx
+                        .signature
+                        .signature
+                        .serialize_packed()
+                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
+
+                    let (
+                        first_sig_msg,
+                        second_sig_msg,
+                        third_sig_msg,
+                        signature_data,
+                        signer_packed_key_bits,
+                    ) = prepare_sig_data(
+                        &sig_packed,
+                        &withdraw.tx.get_bytes(),
+                        &withdraw.tx.signature.pub_key,
+                    )?;
+
+                    let withdraw_operations = calculate_withdraw_operations_from_witness(
+                        &withdraw_witness,
+                        &first_sig_msg,
+                        &second_sig_msg,
+                        &third_sig_msg,
+                        &signature_data,
+                        &signer_packed_key_bits,
+                    );
+
+                    operations.extend(withdraw_operations);
+                    fees.push(CollectedFee {
+                        token: withdraw.tx.token,
+                        amount: withdraw.tx.fee,
+                    });
+                    pub_data.extend(withdraw_witness.get_pubdata());
+                }
+                FranklinOp::Close(close) => {
+                    let close_account_witness =
+                        apply_close_account_tx(&mut witness_accum.account_tree, &close);
+
+                    let sig_packed = close
+                        .tx
+                        .signature
+                        .signature
+                        .serialize_packed()
+                        .map_err(|e| format!("failed to pack signature: {}", e))?;
+
+                    let (
+                        first_sig_msg,
+                        second_sig_msg,
+                        third_sig_msg,
+                        signature_data,
+                        signer_packed_key_bits,
+                    ) = prepare_sig_data(
+                        &sig_packed,
+                        &close.tx.get_bytes(),
+                        &close.tx.signature.pub_key,
+                    )?;
+
+                    let close_account_operations = calculate_close_account_operations_from_witness(
+                        &close_account_witness,
+                        &first_sig_msg,
+                        &second_sig_msg,
+                        &third_sig_msg,
+                        &signature_data,
+                        &signer_packed_key_bits,
+                    );
+
+                    operations.extend(close_account_operations);
+                    pub_data.extend(close_account_witness.get_pubdata());
+                }
+                FranklinOp::FullExit(full_exit_op) => {
+                    let success = full_exit_op.withdraw_amount.is_some();
+
+                    let full_exit_witness =
+                        apply_full_exit_tx(&mut witness_accum.account_tree, &full_exit_op, success);
+
+                    let full_exit_operations =
+                        calculate_full_exit_operations_from_witness(&full_exit_witness);
+
+                    operations.extend(full_exit_operations);
+                    pub_data.extend(full_exit_witness.get_pubdata());
+                }
+                FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
+                    let change_pkhash_witness = apply_change_pubkey_offchain_tx(
+                        &mut witness_accum.account_tree,
+                        &change_pkhash_op,
+                    );
+
+                    let change_pkhash_operations =
+                        calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
+
+                    operations.extend(change_pkhash_operations);
+                    pub_data.extend(change_pkhash_witness.get_pubdata());
+                }
+                FranklinOp::Noop(_) => {} // Noops are handled below
             }
+        }
 
-            witness_accum.add_operation_with_pubdata(operations, pub_data);
-            witness_accum.extend_pubdata_with_noops();
-            assert_eq!(witness_accum.pubdata.len(), 64 * block_size);
-            assert_eq!(witness_accum.operations.len(), block_size);
+        witness_accum.add_operation_with_pubdata(operations, pub_data);
+        witness_accum.extend_pubdata_with_noops();
+        assert_eq!(witness_accum.pubdata.len(), 64 * block_size);
+        assert_eq!(witness_accum.operations.len(), block_size);
 
-            witness_accum.collect_fees(&fees);
-            assert_eq!(
-                witness_accum
-                    .root_after_fees
-                    .expect("root_after_fees not present"),
-                commit_operation.block.new_root_hash
-            );
-            witness_accum.calculate_pubdata_commitment();
+        witness_accum.collect_fees(&fees);
+        assert_eq!(
+            witness_accum
+                .root_after_fees
+                .expect("root_after_fees not present"),
+            commit_operation.block.new_root_hash
+        );
+        witness_accum.calculate_pubdata_commitment();
 
-            Ok(ProverData {
-                public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
-                old_root: witness_accum.initial_root_hash,
-                new_root: commit_operation.block.new_root_hash,
-                validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string())
-                    .expect("failed to parse"),
-                operations: witness_accum.operations,
-                validator_balances: witness_accum.fee_account_balances.unwrap(),
-                validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),
-                validator_account: witness_accum.fee_account_witness.unwrap(),
-            })
+        Ok(ProverData {
+            public_data_commitment: witness_accum.pubdata_commitment.unwrap(),
+            old_root: witness_accum.initial_root_hash,
+            new_root: commit_operation.block.new_root_hash,
+            validator_address: Fr::from_str(&commit_operation.block.fee_account.to_string())
+                .expect("failed to parse"),
+            operations: witness_accum.operations,
+            validator_balances: witness_accum.fee_account_balances.unwrap(),
+            validator_audit_path: witness_accum.fee_account_audit_path.unwrap(),
+            validator_account: witness_accum.fee_account_witness.unwrap(),
+        })
     }
 }
