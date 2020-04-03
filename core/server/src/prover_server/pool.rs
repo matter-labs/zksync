@@ -238,19 +238,21 @@ impl Maintainer {
         // Create a storage for prepared data.
         let mut prepared = HashMap::new();
 
-        // Initialize `next_block_number` and circuit tree. Done only once.
         if self.next_block_number == 0 {
             let min_next_block_num = queues
                 .values()
                 .map(BlockSizedOperationsQueue::next_block_number)
+                .map(|x| x.unwrap_or(0))
+                .filter(|x| *x != 0)
                 .min();
-            if let Some(Some(block_number)) = min_next_block_num {
-                let storage = self
-                    .conn_pool
-                    .access_storage()
-                    .expect("failed to connect to db");
-                self.init_account_tree(&storage, block_number - 1)?;
-                self.next_block_number = block_number;
+            if let Some(block_number) = min_next_block_num {
+                    // Initialize `next_block_number` and circuit tree. Done only once.
+                    let storage = self
+                        .conn_pool
+                        .access_storage()
+                        .expect("failed to connect to db");
+                    self.init_account_tree(&storage, block_number - 1)?;
+                    self.next_block_number = block_number;
             }
         }
 
@@ -268,6 +270,7 @@ impl Maintainer {
                             .access_storage()
                             .expect("failed to connect to db");
                         let pd = self.build_prover_data(&storage, &op)?;
+                        info!("build done");
                         prepared.insert(op.block.block_number, pd);
                         self.next_block_number = op.block.block_number + 1;
                     }
@@ -277,6 +280,14 @@ impl Maintainer {
             if all_empty {
                 break;
             }
+            //  else {
+            //     let ret = queues
+            //     .values()
+            //     .map(BlockSizedOperationsQueue::next_block_number)
+            //     .map(|x| x.unwrap_or(0))
+            //     .min();
+            //     panic!("{:?} {}", ret, self.next_block_number)
+            // }
         }
 
         // Update the queues and prepared data in pool.
