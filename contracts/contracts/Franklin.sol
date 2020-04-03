@@ -409,6 +409,7 @@ contract Franklin is Storage, Config, Events {
             } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
                 Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
 
+                // per each operation which needs eht witness, two leading bits in _ethWitness represents index of this operation in block
                 if (ethWitnessOffset + 1 < _ethWitness.length && (uint16(uint8(_ethWitness[ethWitnessOffset])) << 8) + uint8(_ethWitness[ethWitnessOffset + 1]) == processedOnchainOpperations) { // operation needs eth witness
                     require(processedOperationsNeedsEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
                     bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset + 2, _ethWitnessSizes[processedOperationsNeedsEthWitness]);
