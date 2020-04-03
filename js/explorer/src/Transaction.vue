@@ -80,6 +80,12 @@ export default {
             }
 
             txData.tokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
+            if (txData.tx_type  == "Deposit" || txData.tx_type == "FullExit") {
+                txData.feeTokenName = "ETH";
+            } else {
+                txData.feeTokenName = txData.token === -1 ? "" : tokens[txData.token].syncSymbol;
+            }
+
             txData.amount = txData.amount == "unknown amount" ? "" : txData.amount;
             
             const block = await client.getBlock(txData.block_number);
@@ -110,8 +116,15 @@ export default {
             ];
         },
         props() {
+            console.log('lsdafsyy')
             if (Object.keys(this.txData).length == 0) 
                 return [];
+
+            const tx_hash = (() => {if (this.txData.tx_type  == "Deposit" || this.txData.tx_type == "FullExit") {
+                return `<code><a href="${this.blockchainExplorerAddress}/${this.tx_hash}">${this.tx_hash}</a></code> <span class="onchain_icon">onchain</span>`;
+            } else {
+                return `<code>${this.tx_hash}</code>`;
+            }})();
 
             const link_from 
                 = this.txData.tx_type == 'Deposit' ? `${this.blockchainExplorerAddress}/${this.txData.from}`
@@ -138,18 +151,31 @@ export default {
                 = this.txData.tx_type == 'Withdraw' ? `target="_blank" rel="noopener noreferrer"`
                 : '';
 
-            const rows = [
-                { name: 'Tx hash',        value: `<code>${this.tx_hash}</code>`},
-                { name: "Type",           value: `<b>${this.txData.tx_type}</b>`   },
-                { name: "Status",         value: `<b>${this.txData.status}</b>` },
-                { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
-                { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
-                { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${readableEther(this.txData.amount)}`    },
-            ];
+            const rows = (() => {
+                if (this.txData.tx_type == "ChangePubKeyOffchain") {
+                    return [
+                        { name: 'Tx hash',                  value: tx_hash},
+                        { name: "Type",                     value: `<b>${this.txData.tx_type}</b>`   },
+                        { name: "Status",                   value: `<b>${this.txData.status}</b>` },
+                        { name: "Account",                  value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
+                        { name: "New signer key hash",      value: `<code>${this.txData.to}</code>`},
+                    ];
+                } else {
+                    return [
+                        { name: 'Tx hash',        value: tx_hash},
+                        { name: "Type",           value: `<b>${this.txData.tx_type}</b>`   },
+                        { name: "Status",         value: `<b>${this.txData.status}</b>` },
+                        { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
+                        { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
+                        { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${readableEther(this.txData.amount)}`    },
+                        { name: "fee",            value: `<b>${this.txData.feeTokenName}</b> ${readableEther(this.txData.fee)}` },
+                    ];
+                }
+            })();
 
-            if (this.txData.fee) 
-                rows.push(
-                    { name: "fee",            value: this.txData.fee       });
+            if (this.txData.nonce != -1) {
+                rows.push({ name: "Nonce",      value: this.txData.nonce });
+            }
 
             return rows;
         },

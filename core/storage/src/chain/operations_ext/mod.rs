@@ -4,7 +4,7 @@ use diesel::prelude::*;
 use itertools::Itertools;
 use serde_json::value::Value;
 // Workspace imports
-use models::node::{Address, PubKeyHash};
+use models::node::{Address, PubKeyHash, TokenId};
 use models::ActionType;
 // Local imports
 use self::records::{
@@ -12,6 +12,7 @@ use self::records::{
     TxByHashResponse, TxReceiptResponse,
 };
 use crate::schema::*;
+use crate::tokens::TokensSchema;
 use crate::StorageProcessor;
 use crate::{
     chain::operations::{
@@ -150,7 +151,7 @@ impl<'a> OperationsExtSchema<'a> {
             let tx_amount = operation["tx"]["amount"]
                 .as_str()
                 .unwrap_or("unknown amount");
-
+            let nonce = operation["tx"]["nonce"].as_i64().unwrap_or(-1);
             let (tx_from, tx_to, tx_fee) = match tx_type {
                 "Withdraw" | "Transfer" | "TransferToNew" => (
                     operation["tx"]["from"]
@@ -195,6 +196,7 @@ impl<'a> OperationsExtSchema<'a> {
                 amount: tx_amount.to_string(),
                 fee: tx_fee,
                 block_number,
+                nonce,
             }));
         };
 
@@ -229,9 +231,7 @@ impl<'a> OperationsExtSchema<'a> {
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
-                    operation["priority_op"]["fee"]
-                        .as_str()
-                        .map(|v| v.to_string()),
+                    operation["eth_fee"].as_str().map(|v| v.to_string()),
                     operation["priority_op"]["amount"]
                         .as_str()
                         .unwrap_or("unknown amount"),
@@ -245,9 +245,7 @@ impl<'a> OperationsExtSchema<'a> {
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
-                    operation["priority_op"]["fee"]
-                        .as_str()
-                        .map(|v| v.to_string()),
+                    operation["eth_fee"].as_str().map(|v| v.to_string()),
                     operation["withdraw_amount"]
                         .as_str()
                         .unwrap_or("unknown amount"),
@@ -268,6 +266,7 @@ impl<'a> OperationsExtSchema<'a> {
                 amount: tx_amount.to_string(),
                 fee: tx_fee,
                 block_number,
+                nonce: -1,
             }));
         };
 
@@ -370,8 +369,41 @@ impl<'a> OperationsExtSchema<'a> {
             offset = offset,
             limit = limit
         );
+        let mut tx_history =
+            diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())?;
+        if !tx_history.is_empty() {
+            let tokens = TokensSchema(self.0).load_tokens()?;
+            for tx_item in &mut tx_history {
+                let tx_info = match tx_item.tx["type"].as_str().unwrap_or("NONE") {
+                    "NONE" => {
+                        log::warn!("Tx history item type not found, tx: {:?}", tx_item);
+                        continue;
+                    }
+                    "Deposit" | "FullExit" => tx_item.tx.get_mut("priority_op"),
+                    _ => Some(&mut tx_item.tx),
+                };
 
-        diesel::sql_query(query).load::<TransactionsHistoryItem>(self.0.conn())
+                let tx_info = if let Some(tx_info) = tx_info {
+                    tx_info
+                } else {
+                    log::warn!("tx_info not found for tx: {:?}", tx_item);
+                    continue;
+                };
+
+                if let Some(tok_val) = tx_info.get_mut("token") {
+                    if let Some(token_id) = tok_val.as_u64() {
+                        let token_id = token_id as TokenId;
+                        let token_symbol = tokens
+                            .get(&token_id)
+                            .map(|t| t.symbol.clone())
+                            .unwrap_or_else(|| "UNKNOWN".to_string());
+                        *tok_val =
+                            serde_json::to_value(token_symbol).expect("json string to value");
+                    };
+                };
+            }
+        }
+        Ok(tx_history)
     }
 
     /// Loads all the transactions that affected the certain account.
