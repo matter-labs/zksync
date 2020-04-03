@@ -93,11 +93,12 @@ impl Block {
         let mut used_bytes = Vec::new();
 
         for (index, block_tx) in self.block_transactions.iter().enumerate() {
-            if let Some(FranklinOp::ChangePubKeyOffchain(op)) = block_tx.get_executed_op() {
-                let witness_bytes = op.get_eth_witness();
+            if let Some(franklin_op) = block_tx.get_executed_op() {
+                let witness_bytes = franklin_op.eth_witness();
                 if !witness_bytes.is_empty() {
                     used_bytes.push(witness_bytes.len() as u64);
-                    eth_witness.push(index as u8);
+                    eth_witness.push(((index as u16) >> 8) as u8);
+                    eth_witness.push(((index as u16) & 0xff) as u8);
                     eth_witness.extend(witness_bytes.into_iter());
                 }
             }

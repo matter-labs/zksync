@@ -363,8 +363,8 @@ contract Franklin is Storage, Config, Events {
 
         uint256 pubdataOffset = 0;
         uint64 ethWitnessOffset = 0;
-        uint8 processedOperationsNeedsEthWitness = 0;
-        uint8 processedOnchainOpperations = 0;
+        uint16 processedOperationsNeedsEthWitness = 0;
+        uint16 processedOnchainOpperations = 0;
 
         while (pubdataOffset < _publicData.length) {
             uint8 opType = uint8(_publicData[pubdataOffset]);
@@ -409,14 +409,14 @@ contract Franklin is Storage, Config, Events {
             } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
                 Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
 
-                if (uint8(_ethWitness[ethWitnessOffset]) == processedOnchainOpperations) { // operation needs eth witness
+                if (ethWitnessOffset + 1 < _ethWitness.length && (uint16(uint8(_ethWitness[ethWitnessOffset])) << 8) + uint8(_ethWitness[ethWitnessOffset + 1]) == processedOnchainOpperations) { // operation needs eth witness
                     require(processedOperationsNeedsEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
-                    bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset + 1, _ethWitnessSizes[processedOperationsNeedsEthWitness]);
+                    bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset + 2, _ethWitnessSizes[processedOperationsNeedsEthWitness]);
 
                     bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
                     require(valid, "fpp15"); // failed to verify change pubkey hash signature
 
-                    ethWitnessOffset += _ethWitnessSizes[processedOperationsNeedsEthWitness] + 1;
+                    ethWitnessOffset += _ethWitnessSizes[processedOperationsNeedsEthWitness] + 2;
                     processedOperationsNeedsEthWitness++;
                 } else {
                     bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);

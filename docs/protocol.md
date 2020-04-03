@@ -932,8 +932,8 @@ commitBlock(
 - _feeAccount: Account to collect fees
 - _newRoot: New tree root
 - _publicData: Operations pubdata
-- _ethWitness - data that can be used by smart contract for block commit that is posted outside of `_publicData` (e.g ETH signatures for pubkey change verification).
-- _ethWitnessSizes - number of bytes from _ethWitness that is used for each onchain operation which needed them (starts with byte equals to the index of appropriate operation in block).
+- _ethWitness - data that can be used by smart contract for block commit that is posted outside of `_publicData` (e.g ETH signatures for pubkey change verification) (starts with 2 bytes, concatenated equals to the index of appropriate operation in block).
+- _ethWitnessSizes - number of bytes from _ethWitness that is used for each onchain operation which needed them.
 
 ##### Verify block
 
