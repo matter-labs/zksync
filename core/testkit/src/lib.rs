@@ -281,13 +281,22 @@ pub fn perform_basic_operations(
 
     test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
 
+    //transfer to self should work
+    test_setup.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(1),
+        Token(token),
+        &deposit_amount / &BigDecimal::from(8),
+        &deposit_amount / &BigDecimal::from(8),
+    );
+
     //should be executed as a transfer
     test_setup.transfer(
         ZKSyncAccountId(1),
         ZKSyncAccountId(2),
         Token(token),
-        &deposit_amount / &BigDecimal::from(4),
-        &deposit_amount / &BigDecimal::from(4),
+        &deposit_amount / &BigDecimal::from(8),
+        &deposit_amount / &BigDecimal::from(8),
     );
 
     let nonce = test_setup.accounts.zksync_accounts[1].nonce();
