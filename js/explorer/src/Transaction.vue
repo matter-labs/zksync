@@ -116,7 +116,6 @@ export default {
             ];
         },
         props() {
-            console.log('lsdafsyy')
             if (Object.keys(this.txData).length == 0) 
                 return [];
 
@@ -151,27 +150,23 @@ export default {
                 = this.txData.tx_type == 'Withdraw' ? `target="_blank" rel="noopener noreferrer"`
                 : '';
 
-            const rows = (() => {
-                if (this.txData.tx_type == "ChangePubKeyOffchain") {
-                    return [
-                        { name: 'Tx hash',                  value: tx_hash},
-                        { name: "Type",                     value: `<b>${this.txData.tx_type}</b>`   },
-                        { name: "Status",                   value: `<b>${this.txData.status}</b>` },
-                        { name: "Account",                  value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
-                        { name: "New signer key hash",      value: `<code>${this.txData.to}</code>`},
-                    ];
-                } else {
-                    return [
-                        { name: 'Tx hash',        value: tx_hash},
-                        { name: "Type",           value: `<b>${this.txData.tx_type}</b>`   },
-                        { name: "Status",         value: `<b>${this.txData.status}</b>` },
-                        { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
-                        { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
-                        { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${readableEther(this.txData.amount)}`    },
-                        { name: "fee",            value: `<b>${this.txData.feeTokenName}</b> ${readableEther(this.txData.fee)}` },
-                    ];
-                }
-            })();
+            const rows = this.txData.tx_type == "ChangePubKeyOffchain"
+                ? [
+                    { name: 'Tx hash',                  value: tx_hash},
+                    { name: "Type",                     value: `<b>${this.txData.tx_type}</b>`   },
+                    { name: "Status",                   value: `<b>${this.txData.status}</b>` },
+                    { name: "Account",                  value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
+                    { name: "New signer key hash",      value: `<code>${this.txData.to}</code>`},
+                ]
+                : [
+                    { name: 'Tx hash',        value: tx_hash},
+                    { name: "Type",           value: `<b>${this.txData.tx_type}</b>`   },
+                    { name: "Status",         value: `<b>${this.txData.status}</b>` },
+                    { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
+                    { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
+                    { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${readableEther(this.txData.amount)}`    },
+                    { name: "fee",            value: `<b>${this.txData.feeTokenName}</b> ${readableEther(this.txData.fee)}` },
+                ];
 
             if (this.txData.nonce != -1) {
                 rows.push({ name: "Nonce",      value: this.txData.nonce });
