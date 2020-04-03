@@ -156,7 +156,7 @@ pub struct Maintainer {
     account_tree: CircuitAccountTree,
     /// Maintainer prepared prover for blocks in order
     /// `next_block_number` stores next block number to prepare data for.
-    next_block_number: u32,
+    next_block_number: models::node::BlockNumber,
 }
 
 impl Maintainer {
@@ -240,7 +240,11 @@ impl Maintainer {
 
         // Initialize `next_block_number` and circuit tree. Done only once.
         if self.next_block_number == 0 {
-            if let Some(block_number) = self.get_min_next_block_number(&queues) {
+            let min_next_block_num = queues
+                .values()
+                .map(BlockSizedOperationsQueue::next_block_number)
+                .min();
+            if let Some(Some(block_number)) = min_next_block_num {
                 let storage = self
                     .conn_pool
                     .access_storage()
@@ -285,26 +289,6 @@ impl Maintainer {
         pool.prepared.extend(prepared);
 
         Ok(())
-    }
-
-    /// Returns min block number within all operations in all queues.
-    fn get_min_next_block_number(
-        &self,
-        queues: &HashMap<usize, BlockSizedOperationsQueue>,
-    ) -> Option<u32> {
-        let mut next = None;
-        for queue in queues.values() {
-            if let Some(num) = queue.next_block_number() {
-                if let Some(cur) = next {
-                    if num < cur {
-                        next = Some(num)
-                    }
-                } else {
-                    next = Some(num)
-                }
-            }
-        }
-        next
     }
 
     /// Initializes account tree, obtaining the state for the requested block.
