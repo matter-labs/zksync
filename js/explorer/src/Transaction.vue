@@ -121,7 +121,7 @@ export default {
                 return [];
 
             const tx_hash = (() => {if (this.txData.tx_type  == "Deposit" || this.txData.tx_type == "FullExit") {
-                return `<code><a href="${this.blockchainExplorerAddress}/${this.tx_hash}">${this.tx_hash}</a></code> <span class="onchain_icon">onchain</span>`;
+                return `<code><a href="${this.blockchainExplorerTx}/${this.tx_hash}">${this.tx_hash}</a></code> <span class="onchain_icon">onchain</span>`;
             } else {
                 return `<code>${this.tx_hash}</code>`;
             }})();
