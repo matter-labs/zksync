@@ -6,7 +6,7 @@ import {
 // HACK: using require as type system work-around
 const franklin_abi = require('../../contracts/build/Franklin.json');
 import {ethers, utils, Contract} from "ethers";
-import {parseEther} from "ethers/utils";
+import {bigNumberify, parseEther} from "ethers/utils";
 import {IERC20_INTERFACE} from "zksync/build/utils";
 
 
@@ -88,6 +88,30 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
 
     if (!balanceAfterDep.sub(balanceBeforeDep).eq(amount)) {
         throw new Error("Deposit checks failed");
+    }
+}
+
+async function testTransferToSelf(syncWallet: Wallet, token: types.TokenLike, amount: utils.BigNumber, fee: utils.BigNumber) {
+    const walletBeforeTransfer = await syncWallet.getBalance(token);
+    const operatorBeforeTransfer = await getOperatorBalance(token);
+    const startTime = new Date().getTime();
+    const transferToNewHandle = await syncWallet.syncTransfer({
+        to: syncWallet.address(),
+        token,
+        amount,
+        fee
+    });
+    console.log(`Transfer to self posted: ${(new Date().getTime()) - startTime} ms`);
+    await transferToNewHandle.awaitReceipt();
+    console.log(`Transfer to self committed: ${(new Date().getTime()) - startTime} ms`);
+    const walletAfterTransfer = await syncWallet.getBalance(token);
+    const operatorAfterTransfer = await getOperatorBalance(token);
+
+    let transferCorrect = true;
+    transferCorrect = transferCorrect && walletBeforeTransfer.sub(fee).eq(walletAfterTransfer);
+    transferCorrect = transferCorrect && operatorAfterTransfer.sub(operatorBeforeTransfer).eq(fee);
+    if (!transferCorrect) {
+        throw new Error("Transfer to self checks failed");
     }
 }
 
@@ -225,11 +249,11 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     const depositAmount = utils.parseEther(depositAmountETH);
 
     // we do two transfers to test transfer to new and ordinary transfer.
-    const transfersAmount = depositAmount.div(3);
+    const transfersAmount = depositAmount.div(6);
     const transfersFee = await syncProvider.getTransactionFee("Transfer", transfersAmount, token);
 
 
-    const withdrawAmount = transfersAmount.div(3);
+    const withdrawAmount = transfersAmount.div(6);
     const withdrawFee = await syncProvider.getTransactionFee("Withdraw", withdrawAmount, token);
 
     await testAutoApprovedDeposit(depositWallet, syncWallet1, token, depositAmount.div(2));
@@ -242,6 +266,10 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Transfer to new ok, Token: ${token}`);
     await testTransfer(syncWallet1, syncWallet2, token, transfersAmount, transfersFee);
     console.log(`Transfer ok, Token: ${token}`);
+    await testTransferToSelf(syncWallet1, token, transfersAmount, transfersFee);
+    console.log(`Transfer to self with fee ok, Token: ${token}`);
+    await testTransferToSelf(syncWallet1, token, transfersAmount, bigNumberify(0));
+    console.log(`Transfer to self no fee ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, withdrawFee);
