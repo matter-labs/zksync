@@ -15,6 +15,8 @@ pub struct PedersenHasher<E: JubjubEngine> {
     params: &'static E::Params,
 }
 
+// These implementations are OK as we only have a static reference
+// to the constant hasher params, and access is read-only.
 unsafe impl<E: JubjubEngine> Send for PedersenHasher<E> {}
 unsafe impl<E: JubjubEngine> Sync for PedersenHasher<E> {}
 
