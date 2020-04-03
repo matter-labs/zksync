@@ -241,18 +241,16 @@ impl Maintainer {
         if self.next_block_number == 0 {
             let min_next_block_num = queues
                 .values()
-                .map(BlockSizedOperationsQueue::next_block_number)
-                .map(|x| x.unwrap_or(0))
-                .filter(|x| *x != 0)
+                .filter_map(BlockSizedOperationsQueue::next_block_number)
                 .min();
             if let Some(block_number) = min_next_block_num {
-                    // Initialize `next_block_number` and circuit tree. Done only once.
-                    let storage = self
-                        .conn_pool
-                        .access_storage()
-                        .expect("failed to connect to db");
-                    self.init_account_tree(&storage, block_number - 1)?;
-                    self.next_block_number = block_number;
+                // Initialize `next_block_number` and circuit tree. Done only once.
+                let storage = self
+                    .conn_pool
+                    .access_storage()
+                    .expect("failed to connect to db");
+                self.init_account_tree(&storage, block_number - 1)?;
+                self.next_block_number = block_number;
             }
         }
 
