@@ -26,7 +26,7 @@ type NodeRef = usize;
 /// Sparse Merkle tree with the support of the parallel hashes calculation.
 ///
 /// Sparse Merkle tree is basically a [Merkle tree] which is allowed to have
-/// gapes between elements.
+/// gaps between elements.
 ///
 /// The essential operation of this structure is obtaining a root hash of the structure,
 /// which represents the state of all of the tree elements.
