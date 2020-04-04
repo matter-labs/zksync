@@ -473,20 +473,28 @@ contract Franklin is Storage, Config, Events {
         bytes32 _oldRoot,
         bytes32 _newRoot,
         bytes memory _publicData
-    ) internal pure returns (bytes32) {
+    ) internal view returns (bytes32) {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount))
         );
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
-        // public data is committed with padding (TODO: check assembly and optimize to avoid copying data)
-        hash = sha256(
-            abi.encodePacked(
-                hash,
-                _publicData
-            )
-        );
-        return hash;
+
+        /// hash will be stored in 32 byte slots at the front of _publicData memory (at the place of storing _publicData.length)
+        /// this is done to avoid copying _publicData
+        /// at the end of this function _publicData length will be correctly stored again at the rigth place
+        bytes32[1] memory hashResult;
+        assembly {
+            let pubDataLen := mload(_publicData)
+            mstore(_publicData, hash)
+            // staticcall to the sha256 precompile at address 0x2
+            let success := staticcall(gas, 0x2, _publicData, add(pubDataLen, 0x20), hashResult, 0x20)
+            mstore(_publicData, pubDataLen)
+
+            // Use "invalid" to make gas estimation work
+            switch success case 0 { invalid() }
+        }
+        return hashResult[0];
     }
 
     function verifyNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
