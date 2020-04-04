@@ -489,7 +489,14 @@ contract Franklin is Storage, Config, Events {
             let pubDataLen := mload(_publicData)
             mstore(_publicData, hash)
             // staticcall to the sha256 precompile at address 0x2
-            let success := staticcall(gas, 0x2, _publicData, add(pubDataLen, 0x20), hashResult, 0x20)
+            let success := staticcall(
+                gas,
+                0x2,
+                _publicData,
+                add(pubDataLen, 0x20),
+                hashResult,
+                0x20
+            )
             mstore(_publicData, pubDataLen)
 
             // Use "invalid" to make gas estimation work
