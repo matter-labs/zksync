@@ -480,6 +480,7 @@ contract Franklin is Storage, Config, Events {
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
 
+        /// here will be computed sha256 of hash concatenated with _publicData
         /// hash will be stored in 32 byte slots at the front of _publicData memory (at the place of storing _publicData.length)
         /// this is done to avoid copying _publicData
         /// at the end of this function _publicData length will be correctly stored again at the rigth place
