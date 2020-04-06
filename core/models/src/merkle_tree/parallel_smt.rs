@@ -4,7 +4,7 @@ use crate::primitives::GetBits;
 use fnv::FnvHashMap;
 
 use std::fmt::Debug;
-use std::sync::RwLock;
+use std::sync::{RwLock, RwLockReadGuard};
 
 /// Nodes are indexed starting with index(root) = 0
 /// To store the index, at least 2 * TREE_HEIGHT bits is required.
@@ -393,106 +393,66 @@ where
     pub fn merkle_path(&self, index: u32) -> Vec<(Hash, bool)> {
         assert!((index as ItemIndex) < self.capacity());
 
+        // By calculating the root hash we update the cache of hashes,
+        // which we will use to build a proof.
+        // After updating the cache, there will be no "unknown" hashes:
+        // the required hash will either be in hash, or it will be a precomputed
+        // hash for the current depth.
+        let _root_hash = self.root_hash();
+
         let index = index as ItemIndex;
 
+        // Node indexes use an additional bit set at the position `(1 << self.tree_depth)`
+        // for indexing.
+        let mut cur_index: NodeIndex = NodeIndex((1 << self.tree_depth) + index);
         let mut proof = Vec::new();
-        let mut current_node = Some(self.nodes[Self::ROOT_ITEM_IDX].clone());
-        let mut current_depth = 0;
-        while current_depth != self.tree_depth {
-            // Level bit mask is the bit we need to see for the direction on this level.
-            // For example, on the level 0 (root level) with the tree depth 3, we have to see
-            // the most significant bit, in our case it's the 3rd bit of the number.
-            // Given the tree depth 3 and current level 0, the shift is equal to 3 - 0 - 1 = 2,
-            // and the mask to check the MSB is (1 << 2) = 0b0100.
-            let level_bit_mask = 1 << (self.tree_depth - current_depth - 1);
 
-            // If the corresponding bit is set within the number, the our node is in the right
-            // branch of the parent node. Otherwise, it's in the left branch.
-            let going_right = (index & level_bit_mask) != 0;
+        // We will access cache at the every iteration of our cycle, thus obtaining
+        // the lock here and passing it as an argument is more efficient than
+        // obtaining it for every iteration separately.
+        let cache_lock = self.cache.read().expect("Read lock");
 
-            // The neighbor node (which hash we should include in the proof) direction is
-            // opposite to the direction of our node.
-            let neighbor_direction = if going_right {
-                NodeDirection::Left
-            } else {
-                NodeDirection::Right
-            };
+        // We go through all the depths starting from `tree_depth` to collect the proof
+        // hashes.
+        for depth in (1..=self.tree_depth).rev() {
+            let (neighbor_hash, dir) = self.get_calculated_node_hash(&cache_lock, depth, cur_index);
 
-            // Depending on existence of our node we may include different hashes:
-            // if current node is absent in the tree, we must include the precomputed
-            // hash (and since there is no current node, there will be no child nodes,
-            // so the rest of the proof will contain precomputed hashes only).
-            // Otherwise, we must include the hash of our neighbor (which also can be
-            // absent, and thus it also may be either hash of the actual node, or
-            // precomputed hash).
-            if let Some(node) = current_node.clone() {
-                let next_ref = if going_right { node.right } else { node.left };
+            // At each step we go one height closer to the root and replacing the
+            // current node index with the index of its parent.
+            // For node with an index `N` the index of the parent will always be `N / 2`.
+            cur_index.0 >>= 1;
 
-                let (neighbor_hash, _) = self.get_child_hash(&node, neighbor_direction);
-
-                proof.push((neighbor_hash, going_right));
-
-                // After getting the neighbor hash we must go down the tree to obtain
-                // the next proof element.
-                // Note that if the reference on this iteration was `None`, it will
-                // remain `None` until we reach the very bottom of the tree.
-                current_node = next_ref.map(|next_ref| self.nodes[next_ref].clone());
-
-                current_depth += 1;
-
-                // Check if we've jumped through some levels.
-                // Since reference to the child can skip some "empty" levels,
-                // we have to manually check it and fill the gaps with precomputed hashes.
-                if let Some(current_node) = current_node.clone() {
-                    while current_depth != current_node.depth {
-                        let proof_step = self.get_intermediate_hash_to_proof(index, current_depth);
-                        proof.push(proof_step);
-
-                        current_depth += 1;
-                    }
-                }
-            } else {
-                let proof_step = self.get_intermediate_hash_to_proof(index, current_depth);
-                proof.push(proof_step);
-
-                current_depth += 1;
-            }
+            proof.push((neighbor_hash, dir));
         }
 
-        // Since we've come from the root of the tree to its bottom, we have to reverse the
-        // proof elements order, so the proof receiver will apply hashes in order of their
-        // appearance to (hopefully) get the correct tree root hash.
-        proof.into_iter().rev().collect()
+        proof
     }
 
-    /// Helper method for `merkle_path`.
-    /// Gets the hash of the tree node which does not have an allocated entry (which can be
-    /// either a "intermediate" precomputed hash, or the leaf node hash).
-    fn get_intermediate_hash_to_proof(
+    /// A helper method for `merkle_path`: obtains the hash for the node with provided index,
+    /// assuming that it is already calculated. That is, if the node is absent in the cache,
+    /// it is assumed that it has the precomputed hash for the current depth.
+    fn get_calculated_node_hash(
         &self,
-        index: ItemIndex,
-        current_depth: usize,
+        cache_lock: &RwLockReadGuard<FnvHashMap<NodeIndex, Hash>>,
+        depth: usize,
+        node_index: NodeIndex,
     ) -> (Hash, bool) {
-        let level_bit_mask = 1 << (self.tree_depth - current_depth - 1);
-        let going_right = (index & level_bit_mask) != 0;
+        // By `xor`ing the node index with 1 we will obtain the index of the neighbor node:
+        // if the index of current node is (2 * N), it will become (2 * N + 1), and vice versa:
+        // for (2 * N + 1) it will become (2 * N).
+        let neighbor_index = NodeIndex(node_index.0 ^ 1);
 
-        let hash = if current_depth == self.tree_depth - 1 {
-            // We're getting the hash of the leaf, so we must check if this leaf exists in the
-            // tree. If so, we'll use its actual hash, otherwise we'll use a precomputed one.
-            let neighbor_leaf_index = index ^ 1;
-            match self.get(neighbor_leaf_index as u32) {
-                Some(value) => {
-                    let item_bits = value.get_bits_le();
-                    self.hasher.hash_bits(item_bits)
-                }
-                None => self.prehashed[self.tree_depth].clone(),
-            }
-        } else {
-            // Not a leaf level, so just use a precomputed hash.
-            self.prehashed[current_depth + 1].clone()
+        // `node_index` is the index of the current node according to the current depth,
+        // thus LSB represents the direction for the current depth.
+        let going_right = (node_index.0 & 1) != 0;
+
+        // If hash is not presented in the cache, it must be a precomputed one.
+        let neighbor_hash = match cache_lock.get(&neighbor_index) {
+            Some(hash) => hash.clone(),
+            None => self.prehashed[depth].clone(),
         };
 
-        (hash, going_right)
+        (neighbor_hash, going_right)
     }
 
     /// Calculates the depth ("layer") of the element with the provided index.
