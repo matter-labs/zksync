@@ -1,9 +1,54 @@
+use super::hasher::Hasher;
 use crate::merkle_tree::{parallel_smt, sequential_smt, PedersenHasher};
 use crate::node::{Engine, Fr};
+use crate::primitives::GetBits;
 use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 
+/// Applies the proof for the element and compares it against the expected
+/// root hash.
+fn verify_proof<T>(
+    element_index: u64,
+    element: T,
+    hasher: PedersenHasher<Engine>,
+    merkle_proof: Vec<(Fr, bool)>,
+    expected_root: Fr,
+) where
+    T: GetBits,
+{
+    // To check the proof, we fold it starting from the hash of the value
+    // and updating with the hashes from the proof.
+    // We should obtain the root hash at the end if the proof is correct.
+    let mut level = 0;
+    let mut proof_index = 0;
+    let mut aggregated_hash = hasher.hash_bits(element.get_bits_le());
+    for (hash, dir) in merkle_proof {
+        let (lhs, rhs) = if dir {
+            proof_index |= 1 << level;
+            (hash, aggregated_hash)
+        } else {
+            (aggregated_hash, hash)
+        };
+
+        aggregated_hash = hasher.compress(&lhs, &rhs, level);
+
+        level += 1;
+    }
+
+    assert_eq!(
+        proof_index, element_index,
+        "Got unexpected element index while verifying the proof"
+    );
+    assert_eq!(
+        aggregated_hash, expected_root,
+        "Got unexpected root hash while verifying the proof"
+    );
+}
+
+/// Verifies that for a randomly-chosen sequence of elements
+/// the merkle paths provided by both sequential and parallel trees
+/// are equal.
 #[test]
-fn random_compare_par_tree_seq_tree() {
+fn cross_trees_merkle_path_comparison() {
     let depth = 8;
 
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
@@ -15,13 +60,14 @@ fn random_compare_par_tree_seq_tree() {
         sequential_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth as u32);
 
     for (idx, item) in elements.into_iter().enumerate() {
+        // Insert the same element in both trees and verify that the root hash is the same.
         let idx = idx as u32;
         par_tree.insert(idx, item);
         seq_tree.insert(idx, item);
         assert_eq!(
             par_tree.root_hash(),
             seq_tree.root_hash(),
-            "root_hahs() idx: {}, item: {}",
+            "Root hashes for seq/par trees diverged, element idx: {}, item: {}",
             idx,
             item
         );
@@ -29,14 +75,35 @@ fn random_compare_par_tree_seq_tree() {
         let par_merkle_path = par_tree.merkle_path(idx);
         let seq_merkle_path = seq_tree.merkle_path(idx);
 
+        // Check that proofs are equal.
         assert_eq!(
             par_merkle_path, seq_merkle_path,
-            "merkle_path() idx: {}",
+            "Merkle paths for seq/par trees diverged, element idx: {}",
             idx
+        );
+
+        // Check that verifying proofs provides expected results.
+        verify_proof(
+            idx as u64,
+            item,
+            seq_tree.hasher.clone(),
+            seq_merkle_path,
+            seq_tree.root_hash(),
+        );
+
+        verify_proof(
+            idx as u64,
+            item,
+            par_tree.hasher.clone(),
+            par_merkle_path,
+            par_tree.root_hash(),
         );
     }
 }
 
+/// Simulates a transfer operation, then obtains the
+/// proof for the element absent in the tree and compares
+/// the proofs between sequential and parallel trees.
 #[test]
 fn simulate_transfer_to_new_par_tree_seq_tree() {
     let depth = 3;
@@ -50,6 +117,9 @@ fn simulate_transfer_to_new_par_tree_seq_tree() {
     let from_account_before_bal = 5;
 
     let to_account_id = 2;
+
+    // First, we insert the element to the both trees, and then
+    // we get the proof for the element which is absent in the tree.
 
     let (par_root_before, par_audit_to_before) = {
         let tree = &mut par_tree;
@@ -69,4 +139,24 @@ fn simulate_transfer_to_new_par_tree_seq_tree() {
 
     assert_eq!(par_root_before, seq_root_before);
     assert_eq!(par_audit_to_before, seq_audit_to_before);
+
+    // Check the sequential tree proof.
+    let element_idx = to_account_id as u64;
+    let element: u64 = 0;
+    verify_proof(
+        element_idx,
+        element,
+        seq_tree.hasher.clone(),
+        seq_audit_to_before,
+        seq_tree.root_hash(),
+    );
+
+    // Check the parallel tree proof.
+    verify_proof(
+        element_idx,
+        element,
+        par_tree.hasher.clone(),
+        par_audit_to_before,
+        par_tree.root_hash(),
+    );
 }
