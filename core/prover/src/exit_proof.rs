@@ -26,8 +26,7 @@ pub fn create_exit_proof(
     token_id: TokenId,
 ) -> Result<(EncodedProof, BigDecimal), failure::Error> {
     let timer = Instant::now();
-    let mut circuit_account_tree =
-        CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+    let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
 
     let mut target_account = None;
     for (id, account) in accounts {

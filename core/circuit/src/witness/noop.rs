@@ -120,7 +120,7 @@ mod test {
         let phasher = PedersenHasher::<Bn256>::default();
 
         let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::account_tree_depth() as u32);
+            CircuitAccountTree::new(franklin_constants::account_tree_depth());
 
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, params);
@@ -135,7 +135,7 @@ mod test {
         let (validator_x, validator_y) = validator_pk.0.into_xy();
         println!("x = {}, y = {}", validator_x, validator_y);
         let validator_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32),
+            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
             address: Fr::zero(),
@@ -148,7 +148,7 @@ mod test {
         tree.insert(validator_address_number, validator_leaf);
 
         let mut account_address: u32 = rng.gen();
-        account_address %= tree.capacity();
+        account_address %= tree.capacity() as u32;
         let token: u32 = 2;
 
         let sender_balance_before: u128 = 2000;
@@ -157,7 +157,7 @@ mod test {
             Fr::from_str(&sender_balance_before.to_string()).unwrap();
 
         let mut sender_balance_tree =
-            CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH as u32);
+            CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH);
         sender_balance_tree.insert(
             token,
             Balance {
