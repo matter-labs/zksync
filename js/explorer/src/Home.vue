@@ -23,7 +23,7 @@
     <b-container>
         <ClosableJumbotron></ClosableJumbotron>
         <b-alert v-if="updateError" variant="danger" show>
-            {{updateError}}. Please reload the page
+            {{updateError}}. Try again later.
         </b-alert>
         <b-card bg-variant="light" >
             <h4>ZK Sync Devnet Block Explorer</h4> 
@@ -125,7 +125,6 @@ export default {
     },
     methods: {
         async ticker() {
-            console.log("ticker");
             try {
                 await this.update(true);
                 this.updateError = null;
