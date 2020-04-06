@@ -18,10 +18,9 @@ fn verify_proof<T>(
     // To check the proof, we fold it starting from the hash of the value
     // and updating with the hashes from the proof.
     // We should obtain the root hash at the end if the proof is correct.
-    let mut level = 0;
     let mut proof_index = 0;
     let mut aggregated_hash = hasher.hash_bits(element.get_bits_le());
-    for (hash, dir) in merkle_proof {
+    for (level, (hash, dir)) in merkle_proof.into_iter().enumerate() {
         let (lhs, rhs) = if dir {
             proof_index |= 1 << level;
             (hash, aggregated_hash)
@@ -30,8 +29,6 @@ fn verify_proof<T>(
         };
 
         aggregated_hash = hasher.compress(&lhs, &rhs, level);
-
-        level += 1;
     }
 
     assert_eq!(
