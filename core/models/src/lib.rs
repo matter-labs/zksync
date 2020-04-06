@@ -6,6 +6,7 @@ extern crate log;
 pub mod abi;
 pub mod circuit;
 pub mod config_options;
+pub mod ethereum;
 pub mod merkle_tree;
 pub mod misc;
 pub mod node;
@@ -20,8 +21,8 @@ pub use crypto_exports::franklin_crypto;
 pub use crypto_exports::rand;
 
 use crate::node::block::Block;
-use crate::node::AccountUpdates;
 use crate::node::BlockNumber;
+use crate::node::{AccountUpdates, TokenId};
 use ethabi::{decode, ParamType};
 use failure::format_err;
 use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
@@ -158,7 +159,7 @@ impl std::str::FromStr for ActionType {
 #[derive(Debug)]
 pub struct TokenAddedEvent {
     pub address: Address,
-    pub id: u32,
+    pub id: TokenId,
 }
 
 impl TryFrom<Log> for TokenAddedEvent {
@@ -173,7 +174,7 @@ impl TryFrom<Log> for TokenAddedEvent {
                 .remove(0)
                 .to_uint()
                 .as_ref()
-                .map(U256::as_u32)
+                .map(|id| id.as_u32() as TokenId)
                 .unwrap(),
         })
     }

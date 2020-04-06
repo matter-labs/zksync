@@ -4,7 +4,7 @@
 use bigdecimal::BigDecimal;
 use clap::{App, Arg};
 use log::info;
-use models::node::{Address, TokenId};
+use models::node::{Address, TokenId, TokenLike};
 use models::EncodedProof;
 use serde::Serialize;
 use std::time::Instant;
@@ -51,21 +51,9 @@ fn main() {
             .expect("Address should be valid account address")
     };
 
-    let target_token_address = {
+    let target_token = {
         let token = cli.value_of("Token").expect("required argument");
-        if token == "ETH" {
-            token.to_string()
-        } else {
-            let token_address_to_parse = if token.starts_with("0x") {
-                &token[2..]
-            } else {
-                token
-            };
-            let address: Address = token_address_to_parse
-                .parse()
-                .expect("Token address should be valid ERC20 address");
-            format!("0x{:x}", address)
-        }
+        serde_json::from_str::<TokenLike>(token).expect("invalid token argument")
     };
 
     let timer = Instant::now();
@@ -75,19 +63,12 @@ fn main() {
         .access_storage()
         .expect("Storage access failed");
 
-    let token_id = if target_token_address == "ETH" {
-        0
-    } else {
-        let tokens = storage
-            .tokens_schema()
-            .load_tokens()
-            .expect("Failed to load token");
-        tokens
-            .into_iter()
-            .find(|(_, token)| token.address == target_token_address)
-            .expect("Token not found")
-            .0
-    };
+    let token_id = storage
+        .tokens_schema()
+        .get_token(target_token)
+        .expect("Db access fail")
+        .expect("Token not found")
+        .id;
     let accounts = storage
         .chain()
         .state_schema()

@@ -100,4 +100,7 @@ pub struct TxByHashResponse {
 
     #[sql_type = "BigInt"]
     pub block_number: i64, // all
+
+    #[sql_type = "BigInt"]
+    pub nonce: i64, // all txs
 }

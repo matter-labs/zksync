@@ -6,6 +6,7 @@ use std::str::FromStr;
 const ZKSYNC_CONTRACT_FILE: &str = "contracts/build/Franklin.json";
 const GOVERNANCE_CONTRACT_FILE: &str = "contracts/build/Governance.json";
 const IERC20_CONTRACT_FILE: &str = "contracts/build/IERC20.json";
+const IEIP1271_CONTRACT_FILE: &str = "contracts/build/IEIP1271.json";
 
 fn read_file_to_json_value(path: &str) -> io::Result<serde_json::Value> {
     let contents = fs::read_to_string(path)?;
@@ -36,6 +37,15 @@ pub fn erc20_contract() -> Contract {
         .expect("couldn't read IERC20_CONTRACT_FILE")
         .get("abi")
         .expect("couldn't get abi from IERC20_CONTRACT_FILE")
+        .to_string();
+    Contract::load(abi_string.as_bytes()).expect("erc20 contract abi")
+}
+
+pub fn eip1271_contract() -> Contract {
+    let abi_string = read_file_to_json_value(IEIP1271_CONTRACT_FILE)
+        .expect("couldn't read IEIP1271_CONTRACT_FILE")
+        .get("abi")
+        .expect("couldn't get abi from IEIP1271_CONTRACT_FILE")
         .to_string();
     Contract::load(abi_string.as_bytes()).expect("erc20 contract abi")
 }

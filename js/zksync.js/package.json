@@ -1,6 +1,6 @@
 {
   "name": "zksync",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "license": "MIT",
   "main": "build/index.js",
   "types": "build/index.d.ts",
@@ -12,7 +12,8 @@
     "elliptic": "^6.5.0",
     "js-sha256": "^0.9.0",
     "websocket": "^1.0.30",
-    "websocket-as-promised": "^0.10.1"
+    "websocket-as-promised": "^0.10.1",
+    "zksync-crypto": "^0.0.2"
   },
   "peerDependencies": {
     "ethers": "^4.0.33"

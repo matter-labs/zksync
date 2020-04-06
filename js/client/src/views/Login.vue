@@ -26,7 +26,7 @@ const components = {
 };
 
 const ethers = require('ethers');
-const zksync = require('zksync');
+const zksync_promise = import('zksync');
 import config from '../env-config';
 
 import { WalletDecorator } from '../WalletDecorator'
@@ -34,11 +34,12 @@ import { WalletDecorator } from '../WalletDecorator'
 export default {
     name: 'login',
     computed: {
-        ethereumSupported: () => typeof window.web3 !== 'undefined',
+        ethereumSupported: () => typeof window.ethereum !== 'undefined',
     },
     methods: {
         async login() {
             try {
+                const zksync = await zksync_promise;
                 const syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
                 // const syncProvider = await zksync.Provider.newWebsocketProvider(config.WS_API_ADDR);
                 const tokensList = await syncProvider.getTokens()

@@ -2,7 +2,7 @@ use bigdecimal::BigDecimal;
 use crypto_exports::rand::{thread_rng, Rng};
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
-    priv_key_from_fs, Address, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
+    priv_key_from_fs, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
 use std::sync::Mutex;
 use web3::types::H256;
@@ -117,6 +117,21 @@ impl ZksyncAccount {
             *stored_nonce += 1;
         }
         withdraw
+    }
+
+    pub fn sign_close(&self, nonce: Option<Nonce>, increment_nonce: bool) -> Close {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let mut close = Close {
+            account: self.address,
+            nonce: nonce.unwrap_or_else(|| *stored_nonce),
+            signature: TxSignature::default(),
+        };
+        close.signature = TxSignature::sign_musig_sha256(&self.private_key, &close.get_bytes());
+
+        if increment_nonce {
+            *stored_nonce += 1;
+        }
+        close
     }
 
     pub fn create_change_pubkey_tx(
