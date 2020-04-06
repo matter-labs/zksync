@@ -618,7 +618,7 @@ contract Franklin is Storage, Config, Events {
 
     /// @notice Checks whether oldest unverified block has expired
     /// @return bool flag that indicates whether oldest unverified block has expired
-    function isBlockCommitmentExpired() internal returns (bool) {
+    function isBlockCommitmentExpired() internal view returns (bool) {
         return (
             totalBlocksCommitted > totalBlocksVerified &&
             blocks[totalBlocksVerified + 1].committedAtBlock > 0 &&

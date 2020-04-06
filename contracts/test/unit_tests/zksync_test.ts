@@ -315,7 +315,7 @@ describe("ZK Sync withdraw unit tests", function () {
         const withdrawAmount = parseEther("1.0");
 
         const {revertReason} = await getCallRevertReason( async () => await performWithdraw(wallet, incorrectTokenContract.address, 1, withdrawAmount.add(1)));
-        expect(revertReason, "wrong revert reason").eq("gvs12");
+        expect(revertReason, "wrong revert reason").eq("gvs11");
     });
 
     it("Complete pending withdawals, eth, known erc20", async () => {
