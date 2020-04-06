@@ -611,7 +611,7 @@ contract Franklin is Storage, Config, Events {
             }
             if (op.opType == Operations.OpType.FullExit) {
                 // full exit was successful, accrue balance
-                Operations.FullExit memory data = Operations.readFullExitPubdata(op.pubData, 0);
+                Operations.FullExit memory data = Operations.readFullExitPubdata(op.pubData);
                 storeWithdrawalAsPending(data.owner, data.tokenId, data.amount);
             }
             delete onchainOps[current];

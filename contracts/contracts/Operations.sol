@@ -100,10 +100,10 @@ library Operations {
     uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
         ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
 
-    function readFullExitPubdata(bytes memory _data, uint _offset) internal pure
+    function readFullExitPubdata(bytes memory _data) internal pure
         returns (FullExit memory parsed)
     {
-        uint offset = _offset;
+        uint offset = 0;
         (offset, parsed.accountId) = Bytes.readUInt24(_data, offset);      // accountId
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);         // owner
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);        // tokenId
@@ -162,7 +162,7 @@ library Operations {
     // ChangePubKey
 
     struct ChangePubKey {
-        uint24 accountId;
+        // uint24 accountId;
         bytes pubKeyHash;
         address owner;
         uint32 nonce;
