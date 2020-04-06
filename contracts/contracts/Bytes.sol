@@ -120,6 +120,35 @@ library Bytes {
         return tempBytes;
     }
 
+    /// Compares slices in two `bytes` arrays without copying
+    /// @param _lhs_bytes first bytes array
+    /// @param _lhs_offset slice offset in the first array
+    /// @param _rhs_bytes second bytes array
+    /// @param _rhs_offset slice offset in the second array
+    /// @param _length slices' length (equal for left and right arrays)
+    function isEqualSlices(
+        bytes memory _lhs_bytes,
+        uint _lhs_offset,
+        bytes memory _rhs_bytes,
+        uint _rhs_offset,
+        uint _length
+    )
+        internal
+        pure
+        returns (bool equals)
+    {
+        require(_lhs_bytes.length >= _lhs_offset + _length, "ies10");  // index out of bounds for _lhs_bytes
+        require(_rhs_bytes.length >= _rhs_offset + _length, "ies10");  // index out of bounds for _lhs_bytes
+
+        for (uint i = 0; i < _length; ++i) {
+            if (_lhs_bytes[_lhs_offset + i] != _rhs_bytes[_rhs_offset + i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /// Reads byte stream
     /// @return new_offset - offset + amount of bytes read
     /// @return data - actually read data
@@ -156,16 +185,6 @@ library Bytes {
         bytes memory buf;
         (new_offset, buf) = read(_data, _offset, 20);
         r = bytesToAddress(buf);
-    }
-
-    // Original source code: https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol#L13
-    // Concatenate bytes arrays in memory
-    // Returns the newly created 'bytes memory'.
-    function concat(
-        bytes memory _preBytes,
-        bytes memory _postBytes
-    ) internal pure returns (bytes memory) {
-        return abi.encodePacked (_preBytes, _postBytes);
     }
 
     // Helper function for hex conversion.

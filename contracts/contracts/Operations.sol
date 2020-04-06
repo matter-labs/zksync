@@ -55,10 +55,6 @@ library Operations {
     uint public constant PACKED_DEPOSIT_PUBDATA_BYTES = 
         ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + ADDRESS_BYTES;
 
-    function PackedDepositPubdataBytes() internal pure returns (uint) {
-        return PACKED_DEPOSIT_PUBDATA_BYTES;
-    }
-
     /// Deserialize deposit pubdata
     function readDepositPubdata(bytes memory _data, uint _offset) internal pure
         returns (uint new_offset, Deposit memory parsed)
@@ -67,23 +63,29 @@ library Operations {
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
-        new_offset = _offset + PACKED_DEPOSIT_PUBDATA_BYTES;
+
+        require(offset == _offset + PACKED_DEPOSIT_PUBDATA_BYTES, "rdp10"); // reading invalid deposit pubdata size
+        new_offset = offset;
     }
 
     /// Serialize deposit pubdata
     function writeDepositPubdata(Deposit memory op) internal pure returns (bytes memory buf) {
-        buf = new bytes(ACCOUNT_ID_BYTES);                             // accountId (ignored)
-        buf = Bytes.concat(buf, Bytes.toBytesFromUInt16(op.tokenId));  // tokenId
-        buf = Bytes.concat(buf, Bytes.toBytesFromUInt128(op.amount));  // amount
-        buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));   // owner
+        buf = abi.encodePacked(
+            new bytes(ACCOUNT_ID_BYTES),          // accountId (ignored)
+            Bytes.toBytesFromUInt16(op.tokenId),  // tokenId
+            Bytes.toBytesFromUInt128(op.amount),  // amount
+            Bytes.toBytesFromAddress(op.owner)    // owner
+        );
     }
 
     /// @notice Check that deposit pubdata from request and block matches
     function depositPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
         // We must ignore `accountId` because it is present in block pubdata but not in priority queue
-        bytes memory lhs_trimmed = Bytes.slice(_lhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
-        bytes memory rhs_trimmed = Bytes.slice(_rhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
-        return keccak256(lhs_trimmed) == keccak256(rhs_trimmed);
+        return Bytes.isEqualSlices(
+            _lhs, ACCOUNT_ID_BYTES,
+            _rhs, ACCOUNT_ID_BYTES,
+            PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES
+        );
     }
 
     // FullExit pubdata
@@ -98,10 +100,6 @@ library Operations {
     uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
         ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
 
-    function PackedFullExitPubdataBytes() internal pure returns (uint) {
-        return PACKED_FULL_EXIT_PUBDATA_BYTES;
-    }
-
     function readFullExitPubdata(bytes memory _data, uint _offset) internal pure
         returns (FullExit memory parsed)
     {
@@ -113,18 +111,22 @@ library Operations {
     }
 
     function writeFullExitPubdata(FullExit memory op) internal pure returns (bytes memory buf) {
-        buf = Bytes.toBytesFromUInt24(op.accountId);                    // accountId
-        buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));    // owner
-        buf = Bytes.concat(buf, Bytes.toBytesFromUInt16(op.tokenId));   // tokenId
-        buf = Bytes.concat(buf, Bytes.toBytesFromUInt128(op.amount));   // amount
+        buf = abi.encodePacked(
+            Bytes.toBytesFromUInt24(op.accountId),  // accountId
+            Bytes.toBytesFromAddress(op.owner),     // owner
+            Bytes.toBytesFromUInt16(op.tokenId),    // tokenId
+            Bytes.toBytesFromUInt128(op.amount)     // amount
+        );
     }
 
     /// @notice Check that full exit pubdata from request and block matches
     function fullExitPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
         // We must ignore `amount` because it is present in block pubdata but not in priority queue
-        bytes memory lhs_trimmed = Bytes.slice(_lhs, 0, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
-        bytes memory rhs_trimmed = Bytes.slice(_rhs, 0, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
-        return keccak256(lhs_trimmed) == keccak256(rhs_trimmed);
+        return Bytes.isEqualSlices(
+            _lhs, 0,
+            _rhs, 0,
+            PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES
+        );
     }
 
     // PartialExit pubdata
@@ -148,11 +150,13 @@ library Operations {
     }
 
     function writePartialExitPubdata(PartialExit memory op) internal pure returns (bytes memory buf) {
-        buf = new bytes(ACCOUNT_ID_BYTES);                              // accountId (ignored)
-        buf = Bytes.concat(buf, Bytes.toBytesFromUInt16(op.tokenId));   // tokenId
-        buf = Bytes.concat(buf, Bytes.toBytesFromUInt128(op.amount));   // amount
-        buf = Bytes.concat(buf, new bytes(FEE_BYTES));                  // fee (ignored)
-        buf = Bytes.concat(buf, Bytes.toBytesFromAddress(op.owner));    // owner
+        buf = abi.encodePacked(
+            new bytes(ACCOUNT_ID_BYTES),          // accountId (ignored)
+            Bytes.toBytesFromUInt16(op.tokenId),  // tokenId
+            Bytes.toBytesFromUInt128(op.amount),  // amount
+            new bytes(FEE_BYTES),                 // fee (ignored)
+            Bytes.toBytesFromAddress(op.owner)    // owner
+        );
     }
 
     // ChangePubKey

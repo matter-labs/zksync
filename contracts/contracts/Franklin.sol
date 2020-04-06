@@ -488,7 +488,9 @@ contract Franklin is Storage, Config, Events {
                 bool valid = verifyChangePubkeySignature(_currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
                 require(valid, "fpp15"); // failed to verify change pubkey hash signature
             } else {
-                bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
+                bytes memory authFact = authFacts[op.owner][op.nonce];
+                require(authFact.length == op.pubKeyHash.length, "fpp17");  // invalid authFact length
+                bool valid = Bytes.isEqualSlices(authFact, 0, op.pubKeyHash, 0, op.pubKeyHash.length);
                 require(valid, "fpp16"); // new pub key hash is not authenticated properly
             }
             return CHANGE_PUBKEY_BYTES;
