@@ -39,7 +39,6 @@ export class Client {
                     })
                     .sort((a, b) => a.id - b.id);
             });
-        
         const blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
 
         const props = {
@@ -125,7 +124,7 @@ export class Client {
 
         return Object.entries(account.commited.balances)
             .map(([tokenId, balance]) => {
-                return { 
+                return {
                     tokenId,
                     balance: readableEther(balance),
                     tokenName: tokensInfoList[tokenId].syncSymbol,
@@ -134,6 +133,10 @@ export class Client {
     }
     async tokenNameFromId(tokenId) {
         return (await this.tokensPromise)[tokenId].syncSymbol;
+    }
+
+    tokenNameFromSymbol(symbol) {
+        return `zk${symbol.toString()}`;
     }
 
     async transactionsAsRenderableList(address, offset, limit) {
@@ -189,7 +192,7 @@ export class Client {
 
             switch (true) {
                 case type == 'Deposit': {
-                    const token = await this.tokenNameFromId(tx.tx.priority_op.token);
+                    const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
                     const amount = readableEther(tx.tx.priority_op.amount);
                     return {
                         fields: [
@@ -208,7 +211,7 @@ export class Client {
                 }
                 case type == 'FullExit': {
                     console.log(tx);
-                    const token = await this.tokenNameFromId(tx.tx.priority_op.token);
+                    const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
                     const amount = readableEther(tx.tx.withdraw_amount || 0);
                     return {
                         fields: [
@@ -226,7 +229,7 @@ export class Client {
                     };
                 }
                 case type == 'Transfer': {
-                    const token = await this.tokenNameFromId(tx.tx.token);
+                    const token = this.tokenNameFromSymbol(tx.tx.token);
                     const amount = readableEther(tx.tx.amount);
                     return {
                         fields: [
@@ -244,7 +247,7 @@ export class Client {
                     };
                 }
                 case type == 'Withdraw': {
-                    const token = await this.tokenNameFromId(tx.tx.token);
+                    const token = this.tokenNameFromSymbol(tx.tx.token);
                     const amount = readableEther(tx.tx.amount);   
                     return {
                         fields: [

@@ -3,6 +3,8 @@ use serde_derive::{Deserialize, Serialize};
 // Workspace imports
 // Local imports
 use crate::schema::*;
+use crate::tokens::utils::{address_to_stored_string, stored_str_address_to_address};
+use models::node::{Token, TokenId};
 
 #[derive(
     Debug,
@@ -16,8 +18,29 @@ use crate::schema::*;
     PartialEq,
 )]
 #[table_name = "tokens"]
-pub struct Token {
+
+pub struct DbToken {
     pub id: i32,
     pub address: String,
     pub symbol: String,
+}
+
+impl From<Token> for DbToken {
+    fn from(token: Token) -> Self {
+        Self {
+            id: token.id as i32,
+            address: address_to_stored_string(&token.address),
+            symbol: token.symbol,
+        }
+    }
+}
+
+impl Into<Token> for DbToken {
+    fn into(self) -> Token {
+        Token {
+            id: self.id as TokenId,
+            address: stored_str_address_to_address(&self.address),
+            symbol: self.symbol,
+        }
+    }
 }

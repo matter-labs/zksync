@@ -231,6 +231,7 @@ steps:
     STAGE_ENV_BASE64:
       from_secret: stage_env_base64
   commands:
+  - git checkout ${DRONE_COMMIT_SHA}
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
@@ -367,6 +368,10 @@ trigger:
   - promote
 
 steps:
+- name: check out to commit
+  image: matterlabs/ci
+  commands:
+  - git checkout ${DRONE_COMMIT_SHA}
 - name: check-images-exist
   image: docker
   environment:

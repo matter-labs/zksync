@@ -563,8 +563,11 @@ impl PlasmaState {
         &mut self,
         op: &TransferOp,
     ) -> Result<(CollectedFee, AccountUpdates), Error> {
-        let mut updates = Vec::new();
+        if op.from == op.to {
+            return self.apply_transfer_op_to_self(op);
+        }
 
+        let mut updates = Vec::new();
         let mut from_account = self.get_account(op.from).unwrap();
         let mut to_account = self.get_account(op.to).unwrap();
 
@@ -608,6 +611,52 @@ impl PlasmaState {
                 balance_update: (op.tx.token, to_old_balance, to_new_balance),
                 old_nonce: to_account_nonce,
                 new_nonce: to_account_nonce,
+            },
+        ));
+
+        let fee = CollectedFee {
+            token: op.tx.token,
+            amount: op.tx.fee.clone(),
+        };
+
+        Ok((fee, updates))
+    }
+
+    fn apply_transfer_op_to_self(
+        &mut self,
+        op: &TransferOp,
+    ) -> Result<(CollectedFee, AccountUpdates), Error> {
+        ensure!(
+            op.from == op.to,
+            "Bug: transfer to self should not be called."
+        );
+
+        let mut updates = Vec::new();
+        let mut account = self.get_account(op.from).unwrap();
+
+        let old_balance = account.get_balance(op.tx.token);
+        let old_nonce = account.nonce;
+
+        ensure!(op.tx.nonce == old_nonce, "Nonce mismatch");
+        ensure!(
+            old_balance >= &op.tx.amount + &op.tx.fee,
+            "Not enough balance"
+        );
+
+        account.sub_balance(op.tx.token, &op.tx.fee);
+        account.nonce += 1;
+
+        let new_balance = account.get_balance(op.tx.token);
+        let new_nonce = account.nonce;
+
+        self.insert_account(op.from, account);
+
+        updates.push((
+            op.from,
+            AccountUpdate::UpdateBalance {
+                balance_update: (op.tx.token, old_balance, new_balance),
+                old_nonce,
+                new_nonce,
             },
         ));
 
