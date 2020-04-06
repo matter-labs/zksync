@@ -22,6 +22,12 @@
     <br>
     <b-container>
         <ClosableJumbotron></ClosableJumbotron>
+        <b-alert v-if="isNetworkError" variant="danger" show>
+            Network error. Please reload the page
+        </b-alert>
+        <b-alert v-if="isOtherError" variant="danger" show>
+            Unexpected error. Please reload the page
+        </b-alert>    
         <b-card bg-variant="light" >
             <h4>ZK Sync Devnet Block Explorer</h4> 
             <SearchField :searchFieldInMenu="false" />
@@ -102,6 +108,9 @@ export default {
                     active: true
                 },
             ],
+
+            isNetworkError:     false,
+            isOtherError:       false,
         };
     },
     computed: {
@@ -120,7 +129,14 @@ export default {
     },
     methods: {
         ticker() {
-            this.update(true);
+            this.update(true)
+                .catch(e => {
+                    if (e.message == "Network Error") {
+                        this.isNetworkError = true;
+                    } else {
+                        this.isOtherError = true;
+                    }
+                });
         },
         onRowClicked(item) {
             this.$router.push('/blocks/' + item.block_number);
