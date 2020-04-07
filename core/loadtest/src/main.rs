@@ -57,7 +57,7 @@ fn main() {
     log::info!("sending transactions");
 
     let tps_counter = Arc::new(TPSCounter::default());
-    tokio_runtime.spawn(run_tps_counter_printer(Arc::clone(&tps_counter)));
+    tokio_runtime.spawn(run_tps_counter_printer(tps_counter.clone()));
 
     let sent_txs = tokio_runtime.block_on(send_transactions(
         test_accounts,
@@ -163,33 +163,16 @@ async fn send_transactions(
         })
         .collect::<Vec<_>>();
 
+    let mut merged_txs = SentTransactions::new();
     for j in join_handles {
-        j.await.expect("join handle panicked");
+        let sent_txs_result = j.await.expect("Join handle panicked");
+
+        match sent_txs_result {
+            Ok(sent_txs) => merged_txs.merge(sent_txs),
+            Err(err) => log::warn!("Failed to send txs: {}", err),
+        }
     }
-    //    let send_txs = try_join_all(
-    //        test_accounts
-    //            .iter()
-    //            .enumerate()
-    //            .map(|(i, _)| {
-    //                send_transactions_from_acc(
-    //                    i,
-    //                    &test_accounts,
-    //                    &ctx,
-    //                    rpc_addr,
-    //                    Arc::clone(&tps_counter),
-    //                    req_client.clone(),
-    //                )
-    //            })
-    //            .collect::<Vec<_>>(),
-    //    )
-    //    .await;
-    // let mut merged_txs = SentTransactions::new();
-    let merged_txs = SentTransactions::new();
-    //    if let Ok(sent_txs) = send_txs {
-    //        for acc_txs in sent_txs {
-    //            merged_txs.merge(acc_txs);
-    //        }
-    //    }
+
     merged_txs
 }
 
