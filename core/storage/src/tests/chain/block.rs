@@ -1,7 +1,10 @@
 // External imports
 use web3::types::H256;
 // Workspace imports
-use crypto_exports::rand::XorShiftRng;
+use crypto_exports::{
+    ff::{self, PrimeField},
+    rand::XorShiftRng,
+};
 use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, Fr};
 use models::{ethereum::OperationType, Action, Operation};
 // Local imports
@@ -108,7 +111,7 @@ fn test_commit_rewind() {
 
 /// Creates an unique new root hash for the block based on its number.
 fn root_hash_for_block(block_number: BlockNumber) -> Fr {
-    Fr::from_hex(format!("{:064x}", block_number).as_ref()).unwrap()
+    Fr::from_str(&block_number.to_string()).unwrap()
 }
 
 /// Creates an unique ethereum operation hash based on its number.
@@ -249,7 +252,7 @@ fn find_block_by_height_or_hash() {
             // Initialize reference sample fields.
             current_block_detail.block_number = operation.block.block_number as i64;
             current_block_detail.new_state_root =
-                format!("sync-bl:{}", operation.block.new_root_hash.to_hex());
+                format!("sync-bl:{}", ff::to_hex(&operation.block.new_root_hash));
             current_block_detail.block_size = operation.block.block_transactions.len() as i64;
             current_block_detail.commit_tx_hash = Some(format!("0x{}", hex::encode(eth_tx_hash)));
 

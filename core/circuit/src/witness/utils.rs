@@ -2,7 +2,6 @@ use crate::account::*;
 
 use crate::circuit::FranklinCircuit;
 use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::Field;
 use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField, PrimeFieldRepr};
@@ -10,6 +9,7 @@ use crate::franklin_crypto::eddsa::PrivateKey;
 use crate::franklin_crypto::eddsa::PublicKey;
 use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::operation::Operation;
 use crate::operation::SignatureData;
 use crate::rand::{Rng, SeedableRng, XorShiftRng};

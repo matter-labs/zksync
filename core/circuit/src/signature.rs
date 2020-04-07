@@ -9,10 +9,10 @@ use crate::operation::SignatureData;
 use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
 
 use crate::franklin_crypto::circuit::expression::Expression;
+use crate::franklin_crypto::circuit::multipack;
 use crate::franklin_crypto::circuit::pedersen_hash;
 use crate::franklin_crypto::circuit::rescue;
 use crate::franklin_crypto::circuit::sha256;
-use crate::franklin_crypto::circuit::multipack;
 use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::franklin_crypto::rescue::RescueEngine;
 use models::params as franklin_constants;
@@ -174,16 +174,12 @@ pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSy
     // .clone();
 
     let input = multipack::pack_into_witness(
-        cs.namespace(|| "pack transaction bits into field elements for rescue"), 
-        &serialized_tx_bits
+        cs.namespace(|| "pack transaction bits into field elements for rescue"),
+        &serialized_tx_bits,
     )?;
 
     // signature msg is the hash of serialized transaction
-    let mut sponge_output = rescue::rescue_hash(
-        cs.namespace(|| "sig_msg"),
-        &input,
-        rescue_params,
-    )?;
+    let mut sponge_output = rescue::rescue_hash(cs.namespace(|| "sig_msg"), &input, rescue_params)?;
 
     assert_eq!(sponge_output.len(), 1);
 
@@ -461,37 +457,37 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
     hash_input.resize(INPUT_PAD_LEN_FOR_RESCUE, Boolean::constant(false));
 
     let hash_input = multipack::pack_into_witness(
-        cs.namespace(|| "pack FS parameter bits into fiedl elements"), 
-        &hash_input
+        cs.namespace(|| "pack FS parameter bits into fiedl elements"),
+        &hash_input,
     )?;
 
-    assert_eq!(hash_input.len(), 4, "multipacking of FS hash is expected to have length 4");
+    assert_eq!(
+        hash_input.len(),
+        4,
+        "multipacking of FS hash is expected to have length 4"
+    );
 
     let mut sponge = rescue::StatefulRescueGadget::new(rescue_params);
 
     sponge.absorb(
-        cs.namespace(|| "apply rescue hash on FS parameters"), 
+        cs.namespace(|| "apply rescue hash on FS parameters"),
         &hash_input,
-        &rescue_params
+        &rescue_params,
     )?;
 
     let s0 = sponge.squeeze_out_single(
         cs.namespace(|| "squeeze first word form sponge"),
-        &rescue_params
+        &rescue_params,
     )?;
 
     let s1 = sponge.squeeze_out_single(
         cs.namespace(|| "squeeze second word form sponge"),
-        &rescue_params
+        &rescue_params,
     )?;
 
-    let s0_bits = s0.into_bits_le(
-        cs.namespace(|| "make bits of first word for FS challenge")
-    )?;
+    let s0_bits = s0.into_bits_le(cs.namespace(|| "make bits of first word for FS challenge"))?;
 
-    let s1_bits = s1.into_bits_le(
-        cs.namespace(|| "make bits of second word for FS challenge")
-    )?;
+    let s1_bits = s1.into_bits_le(cs.namespace(|| "make bits of second word for FS challenge"))?;
 
     let take_bits = (<E as JubjubEngine>::Fs::CAPACITY / 2) as usize;
 

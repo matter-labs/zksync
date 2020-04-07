@@ -82,8 +82,6 @@ impl ZksyncAccount {
             nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
         };
-        // transfer.signature =
-            // TxSignature::sign_musig_sha256(&self.private_key, &transfer.get_bytes());
 
         transfer.signature =
             TxSignature::sign_musig_rescue(&self.private_key, &transfer.get_bytes());
@@ -114,7 +112,7 @@ impl ZksyncAccount {
             signature: TxSignature::default(),
         };
         withdraw.signature =
-            TxSignature::sign_musig_sha256(&self.private_key, &withdraw.get_bytes());
+            TxSignature::sign_musig_rescue(&self.private_key, &withdraw.get_bytes());
 
         if increment_nonce {
             *stored_nonce += 1;
@@ -129,7 +127,7 @@ impl ZksyncAccount {
             nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
         };
-        close.signature = TxSignature::sign_musig_sha256(&self.private_key, &close.get_bytes());
+        close.signature = TxSignature::sign_musig_rescue(&self.private_key, &close.get_bytes());
 
         if increment_nonce {
             *stored_nonce += 1;

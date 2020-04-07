@@ -13,7 +13,7 @@ fn generate_input(size: usize) -> Vec<bool> {
 }
 
 /// Measures the hashing time for a small input.
-fn pedersen_small(b: &mut Bencher<'_>) {
+fn rescue_small(b: &mut Bencher<'_>) {
     const INPUT_SIZE: usize = SMALL_INPUT_SIZE;
 
     let hasher = RescueHasher::<Engine>::default();
@@ -31,7 +31,7 @@ fn pedersen_small(b: &mut Bencher<'_>) {
 }
 
 /// Measures the hashing time for a (relatively) big input.
-fn pedersen_big(b: &mut Bencher<'_>) {
+fn rescue_big(b: &mut Bencher<'_>) {
     const INPUT_SIZE: usize = BIG_INPUT_SIZE;
 
     let hasher = RescueHasher::<Engine>::default();
@@ -48,14 +48,14 @@ fn pedersen_big(b: &mut Bencher<'_>) {
     );
 }
 
-pub fn bench_pedersen_hasher(c: &mut Criterion) {
+pub fn bench_rescue_hasher(c: &mut Criterion) {
     let mut small_input_group = c.benchmark_group("Small input");
     small_input_group.throughput(Throughput::Bytes((SMALL_INPUT_SIZE / 8) as u64));
-    small_input_group.bench_function("Pedersen Hasher", pedersen_small);
+    small_input_group.bench_function("Rescue Hasher", rescue_small);
     small_input_group.finish();
 
     let mut big_input_group = c.benchmark_group("Big input");
     big_input_group.throughput(Throughput::Bytes((BIG_INPUT_SIZE / 8) as u64));
-    big_input_group.bench_function("Pedersen Hasher", pedersen_big);
+    big_input_group.bench_function("Rescue Hasher", rescue_big);
     big_input_group.finish();
 }

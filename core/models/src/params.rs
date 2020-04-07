@@ -5,11 +5,11 @@ use std::str::FromStr;
 use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
 // Workspace deps
+use crate::franklin_crypto::group_hash::BlakeHasher;
+use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
 use crate::node::TokenId;
-use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
-use crate::franklin_crypto::group_hash::{BlakeHasher};
 
 static mut ACCOUNT_TREE_DEPTH_VALUE: usize = 0;
 /// account_tree_depth.
@@ -132,6 +132,7 @@ pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
     pub static ref PEDERSEN_HASHER: BabyPedersenHasher = BabyPedersenHasher::default();
-    pub static ref RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_2_into_1::<BlakeHasher>();
+    pub static ref RESCUE_PARAMS: Bn256RescueParams =
+        Bn256RescueParams::new_2_into_1::<BlakeHasher>();
     pub static ref RESCUE_HASHER: BabyRescueHasher = BabyRescueHasher::default();
 }

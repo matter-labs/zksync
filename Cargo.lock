@@ -463,7 +463,7 @@ dependencies = [
 [[package]]
 name = "bellman_ce"
 version = "0.3.2"
-source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#16d1747bba96d534f5b85522706afb2793814903"
+source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#d62dc2da8dd19ebdba7caaf04cfbc486c19966fa"
 dependencies = [
  "bit-vec",
  "blake2s_const",
@@ -472,7 +472,7 @@ dependencies = [
  "cfg-if",
  "crossbeam",
  "futures 0.3.4",
- "hex 0.4.2",
+ "hex 0.3.2",
  "lazy_static",
  "num_cpus",
  "pairing_ce",
@@ -524,7 +524,7 @@ dependencies = [
 [[package]]
 name = "blake2s_const"
 version = "0.6.0"
-source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#16d1747bba96d534f5b85522706afb2793814903"
+source = "git+https://github.com/matter-labs/bellman?branch=plonk_release#d62dc2da8dd19ebdba7caaf04cfbc486c19966fa"
 dependencies = [
  "arrayref",
  "arrayvec 0.5.1",
@@ -1238,8 +1238,9 @@ checksum = "e88a8acf291dafb59c2d96e8f59828f3838bb1a70398823ade51a84de6a6deed"
 
 [[package]]
 name = "ff_ce"
-version = "0.7.1"
-source = "git+https://github.com/matter-labs/ff.git?branch=playground#3f6722c07038bb68c0b9a1012cdddd01037aa985"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83c0a6a2c53b0bd6d8cae976816dc8a171e0554c03f304e3dac110473e0219fd"
 dependencies = [
  "byteorder",
  "ff_derive_ce",
@@ -1249,8 +1250,9 @@ dependencies = [
 
 [[package]]
 name = "ff_derive_ce"
-version = "0.6.0"
-source = "git+https://github.com/matter-labs/ff.git?branch=playground#3f6722c07038bb68c0b9a1012cdddd01037aa985"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7543567f0c51910363eb5706ee2f5368a64e79a8ae607d0332aa60bae03a1bb1"
 dependencies = [
  "num-bigint",
  "num-integer",
@@ -1310,7 +1312,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#d9144b3c51d735cfd830ea6bd051dbad78eb3381"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#88376464a3c558efd99430e4ed6689224af2368c"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -1950,7 +1952,6 @@ dependencies = [
  "hex 0.3.2",
  "log 0.4.8",
  "models",
- "rayon",
  "rust-crypto",
  "time",
 ]
@@ -2371,7 +2372,8 @@ dependencies = [
 [[package]]
 name = "pairing_ce"
 version = "0.20.0"
-source = "git+https://github.com/matter-labs/pairing.git?branch=affine-ops#af828bd2fb1c83c49fe202a0b2b3cc5d177d4d18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c7b23aa7f0489d9a5e8e15cc5b7cb4f3e9b9d64812b8875fb91d25b640b0939"
 dependencies = [
  "byteorder",
  "ff_ce",

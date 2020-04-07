@@ -7,6 +7,7 @@ use futures::SinkExt;
 use tokio::runtime::Runtime;
 // Workspace uses
 use crate::mempool::ProposedBlock;
+use crypto_exports::ff;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
@@ -197,7 +198,7 @@ impl PlasmaStateKeeper {
         let state = PlasmaState::new(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         info!("Genesis block created, state: {}", state.root_hash());
-        println!("GENESIS_ROOT=0x{}", root_hash.to_hex());
+        println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
     }
 
     async fn run(mut self) {

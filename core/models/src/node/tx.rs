@@ -123,7 +123,7 @@ impl Transfer {
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
         self.signature
-            .verify_musig_sha256(&self.get_bytes())
+            .verify_musig_rescue(&self.get_bytes())
             .as_ref()
             .map(PubKeyHash::from_pubkey)
     }
@@ -180,7 +180,7 @@ impl Withdraw {
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
+        if let Some(pub_key) = self.signature.verify_musig_rescue(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -223,7 +223,7 @@ impl Close {
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
+        if let Some(pub_key) = self.signature.verify_musig_rescue(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -410,6 +410,22 @@ impl TxSignature {
             &hashed_msg,
             &self.signature.0,
             FixedGenerators::SpendingKeyGenerator,
+            &JUBJUB_PARAMS,
+        );
+        if valid {
+            Some(self.pub_key.0.clone())
+        } else {
+            None
+        }
+    }
+
+    pub fn verify_musig_rescue(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        let hashed_msg = rescue_hash_tx_msg(msg);
+        let valid = self.pub_key.0.verify_musig_rescue(
+            &hashed_msg,
+            &self.signature.0,
+            FixedGenerators::SpendingKeyGenerator,
+            &RESCUE_PARAMS,
             &JUBJUB_PARAMS,
         );
         if valid {
@@ -759,6 +775,30 @@ mod test {
         messages.push(b"hello world".to_vec());
 
         (pk, messages)
+    }
+
+    #[test]
+    fn test_musig_rescue_signing_verification() {
+        let (pk, messages) = gen_pk_and_msg();
+
+        for msg in &messages {
+            let signature = TxSignature::sign_musig_rescue(&pk, msg);
+
+            if let Some(sign_pub_key) = signature.verify_musig_rescue(msg) {
+                let pub_key = PublicKey::from_private(
+                    &pk,
+                    FixedGenerators::SpendingKeyGenerator,
+                    &JUBJUB_PARAMS,
+                );
+                assert!(
+                    sign_pub_key.0.eq(&pub_key.0),
+                    "Signature pub key is wrong, msg: {}",
+                    hex::encode(&msg)
+                );
+            } else {
+                panic!("Signature is incorrect, msg: {}", hex::encode(&msg));
+            }
+        }
     }
 
     #[test]

@@ -1,5 +1,5 @@
 use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField};
-use crate::franklin_crypto::bellman::pairing::{Engine};
+use crate::franklin_crypto::bellman::pairing::Engine;
 use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 
 use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
@@ -8,7 +8,7 @@ use crate::franklin_crypto::circuit::Assignment;
 use crate::franklin_crypto::eddsa::Signature;
 use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
 use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
-use crate::franklin_crypto::rescue::{RescueEngine};
+use crate::franklin_crypto::rescue::RescueEngine;
 
 use crate::operation::SignatureData;
 use crate::operation::TransactionSignature;
@@ -69,11 +69,17 @@ where
     let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
 
     let seed = Seed::deterministic_seed(&private_key, &message_bytes);
-    let signature = private_key.musig_rescue_sign(&message_bytes, &seed, p_g, rescue_params, jubjub_params);
+    let signature =
+        private_key.musig_rescue_sign(&message_bytes, &seed, p_g, rescue_params, jubjub_params);
 
     let pk = PublicKey::from_private(&private_key, p_g, jubjub_params);
-    let _is_valid_signature =
-        pk.verify_musig_rescue(&message_bytes, &signature.clone(), p_g, rescue_params, jubjub_params);
+    let _is_valid_signature = pk.verify_musig_rescue(
+        &message_bytes,
+        &signature.clone(),
+        p_g,
+        rescue_params,
+        jubjub_params,
+    );
 
     // TODO: handle the case where it is not valid
     // if !is_valid_signature {

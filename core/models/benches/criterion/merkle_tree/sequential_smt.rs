@@ -2,9 +2,10 @@
 
 use criterion::{black_box, BatchSize, Bencher, Criterion};
 
+use crypto_exports::ff::PrimeField;
 use models::circuit::account::CircuitAccount;
-use models::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
-use models::merkle_tree::{pedersen_hasher::PedersenHasher, sequential_smt::SparseMerkleTree};
+use models::merkle_tree::{rescue_hasher::RescueHasher, sequential_smt::SparseMerkleTree};
+use models::node::{Engine, Fr};
 
 // This value should be not to high, since the bench will be run for thousands
 // of iterations. Despite the tree cloning time won't affect the bench results
@@ -13,14 +14,12 @@ use models::merkle_tree::{pedersen_hasher::PedersenHasher, sequential_smt::Spars
 const N_ACCOUNTS: u32 = 100;
 
 /// Type alias equivalent to the actually used SMT.
-type RealSMT = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
+type RealSMT = SparseMerkleTree<CircuitAccount<Engine>, Fr, RescueHasher<Engine>>;
 
-fn gen_account(id: u32) -> CircuitAccount<Bn256> {
-    let mut account = CircuitAccount::<Bn256>::default();
+fn gen_account(id: u32) -> CircuitAccount<Engine> {
+    let mut account = CircuitAccount::<Engine>::default();
 
-    let id_hex = format!("{:064x}", id);
-    account.address = Fr::from_hex(id_hex.as_ref()).unwrap();
-
+    account.address = Fr::from_str(&id.to_string()).unwrap();
     account
 }
 
