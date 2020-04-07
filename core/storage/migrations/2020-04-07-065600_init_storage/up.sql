@@ -1,3 +1,20 @@
+/*
+This migration initializes the ZKSync database state by creating all the
+required tables and performing the associated operations (e.g. creating indexes).
+
+File is structured to contain statements in the following order:
+
+- Tables creation (split by comments into logically separated sections).
+- Indexes creation.
+- Extensions enabling.
+- Data insertion.
+
+Note that this script does not insert all the required data by itself,
+some of the data is inserted by the scripts from the `bin` folder.
+To be sure that database is fully initialized, migrations should not
+be run directly via `diesel_cli`, but `zksync db-reset` should be used instead.
+*/
+
 -- ------------------------------- --
 -- Transactions/operations section --
 -- ------------------------------- --
