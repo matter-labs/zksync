@@ -156,7 +156,7 @@ pub struct Maintainer {
     account_tree: CircuitAccountTree,
     /// Maintainer prepared prover for blocks in order
     /// `next_block_number` stores next block number to prepare data for.
-    next_block_number: models::node::BlockNumber,
+    next_block_number: BlockNumber,
 }
 
 impl Maintainer {
@@ -238,7 +238,7 @@ impl Maintainer {
         // Create a storage for prepared data.
         let mut prepared = HashMap::new();
 
-        if self.next_block_number == 0 {
+        if self.uninitialized() {
             let min_next_block_num = queues
                 .values()
                 .filter_map(BlockSizedOperationsQueue::next_block_number)
@@ -251,6 +251,9 @@ impl Maintainer {
                     .expect("failed to connect to db");
                 self.init_account_tree(&storage, block_number - 1)?;
                 self.next_block_number = block_number;
+            } else {
+                // Nothing to initialize from.
+                return Ok(());
             }
         }
 
@@ -297,8 +300,8 @@ impl Maintainer {
         storage: &storage::StorageProcessor,
         new_block: u32,
     ) -> Result<(), String> {
-        assert_eq!(
-            self.next_block_number, 0,
+        assert!(
+            self.uninitialized(),
             "Attempt to invoke 'init_account_tree' with already initialized state",
         );
         let (_, accounts) = storage
@@ -313,6 +316,10 @@ impl Maintainer {
         }
         debug!("Prover state is initialized");
         Ok(())
+    }
+
+    fn uninitialized(&self) -> bool {
+        self.next_block_number == 0
     }
 
     fn build_prover_data(
