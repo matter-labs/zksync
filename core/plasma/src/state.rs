@@ -41,7 +41,7 @@ pub struct CollectedFee {
 
 impl PlasmaState {
     pub fn empty() -> Self {
-        let tree_depth = params::account_tree_depth() as u32;
+        let tree_depth = params::account_tree_depth();
         let balance_tree = AccountTree::new(tree_depth);
         Self {
             balance_tree,
@@ -72,7 +72,7 @@ impl PlasmaState {
     }
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
-        self.balance_tree.items.get(&account_id).cloned()
+        self.balance_tree.get(account_id).cloned()
     }
 
     pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {
@@ -354,7 +354,7 @@ impl PlasmaState {
     fn remove_account(&mut self, id: AccountId) {
         if let Some(account) = self.get_account(id) {
             self.account_id_by_address.remove(&account.address);
-            self.balance_tree.delete(id);
+            self.balance_tree.remove(id);
         }
     }
 

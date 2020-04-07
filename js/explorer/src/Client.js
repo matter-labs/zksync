@@ -6,7 +6,7 @@ const zksync_promise = import('zksync');
 import axios from 'axios';
 
 async function fetch(req) {
-    let r = await axios(req).catch(() => ({}));
+    let r = await axios(req);
     if (r.status == 200) {
         return r.data;
     } else {
