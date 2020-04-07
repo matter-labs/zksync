@@ -84,14 +84,18 @@ impl<T: Transport> AccountSet<T> {
         let from = &self.zksync_accounts[from.0];
         let to = &self.zksync_accounts[to.0];
 
-        FranklinTx::Transfer(Box::new(from.sign_transfer(
-            token_id.0,
-            amount,
-            fee,
-            &to.address,
-            nonce,
-            increment_nonce,
-        )))
+        FranklinTx::Transfer(Box::new(
+            from.sign_transfer(
+                token_id.0,
+                "",
+                amount,
+                fee,
+                &to.address,
+                nonce,
+                increment_nonce,
+            )
+            .0,
+        ))
     }
 
     /// Create withdraw from zksync account to eth account
@@ -111,14 +115,18 @@ impl<T: Transport> AccountSet<T> {
         let from = &self.zksync_accounts[from.0];
         let to = &self.eth_accounts[to.0];
 
-        FranklinTx::Withdraw(Box::new(from.sign_withdraw(
-            token_id.0,
-            amount,
-            fee,
-            &to.address,
-            nonce,
-            increment_nonce,
-        )))
+        FranklinTx::Withdraw(Box::new(
+            from.sign_withdraw(
+                token_id.0,
+                "",
+                amount,
+                fee,
+                &to.address,
+                nonce,
+                increment_nonce,
+            )
+            .0,
+        ))
     }
 
     /// Create full exit from zksync account to eth account

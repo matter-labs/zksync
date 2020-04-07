@@ -366,14 +366,17 @@ mod test {
         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let withdraw_op = WithdrawOp {
-            tx: zksync_account.sign_withdraw(
-                0,
-                BigDecimal::from(7),
-                BigDecimal::from(3),
-                &Address::zero(),
-                None,
-                true,
-            ),
+            tx: zksync_account
+                .sign_withdraw(
+                    0,
+                    "",
+                    BigDecimal::from(7),
+                    BigDecimal::from(3),
+                    &Address::zero(),
+                    None,
+                    true,
+                )
+                .0,
             account_id,
         };
 

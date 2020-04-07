@@ -2,77 +2,77 @@
 //! Runs scenario of deposits, withdraws and transfers. Scenario detailization
 //! specified as input json file. Transactions send concurrently. Program exits
 //! successfully if all transactions get verified within configured timeout.
+
 // Built-in
 use std::ops::Mul;
 use std::sync::Arc;
-use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use std::{env, thread};
 // External
 use bigdecimal::BigDecimal;
-use futures::executor::block_on;
-use futures::future::try_join_all;
-use futures::try_join;
-use jsonrpc_core::types::response::Output;
-use log::{debug, info, trace};
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use tokio::runtime::{Builder, Handle};
+use tokio::sync::Mutex;
 use web3::transports::Http;
 use web3::types::U256;
-use web3::types::{H160, H256};
+// use web3::types::{H160, H256};
 // Workspace
+// use jsonrpc_core::IoHandler;
+// use jsonrpc_core_client::transports::http::connect;
 use models::config_options::ConfigurationOptions;
-use models::node::tx::FranklinTx;
 use models::node::tx::TxHash;
+use models::node::tx::{FranklinTx, PackedEthSignature};
+// use server::api_server::rpc_server::gen_client::Client as RpcClient;
+// use std::collections::VecDeque;
 use testkit::eth_account::EthereumAccount;
 use testkit::zksync_account::ZksyncAccount;
 
+// Local uses
+use self::requests::{account_state_info, ethop_info, tx_info};
+use self::test_spec::{AccountInfo, TestSpec};
+use self::tps_counter::{run_tps_counter_printer, TPSCounter};
+
+mod requests;
+mod test_spec;
+mod tps_counter;
+
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
+// const TPS_MEASURE_WINDOW: usize = 1000;
 
 fn main() {
     env_logger::init();
+    let mut tokio_runtime = Builder::new()
+        .threaded_scheduler()
+        .enable_all()
+        .build()
+        .expect("failed to construct tokio runtime");
 
     let config = ConfigurationOptions::from_env();
     let filepath = env::args().nth(1).expect("test spec file not given");
-    let test_spec = read_test_spec(filepath);
+    let test_spec = TestSpec::load(filepath);
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
-    let test_accounts = Arc::new(construct_test_accounts(
-        &test_spec.input_accounts,
-        transport,
-        &config,
-    ));
+    let test_accounts = construct_test_accounts(&test_spec.input_accounts, transport, &config);
     let rpc_addr = env::var("HTTP_RPC_API_ADDR").expect("HTTP_RPC_API_ADDR is missing");
-    info!("sending transactions");
-    let sent_txs = block_on(send_transactions(&test_accounts, &test_spec, &rpc_addr));
-    info!("waiting for all transactions to be verified");
-    block_on(wait_for_verify(
+    log::info!("sending transactions");
+
+    let tps_counter = Arc::new(TPSCounter::default());
+    tokio_runtime.spawn(run_tps_counter_printer(tps_counter.clone()));
+
+    let sent_txs = tokio_runtime.block_on(send_transactions(
+        test_accounts,
+        &test_spec,
+        &rpc_addr,
+        tps_counter,
+        tokio_runtime.handle().clone(),
+    ));
+    log::info!("waiting for all transactions to be verified");
+    tokio_runtime.block_on(wait_for_verify(
         sent_txs,
         Duration::from_secs(test_spec.verify_timeout_sec),
         &rpc_addr,
     ));
-    info!("loadtest completed.");
-}
-
-#[derive(Deserialize, Debug)]
-struct AccountInfo {
-    pub address: String,
-    pub private_key: String,
-}
-
-#[derive(Deserialize)]
-struct TestSpec {
-    deposit_initial_gwei: u64,
-    n_deposits: u32,
-    deposit_from_amount_gwei: u64,
-    deposit_to_amount_gwei: u64,
-    n_transfers: u32,
-    transfer_from_amount_gwei: u64,
-    transfer_to_amount_gwei: u64,
-    n_withdraws: u32,
-    withdraw_from_amount_gwei: u64,
-    withdraw_to_amount_gwei: u64,
-    verify_timeout_sec: u64,
-    input_accounts: Vec<AccountInfo>,
+    log::info!("loadtest completed.");
 }
 
 struct TestAccount {
@@ -81,33 +81,31 @@ struct TestAccount {
     eth_nonce: Mutex<u32>,
 }
 
-#[derive(Default)]
 struct SentTransactions {
-    op_serial_ids: Mutex<Vec<u32>>,
-    tx_hashes: Mutex<Vec<TxHash>>,
+    op_serial_ids: Vec<u32>,
+    tx_hashes: Vec<TxHash>,
 }
 
 impl SentTransactions {
-    fn add_op_id(&self, v: u32) {
-        let mut vect = self.op_serial_ids.lock().unwrap();
-        vect.push(v);
+    fn merge(&mut self, other: SentTransactions) {
+        self.op_serial_ids.extend(other.op_serial_ids.into_iter());
+        self.tx_hashes.extend(other.tx_hashes.into_iter());
     }
 
-    fn add_op_ids(&self, v: Vec<u32>) {
-        let mut vect = self.op_serial_ids.lock().unwrap();
-        vect.extend(v);
+    fn new() -> SentTransactions {
+        SentTransactions {
+            op_serial_ids: Vec::new(),
+            tx_hashes: Vec::new(),
+        }
     }
 
-    fn add_tx_hashes(&self, v: Vec<TxHash>) {
-        let mut vect = self.tx_hashes.lock().unwrap();
-        vect.extend(v)
+    fn add_op_id(&mut self, v: u32) {
+        self.op_serial_ids.push(v);
     }
-}
 
-// reads accounts from a file.
-fn read_test_spec(filepath: String) -> TestSpec {
-    let buffer = std::fs::read_to_string(filepath).expect("failed to read file");
-    serde_json::from_str(&buffer).expect("failed to parse accounts")
+    fn add_tx_hash(&mut self, v: TxHash) {
+        self.tx_hashes.push(v);
+    }
 }
 
 // parses and builds new accounts.
@@ -119,11 +117,8 @@ fn construct_test_accounts(
     input_accs
         .iter()
         .map(|acc_info| {
-            let addr: H160 = acc_info.address.parse().expect("failed to parse address");
-            let pk: H256 = acc_info
-                .private_key
-                .parse()
-                .expect("failed to parse private key");
+            let addr = acc_info.address;
+            let pk = acc_info.private_key;
             let eth_acc = EthereumAccount::new(
                 pk,
                 addr,
@@ -147,66 +142,101 @@ fn construct_test_accounts(
 
 // sends confugured deposits, withdraws and transfers from each account concurrently.
 async fn send_transactions(
-    test_accounts: &[TestAccount],
+    test_accounts: Vec<TestAccount>,
     ctx: &TestSpec,
     rpc_addr: &str,
+    tps_counter: Arc<TPSCounter>,
+    rt_handle: Handle,
 ) -> SentTransactions {
-    let sent_txs = SentTransactions::default();
-    try_join_all(
-        test_accounts
-            .iter()
-            .enumerate()
-            .map(|(i, _)| send_transactions_from_acc(i, &test_accounts, &ctx, &sent_txs, rpc_addr))
-            .collect::<Vec<_>>(),
-    )
-    .await
-    .expect("[send_transactions]");
-    sent_txs
+    let req_client = reqwest::Client::new();
+
+    let join_handles = test_accounts
+        .into_iter()
+        .map(|account| {
+            rt_handle.spawn(send_transactions_from_acc(
+                account,
+                ctx.clone(),
+                rpc_addr.to_string(),
+                Arc::clone(&tps_counter),
+                req_client.clone(),
+            ))
+        })
+        .collect::<Vec<_>>();
+
+    let mut merged_txs = SentTransactions::new();
+    for j in join_handles {
+        let sent_txs_result = j.await.expect("Join handle panicked");
+
+        match sent_txs_result {
+            Ok(sent_txs) => merged_txs.merge(sent_txs),
+            Err(err) => log::warn!("Failed to send txs: {}", err),
+        }
+    }
+
+    merged_txs
 }
 
 // sends configured deposits, withdraws and transfer from a single account concurrently.
 async fn send_transactions_from_acc(
-    index: usize,
-    test_accounts: &[TestAccount],
-    ctx: &TestSpec,
-    sent_txs: &SentTransactions,
-    rpc_addr: &str,
-) -> Result<(), failure::Error> {
-    let test_acc = &test_accounts[index];
+    test_acc: TestAccount,
+    ctx: TestSpec,
+    rpc_addr: String,
+    tps_counter: Arc<TPSCounter>,
+    _req_client: reqwest::Client,
+) -> Result<SentTransactions, failure::Error> {
+    let mut sent_txs = SentTransactions::new();
+
     let addr_hex = hex::encode(test_acc.eth_acc.address);
-    update_eth_nonce(test_acc).await?;
+    update_eth_nonce(&test_acc).await?;
+    let zknonce = account_state_info(test_acc.zk_acc.address, &rpc_addr)
+        .await
+        .expect("rpc error")
+        .committed
+        .nonce;
+    test_acc.zk_acc.set_nonce(zknonce);
+
     let wei_in_gwei = BigDecimal::from(1_000_000_000);
     let op_id = deposit_single(
-        test_acc,
+        &test_acc,
         BigDecimal::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei),
-        rpc_addr,
+        &rpc_addr,
     )
     .await?;
-    info!("account {} made initial deposit", addr_hex);
+    log::info!("account {} made initial deposit", addr_hex);
     sent_txs.add_op_id(op_id);
-    change_pubkey(test_acc, rpc_addr)?;
-    let futs_deposits = try_join_all((0..ctx.n_deposits).map(|_i| {
+    let mut tx_queue = Vec::with_capacity((ctx.n_transfers + ctx.n_withdraws) as usize);
+    tx_queue.push((sign_change_pubkey(&test_acc), None));
+    log::info!("sending {} transactions", addr_hex);
+    for _ in 0..ctx.n_deposits {
         let amount = rand_amount(ctx.deposit_from_amount_gwei, ctx.deposit_to_amount_gwei);
-        deposit_single(test_acc, amount.mul(&wei_in_gwei), rpc_addr)
-    }));
-    let futs_withdraws = try_join_all((0..ctx.n_withdraws).map(|_i| {
-        let amount = rand_amount(ctx.withdraw_from_amount_gwei, ctx.withdraw_to_amount_gwei);
-        withdraw_single(test_acc, amount.mul(&wei_in_gwei), rpc_addr)
-    }));
-    let futs_transfers = try_join_all((0..ctx.n_transfers).map(|_i| {
+        let op_id = deposit_single(&test_acc, amount.mul(&wei_in_gwei), &rpc_addr).await?;
+        sent_txs.add_op_id(op_id);
+    }
+
+    log::info!("Signing transactions");
+    for _ in 0..ctx.n_transfers {
         let amount = rand_amount(ctx.transfer_from_amount_gwei, ctx.transfer_to_amount_gwei);
-        transfer_single(index, test_accounts, amount.mul(&wei_in_gwei), rpc_addr)
-    }));
-    let (deposit_ids, withdraw_hashes, transfer_hashes) =
-        try_join!(futs_deposits, futs_withdraws, futs_transfers)?;
-    info!(
-        "simultaneous deposits, transfers and withdraws sent for account: {}",
-        addr_hex
-    );
-    sent_txs.add_op_ids(deposit_ids);
-    sent_txs.add_tx_hashes(withdraw_hashes);
-    sent_txs.add_tx_hashes(transfer_hashes);
-    Ok(())
+        let signed_transfer =
+            sign_transfer_single(&test_acc, &ctx.input_accounts, amount.mul(&wei_in_gwei));
+        tx_queue.push(signed_transfer);
+    }
+    for _ in 0..ctx.n_withdraws {
+        let amount = rand_amount(ctx.withdraw_from_amount_gwei, ctx.withdraw_to_amount_gwei);
+        let signed_withdraw = sign_withdraw_single(&test_acc, amount.mul(&wei_in_gwei));
+        tx_queue.push(signed_withdraw)
+    }
+    log::info!("Done signing transactions");
+
+    let req_client = reqwest::Client::new();
+    for (tx, eth_sign) in tx_queue {
+        let tx_hash = send_tx(tx, eth_sign, &rpc_addr, &req_client).await?;
+        tps_counter.increment();
+        sent_txs.add_tx_hash(tx_hash);
+    }
+
+    log::info!("Sending txs");
+
+    Ok(sent_txs)
 }
 
 // generates random amount for transaction within given range [from, to).
@@ -217,7 +247,7 @@ fn rand_amount(from: u64, to: u64) -> BigDecimal {
 
 // updates current ethereum nonces from eth node.
 async fn update_eth_nonce(test_acc: &TestAccount) -> Result<(), failure::Error> {
-    let mut nonce = test_acc.eth_nonce.lock().unwrap();
+    let mut nonce = test_acc.eth_nonce.lock().await;
     let v = test_acc
         .eth_acc
         .main_contract_eth_client
@@ -228,13 +258,10 @@ async fn update_eth_nonce(test_acc: &TestAccount) -> Result<(), failure::Error> 
     Ok(())
 }
 
-fn change_pubkey(ta: &TestAccount, rpc_addr: &str) -> Result<TxHash, failure::Error> {
-    send_tx(
-        FranklinTx::ChangePubKey(Box::new(
-            ta.zk_acc.create_change_pubkey_tx(None, true, false),
-        )),
-        rpc_addr,
-    )
+fn sign_change_pubkey(ta: &TestAccount) -> FranklinTx {
+    FranklinTx::ChangePubKey(Box::new(
+        ta.zk_acc.create_change_pubkey_tx(None, true, false),
+    ))
 }
 
 // deposits to contract and waits for node to execute it.
@@ -244,7 +271,7 @@ async fn deposit_single(
     rpc_addr: &str,
 ) -> Result<u32, failure::Error> {
     let nonce = {
-        let mut n = test_acc.eth_nonce.lock().unwrap();
+        let mut n = test_acc.eth_nonce.lock().await;
         *n += 1;
         Some(U256::from(*n - 1))
     };
@@ -276,41 +303,45 @@ async fn wait_for_deposit_executed(serial_id: u64, rpc_addr: &str) -> Result<u32
 }
 
 // sends withdraw.
-async fn withdraw_single(
+fn sign_withdraw_single(
     test_acc: &TestAccount,
     amount: BigDecimal,
-    rpc_addr: &str,
-) -> Result<TxHash, failure::Error> {
-    let tx = FranklinTx::Withdraw(Box::new(test_acc.zk_acc.sign_withdraw(
+) -> (FranklinTx, Option<PackedEthSignature>) {
+    let (tx, eth_signature) = test_acc.zk_acc.sign_withdraw(
         0, // ETH
+        "ETH",
         amount,
         BigDecimal::from(0),
         &test_acc.eth_acc.address,
         None,
         true,
-    )));
-    send_tx(tx, rpc_addr)
+    );
+    (FranklinTx::Withdraw(Box::new(tx)), Some(eth_signature))
 }
 
 // sends transfer tx to a random receiver.
-async fn transfer_single(
-    index_from: usize,
-    test_accounts: &[TestAccount],
+fn sign_transfer_single(
+    from: &TestAccount,
+    test_accounts: &[AccountInfo],
     amount: BigDecimal,
-    rpc_addr: &str,
-) -> Result<TxHash, failure::Error> {
-    let from = &test_accounts[index_from];
-    let step = rand::thread_rng().gen_range(1, test_accounts.len());
-    let to = &test_accounts[(index_from + step) % test_accounts.len()];
-    let tx = FranklinTx::Transfer(Box::new(from.zk_acc.sign_transfer(
+) -> (FranklinTx, Option<PackedEthSignature>) {
+    let to = {
+        let mut to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
+        while test_accounts[to_idx].address == from.zk_acc.address {
+            to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
+        }
+        test_accounts[to_idx].address
+    };
+    let (tx, eth_signature) = from.zk_acc.sign_transfer(
         0, // ETH
+        "ETH",
         amount,
         BigDecimal::from(0),
-        &to.zk_acc.address,
+        &to,
         None,
         true,
-    )));
-    send_tx(tx, rpc_addr)
+    );
+    (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
 }
 
 #[derive(Serialize)]
@@ -318,42 +349,49 @@ struct SubmitTxMsg {
     id: String,
     method: String,
     jsonrpc: String,
-    params: Vec<FranklinTx>,
+    params: Vec<serde_json::Value>,
 }
 
 impl SubmitTxMsg {
-    fn new(tx: FranklinTx) -> Self {
+    fn new(tx: FranklinTx, eth_signature: Option<PackedEthSignature>) -> Self {
+        let mut params = Vec::new();
+        params.push(serde_json::to_value(tx).expect("serialization fail"));
+        if let Some(eth_signature) = eth_signature {
+            params.push(serde_json::to_value(eth_signature).expect("serialization fail"));
+        }
         Self {
             id: "1".to_owned(),
             method: "tx_submit".to_owned(),
             jsonrpc: "2.0".to_owned(),
-            params: vec![tx],
+            params,
         }
     }
 }
 
 // sends tx to server json rpc endpoint.
-fn send_tx(tx: FranklinTx, rpc_addr: &str) -> Result<TxHash, failure::Error> {
+async fn send_tx(
+    tx: FranklinTx,
+    eth_signature: Option<PackedEthSignature>,
+    rpc_addr: &str,
+    client: &reqwest::Client,
+) -> Result<TxHash, failure::Error> {
     let tx_hash = tx.hash();
-    let msg = SubmitTxMsg::new(tx);
+    // let nonce = tx.nonce();
+    let msg = SubmitTxMsg::new(tx, eth_signature);
 
-    let client = reqwest::Client::new();
-    let mut res = client
-        .post(rpc_addr)
-        .json(&msg)
-        .send()
-        .expect("failed to submit tx");
+    // let instant = Instant::now();
+    let res = client.post(rpc_addr).json(&msg).send().await?;
     if res.status() != reqwest::StatusCode::OK {
         failure::bail!("non-ok response: {}", res.status());
     }
-    trace!("tx: {}", res.text().unwrap());
+    //    log::trace!("tx: {}", res.text().await.unwrap());
     Ok(tx_hash)
 }
 
 // waits for all priority operations and transactions to become part of some block and get verified.
 async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr: &str) {
     let start = Instant::now();
-    let serial_ids = sent_txs.op_serial_ids.lock().unwrap();
+    let serial_ids = sent_txs.op_serial_ids;
     let sleep_period = Duration::from_millis(500);
     for &id in serial_ids.iter() {
         loop {
@@ -361,7 +399,7 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
                 .await
                 .expect("[wait_for_verify] call ethop_info");
             if executed && verified {
-                debug!("deposit (serial_id={}) is verified", id);
+                log::debug!("deposit (serial_id={}) is verified", id);
                 break;
             }
             if start.elapsed() > timeout {
@@ -370,14 +408,14 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
             thread::sleep(sleep_period);
         }
     }
-    let tx_hashes = sent_txs.tx_hashes.lock().unwrap();
+    let tx_hashes = sent_txs.tx_hashes;
     for hash in tx_hashes.iter() {
         loop {
             let verified = tx_info(hash.clone(), rpc_addr)
                 .await
                 .expect("[wait_for_verify] call tx_info");
             if verified {
-                debug!("{} is verified", hash.to_string());
+                log::debug!("{} is verified", hash.to_string());
                 break;
             }
             if start.elapsed() > timeout {
@@ -386,98 +424,4 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
             thread::sleep(sleep_period);
         }
     }
-}
-
-#[derive(Serialize)]
-struct EthopInfo {
-    id: String,
-    method: String,
-    jsonrpc: String,
-    params: Vec<u64>,
-}
-
-impl EthopInfo {
-    fn new(serial_id: u64) -> Self {
-        Self {
-            id: "3".to_owned(),
-            method: "ethop_info".to_owned(),
-            jsonrpc: "2.0".to_owned(),
-            params: vec![serial_id],
-        }
-    }
-}
-
-// requests and returns a tuple (executed, verified) for operation with given serial_id
-async fn ethop_info(serial_id: u64, rpc_addr: &str) -> Result<(bool, bool), failure::Error> {
-    let msg = EthopInfo::new(serial_id);
-
-    let client = reqwest::Client::new();
-    let mut res = client
-        .post(rpc_addr)
-        .json(&msg)
-        .send()
-        .expect("failed to send ethop_info");
-    if res.status() != reqwest::StatusCode::OK {
-        failure::bail!("non-ok response: {}", res.status());
-    }
-    let reply: Output = res.json().unwrap();
-    let ret = match reply {
-        Output::Success(v) => v.result,
-        Output::Failure(v) => panic!("{}", v.error),
-    };
-    let obj = ret.as_object().unwrap();
-    let executed = obj["executed"].as_bool().unwrap();
-    if !executed {
-        return Ok((false, false));
-    }
-    let block = obj["block"].as_object().unwrap();
-    let verified = block["verified"].as_bool().unwrap();
-    Ok((executed, verified))
-}
-
-#[derive(Serialize)]
-struct TxInfo {
-    id: String,
-    method: String,
-    jsonrpc: String,
-    params: Vec<TxHash>,
-}
-
-impl TxInfo {
-    fn new(h: TxHash) -> Self {
-        Self {
-            id: "4".to_owned(),
-            method: "tx_info".to_owned(),
-            jsonrpc: "2.0".to_owned(),
-            params: vec![h],
-        }
-    }
-}
-
-// requests and returns whether transaction is verified or not.
-async fn tx_info(tx_hash: TxHash, rpc_addr: &str) -> Result<bool, failure::Error> {
-    let msg = TxInfo::new(tx_hash);
-
-    let client = reqwest::Client::new();
-    let mut res = client
-        .post(rpc_addr)
-        .json(&msg)
-        .send()
-        .expect("failed to send tx_info");
-    if res.status() != reqwest::StatusCode::OK {
-        failure::bail!("non-ok response: {}", res.status());
-    }
-    let reply: Output = res.json().unwrap();
-    let ret = match reply {
-        Output::Success(v) => v.result,
-        Output::Failure(v) => panic!("{}", v.error),
-    };
-    let obj = ret.as_object().unwrap();
-    let executed = obj["executed"].as_bool().unwrap();
-    if !executed {
-        return Ok(false);
-    }
-    let block = obj["block"].as_object().unwrap();
-    let verified = block["verified"].as_bool().unwrap();
-    Ok(verified)
 }
