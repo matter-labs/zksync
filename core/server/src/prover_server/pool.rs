@@ -170,7 +170,7 @@ impl Maintainer {
             conn_pool,
             data,
             rounds_interval,
-            account_tree: CircuitAccountTree::new(models::params::account_tree_depth() as u32),
+            account_tree: CircuitAccountTree::new(models::params::account_tree_depth()),
             next_block_number: 0,
         }
     }
