@@ -1,3 +1,7 @@
+-- ------------------------------- --
+-- Transactions/operations section --
+-- ------------------------------- --
+
 CREATE TABLE operations (
     id bigserial PRIMARY KEY,
     block_number BIGINT NOT NULL,
@@ -6,43 +10,57 @@ CREATE TABLE operations (
     confirmed bool NOT NULL DEFAULT false
 );
 
-CREATE TABLE accounts (
-    id BIGINT NOT NULL PRIMARY KEY,
-    last_block BIGINT NOT NULL,
-    nonce BIGINT NOT NULL,
-    address bytea NOT NULL,
-    pubkey_hash bytea NOT NULL
+CREATE TABLE blocks (
+    number BIGINT PRIMARY KEY,
+    root_hash TEXT NOT NULL,
+    fee_account_id BIGINT NOT NULL,
+    unprocessed_prior_op_before BIGINT NOT NULL,
+    unprocessed_prior_op_after BIGINT NOT NULL,
+    block_size BIGINT NOT NULL
 );
 
-CREATE TABLE proofs (
-    block_number bigserial PRIMARY KEY,
-    proof jsonb NOT NULL,
+CREATE TABLE executed_priority_operations (
+    id serial PRIMARY KEY,
+    -- sidechain block info
+    block_number BIGINT NOT NULL,
+    block_index INT NOT NULL,
+    -- operation data
+    operation jsonb NOT NULL,
+    -- operation metadata
+    priority_op_serialid BIGINT NOT NULL,
+    deadline_block BIGINT NOT NULL,
+    eth_fee NUMERIC NOT NULL,
+    eth_hash bytea NOT NULL
+);
+
+CREATE TABLE rollup_ops (
+    id SERIAL PRIMARY KEY,
+    block_num BIGINT NOT NULL,
+    operation JSONB NOT NULL,
+    fee_account BIGINT NOT NULL
+);
+
+CREATE TABLE mempool (
+    HASH bytea PRIMARY KEY,
+    primary_account_address bytea NOT NULL,
+    nonce BIGINT NOT NULL,
+    tx jsonb NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
-CREATE TABLE prover_runs (
+CREATE TABLE executed_transactions (
     id serial PRIMARY KEY,
     block_number BIGINT NOT NULL,
-    worker TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP NOT NULL DEFAULT now()
+    tx_hash bytea NOT NULL REFERENCES mempool(HASH),
+    operation jsonb,
+    success bool NOT NULL,
+    fail_reason TEXT,
+    block_index INT
 );
 
-CREATE TABLE server_config (
-    -- enforce single record
-    id bool PRIMARY KEY NOT NULL DEFAULT true,
-    CONSTRAINT single_server_config CHECK (id),
-    contract_addr TEXT,
-    gov_contract_addr TEXT
-);
-
-CREATE TABLE active_provers (
-    id serial PRIMARY KEY,
-    worker TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    stopped_at TIMESTAMP,
-    block_size BIGINT NOT NULL
-);
+-- -------------- --
+-- Tokens section --
+-- -------------- --
 
 CREATE TABLE tokens (
     id INTEGER NOT NULL PRIMARY KEY,
@@ -50,11 +68,16 @@ CREATE TABLE tokens (
     symbol TEXT NOT NULL
 );
 
-CREATE TABLE balances (
-    account_id BIGINT REFERENCES accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
-    coin_id INTEGER REFERENCES tokens(id) ON UPDATE CASCADE,
-    balance NUMERIC NOT NULL DEFAULT 0,
-    PRIMARY KEY (account_id, coin_id)
+-- ---------------- --
+-- Accounts section --
+-- ---------------- --
+
+CREATE TABLE accounts (
+    id BIGINT NOT NULL PRIMARY KEY,
+    last_block BIGINT NOT NULL,
+    nonce BIGINT NOT NULL,
+    address bytea NOT NULL,
+    pubkey_hash bytea NOT NULL
 );
 
 CREATE TABLE account_balance_updates (
@@ -80,82 +103,6 @@ CREATE TABLE account_creates (
     PRIMARY KEY (account_id, block_number)
 );
 
-CREATE TABLE mempool (
-    HASH bytea PRIMARY KEY,
-    primary_account_address bytea NOT NULL,
-    nonce BIGINT NOT NULL,
-    tx jsonb NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now()
-);
-
-CREATE TABLE executed_transactions (
-    id serial PRIMARY KEY,
-    block_number BIGINT NOT NULL,
-    tx_hash bytea NOT NULL REFERENCES mempool(HASH),
-    operation jsonb,
-    success bool NOT NULL,
-    fail_reason TEXT,
-    block_index INT
-);
-
-CREATE TABLE data_restore_last_watched_eth_block (
-    id SERIAL PRIMARY KEY,
-    block_number TEXT NOT NULL
-);
-
-CREATE TABLE events_state (
-    id SERIAL PRIMARY KEY,
-    block_type TEXT NOT NULL,
-    transaction_hash BYTEA NOT NULL,
-    block_num BIGINT NOT NULL
-);
-
-CREATE TABLE rollup_ops (
-    id SERIAL PRIMARY KEY,
-    block_num BIGINT NOT NULL,
-    operation JSONB NOT NULL,
-    fee_account BIGINT NOT NULL
-);
-
-CREATE TABLE storage_state_update (
-    id SERIAL PRIMARY KEY,
-    storage_state TEXT NOT NULL
-);
-
-CREATE TABLE eth_operations (
-    id bigserial PRIMARY KEY,
-    nonce BIGINT NOT NULL,
-    last_deadline_block BIGINT NOT NULL,
-    last_used_gas_price NUMERIC NOT NULL,
-    confirmed bool NOT NULL DEFAULT false,
-    raw_tx bytea NOT NULL,
-    op_type TEXT NOT NULL,
-    final_hash bytea DEFAULT NULL
-);
-
-CREATE TABLE executed_priority_operations (
-    id serial PRIMARY KEY,
-    -- sidechain block info
-    block_number BIGINT NOT NULL,
-    block_index INT NOT NULL,
-    -- operation data
-    operation jsonb NOT NULL,
-    -- operation metadata
-    priority_op_serialid BIGINT NOT NULL,
-    deadline_block BIGINT NOT NULL,
-    eth_fee NUMERIC NOT NULL,
-    eth_hash bytea NOT NULL
-);
-
-CREATE TABLE blocks (
-    number BIGINT PRIMARY KEY,
-    root_hash TEXT NOT NULL,
-    fee_account_id BIGINT NOT NULL,
-    unprocessed_prior_op_before BIGINT NOT NULL,
-    unprocessed_prior_op_after BIGINT NOT NULL,
-    block_size BIGINT NOT NULL
-);
-
 CREATE TABLE account_pubkey_updates (
     pubkey_update_id serial NOT NULL,
     update_order_id INTEGER NOT NULL,
@@ -168,7 +115,82 @@ CREATE TABLE account_pubkey_updates (
     PRIMARY KEY (pubkey_update_id)
 );
 
--- Your SQL goes here
+CREATE TABLE balances (
+    account_id BIGINT REFERENCES accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
+    coin_id INTEGER REFERENCES tokens(id) ON UPDATE CASCADE,
+    balance NUMERIC NOT NULL DEFAULT 0,
+    PRIMARY KEY (account_id, coin_id)
+);
+
+-- ------------- --
+-- State section --
+-- ------------- --
+
+CREATE TABLE events_state (
+    id SERIAL PRIMARY KEY,
+    block_type TEXT NOT NULL,
+    transaction_hash BYTEA NOT NULL,
+    block_num BIGINT NOT NULL
+);
+
+CREATE TABLE storage_state_update (
+    id SERIAL PRIMARY KEY,
+    storage_state TEXT NOT NULL
+);
+
+-- -------------- --
+-- Prover section --
+-- -------------- --
+
+CREATE TABLE proofs (
+    block_number bigserial PRIMARY KEY,
+    proof jsonb NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE prover_runs (
+    id serial PRIMARY KEY,
+    block_number BIGINT NOT NULL,
+    worker TEXT,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+CREATE TABLE active_provers (
+    id serial PRIMARY KEY,
+    worker TEXT NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    stopped_at TIMESTAMP,
+    block_size BIGINT NOT NULL
+);
+
+-- --------------------- --
+-- Server config section --
+-- --------------------- --
+
+CREATE TABLE server_config (
+    -- enforce single record
+    id bool PRIMARY KEY NOT NULL DEFAULT true,
+    CONSTRAINT single_server_config CHECK (id),
+    contract_addr TEXT,
+    gov_contract_addr TEXT
+);
+
+-- ----------- --
+-- ETH section --
+-- ----------- --
+
+CREATE TABLE eth_operations (
+    id bigserial PRIMARY KEY,
+    nonce BIGINT NOT NULL,
+    last_deadline_block BIGINT NOT NULL,
+    last_used_gas_price NUMERIC NOT NULL,
+    confirmed bool NOT NULL DEFAULT false,
+    raw_tx bytea NOT NULL,
+    op_type TEXT NOT NULL,
+    final_hash bytea DEFAULT NULL
+);
+
 -- Locally stored Ethereum nonce
 CREATE TABLE eth_nonce (
     -- enforce single record
@@ -200,11 +222,28 @@ CREATE TABLE eth_tx_hashes (
     tx_hash bytea NOT NULL
 );
 
+CREATE TABLE data_restore_last_watched_eth_block (
+    id SERIAL PRIMARY KEY,
+    block_number TEXT NOT NULL
+);
+
+-- --------------- --
+-- Indexes section --
+-- --------------- --
+
 CREATE INDEX operations_block_index ON operations (block_number);
 CREATE INDEX accounts_block_index ON accounts (last_block);
 
--- tablefunc enables crosstab (pivot)
+-- ------------------ --
+-- Extensions section --
+-- ------------------ --
+
+-- `tablefunc` enables `crosstab` (pivot)
 CREATE EXTENSION IF NOT EXISTS tablefunc;
+
+-- ---------------------- --
+-- Data insertion section --
+-- ---------------------- --
 
 -- Add ETH token
 INSERT INTO tokens

@@ -1,10 +1,10 @@
 -- Clear transactions/operations section
 DROP TABLE IF EXISTS blocks;
 DROP TABLE IF EXISTS operations;
-DROP TABLE IF EXISTS executed_transactions;
 DROP TABLE IF EXISTS executed_priority_operations;
 DROP TABLE IF EXISTS rollup_ops;
 DROP TABLE IF EXISTS mempool;
+DROP TABLE IF EXISTS executed_transactions;
 
 -- Clear accounts section
 DROP TABLE IF EXISTS accounts;
@@ -14,8 +14,8 @@ DROP TABLE IF EXISTS account_pubkey_updates;
 DROP TABLE IF EXISTS balances;
 
 -- Clear state section
-DROP TABLE IF EXISTS storage_state_update;
 DROP TABLE IF EXISTS events_state;
+DROP TABLE IF EXISTS storage_state_update;
 
 -- Clear prover section
 DROP TABLE IF EXISTS proofs;
