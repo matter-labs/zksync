@@ -13,5 +13,6 @@ pub mod eth_watch;
 pub mod mempool;
 pub mod prover_server;
 pub mod state_keeper;
+pub mod observer_mode;
 
 use crypto_exports::franklin_crypto;
