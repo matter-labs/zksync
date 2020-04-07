@@ -2,8 +2,9 @@
 
 use criterion::{black_box, BatchSize, Bencher, Criterion};
 
-use models::circuit::account::{CircuitAccount, CircuitAccountTree};
+use models::circuit::account::CircuitAccount;
 use models::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
+use models::merkle_tree::{pedersen_hasher::PedersenHasher, sequential_smt::SparseMerkleTree};
 
 // This value should be not to high, since the bench will be run for thousands
 // of iterations. Despite the tree cloning time won't affect the bench results
@@ -12,7 +13,7 @@ use models::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
 const N_ACCOUNTS: u32 = 100;
 
 /// Type alias equivalent to the actually used SMT.
-type RealSMT = CircuitAccountTree;
+type RealSMT = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
 
 fn gen_account(id: u32) -> CircuitAccount<Bn256> {
     let mut account = CircuitAccount::<Bn256>::default();

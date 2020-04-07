@@ -109,10 +109,13 @@ impl NewExecutedPriorityOperation {
         exec_prior_op: ExecutedPriorityOp,
         block: BlockNumber,
     ) -> Self {
+        let mut operation = serde_json::to_value(&exec_prior_op.op).unwrap();
+        operation["eth_fee"] =
+            serde_json::to_value(exec_prior_op.priority_op.eth_fee.to_string()).unwrap();
         Self {
             block_number: i64::from(block),
             block_index: exec_prior_op.block_index as i32,
-            operation: serde_json::to_value(&exec_prior_op.op).unwrap(),
+            operation,
             priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
             deadline_block: exec_prior_op.priority_op.deadline_block as i64,
             eth_fee: exec_prior_op.priority_op.eth_fee,

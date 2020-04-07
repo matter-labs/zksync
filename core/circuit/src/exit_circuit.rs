@@ -177,7 +177,7 @@ mod test {
         test_account.nonce = 0xbabe;
 
         let mut circuit_account_tree =
-            CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+            CircuitAccountTree::new(models::params::account_tree_depth());
         circuit_account_tree.insert(test_account_id, CircuitAccount::from(test_account));
 
         let zksync_exit_circuit = create_exit_circuit_with_public_input(

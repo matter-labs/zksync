@@ -36,8 +36,7 @@ pub fn test_genesis_plasma_state(
     .collect();
     let plasma_state = PlasmaState::new(validator_account, 1);
 
-    let mut circuit_account_tree =
-        CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+    let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
     for (id, account) in plasma_state.get_accounts() {
         circuit_account_tree.insert(id, CircuitAccount::from(account))
     }
