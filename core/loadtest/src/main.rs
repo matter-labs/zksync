@@ -5,33 +5,37 @@
 
 // Built-in
 use std::ops::Mul;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use std::{env, thread};
 // External
 use bigdecimal::BigDecimal;
-use jsonrpc_core::types::response::Output;
 use rand::Rng;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::runtime::{Builder, Handle};
 use tokio::sync::Mutex;
 use web3::transports::Http;
 use web3::types::U256;
 // use web3::types::{H160, H256};
-use web3::types::H256;
 // Workspace
 // use jsonrpc_core::IoHandler;
 // use jsonrpc_core_client::transports::http::connect;
 use models::config_options::ConfigurationOptions;
 use models::node::tx::TxHash;
 use models::node::tx::{FranklinTx, PackedEthSignature};
-use models::node::Address;
 // use server::api_server::rpc_server::gen_client::Client as RpcClient;
-use server::api_server::rpc_server::AccountInfoResp;
 // use std::collections::VecDeque;
 use testkit::eth_account::EthereumAccount;
 use testkit::zksync_account::ZksyncAccount;
+
+// Local uses
+use self::requests::{account_state_info, ethop_info, tx_info};
+use self::test_spec::{AccountInfo, TestSpec};
+use self::tps_counter::{run_tps_counter_printer, TPSCounter};
+
+mod requests;
+mod test_spec;
+mod tps_counter;
 
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
 // const TPS_MEASURE_WINDOW: usize = 1000;
@@ -46,14 +50,14 @@ fn main() {
 
     let config = ConfigurationOptions::from_env();
     let filepath = env::args().nth(1).expect("test spec file not given");
-    let test_spec = read_test_spec(filepath);
+    let test_spec = TestSpec::load(filepath);
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
     let test_accounts = construct_test_accounts(&test_spec.input_accounts, transport, &config);
     let rpc_addr = env::var("HTTP_RPC_API_ADDR").expect("HTTP_RPC_API_ADDR is missing");
     log::info!("sending transactions");
 
     let tps_counter = Arc::new(TPSCounter::default());
-    tokio_runtime.spawn(tps_counter_printer(Arc::clone(&tps_counter)));
+    tokio_runtime.spawn(run_tps_counter_printer(Arc::clone(&tps_counter)));
 
     let sent_txs = tokio_runtime.block_on(send_transactions(
         test_accounts,
@@ -69,28 +73,6 @@ fn main() {
         &rpc_addr,
     ));
     log::info!("loadtest completed.");
-}
-
-#[derive(Clone, Deserialize, Debug)]
-struct AccountInfo {
-    pub address: Address,
-    pub private_key: H256,
-}
-
-#[derive(Clone, Deserialize)]
-struct TestSpec {
-    deposit_initial_gwei: u64,
-    n_deposits: u32,
-    deposit_from_amount_gwei: u64,
-    deposit_to_amount_gwei: u64,
-    n_transfers: u32,
-    transfer_from_amount_gwei: u64,
-    transfer_to_amount_gwei: u64,
-    n_withdraws: u32,
-    withdraw_from_amount_gwei: u64,
-    withdraw_to_amount_gwei: u64,
-    verify_timeout_sec: u64,
-    input_accounts: Vec<AccountInfo>,
 }
 
 struct TestAccount {
@@ -126,12 +108,6 @@ impl SentTransactions {
     }
 }
 
-// reads accounts from a file.
-fn read_test_spec(filepath: String) -> TestSpec {
-    let buffer = std::fs::read_to_string(filepath).expect("failed to read file");
-    serde_json::from_str(&buffer).expect("failed to parse accounts")
-}
-
 // parses and builds new accounts.
 fn construct_test_accounts(
     input_accs: &[AccountInfo],
@@ -162,32 +138,6 @@ fn construct_test_accounts(
             }
         })
         .collect()
-}
-
-#[derive(Default)]
-struct TPSCounter {
-    n_txs: AtomicUsize,
-}
-
-async fn tps_counter_printer(counter: Arc<TPSCounter>) {
-    let mut check_timer = tokio::time::interval(Duration::from_secs(10));
-
-    let mut instant = Instant::now();
-    let mut last_seen_total_txs = counter.n_txs.load(Ordering::SeqCst);
-    loop {
-        let new_seen_total_txs = counter.n_txs.load(Ordering::SeqCst);
-
-        let new_txs = new_seen_total_txs.saturating_sub(last_seen_total_txs);
-
-        let tps = (new_txs as f64) / (instant.elapsed().as_millis() as f64) * 1000f64;
-
-        log::info!("outgoing tps: {}", tps);
-
-        last_seen_total_txs = new_seen_total_txs;
-        instant = Instant::now();
-
-        check_timer.tick().await;
-    }
 }
 
 // sends confugured deposits, withdraws and transfers from each account concurrently.
@@ -297,7 +247,7 @@ async fn send_transactions_from_acc(
     let req_client = reqwest::Client::new();
     for (tx, eth_sign) in tx_queue {
         let tx_hash = send_tx(tx, eth_sign, &rpc_addr, &req_client).await?;
-        tps_counter.n_txs.fetch_add(1, Ordering::SeqCst);
+        tps_counter.increment();
         sent_txs.add_tx_hash(tx_hash);
     }
 
@@ -491,130 +441,4 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
             thread::sleep(sleep_period);
         }
     }
-}
-
-#[derive(Serialize)]
-struct AccountStateReq {
-    id: u32,
-    method: String,
-    jsonrpc: String,
-    params: Vec<Address>,
-}
-
-impl AccountStateReq {
-    fn new(address: Address) -> Self {
-        Self {
-            id: 1,
-            method: "account_info".to_owned(),
-            jsonrpc: "2.0".to_owned(),
-            params: vec![address],
-        }
-    }
-}
-
-// requests and returns a tuple (executed, verified) for operation with given serial_id
-async fn account_state_info(
-    address: Address,
-    rpc_addr: &str,
-) -> Result<AccountInfoResp, failure::Error> {
-    let msg = AccountStateReq::new(address);
-
-    let client = reqwest::Client::new();
-    let res = client.post(rpc_addr).json(&msg).send().await?;
-    if res.status() != reqwest::StatusCode::OK {
-        failure::bail!("non-ok response: {}", res.status());
-    }
-    let reply: Output = res.json().await.unwrap();
-    let ret = match reply {
-        Output::Success(v) => v.result,
-        Output::Failure(v) => failure::bail!("rpc error: {}", v.error),
-    };
-    let account_state =
-        serde_json::from_value(ret).expect("failed to parse account reqest responce");
-    Ok(account_state)
-}
-
-#[derive(Serialize)]
-struct EthopInfo {
-    id: String,
-    method: String,
-    jsonrpc: String,
-    params: Vec<u64>,
-}
-impl EthopInfo {
-    fn new(serial_id: u64) -> Self {
-        Self {
-            id: "3".to_owned(),
-            method: "ethop_info".to_owned(),
-            jsonrpc: "2.0".to_owned(),
-            params: vec![serial_id],
-        }
-    }
-}
-
-// requests and returns a tuple (executed, verified) for operation with given serial_id
-async fn ethop_info(serial_id: u64, rpc_addr: &str) -> Result<(bool, bool), failure::Error> {
-    let msg = EthopInfo::new(serial_id);
-
-    let client = reqwest::Client::new();
-    let res = client.post(rpc_addr).json(&msg).send().await?;
-    if res.status() != reqwest::StatusCode::OK {
-        failure::bail!("non-ok response: {}", res.status());
-    }
-    let reply: Output = res.json().await.unwrap();
-    let ret = match reply {
-        Output::Success(v) => v.result,
-        Output::Failure(v) => panic!("{}", v.error),
-    };
-    let obj = ret.as_object().unwrap();
-    let executed = obj["executed"].as_bool().unwrap();
-    if !executed {
-        return Ok((false, false));
-    }
-    let block = obj["block"].as_object().unwrap();
-    let verified = block["verified"].as_bool().unwrap();
-    Ok((executed, verified))
-}
-
-#[derive(Serialize)]
-struct TxInfo {
-    id: String,
-    method: String,
-    jsonrpc: String,
-    params: Vec<TxHash>,
-}
-
-impl TxInfo {
-    fn new(h: TxHash) -> Self {
-        Self {
-            id: "4".to_owned(),
-            method: "tx_info".to_owned(),
-            jsonrpc: "2.0".to_owned(),
-            params: vec![h],
-        }
-    }
-}
-
-// requests and returns whether transaction is verified or not.
-async fn tx_info(tx_hash: TxHash, rpc_addr: &str) -> Result<bool, failure::Error> {
-    let msg = TxInfo::new(tx_hash);
-
-    let client = reqwest::Client::new();
-    let res = client.post(rpc_addr).json(&msg).send().await?;
-    if res.status() != reqwest::StatusCode::OK {
-        failure::bail!("non-ok response: {}", res.status());
-    }
-    let reply: Output = res.json().await.unwrap();
-    let ret = match reply {
-        Output::Success(v) => v.result,
-        Output::Failure(v) => panic!("{}", v.error),
-    };
-    let obj = ret.as_object().unwrap();
-    let executed = obj["executed"].as_bool().unwrap();
-    if !executed {
-        return Ok(false);
-    }
-    let block = obj["block"].as_object().unwrap();
-    let verified = block["verified"].as_bool().unwrap();
-    Ok(verified)
 }
