@@ -24,9 +24,9 @@ use web3::types::Address;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
-    balances: HashMap<String, BigDecimal>,
-    nonce: Nonce,
-    pub_key_hash: PubKeyHash,
+    pub balances: HashMap<String, BigDecimal>,
+    pub nonce: Nonce,
+    pub pub_key_hash: PubKeyHash,
 }
 
 impl ResponseAccountState {
@@ -52,10 +52,10 @@ impl ResponseAccountState {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfoResp {
-    address: Address,
-    id: Option<AccountId>,
-    committed: ResponseAccountState,
-    verified: ResponseAccountState,
+    pub address: Address,
+    pub id: Option<AccountId>,
+    pub committed: ResponseAccountState,
+    pub verified: ResponseAccountState,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
