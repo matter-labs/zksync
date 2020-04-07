@@ -2,6 +2,7 @@
 //! Runs scenario of deposits, withdraws and transfers. Scenario detailization
 //! specified as input json file. Transactions send concurrently. Program exits
 //! successfully if all transactions get verified within configured timeout.
+
 // Built-in
 use std::ops::Mul;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -11,29 +12,29 @@ use std::{env, thread};
 // External
 use bigdecimal::BigDecimal;
 use jsonrpc_core::types::response::Output;
-use log::{debug, info, trace};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use tokio::runtime::{Builder, Handle};
 use tokio::sync::Mutex;
 use web3::transports::Http;
 use web3::types::U256;
-use web3::types::{H160, H256};
+// use web3::types::{H160, H256};
+use web3::types::H256;
 // Workspace
-use jsonrpc_core::IoHandler;
-use jsonrpc_core_client::transports::http::connect;
+// use jsonrpc_core::IoHandler;
+// use jsonrpc_core_client::transports::http::connect;
 use models::config_options::ConfigurationOptions;
 use models::node::tx::TxHash;
 use models::node::tx::{FranklinTx, PackedEthSignature};
 use models::node::Address;
-use server::api_server::rpc_server::gen_client::Client as RpcClient;
+// use server::api_server::rpc_server::gen_client::Client as RpcClient;
 use server::api_server::rpc_server::AccountInfoResp;
-use std::collections::VecDeque;
+// use std::collections::VecDeque;
 use testkit::eth_account::EthereumAccount;
 use testkit::zksync_account::ZksyncAccount;
 
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
-const TPS_MEASURE_WINDOW: usize = 1000;
+// const TPS_MEASURE_WINDOW: usize = 1000;
 
 fn main() {
     env_logger::init();
@@ -49,7 +50,7 @@ fn main() {
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
     let test_accounts = construct_test_accounts(&test_spec.input_accounts, transport, &config);
     let rpc_addr = env::var("HTTP_RPC_API_ADDR").expect("HTTP_RPC_API_ADDR is missing");
-    info!("sending transactions");
+    log::info!("sending transactions");
 
     let tps_counter = Arc::new(TPSCounter::default());
     tokio_runtime.spawn(tps_counter_printer(Arc::clone(&tps_counter)));
@@ -61,13 +62,13 @@ fn main() {
         tps_counter,
         tokio_runtime.handle().clone(),
     ));
-    info!("waiting for all transactions to be verified");
+    log::info!("waiting for all transactions to be verified");
     tokio_runtime.block_on(wait_for_verify(
         sent_txs,
         Duration::from_secs(test_spec.verify_timeout_sec),
         &rpc_addr,
     ));
-    info!("loadtest completed.");
+    log::info!("loadtest completed.");
 }
 
 #[derive(Clone, Deserialize, Debug)]
@@ -180,7 +181,7 @@ async fn tps_counter_printer(counter: Arc<TPSCounter>) {
 
         let tps = (new_txs as f64) / (instant.elapsed().as_millis() as f64) * 1000f64;
 
-        info!("outgoing tps: {}", tps);
+        log::info!("outgoing tps: {}", tps);
 
         last_seen_total_txs = new_seen_total_txs;
         instant = Instant::now();
@@ -232,7 +233,8 @@ async fn send_transactions(
     //            .collect::<Vec<_>>(),
     //    )
     //    .await;
-    let mut merged_txs = SentTransactions::new();
+    // let mut merged_txs = SentTransactions::new();
+    let merged_txs = SentTransactions::new();
     //    if let Ok(sent_txs) = send_txs {
     //        for acc_txs in sent_txs {
     //            merged_txs.merge(acc_txs);
@@ -247,7 +249,7 @@ async fn send_transactions_from_acc(
     ctx: TestSpec,
     rpc_addr: String,
     tps_counter: Arc<TPSCounter>,
-    req_client: reqwest::Client,
+    _req_client: reqwest::Client,
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();
 
@@ -267,18 +269,18 @@ async fn send_transactions_from_acc(
         &rpc_addr,
     )
     .await?;
-    info!("account {} made initial deposit", addr_hex);
+    log::info!("account {} made initial deposit", addr_hex);
     sent_txs.add_op_id(op_id);
     let mut tx_queue = Vec::with_capacity((ctx.n_transfers + ctx.n_withdraws) as usize);
     tx_queue.push((sign_change_pubkey(&test_acc), None));
-    info!("sending {} transactions", addr_hex);
+    log::info!("sending {} transactions", addr_hex);
     for _ in 0..ctx.n_deposits {
         let amount = rand_amount(ctx.deposit_from_amount_gwei, ctx.deposit_to_amount_gwei);
         let op_id = deposit_single(&test_acc, amount.mul(&wei_in_gwei), &rpc_addr).await?;
         sent_txs.add_op_id(op_id);
     }
 
-    info!("Signing transactions");
+    log::info!("Signing transactions");
     for _ in 0..ctx.n_transfers {
         let amount = rand_amount(ctx.transfer_from_amount_gwei, ctx.transfer_to_amount_gwei);
         let signed_transfer =
@@ -290,7 +292,7 @@ async fn send_transactions_from_acc(
         let signed_withdraw = sign_withdraw_single(&test_acc, amount.mul(&wei_in_gwei));
         tx_queue.push(signed_withdraw)
     }
-    info!("Done signing transactions");
+    log::info!("Done signing transactions");
 
     let req_client = reqwest::Client::new();
     for (tx, eth_sign) in tx_queue {
@@ -299,7 +301,7 @@ async fn send_transactions_from_acc(
         sent_txs.add_tx_hash(tx_hash);
     }
 
-    info!("Sending txs");
+    log::info!("Sending txs");
 
     Ok(sent_txs)
 }
@@ -441,15 +443,15 @@ async fn send_tx(
     client: &reqwest::Client,
 ) -> Result<TxHash, failure::Error> {
     let tx_hash = tx.hash();
-    let nonce = tx.nonce();
+    // let nonce = tx.nonce();
     let msg = SubmitTxMsg::new(tx, eth_signature);
 
-    let instant = Instant::now();
-    let mut res = client.post(rpc_addr).json(&msg).send().await?;
+    // let instant = Instant::now();
+    let res = client.post(rpc_addr).json(&msg).send().await?;
     if res.status() != reqwest::StatusCode::OK {
         failure::bail!("non-ok response: {}", res.status());
     }
-    //    trace!("tx: {}", res.text().await.unwrap());
+    //    log::trace!("tx: {}", res.text().await.unwrap());
     Ok(tx_hash)
 }
 
@@ -464,7 +466,7 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
                 .await
                 .expect("[wait_for_verify] call ethop_info");
             if executed && verified {
-                debug!("deposit (serial_id={}) is verified", id);
+                log::debug!("deposit (serial_id={}) is verified", id);
                 break;
             }
             if start.elapsed() > timeout {
@@ -480,7 +482,7 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
                 .await
                 .expect("[wait_for_verify] call tx_info");
             if verified {
-                debug!("{} is verified", hash.to_string());
+                log::debug!("{} is verified", hash.to_string());
                 break;
             }
             if start.elapsed() > timeout {
@@ -518,7 +520,7 @@ async fn account_state_info(
     let msg = AccountStateReq::new(address);
 
     let client = reqwest::Client::new();
-    let mut res = client.post(rpc_addr).json(&msg).send().await?;
+    let res = client.post(rpc_addr).json(&msg).send().await?;
     if res.status() != reqwest::StatusCode::OK {
         failure::bail!("non-ok response: {}", res.status());
     }
@@ -555,7 +557,7 @@ async fn ethop_info(serial_id: u64, rpc_addr: &str) -> Result<(bool, bool), fail
     let msg = EthopInfo::new(serial_id);
 
     let client = reqwest::Client::new();
-    let mut res = client.post(rpc_addr).json(&msg).send().await?;
+    let res = client.post(rpc_addr).json(&msg).send().await?;
     if res.status() != reqwest::StatusCode::OK {
         failure::bail!("non-ok response: {}", res.status());
     }
@@ -598,7 +600,7 @@ async fn tx_info(tx_hash: TxHash, rpc_addr: &str) -> Result<bool, failure::Error
     let msg = TxInfo::new(tx_hash);
 
     let client = reqwest::Client::new();
-    let mut res = client.post(rpc_addr).json(&msg).send().await?;
+    let res = client.post(rpc_addr).json(&msg).send().await?;
     if res.status() != reqwest::StatusCode::OK {
         failure::bail!("non-ok response: {}", res.status());
     }
