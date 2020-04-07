@@ -172,13 +172,6 @@ table! {
 }
 
 table! {
-    op_config (addr) {
-        addr -> Text,
-        next_nonce -> Nullable<Int8>,
-    }
-}
-
-table! {
     operations (id) {
         id -> Int8,
         block_number -> Int8,
@@ -264,7 +257,6 @@ allow_tables_to_appear_in_same_query!(
     executed_priority_operations,
     executed_transactions,
     mempool,
-    op_config,
     operations,
     proofs,
     prover_runs,

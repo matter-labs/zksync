@@ -226,12 +226,12 @@ CREATE TABLE server_config (
 CREATE TABLE eth_operations (
     id bigserial PRIMARY KEY,
     nonce BIGINT NOT NULL,
-    last_deadline_block BIGINT NOT NULL,
-    last_used_gas_price NUMERIC NOT NULL,
     confirmed bool NOT NULL DEFAULT false,
     raw_tx bytea NOT NULL,
     op_type TEXT NOT NULL,
-    final_hash bytea DEFAULT NULL
+    final_hash bytea DEFAULT NULL,
+    last_deadline_block BIGINT NOT NULL,
+    last_used_gas_price NUMERIC NOT NULL
 );
 
 -- Locally stored Ethereum nonce
