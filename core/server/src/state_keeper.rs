@@ -10,7 +10,7 @@ use crate::mempool::ProposedBlock;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
-    Account, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+    Account, AccountTree, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
 };
 use models::params::max_block_chunk_size;
 use models::{ActionType, CommitRequest};
@@ -79,55 +79,19 @@ pub struct PlasmaStateKeeper {
 }
 
 pub struct PlasmaStateInitParams {
-    pub accounts: AccountMap,
+    pub tree: AccountTree,
+    pub acc_id_by_addr: HashMap<Address, AccountId>,
     pub last_block_number: BlockNumber,
     pub unprocessed_priority_op: u64,
 }
 
 impl PlasmaStateInitParams {
-    pub fn restore_from_db(db_pool: ConnectionPool) -> Self {
-        let timer = Instant::now();
-
-        let storage = db_pool
-            .access_storage()
-            .expect("db connection failed for state restore");
-
-        let (last_committed, accounts) = storage
-            .chain()
-            .state_schema()
-            .load_committed_state(None)
-            .expect("db failed");
-        let last_verified = storage
-            .chain()
-            .block_schema()
-            .get_last_verified_block()
-            .expect("db failed");
-        let unprocessed_priority_op = storage
-            .chain()
-            .operations_schema()
-            .get_operation(last_committed, ActionType::COMMIT)
-            .map(|storage_op| {
-                storage_op
-                    .into_op(&storage)
-                    .expect("storage_op convert")
-                    .block
-                    .processed_priority_ops
-                    .1
-            })
-            .unwrap_or_default();
-
-        info!(
-            "Restored committed state from db, committed: {}, verified: {}, unprocessed priority op: {}, elapsed time: {} ms",
-            last_committed,
-            last_verified,
-            unprocessed_priority_op,
-            timer.elapsed().as_millis(),
-        );
-
+    fn new() -> Self {
         Self {
-            accounts,
-            last_block_number: last_committed,
-            unprocessed_priority_op,
+            tree: AccountTree::new(models::params::account_tree_depth() as u32),
+            acc_id_by_addr: HashMap::new(),
+            last_block_number: 0,
+            unprocessed_priority_op: 0,
         }
     }
 }
@@ -140,7 +104,7 @@ impl PlasmaStateKeeper {
         tx_for_commitments: mpsc::Sender<CommitRequest>,
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
     ) -> Self {
-        let state = PlasmaState::new(initial_state.accounts, initial_state.last_block_number + 1);
+        let state = PlasmaState::new(initial_state.tree, initial_state.acc_id_by_addr, initial_state.last_block_number + 1);
 
         let (fee_account_id, _) = state
             .get_account_by_address(&fee_account_address)
