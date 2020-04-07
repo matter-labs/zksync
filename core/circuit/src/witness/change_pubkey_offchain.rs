@@ -1,6 +1,5 @@
 use super::utils::*;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
-use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::franklin_crypto::rescue::RescueEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;

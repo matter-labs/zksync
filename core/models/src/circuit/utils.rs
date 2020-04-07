@@ -2,7 +2,6 @@ use crate::params;
 
 use crate::franklin_crypto::alt_babyjubjub::JubjubEngine;
 use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField};
-use crate::franklin_crypto::bellman::pairing::Engine;
 use crate::franklin_crypto::eddsa::PublicKey;
 use crate::merkle_tree::hasher::Hasher;
 use crate::node::Fr;

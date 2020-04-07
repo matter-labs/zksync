@@ -11,11 +11,9 @@ use crate::franklin_crypto::circuit::boolean::Boolean;
 use crate::franklin_crypto::circuit::num::AllocatedNum;
 
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
-use crate::franklin_crypto::bellman::pairing::{Engine};
+use crate::franklin_crypto::bellman::pairing::Engine;
 use crate::franklin_crypto::circuit::Assignment;
-use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::franklin_crypto::rescue::RescueEngine;
-
 
 pub struct AllocatedOperationBranch<E: RescueEngine> {
     pub account: AccountContent<E>,
@@ -195,7 +193,7 @@ impl<E: RescueEngine> AllocatedOperationData<E> {
 
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
-        op: &Operation<E>
+        op: &Operation<E>,
     ) -> Result<AllocatedOperationData<E>, SynthesisError> {
         let eth_address = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "eth_address"),

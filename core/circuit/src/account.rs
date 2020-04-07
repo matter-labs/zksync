@@ -1,12 +1,11 @@
 // External deps
 use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::Assignment;
-use crate::franklin_crypto::jubjub::JubjubEngine;
 // Workspace deps
 use crate::element::CircuitElement;
 use models::circuit::account::CircuitAccount;
 
-use crypto_exports::franklin_crypto::rescue::{RescueEngine};
+use crypto_exports::franklin_crypto::rescue::RescueEngine;
 
 #[derive(Clone, Debug)]
 pub struct AccountWitness<E: RescueEngine> {

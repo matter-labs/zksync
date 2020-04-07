@@ -160,17 +160,12 @@ fn estimate_power_of_two(block_size: usize) -> (usize, u32) {
         },
     };
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::kate_commitment::*;
-    use crypto_exports::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
     use crypto_exports::franklin_crypto::bellman::plonk::*;
-    use crypto_exports::franklin_crypto::bellman::worker::Worker;
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::{adaptor::{TranspilationVariant, write_transpilation_hints}, cs::PlonkCsWidth4WithNextStepParams};
-    use crypto_exports::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
 
-    let (size, _) = transpile_with_gates_count(instance_for_generation.clone()).expect("tranapoile with gates counts");
+    let (size, _) = transpile_with_gates_count(instance_for_generation.clone())
+        .expect("tranapoile with gates counts");
     //let hints = transpile::<Bn256, _>(instance_for_generation.clone())
-     //   .expect("transpilation is successful");
+    //   .expect("transpilation is successful");
     //let setup = setup(instance_for_generation.clone(), &hints).expect("must make setup");
 
     // let timer = Instant::now();
@@ -262,18 +257,8 @@ pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
         },
     };
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::kate_commitment::*;
-    use crypto_exports::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
+    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::adaptor::write_transpilation_hints;
     use crypto_exports::franklin_crypto::bellman::plonk::*;
-    use crypto_exports::franklin_crypto::bellman::worker::Worker;
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::{adaptor::{TranspilationVariant, write_transpilation_hints}, cs::PlonkCsWidth4WithNextStepParams};
-    use crypto_exports::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
-
-    let universal_setup_path: String = format!(
-        "{}/keys/setup/",
-        std::env::var("ZKSYNC_HOME").expect("ZKSYNC_HOME_ENV")
-    );
 
     let timer = Instant::now();
     let hints = transpile::<Bn256, _>(instance_for_generation.clone())
@@ -282,7 +267,8 @@ pub fn make_circuit_parameters(block_size: usize) -> Parameters<Bn256> {
     write_transpilation_hints(
         &hints,
         std::io::BufWriter::with_capacity(1 << 24, std::fs::File::create("hints").unwrap()),
-    );
+    )
+    .expect("hint serialize");
 
     let timer = Instant::now();
     let setup = setup(instance_for_generation.clone(), &hints).expect("must make setup");
@@ -489,18 +475,7 @@ pub fn make_circuit_parameters_plonk(block_size: usize) {
         },
     };
 
-    use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
-    use crypto_exports::franklin_crypto::bellman::kate_commitment::*;
-    use crypto_exports::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
     use crypto_exports::franklin_crypto::bellman::plonk::*;
-    use crypto_exports::franklin_crypto::bellman::worker::Worker;
-    use crypto_exports::franklin_crypto::bellman::plonk::better_cs::{adaptor::{TranspilationVariant, write_transpilation_hints}, cs::PlonkCsWidth4WithNextStepParams};
-    use crypto_exports::franklin_crypto::bellman::plonk::fft::cooley_tukey_ntt::*;
-
-    let universal_setup_path: String = format!(
-        "{}/keys/setup/",
-        std::env::var("ZKSYNC_HOME").expect("ZKSYNC_HOME_ENV")
-    );
 
     let timer = Instant::now();
     let hints = transpile::<Bn256, _>(instance_for_generation.clone())
@@ -638,16 +613,19 @@ fn run_estimate_power_of_two() {
     println!("chunks,power_of_two,gates");
     let testable_pows = (6..=180).step_by(2).collect::<Vec<usize>>();
 
-    let pows = testable_pows.into_par_iter().map(|c| {
-        let (gates, pow) = estimate_power_of_two(c); 
-        (c, pow, gates)
-    }).collect::<Vec<_>>();
+    let pows = testable_pows
+        .into_par_iter()
+        .map(|c| {
+            let (gates, pow) = estimate_power_of_two(c);
+            (c, pow, gates)
+        })
+        .collect::<Vec<_>>();
 
-    for (c,pow,gates) in pows {
+    for (c, pow, gates) in pows {
         if pow > 26 {
             break;
         }
-        println!("{},{},{}",c, pow, gates);
+        println!("{},{},{}", c, pow, gates);
     }
 }
 
@@ -662,7 +640,6 @@ fn run_make_circuit_parameters() {
 
 pub fn make_exit_circuit_parameters() -> Parameters<Bn256> {
     // let p_g = FixedGenerators::SpendingKeyGenerator;
-    let jubjub_params = &params::JUBJUB_PARAMS;
     let rescue_params = &params::RESCUE_PARAMS;
     // let rng = &mut XorShiftRng::from_seed([0x3dbe6258, 0x8d313d76, 0x3237db17, 0xe5bc0654]);
     let rng = &mut OsRng::new().unwrap();

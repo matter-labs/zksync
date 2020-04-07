@@ -2,7 +2,6 @@ use super::utils::*;
 
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::franklin_crypto::rescue::RescueEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
@@ -650,12 +649,10 @@ mod test {
         );
 
         use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
-        use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
         // use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
         use crate::franklin_crypto::bellman::kate_commitment::*;
         use crate::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
         use crate::franklin_crypto::bellman::plonk::*;
-        use crate::franklin_crypto::bellman::worker::Worker;
 
         // let mut transpiler = Transpiler::new();
 
@@ -664,7 +661,7 @@ mod test {
         // c.clone().synthesize(&mut transpiler).unwrap();
 
         let timer = Instant::now();
-        let (n, mut hints) =
+        let (n, hints) =
             transpile_with_gates_count::<Bn256, _>(c.clone()).expect("transpilation is successful");
         println!("Transpilation time: {}s", timer.elapsed().as_secs());
         println!("Transpiled into {} gates", n);
@@ -713,7 +710,7 @@ mod test {
         println!("Done checking if satisfied");
 
         let timer = Instant::now();
-        let mut setup = setup(c.clone(), &hints).expect("must make setup");
+        let setup = setup(c.clone(), &hints).expect("must make setup");
         println!("Setup generated time: {}s", timer.elapsed().as_secs());
 
         println!("Made into {} gates", setup.n);
@@ -754,7 +751,7 @@ mod test {
         // let key_lagrange_form = Crs::<Bn256, CrsForLagrangeForm>::dummy_crs(size);
 
         let timer = Instant::now();
-        let mut verification_key = make_verification_key(&setup, &key_monomial_form)
+        let verification_key = make_verification_key(&setup, &key_monomial_form)
             .expect("must make a verification key");
         println!("Verification key generated: {}s", timer.elapsed().as_secs());
 
@@ -767,7 +764,7 @@ mod test {
             .expect("ver key serialize");
 
         let timer = Instant::now();
-        let mut precomputations =
+        let precomputations =
             make_precomputations(&setup).expect("must make precomputations for proving");
         println!("Precomputations generated: {}s", timer.elapsed().as_secs());
 
@@ -778,7 +775,7 @@ mod test {
             <OmegasInvBitreversed<Fr> as CTPrecomputations<Fr>>::new_for_domain_size(size);
 
         let timer = Instant::now();
-        let mut proof = prove_from_recomputations::<_, _, RollingKeccakTranscript<Fr>, _, _>(
+        let proof = prove_from_recomputations::<_, _, RollingKeccakTranscript<Fr>, _, _>(
             c.clone(),
             &hints,
             &setup,
@@ -849,13 +846,8 @@ mod test {
         );
 
         use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
-        // use crate::franklin_crypto::bellman::plonk::better_cs::adaptor::*;
-        // use crate::franklin_crypto::bellman::plonk::better_cs::cs::Circuit as PlonkCircuit;
-        use crate::franklin_crypto::bellman::kate_commitment::*;
         use crate::franklin_crypto::bellman::plonk::better_cs::cs::PlonkCsWidth4WithNextStepParams;
         use crate::franklin_crypto::bellman::plonk::better_cs::fma_adaptor::Transpiler;
-        use crate::franklin_crypto::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
-        use crate::franklin_crypto::bellman::plonk::*;
 
         let mut transpiler = Transpiler::<Bn256, PlonkCsWidth4WithNextStepParams>::new();
 

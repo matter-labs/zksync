@@ -4,7 +4,7 @@ use std::sync::{mpsc, Arc, Mutex};
 use std::{thread, time};
 // External deps
 use bigdecimal::BigDecimal;
-use crypto_exports::franklin_crypto::{self, bellman};
+use crypto_exports::franklin_crypto::bellman;
 use crypto_exports::pairing::ff::PrimeField;
 // Workspace deps
 use circuit::witness::deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness};

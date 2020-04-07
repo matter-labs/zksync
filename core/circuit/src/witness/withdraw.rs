@@ -5,7 +5,6 @@ use crate::operation::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 
 use crate::franklin_crypto::circuit::float_point::convert_to_float;
-use crate::franklin_crypto::jubjub::JubjubEngine;
 use crate::franklin_crypto::rescue::RescueEngine;
 use crate::operation::SignatureData;
 use models::circuit::account::CircuitAccountTree;

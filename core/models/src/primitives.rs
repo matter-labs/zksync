@@ -10,13 +10,14 @@ use crate::franklin_crypto::bellman::pairing::ff::{
 };
 use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
 use crate::franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
-use crate::franklin_crypto::circuit::multipack;
 use bigdecimal::BigDecimal;
 use failure::bail;
 use web3::types::U256;
 // Workspace deps
 use crate::circuit::utils::append_le_fixed_width;
-use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher, rescue_hasher::BabyRescueHasher};
+use crate::merkle_tree::{
+    hasher::Hasher, pedersen_hasher::BabyPedersenHasher, rescue_hasher::BabyRescueHasher,
+};
 use crate::params;
 
 // TODO: replace Vec with Iterator?

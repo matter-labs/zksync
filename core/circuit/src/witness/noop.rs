@@ -93,9 +93,9 @@ mod test {
     use crate::franklin_crypto::bellman::Circuit;
 
     use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-    use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
-    use crate::franklin_crypto::group_hash::BlakeHasher;
     use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+    use crate::franklin_crypto::group_hash::BlakeHasher;
+    use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 
     use crate::franklin_crypto::circuit::test::*;
     use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey};
@@ -108,7 +108,7 @@ mod test {
 
     use crate::rand::{Rng, SeedableRng, XorShiftRng};
 
-    use models::merkle_tree::{PedersenHasher, RescueHasher};
+    use models::merkle_tree::RescueHasher;
 
     #[test]
     #[ignore]

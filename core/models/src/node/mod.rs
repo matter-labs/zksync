@@ -1,4 +1,4 @@
-use super::merkle_tree::{PedersenHasher, SparseMerkleTree, RescueHasher};
+use super::merkle_tree::{RescueHasher, SparseMerkleTree};
 use super::params;
 use super::primitives::{pack_as_float, u128_to_bigdecimal, unpack_float};
 use crate::franklin_crypto::bellman::pairing::bn256;

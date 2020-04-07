@@ -3,7 +3,6 @@ use crate::account::AccountWitness;
 use crate::allocated_structures::*;
 use crate::element::CircuitElement;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-use crate::franklin_crypto::bellman::pairing::{Engine};
 use crate::franklin_crypto::bellman::{Circuit, ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::boolean::Boolean;
 use crate::franklin_crypto::circuit::ecc;
@@ -15,11 +14,11 @@ use crate::utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_e
 use crate::franklin_crypto::circuit::expression::Expression;
 use crate::franklin_crypto::circuit::multipack;
 use crate::franklin_crypto::circuit::num::AllocatedNum;
-use crate::franklin_crypto::circuit::rescue;
-use crate::franklin_crypto::rescue::{RescueEngine};
 use crate::franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
+use crate::franklin_crypto::circuit::rescue;
 use crate::franklin_crypto::circuit::Assignment;
 use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
+use crate::franklin_crypto::rescue::RescueEngine;
 use models::node::operations::{ChangePubKeyOp, NoopOp};
 use models::node::{CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp};
 use models::params as franklin_constants;
@@ -554,10 +553,8 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             self.jubjub_params,
         )?;
 
-        let op_data = AllocatedOperationData::from_witness(
-            cs.namespace(|| "allocated_operation_data"),
-            op,
-        )?;
+        let op_data =
+            AllocatedOperationData::from_witness(cs.namespace(|| "allocated_operation_data"), op)?;
         // ensure op_data is equal to previous
         {
             let mut is_op_data_correct_flags = vec![];
@@ -621,7 +618,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             cs.namespace(|| "unpack pubkey"),
             &op.signer_pub_key_packed,
             self.rescue_params,
-            self.jubjub_params
+            self.jubjub_params,
         )?;
         let signature_data = verify_circuit_signature(
             cs.namespace(|| "verify circuit signature"),
@@ -1789,11 +1786,9 @@ pub fn calc_account_state_tree_root<E: RescueEngine, CS: ConstraintSystem<E>>(
     balance_root: &CircuitElement<E>,
     params: &E::Params,
 ) -> Result<CircuitElement<E>, SynthesisError> {
-
     let state_tree_root_input = balance_root.get_number();
-    let empty_root_padding = AllocatedNum::zero(
-        cs.namespace(|| "allocate zero element for padding")
-    )?;
+    let empty_root_padding =
+        AllocatedNum::zero(cs.namespace(|| "allocate zero element for padding"))?;
 
     let mut sponge_output = rescue::rescue_hash(
         cs.namespace(|| "hash state root and balance root"),
@@ -1868,7 +1863,7 @@ pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
 
     let leaf_packed = multipack::pack_into_witness(
         cs.namespace(|| "pack leaf bits into field elements"),
-        &leaf_bits
+        &leaf_bits,
     )?;
 
     let mut account_leaf_hash = rescue::rescue_hash(
@@ -1906,7 +1901,7 @@ pub fn allocate_merkle_root<E: RescueEngine, CS: ConstraintSystem<E>>(
         let mut sponge_output = rescue::rescue_hash(
             cs.namespace(|| format!("hash tree level {}", i)),
             &[xl, xr],
-            params
+            params,
         )?;
 
         assert_eq!(sponge_output.len(), 1);
@@ -2012,14 +2007,11 @@ fn calculate_root_from_full_representation_fees<E: RescueEngine, CS: ConstraintS
 
         fee.limit_number_of_bits(
             cs.namespace(|| "ensure that fees are short enough"),
-            franklin_constants::BALANCE_BIT_WIDTH
+            franklin_constants::BALANCE_BIT_WIDTH,
         )?;
 
-        let mut sponge_output = rescue::rescue_hash(
-            cs.namespace(|| "hash the fee leaf content"), 
-            &[fee], 
-            params
-        )?;
+        let mut sponge_output =
+            rescue::rescue_hash(cs.namespace(|| "hash the fee leaf content"), &[fee], params)?;
 
         assert_eq!(sponge_output.len(), 1);
 
@@ -2036,14 +2028,10 @@ fn calculate_root_from_full_representation_fees<E: RescueEngine, CS: ConstraintS
         for (chunk_number, x) in chunks.enumerate() {
             let cs = &mut cs.namespace(|| format!("chunk number {}", chunk_number));
 
-            let mut sponge_output = rescue::rescue_hash(
-                cs,
-                &x, 
-                params
-            )?;
-    
+            let mut sponge_output = rescue::rescue_hash(cs, &x, params)?;
+
             assert_eq!(sponge_output.len(), 1);
-    
+
             let tmp = sponge_output.pop().expect("must get a single element");
 
             new_hashes.push(tmp);

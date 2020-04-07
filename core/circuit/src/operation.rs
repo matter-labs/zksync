@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 // Workspace
 use crate::account::AccountWitness;
 
-use crypto_exports::franklin_crypto::rescue::{RescueEngine};
-use crypto_exports::franklin_crypto::bellman::pairing::Engine;
+use crypto_exports::franklin_crypto::rescue::RescueEngine;
 
 #[derive(Clone, Debug)]
 pub struct OperationBranchWitness<E: RescueEngine> {

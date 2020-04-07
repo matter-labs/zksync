@@ -16,7 +16,6 @@ use crate::circuit::account::{Balance, CircuitAccount};
 use crate::circuit::utils::{eth_address_to_fr, pub_key_hash_bytes};
 use crate::franklin_crypto::eddsa::PublicKey;
 use crate::franklin_crypto::jubjub::FixedGenerators;
-use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
 use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
 use crate::node::PrivateKey;
 use crate::params::JUBJUB_PARAMS;

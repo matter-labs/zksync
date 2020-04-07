@@ -5,15 +5,14 @@ use crate::operation::{OperationBranch, OperationBranchWitness};
 use crate::witness::utils::{apply_leaf_operation, get_audits};
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
+use crypto_exports::franklin_crypto::rescue::RescueEngine;
 use crypto_exports::franklin_crypto::{
     bellman::{
         pairing::ff::{Field, PrimeField, PrimeFieldRepr},
         Circuit, ConstraintSystem, SynthesisError,
     },
     circuit::{boolean::Boolean, num::AllocatedNum, sha256, Assignment},
-    jubjub::JubjubEngine,
 };
-use crypto_exports::franklin_crypto::rescue::{RescueEngine};
 use models::circuit::utils::{append_be_fixed_width, be_bit_vector_into_bytes};
 use models::circuit::CircuitAccountTree;
 use models::node::{AccountId, Engine, Fr, TokenId};

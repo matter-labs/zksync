@@ -6,7 +6,6 @@ use std::sync::Arc;
 use std::{env, thread, time};
 // External deps
 use clap::{App, Arg};
-use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use log::*;
 use signal_hook::iterator::Signals;
 // Workspace deps
