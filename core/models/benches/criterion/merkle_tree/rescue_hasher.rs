@@ -1,8 +1,8 @@
 //! Benchmarks for the Parallel Sparse Merkle Tree.
 
 use criterion::{black_box, BatchSize, Bencher, Criterion, Throughput};
-use models::franklin_crypto::bellman::pairing::bn256::Bn256;
-use models::merkle_tree::{hasher::Hasher, PedersenHasher};
+use models::merkle_tree::{hasher::Hasher, RescueHasher};
+use models::node::Engine;
 
 const SMALL_INPUT_SIZE: usize = 16; // 16 bits / 2 bytes
 const BIG_INPUT_SIZE: usize = models::params::MAX_CIRCUIT_MSG_HASH_BITS; // Biggest supported size.
@@ -16,7 +16,7 @@ fn generate_input(size: usize) -> Vec<bool> {
 fn pedersen_small(b: &mut Bencher<'_>) {
     const INPUT_SIZE: usize = SMALL_INPUT_SIZE;
 
-    let hasher = PedersenHasher::<Bn256>::default();
+    let hasher = RescueHasher::<Engine>::default();
     let input: Vec<bool> = generate_input(INPUT_SIZE);
 
     let setup = || (hasher.clone(), input.clone());
@@ -34,7 +34,7 @@ fn pedersen_small(b: &mut Bencher<'_>) {
 fn pedersen_big(b: &mut Bencher<'_>) {
     const INPUT_SIZE: usize = BIG_INPUT_SIZE;
 
-    let hasher = PedersenHasher::<Bn256>::default();
+    let hasher = RescueHasher::<Engine>::default();
     let input: Vec<bool> = generate_input(INPUT_SIZE);
 
     let setup = || (hasher.clone(), input.clone());
