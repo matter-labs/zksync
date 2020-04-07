@@ -360,9 +360,9 @@ mod test {
             account
         };
 
-        let fee_account_id = 0;
         let (mut plasma_state, mut circuit_account_tree) =
-            test_genesis_plasma_state(vec![(account_id, account)], fee_account_id);
+            test_genesis_plasma_state(vec![(account_id, account)]);
+        let fee_account_id = 0;
         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let withdraw_op = WithdrawOp {

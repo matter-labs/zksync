@@ -138,9 +138,8 @@ fn prover_proves_a_block_and_publishes_result() {
 
 fn new_test_data_for_prover() -> ProverData {
     use circuit::witness::test_utils::test_genesis_plasma_state;
+    let (_plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(Vec::new());
     let fee_account_id = 0;
-    let (_plasma_state, mut circuit_account_tree) =
-        test_genesis_plasma_state(Vec::new(), fee_account_id);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let empty_account_id = 1;

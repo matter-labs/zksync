@@ -308,10 +308,9 @@ mod test {
     #[test]
     #[ignore]
     fn test_deposit_in_empty_leaf() {
-        let fee_account_id = 0;
-        let (mut plasma_state, mut circuit_account_tree) =
-            test_genesis_plasma_state(Vec::new(), fee_account_id);
+        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(Vec::new());
 
+        let fee_account_id = 0;
         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let empty_account_id = 1;
@@ -365,15 +364,12 @@ mod test {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
             "1111111111111111111111111111111111111111".parse().unwrap();
-        let fee_account_id = 0;
-        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(
-            vec![(
-                deposit_to_account_id,
-                Account::default_with_address(&deposit_to_account_address),
-            )],
-            fee_account_id,
-        );
+        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![(
+            deposit_to_account_id,
+            Account::default_with_address(&deposit_to_account_address),
+        )]);
 
+        let fee_account_id = 0;
         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let deposit_op = DepositOp {
@@ -415,15 +411,12 @@ mod test {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
             "1111111111111111111111111111111111111111".parse().unwrap();
-        let fee_account_id = 0;
-        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(
-            vec![(
-                deposit_to_account_id,
-                Account::default_with_address(&deposit_to_account_address),
-            )],
-            fee_account_id,
-        );
+        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![(
+            deposit_to_account_id,
+            Account::default_with_address(&deposit_to_account_address),
+        )]);
 
+        let fee_account_id = 0;
         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let deposit_op = DepositOp {
@@ -499,14 +492,11 @@ mod test {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
             "1111111111111111111111111111111111111111".parse().unwrap();
+        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![(
+            deposit_to_account_id,
+            Account::default_with_address(&deposit_to_account_address),
+        )]);
         let fee_account_id = 0;
-        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(
-            vec![(
-                deposit_to_account_id,
-                Account::default_with_address(&deposit_to_account_address),
-            )],
-            fee_account_id,
-        );
         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let deposit_op = DepositOp {
