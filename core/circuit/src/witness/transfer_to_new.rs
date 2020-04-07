@@ -463,14 +463,17 @@ mod test {
             test_genesis_plasma_state(vec![(from_account_id, from_account)]);
 
         let transfer_op = TransferToNewOp {
-            tx: from_zksync_account.sign_transfer(
-                0,
-                BigDecimal::from(7),
-                BigDecimal::from(3),
-                &to_account_address,
-                None,
-                true,
-            ),
+            tx: from_zksync_account
+                .sign_transfer(
+                    0,
+                    "",
+                    BigDecimal::from(7),
+                    BigDecimal::from(3),
+                    &to_account_address,
+                    None,
+                    true,
+                )
+                .0,
             from: from_account_id,
             to: to_account_id,
         };
