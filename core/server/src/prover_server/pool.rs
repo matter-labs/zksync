@@ -24,25 +24,23 @@ use circuit::witness::{
 use models::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
     config_options::ThreadPanicNotify,
-    node::{apply_updates, AccountMap, BlockNumber, Fr, FranklinOp},
+    node::{BlockNumber, Fr, FranklinOp},
     Operation,
 };
 use plasma::state::CollectedFee;
 use prover::prover_data::ProverData;
 
 #[derive(Debug, Clone)]
-struct BlockSizedOperationsQueue {
+struct OperationsQueue {
     operations: VecDeque<Operation>,
     last_loaded_block: BlockNumber,
-    block_size: usize,
 }
 
-impl BlockSizedOperationsQueue {
-    fn new(block_size: usize) -> Self {
+impl OperationsQueue {
+    fn new() -> Self {
         Self {
             operations: VecDeque::new(),
             last_loaded_block: 0,
-            block_size,
         }
     }
 
@@ -58,7 +56,7 @@ impl BlockSizedOperationsQueue {
             let ops = storage
                 .chain()
                 .block_schema()
-                .load_unverified_commits_after_block(self.block_size, self.last_loaded_block, limit)
+                .load_unverified_commits_after_block(self.last_loaded_block, limit)
                 .map_err(|e| format!("failed to read commit operations: {}", e))?;
 
             self.operations.extend(ops);
@@ -68,8 +66,7 @@ impl BlockSizedOperationsQueue {
             }
 
             trace!(
-                "Operations size {}: {:?}",
-                self.block_size,
+                "Operations: {:?}",
                 self.operations
                     .iter()
                     .map(|op| op.block.block_number)
@@ -85,28 +82,35 @@ impl BlockSizedOperationsQueue {
     fn take_next_operation(&mut self) -> Option<Operation> {
         self.operations.pop_front()
     }
+
+    /// Return block number of the next operation to take.
+    fn next_block_number(&self) -> Option<u32> {
+        if self.operations.is_empty() {
+            None
+        } else {
+            Some(self.operations[0].block.block_number)
+        }
+    }
+
+    // Whether queue is empty or not.
+    fn is_empty(&self) -> bool {
+        self.operations.is_empty()
+    }
 }
 
 pub struct ProversDataPool {
     limit: i64,
-    op_queues: HashMap<usize, BlockSizedOperationsQueue>,
+    op_queue: OperationsQueue,
     prepared: HashMap<BlockNumber, ProverData>,
 }
 
 impl ProversDataPool {
     pub fn new(limit: i64) -> Self {
-        let mut res = Self {
+        Self {
             limit,
-            op_queues: HashMap::new(),
+            op_queue: OperationsQueue::new(),
             prepared: HashMap::new(),
-        };
-
-        for block_size in models::params::block_chunk_sizes() {
-            res.op_queues
-                .insert(*block_size, BlockSizedOperationsQueue::new(*block_size));
         }
-
-        res
     }
 
     pub fn get(&self, block: BlockNumber) -> Option<&ProverData> {
@@ -139,7 +143,10 @@ pub struct Maintainer {
     ///
     /// This field is initialized at the first iteration of `maintain`
     /// routine, and is updated by applying the state diff after that.
-    account_state: Option<(u32, AccountMap)>,
+    account_tree: CircuitAccountTree,
+    /// Maintainer prepared prover for blocks in order
+    /// `next_block_number` stores next block number to prepare data for.
+    next_block_number: BlockNumber,
 }
 
 impl Maintainer {
@@ -153,7 +160,8 @@ impl Maintainer {
             conn_pool,
             data,
             rounds_interval,
-            account_state: None,
+            account_tree: CircuitAccountTree::new(models::params::account_tree_depth()),
+            next_block_number: 0,
         }
     }
 
@@ -186,21 +194,19 @@ impl Maintainer {
         // since it can cause provers to not be able to interact with the server.
 
         // Clone the required data to process it without holding the lock.
-        let (mut queues, limit) = {
+        let (mut queue, limit) = {
             let pool = self.data.read().expect("failed to get write lock on data");
-            (pool.op_queues.clone(), pool.limit)
+            (pool.op_queue.clone(), pool.limit)
         };
 
-        // Process every queue and fill it with data.
-        for queue in queues.values_mut() {
-            queue.take_next_commits_if_needed(&self.conn_pool, limit)?;
-        }
+        // Process queue and fill it with data.
+        queue.take_next_commits_if_needed(&self.conn_pool, limit)?;
 
         // Update the queues in pool.
         // Since this structure is the only writer to the queues, it is guaranteed
         // to not contain data that will be overwritten by the assignment.
         let mut pool = self.data.write().expect("failed to get write lock on data");
-        pool.op_queues = queues;
+        pool.op_queue = queue;
 
         Ok(())
     }
@@ -211,108 +217,88 @@ impl Maintainer {
         // since it can cause provers to not be able to interact with the server.
 
         // Clone the queues to process them without holding the lock.
-        let mut queues = {
+        let mut queue = {
             let pool = self.data.read().expect("failed to get write lock on data");
 
-            pool.op_queues.clone()
+            pool.op_queue.clone()
         };
 
         // Create a storage for prepared data.
         let mut prepared = HashMap::new();
 
-        // Go through every queue, take the next operation to process, and build the
-        // prover data for them.
-        // Empty queues are ignored.
-        for queue in queues.values_mut() {
-            let maybe_op = queue.take_next_operation();
-            if let Some(op) = maybe_op {
+        if self.uninitialized() {
+            let min_next_block_num = queue.next_block_number();
+            if let Some(block_number) = min_next_block_num {
+                // Initialize `next_block_number` and circuit tree. Done only once.
+                let storage = self
+                    .conn_pool
+                    .access_storage()
+                    .expect("failed to connect to db");
+                self.init_account_tree(&storage, block_number - 1)?;
+                self.next_block_number = block_number;
+            } else {
+                // Nothing to initialize from.
+                return Ok(());
+            }
+        }
+
+        // Go through queue, take the next operation to process, and build the
+        // prover data for it.
+        while !queue.is_empty() {
+            assert_eq!(
+                Some(self.next_block_number),
+                queue.next_block_number(),
+                "Blocks must be processed in order"
+            );
+            if let Some(op) = queue.take_next_operation() {
                 let storage = self
                     .conn_pool
                     .access_storage()
                     .expect("failed to connect to db");
                 let pd = self.build_prover_data(&storage, &op)?;
                 prepared.insert(op.block.block_number, pd);
+                self.next_block_number = op.block.block_number + 1;
             }
         }
 
-        // Update the queues and prepared data in pool.
-        // Since this structure is the only writer to the queues, it is guaranteed
+        // Update the queue and prepared data in pool.
+        // Since this structure is the only writer to the queue, it is guaranteed
         // to not contain data that will be overwritten by the assignment.
         // Prepared data is appended to the existing one, thus we can not worry about
         // synchronization as well.
         let mut pool = self.data.write().expect("failed to get write lock on data");
-        pool.op_queues = queues;
+        pool.op_queue = queue;
         pool.prepared.extend(prepared);
 
         Ok(())
     }
 
-    /// Updates stored account state, obtaining the state for the requested block.
-    ///
-    /// This method updates the stored version of state with a diff, or initializes
-    /// the state if it was not initialized yet.
-    fn update_account_state(
+    /// Initializes account tree, obtaining the state for the requested block.
+    fn init_account_tree(
         &mut self,
         storage: &storage::StorageProcessor,
         new_block: u32,
     ) -> Result<(), String> {
-        match self.account_state {
-            Some((block, ref state)) => {
-                // State is initialized. We need to load diff (if any) and update
-                // the stored state.
-                let state_diff = storage
-                    .chain()
-                    .state_schema()
-                    .load_state_diff(block, Some(new_block))
-                    .map_err(|e| format!("failed to load committed state: {}", e))?;
+        assert!(
+            self.uninitialized(),
+            "Attempt to invoke 'init_account_tree' with already initialized state",
+        );
+        let (_, accounts) = storage
+            .chain()
+            .state_schema()
+            .load_committed_state(Some(new_block))
+            .map_err(|e| format!("failed to load committed state: {}", e))?;
 
-                if let Some((_, state_diff)) = state_diff {
-                    // Diff exists, update the state and return it.
-                    let mut new_state = state.clone();
-
-                    apply_updates(&mut new_state, state_diff);
-                    debug!("Prover state is updated ({} => {})", block, new_block);
-
-                    self.account_state = Some((new_block, new_state));
-                }
-            }
-            None => {
-                // State is not initialized, load it.
-                let (block, accounts) = storage
-                    .chain()
-                    .state_schema()
-                    .load_committed_state(Some(new_block))
-                    .map_err(|e| format!("failed to load committed state: {}", e))?;
-
-                debug!("Prover state is initialized");
-
-                self.account_state = Some((block, accounts));
-            }
+        for (k, v) in accounts.iter() {
+            self.account_tree
+                .insert(*k, CircuitAccount::from(v.clone()));
         }
-
+        debug!("Prover state is initialized");
         Ok(())
     }
 
-    /// Builds an `CircutAccountTree` based on the stored account state.
-    ///
-    /// This method does not update the account state itself and expects
-    /// it to be up to date.
-    fn build_account_tree(&self) -> CircuitAccountTree {
-        assert!(
-            self.account_state.is_some(),
-            "There is no state to build a circuit account tree"
-        );
-
-        let mut account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
-
-        if let Some((_, ref state)) = self.account_state {
-            for (&account_id, account) in state {
-                let circuit_account = CircuitAccount::from(account.clone());
-                account_tree.insert(account_id, circuit_account);
-            }
-        }
-
-        account_tree
+    fn uninitialized(&self) -> bool {
+        self.next_block_number == 0
     }
 
     fn build_prover_data(
@@ -325,11 +311,8 @@ impl Maintainer {
 
         info!("building prover data for block {}", &block_number);
 
-        self.update_account_state(storage, block_number - 1)?;
-        let account_tree = self.build_account_tree();
-
         let mut witness_accum = WitnessBuilder::new(
-            account_tree,
+            &mut self.account_tree,
             commit_operation.block.fee_account,
             block_number,
         );
