@@ -257,8 +257,10 @@ impl Maintainer {
         // Go through every queue, take the next operation to process, and build the
         // prover data for them.
         // Empty queues are ignored.
-        loop {
-            let mut all_empty = true;
+        let mut all_empty = false;
+        while !all_empty {
+            all_empty = true;
+
             for queue in queues.values_mut() {
                 if queue.next_block_number() == Some(self.next_block_number) {
                     let maybe_op = queue.take_next_operation();
@@ -275,17 +277,6 @@ impl Maintainer {
                 }
                 all_empty = all_empty && queue.is_empty();
             }
-            if all_empty {
-                break;
-            }
-            //  else {
-            //     let ret = queues
-            //     .values()
-            //     .map(BlockSizedOperationsQueue::next_block_number)
-            //     .map(|x| x.unwrap_or(0))
-            //     .min();
-            //     panic!("{:?} {}", ret, self.next_block_number)
-            // }
         }
 
         // Update the queues and prepared data in pool.
@@ -306,20 +297,21 @@ impl Maintainer {
         storage: &storage::StorageProcessor,
         new_block: u32,
     ) -> Result<(), String> {
-        if self.next_block_number == 0 {
-            // State is not initialized, load it.
-            let (_, accounts) = storage
-                .chain()
-                .state_schema()
-                .load_committed_state(Some(new_block))
-                .map_err(|e| format!("failed to load committed state: {}", e))?;
+        assert_eq!(
+            self.next_block_number, 0,
+            "Attempt to invoke 'init_account_tree' with already initialized state",
+        );
+        let (_, accounts) = storage
+            .chain()
+            .state_schema()
+            .load_committed_state(Some(new_block))
+            .map_err(|e| format!("failed to load committed state: {}", e))?;
 
-            for (k, v) in accounts.iter() {
-                self.account_tree
-                    .insert(*k, CircuitAccount::from(v.clone()));
-            }
-            debug!("Prover state is initialized");
+        for (k, v) in accounts.iter() {
+            self.account_tree
+                .insert(*k, CircuitAccount::from(v.clone()));
         }
+        debug!("Prover state is initialized");
         Ok(())
     }
 
