@@ -19,6 +19,10 @@ be run directly via `diesel_cli`, but `zksync db-reset` should be used instead.
 -- Transactions/operations section --
 -- ------------------------------- --
 
+-- Table containing all the ZKSync block execution operations.
+-- Operations are associated with some block and every block can
+-- have multiple related operations with different action types
+-- (e.g. `commit` / `verify`).
 CREATE TABLE operations (
     id bigserial PRIMARY KEY,
     block_number BIGINT NOT NULL,
@@ -27,6 +31,7 @@ CREATE TABLE operations (
     confirmed bool NOT NULL DEFAULT false
 );
 
+-- Block header entry.
 CREATE TABLE blocks (
     number BIGINT PRIMARY KEY,
     root_hash TEXT NOT NULL,
@@ -36,6 +41,25 @@ CREATE TABLE blocks (
     block_size BIGINT NOT NULL
 );
 
+-- Table for the executed franklin operations, used by
+-- the `data_restore` module.
+CREATE TABLE rollup_ops (
+    id SERIAL PRIMARY KEY,
+    block_num BIGINT NOT NULL,
+    operation JSONB NOT NULL,
+    fee_account BIGINT NOT NULL
+);
+
+-- Storage for all the added transactions.
+CREATE TABLE mempool (
+    HASH bytea PRIMARY KEY,
+    primary_account_address bytea NOT NULL,
+    nonce BIGINT NOT NULL,
+    tx jsonb NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT now()
+);
+
+-- Table for the executed priority operations (e.g. deposit).
 CREATE TABLE executed_priority_operations (
     id serial PRIMARY KEY,
     -- sidechain block info
@@ -50,21 +74,7 @@ CREATE TABLE executed_priority_operations (
     eth_hash bytea NOT NULL
 );
 
-CREATE TABLE rollup_ops (
-    id SERIAL PRIMARY KEY,
-    block_num BIGINT NOT NULL,
-    operation JSONB NOT NULL,
-    fee_account BIGINT NOT NULL
-);
-
-CREATE TABLE mempool (
-    HASH bytea PRIMARY KEY,
-    primary_account_address bytea NOT NULL,
-    nonce BIGINT NOT NULL,
-    tx jsonb NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now()
-);
-
+-- Table for the executed common operations (e.g. transfer).
 CREATE TABLE executed_transactions (
     id serial PRIMARY KEY,
     block_number BIGINT NOT NULL,
@@ -79,6 +89,8 @@ CREATE TABLE executed_transactions (
 -- Tokens section --
 -- -------------- --
 
+-- Token types known to the ZKSync node.
+-- By default has the ETH token only (see the `INSERT` statement in the end of the file).
 CREATE TABLE tokens (
     id INTEGER NOT NULL PRIMARY KEY,
     address TEXT NOT NULL,
@@ -89,6 +101,7 @@ CREATE TABLE tokens (
 -- Accounts section --
 -- ---------------- --
 
+-- Table for the ZKSync accounts.
 CREATE TABLE accounts (
     id BIGINT NOT NULL PRIMARY KEY,
     last_block BIGINT NOT NULL,
@@ -97,6 +110,7 @@ CREATE TABLE accounts (
     pubkey_hash bytea NOT NULL
 );
 
+-- Table for the account balance change operations.
 CREATE TABLE account_balance_updates (
     balance_update_id serial NOT NULL,
     account_id BIGINT NOT NULL,
@@ -110,6 +124,7 @@ CREATE TABLE account_balance_updates (
     PRIMARY KEY (balance_update_id)
 );
 
+-- Table for the account creation operations.
 CREATE TABLE account_creates (
     account_id BIGINT NOT NULL,
     is_create bool NOT NULL,
@@ -120,6 +135,7 @@ CREATE TABLE account_creates (
     PRIMARY KEY (account_id, block_number)
 );
 
+-- Table for the account public key change operations.
 CREATE TABLE account_pubkey_updates (
     pubkey_update_id serial NOT NULL,
     update_order_id INTEGER NOT NULL,
@@ -132,6 +148,10 @@ CREATE TABLE account_pubkey_updates (
     PRIMARY KEY (pubkey_update_id)
 );
 
+-- Table for the account balances. One account can have several balances,
+-- but every balance account has must have an unique token (meaning that
+-- there may be user with `ETH` and `ERC-20` balances, but not with `ETH`
+-- and `ETH` balances).
 CREATE TABLE balances (
     account_id BIGINT REFERENCES accounts(id) ON UPDATE CASCADE ON DELETE CASCADE,
     coin_id INTEGER REFERENCES tokens(id) ON UPDATE CASCADE,
@@ -159,12 +179,14 @@ CREATE TABLE storage_state_update (
 -- Prover section --
 -- -------------- --
 
+-- Stored proofs for the blocks.
 CREATE TABLE proofs (
     block_number bigserial PRIMARY KEY,
     proof jsonb NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
+-- Ongoing block proving jobs.
 CREATE TABLE prover_runs (
     id serial PRIMARY KEY,
     block_number BIGINT NOT NULL,
@@ -173,6 +195,7 @@ CREATE TABLE prover_runs (
     updated_at TIMESTAMP NOT NULL DEFAULT now()
 );
 
+-- List of currently available provers.
 CREATE TABLE active_provers (
     id serial PRIMARY KEY,
     worker TEXT NOT NULL,
@@ -185,6 +208,8 @@ CREATE TABLE active_provers (
 -- Server config section --
 -- --------------------- --
 
+-- Unique server configuration entry.
+-- Expected to be initialized separately, e.g. by `zksync db-reset` or `zksync init` command.
 CREATE TABLE server_config (
     -- enforce single record
     id bool PRIMARY KEY NOT NULL DEFAULT true,
@@ -197,6 +222,7 @@ CREATE TABLE server_config (
 -- ETH section --
 -- ----------- --
 
+-- Stored Ethereum anchoring operations.
 CREATE TABLE eth_operations (
     id bigserial PRIMARY KEY,
     nonce BIGINT NOT NULL,
