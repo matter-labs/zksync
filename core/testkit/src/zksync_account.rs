@@ -67,6 +67,7 @@ impl ZksyncAccount {
         *self.nonce.lock().unwrap() = new_nonce;
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn sign_transfer(
         &self,
         token_id: TokenId,
@@ -102,6 +103,7 @@ impl ZksyncAccount {
         (transfer, eth_signature)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn sign_withdraw(
         &self,
         token_id: TokenId,
