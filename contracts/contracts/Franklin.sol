@@ -451,7 +451,7 @@ contract Franklin is Storage, Config, Events {
                 Operations.OpType.Deposit,
                 pubData
             );
-            verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
+            commitNextPriorityOperation(onchainOps[totalOnchainOps]);
 
             totalOnchainOps++;
 
@@ -476,7 +476,7 @@ contract Franklin is Storage, Config, Events {
                 pubData
             );
 
-            verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
+            commitNextPriorityOperation(onchainOps[totalOnchainOps]);
 
             totalOnchainOps++;
             return FULL_EXIT_BYTES;
@@ -528,7 +528,7 @@ contract Franklin is Storage, Config, Events {
         return hash;
     }
 
-    function verifyNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
+    function commitNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
         require(totalOpenPriorityRequests > totalCommittedPriorityRequests, "vnp11"); // no more priority requests in queue
 
         uint64 _priorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;

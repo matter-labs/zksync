@@ -25,7 +25,7 @@ contract Storage {
         uint16 tokenId;
     }
     
-    /// @notice Verified but not executed withdrawals for addresses stored in here
+    /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index)
     mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
     uint32 public firstPendingWithdrawalIndex;
     uint32 public numberOfPendingWithdrawals;
