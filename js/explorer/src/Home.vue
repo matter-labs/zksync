@@ -22,6 +22,9 @@
     <br>
     <b-container>
         <ClosableJumbotron></ClosableJumbotron>
+        <b-alert v-if="updateError" variant="danger" show>
+            {{updateError}}. Try again later.
+        </b-alert>
         <b-card bg-variant="light" >
             <h4>ZK Sync Devnet Block Explorer</h4> 
             <SearchField :searchFieldInMenu="false" />
@@ -102,6 +105,8 @@ export default {
                     active: true
                 },
             ],
+
+            updateError:        null,
         };
     },
     computed: {
@@ -119,8 +124,13 @@ export default {
         },
     },
     methods: {
-        ticker() {
-            this.update(true);
+        async ticker() {
+            try {
+                await this.update(true);
+                this.updateError = null;
+            } catch (e) {
+                this.updateError = e.message || "Unknown error";
+            }
         },
         onRowClicked(item) {
             this.$router.push('/blocks/' + item.block_number);
