@@ -8,7 +8,8 @@ use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, Execute
 use models::node::operations::{ChangePubKeyOp, FranklinOp};
 use models::node::priority_ops::PriorityOp;
 use models::node::{
-    CloseOp, Deposit, DepositOp, Fr, FullExit, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    Address, CloseOp, Deposit, DepositOp, Fr, FullExit, FullExitOp, Token, TransferOp,
+    TransferToNewOp, WithdrawOp,
 };
 use testkit::zksync_account::ZksyncAccount;
 // Local imports
@@ -20,6 +21,12 @@ use crate::StorageProcessor;
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn get_account_transactions_history() {
+    let tokens = vec![
+        Token::new(0, Address::zero(), "ETH"),   // used for deposits
+        Token::new(1, Address::random(), "DAI"), // used for transfers
+        Token::new(2, Address::random(), "FAU"), // used for withdraws
+    ];
+
     let from_zksync_account = ZksyncAccount::rand();
     let from_account_id = 0xbabe;
     let from_account_address = from_zksync_account.address;
@@ -30,14 +37,13 @@ fn get_account_transactions_history() {
     let to_account_address = to_zksync_account.address;
     let to_account_address_string = format!("{:?}", &to_account_address);
 
-    let token = 0;
     let amount = BigDecimal::from(1);
 
     let executed_deposit_op = {
         let deposit_op = FranklinOp::Deposit(Box::new(DepositOp {
             priority_op: Deposit {
                 from: from_account_address,
-                token,
+                token: tokens[0].id,
                 amount: amount.clone(),
                 to: to_account_address,
             },
@@ -64,7 +70,7 @@ fn get_account_transactions_history() {
             priority_op: FullExit {
                 account_id: from_account_id,
                 eth_address: from_account_address,
-                token,
+                token: tokens[2].id,
             },
             withdraw_amount: Some(amount.clone()),
         }));
@@ -87,7 +93,7 @@ fn get_account_transactions_history() {
     let executed_transfer_to_new_op = {
         let transfer_to_new_op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx: from_zksync_account.sign_transfer(
-                token,
+                tokens[1].id,
                 amount.clone(),
                 BigDecimal::from(0),
                 &to_account_address,
@@ -112,7 +118,7 @@ fn get_account_transactions_history() {
     let executed_transfer_op = {
         let transfer_op = FranklinOp::Transfer(Box::new(TransferOp {
             tx: from_zksync_account.sign_transfer(
-                token,
+                tokens[1].id,
                 amount.clone(),
                 BigDecimal::from(0),
                 &to_account_address,
@@ -137,7 +143,7 @@ fn get_account_transactions_history() {
     let executed_withdraw_op = {
         let withdraw_op = FranklinOp::Withdraw(Box::new(WithdrawOp {
             tx: from_zksync_account.sign_withdraw(
-                token,
+                tokens[2].id,
                 amount.clone(),
                 BigDecimal::from(0),
                 &to_account_address,
@@ -215,7 +221,7 @@ fn get_account_transactions_history() {
             (
                 Some(from_account_address_string.as_str()),
                 Some(to_account_address_string.as_str()),
-                Some(&token),
+                Some(tokens[0].symbol.clone()),
                 Some(amount.to_string()),
             ),
         );
@@ -224,7 +230,7 @@ fn get_account_transactions_history() {
             (
                 Some(from_account_address_string.as_str()),
                 Some(to_account_address_string.as_str()),
-                Some(&token),
+                Some(tokens[1].symbol.clone()),
                 Some(amount.to_string()),
             ),
         );
@@ -233,7 +239,7 @@ fn get_account_transactions_history() {
             (
                 Some(from_account_address_string.as_str()),
                 Some(to_account_address_string.as_str()),
-                Some(&token),
+                Some(tokens[2].symbol.clone()),
                 Some(amount.to_string()),
             ),
         );
@@ -243,6 +249,10 @@ fn get_account_transactions_history() {
     // execute_operation
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
+        for token in &tokens {
+            conn.tokens_schema().store_token(token.clone())?;
+        }
+
         conn.chain().block_schema().save_block_transactions(block)?;
 
         let from_history = conn
@@ -257,17 +267,18 @@ fn get_account_transactions_history() {
 
             if let Some((from, to, token, amount)) = expected_behavior.get(tx_type) {
                 let tx_info = match tx_type {
-                    "Deposit" => tx.tx["priority_op"].clone(),
+                    "Deposit" | "FullExit" => tx.tx["priority_op"].clone(),
                     _ => tx.tx.clone(),
                 };
                 let tx_from_addr = tx_info["from"].as_str();
                 let tx_to_addr = tx_info["to"].as_str();
-                let tx_token = tx_info["token"].as_u64().map(|x| x as u16);
+                let tx_token = tx_info["token"].as_str().map(String::from);
                 let tx_amount = tx_info["amount"].as_str().map(String::from);
 
+                println!("tx_type: {} info: {:#?}", tx_type, tx_info);
                 assert_eq!(tx_from_addr, *from);
                 assert_eq!(tx_to_addr, *to);
-                assert_eq!(tx_token, token.cloned());
+                assert_eq!(tx_token, *token);
                 assert_eq!(tx_amount, *amount);
             }
         }

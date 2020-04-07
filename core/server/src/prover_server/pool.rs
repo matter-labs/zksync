@@ -303,7 +303,7 @@ impl Maintainer {
             "There is no state to build a circuit account tree"
         );
 
-        let mut account_tree = CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+        let mut account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
 
         if let Some((_, ref state)) = self.account_state {
             for (&account_id, account) in state {

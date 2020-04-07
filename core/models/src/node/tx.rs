@@ -114,8 +114,7 @@ impl Transfer {
     }
 
     pub fn check_correctness(&self) -> bool {
-        self.from != self.to
-            && self.amount.is_integer() // TODO: remove after # 366
+        self.amount.is_integer() // TODO: remove after # 366
             && self.fee.is_integer()
             && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee)
@@ -173,11 +172,11 @@ impl Withdraw {
     }
 
     pub fn check_correctness(&self) -> bool {
-        is_fee_amount_packable(&self.fee)
-            && self.amount <= u128_to_bigdecimal(u128::max_value())
+        self.amount <= u128_to_bigdecimal(u128::max_value())
             && self.verify_signature().is_some()
             && self.amount.is_integer() // TODO: remove after # 366
             && self.fee.is_integer()
+            && is_fee_amount_packable(&self.fee)
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {

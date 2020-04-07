@@ -22,24 +22,22 @@ pub fn check_circuit(circuit: FranklinCircuit<Engine>) {
 pub fn test_genesis_plasma_state(
     accounts: Vec<(AccountId, Account)>,
 ) -> (PlasmaState, WitnessBuilder) {
-    if accounts.iter().any(|(id, _)| *id == 0) {
-        panic!("AccountId 0 is existing fee account");
+    const FEE_ACCOUNT_ID: u32 = 0;
+    if accounts.iter().any(|(id, _)| *id == FEE_ACCOUNT_ID) {
+        panic!("AccountId {} is existing fee account", FEE_ACCOUNT_ID);
     }
 
-    const FEE_ACCOUNT_ID: u32 = 0;
-    let validator_and_other_accounts : models::node::AccountMap = vec![(
-            FEE_ACCOUNT_ID,
-            Account::default_with_address(&Address::default()),
-        )]
-        .into_iter()
-        .chain(accounts.into_iter())
-        .collect();
+    let validator_and_other_accounts: models::node::AccountMap = vec![(
+        FEE_ACCOUNT_ID,
+        Account::default_with_address(&Address::default()),
+    )]
+    .into_iter()
+    .chain(accounts.into_iter())
+    .collect();
 
     let plasma_state = PlasmaState::new(validator_and_other_accounts, 1);
 
-    let mut circuit_account_tree =
-        CircuitAccountTree::new(models::params::account_tree_depth() as u32);
-
+    let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
     for (id, account) in plasma_state.get_accounts() {
         circuit_account_tree.insert(id, CircuitAccount::from(account))
     }
