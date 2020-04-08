@@ -276,7 +276,7 @@ export class Deployer {
         return contract;
     }
 
-    async addTestERC20Token() {
+    async addTestERC20Token(approve: boolean = true) {
         let erc20 = await deployContract(
             this.wallet, 
             this.bytecodes.ERC20,
@@ -288,13 +288,15 @@ export class Deployer {
         );
         this.addresses.ERC20 = erc20.address;
         await erc20.mint(this.wallet.address, parseEther("3000000000"), { nonce: await this.nextNonce() });
-        const governance = this.getDeployedProxyContract('Governance');
-        await governance.addToken(erc20.address, { nonce: await this.nextNonce() });
+        if (approve) {
+            const governance = this.getDeployedProxyContract('Governance');
+            await governance.addToken(erc20.address, { nonce: await this.nextNonce() });
+        }
         return erc20;
     }
 
-    async mintTestERC20Token(address) {
-        const erc20 = this.getDeployedContract("ERC20");
+    async mintTestERC20Token(address, erc20?: ethers.Contract) {
+        erc20 = erc20 || this.getDeployedContract("ERC20");
         const txCall = await erc20.mint(address, parseEther("3000000000"), { nonce: await this.nextNonce() });
         await txCall.wait();
     }
@@ -380,15 +382,5 @@ export class Deployer {
 
             console.log(`Published ${contractname} sources on https://${network}.etherscan.io/address/${contractaddress} with status`, status);
         }
-    }
-}
-
-export async function addTestNotApprovedERC20Token(wallet) {
-    try {
-        let erc20 = await deployContract(wallet, ERC20MintableContract, []);
-        await erc20.mint(wallet.address, bigNumberify("1000000000"));
-        return erc20;
-    } catch (err) {
-        console.error("Add token error:" + err);
     }
 }

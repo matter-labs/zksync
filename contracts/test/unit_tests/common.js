@@ -4,6 +4,7 @@ const { createMockProvider, getWallets, solidity, deployContract } = require("et
 const { bigNumberify, parseEther, hexlify, formatEther } = require("ethers/utils");
 
 const IERC20_INTERFACE = require("openzeppelin-solidity/build/contracts/IERC20");
+const abi = require('ethereumjs-abi')
 
 // For: geth
 
@@ -36,7 +37,7 @@ async function deployProxyContract(
     initArgsValues,
 ) {
     try {
-        const initArgsInBytes = await abiRawEncode(initArgs, initArgsValues);
+        const initArgsInBytes = await abi.rawEncode(initArgs, initArgsValues);
         const contract = await deployContract(wallet, contractCode, [], {
             gasLimit: 3000000,
         });

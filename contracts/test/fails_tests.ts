@@ -1,10 +1,5 @@
 import {ethers} from "ethers";
-import {
-    addTestERC20Token,
-    addTestNotApprovedERC20Token,
-    mintTestERC20Token,
-    Deployer,
-} from "../src.ts/deploy";
+import { Deployer } from "../src.ts/deploy";
 import {expect, use} from "chai";
 const { createMockProvider, getWallets, solidity } = require("ethereum-waffle");
 import {bigNumberify, hexlify, parseEther} from "ethers/utils";
@@ -57,11 +52,11 @@ describe("PLANNED FAILS", function () {
         verifierDeployedContract = await deployer.deployVerifier();
         governanceDeployedContract = await deployer.deployGovernance();
         franklinDeployedContract = await deployer.deployFranklin();
-        await governanceDeployedContract.setValidator(wallet.address, true);
-        erc20DeployedToken1 = await addTestERC20Token(wallet, governanceDeployedContract);
-        erc20DeployedToken2 = await addTestNotApprovedERC20Token(wallet);
-        await mintTestERC20Token(wallet, erc20DeployedToken1);
-        await mintTestERC20Token(wallet, erc20DeployedToken2);
+        await deployer.setGovernanceValidator();
+        erc20DeployedToken1 = await deployer.addTestERC20Token(true);
+        erc20DeployedToken2 = await deployer.addTestERC20Token(false);
+        await deployer.mintTestERC20Token(wallet.address, erc20DeployedToken1);
+        await deployer.mintTestERC20Token(wallet.address, erc20DeployedToken2);
         // Make sure that exit wallet can execute transactions.
         await wallet.sendTransaction({to: exitWallet.address, value: parseEther("1.0")});
     });
