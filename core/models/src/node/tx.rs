@@ -1,8 +1,8 @@
 use super::{Nonce, TokenId};
 
 use crate::node::{
-    is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount, CloseOp,
-    TransferOp, WithdrawOp,
+    is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
+    public_key_from_private, CloseOp, TransferOp, WithdrawOp,
 };
 use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
@@ -446,11 +446,7 @@ impl TxSignature {
         );
 
         Self {
-            pub_key: PackedPublicKey(PublicKey::from_private(
-                pk,
-                FixedGenerators::SpendingKeyGenerator,
-                &JUBJUB_PARAMS,
-            )),
+            pub_key: PackedPublicKey(public_key_from_private(pk)),
             signature: PackedSignature(signature),
         }
     }
@@ -466,11 +462,7 @@ impl TxSignature {
         );
 
         Self {
-            pub_key: PackedPublicKey(PublicKey::from_private(
-                pk,
-                FixedGenerators::SpendingKeyGenerator,
-                &JUBJUB_PARAMS,
-            )),
+            pub_key: PackedPublicKey(public_key_from_private(pk)),
             signature: PackedSignature(signature),
         }
     }
@@ -490,13 +482,20 @@ impl TxSignature {
         );
 
         Self {
-            pub_key: PackedPublicKey(PublicKey::from_private(
-                pk,
-                FixedGenerators::SpendingKeyGenerator,
-                &JUBJUB_PARAMS,
-            )),
+            pub_key: PackedPublicKey(public_key_from_private(pk)),
             signature: PackedSignature(signature),
         }
+    }
+
+    /// Deserialize signature from packed bytes representation.
+    /// [0..32] - packed pubkey of the signer.
+    /// [32..96] - packed r,s of the signature
+    pub fn deserialize_from_packed_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
+        ensure!(bytes.len() == 32 + 64, "packed signature length mismatch");
+        Ok(Self {
+            pub_key: PackedPublicKey::deserialize_packed(&bytes[0..32])?,
+            signature: PackedSignature::deserialize_packed(&bytes[32..])?,
+        })
     }
 }
 

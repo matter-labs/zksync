@@ -14,7 +14,7 @@ serde_json = "1.0.0"
 
 web3 = "0.8.0"
 
-hex = "0.3.2"
+hex = "0.4"
 
 futures = { version = "0.3", features = ["compat"] }
 

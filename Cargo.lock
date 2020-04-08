@@ -472,7 +472,7 @@ dependencies = [
  "cfg-if",
  "crossbeam",
  "futures 0.3.4",
- "hex 0.3.2",
+ "hex",
  "lazy_static",
  "num_cpus",
  "pairing_ce",
@@ -690,7 +690,7 @@ dependencies = [
  "bigdecimal",
  "crypto_exports",
  "handlebars",
- "hex 0.3.2",
+ "hex",
  "log 0.4.8",
  "models",
  "num-traits",
@@ -995,7 +995,7 @@ dependencies = [
  "ethabi",
  "failure",
  "futures 0.3.4",
- "hex 0.3.2",
+ "hex",
  "lazy_static",
  "log 0.4.8",
  "models",
@@ -1244,7 +1244,7 @@ checksum = "83c0a6a2c53b0bd6d8cae976816dc8a171e0554c03f304e3dac110473e0219fd"
 dependencies = [
  "byteorder",
  "ff_derive_ce",
- "hex 0.4.2",
+ "hex",
  "rand 0.4.6",
 ]
 
@@ -1568,12 +1568,6 @@ checksum = "725cf19794cf90aa94e65050cb4191ff5d8fa87a498383774c47b332e3af952e"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "hex"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "805026a5d0141ffc30abb3be3173848ad46a1b1664fe632428479619a3644d77"
 
 [[package]]
 name = "hex"
@@ -1949,7 +1943,7 @@ dependencies = [
  "clap",
  "crypto_exports",
  "env_logger",
- "hex 0.3.2",
+ "hex",
  "log 0.4.8",
  "models",
  "rust-crypto",
@@ -1994,7 +1988,7 @@ dependencies = [
  "env_logger",
  "failure",
  "futures 0.3.4",
- "hex 0.3.2",
+ "hex",
  "jsonrpc-core 14.0.5",
  "log 0.4.8",
  "models",
@@ -2223,7 +2217,7 @@ dependencies = [
  "failure",
  "fnv",
  "futures 0.3.4",
- "hex 0.3.2",
+ "hex",
  "lazy_static",
  "log 0.4.8",
  "rayon",
@@ -2685,14 +2679,13 @@ dependencies = [
  "failure",
  "fnv",
  "futures 0.1.29",
- "hex 0.3.2",
+ "hex",
  "log 0.4.8",
  "models",
  "num-traits",
  "plasma",
  "reqwest",
  "rust-crypto",
- "rustc-hex",
  "serde",
  "serde_derive",
  "serde_json",
@@ -3310,7 +3303,7 @@ dependencies = [
  "failure",
  "futures 0.1.29",
  "futures 0.3.4",
- "hex 0.3.2",
+ "hex",
  "itertools",
  "jsonrpc-core 14.0.5",
  "jsonrpc-core-client",
@@ -3432,7 +3425,7 @@ dependencies = [
  "actix-web",
  "crypto_exports",
  "env_logger",
- "hex 0.3.2",
+ "hex",
  "log 0.4.8",
  "models",
  "serde",
@@ -3457,7 +3450,7 @@ dependencies = [
  "env_logger",
  "failure",
  "fnv",
- "hex 0.4.2",
+ "hex",
  "itertools",
  "log 0.4.8",
  "models",

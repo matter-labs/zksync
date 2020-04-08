@@ -13,7 +13,7 @@ time = "0.1"
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 models = { path = "../models", version = "0.0.1" }
 circuit= { path = "../circuit", version = "0.1.1" }
-hex = "0.3.2"
+hex = "0.4"
 rust-crypto = "0.2"
 log = "0.4"
 env_logger = "0.6"

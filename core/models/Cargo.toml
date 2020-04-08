@@ -17,7 +17,7 @@ lazy_static = "1.2.0"
 rayon = "1.0.3"
 fnv = "1.0.3"
 rust-crypto = "0.2"
-hex = "0.3"
+hex = "0.4"
 failure = "0.1"
 log = "0.4"
 futures = { version = "0.3", features = ["compat"] }

@@ -1,15 +1,22 @@
 //! Utils for signing zksync transactions.
 //! This crate is compiled into wasm to be used in `zksync.js`.
 
+#[cfg(test)]
+mod tests;
 mod utils;
 
 const PACKED_POINT_SIZE: usize = 32;
 const PACKED_SIGNATURE_SIZE: usize = 64;
 
 pub use crypto_exports::franklin_crypto::bellman::pairing::bn256::{Bn256 as Engine, Fr};
+use crypto_exports::franklin_crypto::group_hash::BlakeHasher;
+use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
+
 pub type Fs = <Engine as JubjubEngine>::Fs;
+
 thread_local! {
     pub static JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();
+    pub static RESCUE_PARAMS: Bn256RescueParams = Bn256RescueParams::new_2_into_1::<BlakeHasher>();
 }
 
 use wasm_bindgen::prelude::*;
@@ -21,7 +28,7 @@ use crypto_exports::franklin_crypto::{
     jubjub::JubjubEngine,
 };
 
-use crate::utils::{pedersen_hash_tx_msg, pub_key_hash, set_panic_hook};
+use crate::utils::{pub_key_hash, rescue_hash_tx_msg, set_panic_hook};
 use sha2::{Digest, Sha256};
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -31,8 +38,11 @@ use sha2::{Digest, Sha256};
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 #[wasm_bindgen]
+/// This method initializes params for current thread, otherwise they will be initialized when signing
+/// first message.
 pub fn init() {
     JUBJUB_PARAMS.with(|_| {});
+    RESCUE_PARAMS.with(|_| {});
     set_panic_hook();
 }
 
@@ -42,14 +52,16 @@ pub fn private_key_from_seed(seed: &[u8]) -> Vec<u8> {
         panic!("Seed is too short");
     };
 
-    let mut effective_seed = seed.to_vec();
+    let sha256_bytes = |input: &[u8]| -> Vec<u8> {
+        let mut hasher = Sha256::new();
+        hasher.input(input);
+        hasher.result().to_vec()
+    };
+
+    let mut effective_seed = sha256_bytes(seed);
 
     loop {
-        let raw_priv_key = {
-            let mut hasher = Sha256::new();
-            hasher.input(&effective_seed);
-            hasher.result().to_vec()
-        };
+        let raw_priv_key = sha256_bytes(&effective_seed);
         let mut fs_repr = FsRepr::default();
         fs_repr
             .read_be(&raw_priv_key[..])
@@ -81,33 +93,49 @@ pub fn private_key_to_pubkey_hash(private_key: &[u8]) -> Vec<u8> {
 }
 
 #[wasm_bindgen]
-pub fn sign_musig_sha256(private_key: &[u8], msg: &[u8]) -> Vec<u8> {
+/// We use musig Schnorr signature scheme.
+/// It is impossible to restore signer for signature, that is why we provide public key of the signer
+/// along with signature.
+/// [0..32] - packed public key of signer.
+/// [32..64] - packed r point of the signature.
+/// [64..96] - s poing of the signature.
+pub fn sign_musig_rescue(private_key: &[u8], msg: &[u8]) -> Vec<u8> {
+    let mut packed_full_signature = Vec::with_capacity(PACKED_POINT_SIZE + PACKED_SIGNATURE_SIZE);
+    //
     let p_g = FixedGenerators::SpendingKeyGenerator;
-    let sk = read_signing_key(private_key);
+    let private_key = read_signing_key(private_key);
 
-    let pubkey = JUBJUB_PARAMS.with(|params| PublicKey::from_private(&sk, p_g, params));
-    let mut packed_point = [0u8; PACKED_POINT_SIZE];
-    pubkey
-        .write(packed_point.as_mut())
-        .expect("failed to write pubkey to packed_point");
+    {
+        let public_key =
+            JUBJUB_PARAMS.with(|params| PublicKey::from_private(&private_key, p_g, params));
+        public_key
+            .write(&mut packed_full_signature)
+            .expect("failed to write pubkey to packed_point");
+    };
+    //
+    let signature = JUBJUB_PARAMS.with(|jubjub_params| {
+        RESCUE_PARAMS.with(|rescue_params| {
+            let hashed_msg = rescue_hash_tx_msg(msg);
+            let seed = Seed::deterministic_seed(&private_key, &hashed_msg);
+            private_key.musig_rescue_sign(&hashed_msg, &seed, p_g, rescue_params, jubjub_params)
+        })
+    });
 
-    let signable_msg = pedersen_hash_tx_msg(msg);
-
-    let seed1 = Seed::deterministic_seed(&sk, &signable_msg);
-    let sign =
-        JUBJUB_PARAMS.with(|params| sk.musig_sha256_sign(&signable_msg, &seed1, p_g, params));
-
-    let mut packed_signature = [0u8; PACKED_SIGNATURE_SIZE];
-    let (r_bar, s_bar) = packed_signature.as_mut().split_at_mut(PACKED_POINT_SIZE);
-
-    sign.r.write(r_bar).expect("failed to write signature");
-    sign.s
+    signature
+        .r
+        .write(&mut packed_full_signature)
+        .expect("failed to write signature");
+    signature
+        .s
         .into_repr()
-        .write_le(s_bar)
+        .write_le(&mut packed_full_signature)
         .expect("failed to write signature repr");
 
-    let mut result = Vec::with_capacity(PACKED_POINT_SIZE + PACKED_SIGNATURE_SIZE);
-    result.extend_from_slice(&packed_point);
-    result.extend_from_slice(&packed_signature[..]);
-    result
+    assert_eq!(
+        packed_full_signature.len(),
+        PACKED_POINT_SIZE + PACKED_SIGNATURE_SIZE,
+        "incorrect signature size when signing"
+    );
+
+    packed_full_signature
 }

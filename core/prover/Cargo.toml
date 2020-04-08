@@ -10,9 +10,8 @@ storage = { path = "../storage", version = "0.0.1" }
 circuit = { path = "../circuit", version = "0.1.1"}
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
-hex = "0.3"
+hex = "0.4"
 rust-crypto = "0.2"
-rustc-hex = "2.0.1"
 
 web3 = "0.8.0"
 signal-hook = "0.1.8"

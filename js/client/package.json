@@ -14,7 +14,7 @@
     "bootstrap-vue": "^2.0.0",
     "clipboard": "^2.0.4",
     "core-js": "^2.6.5",
-    "ethers": "^4.0.37",
+    "ethers": "^4.0.46",
     "ethjs": "^0.4.0",
     "ethjs-util": "^0.1.6",
     "is-reachable": "^4.0.0",

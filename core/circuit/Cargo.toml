@@ -13,7 +13,7 @@ models = { path = "../models", version = "0.0.1" }
 plasma = { path = "../plasma", version = "0.1.1" }
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 rust-crypto = "0.2"
-hex = "0.3.2"
+hex = "0.4"
 num-traits = "0.2"
 log = "0.4"
 serde = "1.0.90"

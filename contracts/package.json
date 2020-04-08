@@ -11,7 +11,7 @@
     "chai": "^4.2.0",
     "ethereum-waffle": "2.0.12",
     "ethereumjs-abi": "^0.6.8",
-    "ethers": "4.0.33",
+    "ethers": "4.0.46",
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
     "mocha": "^6.2.0",
@@ -45,5 +45,8 @@
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",
     "prettier:solidity": "prettier --write contracts/**/*.sol",
     "exampleDeposits": "ts-node scripts/exampleDeposits.ts"
+  },
+  "resolutions": {
+    "ethereum-waffle/ethers": "4.0.46"
   }
 }
