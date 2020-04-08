@@ -378,20 +378,25 @@ mod test {
         let to_account_address = "2222222222222222222222222222222222222222".parse().unwrap();
         let to_account = Account::default_with_address(&to_account_address);
 
-        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![
+        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![
             (from_account_id, from_account),
             (to_account_id, to_account),
         ]);
+        let fee_account_id = 0;
+        let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let transfer_op = TransferOp {
-            tx: from_zksync_account.sign_transfer(
-                0,
-                BigDecimal::from(7),
-                BigDecimal::from(3),
-                &to_account_address,
-                None,
-                true,
-            ),
+            tx: from_zksync_account
+                .sign_transfer(
+                    0,
+                    "",
+                    BigDecimal::from(7),
+                    BigDecimal::from(3),
+                    &to_account_address,
+                    None,
+                    true,
+                )
+                .0,
             from: from_account_id,
             to: to_account_id,
         };
@@ -453,18 +458,24 @@ mod test {
             account
         };
 
-        let (mut plasma_state, mut witness_accum) =
+        let (mut plasma_state, mut circuit_account_tree) =
             test_genesis_plasma_state(vec![(from_account_id, from_account)]);
 
+        let fee_account_id = 0;
+        let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
+
         let transfer_op = TransferOp {
-            tx: from_zksync_account.sign_transfer(
-                0,
-                BigDecimal::from(7),
-                BigDecimal::from(3),
-                &from_account_address,
-                None,
-                true,
-            ),
+            tx: from_zksync_account
+                .sign_transfer(
+                    0,
+                    "",
+                    BigDecimal::from(7),
+                    BigDecimal::from(3),
+                    &from_account_address,
+                    None,
+                    true,
+                )
+                .0,
             from: from_account_id,
             to: from_account_id,
         };

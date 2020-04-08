@@ -8,6 +8,7 @@ use crypto_exports::franklin_crypto::bellman;
 use crypto_exports::pairing::ff::PrimeField;
 // Workspace deps
 use circuit::witness::deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness};
+use circuit::witness::utils::WitnessBuilder;
 use models::node::operations::DepositOp;
 use models::node::{Deposit, Engine, Fr};
 use models::params::block_chunk_sizes;
@@ -141,7 +142,9 @@ fn prover_proves_a_block_and_publishes_result() {
 
 fn new_test_data_for_prover() -> ProverData {
     use circuit::witness::test_utils::test_genesis_plasma_state;
-    let (_plasma_state, mut witness_accum) = test_genesis_plasma_state(Vec::new());
+    let (_plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(Vec::new());
+    let fee_account_id = 0;
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let empty_account_id = 1;
     let empty_account_address = [7u8; 20].into();

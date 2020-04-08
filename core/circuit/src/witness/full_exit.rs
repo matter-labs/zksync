@@ -11,6 +11,7 @@ use models::circuit::utils::{
 };
 use models::node::FullExitOp;
 use models::params as franklin_constants;
+
 pub struct FullExitData {
     pub token: u32,
     pub account_address: u32,
@@ -227,6 +228,7 @@ mod test {
         apply_full_exit_tx, calculate_full_exit_operations_from_witness,
     };
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
+    use crate::witness::utils::WitnessBuilder;
     use bigdecimal::BigDecimal;
     use models::node::{Account, FullExit, FullExitOp};
     use testkit::zksync_account::ZksyncAccount;
@@ -244,8 +246,10 @@ mod test {
             account
         };
 
-        let (mut plasma_state, mut witness_accum) =
+        let (mut plasma_state, mut circuit_account_tree) =
             test_genesis_plasma_state(vec![(account_id, account)]);
+        let fee_account_id = 0;
+        let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let full_exit_op = FullExitOp {
             priority_op: FullExit {
@@ -287,7 +291,9 @@ mod test {
         let account_id = 1;
         let account_address = zksync_account.address;
 
-        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(Vec::new());
+        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(Vec::new());
+        let fee_account_id = 0;
+        let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let full_exit_op = FullExitOp {
             priority_op: FullExit {
