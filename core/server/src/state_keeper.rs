@@ -1,5 +1,4 @@
-use std::collections::VecDeque;
-use std::time::Instant;
+use std::collections::{HashMap, VecDeque};
 // External uses
 use futures::channel::{mpsc, oneshot};
 use futures::stream::StreamExt;
@@ -10,10 +9,11 @@ use crate::mempool::ProposedBlock;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
-    Account, AccountTree, AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
+    Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
 };
 use models::params::max_block_chunk_size;
-use models::{ActionType, CommitRequest};
+use models::ActionType;
+use models::CommitRequest;
 use plasma::state::{OpSuccess, PlasmaState};
 use storage::ConnectionPool;
 use web3::types::Address;
@@ -86,12 +86,98 @@ pub struct PlasmaStateInitParams {
 }
 
 impl PlasmaStateInitParams {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
-            tree: AccountTree::new(models::params::account_tree_depth() as u32),
+            tree: AccountTree::new(models::params::account_tree_depth()),
             acc_id_by_addr: HashMap::new(),
             last_block_number: 0,
             unprocessed_priority_op: 0,
+        }
+    }
+
+    pub fn restore_from_db(db_pool: ConnectionPool) -> Result<Self, failure::Error> {
+        let storage = db_pool
+            .access_storage()
+            .expect("db connection failed for state restore");
+
+        let mut init_params = Self::new();
+        init_params.load_from_db(None, &storage)?;
+        Ok(init_params)
+    }
+
+    pub fn load_from_db(
+        &mut self,
+        block_number: Option<BlockNumber>,
+        storage: &storage::StorageProcessor,
+    ) -> Result<(), failure::Error> {
+        let (block_number, accounts) = storage
+            .chain()
+            .state_schema()
+            .load_committed_state(block_number)
+            .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
+        for (account_id, account) in accounts.into_iter() {
+            self.insert_account(account_id, account);
+        }
+        self.last_block_number = block_number;
+        self.unprocessed_priority_op = Self::unprocessed_priority_op_id(&storage, block_number)?;
+        Ok(())
+    }
+
+    pub fn load_state_diff(
+        &mut self,
+        storage: &storage::StorageProcessor,
+        to_block: BlockNumber,
+    ) -> Result<(), failure::Error> {
+        let state_diff = storage
+            .chain()
+            .state_schema()
+            .load_state_diff(self.last_block_number, Some(to_block))
+            .map_err(|e| failure::format_err!("failed to load committed state: {}", e))?;
+
+        if let Some((_, updates)) = state_diff {
+            for (id, update) in updates.into_iter() {
+                let updated_account = Account::apply_update(self.remove_account(id), update);
+                if let Some(account) = updated_account {
+                    self.insert_account(id, account);
+                }
+            }
+        }
+        self.unprocessed_priority_op = Self::unprocessed_priority_op_id(&storage, to_block)?;
+        self.last_block_number = to_block;
+        Ok(())
+    }
+
+    pub fn insert_account(&mut self, id: u32, acc: Account) {
+        self.acc_id_by_addr.insert(acc.address, id);
+        self.tree.insert(id, acc);
+    }
+
+    pub fn remove_account(&mut self, id: u32) -> Option<Account> {
+        if let Some(acc) = self.tree.remove(id) {
+            self.acc_id_by_addr.remove(&acc.address);
+            Some(acc)
+        } else {
+            None
+        }
+    }
+
+    fn unprocessed_priority_op_id(
+        storage: &storage::StorageProcessor,
+        block_number: BlockNumber,
+    ) -> Result<u64, failure::Error> {
+        let storage_op = storage
+            .chain()
+            .operations_schema()
+            .get_operation(block_number, ActionType::COMMIT);
+        if let Some(storage_op) = storage_op {
+            Ok(storage_op
+                .into_op(&storage)
+                .map_err(|e| failure::format_err!("could not convert storage_op: {}", e))?
+                .block
+                .processed_priority_ops
+                .1)
+        } else {
+            Ok(0)
         }
     }
 }
@@ -104,7 +190,11 @@ impl PlasmaStateKeeper {
         tx_for_commitments: mpsc::Sender<CommitRequest>,
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
     ) -> Self {
-        let state = PlasmaState::new(initial_state.tree, initial_state.acc_id_by_addr, initial_state.last_block_number + 1);
+        let state = PlasmaState::new(
+            initial_state.tree,
+            initial_state.acc_id_by_addr,
+            initial_state.last_block_number + 1,
+        );
 
         let (fee_account_id, _) = state
             .get_account_by_address(&fee_account_address)
@@ -158,7 +248,7 @@ impl PlasmaStateKeeper {
             .state_schema()
             .apply_state_update(0)
             .expect("db fail");
-        let state = PlasmaState::new(accounts, last_committed + 1);
+        let state = PlasmaState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         info!("Genesis block created, state: {}", state.root_hash());
         println!("GENESIS_ROOT=0x{}", root_hash.to_hex());

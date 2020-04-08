@@ -26,7 +26,7 @@ fn gen_account(id: u32) -> CircuitAccount<Bn256> {
 
 /// Measures the time of `RealSMT` creation time.
 fn smt_create(b: &mut Bencher<'_>) {
-    let depth = models::params::account_tree_depth() as u32;
+    let depth = models::params::account_tree_depth();
 
     b.iter(|| {
         RealSMT::new(black_box(depth));
@@ -35,7 +35,7 @@ fn smt_create(b: &mut Bencher<'_>) {
 
 /// Measures the time of insertion into an empty SMT.
 fn smt_insert_empty(b: &mut Bencher<'_>) {
-    let depth = models::params::account_tree_depth() as u32;
+    let depth = models::params::account_tree_depth();
 
     // Create an empty SMT and one account in setup.
     let tree = RealSMT::new(depth);
@@ -55,7 +55,7 @@ fn smt_insert_empty(b: &mut Bencher<'_>) {
 
 /// Measures the time of insertion into a non-empty SMT.
 fn smt_insert_filled(b: &mut Bencher<'_>) {
-    let depth = models::params::account_tree_depth() as u32;
+    let depth = models::params::account_tree_depth();
     let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
@@ -79,7 +79,7 @@ fn smt_insert_filled(b: &mut Bencher<'_>) {
 
 /// Measures the time of obtaining a SMT root hash.
 fn smt_root_hash(b: &mut Bencher<'_>) {
-    let depth = models::params::account_tree_depth() as u32;
+    let depth = models::params::account_tree_depth();
     let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.

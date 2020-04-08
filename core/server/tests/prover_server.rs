@@ -159,7 +159,7 @@ pub fn test_operation_and_wanted_prover_data(
     let validator_account_id: u32 = 0;
     accounts.insert(validator_account_id, validator_account.clone());
 
-    let mut state = plasma::state::PlasmaState::new(accounts, 1);
+    let mut state = plasma::state::PlasmaState::from_acc_map(accounts, 1);
     println!(
         "acc_number 0, acc {:?}",
         models::circuit::account::CircuitAccount::from(validator_account.clone()).pub_key_hash,

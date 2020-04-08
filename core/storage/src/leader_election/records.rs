@@ -4,10 +4,18 @@ use chrono::prelude::*;
 // Local imports
 use crate::schema::*;
 
-#[derive(Debug, Clone, Queryable, QueryableByName, Insertable, PartialEq)]
+#[derive(Debug, Clone, Queryable, QueryableByName, PartialEq)]
 #[table_name = "leader_election"]
 pub struct LeaderElection {
-    pub id: bool,
+    pub id: i32,
     pub name: String,
-    pub voted_at: NaiveDateTime, 
+    pub created_at: NaiveDateTime,
+    pub retired_at: Option<NaiveDateTime>,
+}
+
+#[derive(Debug, Clone, Insertable, PartialEq)]
+#[table_name = "leader_election"]
+pub struct NewLeaderElection {
+    pub name: String,
+    pub retired_at: Option<NaiveDateTime>,
 }

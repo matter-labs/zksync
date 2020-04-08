@@ -240,9 +240,10 @@ table! {
 
 table! {
     leader_election (id) {
-        id -> Bool,
+        id -> Int4,
         name -> Text,
-        voted_at -> Timestamp,
+        created_at -> Timestamp,
+        retired_at -> Nullable<Timestamp>,
     }
 }
 
