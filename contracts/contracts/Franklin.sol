@@ -155,6 +155,7 @@ contract Franklin is Storage, Config, Events {
         uint fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
 
         uint totalValue = fee + _amount;
+        require(totalValue >= _amount, "fdh10");  // integer overflow (fee + amount)
 
         require(msg.value >= totalValue, "fdh11"); // Not enough ETH provided
 
@@ -308,8 +309,6 @@ contract Franklin is Storage, Config, Events {
         governance.requireActiveValidator(msg.sender);
         require(!isBlockCommitmentExpired(), "fck12"); // committed blocks had expired
         if(!triggerExodusIfNeeded()) {
-            require(totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS, "fck13"); // too many blocks committed
-
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
@@ -662,7 +661,7 @@ contract Franklin is Storage, Config, Events {
         require(!exodusMode, "fre11"); // exodus mode activated
     }
 
-    /// @notice Checks if Exodus mode must be entered. If true - cancels outstanding deposits and emits ExodusMode event.
+    /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
@@ -670,8 +669,10 @@ contract Franklin is Storage, Config, Events {
         bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
             priorityRequests[firstPriorityRequestId].expirationBlock != 0;
         if (trigger) {
-            exodusMode = true;
-            emit ExodusMode();
+            if (!exodusMode) {
+                exodusMode = true;
+                emit ExodusMode();
+            }
             return true;
         } else {
             return false;
@@ -715,7 +716,9 @@ contract Franklin is Storage, Config, Events {
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
-        priorityRequests[firstPriorityRequestId+totalOpenPriorityRequests] = PriorityOperation({
+        uint64 nextPriorityRequestId =  firstPriorityRequestId + totalOpenPriorityRequests;
+
+        priorityRequests[nextPriorityRequestId] = PriorityOperation({
             opType: _opType,
             pubData: _pubData,
             expirationBlock: expirationBlock,
@@ -724,7 +727,7 @@ contract Franklin is Storage, Config, Events {
 
         emit NewPriorityRequest(
             msg.sender,
-            firstPriorityRequestId+totalOpenPriorityRequests,
+            nextPriorityRequestId,
             uint8(_opType),
             _pubData,
             expirationBlock,

@@ -9,8 +9,8 @@ contract Governance is Config {
 
     /// @notice Token added to Franklin net
     event TokenAdded(
-        address indexed token,
-        uint16 indexed tokenId
+        address token,
+        uint16 tokenId
     );
 
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades

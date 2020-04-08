@@ -41,16 +41,13 @@ contract Config {
     /// @notice ETH blocks verification expectation
     uint256 constant EXPECT_VERIFICATION_IN = 2 days / BLOCK_PERIOD;
 
-    /// @notice Max number of unverified blocks. To make sure that all reverted blocks can be copied under block gas limit!
-    uint256 constant MAX_UNVERIFIED_BLOCKS = 4 * 60 * 100;
-
     uint256 constant NOOP_BYTES = 1 * 8;
     uint256 constant DEPOSIT_BYTES = 6 * 8;
     uint256 constant TRANSFER_TO_NEW_BYTES = 5 * 8;
     uint256 constant PARTIAL_EXIT_BYTES = 6 * 8;
     uint256 constant CLOSE_ACCOUNT_BYTES = 1 * 8;
     uint256 constant TRANSFER_BYTES = 2 * 8;
-    
+
     /// @notice Full exit operation length
     uint256 constant FULL_EXIT_BYTES = 6 * 8;
 
