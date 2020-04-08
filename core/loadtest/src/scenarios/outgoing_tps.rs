@@ -2,6 +2,8 @@
 //! Runs scenario of deposits, withdraws and transfers. Scenario details are
 //! specified as input json file. Transactions are sent concurrently. Program exits
 //! successfully if all transactions get verified within configured timeout.
+//!
+//! This scenario measures the outgoing TPS.
 
 // Built-in import
 use std::{
@@ -28,7 +30,7 @@ use crate::{
 
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
 
-pub fn basic_scenario(mut ctx: ScenarioContext) {
+pub fn run_scenario(mut ctx: ScenarioContext) {
     let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec).clone();
     let rpc_addr = ctx.rpc_addr.clone();
 

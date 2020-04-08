@@ -28,3 +28,4 @@ bigdecimal = { version = "0.1.0", features = ["serde"]}
 rand = "0.4"
 log = "0.4"
 env_logger = "0.6"
+structopt = "0.3"

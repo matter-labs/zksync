@@ -1,3 +1,5 @@
+// Built-in imports
+use std::path::PathBuf;
 // External uses
 use serde_derive::Deserialize;
 use web3::types::H256;
@@ -28,7 +30,7 @@ pub struct TestSpec {
 
 impl TestSpec {
     /// Loads the spec from the file given its path.
-    pub fn load(filepath: String) -> TestSpec {
+    pub fn load(filepath: PathBuf) -> TestSpec {
         let buffer = std::fs::read_to_string(filepath).expect("Failed to read the test spec file");
         serde_json::from_str(&buffer).expect("Failed to parse accounts")
     }

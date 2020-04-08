@@ -10,13 +10,15 @@
 
 // Built-in import
 use std::env;
+use structopt::StructOpt;
 // External uses
 use tokio::runtime::Builder;
 // Workspace uses
 use models::config_options::ConfigurationOptions;
 // Local uses
-use self::{scenarios::basic_scenario::basic_scenario, scenarios::ScenarioContext};
+use self::{cli::CliOptions, scenarios::ScenarioContext};
 
+mod cli;
 mod rpc_client;
 mod scenarios;
 mod sent_transactions;
@@ -32,11 +34,18 @@ fn main() {
         .build()
         .expect("failed to construct tokio runtime");
 
-    let config = ConfigurationOptions::from_env();
-    let test_spec_path = env::args().nth(1).expect("test spec file not given");
     let rpc_addr = env::var("HTTP_RPC_API_ADDR").expect("HTTP_RPC_API_ADDR is missing");
+    let env_config = ConfigurationOptions::from_env();
+    let cli_args = CliOptions::from_args();
 
-    let context = ScenarioContext::new(config, test_spec_path, rpc_addr.clone(), tokio_runtime);
+    let context = ScenarioContext::new(
+        env_config,
+        cli_args.test_spec_path,
+        rpc_addr.clone(),
+        tokio_runtime,
+    );
 
-    basic_scenario(context);
+    let scenario = cli_args.scenario_type.into_scenario();
+
+    scenario(context);
 }
