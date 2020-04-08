@@ -294,6 +294,8 @@ contract Franklin is Storage, Config, Events {
         bytes calldata _ethWitness,
         uint32[] calldata _ethWitnessSizes
     ) external {
+        bytes memory publicData = _publicData;
+
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
@@ -306,12 +308,12 @@ contract Franklin is Storage, Config, Events {
             uint64 firstOnchainOpId = totalOnchainOps;
             uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
-            collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
+            collectOnchainOps(publicData, _ethWitness, _ethWitnessSizes);
 
             uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
             uint64 nOnchainOpsProcessed = totalOnchainOps - firstOnchainOpId;
 
-            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _publicData, firstOnchainOpId, nOnchainOpsProcessed, nPriorityRequestProcessed);
+            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, publicData, firstOnchainOpId, nOnchainOpsProcessed, nPriorityRequestProcessed);
             totalBlocksCommitted++;
 
             emit BlockCommitted(_blockNumber);
@@ -375,7 +377,7 @@ contract Franklin is Storage, Config, Events {
 
         while (pubDataPtr<pubDataEnd) {
             uint8 opType;
-            // read operation type from public data (the first byte)
+            // read operation type from public data (the first byte per each operation)
             assembly {
                 opType := shr(0xf8, mload(pubDataPtr))
             }
@@ -386,7 +388,7 @@ contract Franklin is Storage, Config, Events {
             } else {
                 // other operations processing
 
-                // calculation public data offset
+                // calculation of public data offset
                 uint256 pubdataOffset;
                 assembly {
                     pubdataOffset := sub(pubDataPtr, add(_publicData, 0x20))
