@@ -34,9 +34,9 @@ mod chain;
 mod config;
 mod data_restore;
 mod ethereum;
+mod leader_election;
 mod prover;
 mod tokens;
-mod leader_election;
 
 /// Runs the database test content within the test transaction, which provides an isolation
 /// for several tests running at the same time.

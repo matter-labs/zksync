@@ -93,9 +93,9 @@ pub mod connection;
 pub mod data_restore;
 pub mod diff;
 pub mod ethereum;
+pub mod leader_election;
 pub mod prover;
 pub mod tokens;
-pub mod leader_election;
 
 pub use crate::connection::ConnectionPool;
 
@@ -159,7 +159,7 @@ impl StorageProcessor {
     }
 
     // Gains access to the `LeaderElection` schema.
-    pub fn leader_election_schema(&self) ->  leader_election::LeaderElectionSchema<'_> {
+    pub fn leader_election_schema(&self) -> leader_election::LeaderElectionSchema<'_> {
         leader_election::LeaderElectionSchema(self)
     }
 

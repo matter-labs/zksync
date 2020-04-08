@@ -59,7 +59,11 @@ impl PlasmaState {
         empty
     }
 
-    pub fn new(balance_tree: AccountTree, account_id_by_address: HashMap<Address, AccountId>, current_block: u32) -> Self {
+    pub fn new(
+        balance_tree: AccountTree,
+        account_id_by_address: HashMap<Address, AccountId>,
+        current_block: u32,
+    ) -> Self {
         Self {
             balance_tree,
             block_number: current_block,

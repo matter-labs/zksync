@@ -5,13 +5,13 @@
 //!
 //! Right now logic of this actor is simple, but in future consensus will replace it using the same API.
 
-use futures::channel::{mpsc, oneshot};
-use futures::SinkExt;
-use tokio::runtime::Runtime;
-use tokio::time;
-use models::node::config::TX_MINIBATCH_CREATE_TIME;
 use crate::mempool::{GetBlockRequest, MempoolRequest, ProposedBlock};
 use crate::state_keeper::StateKeeperRequest;
+use futures::channel::{mpsc, oneshot};
+use futures::SinkExt;
+use models::node::config::TX_MINIBATCH_CREATE_TIME;
+use tokio::runtime::Runtime;
+use tokio::time;
 
 fn create_mempool_req(
     last_priority_op_number: u64,
