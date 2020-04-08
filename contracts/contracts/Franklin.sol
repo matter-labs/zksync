@@ -361,77 +361,100 @@ contract Franklin is Storage, Config, Events {
         internal {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
 
-        uint256 pubdataOffset = 0;
+        uint64 currentOnchainOps = 0;
+
+        uint256 pubDataPtr = 0;
+        uint256 pubDataEnd = 0;
+        assembly {
+            pubDataPtr := add(_publicData, 0x20)
+            pubDataEnd := add(pubDataPtr, mload(_publicData))
+        }
+
         uint64 ethWitnessOffset = 0;
         uint16 processedOperationsNeedsEthWitness = 0;
-        uint16 processedOnchainOpperations = 0;
 
-        while (pubdataOffset < _publicData.length) {
-            uint8 opType = uint8(_publicData[pubdataOffset]);
+        while (pubDataPtr<pubDataEnd) {
+            uint8 opType;
+            // read operation type from public data (the first byte)
+            assembly {
+                opType := shr(0xf8, mload(pubDataPtr))
+            }
 
+            // cheap transfer operation processing
             if (opType == uint8(Operations.OpType.Transfer)) {
-                pubdataOffset += TRANSFER_BYTES;
-            } else if (opType == uint8(Operations.OpType.Noop)) {
-                pubdataOffset += NOOP_BYTES;
-            } else if (opType == uint8(Operations.OpType.TransferToNew)) {
-                pubdataOffset += TRANSFER_TO_NEW_BYTES;
-            } else if (opType == uint8(Operations.OpType.CloseAccount)) {
-                pubdataOffset += CLOSE_ACCOUNT_BYTES;
-            } else if (opType == uint8(Operations.OpType.Deposit)) {
-                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
-                onchainOps[totalOnchainOps] = OnchainOperation(
-                    Operations.OpType.Deposit,
-                    pubData
-                );
-                verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
-                totalOnchainOps++;
+                pubDataPtr += TRANSFER_BYTES;
+            } else {
+                // other operations processing
 
-                pubdataOffset += DEPOSIT_BYTES;
-            } else if (opType == uint8(Operations.OpType.PartialExit)) {
-                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, PARTIAL_EXIT_BYTES - 1);
-                onchainOps[totalOnchainOps] = OnchainOperation(
-                    Operations.OpType.PartialExit,
-                    pubData
-                );
-                totalOnchainOps++;
-
-                pubdataOffset += PARTIAL_EXIT_BYTES;
-            } else if (opType == uint8(Operations.OpType.FullExit)) {
-                bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
-                onchainOps[totalOnchainOps] = OnchainOperation(
-                    Operations.OpType.FullExit,
-                    pubData
-                );
-                verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
-                totalOnchainOps++;
-
-                pubdataOffset += FULL_EXIT_BYTES;
-            } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
-                Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
-
-                // per each operation which needs eht witness, two leading bits in _ethWitness represents index of this operation in block
-                if (ethWitnessOffset + 1 < _ethWitness.length && (uint16(uint8(_ethWitness[ethWitnessOffset])) << 8) + uint8(_ethWitness[ethWitnessOffset + 1]) == processedOnchainOpperations) { // operation needs eth witness
-                    require(processedOperationsNeedsEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
-                    bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset + 2, _ethWitnessSizes[processedOperationsNeedsEthWitness]);
-
-                    bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
-                    require(valid, "fpp15"); // failed to verify change pubkey hash signature
-
-                    ethWitnessOffset += _ethWitnessSizes[processedOperationsNeedsEthWitness] + 2;
-                    processedOperationsNeedsEthWitness++;
-                } else {
-                    bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
-                    require(valid, "fpp16"); // new pub key hash is not authenticated properly
+                // calculation public data offset
+                uint256 pubdataOffset;
+                assembly {
+                    pubdataOffset := sub(pubDataPtr, add(_publicData, 0x20))
                 }
 
-                pubdataOffset += CHANGE_PUBKEY_BYTES;
-            } else {
-                revert("fpp14"); // unsupported op
+                if (opType == uint8(Operations.OpType.Noop)) {
+                    pubDataPtr += NOOP_BYTES;
+                } else if (opType == uint8(Operations.OpType.TransferToNew)) {
+                    pubDataPtr += TRANSFER_TO_NEW_BYTES;
+                } else if (opType == uint8(Operations.OpType.CloseAccount)) {
+                    pubDataPtr += CLOSE_ACCOUNT_BYTES;
+                } else if (opType == uint8(Operations.OpType.Deposit)) {
+                    bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
+                    onchainOps[totalOnchainOps + currentOnchainOps] = OnchainOperation(
+                        Operations.OpType.Deposit,
+                        pubData
+                    );
+                    verifyNextPriorityOperation(onchainOps[totalOnchainOps + currentOnchainOps]);
+                    currentOnchainOps++;
+
+                    pubDataPtr += DEPOSIT_BYTES;
+                } else if (opType == uint8(Operations.OpType.PartialExit)) {
+                    bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, PARTIAL_EXIT_BYTES - 1);
+                    onchainOps[totalOnchainOps + currentOnchainOps] = OnchainOperation(
+                        Operations.OpType.PartialExit,
+                        pubData
+                    );
+                    currentOnchainOps++;
+
+                    pubDataPtr += PARTIAL_EXIT_BYTES;
+                } else if (opType == uint8(Operations.OpType.FullExit)) {
+                    bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
+                    onchainOps[totalOnchainOps + currentOnchainOps] = OnchainOperation(
+                        Operations.OpType.FullExit,
+                        pubData
+                    );
+                    verifyNextPriorityOperation(onchainOps[totalOnchainOps + currentOnchainOps]);
+                    currentOnchainOps++;
+
+                    pubDataPtr += FULL_EXIT_BYTES;
+                } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
+                    require(processedOperationsNeedsEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
+                    Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
+
+                    if (_ethWitnessSizes[processedOperationsNeedsEthWitness] != 0) {
+                        bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsNeedsEthWitness]);
+
+                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
+                        require(valid, "fpp15"); // failed to verify change pubkey hash signature
+                    } else {
+                        bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
+                        require(valid, "fpp16"); // new pub key hash is not authenticated properly
+                    }
+
+                    ethWitnessOffset += _ethWitnessSizes[processedOperationsNeedsEthWitness];
+                    processedOperationsNeedsEthWitness++;
+
+                    pubDataPtr += CHANGE_PUBKEY_BYTES;
+                } else {
+                    revert("fpp14"); // unsupported op
+                }
             }
-            processedOnchainOpperations++;
         }
-        require(pubdataOffset == _publicData.length, "fcs12"); // last chunk exceeds pubdata
+        require(pubDataPtr == pubDataEnd, "fcs12"); // last chunk exceeds pubdata
         require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
+        require(processedOperationsNeedsEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
+
+        totalOnchainOps += currentOnchainOps;
     }
 
     /// @notice Verifies ethereum signature for given message and recovers address of the signer
@@ -473,7 +496,7 @@ contract Franklin is Storage, Config, Events {
         bytes32 _oldRoot,
         bytes32 _newRoot,
         bytes memory _publicData
-    ) internal view returns (bytes32) {
+    ) internal view returns (bytes32 commitment) {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount))
         );
@@ -484,8 +507,8 @@ contract Franklin is Storage, Config, Events {
         /// hash will be stored in 32 byte slots at the front of _publicData memory (at the place of storing _publicData.length)
         /// this is done to avoid copying _publicData
         /// at the end of this function _publicData length will be correctly stored again at the rigth place
-        bytes32[1] memory hashResult;
         assembly {
+            let hashResult := mload(0x40)
             let pubDataLen := mload(_publicData)
             mstore(_publicData, hash)
             // staticcall to the sha256 precompile at address 0x2
@@ -501,8 +524,9 @@ contract Franklin is Storage, Config, Events {
 
             // Use "invalid" to make gas estimation work
             switch success case 0 { invalid() }
+
+            commitment := mload(hashResult)
         }
-        return hashResult[0];
     }
 
     function verifyNextPriorityOperation(OnchainOperation memory _onchainOp) internal {

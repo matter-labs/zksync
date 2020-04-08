@@ -44,7 +44,7 @@ impl ExecutedOperations {
             .unwrap_or_default()
     }
 
-    pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
+    pub fn get_eth_witness_bytes(&self) -> Option<Option<Vec<u8>>> {
         self.get_executed_op().map(FranklinOp::eth_witness)
     }
 }
@@ -83,32 +83,18 @@ impl Block {
         executed_tx_pub_data
     }
 
-    fn get_noops(&self) -> usize {
-        self.smallest_block_size() - self.chunks_used()
-    }
-
     /// Returns eth_witness data and bytes used by each operation which needed them
     pub fn get_eth_witness_data(&self) -> (Vec<u8>, Vec<u64>) {
         let mut eth_witness = Vec::new();
         let mut used_bytes = Vec::new();
 
-        for (index, block_tx) in self.block_transactions.iter().enumerate() {
+        for block_tx in &self.block_transactions {
             if let Some(franklin_op) = block_tx.get_executed_op() {
-                let witness_bytes = franklin_op.eth_witness();
-                if !witness_bytes.is_empty() {
+                if let Some(witness_bytes) = franklin_op.eth_witness() {
                     used_bytes.push(witness_bytes.len() as u64);
-
-                    // per each operation which needs eht witness, two leading bits in _ethWitness represents index of this operation in block
-                    eth_witness.push(((index as u16) >> 8) as u8);
-                    eth_witness.push(((index as u16) & 0xff) as u8);
-
                     eth_witness.extend(witness_bytes.into_iter());
                 }
             }
-        }
-
-        for _ in 0..self.get_noops() {
-            used_bytes.push(0);
         }
 
         (eth_witness, used_bytes)
