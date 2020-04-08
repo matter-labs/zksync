@@ -1,6 +1,6 @@
 import {ethers} from "ethers";
 import {ArgumentParser} from "argparse";
-import {Deployer, addTestERC20Token, mintTestERC20Token} from "../src.ts/deploy";
+import {Deployer} from "../src.ts/deploy";
 
 async function main() {
     const parser = new ArgumentParser({
@@ -56,13 +56,16 @@ async function main() {
         await deployer.deployUpgradeGatekeeper();
         console.log(`UPGRADE_GATEKEEPER_ADDR=${await deployer.getDeployedContract('UpgradeGatekeeper').address}`);
         console.log(`Upgrade gatekeeper deployed, time: ${(Date.now() - timer) / 1000} secs`);
-
-        const governance = await deployer.getDeployedProxyContract('Governance');
-        await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
-
-        const erc20 = await addTestERC20Token(wallet, governance);
+        
+        await deployer.setGovernanceValidator();
+        
+        const erc20 = await deployer.addTestERC20Token();
         console.log("TEST_ERC20=" + erc20.address);
-        await mintTestERC20Token(testWallet, erc20);
+        await deployer.mintTestERC20Token(testWallet.address);
+    }
+
+    if (args.test) {
+        await deployer.sendEthToTestWallets();
     }
 
     if (args.publish) {

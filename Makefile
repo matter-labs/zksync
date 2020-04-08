@@ -170,9 +170,7 @@ loadtest: confirm_action
 	@bin/loadtest.sh
 
 integration-testkit: build-contracts
-	cargo run --bin testkit --release
-	cargo run --bin exodus_test --release
-	cargo run --bin migration_test --release
+	@bin/integration-testkit
 
 migration-test: build-contracts
 	cargo run --bin migration_test --release

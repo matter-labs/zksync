@@ -16,3 +16,9 @@ members = [
     "core/loadtest",
     "core/crypto_exports"
 ]
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+debug = true

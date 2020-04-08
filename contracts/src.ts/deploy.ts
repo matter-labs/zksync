@@ -7,12 +7,16 @@ import * as url from 'url';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const abi = require('ethereumjs-abi')
+export function abiRawEncode(args, vals) {
+    return Buffer.from(ethers.utils.defaultAbiCoder.encode(args, vals).slice(2), 'hex');
+}
+
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
 export const ERC20MintableContract = function () {
     let contract = require('openzeppelin-solidity/build/contracts/ERC20Mintable');
     contract.evm = { bytecode: contract.bytecode };
+    contract.interface = contract.abi;
     return contract
 }();
 
@@ -65,6 +69,14 @@ export class Deployer {
     addresses: any;
     deployTransactionHash: any;
 
+    private noncePromise: Promise<number>;
+    private nonceShift: number;
+
+    async nextNonce(): Promise<number> {
+        const shift = this.nonceShift++;
+        return shift + await this.noncePromise;
+    }
+
     constructor(public wallet: ethers.Wallet, isTest: boolean) {
         this.bytecodes = {
             GovernanceTarget:    isTest ? governanceTestContractCode        : governanceContractCode,
@@ -74,6 +86,7 @@ export class Deployer {
             Verifier:            proxyContractCode,
             Franklin:            proxyContractCode,
             UpgradeGatekeeper:   isTest ? upgradeGatekeeperTestContractCode : upgradeGatekeeperContractCode,
+            ERC20:               ERC20MintableContract,
         };
 
         this.addresses = {
@@ -84,12 +97,16 @@ export class Deployer {
             Verifier: process.env.VERIFIER_ADDR,
             Franklin: process.env.CONTRACT_ADDR,
             UpgradeGatekeeper: process.env.UPGRADE_GATEKEEPER_ADDR,
+            ERC20: process.env.TEST_ERC20,
         };
 
         this.deployTransactionHash = {
             Governance: process.env.GOVERNANCE_GENESIS_TX_HASH,
             Franklin: process.env.CONTRACT_GENESIS_TX_HASH,
         };
+
+        this.nonceShift = 0;
+        this.noncePromise = wallet.getTransactionCount();
     }
 
     getDeployTransactionHash(name) {
@@ -104,7 +121,7 @@ export class Deployer {
         );
     }
 
-    getDeployedContract(name) {
+    getDeployedContract(name): ethers.Contract {
         return new ethers.Contract(
             this.addresses[name],
             this.bytecodes[name].interface,
@@ -126,7 +143,7 @@ export class Deployer {
     }
     encodedInitializationArgs(contractName) {
         let [initArgs, initArgsValues] = this.initializationArgs(contractName);
-        return abi.rawEncode(initArgs, initArgsValues);
+        return abiRawEncode(initArgs, initArgsValues);
     }
     constructorArgs(contractName) {
         return {
@@ -160,7 +177,10 @@ export class Deployer {
             this.wallet,
             this.bytecodes.GovernanceTarget,
             this.constructorArgs('GovernanceTarget'),
-            { gasLimit: 3000000 },
+            {
+                gasLimit: 3000000,
+                nonce: await this.nextNonce(),
+            },
         );
         this.addresses.GovernanceTarget = target.address;
 
@@ -168,7 +188,10 @@ export class Deployer {
             this.wallet,
             this.bytecodes.Governance,
             this.constructorArgs('Governance'),
-            { gasLimit: 3000000 },
+            {
+                gasLimit: 3000000,
+                nonce: await this.nextNonce(),
+            },
         );
         this.addresses.Governance = proxy.address;
         this.deployTransactionHash.Governance = proxy.deployTransaction.hash;
@@ -180,7 +203,10 @@ export class Deployer {
             this.wallet,
             this.bytecodes.VerifierTarget,
             this.constructorArgs('VerifierTarget'),
-            { gasLimit: 3000000 },
+            {
+                gasLimit: 3000000,
+                nonce: await this.nextNonce(),
+            },
         );
         this.addresses.VerifierTarget = target.address;
 
@@ -188,7 +214,10 @@ export class Deployer {
             this.wallet,
             this.bytecodes.Verifier,
             this.constructorArgs('Verifier'),
-            { gasLimit: 3000000 },
+            {
+                gasLimit: 3000000,
+                nonce: await this.nextNonce(),
+            },
         );
         this.addresses.Verifier = proxy.address;
         return new ethers.Contract(proxy.address, this.bytecodes.VerifierTarget.interface, this.wallet);
@@ -199,7 +228,10 @@ export class Deployer {
             this.wallet,
             this.bytecodes.FranklinTarget,
             this.constructorArgs('FranklinTarget'),
-            { gasLimit: 6500000 },
+            { 
+                gasLimit: 6500000,
+                nonce: await this.nextNonce(),
+            },
         );
         this.addresses.FranklinTarget = target.address;
 
@@ -207,7 +239,10 @@ export class Deployer {
             this.wallet,
             this.bytecodes.Franklin,
             this.constructorArgs('Franklin'),
-            { gasLimit: 3000000 },
+            {
+                gasLimit: 3000000,
+                nonce: await this.nextNonce(),
+            },
         );
         this.addresses.Franklin = proxy.address;
         this.deployTransactionHash.Franklin = proxy.deployTransaction.hash;
@@ -219,19 +254,62 @@ export class Deployer {
             this.wallet,
             this.bytecodes.UpgradeGatekeeper,
             this.constructorArgs('UpgradeGatekeeper'),
-            { gasLimit: 3000000 },
+            {
+                gasLimit: 3000000,
+                nonce: await this.nextNonce(),
+            },
         );
         this.addresses.UpgradeGatekeeper = contract.address;
 
-        await (await this.getDeployedContract('Governance').transferMastership(contract.address)).wait();
-        await (await this.getDeployedContract('Verifier').transferMastership(contract.address)).wait();
-        await (await this.getDeployedContract('Franklin').transferMastership(contract.address)).wait();
+        const promises = [
+            await this.getDeployedContract('Governance').transferMastership(contract.address, { nonce: await this.nextNonce() }),
+            await this.getDeployedContract('Verifier').transferMastership(contract.address, { nonce: await this.nextNonce() }),
+            await this.getDeployedContract('Franklin').transferMastership(contract.address, { nonce: await this.nextNonce() }),
+    
+            await contract.addUpgradeable(this.addresses['Governance'], { nonce: await this.nextNonce() }),
+            await contract.addUpgradeable(this.addresses['Verifier'], { nonce: await this.nextNonce() }),
+            await contract.addUpgradeable(this.addresses['Franklin'], { nonce: await this.nextNonce() }),
+        ];
 
-        await (await contract.addUpgradeable(this.getDeployedContract('Governance').address)).wait();
-        await (await contract.addUpgradeable(this.getDeployedContract('Verifier').address)).wait();
-        await (await contract.addUpgradeable(this.getDeployedContract('Franklin').address)).wait();
-
+        await Promise.all(promises.map(tx => tx.wait()));
+    
         return contract;
+    }
+
+    async addTestERC20Token() {
+        let erc20 = await deployContract(
+            this.wallet, 
+            this.bytecodes.ERC20,
+            [], 
+            {
+                gasLimit: 3000000,
+                nonce: await this.nextNonce(),
+            }
+        );
+        this.addresses.ERC20 = erc20.address;
+        await erc20.mint(this.wallet.address, parseEther("3000000000"), { nonce: await this.nextNonce() });
+        const governance = this.getDeployedProxyContract('Governance');
+        await governance.addToken(erc20.address, { nonce: await this.nextNonce() });
+        return erc20;
+    }
+
+    async mintTestERC20Token(address) {
+        const erc20 = this.getDeployedContract("ERC20");
+        const txCall = await erc20.mint(address, parseEther("3000000000"), { nonce: await this.nextNonce() });
+        await txCall.wait();
+    }
+
+    async setGovernanceValidator() {
+        const governance = await this.getDeployedProxyContract('Governance');
+        await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true, { nonce: await this.nextNonce() });
+    }
+
+    async sendEthToTestWallets() {
+        for (let i = 0; i < 10; ++i) {
+            const to = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/" + i).address;
+            await this.wallet.sendTransaction({ to, value: parseEther("100"), nonce: await this.nextNonce() });
+            console.log(`sending ETH to ${to}`);
+        }
     }
 
     async postContractToTesseracts(contractName) {
@@ -302,26 +380,6 @@ export class Deployer {
 
             console.log(`Published ${contractname} sources on https://${network}.etherscan.io/address/${contractaddress} with status`, status);
         }
-    }
-}
-
-export async function addTestERC20Token(wallet, governance) {
-    try {
-        let erc20 = await deployContract(wallet, ERC20MintableContract, [], { gasLimit: 3000000 });
-        await erc20.mint(wallet.address, parseEther("3000000000"));
-        await (await governance.addToken(erc20.address)).wait();
-        return erc20;
-    } catch (err) {
-        console.error("Add token error:" + err);
-    }
-}
-
-export async function mintTestERC20Token(wallet, erc20) {
-    try {
-        const txCall = await erc20.mint(wallet.address, parseEther("3000000000"));
-        await txCall.wait();
-    } catch (err) {
-        console.error("Mint token error:" + err);
     }
 }
 
