@@ -1,18 +1,16 @@
 //! Leader election is a always live routine that continuously votes to become the leader.
 
-use models::node::config::LEADER_ELECTION_ITERVAL;
-use std::sync::mpsc;
+use models::node::config::LEADER_ELECTION_INTERVAL;
 use std::thread;
-use std::time::Instant;
 
 /// Continuously votes to be the leader and exits when it becomes the leader.
-/// Voting happens with `LEADER_ELECTION_ITERVAL`.
+/// Voting happens with `LEADER_ELECTION_INTERVAL`.
 /// The leader retirement handled by external service.
 ///
 /// # Panics
 ///
-/// Panics on failed conenction to db.
-pub fn vote_to_be_the_leader(
+/// Panics on failed connection to db.
+pub fn keep_voting_to_be_leader(
     name: String,
     connection_pool: storage::ConnectionPool,
 ) -> Result<(), failure::Error> {
@@ -27,7 +25,7 @@ pub fn vote_to_be_the_leader(
         if won_election {
             break;
         }
-        thread::sleep(LEADER_ELECTION_ITERVAL);
+        thread::sleep(LEADER_ELECTION_INTERVAL);
     }
     Ok(())
 }

@@ -115,7 +115,7 @@ impl ObservedState {
     }
 }
 
-/// Accamulate state from db continuously and return that state on stop signal.
+/// Accumulate state from db continuously and return that state on stop signal.
 ///
 /// # Panics
 /// Panics on failed connection to db.
