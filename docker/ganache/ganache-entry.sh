@@ -10,4 +10,4 @@ function ctrl_c() {
     exit 0
 }
 
-exec yarn ganache-cli --accounts 100 --defaultBalanceEther 1000000 --mnemonic "fine music test violin matrix prize squirrel panther purchase material script deal" --port 7545 --host "0.0.0.0" 2>&1
+exec yarn ganache-cli --accounts 100 --defaultBalanceEther 1000000 --mnemonic "$MNEMONIC" --port 7545 --host "0.0.0.0" 2>&1

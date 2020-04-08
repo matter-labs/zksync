@@ -11,9 +11,9 @@ async function createWallets() {
             const ethersProvider = new ethers.providers.JsonRpcProvider('http://localhost:7545');
             await ethersProvider.getBlockNumber()
             const baseWalletPath = "m/44'/60'/0'/0/";
-            const wallet1 = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal", baseWalletPath + 0).connect(ethersProvider);
-            const wallet2 = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal", baseWalletPath + 11).connect(ethersProvider);
-            const wallet3 = ethers.Wallet.fromMnemonic("fine music test violin matrix prize squirrel panther purchase material script deal", baseWalletPath + 12).connect(ethersProvider);
+            const wallet1 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, baseWalletPath + 0).connect(ethersProvider);
+            const wallet2 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, baseWalletPath + 11).connect(ethersProvider);
+            const wallet3 = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, baseWalletPath + 12).connect(ethersProvider);
             return [ wallet1, wallet2, wallet3 ];
         } catch (e) {
             await sleep(1000);

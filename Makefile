@@ -4,6 +4,7 @@ export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
+export GANACHE_DOCKER_IMAGE ?= matterlabs/ganache
 
 # Getting started
 
@@ -96,6 +97,12 @@ image-ci:
 
 push-image-ci: image-ci
 	docker push "${CI_DOCKER_IMAGE}"
+
+image-ganache:
+	@cd docker/ganache && envsubst < Dockerfile | docker build -t "${GANACHE_DOCKER_IMAGE}" . -f -
+
+push-image-ganache: image-ganache
+	docker push "${GANACHE_DOCKER_IMAGE}"
 
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env

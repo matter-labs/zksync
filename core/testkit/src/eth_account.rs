@@ -17,7 +17,7 @@ use web3::types::{TransactionReceipt, H256, U128, U256, U64};
 use web3::Transport;
 
 const N_CONFIRMATIONS: usize = 1;
-const WEB3_POLL_INTERVAL: Duration = Duration::from_millis(1000);
+const WEB3_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
     let split = eth_value.split('.').collect::<Vec<&str>>();

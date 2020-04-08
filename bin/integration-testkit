@@ -1,15 +1,23 @@
 #!/bin/bash
 . .setup_env
 
-run with usual geth
+set -e
+
+trap clean_up EXIT
+
+function clean_up() {
+    exitcode=$?
+    docker kill $CONTAINER_ID
+    exit $exitcode
+}
+
+# run with usual geth
 cargo run --bin exodus_test --release
 
 export WEB3_URL=http://localhost:7545
 
-CONTAINER_ID=$(docker run -d -p 7545:7545 e3e4258b5168)
+CONTAINER_ID=$(docker run -d -p 7545:7545 matterlabs/ganache)
 echo $CONTAINER_ID
 
 cargo run --bin testkit --release
 cargo run --bin migration_test --release
-
-docker kill $CONTAINER_ID
