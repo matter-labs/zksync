@@ -1,39 +1,37 @@
 //! Load test meant to run against running node.
-//! Runs scenario of deposits, withdraws and transfers. Scenario detailization
+//! Runs scenario of deposits, withdraws and transfers. Scenario details are
 //! specified as input json file. Transactions send concurrently. Program exits
 //! successfully if all transactions get verified within configured timeout.
 
-// Built-in
-use std::ops::Mul;
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-use std::{env, thread};
-// External
+// Built-in import
+use std::{
+    env,
+    ops::Mul,
+    sync::Arc,
+    thread,
+    time::{Duration, Instant},
+};
+// External uses
 use bigdecimal::BigDecimal;
 use rand::Rng;
 use serde::Serialize;
 use tokio::runtime::{Builder, Handle};
-use tokio::sync::Mutex;
-use web3::transports::Http;
-use web3::types::U256;
-// use web3::types::{H160, H256};
-// Workspace
-// use jsonrpc_core::IoHandler;
-// use jsonrpc_core_client::transports::http::connect;
-use models::config_options::ConfigurationOptions;
-use models::node::tx::TxHash;
-use models::node::tx::{FranklinTx, PackedEthSignature};
-// use server::api_server::rpc_server::gen_client::Client as RpcClient;
-// use std::collections::VecDeque;
-use testkit::eth_account::EthereumAccount;
-use testkit::zksync_account::ZksyncAccount;
-
+use web3::{transports::Http, types::U256};
+// Workspace uses
+use models::{
+    config_options::ConfigurationOptions,
+    node::tx::{FranklinTx, PackedEthSignature, TxHash},
+};
 // Local uses
-use self::requests::{account_state_info, ethop_info, tx_info};
-use self::test_spec::{AccountInfo, TestSpec};
-use self::tps_counter::{run_tps_counter_printer, TPSCounter};
+use self::{
+    requests::{account_state_info, ethop_info, tx_info},
+    test_accounts::TestAccount,
+    test_spec::{AccountInfo, TestSpec},
+    tps_counter::{run_tps_counter_printer, TPSCounter},
+};
 
 mod requests;
+mod test_accounts;
 mod test_spec;
 mod tps_counter;
 
@@ -52,7 +50,8 @@ fn main() {
     let filepath = env::args().nth(1).expect("test spec file not given");
     let test_spec = TestSpec::load(filepath);
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
-    let test_accounts = construct_test_accounts(&test_spec.input_accounts, transport, &config);
+    let test_accounts =
+        TestAccount::construct_test_accounts(&test_spec.input_accounts, transport, &config);
     let rpc_addr = env::var("HTTP_RPC_API_ADDR").expect("HTTP_RPC_API_ADDR is missing");
     log::info!("sending transactions");
 
@@ -73,12 +72,6 @@ fn main() {
         &rpc_addr,
     ));
     log::info!("loadtest completed.");
-}
-
-struct TestAccount {
-    zk_acc: ZksyncAccount,
-    eth_acc: EthereumAccount<Http>,
-    eth_nonce: Mutex<u32>,
 }
 
 struct SentTransactions {
@@ -106,38 +99,6 @@ impl SentTransactions {
     fn add_tx_hash(&mut self, v: TxHash) {
         self.tx_hashes.push(v);
     }
-}
-
-// parses and builds new accounts.
-fn construct_test_accounts(
-    input_accs: &[AccountInfo],
-    transport: Http,
-    config: &ConfigurationOptions,
-) -> Vec<TestAccount> {
-    input_accs
-        .iter()
-        .map(|acc_info| {
-            let addr = acc_info.address;
-            let pk = acc_info.private_key;
-            let eth_acc = EthereumAccount::new(
-                pk,
-                addr,
-                transport.clone(),
-                config.contract_eth_addr,
-                &config,
-            );
-            TestAccount {
-                zk_acc: ZksyncAccount::new(
-                    ZksyncAccount::rand().private_key,
-                    0,
-                    eth_acc.address,
-                    eth_acc.private_key,
-                ),
-                eth_acc,
-                eth_nonce: Mutex::new(0),
-            }
-        })
-        .collect()
 }
 
 // sends confugured deposits, withdraws and transfers from each account concurrently.
