@@ -3,7 +3,7 @@
 //! specified as input json file. Transactions are sent concurrently. Program exits
 //! successfully if all transactions get verified within configured timeout.
 //!
-//! This scenario measures the outgoing TPS.
+//! This scenario measures the execution TPS.
 
 // Built-in import
 use std::{
@@ -14,10 +14,12 @@ use std::{
 };
 // External uses
 use bigdecimal::BigDecimal;
+use futures::future::join_all;
 use rand::Rng;
 use tokio::runtime::Handle;
 use web3::types::U256;
 // Workspace uses
+use models::node::tx::TxHash;
 // Local uses
 use crate::{
     rpc_client::RpcClient,
@@ -29,10 +31,11 @@ use crate::{
 };
 
 const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
+const TX_EXECUTION_TIMEOUT_SEC: u64 = 5 * 60;
 
-/// Runs the outgoing TPS scenario:
-/// sends the different types of transactions, and measures the TPS for the sending
-/// process (in other words, speed of the ZKSync node mempool).
+/// Runs the execution TPS scenario:
+/// sends the different types of transactions, and measures the TPS for the txs execution
+/// (not including the verification).
 pub fn run_scenario(mut ctx: ScenarioContext) {
     let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec).clone();
     let rpc_addr = ctx.rpc_addr.clone();
@@ -72,27 +75,47 @@ async fn send_transactions(
 ) -> SentTransactions {
     // Send transactions from every account.
 
-    let join_handles = test_accounts
+    let join_handles: Vec<_> = test_accounts
         .into_iter()
         .map(|account| {
             rt_handle.spawn(send_transactions_from_acc(
                 account,
                 ctx.clone(),
                 rpc_client.clone(),
-                Arc::clone(&tps_counter),
             ))
         })
-        .collect::<Vec<_>>();
+        .collect();
 
     // Collect all the sent transactions (so we'll be able to wait for their confirmation).
     let mut merged_txs = SentTransactions::new();
+
+    let mut txs_await_handles = Vec::new();
+
+    // Await for the transaction send routines, and create the transaction execution routines
+    // (which will measure the execution TPS).
     for j in join_handles {
         let sent_txs_result = j.await.expect("Join handle panicked");
 
         match sent_txs_result {
-            Ok(sent_txs) => merged_txs.merge(sent_txs),
+            Ok(sent_txs) => {
+                let task_handle = rt_handle.spawn(await_txs_execution(
+                    rt_handle.clone(),
+                    sent_txs.tx_hashes.clone(),
+                    Arc::clone(&tps_counter),
+                    rpc_client.clone(),
+                ));
+
+                txs_await_handles.push(task_handle);
+
+                merged_txs.merge(sent_txs);
+            }
             Err(err) => log::warn!("Failed to send txs: {}", err),
         }
+    }
+
+    // Await transaction execution routines.
+    for j in txs_await_handles {
+        j.await.expect("Join handle panicked");
     }
 
     merged_txs
@@ -103,7 +126,6 @@ async fn send_transactions_from_acc(
     test_acc: TestAccount,
     ctx: TestSpec,
     rpc_client: RpcClient,
-    tps_counter: Arc<TPSCounter>,
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();
     let addr_hex = hex::encode(test_acc.eth_acc.address);
@@ -181,7 +203,6 @@ async fn send_transactions_from_acc(
 
     for (tx, eth_sign) in tx_queue {
         let tx_hash = rpc_client.send_tx(tx, eth_sign).await?;
-        tps_counter.increment();
         sent_txs.add_tx_hash(tx_hash);
     }
 
@@ -238,6 +259,43 @@ async fn wait_for_deposit_executed(
     }
 
     Ok(serial_id)
+}
+
+async fn await_txs_execution(
+    rt_handle: Handle,
+    tx_hashes: Vec<TxHash>,
+    tps_counter: Arc<TPSCounter>,
+    rpc_client: RpcClient,
+) {
+    async fn await_tx(tx_hash: TxHash, rpc_client: RpcClient, tps_counter: Arc<TPSCounter>) {
+        let timeout = Duration::from_secs(TX_EXECUTION_TIMEOUT_SEC);
+        // Small polling interval, so we won't wait too long between confirmation
+        // check attempts.
+        let polling_interval = Duration::from_millis(100);
+        let start = Instant::now();
+        loop {
+            let state = rpc_client
+                .tx_info(tx_hash.clone())
+                .await
+                .expect("[wait_for_verify] call tx_info");
+
+            if state.executed {
+                tps_counter.increment();
+                break;
+            }
+            if start.elapsed() > timeout {
+                panic!("[wait_for_verify] Timeout")
+            }
+            thread::sleep(polling_interval);
+        }
+    }
+
+    let task_handles: Vec<_> = tx_hashes
+        .into_iter()
+        .map(|hash| rt_handle.spawn(await_tx(hash, rpc_client.clone(), tps_counter.clone())))
+        .collect();
+
+    join_all(task_handles).await;
 }
 
 /// Waits for all the priority operations and transactions to become a part of some block and get verified.

@@ -38,10 +38,14 @@ impl RpcClient {
         tx: FranklinTx,
         eth_signature: Option<PackedEthSignature>,
     ) -> Result<TxHash, failure::Error> {
-        let tx_hash = tx.hash();
         let msg = SubmitTxMsg::new(tx, eth_signature);
 
-        let _ = self.post(&msg).await?;
+        let reply = self.post(&msg).await?;
+        let ret = match reply {
+            Output::Success(v) => v.result,
+            Output::Failure(v) => failure::bail!("rpc error: {}", v.error),
+        };
+        let tx_hash = serde_json::from_value(ret).expect("failed to parse account reqest responce");
         Ok(tx_hash)
     }
 
@@ -85,7 +89,7 @@ impl RpcClient {
 
     // Requests and returns whether transaction is verified or not.
     pub async fn tx_info(&self, tx_hash: TxHash) -> Result<OperationState, failure::Error> {
-        let msg = TxInfoRequest::new(tx_hash);
+        let msg = TxInfoRequest::new(tx_hash.clone());
 
         let reply = self.post(&msg).await?;
         let ret = match reply {
@@ -125,7 +129,7 @@ impl RpcClient {
 /// Structures representing the RPC request messages.
 mod messages {
     use models::node::{
-        tx::{FranklinTx, PackedEthSignature, TxHash},
+        tx::{FranklinTx, PackedEthSignature, TxEthSignature, TxHash},
         Address,
     };
     use serde_derive::Serialize;
@@ -142,9 +146,10 @@ mod messages {
         pub fn new(tx: FranklinTx, eth_signature: Option<PackedEthSignature>) -> Self {
             let mut params = Vec::new();
             params.push(serde_json::to_value(tx).expect("serialization fail"));
-            if let Some(eth_signature) = eth_signature {
-                params.push(serde_json::to_value(eth_signature).expect("serialization fail"));
-            }
+            params.push(
+                serde_json::to_value(eth_signature.map(TxEthSignature::EthereumSignature))
+                    .expect("serialization fail"),
+            );
             Self {
                 id: "1".to_owned(),
                 method: "tx_submit".to_owned(),
@@ -156,7 +161,7 @@ mod messages {
 
     #[derive(Debug, Serialize)]
     pub struct AccountStateRequest {
-        pub id: u32,
+        pub id: String,
         pub method: String,
         pub jsonrpc: String,
         pub params: Vec<Address>,
@@ -165,7 +170,7 @@ mod messages {
     impl AccountStateRequest {
         pub fn new(address: Address) -> Self {
             Self {
-                id: 1,
+                id: "2".to_owned(),
                 method: "account_info".to_owned(),
                 jsonrpc: "2.0".to_owned(),
                 params: vec![address],

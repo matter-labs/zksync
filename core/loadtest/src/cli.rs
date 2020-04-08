@@ -12,7 +12,7 @@ use crate::scenarios::ScenarioType;
 #[structopt(name = "loadtest")]
 pub struct CliOptions {
     /// Loadtest scenario to run.
-    #[structopt(short, long = "scenario", default_value = "ScenarioType::OutgoingTps")]
+    #[structopt(short, long = "scenario", default_value = "outgoing")]
     pub scenario_type: ScenarioType,
 
     /// Path to the test spec JSON file.

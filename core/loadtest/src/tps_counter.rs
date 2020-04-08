@@ -30,6 +30,8 @@ impl TPSCounter {
 /// and not the actual tx processing throughput.
 /// TPS is reported only if the new txs were sent within polling interval.
 pub async fn run_tps_counter_printer(counter: Arc<TPSCounter>) {
+    log::info!("Starting the TPS counter routine...");
+
     let mut check_timer = tokio::time::interval(Duration::from_secs(1));
 
     let mut instant = Instant::now();
