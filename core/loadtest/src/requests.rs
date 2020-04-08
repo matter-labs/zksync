@@ -2,17 +2,56 @@
 // External
 use jsonrpc_core::types::response::Output;
 use serde::Serialize;
-// use web3::types::{H160, H256};
 // Workspace
-// use jsonrpc_core::IoHandler;
-// use jsonrpc_core_client::transports::http::connect;
-use models::node::tx::TxHash;
+use models::node::tx::{FranklinTx, PackedEthSignature, TxHash};
 use models::node::Address;
-// use server::api_server::rpc_server::gen_client::Client as RpcClient;
 use server::api_server::rpc_server::AccountInfoResp;
-// use std::collections::VecDeque;
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
+struct SubmitTxMsg {
+    id: String,
+    method: String,
+    jsonrpc: String,
+    params: Vec<serde_json::Value>,
+}
+
+impl SubmitTxMsg {
+    fn new(tx: FranklinTx, eth_signature: Option<PackedEthSignature>) -> Self {
+        let mut params = Vec::new();
+        params.push(serde_json::to_value(tx).expect("serialization fail"));
+        if let Some(eth_signature) = eth_signature {
+            params.push(serde_json::to_value(eth_signature).expect("serialization fail"));
+        }
+        Self {
+            id: "1".to_owned(),
+            method: "tx_submit".to_owned(),
+            jsonrpc: "2.0".to_owned(),
+            params,
+        }
+    }
+}
+
+// sends tx to server json rpc endpoint.
+pub async fn send_tx(
+    tx: FranklinTx,
+    eth_signature: Option<PackedEthSignature>,
+    rpc_addr: &str,
+    client: &reqwest::Client,
+) -> Result<TxHash, failure::Error> {
+    let tx_hash = tx.hash();
+    // let nonce = tx.nonce();
+    let msg = SubmitTxMsg::new(tx, eth_signature);
+
+    // let instant = Instant::now();
+    let res = client.post(rpc_addr).json(&msg).send().await?;
+    if res.status() != reqwest::StatusCode::OK {
+        failure::bail!("non-ok response: {}", res.status());
+    }
+    //    log::trace!("tx: {}", res.text().await.unwrap());
+    Ok(tx_hash)
+}
+
+#[derive(Debug, Serialize)]
 struct AccountStateReq {
     id: u32,
     method: String,
@@ -53,7 +92,7 @@ pub async fn account_state_info(
     Ok(account_state)
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 struct EthopInfo {
     id: String,
     method: String,
@@ -95,7 +134,7 @@ pub async fn ethop_info(serial_id: u64, rpc_addr: &str) -> Result<(bool, bool), 
     Ok((executed, verified))
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 struct TxInfo {
     id: String,
     method: String,

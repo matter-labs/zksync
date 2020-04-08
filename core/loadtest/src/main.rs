@@ -14,19 +14,15 @@ use std::{
 // External uses
 use bigdecimal::BigDecimal;
 use rand::Rng;
-use serde::Serialize;
 use tokio::runtime::{Builder, Handle};
 use web3::{transports::Http, types::U256};
 // Workspace uses
-use models::{
-    config_options::ConfigurationOptions,
-    node::tx::{FranklinTx, PackedEthSignature, TxHash},
-};
+use models::{config_options::ConfigurationOptions, node::tx::TxHash};
 // Local uses
 use self::{
-    requests::{account_state_info, ethop_info, tx_info},
+    requests::{account_state_info, ethop_info, send_tx, tx_info},
     test_accounts::TestAccount,
-    test_spec::{AccountInfo, TestSpec},
+    test_spec::TestSpec,
     tps_counter::{run_tps_counter_printer, TPSCounter},
 };
 
@@ -46,18 +42,27 @@ fn main() {
         .build()
         .expect("failed to construct tokio runtime");
 
+    // Load the configuration options.
     let config = ConfigurationOptions::from_env();
+
+    // Load the test spec.
     let filepath = env::args().nth(1).expect("test spec file not given");
     let test_spec = TestSpec::load(filepath);
+
+    // Create test accounts.
     let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
     let test_accounts =
         TestAccount::construct_test_accounts(&test_spec.input_accounts, transport, &config);
+
+    // Obtain the Ethereum node JSON RPC address.
     let rpc_addr = env::var("HTTP_RPC_API_ADDR").expect("HTTP_RPC_API_ADDR is missing");
     log::info!("sending transactions");
 
+    // Spawn the TPS counter.
     let tps_counter = Arc::new(TPSCounter::default());
     tokio_runtime.spawn(run_tps_counter_printer(tps_counter.clone()));
 
+    // Send the transactions and block until all of them are sent.
     let sent_txs = tokio_runtime.block_on(send_transactions(
         test_accounts,
         &test_spec,
@@ -65,6 +70,8 @@ fn main() {
         tps_counter,
         tokio_runtime.handle().clone(),
     ));
+
+    // Wait until all the transactions are verified.
     log::info!("waiting for all transactions to be verified");
     tokio_runtime.block_on(wait_for_verify(
         sent_txs,
@@ -74,8 +81,9 @@ fn main() {
     log::info!("loadtest completed.");
 }
 
+#[derive(Debug)]
 struct SentTransactions {
-    op_serial_ids: Vec<u32>,
+    op_serial_ids: Vec<u64>,
     tx_hashes: Vec<TxHash>,
 }
 
@@ -92,7 +100,7 @@ impl SentTransactions {
         }
     }
 
-    fn add_op_id(&mut self, v: u32) {
+    fn add_op_id(&mut self, v: u64) {
         self.op_serial_ids.push(v);
     }
 
@@ -101,7 +109,7 @@ impl SentTransactions {
     }
 }
 
-// sends confugured deposits, withdraws and transfers from each account concurrently.
+// Sends the configured deposits, withdraws and transfers from each account concurrently.
 async fn send_transactions(
     test_accounts: Vec<TestAccount>,
     ctx: &TestSpec,
@@ -111,6 +119,7 @@ async fn send_transactions(
 ) -> SentTransactions {
     let req_client = reqwest::Client::new();
 
+    // Send transactions from every account.
     let join_handles = test_accounts
         .into_iter()
         .map(|account| {
@@ -124,6 +133,7 @@ async fn send_transactions(
         })
         .collect::<Vec<_>>();
 
+    // Collect all the sent transactions (so we'll be able to wait for their confirmation).
     let mut merged_txs = SentTransactions::new();
     for j in join_handles {
         let sent_txs_result = j.await.expect("Join handle panicked");
@@ -137,7 +147,7 @@ async fn send_transactions(
     merged_txs
 }
 
-// sends configured deposits, withdraws and transfer from a single account concurrently.
+// Sends the configured deposits, withdraws and transfer from a single account concurrently.
 async fn send_transactions_from_acc(
     test_acc: TestAccount,
     ctx: TestSpec,
@@ -146,9 +156,12 @@ async fn send_transactions_from_acc(
     _req_client: reqwest::Client,
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();
-
     let addr_hex = hex::encode(test_acc.eth_acc.address);
-    update_eth_nonce(&test_acc).await?;
+    let wei_in_gwei = BigDecimal::from(1_000_000_000);
+
+    // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
+    test_acc.update_eth_nonce().await?;
+
     let zknonce = account_state_info(test_acc.zk_acc.address, &rpc_addr)
         .await
         .expect("rpc error")
@@ -156,37 +169,64 @@ async fn send_transactions_from_acc(
         .nonce;
     test_acc.zk_acc.set_nonce(zknonce);
 
-    let wei_in_gwei = BigDecimal::from(1_000_000_000);
-    let op_id = deposit_single(
-        &test_acc,
-        BigDecimal::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei),
-        &rpc_addr,
-    )
-    .await?;
-    log::info!("account {} made initial deposit", addr_hex);
+    // Perform the deposit operation.
+    let deposit_amount = BigDecimal::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei);
+    let op_id = deposit_single(&test_acc, deposit_amount.clone(), &rpc_addr).await?;
+
+    log::info!(
+        "Account {}: initial deposit completed (amount: {})",
+        addr_hex,
+        deposit_amount
+    );
     sent_txs.add_op_id(op_id);
-    let mut tx_queue = Vec::with_capacity((ctx.n_transfers + ctx.n_withdraws) as usize);
-    tx_queue.push((sign_change_pubkey(&test_acc), None));
-    log::info!("sending {} transactions", addr_hex);
+
+    log::info!(
+        "Account {}: performing {} deposit operations",
+        addr_hex,
+        ctx.n_deposits,
+    );
+
+    // Add the deposit operations.
     for _ in 0..ctx.n_deposits {
         let amount = rand_amount(ctx.deposit_from_amount_gwei, ctx.deposit_to_amount_gwei);
         let op_id = deposit_single(&test_acc, amount.mul(&wei_in_gwei), &rpc_addr).await?;
         sent_txs.add_op_id(op_id);
     }
 
-    log::info!("Signing transactions");
+    // Create a queue for all the transactions to send.
+    // First, we will create and sign all the transactions, and then we will send all the
+    // prepared transactions.
+    let n_change_pubkeys = 1;
+    let txs_amount = (n_change_pubkeys + ctx.n_transfers + ctx.n_withdraws) as usize;
+    let mut tx_queue = Vec::with_capacity(txs_amount);
+
+    log::info!(
+        "Account {}: preparing {} transactions to send",
+        addr_hex,
+        txs_amount,
+    );
+
+    // Add the `ChangePubKey` operation.
+    tx_queue.push((test_acc.sign_change_pubkey(), None));
+
+    // Add the transfer operations.
     for _ in 0..ctx.n_transfers {
         let amount = rand_amount(ctx.transfer_from_amount_gwei, ctx.transfer_to_amount_gwei);
         let signed_transfer =
-            sign_transfer_single(&test_acc, &ctx.input_accounts, amount.mul(&wei_in_gwei));
+            test_acc.sign_transfer_to_random(&ctx.input_accounts, amount.mul(&wei_in_gwei));
         tx_queue.push(signed_transfer);
     }
+    // Add the withdraw operations.
     for _ in 0..ctx.n_withdraws {
         let amount = rand_amount(ctx.withdraw_from_amount_gwei, ctx.withdraw_to_amount_gwei);
-        let signed_withdraw = sign_withdraw_single(&test_acc, amount.mul(&wei_in_gwei));
+        let signed_withdraw = test_acc.sign_withdraw_single(amount.mul(&wei_in_gwei));
         tx_queue.push(signed_withdraw)
     }
-    log::info!("Done signing transactions");
+
+    log::info!(
+        "Account {}: preparing transactions completed, sending...",
+        addr_hex
+    );
 
     let req_client = reqwest::Client::new();
     for (tx, eth_sign) in tx_queue {
@@ -195,7 +235,7 @@ async fn send_transactions_from_acc(
         sent_txs.add_tx_hash(tx_hash);
     }
 
-    log::info!("Sending txs");
+    log::info!("Account: {}: all the transactions are sent", addr_hex);
 
     Ok(sent_txs)
 }
@@ -206,154 +246,54 @@ fn rand_amount(from: u64, to: u64) -> BigDecimal {
     BigDecimal::from(amount)
 }
 
-// updates current ethereum nonces from eth node.
-async fn update_eth_nonce(test_acc: &TestAccount) -> Result<(), failure::Error> {
-    let mut nonce = test_acc.eth_nonce.lock().await;
-    let v = test_acc
-        .eth_acc
-        .main_contract_eth_client
-        .pending_nonce()
-        .await
-        .map_err(|e| failure::format_err!("update_eth_nonce: {}", e))?;
-    *nonce = v.as_u32();
-    Ok(())
-}
-
-fn sign_change_pubkey(ta: &TestAccount) -> FranklinTx {
-    FranklinTx::ChangePubKey(Box::new(
-        ta.zk_acc.create_change_pubkey_tx(None, true, false),
-    ))
-}
-
-// deposits to contract and waits for node to execute it.
+/// Deposits to contract and waits for node to execute it.
 async fn deposit_single(
     test_acc: &TestAccount,
     deposit_amount: BigDecimal,
     rpc_addr: &str,
-) -> Result<u32, failure::Error> {
+) -> Result<u64, failure::Error> {
     let nonce = {
         let mut n = test_acc.eth_nonce.lock().await;
         *n += 1;
         Some(U256::from(*n - 1))
     };
-    let po = test_acc
+    let priority_op = test_acc
         .eth_acc
         .deposit_eth(deposit_amount, &test_acc.zk_acc.address, nonce)
         .await?;
-    wait_for_deposit_executed(po.serial_id, rpc_addr).await
+    wait_for_deposit_executed(priority_op.serial_id, rpc_addr).await
 }
 
-async fn wait_for_deposit_executed(serial_id: u64, rpc_addr: &str) -> Result<u32, failure::Error> {
+/// Waits until the deposit priority operation is executed.
+async fn wait_for_deposit_executed(serial_id: u64, rpc_addr: &str) -> Result<u64, failure::Error> {
     let mut executed = false;
-    // 5 min wait
+    // We poll the operation status twice a second until timeout is reached.
     let start = Instant::now();
     let timeout = Duration::from_secs(DEPOSIT_TIMEOUT_SEC);
-    let check_period = Duration::from_secs(1);
-    while start.elapsed() < timeout {
-        let (ex, _) = ethop_info(serial_id, rpc_addr).await?;
-        if ex {
-            executed = true;
-            break;
-        }
-        thread::sleep(check_period);
+    let polling_interval = Duration::from_millis(500);
+
+    // Polling cycle.
+    while !executed && start.elapsed() < timeout {
+        thread::sleep(polling_interval);
+        executed = ethop_info(serial_id, rpc_addr).await?.0;
     }
-    if executed {
-        return Ok(serial_id as u32);
+
+    // Check for the successful execution.
+    if !executed {
+        failure::bail!("Deposit operation timeout");
     }
-    failure::bail!("timeout")
+
+    Ok(serial_id)
 }
 
-// sends withdraw.
-fn sign_withdraw_single(
-    test_acc: &TestAccount,
-    amount: BigDecimal,
-) -> (FranklinTx, Option<PackedEthSignature>) {
-    let (tx, eth_signature) = test_acc.zk_acc.sign_withdraw(
-        0, // ETH
-        "ETH",
-        amount,
-        BigDecimal::from(0),
-        &test_acc.eth_acc.address,
-        None,
-        true,
-    );
-    (FranklinTx::Withdraw(Box::new(tx)), Some(eth_signature))
-}
-
-// sends transfer tx to a random receiver.
-fn sign_transfer_single(
-    from: &TestAccount,
-    test_accounts: &[AccountInfo],
-    amount: BigDecimal,
-) -> (FranklinTx, Option<PackedEthSignature>) {
-    let to = {
-        let mut to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
-        while test_accounts[to_idx].address == from.zk_acc.address {
-            to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
-        }
-        test_accounts[to_idx].address
-    };
-    let (tx, eth_signature) = from.zk_acc.sign_transfer(
-        0, // ETH
-        "ETH",
-        amount,
-        BigDecimal::from(0),
-        &to,
-        None,
-        true,
-    );
-    (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
-}
-
-#[derive(Serialize)]
-struct SubmitTxMsg {
-    id: String,
-    method: String,
-    jsonrpc: String,
-    params: Vec<serde_json::Value>,
-}
-
-impl SubmitTxMsg {
-    fn new(tx: FranklinTx, eth_signature: Option<PackedEthSignature>) -> Self {
-        let mut params = Vec::new();
-        params.push(serde_json::to_value(tx).expect("serialization fail"));
-        if let Some(eth_signature) = eth_signature {
-            params.push(serde_json::to_value(eth_signature).expect("serialization fail"));
-        }
-        Self {
-            id: "1".to_owned(),
-            method: "tx_submit".to_owned(),
-            jsonrpc: "2.0".to_owned(),
-            params,
-        }
-    }
-}
-
-// sends tx to server json rpc endpoint.
-async fn send_tx(
-    tx: FranklinTx,
-    eth_signature: Option<PackedEthSignature>,
-    rpc_addr: &str,
-    client: &reqwest::Client,
-) -> Result<TxHash, failure::Error> {
-    let tx_hash = tx.hash();
-    // let nonce = tx.nonce();
-    let msg = SubmitTxMsg::new(tx, eth_signature);
-
-    // let instant = Instant::now();
-    let res = client.post(rpc_addr).json(&msg).send().await?;
-    if res.status() != reqwest::StatusCode::OK {
-        failure::bail!("non-ok response: {}", res.status());
-    }
-    //    log::trace!("tx: {}", res.text().await.unwrap());
-    Ok(tx_hash)
-}
-
-// waits for all priority operations and transactions to become part of some block and get verified.
+/// Waits for all the priority operations and transactions to become a part of some block and get verified.
 async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr: &str) {
-    let start = Instant::now();
     let serial_ids = sent_txs.op_serial_ids;
-    let sleep_period = Duration::from_millis(500);
+
+    let start = Instant::now();
+    let polling_interval = Duration::from_millis(500);
+
+    // Wait until all the transactions are verified.
     for &id in serial_ids.iter() {
         loop {
             let (executed, verified) = ethop_info(id as u64, rpc_addr)
@@ -364,11 +304,12 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
                 break;
             }
             if start.elapsed() > timeout {
-                panic!("[wait_for_verify] timeout")
+                panic!("[wait_for_verify] Timeout")
             }
-            thread::sleep(sleep_period);
+            thread::sleep(polling_interval);
         }
     }
+
     let tx_hashes = sent_txs.tx_hashes;
     for hash in tx_hashes.iter() {
         loop {
@@ -380,9 +321,9 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
                 break;
             }
             if start.elapsed() > timeout {
-                panic!("[wait_for_verify] timeout")
+                panic!("[wait_for_verify] Timeout")
             }
-            thread::sleep(sleep_period);
+            thread::sleep(polling_interval);
         }
     }
 }
