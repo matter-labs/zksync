@@ -17,7 +17,7 @@ use models::config_options::ConfigurationOptions;
 // Local uses
 use self::{scenarios::basic_scenario::basic_scenario, scenarios::ScenarioContext};
 
-mod requests;
+mod rpc_client;
 mod scenarios;
 mod sent_transactions;
 mod test_accounts;

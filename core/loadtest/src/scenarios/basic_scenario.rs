@@ -18,7 +18,7 @@ use web3::types::U256;
 // Workspace uses
 // Local uses
 use crate::{
-    requests::{account_state_info, ethop_info, send_tx, tx_info},
+    rpc_client::RpcClient,
     scenarios::ScenarioContext,
     sent_transactions::SentTransactions,
     test_accounts::TestAccount,
@@ -32,6 +32,8 @@ pub fn basic_scenario(mut ctx: ScenarioContext) {
     let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec).clone();
     let rpc_addr = ctx.rpc_addr.clone();
 
+    let rpc_client = RpcClient::new(&rpc_addr);
+
     // Obtain the Ethereum node JSON RPC address.
     log::info!("Starting the loadtest");
 
@@ -42,7 +44,7 @@ pub fn basic_scenario(mut ctx: ScenarioContext) {
     // Send the transactions and block until all of them are sent.
     let sent_txs = ctx.rt.block_on(send_transactions(
         ctx.test_accounts,
-        ctx.rpc_addr,
+        rpc_client.clone(),
         ctx.ctx,
         ctx.rt.handle().clone(),
         ctx.tps_counter,
@@ -51,14 +53,14 @@ pub fn basic_scenario(mut ctx: ScenarioContext) {
     // Wait until all the transactions are verified.
     log::info!("Waiting for all transactions to be verified");
     ctx.rt
-        .block_on(wait_for_verify(sent_txs, verify_timeout_sec, &rpc_addr));
+        .block_on(wait_for_verify(sent_txs, verify_timeout_sec, &rpc_client));
     log::info!("Loadtest completed.");
 }
 
 // Sends the configured deposits, withdraws and transfers from each account concurrently.
 async fn send_transactions(
     test_accounts: Vec<TestAccount>,
-    rpc_addr: String,
+    rpc_client: RpcClient,
     ctx: TestSpec,
     rt_handle: Handle,
     tps_counter: Arc<TPSCounter>,
@@ -71,7 +73,7 @@ async fn send_transactions(
             rt_handle.spawn(send_transactions_from_acc(
                 account,
                 ctx.clone(),
-                rpc_addr.clone(),
+                rpc_client.clone(),
                 Arc::clone(&tps_counter),
             ))
         })
@@ -95,7 +97,7 @@ async fn send_transactions(
 async fn send_transactions_from_acc(
     test_acc: TestAccount,
     ctx: TestSpec,
-    rpc_addr: String,
+    rpc_client: RpcClient,
     tps_counter: Arc<TPSCounter>,
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();
@@ -105,7 +107,8 @@ async fn send_transactions_from_acc(
     // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
     test_acc.update_eth_nonce().await?;
 
-    let zknonce = account_state_info(test_acc.zk_acc.address, &rpc_addr)
+    let zknonce = rpc_client
+        .account_state_info(test_acc.zk_acc.address)
         .await
         .expect("rpc error")
         .committed
@@ -114,7 +117,7 @@ async fn send_transactions_from_acc(
 
     // Perform the deposit operation.
     let deposit_amount = BigDecimal::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei);
-    let op_id = deposit_single(&test_acc, deposit_amount.clone(), &rpc_addr).await?;
+    let op_id = deposit_single(&test_acc, deposit_amount.clone(), &rpc_client).await?;
 
     log::info!(
         "Account {}: initial deposit completed (amount: {})",
@@ -132,7 +135,7 @@ async fn send_transactions_from_acc(
     // Add the deposit operations.
     for _ in 0..ctx.n_deposits {
         let amount = rand_amount(ctx.deposit_from_amount_gwei, ctx.deposit_to_amount_gwei);
-        let op_id = deposit_single(&test_acc, amount.mul(&wei_in_gwei), &rpc_addr).await?;
+        let op_id = deposit_single(&test_acc, amount.mul(&wei_in_gwei), &rpc_client).await?;
         sent_txs.add_op_id(op_id);
     }
 
@@ -171,9 +174,8 @@ async fn send_transactions_from_acc(
         addr_hex
     );
 
-    let req_client = reqwest::Client::new();
     for (tx, eth_sign) in tx_queue {
-        let tx_hash = send_tx(tx, eth_sign, &rpc_addr, &req_client).await?;
+        let tx_hash = rpc_client.send_tx(tx, eth_sign).await?;
         tps_counter.increment();
         sent_txs.add_tx_hash(tx_hash);
     }
@@ -193,7 +195,7 @@ fn rand_amount(from: u64, to: u64) -> BigDecimal {
 async fn deposit_single(
     test_acc: &TestAccount,
     deposit_amount: BigDecimal,
-    rpc_addr: &str,
+    rpc_client: &RpcClient,
 ) -> Result<u64, failure::Error> {
     let nonce = {
         let mut n = test_acc.eth_nonce.lock().await;
@@ -204,11 +206,14 @@ async fn deposit_single(
         .eth_acc
         .deposit_eth(deposit_amount, &test_acc.zk_acc.address, nonce)
         .await?;
-    wait_for_deposit_executed(priority_op.serial_id, rpc_addr).await
+    wait_for_deposit_executed(priority_op.serial_id, &rpc_client).await
 }
 
 /// Waits until the deposit priority operation is executed.
-async fn wait_for_deposit_executed(serial_id: u64, rpc_addr: &str) -> Result<u64, failure::Error> {
+async fn wait_for_deposit_executed(
+    serial_id: u64,
+    rpc_client: &RpcClient,
+) -> Result<u64, failure::Error> {
     let mut executed = false;
     // We poll the operation status twice a second until timeout is reached.
     let start = Instant::now();
@@ -218,7 +223,8 @@ async fn wait_for_deposit_executed(serial_id: u64, rpc_addr: &str) -> Result<u64
     // Polling cycle.
     while !executed && start.elapsed() < timeout {
         thread::sleep(polling_interval);
-        executed = ethop_info(serial_id, rpc_addr).await?.0;
+        let state = rpc_client.ethop_info(serial_id).await?;
+        executed = state.executed;
     }
 
     // Check for the successful execution.
@@ -230,7 +236,7 @@ async fn wait_for_deposit_executed(serial_id: u64, rpc_addr: &str) -> Result<u64
 }
 
 /// Waits for all the priority operations and transactions to become a part of some block and get verified.
-async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr: &str) {
+async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_client: &RpcClient) {
     let serial_ids = sent_txs.op_serial_ids;
 
     let start = Instant::now();
@@ -239,10 +245,11 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
     // Wait until all the transactions are verified.
     for &id in serial_ids.iter() {
         loop {
-            let (executed, verified) = ethop_info(id as u64, rpc_addr)
+            let state = rpc_client
+                .ethop_info(id as u64)
                 .await
                 .expect("[wait_for_verify] call ethop_info");
-            if executed && verified {
+            if state.executed && state.verified {
                 log::debug!("deposit (serial_id={}) is verified", id);
                 break;
             }
@@ -256,10 +263,11 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_addr
     let tx_hashes = sent_txs.tx_hashes;
     for hash in tx_hashes.iter() {
         loop {
-            let verified = tx_info(hash.clone(), rpc_addr)
+            let state = rpc_client
+                .tx_info(hash.clone())
                 .await
                 .expect("[wait_for_verify] call tx_info");
-            if verified {
+            if state.verified {
                 log::debug!("{} is verified", hash.to_string());
                 break;
             }
