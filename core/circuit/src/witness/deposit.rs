@@ -505,10 +505,11 @@ mod test {
 
         // let deposit_to_account_address =
         //         "0000000000000000000000000000000000000000".parse().unwrap();
-        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
+        let (mut plasma_state, mut circuit_tree) = test_genesis_plasma_state(vec![(
             deposit_to_account_id,
             Account::default_with_address(&deposit_to_account_address),
         )]);
+        let mut witness_accum = WitnessBuilder::new(&mut circuit_tree, 0, 1);
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
@@ -522,7 +523,7 @@ mod test {
 
         for _ in 0..NUM_DEPOSITS {
             plasma_state.apply_deposit_op(&deposit_op);
-            let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+            let deposit_witness = apply_deposit_tx(witness_accum.account_tree, &deposit_op);
             let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
             let pub_data_from_witness = deposit_witness.get_pubdata();
 
@@ -822,10 +823,11 @@ mod test {
         let deposit_to_account_id = 1;
         let deposit_to_account_address =
             "1111111111111111111111111111111111111111".parse().unwrap();
-        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
+        let (mut plasma_state, mut circuit_tree) = test_genesis_plasma_state(vec![(
             deposit_to_account_id,
             Account::default_with_address(&deposit_to_account_address),
         )]);
+        let mut witness_accum = WitnessBuilder::new(&mut circuit_tree, 0, 1);
 
         let deposit_op = DepositOp {
             priority_op: Deposit {
@@ -839,7 +841,7 @@ mod test {
 
         for _ in 0..NUM_DEPOSITS {
             plasma_state.apply_deposit_op(&deposit_op);
-            let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
+            let deposit_witness = apply_deposit_tx(witness_accum.account_tree, &deposit_op);
             let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
             let pub_data_from_witness = deposit_witness.get_pubdata();
 
