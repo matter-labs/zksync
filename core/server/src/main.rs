@@ -5,7 +5,7 @@ extern crate log;
 use clap::{App, Arg};
 // Workspace uses
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
-use models::config_options::ConfigurationOptions;
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::config::{
     OBSERVER_MODE_PULL_INTERVAL, PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL,
 };
@@ -72,7 +72,7 @@ fn main() {
     let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
     let (observed_state_tx, observed_state_rx) = std::sync::mpsc::channel();
     let conn_pool_clone = connection_pool.clone();
-    std::thread::Builder::new()
+    let jh = std::thread::Builder::new()
         .name("Observer mode".to_owned())
         .spawn(move || {
             let state = observer_mode::run(
@@ -90,6 +90,13 @@ fn main() {
     .expect("voting for leader fail");
     stop_observer_mode_tx.send(()).expect("unexpected failure");
     let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
+    jh.join().unwrap();
+
+    // Panic after a minute, for testing leader election.
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_secs(60));
+        panic!("TEST LEADER ELECTION PANIC");
+    });
 
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing

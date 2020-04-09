@@ -11,7 +11,6 @@ use std::env;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let client = Client::from(Configuration::infer().await?);
     let namespace = env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
