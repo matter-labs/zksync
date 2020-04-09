@@ -680,15 +680,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
     }
-
-    /// @notice Reverts block onchain operations
-    /// @param _reverted Reverted block
-    function revertBlock(Block memory _reverted) internal {
-        require(_reverted.committedAtBlock > 0, "frk11"); // block not found
-        revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
-        totalCommittedPriorityRequests -= _reverted.priorityOperations;
-    }
-
+    
     /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)
     function upgradePreparationLockStatus() public returns (bool) {
         return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;
