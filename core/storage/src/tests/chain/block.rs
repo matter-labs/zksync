@@ -425,8 +425,6 @@ fn load_unverified_commits_after_block() {
     let _ = env_logger::try_init();
     let mut rng = create_rng();
 
-    let block_size = Block::smallest_block_size_for_chunks(0);
-
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
         // Create the input data for three blocks.
@@ -472,7 +470,7 @@ fn load_unverified_commits_after_block() {
 
         for ((block, limit), expected_slice) in test_vector {
             let unverified_commits =
-                BlockSchema(&conn).load_unverified_commits_after_block(block_size, block, limit)?;
+                BlockSchema(&conn).load_unverified_commits_after_block(block, limit)?;
 
             assert_eq!(unverified_commits.len(), expected_slice.len());
 

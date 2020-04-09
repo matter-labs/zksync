@@ -459,8 +459,10 @@ mod test {
         let to_account_id = 2;
         let to_account_address = "2222222222222222222222222222222222222222".parse().unwrap();
 
-        let (mut plasma_state, mut witness_accum) =
+        let (mut plasma_state, mut circuit_account_tree) =
             test_genesis_plasma_state(vec![(from_account_id, from_account)]);
+        let fee_account_id = 0;
+        let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let transfer_op = TransferToNewOp {
             tx: from_zksync_account

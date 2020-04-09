@@ -193,10 +193,13 @@ mod test {
         let zksync_account = ZksyncAccount::rand();
         let change_pkhash_to_account_id = 0xc1;
         let change_pkhash_to_account_address = zksync_account.address;
-        let (mut plasma_state, mut witness_accum) = test_genesis_plasma_state(vec![(
+        let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![(
             change_pkhash_to_account_id,
             Account::default_with_address(&change_pkhash_to_account_address),
         )]);
+
+        let fee_account_id = 0;
+        let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
         let change_pkhash_op = ChangePubKeyOp {
             tx: zksync_account.create_change_pubkey_tx(None, true, false),
