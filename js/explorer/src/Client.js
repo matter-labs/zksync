@@ -2,11 +2,11 @@ import config from './env-config';
 import * as constants from './constants';
 import { readableEther } from './utils';
 import { BlockExplorerClient } from './BlockExplorerClient';
-const zksync = require('zksync');   
+const zksync_promise = import('zksync');
 import axios from 'axios';
 
 async function fetch(req) {
-    let r = await axios(req).catch(() => ({}));
+    let r = await axios(req);
     if (r.status == 200) {
         return r.data;
     } else {
@@ -23,6 +23,7 @@ export class Client {
     }
 
     static async new() {
+        const zksync = await zksync_promise;
         const syncProvider = await zksync.Provider.newHttpProvider(config.HTTP_RPC_API_ADDR);
         const tokensPromise = syncProvider.getTokens()
             .then(tokens => {
@@ -38,7 +39,6 @@ export class Client {
                     })
                     .sort((a, b) => a.id - b.id);
             });
-        
         const blockExplorerClient = new BlockExplorerClient(config.API_SERVER);
 
         const props = {
@@ -124,7 +124,7 @@ export class Client {
 
         return Object.entries(account.commited.balances)
             .map(([tokenId, balance]) => {
-                return { 
+                return {
                     tokenId,
                     balance: readableEther(balance),
                     tokenName: tokensInfoList[tokenId].syncSymbol,
@@ -133,6 +133,10 @@ export class Client {
     }
     async tokenNameFromId(tokenId) {
         return (await this.tokensPromise)[tokenId].syncSymbol;
+    }
+
+    tokenNameFromSymbol(symbol) {
+        return `zk${symbol.toString()}`;
     }
 
     async transactionsAsRenderableList(address, offset, limit) {
@@ -146,11 +150,14 @@ export class Client {
             const type         = tx.tx.type || '';
             const hash         = tx.hash;
 
-            const receiver_address = type == 'Deposit'
-                ? tx.tx.priority_op.to
+            const to
+                = type == 'Deposit' ? tx.tx.priority_op.to
+                : type == 'FullExit' ? tx.tx.priority_op.eth_address
+                : type == 'Close' ? tx.tx.account
+                : type == 'ChangePubKey' ? tx.tx.account
                 : tx.tx.to;
 
-            const direction = receiver_address == address
+            const direction = to == address
                 ? 'incoming' 
                 : 'outcoming';
 
@@ -185,7 +192,7 @@ export class Client {
 
             switch (true) {
                 case type == 'Deposit': {
-                    const token = await this.tokenNameFromId(tx.tx.priority_op.token);
+                    const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
                     const amount = readableEther(tx.tx.priority_op.amount);
                     return {
                         fields: [
@@ -196,14 +203,33 @@ export class Client {
                         data: {
                             ...data,
                             from: tx.tx.priority_op.from,
-                            to: tx.tx.priority_op.to,
+                            to,
+                            pq_id: tx.pq_id,
+                            token, amount,
+                        },
+                    };
+                }
+                case type == 'FullExit': {
+                    console.log(tx);
+                    const token = this.tokenNameFromSymbol(tx.tx.priority_op.token);
+                    const amount = readableEther(tx.tx.withdraw_amount || 0);
+                    return {
+                        fields: [
+                            { key: 'amount',      label: 'Amount' },
+                            { key: 'row_status',  label: 'Status' },
+                            { key: 'pq_id',       label: 'Priority op' },
+                        ],
+                        data: {
+                            ...data,
+                            from: tx.tx.priority_op.eth_address,
+                            to,
                             pq_id: tx.pq_id,
                             token, amount,
                         },
                     };
                 }
                 case type == 'Transfer': {
-                    const token = await this.tokenNameFromId(tx.tx.token);
+                    const token = this.tokenNameFromSymbol(tx.tx.token);
                     const amount = readableEther(tx.tx.amount);
                     return {
                         fields: [
@@ -215,13 +241,13 @@ export class Client {
                         data: {
                             ...data,
                             from: tx.tx.from,
-                            to: tx.tx.to,
+                            to,
                             token, amount,
                         },
                     };
                 }
                 case type == 'Withdraw': {
-                    const token = await this.tokenNameFromId(tx.tx.token);
+                    const token = this.tokenNameFromSymbol(tx.tx.token);
                     const amount = readableEther(tx.tx.amount);   
                     return {
                         fields: [
@@ -232,8 +258,30 @@ export class Client {
                         data: {
                             ...data,
                             from: tx.tx.from,
-                            to: tx.tx.to,
+                            to,
                             token, amount,
+                        },
+                    };
+                }
+                case type == 'Close': {
+                    return {
+                        fields: [
+                        ],
+                        data: {
+                            ...data,
+                            from: tx.tx.account,
+                            to: '',
+                        },
+                    };
+                }
+                case type == 'ChangePubKey': {
+                    return {
+                        fields: [
+                        ],
+                        data: {
+                            ...data,
+                            from: tx.tx.account,
+                            to: '',
                         },
                     };
                 }

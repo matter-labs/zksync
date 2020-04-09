@@ -6,9 +6,18 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./Operations.sol";
 
+
 /// @title zkSync storage contract
 /// @author Matter Labs
 contract Storage {
+
+    /// @notice Flag indicates that upgrade preparation status is active
+    /// @dev Will store false in case of not active upgrade mode
+    bool public upgradePreparationActive;
+
+    /// @notice Upgrade preparation activation timestamp (as seconds since unix epoch)
+    /// @dev Will be equal to zero in case of not active upgrade mode
+    uint public upgradePreparationActivationTime;
 
     /// @notice Verifier contract. Used to verify block proof and exit proof
     Verifier internal verifier;

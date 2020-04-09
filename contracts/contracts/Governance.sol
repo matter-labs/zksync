@@ -28,9 +28,14 @@ contract Governance is Config {
     /// @notice List of permitted validators
     mapping(address => bool) public validators;
 
-    /// @notice Construct Governance contract
-    /// @param _networkGovernor The address of network governor
-    constructor(address _networkGovernor) public {
+    constructor() public {}
+
+    /// @notice Governance contract initialization
+    /// @param initializationParameters Encoded representation of initialization parameters:
+        /// _networkGovernor The address of network governor
+    function initialize(bytes calldata initializationParameters) external {
+        address _networkGovernor = abi.decode(initializationParameters, (address));
+
         networkGovernor = _networkGovernor;
         validators[_networkGovernor] = true;
     }

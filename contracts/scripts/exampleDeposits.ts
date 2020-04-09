@@ -9,7 +9,7 @@ const franklinAddressBinary = Buffer.from(franklinAddress, "hex");
 
 async function main() {
     const deployer = new Deployer(wallet, false);
-    const franklinDeployedContract = deployer.getDeployedContract('Franklin');
+    const franklinDeployedContract = deployer.getDeployedProxyContract('Franklin');
     const depositValue = parseEther("0.3");
     const tx = await franklinDeployedContract.depositETH(franklinAddressBinary, {value: depositValue});
     const receipt = await tx.wait();

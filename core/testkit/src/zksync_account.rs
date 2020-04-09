@@ -2,7 +2,7 @@ use bigdecimal::BigDecimal;
 use crypto_exports::rand::{thread_rng, Rng};
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
-    priv_key_from_fs, Address, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
+    priv_key_from_fs, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
 use std::sync::Mutex;
 use web3::types::H256;
@@ -63,15 +63,21 @@ impl ZksyncAccount {
         *n
     }
 
+    pub fn set_nonce(&self, new_nonce: Nonce) {
+        *self.nonce.lock().unwrap() = new_nonce;
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn sign_transfer(
         &self,
         token_id: TokenId,
+        token_symbol: &str,
         amount: BigDecimal,
         fee: BigDecimal,
         to: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> Transfer {
+    ) -> (Transfer, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let mut transfer = Transfer {
             from: self.address,
@@ -88,18 +94,26 @@ impl ZksyncAccount {
         if increment_nonce {
             *stored_nonce += 1;
         }
-        transfer
+
+        let eth_signature = PackedEthSignature::sign(
+            &self.eth_private_key,
+            transfer.get_ethereum_sign_message(token_symbol).as_bytes(),
+        )
+        .expect("Signing the transfer unexpectedly failed");
+        (transfer, eth_signature)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn sign_withdraw(
         &self,
         token_id: TokenId,
+        token_symbol: &str,
         amount: BigDecimal,
         fee: BigDecimal,
         eth_address: &Address,
         nonce: Option<Nonce>,
         increment_nonce: bool,
-    ) -> Withdraw {
+    ) -> (Withdraw, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let mut withdraw = Withdraw {
             from: self.address,
@@ -116,7 +130,28 @@ impl ZksyncAccount {
         if increment_nonce {
             *stored_nonce += 1;
         }
-        withdraw
+
+        let eth_signature = PackedEthSignature::sign(
+            &self.eth_private_key,
+            withdraw.get_ethereum_sign_message(token_symbol).as_bytes(),
+        )
+        .expect("Signing the withdraw unexpectedly failed");
+        (withdraw, eth_signature)
+    }
+
+    pub fn sign_close(&self, nonce: Option<Nonce>, increment_nonce: bool) -> Close {
+        let mut stored_nonce = self.nonce.lock().unwrap();
+        let mut close = Close {
+            account: self.address,
+            nonce: nonce.unwrap_or_else(|| *stored_nonce),
+            signature: TxSignature::default(),
+        };
+        close.signature = TxSignature::sign_musig_sha256(&self.private_key, &close.get_bytes());
+
+        if increment_nonce {
+            *stored_nonce += 1;
+        }
+        close
     }
 
     pub fn create_change_pubkey_tx(

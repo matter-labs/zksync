@@ -2,13 +2,23 @@ pragma solidity 0.5.16;
 
 import "./VerificationKey.sol";
 
+
 /// @title Verifier Contract
 /// @notice Based on https://github.com/HarryR/ethsnarks/blob/master/contracts/Verifier.sol
 /// @dev TODO: - remove DUMMY_VERIFIER variable for production
 /// @author Matter Labs
 contract Verifier is VerificationKey {
+
     /// @notice If this flag is true - dummy verification is used instead of full verifier
     bool constant DUMMY_VERIFIER = false;
+
+    constructor() public {}
+
+    /// @notice Verifier contract initialization
+    /// @param initializationParameters Encoded representation of initialization parameters
+    function initialize(bytes calldata initializationParameters) external {
+        // parameters are not used during initialization
+    }
 
     /// @notice Rollup block proof verification
     /// @param _proof Block proof
