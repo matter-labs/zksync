@@ -1,3 +1,9 @@
+//! `signature_checker` module provides a detached thread routine
+//! dedicated for checking the signatures of incoming transactions.
+//! Main routine of this module operates a multithreaded event loop,
+//! which is used to spawn concurrent tasks to efficiently check the
+//! transactions signatures.
+
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -7,13 +13,14 @@ use tokio::runtime::{Builder, Handle};
 // Workspace uses
 use models::{
     config_options::ThreadPanicNotify,
-    node::{tx::TxEthSignature, Address, FranklinTx},
+    node::{tx::TxEthSignature, FranklinTx},
 };
 // Local uses
 // use crate::api_server::rpc_server::RpcErrorCodes;
 use crate::eth_watch::EthWatchRequest;
 use crate::mempool::TxAddError;
 
+/// Verifies the Ethereum signature of the transaction.
 async fn verify_eth_signature(
     request: &VerifyTxSignatureRequest,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
@@ -59,6 +66,8 @@ async fn verify_eth_signature(
     Ok(())
 }
 
+/// Verifies the correctness of the ZKSync transaction (including the
+/// signature check).
 fn verify_tx_correctness(tx: &FranklinTx) -> Result<(), TxAddError> {
     if !tx.check_correctness() {
         return Err(TxAddError::IncorrectTx);
@@ -67,19 +76,20 @@ fn verify_tx_correctness(tx: &FranklinTx) -> Result<(), TxAddError> {
     Ok(())
 }
 
-#[derive(Debug)]
-pub struct SignatureCheckResponse {
-    pub resolved_address: Result<Address, failure::Error>,
-    pub tx_correct: bool,
-}
-
+/// Request for the signature check.
 #[derive(Debug)]
 pub struct VerifyTxSignatureRequest {
     pub tx: FranklinTx,
+    /// `eth_sign_data` is a tuple of the Ethereum signature and the message
+    /// which user should have signed with their private key.
+    /// Can be `None` if the Ethereum signature is not required.
     pub eth_sign_data: Option<(TxEthSignature, String)>,
+    /// Channel for sending the check response.
     pub response: oneshot::Sender<Result<(), TxAddError>>,
 }
 
+/// Main routine of the concurrent signature checker.
+/// See the module documentation for details.
 pub fn start_sign_checker_detached(
     input: mpsc::Receiver<VerifyTxSignatureRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
@@ -106,7 +116,7 @@ pub fn start_sign_checker_detached(
     }
 
     std::thread::Builder::new()
-        .name("verify 2fa signature".to_string())
+        .name("Signature checker thread".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
 
@@ -118,5 +128,5 @@ pub fn start_sign_checker_detached(
             let handle = runtime.handle().clone();
             runtime.block_on(checker_routine(handle, input, eth_watch_req));
         })
-        .expect("failed to start 2fa verifier");
+        .expect("failed to start signature checker thread");
 }
