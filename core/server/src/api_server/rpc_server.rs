@@ -1,28 +1,35 @@
-use crate::mempool::MempoolRequest;
-use crate::mempool::TxAddError;
-use crate::state_keeper::StateKeeperRequest;
-use bigdecimal::BigDecimal;
-use futures::channel::{mpsc, oneshot};
-use futures::{FutureExt, SinkExt, TryFutureExt};
-use jsonrpc_core::{Error, ErrorCode, Result};
-use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
-use jsonrpc_derive::rpc;
-use jsonrpc_http_server::ServerBuilder;
-use models::config_options::ThreadPanicNotify;
-use models::node::tx::TxEthSignature;
-use models::node::tx::TxHash;
-use models::node::{
-    closest_packable_fee_amount, Account, AccountId, FranklinTx, Nonce, PubKeyHash, Token, TokenId,
-    TokenLike,
-};
-use models::primitives::floor_big_decimal;
+// Built-in deps
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use storage::{ConnectionPool, StorageProcessor};
-use web3::types::Address;
 
-use crate::signature_checker::VerifyTxSignatureRequest;
-use std::sync::RwLock;
+// External uses
+use bigdecimal::BigDecimal;
+use futures::{
+    channel::{mpsc, oneshot},
+    FutureExt, SinkExt, TryFutureExt,
+};
+use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
+use jsonrpc_derive::rpc;
+use jsonrpc_http_server::ServerBuilder;
+use web3::types::Address;
+// Workspace uses
+use models::{
+    config_options::ThreadPanicNotify,
+    node::{
+        closest_packable_fee_amount,
+        tx::{TxEthSignature, TxHash},
+        Account, AccountId, FranklinTx, Nonce, PubKeyHash, Token, TokenId, TokenLike,
+    },
+    primitives::floor_big_decimal,
+};
+use storage::{ConnectionPool, StorageProcessor};
+// Local uses
+use crate::{
+    mempool::{MempoolRequest, TxAddError},
+    signature_checker::VerifyTxSignatureRequest,
+    state_keeper::StateKeeperRequest,
+    utils::TokenDBCache,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -168,40 +175,49 @@ pub struct RpcApp {
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub connection_pool: ConnectionPool,
     pub sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
-    pub token_cache: RwLock<HashMap<TokenId, String>>,
+    pub token_cache: TokenDBCache,
 }
 
 impl RpcApp {
+    pub fn new(
+        connection_pool: ConnectionPool,
+        mempool_request_sender: mpsc::Sender<MempoolRequest>,
+        state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    ) -> Self {
+        let token_cache = TokenDBCache::new(connection_pool.clone());
+
+        RpcApp {
+            connection_pool,
+            mempool_request_sender,
+            state_keeper_request_sender,
+            sign_verify_request_sender,
+            token_cache,
+        }
+    }
+
     pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
     }
 
-    /// Returns the token symbol for a `TokenId` as a string.
-    /// In case of failure, returns `jsonrpc_core::Error`,
-    /// which makes it convenient to use in the RPC methods.
-    fn token_symbol_from_id(&self, token: TokenId) -> Result<String> {
-        let cached_symbol = {
-            let cache = self.token_cache.read().unwrap();
-            cache.get(&token).cloned()
-        };
-        if let Some(cached_symbol) = cached_symbol {
-            return Ok(cached_symbol);
-        } else {
-            let symbol_from_db = self
-                .access_storage()?
-                .tokens_schema()
-                .get_token(token.into())
-                .map_err(|_| Error::internal_error())?
-                .ok_or(Error {
-                    code: RpcErrorCodes::IncorrectTx.into(),
-                    message: "No such token registered".into(),
-                    data: None,
-                })?;
-            self.token_cache
-                .write()
-                .unwrap()
-                .insert(token, symbol_from_db.symbol.clone());
-            Ok(symbol_from_db.symbol)
+    fn token_symbol_from_id(&self, token_id: TokenId) -> Result<String> {
+        fn rpc_message(error: impl ToString) -> Error {
+            Error {
+                code: RpcErrorCodes::Other.into(),
+                message: error.to_string(),
+                data: None,
+            }
+        }
+
+        let symbol = self
+            .token_cache
+            .get_token(token_id)
+            .map_err(rpc_message)?
+            .map(|t| t.symbol);
+
+        match symbol {
+            Some(symbol) => Ok(symbol),
+            None => Err(rpc_message("Token not found in the DB")),
         }
     }
 
@@ -449,13 +465,12 @@ pub fn start_rpc_server(
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
             let mut io = IoHandler::new();
 
-            let rpc_app = RpcApp {
+            let rpc_app = RpcApp::new(
                 connection_pool,
                 mempool_request_sender,
                 state_keeper_request_sender,
                 sign_verify_request_sender,
-                token_cache: RwLock::new(HashMap::new()),
-            };
+            );
             rpc_app.extend(&mut io);
 
             let server = ServerBuilder::new(io).threads(8).start_http(&addr).unwrap();
