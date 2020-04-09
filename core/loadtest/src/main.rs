@@ -5,8 +5,22 @@
 //!
 //! The behavior of the loadtest is flexible and determined by different "scenarios":
 //! every scenario is basically a function which interacts with a node according to some rules.
-//! Currently the main scenario is a "basic" scenario, which creates transactions according to the
-//! test spec parameters parsed from a `json` file.
+//!
+//! Currently supported scenarios:
+//!
+//! - Outgoing TPS. Measures the throughput of the ZKSync node's mempool (time of the tx acceptance).
+//!   To run this scenario, use the following command:
+//!   
+//!   ```sh
+//!   f cargo run --release --bin loadtest -- --scenario outgoing core/loadtest/src/loadtest.json
+//!   ```
+//!   
+//! - Execution TPS. Measures the throughput of the ZKSync block executor (amount of txs executed per second)
+//!   To run this scenario, use the following command:
+//!   
+//!   ```sh
+//!   f cargo run --release --bin loadtest -- --scenario execution core/loadtest/src/loadtest.json
+//!   ```
 
 // Built-in import
 use std::env;

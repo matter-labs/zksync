@@ -3,7 +3,8 @@
 //! specified as input json file. Transactions are sent concurrently. Program exits
 //! successfully if all transactions get verified within configured timeout.
 //!
-//! This scenario measures the outgoing TPS.
+//! This scenario measures the outgoing TPS. We spawn sender routines and measure the
+//! TPS as the transactions get accepted in the mempool.
 
 // Built-in import
 use std::{

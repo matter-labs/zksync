@@ -4,6 +4,8 @@
 //! successfully if all transactions get verified within configured timeout.
 //!
 //! This scenario measures the execution TPS.
+//! Unlike the `outgoing_tps` scenario, here we send all the transactions, and start
+//! measuring TPS only when sent transactions become executed.
 
 // Built-in import
 use std::{
@@ -14,7 +16,6 @@ use std::{
 };
 // External uses
 use bigdecimal::BigDecimal;
-use futures::future::join_all;
 use rand::Rng;
 use tokio::runtime::Handle;
 use web3::types::U256;
@@ -99,7 +100,6 @@ async fn send_transactions(
         match sent_txs_result {
             Ok(sent_txs) => {
                 let task_handle = rt_handle.spawn(await_txs_execution(
-                    rt_handle.clone(),
                     sent_txs.tx_hashes.clone(),
                     Arc::clone(&tps_counter),
                     rpc_client.clone(),
@@ -261,8 +261,8 @@ async fn wait_for_deposit_executed(
     Ok(serial_id)
 }
 
+/// Waits for the transactions to be executed and measures the execution TPS.
 async fn await_txs_execution(
-    rt_handle: Handle,
     tx_hashes: Vec<TxHash>,
     tps_counter: Arc<TPSCounter>,
     rpc_client: RpcClient,
@@ -290,12 +290,9 @@ async fn await_txs_execution(
         }
     }
 
-    let task_handles: Vec<_> = tx_hashes
-        .into_iter()
-        .map(|hash| rt_handle.spawn(await_tx(hash, rpc_client.clone(), tps_counter.clone())))
-        .collect();
-
-    join_all(task_handles).await;
+    for hash in tx_hashes {
+        await_tx(hash, rpc_client.clone(), tps_counter.clone()).await;
+    }
 }
 
 /// Waits for all the priority operations and transactions to become a part of some block and get verified.

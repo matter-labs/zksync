@@ -32,7 +32,7 @@ impl RpcClient {
         }
     }
 
-    // sends tx to server json rpc endpoint.
+    /// Sends the transaction to the ZKSync server using the JSON RPC.
     pub async fn send_tx(
         &self,
         tx: FranklinTx,
@@ -40,41 +40,30 @@ impl RpcClient {
     ) -> Result<TxHash, failure::Error> {
         let msg = SubmitTxMsg::new(tx, eth_signature);
 
-        let reply = self.post(&msg).await?;
-        let ret = match reply {
-            Output::Success(v) => v.result,
-            Output::Failure(v) => failure::bail!("rpc error: {}", v.error),
-        };
-        let tx_hash = serde_json::from_value(ret).expect("failed to parse account reqest responce");
+        let ret = self.post(&msg).await?;
+        let tx_hash = serde_json::from_value(ret).expect("failed to parse `send_tx` response");
         Ok(tx_hash)
     }
 
-    // Requests and returns a tuple (executed, verified) for operation given its `serial_id`.
+    /// Requests and returns information about a ZKSync account given its address.
     pub async fn account_state_info(
         &self,
         address: Address,
     ) -> Result<AccountInfoResp, failure::Error> {
         let msg = AccountStateRequest::new(address);
 
-        let reply = self.post(&msg).await?;
-        let ret = match reply {
-            Output::Success(v) => v.result,
-            Output::Failure(v) => failure::bail!("rpc error: {}", v.error),
-        };
+        let ret = self.post(&msg).await?;
         let account_state =
-            serde_json::from_value(ret).expect("failed to parse account reqest responce");
+            serde_json::from_value(ret).expect("failed to parse account request response");
         Ok(account_state)
     }
 
-    /// Requests and returns a tuple `(executed, verified)` for operation given its `serial_id`.
+    /// Requests and returns a tuple `(executed, verified)` (as `OperationState`) for
+    /// an Ethereum operation given its `serial_id`.
     pub async fn ethop_info(&self, serial_id: u64) -> Result<OperationState, failure::Error> {
         let msg = EthopInfoRequest::new(serial_id);
 
-        let reply = self.post(&msg).await?;
-        let ret = match reply {
-            Output::Success(v) => v.result,
-            Output::Failure(v) => panic!("{}", v.error),
-        };
+        let ret = self.post(&msg).await?;
         let obj = ret.as_object().unwrap();
         let executed = obj["executed"].as_bool().unwrap();
         let verified = if executed {
@@ -87,15 +76,12 @@ impl RpcClient {
         Ok(OperationState { executed, verified })
     }
 
-    // Requests and returns whether transaction is verified or not.
+    /// Requests and returns a tuple `(executed, verified)` (as `OperationState`) for
+    /// a transaction given its hash`.
     pub async fn tx_info(&self, tx_hash: TxHash) -> Result<OperationState, failure::Error> {
         let msg = TxInfoRequest::new(tx_hash.clone());
 
-        let reply = self.post(&msg).await?;
-        let ret = match reply {
-            Output::Success(v) => v.result,
-            Output::Failure(v) => panic!("{}", v.error),
-        };
+        let ret = self.post(&msg).await?;
         let obj = ret.as_object().unwrap();
         let executed = obj["executed"].as_bool().unwrap();
         let verified = if executed {
@@ -107,7 +93,15 @@ impl RpcClient {
         Ok(OperationState { executed, verified })
     }
 
-    async fn post(&self, message: impl serde::Serialize) -> Result<Output, failure::Error> {
+    /// Performs a POST query to the JSON RPC endpoint,
+    /// and decodes the response, returning the decoded `serde_json::Value`.
+    /// `Ok` is returned only for successful calls, for any kind of error
+    /// the `Err` variant is returned (including the failed RPC method
+    /// execution response).
+    async fn post(
+        &self,
+        message: impl serde::Serialize,
+    ) -> Result<serde_json::Value, failure::Error> {
         let res = self
             .client
             .post(&self.rpc_addr)
@@ -122,7 +116,12 @@ impl RpcClient {
         }
         let reply: Output = res.json().await.unwrap();
 
-        Ok(reply)
+        let ret = match reply {
+            Output::Success(v) => v.result,
+            Output::Failure(v) => failure::bail!("RPC error: {}", v.error),
+        };
+
+        Ok(ret)
     }
 }
 
