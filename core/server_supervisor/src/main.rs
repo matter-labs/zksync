@@ -14,7 +14,7 @@ async fn main() -> anyhow::Result<()> {
     env::set_var("RUST_LOG", "info,kube=debug");
     env_logger::init();
     let client = Client::from(Configuration::infer().await?);
-    let namespace = env::var("NAMESPACE").unwrap_or("default".into());
+    let namespace = env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let resource = Resource::namespaced::<Pod>(&namespace);
     let inf = Informer::new(client, ListParams::default(), resource);
 

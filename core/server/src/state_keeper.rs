@@ -85,6 +85,12 @@ pub struct PlasmaStateInitParams {
     pub unprocessed_priority_op: u64,
 }
 
+impl Default for PlasmaStateInitParams {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PlasmaStateInitParams {
     pub fn new() -> Self {
         Self {
