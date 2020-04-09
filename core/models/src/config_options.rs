@@ -22,13 +22,13 @@ impl Drop for ThreadPanicNotify {
 
 /// Obtains the environment variable value.
 /// Panics if there is no environment variable with provided name set.
-fn get_env(name: &str) -> String {
+pub fn get_env(name: &str) -> String {
     env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e))
 }
 
 /// Obtains the environment variable value and parses it using the `FromStr` type implementation.
 /// Panics if there is no environment variable with provided name set, or the value cannot be parsed.
-fn parse_env<F>(name: &str) -> F
+pub fn parse_env<F>(name: &str) -> F
 where
     F: FromStr,
     F::Err: std::fmt::Debug,
@@ -39,7 +39,7 @@ where
 }
 
 /// Similar to `parse_env`, but also takes a function to change the variable value before parsing.
-fn parse_env_with<T, F>(name: &str, f: F) -> T
+pub fn parse_env_with<T, F>(name: &str, f: F) -> T
 where
     T: FromStr,
     T::Err: std::fmt::Debug,
@@ -118,5 +118,34 @@ impl ConfigurationOptions {
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
         }
+    }
+}
+
+/// Possible block chunks sizes and corresponding setup powers of two,
+/// this is only parameters needed to create verifying contract.
+#[derive(Debug)]
+pub struct AvailableBlockSizesConfig {
+    pub blocks_chunks: Vec<usize>,
+    pub blocks_setup_power2: Vec<u32>,
+}
+
+impl AvailableBlockSizesConfig {
+    pub fn from_env() -> Self {
+        let result = Self {
+            blocks_chunks: get_env("SUPPORTED_BLOCK_CHUNKS_SIZES")
+                .split(',')
+                .map(|p| p.parse().unwrap())
+                .collect(),
+            blocks_setup_power2: get_env("SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS")
+                .split(',')
+                .map(|p| p.parse().unwrap())
+                .collect(),
+        };
+        assert_eq!(
+            result.blocks_chunks.len(),
+            result.blocks_setup_power2.len(),
+            "block sized and setup powers should have same length, check config file"
+        );
+        result
     }
 }

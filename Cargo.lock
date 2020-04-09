@@ -2027,10 +2027,12 @@ dependencies = [
  "clap",
  "crypto_exports",
  "env_logger",
+ "handlebars",
  "hex",
  "log 0.4.8",
  "models",
  "rust-crypto",
+ "serde_json",
  "time",
 ]
 

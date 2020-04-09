@@ -155,11 +155,8 @@ build-contracts: confirm_action prepare-contracts
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
-gen-keys-if-not-present:
-	test -f ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol || gen-keys
-
 prepare-contracts:
-	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/Verifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
 # testing
 

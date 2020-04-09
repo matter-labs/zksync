@@ -3,6 +3,7 @@ use crate::franklin_crypto::bellman::groth16::{
 };
 use crate::franklin_crypto::bellman::{Circuit, SynthesisError};
 use crate::node::{Engine, Fr};
+use crate::params::{account_tree_depth, BALANCE_TREE_DEPTH};
 use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum};
 use crate::EncodedProof;
 use crypto_exports::rand::thread_rng;
@@ -67,8 +68,61 @@ pub fn get_keys_root_dir() -> PathBuf {
     let mut out_dir = PathBuf::new();
     out_dir.push(&std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));
     out_dir.push(&std::env::var("KEY_DIR").expect("KEY_DIR not set"));
-    out_dir.push(&format!("account-{}", crate::params::account_tree_depth()));
+    out_dir.push(&format!(
+        "account-{}_balance-{}",
+        account_tree_depth(),
+        BALANCE_TREE_DEPTH
+    ));
     out_dir
+}
+
+fn base_universal_setup_dir() -> Result<PathBuf, failure::Error> {
+    let mut dir = PathBuf::new();
+    // root is used by default for provers
+    dir.push(&std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));
+    dir.push("keys");
+    dir.push("setup");
+    failure::ensure!(dir.exists(), "Universal setup dir does not exits");
+    Ok(dir)
+}
+
+/// Returns paths for universal setup in monomial form of the given power of two (range: 20-26). Checks if file exists
+pub fn get_universal_setup_monomial_form_file_path(
+    power_of_two: usize,
+) -> Result<PathBuf, failure::Error> {
+    failure::ensure!(
+        (20..=26).contains(&power_of_two),
+        "power of two is not in [20,26] range"
+    );
+    let setup_file_name = format!("setup_2^{}.key", power_of_two);
+    let mut setup_file = base_universal_setup_dir()?;
+    setup_file.push(&setup_file_name);
+    failure::ensure!(
+        setup_file.exists(),
+        "Universal setup file {} does not exist",
+        setup_file_name
+    );
+    Ok(setup_file)
+}
+
+/// Returns paths for universal setup in lagrange form of the given power of two (range: 20-26). Checks if file exists
+pub fn get_universal_setup_lagrange_form_file_path(
+    power_of_two: usize,
+) -> Result<PathBuf, failure::Error> {
+    failure::ensure!(
+        (20..=26).contains(&power_of_two),
+        "power of two is not in [20,26] range"
+    );
+    let setup_file_name = format!("setup_2^{}_lagrange.key", power_of_two);
+    let mut setup_file = base_universal_setup_dir()?;
+    setup_file.push(&setup_file_name);
+
+    failure::ensure!(
+        setup_file.exists(),
+        "Universal setup file {} does not exist",
+        setup_file_name
+    );
+    Ok(setup_file)
 }
 
 pub fn get_block_proof_key_and_vk_path(block_size: usize) -> (PathBuf, PathBuf) {
@@ -95,4 +149,22 @@ pub fn get_exodus_proof_key_and_vk_path() -> (PathBuf, PathBuf) {
     get_vk_file.push(VERIFY_KEY_FILENAME);
 
     (key_file, get_vk_file)
+}
+
+pub fn get_exodus_verification_key_path() -> PathBuf {
+    let mut key = get_keys_root_dir();
+    key.push("verification_exit.key");
+    key
+}
+
+pub fn get_block_verification_key_path(block_chunks: usize) -> PathBuf {
+    let mut key = get_keys_root_dir();
+    key.push(&format!("verification_block_{}.key", block_chunks));
+    key
+}
+
+pub fn get_verifier_contract_key_path() -> PathBuf {
+    let mut contract = get_keys_root_dir();
+    contract.push("Verifier.sol");
+    contract
 }

@@ -841,7 +841,7 @@ mod test {
 
         for _ in 0..NUM_DEPOSITS {
             plasma_state.apply_deposit_op(&deposit_op);
-            let deposit_witness = apply_deposit_tx(witness_accum.account_tree, &deposit_op);
+            let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
             let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
             let pub_data_from_witness = deposit_witness.get_pubdata();
 
