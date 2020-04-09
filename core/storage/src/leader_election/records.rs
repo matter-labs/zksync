@@ -10,12 +10,11 @@ pub struct LeaderElection {
     pub id: i32,
     pub name: String,
     pub created_at: NaiveDateTime,
-    pub retired_at: Option<NaiveDateTime>,
+    pub bail_at: Option<NaiveDateTime>,
 }
 
 #[derive(Debug, Clone, Insertable, PartialEq)]
 #[table_name = "leader_election"]
 pub struct NewLeaderElection {
     pub name: String,
-    pub retired_at: Option<NaiveDateTime>,
 }

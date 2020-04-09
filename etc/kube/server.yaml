@@ -49,6 +49,34 @@ spec:
     name: ${ZKSYNC_ENV}-prover-server-port
   selector:
     app: ${ZKSYNC_ENV}-server
+  ---
+  apiVersion: apps/v1
+  kind: Deployment
+  metadata:
+    name: ${ZKSYNC_ENV}-server-supervisor
+    namespace: ${ZKSYNC_ENV}
+  spec:
+    replicas: 1
+    selector:
+      matchLabels:
+        app: ${ZKSYNC_ENV}-server-supervisor
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          app: ${ZKSYNC_ENV}-server-supervisor
+      spec:
+        containers:
+          - name: server
+            image: matterlabs/server_supervisor:${IMAGE_TAG}
+            imagePullPolicy: Always
+            envFrom:
+              - secretRef:
+                  name: ${ZKSYNC_ENV}-secret
+            env:
+            - name: NAMESPACE
+              value: "${ZKSYNC_ENV}"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -62,8 +90,6 @@ spec:
   selector:
     matchLabels:
       app: ${ZKSYNC_ENV}-server
-  strategy:
-    type: Recreate
   template:
     metadata:
       labels:
@@ -85,3 +111,8 @@ spec:
           env:
           - name: ZKSYNC_ENV
             value: "${ZKSYNC_ENV}"
+          - name: SERVER_REPLICA_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name

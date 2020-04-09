@@ -243,7 +243,7 @@ table! {
         id -> Int4,
         name -> Text,
         created_at -> Timestamp,
-        retired_at -> Nullable<Timestamp>,
+        bail_at -> Nullable<Timestamp>,
     }
 }
 
