@@ -27,7 +27,7 @@ use crate::{
         operations_ext::records::{InsertTx, ReadTx},
         state::StateSchema,
     },
-    ethereum::records::StorageETHOperation,
+    ethereum::records::ETHBinding,
 };
 
 mod conversion;
@@ -225,7 +225,8 @@ impl<'a> BlockSchema<'a> {
         limit: u32,
     ) -> QueryResult<Vec<BlockDetails>> {
         // This query does the following:
-        // - joins the `operations` and `eth_operations` tables to collect the data:
+        // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
+        //   tables to collect the data:
         //   block number, ethereum transaction hash, action type and action creation timestamp;
         // - joins the `blocks` table with result of the join twice: once for committed operations
         //   and verified operations;
@@ -235,14 +236,15 @@ impl<'a> BlockSchema<'a> {
             with eth_ops as ( \
                 select \
                     operations.block_number, \
-                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash, \
+                    '0x' || encode(eth_tx_hashes.tx_hash::bytea, 'hex') as tx_hash, \
                     operations.action_type, \
                     operations.created_at \
                 from operations \
-                    left join eth_operations on eth_operations.op_id = operations.id \
+                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
             ) \
             select \
-                blocks.number as block_number, \
+                DISTINCT blocks.number as block_number, \
                 blocks.root_hash as new_state_root, \
                 blocks.block_size as block_size, \
                 committed.tx_hash as commit_tx_hash, \
@@ -276,7 +278,8 @@ impl<'a> BlockSchema<'a> {
         let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
         let l_query = query.to_lowercase();
         // This query does the following:
-        // - joins the `operations` and `eth_operations` tables to collect the data:
+        // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
+        //   tables to collect the data:
         //   block number, ethereum transaction hash, action type and action creation timestamp;
         // - joins the `blocks` table with result of the join twice: once for committed operations
         //   and verified operations;
@@ -290,11 +293,12 @@ impl<'a> BlockSchema<'a> {
             with eth_ops as ( \
                 select \
                     operations.block_number, \
-                    '0x' || encode(eth_operations.tx_hash::bytea, 'hex') as tx_hash, \
+                    '0x' || encode(eth_tx_hashes.tx_hash::bytea, 'hex') as tx_hash, \
                     operations.action_type, \
                     operations.created_at \
                 from operations \
-                    left join eth_operations on eth_operations.op_id = operations.id \
+                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
             ) \
             select \
                 blocks.number as block_number, \
@@ -337,17 +341,16 @@ impl<'a> BlockSchema<'a> {
     pub fn load_unsent_ops(&self) -> QueryResult<Vec<Operation>> {
         self.0.conn().transaction(|| {
             let ops: Vec<_> = operations::table
-                .left_join(eth_operations::table.on(eth_operations::op_id.eq(operations::id)))
-                .filter(eth_operations::id.is_null())
+                .left_join(eth_ops_binding::table.on(eth_ops_binding::op_id.eq(operations::id)))
+                .filter(eth_ops_binding::id.is_null())
                 .order(operations::id.asc())
-                .load::<(StoredOperation, Option<StorageETHOperation>)>(self.0.conn())?;
+                .load::<(StoredOperation, Option<ETHBinding>)>(self.0.conn())?;
             ops.into_iter().map(|(o, _)| o.into_op(self.0)).collect()
         })
     }
 
     pub fn load_unverified_commits_after_block(
         &self,
-        block_size: usize,
         block: BlockNumber,
         limit: i64,
     ) -> QueryResult<Vec<Operation>> {
@@ -358,7 +361,7 @@ impl<'a> BlockSchema<'a> {
                     SELECT operations.* FROM operations
                     LEFT JOIN blocks ON number = block_number
                     LEFT JOIN proofs USING (block_number)
-                    WHERE proof IS NULL AND block_size = {}
+                    WHERE proof IS NULL
                 )
                 SELECT * FROM sized_operations
                 WHERE action_type = 'COMMIT'
@@ -371,7 +374,7 @@ impl<'a> BlockSchema<'a> {
                 ORDER BY block_number
                 LIMIT {}
                 ",
-                block_size, block, limit
+                block, limit
             ))
             .load(self.0.conn())?;
             ops.into_iter().map(|o| o.into_op(self.0)).collect()

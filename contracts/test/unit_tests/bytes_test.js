@@ -2,7 +2,7 @@ const { expect } = require("chai")
 const { bigNumberify } = require("ethers/utils");
 const { provider, wallet, deployTestContract, getCallRevertReason } = require("./common")
 
-describe("Bytes unit test", function () {
+describe("Bytes unit tests", function () {
     this.timeout(50000);
 
     let bytesTestContract
@@ -10,14 +10,7 @@ describe("Bytes unit test", function () {
         bytesTestContract = await deployTestContract('../../build/BytesTest')
     });
 
-    // concat
-
-    it("should concatenate bytes", async () => {
-        let r = await bytesTestContract.concat("0x010203", "0x11121314")
-        expect(r).equal("0x01020311121314")
-    });
-
-    // read 
+    // read
 
     it("should read bytes", async () => {
         let r = await bytesTestContract.read("0x0102030405060708", 4, 2)

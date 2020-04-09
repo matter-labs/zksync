@@ -37,6 +37,37 @@ pub type PrivateKey = PrivateKeyImport<Engine>;
 pub type PublicKey = PublicKeyImport<Engine>;
 pub type Address = web3::types::Address;
 
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[serde(untagged)]
+/// Order of the fields are important (from more specific types to less specific types)
+pub enum TokenLike {
+    Id(TokenId),
+    Address(Address),
+    Symbol(String),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
+/// Token supported in ZK Sync protocol
+pub struct Token {
+    /// id is used for tx signature and serialization
+    pub id: TokenId,
+    /// Contract address of ERC20 token or Address::zero() for "ETH"
+    pub address: Address,
+    /// Token symbol (e.g. "ETH" or "USDC")
+    pub symbol: String,
+}
+
+impl Token {
+    pub fn new(id: TokenId, address: Address, symbol: &str) -> Self {
+        Self {
+            id,
+            address,
+            symbol: symbol.to_string(),
+        }
+    }
+}
+
 pub fn priv_key_from_fs(fs: Fs) -> PrivateKey {
     PrivateKeyImport(fs)
 }
@@ -106,6 +137,16 @@ pub fn unpack_fee_amount(data: &[u8]) -> Option<BigDecimal> {
     .map(u128_to_bigdecimal)
 }
 
+pub fn closest_packable_fee_amount(amount: &BigDecimal) -> BigDecimal {
+    let fee_packed = pack_fee_amount(&amount);
+    unpack_fee_amount(&fee_packed).expect("fee repacking")
+}
+
+pub fn closest_packable_token_amount(amount: &BigDecimal) -> BigDecimal {
+    let fee_packed = pack_token_amount(&amount);
+    unpack_token_amount(&fee_packed).expect("token amount repacking")
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -141,5 +182,93 @@ mod test {
         assert!(!is_fee_amount_packable(
             &(max_mantissa_fee + BigDecimal::from(1))
         ));
+    }
+
+    #[test]
+    fn pack_to_closest_packable() {
+        let fee = BigDecimal::from(1_234_123_424);
+        assert!(
+            !is_fee_amount_packable(&fee),
+            "fee should not be packable for this test"
+        );
+        let closest_packable_fee = closest_packable_fee_amount(&fee);
+        assert!(
+            is_fee_amount_packable(&closest_packable_fee),
+            "repacked fee should be packable"
+        );
+        assert_ne!(
+            closest_packable_fee,
+            BigDecimal::from(0),
+            "repacked fee should not be 0"
+        );
+        assert!(
+            closest_packable_fee < fee,
+            "packable fee should be less then original"
+        );
+        println!(
+            "fee: original: {}, truncated: {}",
+            fee, closest_packable_fee
+        );
+
+        let token = BigDecimal::from(123_456_789_123_456_789u64);
+        assert!(
+            !is_token_amount_packable(&token),
+            "token should not be packable for this test"
+        );
+        let closest_packable_token = closest_packable_token_amount(&token);
+        assert!(
+            is_token_amount_packable(&closest_packable_token),
+            "repacked token amount should be packable"
+        );
+        assert_ne!(
+            closest_packable_token,
+            BigDecimal::from(0),
+            "repacked token should not be 0"
+        );
+        assert!(
+            closest_packable_token < token,
+            "packable token should be less then original"
+        );
+        println!(
+            "token: original: {}, packable: {}",
+            token, closest_packable_token
+        );
+    }
+
+    #[test]
+    fn token_like_serialization() {
+        #[derive(Debug, Serialize, Deserialize, PartialEq)]
+        struct Query {
+            token: TokenLike,
+        }
+        let test_cases = vec![
+            (
+                Query {
+                    token: TokenLike::Address(
+                        "c919467ee96806d584cae8d0b11504b26fedfbab".parse().unwrap(),
+                    ),
+                },
+                r#"{"token":"0xc919467ee96806d584cae8d0b11504b26fedfbab"}"#,
+            ),
+            (
+                Query {
+                    token: TokenLike::Symbol("ETH".to_string()),
+                },
+                r#"{"token":"ETH"}"#,
+            ),
+            (
+                Query {
+                    token: TokenLike::Id(14),
+                },
+                r#"{"token":14}"#,
+            ),
+        ];
+
+        for (query, json_str) in test_cases {
+            let ser = serde_json::to_string(&query).expect("ser");
+            assert_eq!(ser, json_str);
+            let de = serde_json::from_str(&ser).expect("de");
+            assert_eq!(query, de);
+        }
     }
 }

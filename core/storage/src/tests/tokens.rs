@@ -2,10 +2,8 @@
 // Workspace imports
 // Local imports
 use crate::tests::db_test;
-use crate::{
-    tokens::{records::Token, TokensSchema},
-    StorageProcessor,
-};
+use crate::{tokens::TokensSchema, StorageProcessor};
+use models::node::{Token, TokenLike};
 
 /// Verifies the token save & load mechanism.
 #[test]
@@ -18,28 +16,30 @@ fn tokens_storage() {
             .load_tokens()
             .expect("Load tokens query failed");
         assert_eq!(tokens.len(), 1);
-        assert_eq!(
-            tokens[&0],
-            Token {
-                id: 0,
-                address: "0000000000000000000000000000000000000000".into(),
-                symbol: "ETH".into(),
-            }
-        );
+        let eth_token = Token {
+            id: 0,
+            address: "0000000000000000000000000000000000000000".parse().unwrap(),
+            symbol: "ETH".into(),
+        };
+        assert_eq!(tokens[&0], eth_token);
 
         // Add two tokens.
-        let token_a_id = 1;
-        let token_a_symbol = "ABC";
-        let token_a_addr = "0000000000000000000000000000000000000001";
-        let token_b_id = 2;
-        let token_b_symbol = "DEF";
-        let token_b_addr = "0000000000000000000000000000000000000002";
+        let token_a = Token {
+            id: 1,
+            address: "0000000000000000000000000000000000000001".parse().unwrap(),
+            symbol: "ABC".into(),
+        };
+        let token_b = Token {
+            id: 2,
+            address: "0000000000000000000000000000000000000002".parse().unwrap(),
+            symbol: "DEF".into(),
+        };
 
         TokensSchema(&conn)
-            .store_token(token_a_id, token_a_addr, token_a_symbol)
+            .store_token(token_a.clone())
             .expect("Store tokens query failed");
         TokensSchema(&conn)
-            .store_token(token_b_id, token_b_addr, token_b_symbol)
+            .store_token(token_b.clone())
             .expect("Store tokens query failed");
 
         // Load tokens again.
@@ -48,22 +48,27 @@ fn tokens_storage() {
             .expect("Load tokens query failed");
 
         assert_eq!(tokens.len(), 3);
-        assert_eq!(
-            tokens[&token_a_id],
-            Token {
-                id: token_a_id as i32,
-                address: token_a_addr.into(),
-                symbol: token_a_symbol.into(),
-            }
-        );
-        assert_eq!(
-            tokens[&token_b_id],
-            Token {
-                id: token_b_id as i32,
-                address: token_b_addr.into(),
-                symbol: token_b_symbol.into(),
-            }
-        );
+        assert_eq!(tokens[&eth_token.id], eth_token);
+        assert_eq!(tokens[&token_a.id], token_a);
+        assert_eq!(tokens[&token_b.id], token_b);
+
+        let token_b_by_id = TokensSchema(&conn)
+            .get_token(TokenLike::Id(token_b.id))
+            .expect("get token query failed")
+            .expect("token by id not found");
+        assert_eq!(token_b, token_b_by_id);
+
+        let token_b_by_address = TokensSchema(&conn)
+            .get_token(TokenLike::Address(token_b.address))
+            .expect("get token query failed")
+            .expect("token by address not found");
+        assert_eq!(token_b, token_b_by_address);
+
+        let token_b_by_symbol = TokensSchema(&conn)
+            .get_token(TokenLike::Symbol(token_b.symbol.clone()))
+            .expect("get token query failed")
+            .expect("token by symbol not found");
+        assert_eq!(token_b, token_b_by_symbol);
 
         Ok(())
     });

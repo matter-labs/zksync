@@ -199,19 +199,21 @@ export default {
                         to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
                         token              = tx.priority_op.data.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.op.withdraw_amount, token)} ${token}`;
+                        amount             = `${formatToken(tx.priority_op.withdraw_amount || 0, token)} ${token}`;
                         fee                = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
                         break;
                     default:
                         throw new Error('switch reached default');
                 }
 
-                const from_target = from_explorer_link.startsWith('/')
-                    ? ''
+                const from_target 
+                    = from_explorer_link.startsWith('/') ? ''
+                    : from_explorer_link == '' ? ''
                     : `target="_blank" rel="noopener noreferrer"`;
 
-                const to_target = to_explorer_link.startsWith('/')
-                    ? ''
+                const to_target 
+                    = to_explorer_link.startsWith('/') ? ''
+                    : to_explorer_link == '' ? ''
                     : `target="_blank" rel="noopener noreferrer"`;
 
                 return {

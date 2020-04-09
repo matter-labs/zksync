@@ -6,9 +6,18 @@ import "./Governance.sol";
 import "./Verifier.sol";
 import "./Operations.sol";
 
+
 /// @title zkSync storage contract
 /// @author Matter Labs
 contract Storage {
+
+    /// @notice Flag indicates that upgrade preparation status is active
+    /// @dev Will store false in case of not active upgrade mode
+    bool public upgradePreparationActive;
+
+    /// @notice Upgrade preparation activation timestamp (as seconds since unix epoch)
+    /// @dev Will be equal to zero in case of not active upgrade mode
+    uint public upgradePreparationActivationTime;
 
     /// @notice Verifier contract. Used to verify block proof and exit proof
     Verifier internal verifier;
@@ -25,7 +34,7 @@ contract Storage {
         uint16 tokenId;
     }
     
-    /// @notice Verified but not executed withdrawals for addresses stored in here
+    /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index)
     mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
     uint32 public firstPendingWithdrawalIndex;
     uint32 public numberOfPendingWithdrawals;

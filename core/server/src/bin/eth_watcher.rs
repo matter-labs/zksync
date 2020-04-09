@@ -35,6 +35,7 @@ fn main() {
         governance_addr,
         //priority_queue_address,
         contract_address,
+        0,
         eth_req_receiver,
     );
 

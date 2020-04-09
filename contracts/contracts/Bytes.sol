@@ -76,7 +76,7 @@ library Bytes {
     }
 
     function bytesToBytes32(bytes memory  _input) internal pure returns (bytes32 _output) {
-        require (_input.length >= 0x20);
+        require (_input.length == 0x20);
         assembly {
             _output := mload(add(_input, 0x20))
         }
@@ -156,16 +156,6 @@ library Bytes {
         bytes memory buf;
         (new_offset, buf) = read(_data, _offset, 20);
         r = bytesToAddress(buf);
-    }
-
-    // Original source code: https://github.com/GNSPS/solidity-bytes-utils/blob/master/contracts/BytesLib.sol#L13
-    // Concatenate bytes arrays in memory
-    // Returns the newly created 'bytes memory'.
-    function concat(
-        bytes memory _preBytes,
-        bytes memory _postBytes
-    ) internal pure returns (bytes memory) {
-        return abi.encodePacked (_preBytes, _postBytes);
     }
 
     // Helper function for hex conversion.

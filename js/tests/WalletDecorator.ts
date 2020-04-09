@@ -1,8 +1,9 @@
 import * as ethers from 'ethers';
-const zksync = require('zksync');
+import * as zksync from 'zksync';
 import * as utils from './utils';
 import { sleep } from 'zksync/build/utils';
-const contractCode = require('../../contracts/flat_build/Franklin');
+import { bigNumberify } from 'ethers/utils';
+const contractCode = require('../../contracts/build/Franklin');
 const erc20ContractCode = require('openzeppelin-solidity/build/contracts/IERC20');
 
 const ethersProvider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
@@ -27,6 +28,13 @@ const contract = new ethers.Contract(
     ethersProvider,
 );
 
+export type TxResult = {
+    payload: any,
+    tx: any,
+    receipt: any,
+    error: any,
+};
+
 export class WalletDecorator {
     syncNonce: number;
     ethNonce: number;
@@ -34,7 +42,7 @@ export class WalletDecorator {
 
     constructor(
         public ethWallet,
-        public syncWallet,
+        public syncWallet: zksync.Wallet,
     ) {
         this.contract = new ethers.Contract(
             process.env.CONTRACT_ADDR, 
@@ -48,43 +56,19 @@ export class WalletDecorator {
             utils.rangearr(n).map(
                 _ => this.cancelOutstandingDepositsForExodusMode(10, { gasLimit: 1000000 })
             )
-            .map(promise => promise.catch(WalletDecorator.revertReasonHandler))
         );
     }
 
-    async cancelOutstandingDepositsForExodusMode(numDeposits = 10, overrideOptions?) {
+    async cancelOutstandingDepositsForExodusMode(numDeposits = 10, ethTxOptions?) {
         const nonce = this.ethNonce++;
         const tx = await this.contract.cancelOutstandingDepositsForExodusMode(
             numDeposits, 
             { 
                 nonce, 
-                ...overrideOptions 
+                ...ethTxOptions 
             }
         );
         return tx.wait();
-    }
-
-    static async replacementUnderpricedHandler(e) {
-        if (e.code == 'REPLACEMENT_UNDERPRICED') {
-            return {
-                hash: e.transactionHash,
-                code: e.code,
-                reason: 'replacement fee too low',
-            };
-        }
-        
-        throw e;
-    }
-
-    static async revertReasonHandler(e) {
-        const hash = e.transactionHash;
-        if (hash == undefined) throw e;
-        const revertReason = await WalletDecorator.revertReason(hash);
-        if (revertReason == 'tx null') throw e;
-        return {
-            hash,
-            revertReason,
-        };
     }
 
     static async revertReason(hash) {
@@ -93,7 +77,7 @@ export class WalletDecorator {
         if (!tx) {
             return "tx not found";
         }
-        
+
         const receipt = await ethersProvider.getTransactionReceipt(hash);
     
         if (receipt.status) {
@@ -152,10 +136,9 @@ export class WalletDecorator {
     }
 
     static async fromEthWallet(ethWallet) {
-        const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider, ethProxy);
+        const syncWallet = await zksync.Wallet.fromEthSigner(ethWallet, syncProvider);
         const wallet = new WalletDecorator(ethWallet, syncWallet);
-        wallet.syncNonce = await syncWallet.getNonce();
-        wallet.ethNonce = await ethWallet.getTransactionCount();
+        await wallet.resetNonce();
         console.log(`wallet ${syncWallet.address()} syncNonce ${wallet.syncNonce}, ethNonce ${wallet.ethNonce}`);
         return wallet;
     }
@@ -178,7 +161,7 @@ export class WalletDecorator {
         if (await this.syncWallet.isSigningKeySet()) return;
 
         const startTime = new Date().getTime();
-        await (await this.syncWallet.onchainAuthSigningKey(this.syncNonce++)).wait();
+        await (await this.syncWallet.onchainAuthSigningKey(this.syncNonce)).wait();
         const changePubkeyHandle = await this.syncWallet.setSigningKey(this.syncNonce++, true);
         console.log(`Change pubkey onchain posted: ${(new Date().getTime()) - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
@@ -231,7 +214,7 @@ export class WalletDecorator {
         }
     }
 
-    async emergencyWithdraw(tokens) {
+    async emergencyWithdraw(tokens): Promise<TxResult[]> {
         return await Promise.all(
             tokens.map(async token => {
                 const ethNonce = this.ethNonce++;
@@ -245,11 +228,11 @@ export class WalletDecorator {
                         withdrawFrom: this.syncWallet,
                         token,
                         nonce: syncNonce,
-                        overrideOptions: {
+                        ethTxOptions: {
                             nonce: ethNonce,
                         },
                     };
-                    tx = await zksync.emergencyWithdraw(payload);
+                    tx = await this.syncWallet.emergencyWithdraw(payload);
                     receipt = tx.awaitReceipt();
                 } catch (e) {
                     error = e;
@@ -262,15 +245,10 @@ export class WalletDecorator {
                     error,
                 };
             })
-            .map(promise => promise
-                .catch(utils.jrpcErrorHandler("Emergency withdraw error"))
-                .catch(WalletDecorator.revertReasonHandler)
-                .catch(WalletDecorator.replacementUnderpricedHandler)
-            )
         );
     }
 
-    async deposit(amount, tokens) {
+    async deposit(amount, tokens): Promise<TxResult[]> {
         return await Promise.all(
             tokens.map(async token => {
                 const nonce = this.ethNonce;
@@ -280,15 +258,14 @@ export class WalletDecorator {
                 let error = null;
                 try {
                     payload = {
-                        depositFrom: this.ethWallet,
-                        depositTo: this.syncWallet,
-                        token: token,
-                        amount: amount,
-                        overrideOptions: {
+                        depositTo: this.syncWallet.address(),
+                        token,
+                        amount,
+                        ethTxOptions: {
                             nonce,
                         },
                     };
-                    tx = await zksync.depositFromETH(payload);
+                    tx = await this.syncWallet.depositToSyncFromEthereum(payload);
                     receipt = await tx.awaitReceipt();
                 } catch (e) {
                     error = e;
@@ -304,7 +281,7 @@ export class WalletDecorator {
         );
     }
 
-    async transfer(wallet, amount, tokens) {
+    async transfer(wallet, amount, tokens): Promise<TxResult[]> {
         const fee = ethers.utils.bigNumberify(0);
         return await Promise.all(
             tokens
@@ -337,7 +314,7 @@ export class WalletDecorator {
         );
     }
 
-    async withdraw(amount, tokens) {
+    async withdraw(amount, tokens): Promise<TxResult[]> {
         const fee = ethers.utils.bigNumberify(0);
         const ethAddress = await this.ethWallet.getAddress();
         return await Promise.all(
@@ -355,7 +332,7 @@ export class WalletDecorator {
                             fee,
                             nonce,
                         };
-                        tx = await this.syncWallet.withdrawTo(payload);
+                        tx = await this.syncWallet.withdrawFromSyncToEthereum(payload);
                         receipt = await tx.awaitReceipt();
                     } catch (e) {
                         error = e;
@@ -415,9 +392,8 @@ export class WalletDecorator {
     }
 
     async prettyPrintBalances(tokens) {
-        const ethAddress       = await this.ethWallet.getAddress();
         const syncAddress      = this.syncWallet.address();
-        console.log(`Balance of ${ethAddress} ( ${syncAddress} ):`);
+        console.log(`Balance of ${syncAddress}:`);
         console.table(await this.balances(tokens));
     }
 }
