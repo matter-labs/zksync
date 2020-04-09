@@ -16,7 +16,6 @@ use models::{
     node::{tx::TxEthSignature, FranklinTx},
 };
 // Local uses
-// use crate::api_server::rpc_server::RpcErrorCodes;
 use crate::eth_watch::EthWatchRequest;
 use crate::mempool::TxAddError;
 
@@ -25,6 +24,30 @@ async fn verify_eth_signature(
     request: &VerifyTxSignatureRequest,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
 ) -> Result<(), TxAddError> {
+    // Check if the tx is a `ChangePubKey` operation without an Ethereum signature.
+    if let FranklinTx::ChangePubKey(change_pk) = &request.tx {
+        if change_pk.eth_signature.is_none() {
+            // Check that user is allowed to perform this operation.
+            let eth_watch_resp = oneshot::channel();
+            eth_watch_req
+                .clone()
+                .send(EthWatchRequest::IsPubkeyChangeAuthorized {
+                    address: change_pk.account,
+                    nonce: change_pk.nonce,
+                    pubkey_hash: change_pk.new_pk_hash.clone(),
+                    resp: eth_watch_resp.0,
+                })
+                .await
+                .expect("ETH watch req receiver dropped");
+
+            let is_authorized = eth_watch_resp.1.await.expect("Err response from eth watch");
+            if !is_authorized {
+                return Err(TxAddError::ChangePkNotAuthorized);
+            }
+        }
+    }
+
+    // Check the signature.
     if let Some((signature, message)) = &request.eth_sign_data {
         match &signature {
             TxEthSignature::EthereumSignature(packed_signature) => {

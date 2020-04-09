@@ -128,7 +128,8 @@ impl MempoolState {
     }
 
     fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
-        // Correctness should be checked by `signature_checker`.
+        // Correctness should be checked by `signature_checker`, thus
+        // `tx.check_correctness()` is not invoked here.
 
         if tx.nonce() >= self.nonce(&tx.account()) {
             self.ready_txs.push_back(tx);
@@ -146,28 +147,7 @@ struct Mempool {
 }
 
 impl Mempool {
-    async fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
-        if let FranklinTx::ChangePubKey(change_pk) = &tx {
-            if change_pk.eth_signature.is_none() {
-                let eth_watch_resp = oneshot::channel();
-                self.eth_watch_req
-                    .clone()
-                    .send(EthWatchRequest::IsPubkeyChangeAuthorized {
-                        address: change_pk.account,
-                        nonce: change_pk.nonce,
-                        pubkey_hash: change_pk.new_pk_hash.clone(),
-                        resp: eth_watch_resp.0,
-                    })
-                    .await
-                    .expect("ETH watch req receiver dropped");
-
-                let is_authorized = eth_watch_resp.1.await.expect("Err response from eth watch");
-                if !is_authorized {
-                    return Err(TxAddError::ChangePkNotAuthorized);
-                }
-            }
-        }
-
+    fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
         self.mempool_state.add_tx(tx)
     }
 
@@ -175,7 +155,7 @@ impl Mempool {
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolRequest::NewTx(tx, resp) => {
-                    let tx_add_result = self.add_tx(*tx).await;
+                    let tx_add_result = self.add_tx(*tx);
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
