@@ -38,7 +38,7 @@ const TX_EXECUTION_TIMEOUT_SEC: u64 = 5 * 60;
 /// sends the different types of transactions, and measures the TPS for the txs execution
 /// (not including the verification).
 pub fn run_scenario(mut ctx: ScenarioContext) {
-    let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec).clone();
+    let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec);
     let rpc_addr = ctx.rpc_addr.clone();
 
     let rpc_client = RpcClient::new(&rpc_addr);
