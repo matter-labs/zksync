@@ -7,9 +7,14 @@ volumes:
   - name: cache
     host:
       path: /drone-cache
+  - name: docker-sock
+    host:
+      path: /var/run/docker.sock
 services:
   - name: geth
     image: matterlabs/geth:latest
+  - name: ganache
+    image: matterlabs/ganache
   - name: postgres
     image: postgres:10.4
 trigger:
@@ -73,6 +78,9 @@ steps:
   - init
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
+  volumes:
+    - name: docker-sock
+      path: /var/run/docker.sock
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
