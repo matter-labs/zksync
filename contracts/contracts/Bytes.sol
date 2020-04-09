@@ -76,7 +76,7 @@ library Bytes {
     }
 
     function bytesToBytes32(bytes memory  _input) internal pure returns (bytes32 _output) {
-        require (_input.length >= 0x20);
+        require (_input.length == 0x20);
         assembly {
             _output := mload(add(_input, 0x20))
         }
@@ -118,35 +118,6 @@ library Bytes {
         }
 
         return tempBytes;
-    }
-
-    /// Compares slices in two `bytes` arrays without copying
-    /// @param _lhs_bytes first bytes array
-    /// @param _lhs_offset slice offset in the first array
-    /// @param _rhs_bytes second bytes array
-    /// @param _rhs_offset slice offset in the second array
-    /// @param _length slices' length (equal for left and right arrays)
-    function isEqualSlices(
-        bytes memory _lhs_bytes,
-        uint _lhs_offset,
-        bytes memory _rhs_bytes,
-        uint _rhs_offset,
-        uint _length
-    )
-        internal
-        pure
-        returns (bool equals)
-    {
-        require(_lhs_bytes.length >= _lhs_offset + _length, "ies10");  // index out of bounds for _lhs_bytes
-        require(_rhs_bytes.length >= _rhs_offset + _length, "ies10");  // index out of bounds for _lhs_bytes
-
-        for (uint i = 0; i < _length; ++i) {
-            if (_lhs_bytes[_lhs_offset + i] != _rhs_bytes[_rhs_offset + i]) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     /// Reads byte stream

@@ -81,11 +81,9 @@ library Operations {
     /// @notice Check that deposit pubdata from request and block matches
     function depositPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
         // We must ignore `accountId` because it is present in block pubdata but not in priority queue
-        return Bytes.isEqualSlices(
-            _lhs, ACCOUNT_ID_BYTES,
-            _rhs, ACCOUNT_ID_BYTES,
-            PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES
-        );
+        bytes memory lhs_trimmed = Bytes.slice(_lhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
+        bytes memory rhs_trimmed = Bytes.slice(_rhs, ACCOUNT_ID_BYTES, PACKED_DEPOSIT_PUBDATA_BYTES - ACCOUNT_ID_BYTES);
+        return keccak256(lhs_trimmed) == keccak256(rhs_trimmed);
     }
 
     // FullExit pubdata
@@ -122,11 +120,9 @@ library Operations {
     /// @notice Check that full exit pubdata from request and block matches
     function fullExitPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
         // We must ignore `amount` because it is present in block pubdata but not in priority queue
-        return Bytes.isEqualSlices(
-            _lhs, 0,
-            _rhs, 0,
-            PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES
-        );
+        bytes memory lhs_trimmed = Bytes.slice(_lhs, 0, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
+        bytes memory rhs_trimmed = Bytes.slice(_rhs, 0, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
+        return keccak256(lhs_trimmed) == keccak256(rhs_trimmed);
     }
 
     // PartialExit pubdata

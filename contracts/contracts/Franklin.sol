@@ -315,8 +315,9 @@ contract Franklin is Storage, Config, Events {
             uint64 firstOnchainOpId = totalOnchainOps;
             uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
-            uint64 nOnchainOpsProcessed = collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
+            collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
 
+            uint64 nOnchainOpsProcessed = totalOnchainOps - firstOnchainOpId;
             uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
 
             createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _publicData, firstOnchainOpId, nOnchainOpsProcessed, nPriorityRequestProcessed);
@@ -368,7 +369,7 @@ contract Franklin is Storage, Config, Events {
     /// @param _ethWitness Eth witness that was posted with commit
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
-        internal returns (uint32 _processedZKSyncOperation){
+        internal {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
 
         uint256 pubdataOffset = 0;
@@ -391,8 +392,6 @@ contract Franklin is Storage, Config, Events {
         }
         require(pubdataOffset == _publicData.length, "fcs12"); // last chunk exceeds pubdata
         require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
-
-        return processedZKSyncOperation;
     }
 
     /// @notice Verifies ethereum signature for given message and recovers address of the signer
@@ -488,8 +487,7 @@ contract Franklin is Storage, Config, Events {
                 require(valid, "fpp15"); // failed to verify change pubkey hash signature
             } else {
                 bytes memory authFact = authFacts[op.owner][op.nonce];
-                require(authFact.length == op.pubKeyHash.length, "fpp17");  // invalid authFact length
-                bool valid = Bytes.isEqualSlices(authFact, 0, op.pubKeyHash, 0, op.pubKeyHash.length);
+                bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
                 require(valid, "fpp16"); // new pub key hash is not authenticated properly
             }
             return CHANGE_PUBKEY_BYTES;
@@ -545,18 +543,6 @@ contract Franklin is Storage, Config, Events {
         }
 
         totalCommittedPriorityRequests++;
-    }
-
-    /// @notice Removes some onchain ops (for example in case of wrong priority comparison)
-    /// @param _startId Onchain op start id
-    /// @param _totalProcessed How many ops are procceeded
-    function revertOnchainOps(uint64 _startId, uint64 _totalProcessed) internal {
-        uint64 start = _startId;
-        uint64 end = start + _totalProcessed;
-
-        for (uint64 current = start; current < end; ++current) {
-            delete onchainOps[current];
-        }
     }
 
     /// @notice Block verification.
@@ -641,7 +627,6 @@ contract Franklin is Storage, Config, Events {
         for (uint32 i = totalBlocksCommitted - blocksToRevert + 1; i <= totalBlocksCommitted; i++) {
             Block memory revertedBlock = blocks[i];
             require(revertedBlock.committedAtBlock > 0, "frk11"); // block not found
-            revertOnchainOps(revertedBlock.operationStartId, revertedBlock.onchainOperations);
 
             revertedOnchainOps += revertedBlock.onchainOperations;
             revertedPriorityRequests += revertedBlock.priorityOperations;
