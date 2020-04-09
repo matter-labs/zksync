@@ -356,12 +356,10 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
             uint64 firstOnchainOpId = totalOnchainOps;
-            uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
-            collectOnchainOps(publicData, _ethWitness, _ethWitnessSizes);
+            uint64 nOnchainOpsProcessed = collectOnchainOps(publicData, _ethWitness, _ethWitnessSizes);
 
             uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
-            uint64 nOnchainOpsProcessed = totalOnchainOps - firstOnchainOpId;
 
             createCommittedBlock(_blockNumber, _feeAccount, _newRoot, publicData, firstOnchainOpId, nOnchainOpsProcessed, nPriorityRequestProcessed);
             totalBlocksCommitted++;
@@ -412,7 +410,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _ethWitness Eth witness that was posted with commit
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
-        internal {
+        internal returns (uint64 processedOnchainOperations) {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
 
         uint64 currentOnchainOps = 0;
@@ -509,6 +507,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         require(processedOperationsNeedsEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
 
         totalOnchainOps += currentOnchainOps;
+        return currentOnchainOps;
     }
 
     /// @notice Verifies ethereum signature for given message and recovers address of the signer
