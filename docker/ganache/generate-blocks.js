@@ -28,10 +28,10 @@ async function generateBlocks() {
         .sendTransaction({ to: wallet2.address, value: parseEther("10") })
         .then(tx => tx.wait());
 
-    // send 1 wei to generate a new block each second
+    const blockGenerationIntervalMillis = 100;
     while (true) {
         await wallet2.sendTransaction({ to: wallet3.address, value: bigNumberify(1) });
-        await sleep(1000);
+        await sleep(blockGenerationIntervalMillis);
     }
 }
 
