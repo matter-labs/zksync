@@ -356,6 +356,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
             uint64 firstOnchainOpId = totalOnchainOps;
+            uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
             uint64 nOnchainOpsProcessed = collectOnchainOps(publicData, _ethWitness, _ethWitnessSizes);
 
