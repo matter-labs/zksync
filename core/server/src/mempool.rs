@@ -15,13 +15,12 @@
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
 use crate::eth_watch::EthWatchRequest;
-use failure::{format_err, Fail};
+use failure::Fail;
 use futures::channel::{mpsc, oneshot};
 use futures::{SinkExt, StreamExt};
-use models::node::tx::TxEthSignature;
 use models::node::{
-    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, Token, TokenId,
-    TokenLike, TransferOp, TransferToNewOp,
+    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TransferOp,
+    TransferToNewOp,
 };
 use models::params::max_block_chunk_size;
 use std::collections::{HashMap, VecDeque};
@@ -73,11 +72,7 @@ pub struct GetBlockRequest {
 pub enum MempoolRequest {
     /// Add new transaction to mempool, check signature and correctness
     /// oneshot is used to receive tx add result.
-    NewTx(
-        Box<FranklinTx>,
-        Box<Option<TxEthSignature>>,
-        oneshot::Sender<Result<(), TxAddError>>,
-    ),
+    NewTx(Box<FranklinTx>, oneshot::Sender<Result<(), TxAddError>>),
     /// When block is committed, nonces of the account tree should be updated too.
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
@@ -133,9 +128,7 @@ impl MempoolState {
     }
 
     fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
-        if !tx.check_correctness() {
-            return Err(TxAddError::IncorrectTx);
-        }
+        // Correctness should be checked by `signature_checker`.
 
         if tx.nonce() >= self.nonce(&tx.account()) {
             self.ready_txs.push_back(tx);
@@ -150,23 +143,10 @@ struct Mempool {
     mempool_state: MempoolState,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
-    token_cache: TokenDBCache,
 }
 
 impl Mempool {
-    fn token_symbol_from_id(&mut self, token_id: TokenId) -> Result<String, TxAddError> {
-        self.token_cache
-            .get_token(TokenLike::Id(token_id))
-            .or(Err(TxAddError::Other))?
-            .ok_or(TxAddError::IncorrectTx)
-            .map(|t| t.symbol)
-    }
-
-    async fn add_tx(
-        &mut self,
-        tx: FranklinTx,
-        signature: Option<TxEthSignature>,
-    ) -> Result<(), TxAddError> {
+    async fn add_tx(&mut self, tx: FranklinTx) -> Result<(), TxAddError> {
         if let FranklinTx::ChangePubKey(change_pk) = &tx {
             if change_pk.eth_signature.is_none() {
                 let eth_watch_resp = oneshot::channel();
@@ -188,66 +168,14 @@ impl Mempool {
             }
         }
 
-        let message_to_sign = match &tx {
-            FranklinTx::Transfer(tx) => {
-                let token_symbol = self.token_symbol_from_id(tx.token)?;
-                Some(tx.get_ethereum_sign_message(&token_symbol))
-            }
-            FranklinTx::Withdraw(tx) => {
-                let token_symbol = self.token_symbol_from_id(tx.token)?;
-                Some(tx.get_ethereum_sign_message(&token_symbol))
-            }
-            _ => None,
-        };
-
-        if let Some(message_to_sign) = message_to_sign {
-            let tx_eth_signature = signature.ok_or(TxAddError::MissingEthSignature)?;
-
-            match tx_eth_signature {
-                TxEthSignature::EthereumSignature(packed_signature) => {
-                    let signer_account = packed_signature
-                        .signature_recover_signer(message_to_sign.as_bytes())
-                        .or(Err(TxAddError::IncorrectEthSignature))?;
-
-                    if signer_account != tx.account() {
-                        return Err(TxAddError::IncorrectEthSignature);
-                    }
-                }
-                TxEthSignature::EIP1271Signature(signature) => {
-                    let eth_watch_resp = oneshot::channel();
-                    self.eth_watch_req
-                        .clone()
-                        .send(EthWatchRequest::CheckEIP1271Signature {
-                            address: tx.account(),
-                            data: message_to_sign.as_bytes().to_vec(),
-                            signature,
-                            resp: eth_watch_resp.0,
-                        })
-                        .await
-                        .expect("ETH watch req receiver dropped");
-
-                    let signature_correct = eth_watch_resp
-                        .1
-                        .await
-                        .expect("Failed receiving response from eth watch")
-                        .map_err(|e| warn!("Err in eth watch: {}", e))
-                        .or(Err(TxAddError::EIP1271SignatureVerificationFail))?;
-
-                    if !signature_correct {
-                        return Err(TxAddError::IncorrectTx);
-                    }
-                }
-            };
-        };
-
         self.mempool_state.add_tx(tx)
     }
 
     async fn run(mut self) {
         while let Some(request) = self.requests.next().await {
             match request {
-                MempoolRequest::NewTx(tx, signature, resp) => {
-                    let tx_add_result = self.add_tx(*tx, *signature).await;
+                MempoolRequest::NewTx(tx, resp) => {
+                    let tx_add_result = self.add_tx(*tx).await;
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {
@@ -353,48 +281,48 @@ impl Mempool {
     }
 }
 
-#[derive(Debug)]
-struct TokenDBCache {
-    db_pool: ConnectionPool,
-    // TODO: handle stale entries. (edge case when we rename token after adding it)
-    tokens: HashMap<TokenId, Token>,
-}
+// #[derive(Debug)]
+// struct TokenDBCache {
+//     db_pool: ConnectionPool,
+//     // TODO: handle stale entries. (edge case when we rename token after adding it)
+//     tokens: HashMap<TokenId, Token>,
+// }
 
-impl TokenDBCache {
-    pub fn new(db_pool: ConnectionPool) -> Self {
-        Self {
-            db_pool,
-            tokens: HashMap::new(),
-        }
-    }
+// impl TokenDBCache {
+//     pub fn new(db_pool: ConnectionPool) -> Self {
+//         Self {
+//             db_pool,
+//             tokens: HashMap::new(),
+//         }
+//     }
 
-    pub fn get_token(&mut self, token_like: TokenLike) -> Result<Option<Token>, failure::Error> {
-        let cached_value = match &token_like {
-            TokenLike::Id(token_id) => self.tokens.get(token_id),
-            TokenLike::Address(address) => self.tokens.values().find(|t| &t.address == address),
-            TokenLike::Symbol(symbol) => self.tokens.values().find(|t| &t.symbol == symbol),
-        };
+//     pub fn get_token(&mut self, token_like: TokenLike) -> Result<Option<Token>, failure::Error> {
+//         let cached_value = match &token_like {
+//             TokenLike::Id(token_id) => self.tokens.get(token_id),
+//             TokenLike::Address(address) => self.tokens.values().find(|t| &t.address == address),
+//             TokenLike::Symbol(symbol) => self.tokens.values().find(|t| &t.symbol == symbol),
+//         };
 
-        if let Some(cached_value) = cached_value {
-            Ok(Some(cached_value.clone()))
-        } else {
-            let storage = self
-                .db_pool
-                .access_storage_fragile()
-                .map_err(|e| format_err!("Failed to access storage: {}", e))?;
+//         if let Some(cached_value) = cached_value {
+//             Ok(Some(cached_value.clone()))
+//         } else {
+//             let storage = self
+//                 .db_pool
+//                 .access_storage_fragile()
+//                 .map_err(|e| format_err!("Failed to access storage: {}", e))?;
 
-            let db_token = storage
-                .tokens_schema()
-                .get_token(token_like)
-                .map_err(|e| format_err!("Tokens load failed: {}", e))?;
+//             let db_token = storage
+//                 .tokens_schema()
+//                 .get_token(token_like)
+//                 .map_err(|e| format_err!("Tokens load failed: {}", e))?;
 
-            if let Some(token) = &db_token {
-                self.tokens.insert(token.id, token.clone());
-            }
-            Ok(db_token)
-        }
-    }
-}
+//             if let Some(token) = &db_token {
+//                 self.tokens.insert(token.id, token.clone());
+//             }
+//             Ok(db_token)
+//         }
+//     }
+// }
 
 pub fn run_mempool_task(
     db_pool: ConnectionPool,
@@ -404,13 +332,12 @@ pub fn run_mempool_task(
 ) {
     let mempool_state = MempoolState::restore_from_db(&db_pool);
 
-    let token_cache = TokenDBCache::new(db_pool);
+    // let token_cache = TokenDBCache::new(db_pool);
 
     let mempool = Mempool {
         mempool_state,
         requests,
         eth_watch_req,
-        token_cache,
     };
     runtime.spawn(mempool.run());
 }

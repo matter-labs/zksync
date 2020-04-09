@@ -21,6 +21,9 @@ use std::net::SocketAddr;
 use storage::{ConnectionPool, StorageProcessor};
 use web3::types::Address;
 
+use crate::signature_checker::VerifyTxSignatureRequest;
+use std::sync::RwLock;
+
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
@@ -95,7 +98,8 @@ pub enum TxFeeTypes {
     Transfer,
 }
 
-enum RpcErrorCodes {
+#[derive(Debug)]
+pub enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
 
@@ -163,11 +167,57 @@ pub struct RpcApp {
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub connection_pool: ConnectionPool,
+    pub sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    pub token_cache: RwLock<HashMap<TokenId, String>>,
 }
 
 impl RpcApp {
     pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
+    }
+
+    /// Returns the token symbol for a `TokenId` as a string.
+    /// In case of failure, returns `jsonrpc_core::Error`,
+    /// which makes it convenient to use in the RPC methods.
+    fn token_symbol_from_id(&self, token: TokenId) -> Result<String> {
+        let cached_symbol = {
+            let cache = self.token_cache.read().unwrap();
+            cache.get(&token).cloned()
+        };
+        if let Some(cached_symbol) = cached_symbol {
+            return Ok(cached_symbol);
+        } else {
+            let symbol_from_db = self
+                .access_storage()?
+                .tokens_schema()
+                .get_token(token.into())
+                .map_err(|_| Error::internal_error())?
+                .ok_or(Error {
+                    code: RpcErrorCodes::IncorrectTx.into(),
+                    message: "No such token registered".into(),
+                    data: None,
+                })?;
+            self.token_cache
+                .write()
+                .unwrap()
+                .insert(token, symbol_from_db.symbol.clone());
+            Ok(symbol_from_db.symbol)
+        }
+    }
+
+    /// Returns a message that user has to sign to send the transaction.
+    /// If the transaction doesn't need a message signature, returns `None`.
+    /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
+    fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
+        match tx {
+            FranklinTx::Transfer(tx) => Ok(Some(
+                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
+            )),
+            FranklinTx::Withdraw(tx) => Ok(Some(
+                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
+            )),
+            _ => Ok(None),
+        }
     }
 }
 
@@ -312,12 +362,21 @@ impl Rpc for RpcApp {
             }));
         }
 
+        let msg_to_sign = match self.get_tx_info_message_to_sign(&tx) {
+            Ok(res) => res,
+            Err(e) => return Box::new(futures01::future::err(e)),
+        };
+
         let mut mempool_sender = self.mempool_request_sender.clone();
+        let sign_verify_channel = self.sign_verify_request_sender.clone();
         let mempool_resp = async move {
+            verify_tx_info_message_signature(&tx, *signature, msg_to_sign, sign_verify_channel)
+                .await?;
+
             let hash = tx.hash();
             let mempool_resp = oneshot::channel();
             mempool_sender
-                .send(MempoolRequest::NewTx(tx, signature, mempool_resp.0))
+                .send(MempoolRequest::NewTx(tx, mempool_resp.0))
                 .await
                 .expect("mempool receiver dropped");
             let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
@@ -381,6 +440,7 @@ pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -393,14 +453,62 @@ pub fn start_rpc_server(
                 connection_pool,
                 mempool_request_sender,
                 state_keeper_request_sender,
+                sign_verify_request_sender,
+                token_cache: RwLock::new(HashMap::new()),
             };
             rpc_app.extend(&mut io);
 
-            let server = ServerBuilder::new(io).threads(1).start_http(&addr).unwrap();
+            let server = ServerBuilder::new(io).threads(8).start_http(&addr).unwrap();
 
             server.wait();
         })
         .expect("JSON-RPC http thread");
+}
+
+async fn verify_tx_info_message_signature(
+    tx: &FranklinTx,
+    signature: Option<TxEthSignature>,
+    msg_to_sign: Option<String>,
+    mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+) -> Result<()> {
+    fn rpc_message(error: TxAddError) -> Error {
+        Error {
+            code: RpcErrorCodes::from(error).into(),
+            message: error.to_string(),
+            data: None,
+        }
+    }
+
+    let eth_sign_data = match msg_to_sign {
+        Some(message_to_sign) => {
+            let signature =
+                signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
+
+            Some((signature, message_to_sign))
+        }
+        None => None,
+    };
+
+    let resp = oneshot::channel();
+
+    let request = VerifyTxSignatureRequest {
+        tx: tx.clone(),
+        eth_sign_data,
+        response: resp.0,
+    };
+
+    req_channel
+        .send(request)
+        .await
+        .expect("verifier pool receiver dropped");
+
+    let check_result = resp
+        .1
+        .await
+        .map_err(|_| Error::internal_error())?
+        .map_err(rpc_message);
+
+    check_result
 }
 
 #[cfg(test)]

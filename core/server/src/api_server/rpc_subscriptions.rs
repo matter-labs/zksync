@@ -19,6 +19,9 @@ use std::sync::Arc;
 use storage::ConnectionPool;
 use web3::types::Address;
 
+use crate::signature_checker::VerifyTxSignatureRequest;
+use std::{collections::HashMap, sync::RwLock};
+
 #[rpc]
 pub trait RpcPubSub {
     type Metadata;
@@ -180,6 +183,7 @@ pub fn start_ws_server(
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     executed_tx_receiver: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
@@ -190,6 +194,8 @@ pub fn start_ws_server(
         mempool_request_sender,
         state_keeper_request_sender: state_keeper_request_sender.clone(),
         connection_pool: db_pool.clone(),
+        sign_verify_request_sender,
+        token_cache: RwLock::new(HashMap::new()),
     };
     req_rpc_app.extend(&mut io);
 
