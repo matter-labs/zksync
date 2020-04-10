@@ -424,7 +424,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         }
 
         uint64 ethWitnessOffset = 0;
-        uint16 processedOperationsNeedsEthWitness = 0;
+        uint16 processedOperationsRequiringEthWitness = 0;
 
         while (pubDataPtr<pubDataEnd) {
             uint8 opType;
@@ -442,6 +442,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                 // calculation of public data offset
                 uint256 pubdataOffset;
                 assembly {
+                    // Number of pubdata bytes processed equal to current pubData memory pointer minus pubData memory start pointer (_publicData + 0x20)
                     pubdataOffset := sub(pubDataPtr, add(_publicData, 0x20))
                 }
 
@@ -481,11 +482,11 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
                     pubDataPtr += FULL_EXIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
-                    require(processedOperationsNeedsEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
+                    require(processedOperationsRequiringEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
                     Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
 
-                    if (_ethWitnessSizes[processedOperationsNeedsEthWitness] != 0) {
-                        bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsNeedsEthWitness]);
+                    if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
+                        bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsRequiringEthWitness]);
 
                         bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
                         require(valid, "fpp15"); // failed to verify change pubkey hash signature
@@ -494,8 +495,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                         require(valid, "fpp16"); // new pub key hash is not authenticated properly
                     }
 
-                    ethWitnessOffset += _ethWitnessSizes[processedOperationsNeedsEthWitness];
-                    processedOperationsNeedsEthWitness++;
+                    ethWitnessOffset += _ethWitnessSizes[processedOperationsRequiringEthWitness];
+                    processedOperationsRequiringEthWitness++;
 
                     pubDataPtr += CHANGE_PUBKEY_BYTES;
                 } else {
@@ -505,7 +506,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         }
         require(pubDataPtr == pubDataEnd, "fcs12"); // last chunk exceeds pubdata
         require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
-        require(processedOperationsNeedsEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
+        require(processedOperationsRequiringEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
 
         totalOnchainOps += currentOnchainOps;
         return currentOnchainOps;
@@ -563,7 +564,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
 
-        /// here will be computed sha256 of hash concatenated with _publicData
+        /// here will be computed sha256 of variable 'hash' concatenated with _publicData
         /// hash will be stored in 32 byte slots at the front of _publicData memory (at the place of storing _publicData.length)
         /// this is done to avoid copying _publicData
         /// at the end of this function _publicData length will be correctly stored again at the rigth place
