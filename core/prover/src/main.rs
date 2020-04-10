@@ -91,7 +91,7 @@ fn main() {
 
     let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
     let worker = BabyProver::new(
-        block_size_chunks,
+        vec![block_size_chunks], // TODO: tmp
         api_client.clone(),
         heartbeat_interval,
         stop_signal,

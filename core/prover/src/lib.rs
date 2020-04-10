@@ -5,7 +5,7 @@ pub mod serialization;
 
 // Built-in deps
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::{mpsc, Arc, Mutex};
 use std::{fmt, thread, time};
 // External deps
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
@@ -14,10 +14,20 @@ use log::*;
 use crypto_exports::franklin_crypto;
 use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
+use models::node::Engine;
 use models::prover_utils::plonk::EncodedProofPlonk;
+use models::prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
+
+/// We prepare some data before making proof for each block size, so we cache it in case next block
+/// would be of our size
+struct PreparedComputations {
+    block_size: usize,
+    setup: SetupForStepByStepProver,
+}
 
 pub struct BabyProver<C: ApiClient> {
-    block_size: usize,
+    block_sizes: Vec<usize>,
+    prepared_computations: Mutex<Option<PreparedComputations>>,
     api_client: C,
     heartbeat_interval: time::Duration,
     stop_signal: Arc<AtomicBool>,
@@ -72,13 +82,15 @@ pub fn start<C: 'static + Sync + Send + ApiClient>(
 
 impl<C: ApiClient> BabyProver<C> {
     pub fn new(
-        block_size: usize,
+        block_sizes: Vec<usize>,
         api_client: C,
         heartbeat_interval: time::Duration,
         stop_signal: Arc<AtomicBool>,
     ) -> Self {
+        assert!(!block_sizes.is_empty());
         BabyProver {
-            block_size,
+            block_sizes,
+            prepared_computations: Mutex::new(None),
             api_client,
             heartbeat_interval,
             stop_signal,
@@ -114,18 +126,45 @@ impl<C: ApiClient> BabyProver<C> {
         &self,
         start_heartbeats_tx: &mpsc::Sender<(i32, bool)>,
     ) -> Result<(), BabyProverError> {
-        let block_to_prove = self
-            .api_client
-            .block_to_prove(self.block_size)
-            .map_err(|e| {
-                let e = format!("failed to get block to prove {}", e);
-                BabyProverError::Api(e)
-            })?;
+        let block_size_idx_to_try_first =
+            if let Some(precomp) = self.prepared_computations.lock().unwrap().as_ref() {
+                self.block_sizes
+                    .iter()
+                    .position(|size| *size == precomp.block_size)
+                    .unwrap()
+            } else {
+                0
+            };
 
-        let (block, job_id) = block_to_prove.unwrap_or_else(|| {
-            trace!("no block to prove from the server");
-            (0, 0)
-        });
+        let (mut block, mut job_id, mut block_size) = (0, 0, 0);
+        for offset_idx in 0..self.block_sizes.len() {
+            let idx = (block_size_idx_to_try_first + offset_idx) % self.block_sizes.len();
+            let current_block_size = self.block_sizes[idx];
+
+            let block_to_prove =
+                self.api_client
+                    .block_to_prove(current_block_size)
+                    .map_err(|e| {
+                        let e = format!("failed to get block to prove {}", e);
+                        BabyProverError::Api(e)
+                    })?;
+
+            let (current_request_block, current_request_job_id) =
+                block_to_prove.unwrap_or_else(|| {
+                    trace!(
+                        "no block to prove from the server for size: {}",
+                        current_block_size
+                    );
+                    (0, 0)
+                });
+
+            if current_request_job_id != 0 {
+                block = current_request_block;
+                job_id = current_request_job_id;
+                block_size = current_block_size;
+                break;
+            }
+        }
 
         // Notify heartbeat routine on new proving block job or None.
         start_heartbeats_tx
@@ -140,12 +179,16 @@ impl<C: ApiClient> BabyProver<C> {
                 block, err
             ))
         })?;
-        info!("starting to compute proof for block {}", block);
+
+        info!(
+            "starting to compute proof for block {}, size: {}",
+            block, block_size
+        );
 
         let instance = circuit::circuit::FranklinCircuit {
             rescue_params: &models::params::RESCUE_PARAMS as &Bn256RescueParams,
             jubjub_params: &models::params::JUBJUB_PARAMS as &AltJubjubBn256,
-            operation_batch_size: self.block_size,
+            operation_batch_size: block_size,
             old_root: Some(prover_data.old_root),
             new_root: Some(prover_data.new_root),
             block_number: models::node::Fr::from_str(&block.to_string()),
@@ -157,39 +200,53 @@ impl<C: ApiClient> BabyProver<C> {
             validator_account: prover_data.validator_account,
         };
 
-        // let p = franklin_crypto::bellman::groth16::create_random_proof(
-        //     instance,
-        //     &self.circuit_params,
-        //     rng,
-        // )
-        // .map_err(|e| BabyProverError::Internal(format!("failed to create a proof: {}", e)))?;
-        //
-        // let pvk = franklin_crypto::bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
-        //
-        // let proof_verified = franklin_crypto::bellman::groth16::verify_proof(
-        //     &pvk,
-        //     &p.clone(),
-        //     &[prover_data.public_data_commitment],
-        // )
-        // .map_err(|e| BabyProverError::Internal(format!("failed to verify created proof: {}", e)))?;
-        // if !proof_verified {
-        //     return Err(BabyProverError::Internal(
-        //         "created proof did not pass verification".to_owned(),
-        //     ));
-        // }
+        // we do this way here so old precomp is dropped
+        let valid_cached_precomp = {
+            self.prepared_computations
+                .lock()
+                .unwrap()
+                .take()
+                .filter(|p| p.block_size == block_size)
+        };
+        let precomp = if let Some(precomp) = valid_cached_precomp {
+            precomp
+        } else {
+            let setup =
+                SetupForStepByStepProver::prepare_setup_for_step_by_step_prover(instance.clone())
+                    .map_err(|e| {
+                    BabyProverError::Internal(format!(
+                        "Failed to prepare setup for block_size: {}, err: {}",
+                        block_size, e
+                    ))
+                })?;
+            PreparedComputations { block_size, setup }
+        };
 
-        let block_chunks = instance.operations.len();
-        let p = models::prover_utils::plonk::gen_block_prove_for_circuit_by_steps(
-            instance,
-            block_chunks,
-        )
-        .map_err(|e| BabyProverError::Internal(format!("Failed to generate proof: {}", e)))?;
+        let vk = PlonkVerificationKey::read_verification_key_for_main_circuit(block_size).map_err(
+            |e| {
+                BabyProverError::Internal(format!(
+                    "Failed to read vk for block: {}, size: {}, err: {}",
+                    block, block_size, e
+                ))
+            },
+        )?;
+        let verified_proof = precomp
+            .setup
+            .gen_step_by_step_proof_using_prepared_setup(instance, &vk)
+            .map_err(|e| {
+                BabyProverError::Internal(format!(
+                    "Failed to create verified proof for block: {}, size: {}, err: {}",
+                    block, block_size, e
+                ))
+            })?;
+
+        *self.prepared_computations.lock().unwrap() = Some(precomp);
+
         self.api_client
-            .publish(block, p)
+            .publish(block, verified_proof)
             .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
 
         info!("finished and published proof for block {}", block);
-
         Ok(())
     }
 

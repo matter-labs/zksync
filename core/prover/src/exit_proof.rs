@@ -7,7 +7,7 @@ use log::info;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
 use models::node::{AccountMap, Address, TokenId};
-use models::prover_utils::{gen_prove_for_circuit_by_steps, EncodedProofPlonk};
+use models::prover_utils::{gen_verified_proof_for_exit_circuit, EncodedProofPlonk};
 use std::time::Instant;
 
 pub fn create_exit_proof(
@@ -33,7 +33,7 @@ pub fn create_exit_proof(
     let zksync_exit_circuit =
         create_exit_circuit_with_public_input(&mut circuit_account_tree, account_id, token_id);
 
-    let proof = gen_prove_for_circuit_by_steps(zksync_exit_circuit)
+    let proof = gen_verified_proof_for_exit_circuit(zksync_exit_circuit)
         .map_err(|e| format_err!("Failed to generate proof: {}", e))?;
 
     info!("Exit proof created: {} s", timer.elapsed().as_secs());

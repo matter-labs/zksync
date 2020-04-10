@@ -5,7 +5,8 @@ use crate::params::{account_tree_depth, BALANCE_TREE_DEPTH};
 use crate::primitives::{serialize_fe_for_ethereum, serialize_g1_for_ethereum};
 use crypto_exports::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
 use crypto_exports::bellman::plonk::better_cs::{
-    cs::PlonkCsWidth4WithNextStepParams, keys::Proof, keys::VerificationKey,
+    adaptor::TranspilationVariant, cs::PlonkCsWidth4WithNextStepParams, keys::Proof,
+    keys::SetupPolynomials, keys::VerificationKey,
 };
 use crypto_exports::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
 use crypto_exports::bellman::plonk::{prove_by_steps, setup, transpile, verify};
@@ -13,6 +14,24 @@ use failure::format_err;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+
+pub struct PlonkVerificationKey(VerificationKey<Engine, PlonkCsWidth4WithNextStepParams>);
+
+impl PlonkVerificationKey {
+    pub fn read_verification_key_for_main_circuit(
+        block_chunks: usize,
+    ) -> Result<Self, failure::Error> {
+        Ok(Self(VerificationKey::read(File::open(
+            get_block_verification_key_path(block_chunks),
+        )?)?))
+    }
+
+    pub fn read_verification_key_for_exit_circuit() -> Result<Self, failure::Error> {
+        Ok(Self(VerificationKey::read(File::open(
+            get_exodus_verification_key_path(),
+        )?)?))
+    }
+}
 
 pub mod plonk {
     pub use super::*;
@@ -109,40 +128,49 @@ pub struct EncodedProofPlonk {
     pub proof: Vec<U256>,
 }
 
-/// Generates proof for given circuit using step-by-step algorithm(slower, but more memory efficient)
-/// TODO: do this in optimized way.
-pub fn gen_block_prove_for_circuit_by_steps<C: Circuit<Engine> + Clone>(
-    circuit: C,
-    block_chunks: usize,
-) -> Result<EncodedProofPlonk, failure::Error> {
-    let vk = VerificationKey::read(File::open(get_block_verification_key_path(block_chunks))?)?;
-
-    info!("Proof for block circuit started");
-
-    let hints = transpile(circuit.clone())?;
-    let setup = setup(circuit.clone(), &hints)?;
-    let size_log2 = setup.n.next_power_of_two().trailing_zeros();
-
-    let size_log2 = std::cmp::max(size_log2, 20); // for exit circuit
-    let key_monomial_form = get_universal_setup_monomial_form(size_log2)?;
-
-    let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
-        circuit,
-        &hints,
-        &setup,
-        None,
-        &key_monomial_form,
-    )?;
-
-    let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
-    failure::ensure!(valid, "proof for block is invalid");
-
-    info!("Proof for block circuit successful");
-    Ok(serialize_proof(&proof))
+pub struct SetupForStepByStepProver {
+    setup_polynomials: SetupPolynomials<Engine, PlonkCsWidth4WithNextStepParams>,
+    hints: Vec<(usize, TranspilationVariant)>,
+    key_monomial_form: Crs<Engine, CrsForMonomialForm>,
 }
 
-/// Generates proof for exit given circuit using step-by-step algorithm(slower, but more memory efficient)
-pub fn gen_prove_for_circuit_by_steps<C: Circuit<Engine> + Clone>(
+impl SetupForStepByStepProver {
+    pub fn prepare_setup_for_step_by_step_prover<C: Circuit<Engine> + Clone>(
+        circuit: C,
+    ) -> Result<Self, failure::Error> {
+        let hints = transpile(circuit.clone())?;
+        let setup_polynomials = setup(circuit, &hints)?;
+        let size_log2 = setup_polynomials.n.next_power_of_two().trailing_zeros();
+        let size_log2 = std::cmp::max(size_log2, 20); // for exit circuit
+        let key_monomial_form = get_universal_setup_monomial_form(size_log2)?;
+        Ok(SetupForStepByStepProver {
+            setup_polynomials,
+            hints,
+            key_monomial_form,
+        })
+    }
+
+    pub fn gen_step_by_step_proof_using_prepared_setup<C: Circuit<Engine> + Clone>(
+        &self,
+        circuit: C,
+        vk: &PlonkVerificationKey,
+    ) -> Result<EncodedProofPlonk, failure::Error> {
+        let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
+            circuit,
+            &self.hints,
+            &self.setup_polynomials,
+            None,
+            &self.key_monomial_form,
+        )?;
+
+        let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk.0)?;
+        failure::ensure!(valid, "proof for block is invalid");
+        Ok(serialize_proof(&proof))
+    }
+}
+
+/// Generates proof for exit given circuit using step-by-step algorithm.
+pub fn gen_verified_proof_for_exit_circuit<C: Circuit<Engine> + Clone>(
     circuit: C,
 ) -> Result<EncodedProofPlonk, failure::Error> {
     let vk = VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;

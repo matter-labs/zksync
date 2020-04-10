@@ -180,7 +180,7 @@ export class Deployer {
             this.wallet,
             this.bytecodes.VerifierTarget,
             this.constructorArgs('VerifierTarget'),
-            { gasLimit: 3000000 },
+            { gasLimit: 5000000 },
         );
         this.addresses.VerifierTarget = target.address;
 
