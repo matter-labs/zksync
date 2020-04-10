@@ -44,15 +44,13 @@ const DEFAULT_THRESHOLD: f64 = 5.0f64;
 ///     }
 /// }
 ///
-/// fn main() {
-///     env_logger::init();
-///     let mut processor = SomeProcessor::new();
-///     for _ in 0..5 {
-///         let elements = // ...
-///             #  vec![1, 2, 3];
-///         processor.do_work(elements);
-///         processor.metrics_counter.output_stats();
-///     }
+/// env_logger::init();
+/// let mut processor = SomeProcessor::new();
+/// for _ in 0..5 {
+///     let elements = // ...
+///         #  vec![1, 2, 3];
+///     processor.do_work(elements);
+///     processor.metrics_counter.output_stats();
 /// }
 /// ```
 #[derive(Debug)]

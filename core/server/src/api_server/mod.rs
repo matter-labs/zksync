@@ -19,6 +19,7 @@ use storage::ConnectionPool;
 
 use crate::eth_watch::EthWatchRequest;
 
+#[allow(clippy::too_many_arguments)]
 pub fn start_api_server(
     op_notify_receiver: mpsc::Receiver<Operation>,
     connection_pool: ConnectionPool,

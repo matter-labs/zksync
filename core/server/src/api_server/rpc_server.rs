@@ -512,18 +512,17 @@ async fn verify_tx_info_message_signature(
         response: resp.0,
     };
 
+    // Send the check request.
     req_channel
         .send(request)
         .await
         .expect("verifier pool receiver dropped");
 
-    let check_result = resp
-        .1
+    // Wait for the check result.
+    resp.1
         .await
         .map_err(|_| Error::internal_error())?
-        .map_err(rpc_message);
-
-    check_result
+        .map_err(rpc_message)
 }
 
 #[cfg(test)]

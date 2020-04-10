@@ -173,6 +173,7 @@ struct RpcSubApp {
     event_sub_sender: mpsc::Sender<EventNotifierRequest>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn start_ws_server(
     op_recv: mpsc::Receiver<Operation>,
     db_pool: ConnectionPool,
