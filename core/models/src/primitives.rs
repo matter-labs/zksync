@@ -108,7 +108,10 @@ pub fn field_element_to_u128<P: PrimeField>(fr: P) -> u128 {
     res
 }
 
-pub fn serialize_g1_for_ethereum(point: <Bn256 as Engine>::G1Affine) -> (U256, U256) {
+pub fn serialize_g1_for_ethereum(point: &<Bn256 as Engine>::G1Affine) -> (U256, U256) {
+    if point.is_zero() {
+        return (U256::zero(), U256::zero());
+    }
     let uncompressed = point.into_uncompressed();
 
     let uncompressed_slice = uncompressed.as_ref();
@@ -122,7 +125,7 @@ pub fn serialize_g1_for_ethereum(point: <Bn256 as Engine>::G1Affine) -> (U256, U
 }
 
 pub fn serialize_g2_for_ethereum(
-    point: <Bn256 as Engine>::G2Affine,
+    point: &<Bn256 as Engine>::G2Affine,
 ) -> ((U256, U256), (U256, U256)) {
     let uncompressed = point.into_uncompressed();
 
@@ -138,7 +141,7 @@ pub fn serialize_g2_for_ethereum(
     ((x_1, x_0), (y_1, y_0))
 }
 
-pub fn serialize_fe_for_ethereum(field_element: <Bn256 as ScalarEngine>::Fr) -> U256 {
+pub fn serialize_fe_for_ethereum(field_element: &<Bn256 as ScalarEngine>::Fr) -> U256 {
     let mut be_bytes = [0u8; 32];
     field_element
         .into_repr()

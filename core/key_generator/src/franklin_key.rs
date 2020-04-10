@@ -1,6 +1,5 @@
 // Built-in deps
 use std::fs::{remove_file, File};
-use std::io::BufReader;
 use std::path::Path;
 // Workspace deps
 use circuit::account::AccountWitness;
@@ -9,7 +8,6 @@ use circuit::exit_circuit::ZksyncExitCircuit;
 use circuit::operation::{
     Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
-use crypto_exports::bellman::kate_commitment::{Crs, CrsForMonomialForm};
 use crypto_exports::bellman::plonk::{make_verification_key, setup, transpile_with_gates_count};
 use crypto_exports::bellman::Circuit;
 use models::config_options::AvailableBlockSizesConfig;
@@ -17,7 +15,7 @@ use models::node::Engine;
 use models::params;
 use models::prover_utils::{
     get_block_verification_key_path, get_exodus_verification_key_path,
-    get_universal_setup_monomial_form_file_path,
+    get_universal_setup_monomial_form,
 };
 
 pub(crate) fn make_plonk_exodus_verify_key() {
@@ -180,16 +178,8 @@ fn generate_verification_key<C: Circuit<Engine> + Clone, P: AsRef<Path>>(
         size_log2
     );
 
-    let key_monomial_form = {
-        let file_path = get_universal_setup_monomial_form_file_path(size_log2 as usize)
-            .expect("problem with setup files path");
-        let mut monomial_form_reader = BufReader::with_capacity(
-            1 << 29,
-            File::open(file_path).expect("failed to open setup file"),
-        );
-        Crs::<Engine, CrsForMonomialForm>::read(&mut monomial_form_reader)
-            .expect("Failed to read Crs from setup file")
-    };
+    let key_monomial_form =
+        get_universal_setup_monomial_form(size_log2).expect("Failed to read setup file.");
 
     log::info!("Generating setup");
     let setup = setup(circuit, &transpilation_hints).expect("failed to make setup");

@@ -94,7 +94,7 @@ pub fn create_exit_circuit_with_public_input(
     account_tree: &mut CircuitAccountTree,
     account_id: AccountId,
     token_id: TokenId,
-) -> (ZksyncExitCircuit<'static, Engine>, Fr) {
+) -> ZksyncExitCircuit<'static, Engine> {
     let account_address_fe = Fr::from_str(&account_id.to_string()).unwrap();
     let token_id_fe = Fr::from_str(&token_id.to_string()).unwrap();
     let root_hash = account_tree.root_hash();
@@ -136,24 +136,21 @@ pub fn create_exit_circuit_with_public_input(
 
     let pub_data_commitment = Fr::from_repr(repr).unwrap();
 
-    (
-        ZksyncExitCircuit {
-            params: &models::params::RESCUE_PARAMS,
-            pub_data_commitment: Some(pub_data_commitment),
-            root_hash: Some(root_hash),
-            account_audit_data: OperationBranch {
-                address: Some(account_address_fe),
-                token: Some(token_id_fe),
-                witness: OperationBranchWitness {
-                    account_witness,
-                    account_path: audit_path,
-                    balance_value: Some(balance),
-                    balance_subtree_path: audit_balance_path,
-                },
+    ZksyncExitCircuit {
+        params: &models::params::RESCUE_PARAMS,
+        pub_data_commitment: Some(pub_data_commitment),
+        root_hash: Some(root_hash),
+        account_audit_data: OperationBranch {
+            address: Some(account_address_fe),
+            token: Some(token_id_fe),
+            witness: OperationBranchWitness {
+                account_witness,
+                account_path: audit_path,
+                balance_value: Some(balance),
+                balance_subtree_path: audit_balance_path,
             },
         },
-        pub_data_commitment,
-    )
+    }
 }
 
 #[cfg(test)]
@@ -184,8 +181,7 @@ mod test {
             &mut circuit_account_tree,
             test_account_id,
             token_id,
-        )
-        .0;
+        );
 
         let mut cs = TestConstraintSystem::<Engine>::new();
         zksync_exit_circuit.synthesize(&mut cs).unwrap();

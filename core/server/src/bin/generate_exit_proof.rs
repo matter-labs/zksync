@@ -5,7 +5,7 @@ use bigdecimal::BigDecimal;
 use clap::{App, Arg};
 use log::info;
 use models::node::{Address, TokenId, TokenLike};
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use serde::Serialize;
 use std::time::Instant;
 use storage::ConnectionPool;
@@ -15,7 +15,7 @@ struct ExitProofData {
     token_id: TokenId,
     owner: Address,
     amount: BigDecimal,
-    proof: EncodedProof,
+    proof: EncodedProofPlonk,
 }
 
 fn main() {

@@ -10,8 +10,9 @@ use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
 use models::node::block::Block;
 use models::node::{AccountMap, AccountUpdate, AccountUpdates, FranklinOp};
+use models::prover_utils::plonk::EncodedProofPlonk;
 use models::TokenAddedEvent;
-use models::{Action, EncodedProof, Operation};
+use models::{Action, Operation};
 use storage::{
     chain::state::records::{NewBlockEvent, StoredBlockEvent},
     data_restore::records::{NewLastWatchedEthBlockNumber, StoredRollupOpsBlock},
@@ -75,7 +76,7 @@ pub fn update_tree_state(
 
         let verify_op = Operation {
             action: Action::Verify {
-                proof: Box::new(EncodedProof::default()),
+                proof: Box::new(EncodedProofPlonk::default()),
             },
             block,
             accounts_updated: Vec::new(),

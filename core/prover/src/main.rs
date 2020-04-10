@@ -10,7 +10,7 @@ use log::*;
 use signal_hook::iterator::Signals;
 // Workspace deps
 use models::node::config::PROVER_HEARTBEAT_INTERVAL;
-use prover::{client, read_circuit_params};
+use prover::client;
 use prover::{start, BabyProver};
 
 fn main() {
@@ -89,15 +89,8 @@ fn main() {
         });
     }
 
-    // Create prover
-    let rescue_params = &models::params::RESCUE_PARAMS;
-    let jubjub_params = &models::params::JUBJUB_PARAMS;
-    let circuit_params = read_circuit_params(block_size_chunks);
     let heartbeat_interval = time::Duration::from_secs(PROVER_HEARTBEAT_INTERVAL);
     let worker = BabyProver::new(
-        circuit_params,
-        rescue_params,
-        jubjub_params,
         block_size_chunks,
         api_client.clone(),
         heartbeat_interval,

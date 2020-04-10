@@ -15,7 +15,7 @@ use bigdecimal::BigDecimal;
 use log::*;
 use models::config_options::ConfigurationOptions;
 use models::node::AccountMap;
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use std::time::{Duration, Instant};
 use testkit::*;
 use web3::transports::Http;
@@ -33,13 +33,13 @@ fn create_verified_initial_state(
 ) {
     info!("Creating initial state");
     for token in tokens {
-        test_setup.start_block();
         for account in zksync_accounts {
+            test_setup.start_block();
             test_setup.deposit(deposit_account, *account, *token, deposit_amount.clone());
+            test_setup
+                .execute_commit_and_verify_block()
+                .expect("Commit and verify initial block");
         }
-        test_setup
-            .execute_commit_and_verify_block()
-            .expect("Commit and verify initial block");
     }
     info!("Done creating initial state");
 }
@@ -116,10 +116,10 @@ fn check_exit_garbage_proof(
         "Checking exit with garbage proof token: {}, amount: {}",
         token.0, amount
     );
-    let proof = EncodedProof::default();
+    let proof = EncodedProofPlonk::default();
     test_setup
         .exit(send_account, token, amount, proof)
-        .expect_revert("vvy14");
+        .expect_revert("empty revert reason");
     info!("Done cheching exit with garbage proof");
 }
 

@@ -29,7 +29,7 @@ use web3::Transport;
 pub mod eth_account;
 pub mod external_commands;
 pub mod zksync_account;
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use web3::types::U64;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -582,7 +582,7 @@ impl TestSetup {
         sending_account: ETHAccountId,
         token_id: Token,
         amount: &BigDecimal,
-        proof: EncodedProof,
+        proof: EncodedProofPlonk,
     ) -> ETHExecResult {
         block_on(self.accounts.eth_accounts[sending_account.0].exit(token_id.0, amount, proof))
             .expect("Failed to post exit tx")
@@ -881,7 +881,7 @@ impl TestSetup {
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
         token: Token,
-    ) -> (EncodedProof, BigDecimal) {
+    ) -> (EncodedProofPlonk, BigDecimal) {
         let owner_address = self.accounts.zksync_accounts[fund_owner.0].address;
         // restore account state
         prover::exit_proof::create_exit_proof(accounts, owner_address, token.0)

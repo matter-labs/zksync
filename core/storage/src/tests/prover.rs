@@ -2,10 +2,11 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
-use models::{Action, EncodedProof};
+use models::Action;
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, StorageProcessor};
+use models::prover_utils::plonk::EncodedProofPlonk;
 
 /// Checks that the proof can be stored and loaded.
 #[test]
@@ -17,7 +18,7 @@ fn test_store_proof() {
         assert!(ProverSchema(&conn).load_proof(1).is_err());
 
         // Store the proof.
-        let proof = EncodedProof::default();
+        let proof = EncodedProofPlonk::default();
         assert!(ProverSchema(&conn).store_proof(1, &proof).is_ok());
 
         // Now load it.
@@ -118,7 +119,7 @@ fn prover_run() {
         );
 
         // Create & store proof for the first block.
-        let proof = EncodedProof::default();
+        let proof = EncodedProofPlonk::default();
         assert!(ProverSchema(&conn).store_proof(1, &proof).is_ok());
 
         // Try to get another run. There should be none, since there are no blocks to prover.

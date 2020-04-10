@@ -1,68 +1,22 @@
-use crate::franklin_crypto::bellman::groth16::{
-    create_random_proof, prepare_verifying_key, verify_proof, Parameters, Proof,
-};
-use crate::franklin_crypto::bellman::{Circuit, SynthesisError};
+use crate::franklin_crypto::bellman::Circuit;
+use crate::node::U256;
 use crate::node::{Engine, Fr};
 use crate::params::{account_tree_depth, BALANCE_TREE_DEPTH};
-use crate::primitives::{serialize_g1_for_ethereum, serialize_g2_for_ethereum};
-use crate::EncodedProof;
-use crypto_exports::rand::thread_rng;
+use crate::primitives::{serialize_fe_for_ethereum, serialize_g1_for_ethereum};
+use crypto_exports::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
+use crypto_exports::bellman::plonk::better_cs::{
+    cs::PlonkCsWidth4WithNextStepParams, keys::Proof, keys::VerificationKey,
+};
+use crypto_exports::bellman::plonk::commitments::transcript::keccak_transcript::RollingKeccakTranscript;
+use crypto_exports::bellman::plonk::{prove_by_steps, setup, transpile, verify};
+use failure::format_err;
 use std::fs::File;
 use std::io::BufReader;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
-#[derive(Debug)]
-pub struct FullBabyProof {
-    pub proof: Proof<Engine>,
-    pub public_input: Fr,
+pub mod plonk {
+    pub use super::*;
 }
-
-/// Prepare proof for Ethereum
-pub fn encode_proof(proof: &Proof<Engine>) -> EncodedProof {
-    // proof
-    // pub a: E::G1Affine,
-    // pub b: E::G2Affine,
-    // pub c: E::G1Affine
-
-    let (a_x, a_y) = serialize_g1_for_ethereum(proof.a);
-
-    let ((b_x_0, b_x_1), (b_y_0, b_y_1)) = serialize_g2_for_ethereum(proof.b);
-
-    let (c_x, c_y) = serialize_g1_for_ethereum(proof.c);
-
-    [a_x, a_y, b_x_0, b_x_1, b_y_0, b_y_1, c_x, c_y]
-}
-
-pub fn verify_full_baby_proof(
-    proof: &FullBabyProof,
-    circuit_params: &Parameters<Engine>,
-) -> Result<bool, SynthesisError> {
-    let pvk = prepare_verifying_key(&circuit_params.vk);
-    verify_proof(&pvk, &proof.proof, &[proof.public_input])
-}
-
-pub fn create_random_full_baby_proof<C: Circuit<Engine>>(
-    circuit_instance: C,
-    public_input: Fr,
-    circuit_params: &Parameters<Engine>,
-) -> Result<FullBabyProof, SynthesisError> {
-    let proof = create_random_proof(circuit_instance, circuit_params, &mut thread_rng())?;
-    Ok(FullBabyProof {
-        proof,
-        public_input,
-    })
-}
-
-pub fn read_circuit_proving_parameters<P: AsRef<Path>>(
-    file_name: P,
-) -> std::io::Result<Parameters<Engine>> {
-    let f_r = File::open(file_name)?;
-    let mut r = BufReader::new(f_r);
-    Parameters::<Engine>::read(&mut r, true)
-}
-const KEY_FILENAME: &str = "zksync_pk.key";
-const EXIT_KEY_FILENAME: &str = "zksync_exit_pk.key";
-const VERIFY_KEY_FILENAME: &str = "GetVk.sol";
 
 pub fn get_keys_root_dir() -> PathBuf {
     let mut out_dir = PathBuf::new();
@@ -86,69 +40,49 @@ fn base_universal_setup_dir() -> Result<PathBuf, failure::Error> {
     Ok(dir)
 }
 
-/// Returns paths for universal setup in monomial form of the given power of two (range: 20-26). Checks if file exists
-pub fn get_universal_setup_monomial_form_file_path(
-    power_of_two: usize,
-) -> Result<PathBuf, failure::Error> {
+fn get_universal_setup_file_buff_reader(
+    setup_file_name: &str,
+) -> Result<BufReader<File>, failure::Error> {
+    let setup_file = {
+        let mut path = base_universal_setup_dir()?;
+        path.push(&setup_file_name);
+        File::open(path).map_err(|e| {
+            format_err!(
+                "Failed to open universal setup file {}, err: {}",
+                setup_file_name,
+                e
+            )
+        })?
+    };
+    Ok(BufReader::with_capacity(1 << 29, setup_file))
+}
+
+/// Returns universal setup in the monomial form of the given power of two (range: 20-26). Checks if file exists
+pub fn get_universal_setup_monomial_form(
+    power_of_two: u32,
+) -> Result<Crs<Engine, CrsForMonomialForm>, failure::Error> {
     failure::ensure!(
         (20..=26).contains(&power_of_two),
         "power of two is not in [20,26] range"
     );
     let setup_file_name = format!("setup_2^{}.key", power_of_two);
-    let mut setup_file = base_universal_setup_dir()?;
-    setup_file.push(&setup_file_name);
-    failure::ensure!(
-        setup_file.exists(),
-        "Universal setup file {} does not exist",
-        setup_file_name
-    );
-    Ok(setup_file)
+    let mut buf_reader = get_universal_setup_file_buff_reader(&setup_file_name)?;
+    Ok(Crs::<Engine, CrsForMonomialForm>::read(&mut buf_reader)
+        .map_err(|e| format_err!("Failed to read Crs from setup file: {}", e))?)
 }
 
-/// Returns paths for universal setup in lagrange form of the given power of two (range: 20-26). Checks if file exists
-pub fn get_universal_setup_lagrange_form_file_path(
-    power_of_two: usize,
-) -> Result<PathBuf, failure::Error> {
+/// Returns universal setup in lagrange form of the given power of two (range: 20-26). Checks if file exists
+pub fn get_universal_setup_lagrange_form(
+    power_of_two: u32,
+) -> Result<Crs<Engine, CrsForLagrangeForm>, failure::Error> {
     failure::ensure!(
         (20..=26).contains(&power_of_two),
         "power of two is not in [20,26] range"
     );
     let setup_file_name = format!("setup_2^{}_lagrange.key", power_of_two);
-    let mut setup_file = base_universal_setup_dir()?;
-    setup_file.push(&setup_file_name);
-
-    failure::ensure!(
-        setup_file.exists(),
-        "Universal setup file {} does not exist",
-        setup_file_name
-    );
-    Ok(setup_file)
-}
-
-pub fn get_block_proof_key_and_vk_path(block_size: usize) -> (PathBuf, PathBuf) {
-    let mut out_dir = get_keys_root_dir();
-    out_dir.push(&format!("block-{}", block_size));
-
-    let mut key_file = out_dir.clone();
-    key_file.push(KEY_FILENAME);
-
-    let mut get_vk_file = out_dir;
-    get_vk_file.push(VERIFY_KEY_FILENAME);
-
-    (key_file, get_vk_file)
-}
-
-pub fn get_exodus_proof_key_and_vk_path() -> (PathBuf, PathBuf) {
-    let mut out_dir = get_keys_root_dir();
-    out_dir.push("exodus_key");
-
-    let mut key_file = out_dir.clone();
-    key_file.push(EXIT_KEY_FILENAME);
-
-    let mut get_vk_file = out_dir;
-    get_vk_file.push(VERIFY_KEY_FILENAME);
-
-    (key_file, get_vk_file)
+    let mut buf_reader = get_universal_setup_file_buff_reader(&setup_file_name)?;
+    Ok(Crs::<Engine, CrsForLagrangeForm>::read(&mut buf_reader)
+        .map_err(|e| format_err!("Failed to read Crs from setup file: {}", e))?)
 }
 
 pub fn get_exodus_verification_key_path() -> PathBuf {
@@ -167,4 +101,130 @@ pub fn get_verifier_contract_key_path() -> PathBuf {
     let mut contract = get_keys_root_dir();
     contract.push("Verifier.sol");
     contract
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
+pub struct EncodedProofPlonk {
+    pub inputs: Vec<U256>,
+    pub proof: Vec<U256>,
+}
+
+/// Generates proof for given circuit using step-by-step algorithm(slower, but more memory efficient)
+/// TODO: do this in optimized way.
+pub fn gen_block_prove_for_circuit_by_steps<C: Circuit<Engine> + Clone>(
+    circuit: C,
+    block_chunks: usize,
+) -> Result<EncodedProofPlonk, failure::Error> {
+    let vk = VerificationKey::read(File::open(get_block_verification_key_path(block_chunks))?)?;
+
+    info!("Proof for block circuit started");
+
+    let hints = transpile(circuit.clone())?;
+    let setup = setup(circuit.clone(), &hints)?;
+    let size_log2 = setup.n.next_power_of_two().trailing_zeros();
+
+    let size_log2 = std::cmp::max(size_log2, 20); // for exit circuit
+    let key_monomial_form = get_universal_setup_monomial_form(size_log2)?;
+
+    let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
+        circuit,
+        &hints,
+        &setup,
+        None,
+        &key_monomial_form,
+    )?;
+
+    let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
+    failure::ensure!(valid, "proof for block is invalid");
+
+    info!("Proof for block circuit successful");
+    Ok(serialize_proof(&proof))
+}
+
+/// Generates proof for exit given circuit using step-by-step algorithm(slower, but more memory efficient)
+pub fn gen_prove_for_circuit_by_steps<C: Circuit<Engine> + Clone>(
+    circuit: C,
+) -> Result<EncodedProofPlonk, failure::Error> {
+    let vk = VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
+
+    info!("Proof for circuit started");
+
+    let hints = transpile(circuit.clone())?;
+    let setup = setup(circuit.clone(), &hints)?;
+    let size_log2 = setup.n.next_power_of_two().trailing_zeros();
+
+    let size_log2 = std::cmp::max(size_log2, 20); // for exit circuit
+    let key_monomial_form = get_universal_setup_monomial_form(size_log2)?;
+
+    let proof = prove_by_steps::<_, _, RollingKeccakTranscript<Fr>>(
+        circuit,
+        &hints,
+        &setup,
+        None,
+        &key_monomial_form,
+    )?;
+
+    let valid = verify::<_, RollingKeccakTranscript<Fr>>(&proof, &vk)?;
+    failure::ensure!(valid, "proof for exit is invalid");
+
+    info!("Proof for circuit successful");
+    Ok(serialize_proof(&proof))
+}
+
+pub fn serialize_proof(
+    proof: &Proof<Engine, PlonkCsWidth4WithNextStepParams>,
+) -> EncodedProofPlonk {
+    let mut inputs = vec![];
+    for input in proof.input_values.iter() {
+        let ser = serialize_fe_for_ethereum(input);
+        inputs.push(ser);
+    }
+    let mut serialized_proof = vec![];
+
+    for c in proof.wire_commitments.iter() {
+        let (x, y) = serialize_g1_for_ethereum(c);
+        serialized_proof.push(x);
+        serialized_proof.push(y);
+    }
+
+    let (x, y) = serialize_g1_for_ethereum(&proof.grand_product_commitment);
+    serialized_proof.push(x);
+    serialized_proof.push(y);
+
+    for c in proof.quotient_poly_commitments.iter() {
+        let (x, y) = serialize_g1_for_ethereum(c);
+        serialized_proof.push(x);
+        serialized_proof.push(y);
+    }
+
+    for c in proof.wire_values_at_z.iter() {
+        serialized_proof.push(serialize_fe_for_ethereum(c));
+    }
+
+    for c in proof.wire_values_at_z_omega.iter() {
+        serialized_proof.push(serialize_fe_for_ethereum(c));
+    }
+
+    serialized_proof.push(serialize_fe_for_ethereum(&proof.grand_product_at_z_omega));
+    serialized_proof.push(serialize_fe_for_ethereum(&proof.quotient_polynomial_at_z));
+    serialized_proof.push(serialize_fe_for_ethereum(
+        &proof.linearization_polynomial_at_z,
+    ));
+
+    for c in proof.permutation_polynomials_at_z.iter() {
+        serialized_proof.push(serialize_fe_for_ethereum(c));
+    }
+
+    let (x, y) = serialize_g1_for_ethereum(&proof.opening_at_z_proof);
+    serialized_proof.push(x);
+    serialized_proof.push(y);
+
+    let (x, y) = serialize_g1_for_ethereum(&proof.opening_at_z_omega_proof);
+    serialized_proof.push(x);
+    serialized_proof.push(y);
+
+    EncodedProofPlonk {
+        inputs,
+        proof: serialized_proof,
+    }
 }

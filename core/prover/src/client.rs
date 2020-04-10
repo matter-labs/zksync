@@ -5,7 +5,6 @@ use std::time;
 // External deps
 use backoff;
 use backoff::Operation;
-use crypto_exports::franklin_crypto::bellman::groth16;
 use failure::bail;
 use failure::format_err;
 use log::*;
@@ -13,7 +12,7 @@ use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
-use models::prover_utils::encode_proof;
+use models::prover_utils::plonk::EncodedProofPlonk;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {
@@ -35,7 +34,7 @@ pub struct WorkingOnReq {
 #[derive(Serialize, Deserialize)]
 pub struct PublishReq {
     pub block: u32,
-    pub proof: models::EncodedProof,
+    pub proof: models::prover_utils::plonk::EncodedProofPlonk,
 }
 
 #[derive(Debug, Clone)]
@@ -222,21 +221,16 @@ impl crate::ApiClient for ApiClient {
         Ok(self.with_retries(&op)?)
     }
 
-    fn publish(
-        &self,
-        block: i64,
-        proof: groth16::Proof<models::node::Engine>,
-    ) -> Result<(), failure::Error> {
-        let op = || -> Result<(), failure::Error> {
+    fn publish(&self, block: i64, proof: EncodedProofPlonk) -> Result<(), failure::Error> {
+        let op = move || -> Result<(), failure::Error> {
             trace!("Trying publish proof {}", block);
-            let encoded = encode_proof(&proof);
-
+            let proof = proof.clone();
             let client = self.get_client()?;
             let mut res = client
                 .post(&self.publish_url)
                 .json(&client::PublishReq {
                     block: block as u32,
-                    proof: encoded,
+                    proof: proof.clone(),
                 })
                 .send()
                 .map_err(|e| format_err!("failed to send publish request: {}", e))?;

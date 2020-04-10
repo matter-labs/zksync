@@ -5,7 +5,7 @@ use std::time::Duration;
 use log::info;
 // Workspace deps
 use models::node::config::PROVER_CYCLE_WAIT;
-use models::EncodedProof;
+use models::prover_utils::plonk::EncodedProofPlonk;
 use storage::ConnectionPool;
 
 fn main() {
@@ -24,7 +24,7 @@ fn main() {
             info!("Received job for block: {}", job.block_number);
             storage
                 .prover_schema()
-                .store_proof(job.block_number as u32, &EncodedProof::default())
+                .store_proof(job.block_number as u32, &EncodedProofPlonk::default())
                 .expect("db error");
         }
         std::thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));

@@ -8,7 +8,7 @@ use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
 use models::node::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 use models::primitives::big_decimal_to_u128;
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
@@ -149,7 +149,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         token_id: TokenId,
         amount: &BigDecimal,
-        proof: EncodedProof,
+        proof: EncodedProofPlonk,
     ) -> Result<ETHExecResult, failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
@@ -158,7 +158,7 @@ impl<T: Transport> EthereumAccount<T> {
                 (
                     u64::from(token_id),
                     U128::from(big_decimal_to_u128(amount)),
-                    proof,
+                    proof.proof,
                 ),
                 Options::default(),
             )
@@ -432,7 +432,7 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "verifyBlock",
-                (u64::from(block.block_number), [U256::default(); 8]),
+                (u64::from(block.block_number), vec![U256::default(); 10]),
                 Options::default(),
             )
             .await

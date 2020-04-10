@@ -8,19 +8,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc};
 use std::{fmt, thread, time};
 // External deps
-use crate::franklin_crypto::bellman::groth16;
 use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use log::*;
 // Workspace deps
 use crypto_exports::franklin_crypto;
-use crypto_exports::rand;
-use models::node::Engine;
-use models::prover_utils::{get_block_proof_key_and_vk_path, read_circuit_proving_parameters};
+use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
+use models::prover_utils::plonk::EncodedProofPlonk;
 
-pub struct BabyProver<'a, C: ApiClient> {
-    circuit_params: groth16::Parameters<Engine>,
-    rescue_params: &'a franklin_crypto::rescue::bn256::Bn256RescueParams,
-    jubjub_params: &'a franklin_crypto::alt_babyjubjub::AltJubjubBn256,
+pub struct BabyProver<C: ApiClient> {
     block_size: usize,
     api_client: C,
     heartbeat_interval: time::Duration,
@@ -31,11 +27,7 @@ pub trait ApiClient {
     fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error>;
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error>;
     fn prover_data(&self, block: i64) -> Result<prover_data::ProverData, failure::Error>;
-    fn publish(
-        &self,
-        block: i64,
-        p: groth16::Proof<models::node::Engine>,
-    ) -> Result<(), failure::Error>;
+    fn publish(&self, block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error>;
 }
 
 #[derive(Debug)]
@@ -57,7 +49,7 @@ impl fmt::Display for BabyProverError {
 }
 
 pub fn start<C: 'static + Sync + Send + ApiClient>(
-    prover: BabyProver<'static, C>,
+    prover: BabyProver<C>,
     exit_err_tx: mpsc::Sender<BabyProverError>,
 ) {
     let (tx_block_start, rx_block_start) = mpsc::channel();
@@ -78,20 +70,14 @@ pub fn start<C: 'static + Sync + Send + ApiClient>(
         .expect("failed to join on running rounds thread");
 }
 
-impl<'a, C: ApiClient> BabyProver<'a, C> {
+impl<C: ApiClient> BabyProver<C> {
     pub fn new(
-        circuit_params: groth16::Parameters<Engine>,
-        rescue_params: &'a franklin_crypto::rescue::bn256::Bn256RescueParams,
-        jubjub_params: &'a franklin_crypto::alt_babyjubjub::AltJubjubBn256,
         block_size: usize,
         api_client: C,
         heartbeat_interval: time::Duration,
         stop_signal: Arc<AtomicBool>,
     ) -> Self {
         BabyProver {
-            circuit_params,
-            rescue_params,
-            jubjub_params,
             block_size,
             api_client,
             heartbeat_interval,
@@ -100,14 +86,13 @@ impl<'a, C: ApiClient> BabyProver<'a, C> {
     }
 
     fn run_rounds(&self, start_heartbeats_tx: mpsc::Sender<(i32, bool)>) -> BabyProverError {
-        let mut rng = rand::OsRng::new().expect("failed to create");
         let pause_duration = time::Duration::from_secs(models::node::config::PROVER_CYCLE_WAIT);
 
         info!("Running worker rounds");
 
         while !self.stop_signal.load(Ordering::SeqCst) {
             trace!("Starting a next round");
-            let ret = self.next_round(&mut rng, &start_heartbeats_tx);
+            let ret = self.next_round(&start_heartbeats_tx);
             if let Err(err) = ret {
                 match err {
                     BabyProverError::Api(text) => {
@@ -127,7 +112,6 @@ impl<'a, C: ApiClient> BabyProver<'a, C> {
 
     fn next_round(
         &self,
-        rng: &mut rand::OsRng,
         start_heartbeats_tx: &mpsc::Sender<(i32, bool)>,
     ) -> Result<(), BabyProverError> {
         let block_to_prove = self
@@ -159,8 +143,8 @@ impl<'a, C: ApiClient> BabyProver<'a, C> {
         info!("starting to compute proof for block {}", block);
 
         let instance = circuit::circuit::FranklinCircuit {
-            rescue_params: self.rescue_params,
-            jubjub_params: self.jubjub_params,
+            rescue_params: &models::params::RESCUE_PARAMS as &Bn256RescueParams,
+            jubjub_params: &models::params::JUBJUB_PARAMS as &AltJubjubBn256,
             operation_batch_size: self.block_size,
             old_root: Some(prover_data.old_root),
             new_root: Some(prover_data.new_root),
@@ -173,27 +157,33 @@ impl<'a, C: ApiClient> BabyProver<'a, C> {
             validator_account: prover_data.validator_account,
         };
 
-        let p = franklin_crypto::bellman::groth16::create_random_proof(
+        // let p = franklin_crypto::bellman::groth16::create_random_proof(
+        //     instance,
+        //     &self.circuit_params,
+        //     rng,
+        // )
+        // .map_err(|e| BabyProverError::Internal(format!("failed to create a proof: {}", e)))?;
+        //
+        // let pvk = franklin_crypto::bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
+        //
+        // let proof_verified = franklin_crypto::bellman::groth16::verify_proof(
+        //     &pvk,
+        //     &p.clone(),
+        //     &[prover_data.public_data_commitment],
+        // )
+        // .map_err(|e| BabyProverError::Internal(format!("failed to verify created proof: {}", e)))?;
+        // if !proof_verified {
+        //     return Err(BabyProverError::Internal(
+        //         "created proof did not pass verification".to_owned(),
+        //     ));
+        // }
+
+        let block_chunks = instance.operations.len();
+        let p = models::prover_utils::plonk::gen_block_prove_for_circuit_by_steps(
             instance,
-            &self.circuit_params,
-            rng,
+            block_chunks,
         )
-        .map_err(|e| BabyProverError::Internal(format!("failed to create a proof: {}", e)))?;
-
-        let pvk = franklin_crypto::bellman::groth16::prepare_verifying_key(&self.circuit_params.vk);
-
-        let proof_verified = franklin_crypto::bellman::groth16::verify_proof(
-            &pvk,
-            &p.clone(),
-            &[prover_data.public_data_commitment],
-        )
-        .map_err(|e| BabyProverError::Internal(format!("failed to verify created proof: {}", e)))?;
-        if !proof_verified {
-            return Err(BabyProverError::Internal(
-                "created proof did not pass verification".to_owned(),
-            ));
-        }
-
+        .map_err(|e| BabyProverError::Internal(format!("Failed to generate proof: {}", e)))?;
         self.api_client
             .publish(block, p)
             .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
@@ -227,10 +217,4 @@ impl<'a, C: ApiClient> BabyProver<'a, C> {
             }
         }
     }
-}
-
-pub fn read_circuit_params(block_size: usize) -> groth16::Parameters<Engine> {
-    let path = get_block_proof_key_and_vk_path(block_size).0;
-    debug!("Reading key from {}", path.to_string_lossy());
-    read_circuit_proving_parameters(&path).expect("Failed to read circuit parameters")
 }

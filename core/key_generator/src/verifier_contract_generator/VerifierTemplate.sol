@@ -4,6 +4,9 @@ import "./PlonkCore.sol";
 
 // Hardcoded constants to avoid accessing store
 contract Verifier is VerifierWithDeserialize{
+
+    bool constant DUMMY_VERIFIER = false;
+
     constructor() public {}
     function initialize(bytes calldata) external {
     }
@@ -109,6 +112,9 @@ contract Verifier is VerifierWithDeserialize{
         bytes32 _commitment,
         uint32 _chunks
     ) external view returns (bool) {
+        if (DUMMY_VERIFIER) {
+            return true;
+        }
         uint256[] memory inputs = new uint256[](1);
         uint256 mask = (~uint256(0)) >> 3;
         inputs[0] = uint256(_commitment) & mask;
