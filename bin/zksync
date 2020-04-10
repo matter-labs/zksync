@@ -2,10 +2,11 @@
 
 . .setup_env
 
+# so you can run zksync @ from everywhere.
+cd $ZKSYNC_HOME
+
 if [ -f bin/$1 ]; then
     bin/$1 "${@:2}"
 else
     make "$@"
 fi
-
-#make "$@"
