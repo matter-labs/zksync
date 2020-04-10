@@ -46,7 +46,7 @@ impl ExecutedOperations {
 
     pub fn get_eth_witness_bytes(&self) -> Option<Vec<u8>> {
         self.get_executed_op()
-            .map(|op| op.eth_witness().unwrap_or_else(|| Vec::new()))
+            .map(|op| op.eth_witness().unwrap_or_else(Vec::new))
     }
 }
 
