@@ -261,49 +261,6 @@ impl Mempool {
     }
 }
 
-// #[derive(Debug)]
-// struct TokenDBCache {
-//     db_pool: ConnectionPool,
-//     // TODO: handle stale entries. (edge case when we rename token after adding it)
-//     tokens: HashMap<TokenId, Token>,
-// }
-
-// impl TokenDBCache {
-//     pub fn new(db_pool: ConnectionPool) -> Self {
-//         Self {
-//             db_pool,
-//             tokens: HashMap::new(),
-//         }
-//     }
-
-//     pub fn get_token(&mut self, token_like: TokenLike) -> Result<Option<Token>, failure::Error> {
-//         let cached_value = match &token_like {
-//             TokenLike::Id(token_id) => self.tokens.get(token_id),
-//             TokenLike::Address(address) => self.tokens.values().find(|t| &t.address == address),
-//             TokenLike::Symbol(symbol) => self.tokens.values().find(|t| &t.symbol == symbol),
-//         };
-
-//         if let Some(cached_value) = cached_value {
-//             Ok(Some(cached_value.clone()))
-//         } else {
-//             let storage = self
-//                 .db_pool
-//                 .access_storage_fragile()
-//                 .map_err(|e| format_err!("Failed to access storage: {}", e))?;
-
-//             let db_token = storage
-//                 .tokens_schema()
-//                 .get_token(token_like)
-//                 .map_err(|e| format_err!("Tokens load failed: {}", e))?;
-
-//             if let Some(token) = &db_token {
-//                 self.tokens.insert(token.id, token.clone());
-//             }
-//             Ok(db_token)
-//         }
-//     }
-// }
-
 pub fn run_mempool_task(
     db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
@@ -311,8 +268,6 @@ pub fn run_mempool_task(
     runtime: &Runtime,
 ) {
     let mempool_state = MempoolState::restore_from_db(&db_pool);
-
-    // let token_cache = TokenDBCache::new(db_pool);
 
     let mempool = Mempool {
         mempool_state,
