@@ -14,19 +14,26 @@
 //! Communication with db:
 //! on restart mempool restores nonces of the accounts that are stored in the account tree.
 
-use crate::eth_watch::EthWatchRequest;
-use failure::Fail;
-use futures::channel::{mpsc, oneshot};
-use futures::{SinkExt, StreamExt};
-use models::node::{
-    AccountId, AccountUpdate, AccountUpdates, FranklinTx, Nonce, PriorityOp, TransferOp,
-    TransferToNewOp,
-};
-use models::params::max_block_chunk_size;
+// Built-in deps
 use std::collections::{HashMap, VecDeque};
-use storage::ConnectionPool;
+// External uses
+use failure::Fail;
+use futures::{
+    channel::{mpsc, oneshot},
+    SinkExt, StreamExt,
+};
 use tokio::runtime::Runtime;
-use web3::types::Address;
+// Workspace uses
+use models::{
+    node::{
+        AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
+        TransferOp, TransferToNewOp,
+    },
+    params::max_block_chunk_size,
+};
+use storage::ConnectionPool;
+// Local uses
+use crate::{eth_watch::EthWatchRequest, signature_checker::VerifiedTx};
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Fail)]
 pub enum TxAddError {
@@ -70,9 +77,10 @@ pub struct GetBlockRequest {
 }
 
 pub enum MempoolRequest {
-    /// Add new transaction to mempool, check signature and correctness
+    /// Add new transaction to mempool, transaction should be previously checked
+    /// for correctness (including its Ethereum and ZKSync signatures).
     /// oneshot is used to receive tx add result.
-    NewTx(Box<FranklinTx>, oneshot::Sender<Result<(), TxAddError>>),
+    NewTx(Box<VerifiedTx>, oneshot::Sender<Result<(), TxAddError>>),
     /// When block is committed, nonces of the account tree should be updated too.
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
@@ -155,7 +163,7 @@ impl Mempool {
         while let Some(request) = self.requests.next().await {
             match request {
                 MempoolRequest::NewTx(tx, resp) => {
-                    let tx_add_result = self.add_tx(*tx);
+                    let tx_add_result = self.add_tx(tx.into_inner());
                     resp.send(tx_add_result).unwrap_or_default();
                 }
                 MempoolRequest::GetBlock(block) => {

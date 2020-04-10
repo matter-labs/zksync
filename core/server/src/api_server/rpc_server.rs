@@ -26,7 +26,7 @@ use storage::{ConnectionPool, StorageProcessor};
 // Local uses
 use crate::{
     mempool::{MempoolRequest, TxAddError},
-    signature_checker::VerifyTxSignatureRequest,
+    signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
     utils::token_db_cache::TokenDBCache,
 };
@@ -386,13 +386,14 @@ impl Rpc for RpcApp {
         let mut mempool_sender = self.mempool_request_sender.clone();
         let sign_verify_channel = self.sign_verify_request_sender.clone();
         let mempool_resp = async move {
-            verify_tx_info_message_signature(&tx, *signature, msg_to_sign, sign_verify_channel)
-                .await?;
+            let verified_tx =
+                verify_tx_info_message_signature(&tx, *signature, msg_to_sign, sign_verify_channel)
+                    .await?;
 
             let hash = tx.hash();
             let mempool_resp = oneshot::channel();
             mempool_sender
-                .send(MempoolRequest::NewTx(tx, mempool_resp.0))
+                .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
                 .await
                 .expect("mempool receiver dropped");
             let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
@@ -485,7 +486,7 @@ async fn verify_tx_info_message_signature(
     signature: Option<TxEthSignature>,
     msg_to_sign: Option<String>,
     mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
-) -> Result<()> {
+) -> Result<VerifiedTx> {
     fn rpc_message(error: TxAddError) -> Error {
         Error {
             code: RpcErrorCodes::from(error).into(),

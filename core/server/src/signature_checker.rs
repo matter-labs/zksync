@@ -19,6 +19,34 @@ use models::{
 use crate::eth_watch::EthWatchRequest;
 use crate::mempool::TxAddError;
 
+/// Wrapper on a `FranklinTx` which guarantees that
+/// transaction was checked and signatures associated with
+/// this transactions are correct.
+///
+/// Underlying `FranklinTx` is a private field, thus no such
+/// object can be created without verification.
+#[derive(Debug)]
+pub struct VerifiedTx(FranklinTx);
+
+impl VerifiedTx {
+    /// Checks the transaction correctness by verifying its
+    /// Ethereum signature (if required) and `ZKSync` signature.
+    pub async fn verify(
+        request: &VerifyTxSignatureRequest,
+        eth_watch_req: mpsc::Sender<EthWatchRequest>,
+    ) -> Result<Self, TxAddError> {
+        verify_eth_signature(&request, eth_watch_req)
+            .await
+            .map(|_| verify_tx_correctness(&request.tx))
+            .map(|_| Self(request.tx.clone()))
+    }
+
+    /// Takes the `FranklinTx` out of the wrapper.
+    pub fn into_inner(self) -> FranklinTx {
+        self.0
+    }
+}
+
 /// Verifies the Ethereum signature of the transaction.
 async fn verify_eth_signature(
     request: &VerifyTxSignatureRequest,
@@ -108,7 +136,7 @@ pub struct VerifyTxSignatureRequest {
     /// Can be `None` if the Ethereum signature is not required.
     pub eth_sign_data: Option<(TxEthSignature, String)>,
     /// Channel for sending the check response.
-    pub response: oneshot::Sender<Result<(), TxAddError>>,
+    pub response: oneshot::Sender<Result<VerifiedTx, TxAddError>>,
 }
 
 /// Main routine of the concurrent signature checker.
@@ -126,14 +154,12 @@ pub fn start_sign_checker_detached(
         mut input: mpsc::Receiver<VerifyTxSignatureRequest>,
         eth_watch_req: mpsc::Sender<EthWatchRequest>,
     ) {
-        while let Some(req) = input.next().await {
+        while let Some(request) = input.next().await {
             let eth_watch_req = eth_watch_req.clone();
             handle.spawn(async move {
-                let resp = verify_eth_signature(&req, eth_watch_req)
-                    .await
-                    .and_then(|_| verify_tx_correctness(&req.tx));
+                let resp = VerifiedTx::verify(&request, eth_watch_req).await;
 
-                req.response.send(resp).unwrap_or_default();
+                request.response.send(resp).unwrap_or_default();
             });
         }
     }
