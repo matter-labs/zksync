@@ -165,6 +165,8 @@ fn main() {
         Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
         Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
         stop_signal_sender,
+        observer_mode_final_state.circuit_acc_tree,
+        observer_mode_final_state.circuit_tree_block,
     );
 
     run_mempool_task(

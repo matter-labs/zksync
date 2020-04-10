@@ -9,6 +9,7 @@ use actix_web::{web, App, HttpResponse, HttpServer};
 use futures::channel::mpsc;
 use log::{error, info, trace};
 // Workspace deps
+use models::circuit::CircuitAccountTree;
 use models::config_options::ThreadPanicNotify;
 use models::node::BlockNumber;
 use prover::client;
@@ -168,6 +169,8 @@ pub fn start_prover_server(
     prover_timeout: time::Duration,
     rounds_interval: time::Duration,
     panic_notify: mpsc::Sender<bool>,
+    account_tree: CircuitAccountTree,
+    tree_block_number: BlockNumber,
 ) {
     thread::Builder::new()
         .name("prover_server".to_string())
@@ -180,6 +183,8 @@ pub fn start_prover_server(
                 connection_pool.clone(),
                 Arc::clone(&data_pool),
                 rounds_interval,
+                account_tree,
+                tree_block_number,
             );
             pool_maintainer.start(panic_notify);
 

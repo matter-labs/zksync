@@ -23,8 +23,8 @@ pub struct ObservedState {
     pub state_keeper_init: PlasmaStateInitParams,
     /// Used to initialize pool of prover_server.
     pub circuit_acc_tree: CircuitAccountTree,
-    /// Block number corresponding to the circuit_acc_tree.
-    pub last_seen_block: BlockNumber,
+    /// Block number corresponding to the state in `circuit_acc_tree`.
+    pub circuit_tree_block: BlockNumber,
 
     storage: storage::StorageProcessor,
 }
@@ -34,7 +34,7 @@ impl ObservedState {
         Self {
             state_keeper_init: PlasmaStateInitParams::new(),
             circuit_acc_tree: CircuitAccountTree::new(models::params::account_tree_depth()),
-            last_seen_block: 0,
+            circuit_tree_block: 0,
             storage,
         }
     }
@@ -43,7 +43,7 @@ impl ObservedState {
     fn init(&mut self) -> Result<(), failure::Error> {
         self.init_circuit_tree()?;
         self.state_keeper_init.load_from_db(&self.storage)?;
-        info!("updated circuit tree to block: {}", self.last_seen_block);
+        info!("updated circuit tree to block: {}", self.circuit_tree_block);
         info!(
             "updated state keeper init params to block: {}",
             self.state_keeper_init.last_block_number
@@ -62,7 +62,7 @@ impl ObservedState {
             let circuit_account = CircuitAccount::from(account.clone());
             self.circuit_acc_tree.insert(account_id, circuit_account);
         }
-        self.last_seen_block = block_number;
+        self.circuit_tree_block = block_number;
         Ok(())
     }
 
@@ -70,7 +70,7 @@ impl ObservedState {
     fn update(&mut self) -> Result<(), failure::Error> {
         self.update_circuit_account_tree()?;
         self.state_keeper_init.load_state_diff(&self.storage)?;
-        info!("updated circuit tree to block: {}", self.last_seen_block);
+        info!("updated circuit tree to block: {}", self.circuit_tree_block);
         info!(
             "updated state keeper init params to block: {}",
             self.state_keeper_init.last_block_number
@@ -86,7 +86,7 @@ impl ObservedState {
             .get_last_verified_block()
             .map_err(|e| failure::format_err!("failed to get last committed block: {}", e))?;
 
-        for bn in self.last_seen_block..block_number {
+        for bn in self.circuit_tree_block..block_number {
             let ops = self
                 .storage
                 .chain()
@@ -124,7 +124,7 @@ impl ObservedState {
                 }
             }
         }
-        self.last_seen_block = block_number;
+        self.circuit_tree_block = block_number;
         Ok(())
     }
 }

@@ -155,13 +155,15 @@ impl Maintainer {
         conn_pool: storage::ConnectionPool,
         data: Arc<RwLock<ProversDataPool>>,
         rounds_interval: time::Duration,
+        account_tree: CircuitAccountTree,
+        block_number: BlockNumber,
     ) -> Self {
         Self {
             conn_pool,
             data,
             rounds_interval,
-            account_tree: CircuitAccountTree::new(models::params::account_tree_depth()),
-            next_block_number: 0,
+            account_tree,
+            next_block_number: block_number + 1,
         }
     }
 
@@ -226,22 +228,6 @@ impl Maintainer {
         // Create a storage for prepared data.
         let mut prepared = HashMap::new();
 
-        if self.uninitialized() {
-            let min_next_block_num = queue.next_block_number();
-            if let Some(block_number) = min_next_block_num {
-                // Initialize `next_block_number` and circuit tree. Done only once.
-                let storage = self
-                    .conn_pool
-                    .access_storage()
-                    .expect("failed to connect to db");
-                self.init_account_tree(&storage, block_number - 1)?;
-                self.next_block_number = block_number;
-            } else {
-                // Nothing to initialize from.
-                return Ok(());
-            }
-        }
-
         // Go through queue, take the next operation to process, and build the
         // prover data for it.
         while !queue.is_empty() {
@@ -271,34 +257,6 @@ impl Maintainer {
         pool.prepared.extend(prepared);
 
         Ok(())
-    }
-
-    /// Initializes account tree, obtaining the state for the requested block.
-    fn init_account_tree(
-        &mut self,
-        storage: &storage::StorageProcessor,
-        new_block: u32,
-    ) -> Result<(), String> {
-        assert!(
-            self.uninitialized(),
-            "Attempt to invoke 'init_account_tree' with already initialized state",
-        );
-        let (_, accounts) = storage
-            .chain()
-            .state_schema()
-            .load_committed_state(Some(new_block))
-            .map_err(|e| format!("failed to load committed state: {}", e))?;
-
-        for (k, v) in accounts.iter() {
-            self.account_tree
-                .insert(*k, CircuitAccount::from(v.clone()));
-        }
-        debug!("Prover state is initialized");
-        Ok(())
-    }
-
-    fn uninitialized(&self) -> bool {
-        self.next_block_number == 0
     }
 
     fn build_prover_data(
