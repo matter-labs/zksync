@@ -4,20 +4,23 @@
 //! `mod rpc_server` - JSON rpc via HTTP (for request reply functions)
 //! `mod rpc_subscriptions` - JSON rpc via WebSocket (for request reply functions and subscriptions)
 
+// External uses
+use futures::channel::mpsc;
+// Workspace uses
+use models::{config_options::ConfigurationOptions, Operation};
+use storage::ConnectionPool;
+// Local uses
+use crate::{
+    eth_watch::EthWatchRequest,
+    mempool::MempoolRequest,
+    signature_checker,
+    state_keeper::{ExecutedOpsNotify, StateKeeperRequest},
+};
+
 mod event_notify;
 mod rest;
 pub mod rpc_server;
 mod rpc_subscriptions;
-
-use crate::mempool::MempoolRequest;
-use crate::signature_checker;
-use crate::state_keeper::{ExecutedOpsNotify, StateKeeperRequest};
-use futures::channel::mpsc;
-use models::config_options::ConfigurationOptions;
-use models::Operation;
-use storage::ConnectionPool;
-
-use crate::eth_watch::EthWatchRequest;
 
 #[allow(clippy::too_many_arguments)]
 pub fn start_api_server(
