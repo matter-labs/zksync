@@ -548,10 +548,10 @@ impl FranklinOp {
         }
     }
 
-    pub fn eth_witness(&self) -> Vec<u8> {
+    pub fn eth_witness(&self) -> Option<Vec<u8>> {
         match self {
-            FranklinOp::ChangePubKeyOffchain(op) => op.get_eth_witness(),
-            _ => Vec::new(),
+            FranklinOp::ChangePubKeyOffchain(op) => Some(op.get_eth_witness()),
+            _ => None,
         }
     }
 
