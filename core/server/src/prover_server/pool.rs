@@ -32,7 +32,7 @@ use prover::prover_data::ProverData;
 
 #[derive(Debug, Clone)]
 struct OperationsQueue {
-    operations: VecDeque<Operation>,
+    operations: VecDeque<(Operation, bool)>,
     last_loaded_block: BlockNumber,
 }
 
@@ -56,12 +56,12 @@ impl OperationsQueue {
             let ops = storage
                 .chain()
                 .block_schema()
-                .load_unverified_commits_after_block(self.last_loaded_block, limit)
+                .load_commits_after_block(self.last_loaded_block, limit)
                 .map_err(|e| format!("failed to read commit operations: {}", e))?;
 
             self.operations.extend(ops);
 
-            if let Some(op) = self.operations.back() {
+            if let Some((op, _)) = self.operations.back() {
                 self.last_loaded_block = op.block.block_number;
             }
 
@@ -69,7 +69,7 @@ impl OperationsQueue {
                 "Operations: {:?}",
                 self.operations
                     .iter()
-                    .map(|op| op.block.block_number)
+                    .map(|(op, _)| op.block.block_number)
                     .collect::<Vec<_>>()
             );
         }
@@ -79,7 +79,7 @@ impl OperationsQueue {
 
     /// Takes the oldest non-processed operation out of the queue.
     /// Returns `None` if there are no non-processed operations.
-    fn take_next_operation(&mut self) -> Option<Operation> {
+    fn take_next_operation(&mut self) -> Option<(Operation, bool)> {
         self.operations.pop_front()
     }
 
@@ -88,7 +88,7 @@ impl OperationsQueue {
         if self.operations.is_empty() {
             None
         } else {
-            Some(self.operations[0].block.block_number)
+            Some(self.operations[0].0.block.block_number)
         }
     }
 
@@ -236,13 +236,17 @@ impl Maintainer {
                 queue.next_block_number(),
                 "Blocks must be processed in order"
             );
-            if let Some(op) = queue.take_next_operation() {
+            if let Some((op, has_proof)) = queue.take_next_operation() {
                 let storage = self
                     .conn_pool
                     .access_storage()
                     .expect("failed to connect to db");
                 let pd = self.build_prover_data(&storage, &op)?;
-                prepared.insert(op.block.block_number, pd);
+                // Always build prover data to update circuit tree to the next block, but store only
+                // if there is no proof for the block.
+                if !has_proof {
+                    prepared.insert(op.block.block_number, pd);
+                }
                 self.next_block_number = op.block.block_number + 1;
             }
         }

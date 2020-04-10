@@ -418,10 +418,10 @@ fn block_range() {
     });
 }
 
-/// Tests for the `load_unverified_commits_after_block` method.
+/// Tests for the `load_commits_after_block` method.
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
-fn load_unverified_commits_after_block() {
+fn load_commits_after_block() {
     let _ = env_logger::try_init();
     let mut rng = create_rng();
 
@@ -469,13 +469,13 @@ fn load_unverified_commits_after_block() {
         ];
 
         for ((block, limit), expected_slice) in test_vector {
-            let unverified_commits =
-                BlockSchema(&conn).load_unverified_commits_after_block(block, limit)?;
+            let commits = BlockSchema(&conn).load_commits_after_block(block, limit)?;
 
-            assert_eq!(unverified_commits.len(), expected_slice.len());
+            assert_eq!(commits.len(), expected_slice.len());
 
-            for (expected, got) in expected_slice.iter().zip(unverified_commits) {
+            for (expected, (got, has_proof)) in expected_slice.iter().zip(commits) {
                 assert_eq!(expected.id, got.id);
+                assert!(!has_proof);
             }
         }
 
