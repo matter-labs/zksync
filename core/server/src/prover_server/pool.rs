@@ -22,7 +22,7 @@ use circuit::witness::{
     withdraw::{apply_withdraw_tx, calculate_withdraw_operations_from_witness},
 };
 use models::{
-    circuit::{account::CircuitAccount, CircuitAccountTree},
+    circuit::CircuitAccountTree,
     config_options::ThreadPanicNotify,
     node::{BlockNumber, Fr, FranklinOp},
     Operation,

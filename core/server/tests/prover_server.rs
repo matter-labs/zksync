@@ -7,7 +7,8 @@ use futures::channel::mpsc;
 // Workspace deps
 use circuit::witness::deposit::apply_deposit_tx;
 use circuit::witness::deposit::calculate_deposit_operations_from_witness;
-use models::params::block_chunk_sizes;
+use models::circuit::CircuitAccountTree;
+use models::params::{account_tree_depth, block_chunk_sizes};
 use prover::client;
 use prover::ApiClient;
 use server::prover_server;
@@ -19,8 +20,17 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
     let conn_pool = storage::ConnectionPool::new();
     let addr = net::SocketAddr::from_str(bind_to).unwrap();
     let (tx, _rx) = mpsc::channel(1);
+    let tree = CircuitAccountTree::new(account_tree_depth());
     thread::spawn(move || {
-        prover_server::start_prover_server(conn_pool, addr, prover_timeout, rounds_interval, tx);
+        prover_server::start_prover_server(
+            conn_pool,
+            addr,
+            prover_timeout,
+            rounds_interval,
+            tx,
+            tree,
+            0,
+        );
     });
     bind_to.to_string()
 }

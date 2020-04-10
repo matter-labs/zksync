@@ -48,7 +48,8 @@ impl<'a> LeaderElectionSchema<'a> {
         let datetime = if let Some(datetime) = until {
             datetime
         } else {
-            NaiveDateTime::from_timestamp(Utc::now().timestamp(), 0)
+            let now = Utc::now();
+            NaiveDateTime::from_timestamp(now.timestamp(), now.timestamp_subsec_nanos())
         };
         let query = leader_election::table
             .filter(dsl::bail_at.is_null())
