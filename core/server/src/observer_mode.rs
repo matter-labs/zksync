@@ -42,8 +42,8 @@ impl ObservedState {
     /// Init state by pulling verified and committed state from db.
     fn init(&mut self) -> Result<(), failure::Error> {
         self.init_circuit_tree()?;
-        self.state_keeper_init.load_from_db(&self.storage)?;
         info!("updated circuit tree to block: {}", self.circuit_tree_block);
+        self.state_keeper_init.load_from_db(&self.storage)?;
         info!(
             "updated state keeper init params to block: {}",
             self.state_keeper_init.last_block_number
@@ -68,13 +68,19 @@ impl ObservedState {
 
     /// Pulls new changes from db and update.
     fn update(&mut self) -> Result<(), failure::Error> {
+        let old = self.circuit_tree_block;
         self.update_circuit_account_tree()?;
+        if old != self.circuit_tree_block {
+            info!("updated circuit tree to block: {}", self.circuit_tree_block);
+        }
+        let old = self.state_keeper_init.last_block_number;
         self.state_keeper_init.load_state_diff(&self.storage)?;
-        info!("updated circuit tree to block: {}", self.circuit_tree_block);
-        info!(
-            "updated state keeper init params to block: {}",
-            self.state_keeper_init.last_block_number
-        );
+        if old != self.state_keeper_init.last_block_number {
+            info!(
+                "updated state keeper init params to block: {}",
+                self.state_keeper_init.last_block_number
+            );
+        }
         Ok(())
     }
 

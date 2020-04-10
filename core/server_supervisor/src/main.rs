@@ -16,9 +16,9 @@ async fn main() -> anyhow::Result<()> {
     let storage = StorageProcessor::establish_connection().expect("failed connect to db");
     let namespace = env::var("NAMESPACE").unwrap_or_else(|_| "default".into());
     let client = Client::from(Configuration::infer().await?);
+    // We are interested in events related to the leader pod, but watch events of all pods
+    // in the same namespace. This is due to limitations of the library. And to keep things simpler too.
     let resource = Resource::namespaced::<Pod>(&namespace);
-    // We are interested of the events related to the leader pod, but watch event of all the pods
-    // in the same namespace. This is due to limitations of the library. And for simplicity too.
     let inf = Informer::new(client, ListParams::default(), resource);
 
     loop {
@@ -55,33 +55,45 @@ fn handle_pod(ev: WatchEvent<Pod>, storage: &StorageProcessor) -> anyhow::Result
                 "Modified Pod: {} (phase={}, owner={})",
                 name, phase, owner.name
             );
-            if let Some(last_state) = &status.container_statuses.unwrap()[0].last_state {
-                if last_state.terminated != None {
-                    let current_leader = storage
-                        .leader_election_schema()
-                        .current_leader()
-                        .expect("failed to get current leader");
-                    if let Some(leader) = current_leader {
-                        if leader.name == name {
-                            info!(
-                                "Bailing leader because pod is last known to be terminated: {}",
-                                leader.name
-                            );
-                            storage
-                                .leader_election_schema()
-                                .bail(&leader.name, Some(leader.created_at))
-                                .expect("failed to bail terminated leader from election");
-                        }
+            if let Some(container_statuses) = &status.container_statuses {
+                if let Some(last_state) = &container_statuses[0].last_state {
+                    if last_state.terminated != None {
+                        bail_if_leader(&storage, name);
                     }
                 }
             }
         }
         WatchEvent::Deleted(o) => {
-            debug!("Deleted Pod: {}", Meta::name(&o));
+            let name = Meta::name(&o);
+            debug!("Deleted Pod: {}", name);
+            info!("Bailing pod because it is being deleted: {}", name);
+            storage
+                .leader_election_schema()
+                .bail(&name, None)
+                .expect("failed to bail deleted pod from election");
         }
         WatchEvent::Error(e) => {
             warn!("Error event: {:?}", e);
         }
     }
     Ok(())
+}
+
+fn bail_if_leader(storage: &StorageProcessor, name: String) {
+    let current_leader = storage
+        .leader_election_schema()
+        .current_leader()
+        .expect("failed to get current leader");
+    if let Some(leader) = current_leader {
+        if leader.name == name {
+            info!(
+                "Bailing leader because pod is last known to be terminated: {}",
+                leader.name
+            );
+            storage
+                .leader_election_schema()
+                .bail(&leader.name, Some(leader.created_at))
+                .expect("failed to bail terminated leader from election");
+        }
+    }
 }
