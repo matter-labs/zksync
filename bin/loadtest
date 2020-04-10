@@ -1,6 +1,6 @@
 #!/bin/bash
 
-USAGE='Usage: zksync loadtest [-h|--help] [SCENARIO] [PATH_TO_CONFI]
+USAGE='Usage: zksync loadtest [-h|--help] [SCENARIO] [PATH_TO_CONFIG]
 where:
     -h | --help     show this message
     SCENARIO        {outgoing,execution} (outgoing by default)
