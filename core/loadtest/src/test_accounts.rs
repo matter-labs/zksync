@@ -11,7 +11,7 @@ use models::{
 };
 use testkit::{eth_account::EthereumAccount, zksync_account::ZksyncAccount};
 // Local uses
-use super::test_spec::AccountInfo;
+use crate::{rpc_client::RpcClient, test_spec::AccountInfo};
 
 #[derive(Debug)]
 pub struct TestAccount {
@@ -53,8 +53,9 @@ impl TestAccount {
             .collect()
     }
 
-    // Updates the current Ethereum nonces with a value obtained from the ETH node.
-    pub async fn update_eth_nonce(&self) -> Result<(), failure::Error> {
+    // Updates the current Ethereum and ZKSync account nonce values.
+    pub async fn update_nonce_values(&self, rpc_client: &RpcClient) -> Result<(), failure::Error> {
+        // Update ETH nonce.
         let mut nonce = self.eth_nonce.lock().await;
         let v = self
             .eth_acc
@@ -63,6 +64,16 @@ impl TestAccount {
             .await
             .map_err(|e| failure::format_err!("update_eth_nonce: {}", e))?;
         *nonce = v.as_u32();
+
+        // Update ZKSync nonce.
+        let zknonce = rpc_client
+            .account_state_info(self.zk_acc.address)
+            .await
+            .expect("rpc error")
+            .committed
+            .nonce;
+        self.zk_acc.set_nonce(zknonce);
+
         Ok(())
     }
 
