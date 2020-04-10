@@ -27,7 +27,7 @@ use std::fmt;
 use std::str::FromStr;
 use web3::types::{Address, H256};
 
-#[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
 pub struct TxHash {
     data: [u8; 32],
 }
