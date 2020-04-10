@@ -34,7 +34,7 @@ contract Storage {
         uint16 tokenId;
     }
     
-    /// @notice Verified but not executed withdrawals for addresses stored in here
+    /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index)
     mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
     uint32 public firstPendingWithdrawalIndex;
     uint32 public numberOfPendingWithdrawals;
@@ -92,7 +92,7 @@ contract Storage {
     /// @notice User authenticated facts for some nonce.
     mapping(address => mapping(uint32 => bytes)) public authFacts;
 
-        /// @notice Priority Operation container
+    /// @notice Priority Operation container
     /// @member opType Priority operation type
     /// @member pubData Priority operation public data
     /// @member expirationBlock Expiration block number (ETH block) for this request (must be satisfied before)
