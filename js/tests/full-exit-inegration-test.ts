@@ -82,7 +82,7 @@ async function testWrongETHWalletFullExit(ethWallet: ethers.Wallet, syncWallet: 
         const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
         console.log("Running integration test on the ", network, " network");
 
-        syncProvider = await Provider.newHttpProvider(process.env.HTTP_RPC_API_ADDR);
+        syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
 
         const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
 
