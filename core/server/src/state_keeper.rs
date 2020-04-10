@@ -107,19 +107,18 @@ impl PlasmaStateInitParams {
             .expect("db connection failed for state restore");
 
         let mut init_params = Self::new();
-        init_params.load_from_db(None, &storage)?;
+        init_params.load_from_db(&storage)?;
         Ok(init_params)
     }
 
     pub fn load_from_db(
         &mut self,
-        block_number: Option<BlockNumber>,
         storage: &storage::StorageProcessor,
     ) -> Result<(), failure::Error> {
         let (block_number, accounts) = storage
             .chain()
             .state_schema()
-            .load_committed_state(block_number)
+            .load_committed_state(None)
             .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
         for (account_id, account) in accounts.into_iter() {
             self.insert_account(account_id, account);
@@ -132,24 +131,24 @@ impl PlasmaStateInitParams {
     pub fn load_state_diff(
         &mut self,
         storage: &storage::StorageProcessor,
-        to_block: BlockNumber,
     ) -> Result<(), failure::Error> {
         let state_diff = storage
             .chain()
             .state_schema()
-            .load_state_diff(self.last_block_number, Some(to_block))
+            .load_state_diff(self.last_block_number, None)
             .map_err(|e| failure::format_err!("failed to load committed state: {}", e))?;
 
-        if let Some((_, updates)) = state_diff {
+        if let Some((block_number, updates)) = state_diff {
             for (id, update) in updates.into_iter() {
                 let updated_account = Account::apply_update(self.remove_account(id), update);
                 if let Some(account) = updated_account {
                     self.insert_account(id, account);
                 }
             }
+            self.unprocessed_priority_op =
+                Self::unprocessed_priority_op_id(&storage, block_number)?;
+            self.last_block_number = block_number;
         }
-        self.unprocessed_priority_op = Self::unprocessed_priority_op_id(&storage, to_block)?;
-        self.last_block_number = to_block;
         Ok(())
     }
 

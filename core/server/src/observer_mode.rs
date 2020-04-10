@@ -44,15 +44,14 @@ impl ObservedState {
             .storage
             .chain()
             .state_schema()
-            .load_committed_state(None)
+            .load_verified_state()
             .map_err(|e| failure::format_err!("couldn't load commited state: {}", e))?;
         for (account_id, account) in accounts.into_iter() {
             let circuit_account = CircuitAccount::from(account.clone());
             self.circuit_acc_tree.insert(account_id, circuit_account);
         }
-        self.state_keeper_init
-            .load_from_db(Some(block_number), &self.storage)?;
         self.last_seen_block = block_number;
+        self.state_keeper_init.load_from_db(&self.storage)?;
         Ok(())
     }
 
@@ -70,7 +69,7 @@ impl ObservedState {
             .storage
             .chain()
             .block_schema()
-            .get_last_committed_block()
+            .get_last_verified_block()
             .map_err(|e| failure::format_err!("failed to get last committed block: {}", e))?;
 
         for bn in self.last_seen_block..block_number {
