@@ -2,7 +2,6 @@ pragma solidity 0.5.16;
 
 import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
 
-import "./Upgradeable.sol";
 import "./Storage.sol";
 import "./Config.sol";
 import "./Events.sol";
@@ -91,7 +90,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external {
-        // TODO: when switched to multi valiators model we need to add insentive mechanism to call complete.
+        // TODO: when switched to multi validators model we need to add incentive mechanism to call complete.
         uint32 toProcess = _n;
         if (toProcess > numberOfPendingWithdrawals) {
             toProcess = numberOfPendingWithdrawals;
@@ -119,8 +118,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
                     sent = toPayable.send(amount);
-                } else if (governance.isValidTokenId(tokenId)) {
+                } else {
                     address tokenAddr = governance.tokenAddresses(tokenId);
+                    require(tokenAddr != address(0), "cwd11"); // unknown tokenId
                     sent = IERC20(tokenAddr).transfer(to, amount);
                 }
                 if (!sent) {
@@ -128,6 +128,10 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                 }
             }
         }
+    }
+
+    function minU32(uint32 a, uint32 b) internal pure returns (uint32) {
+        return a < b ? a : b;
     }
 
     function minU64(uint64 a, uint64 b) internal pure returns (uint64) {
@@ -182,7 +186,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     // }
 
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
-    /// @param _amount Amount to deposit (if user specified msg.value more than this amount + fee - she will recieve difference)
+    /// @param _amount Amount to deposit (if user specified msg.value more than this amount + fee - she will receive difference)
     /// @param _franklinAddr The receiver Layer 2 address
     function depositETH(uint128 _amount, address _franklinAddr) external payable {
         requireActive();
@@ -191,10 +195,13 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         //   fee coeff * base tx gas cost * gas price
         uint fee = FEE_GAS_PRICE_MULTIPLIER * BASE_DEPOSIT_ETH_GAS * tx.gasprice;
 
-        require(msg.value >= fee + _amount, "fdh11"); // Not enough ETH provided
+        uint totalValue = fee + _amount;
+        require(totalValue >= _amount, "fdh10");  // integer overflow (fee + amount)
 
-        if (msg.value != fee + _amount) {
-            uint refund = msg.value-(fee + _amount);
+        require(msg.value >= totalValue, "fdh11"); // Not enough ETH provided
+
+        if (msg.value != totalValue) {
+            uint refund = msg.value - totalValue;
 
             // Doublecheck to never refund more than received!
             require(refund < msg.value, "fdh12");
@@ -288,6 +295,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         uint256 _fee,
         address _owner
     ) internal {
+        require(governance.isValidTokenId(_token), "rgd11"); // invalid token id
 
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
@@ -327,6 +335,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _publicData Operations pubdata
     /// @param _ethWitness Data passed to ethereum outside pubdata of the circuit.
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
+    ///
+    /// _blockNumber is not necessary but it may help to catch server-side errors.
     function commitBlock(
         uint32 _blockNumber,
         uint24 _feeAccount,
@@ -338,9 +348,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
-        if(!triggerRevertIfBlockCommitmentExpired() && !triggerExodusIfNeeded()) {
-            require(totalBlocksCommitted - totalBlocksVerified < MAX_UNVERIFIED_BLOCKS, "fck13"); // too many blocks committed
-
+        require(!isBlockCommitmentExpired(), "fck12"); // committed blocks had expired
+        if(!triggerExodusIfNeeded()) {
             // Unpack onchain operations and store them.
             // Get onchain operations start id for global onchain operations counter,
             // onchain operations number for this block, priority operations number for this block.
@@ -370,8 +379,10 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         bytes memory _publicData,
         uint64 _firstOnchainOpId, uint64 _nOnchainOpsProcessed, uint64 _nCommittedPriorityRequests
     ) internal {
+        require(_publicData.length % 8 == 0, "cbb10"); // Public data size is not multiple of 8
+
         uint32 blockChunks = uint32(_publicData.length / 8);
-        require(verifier.isBlockSizeSupported(blockChunks), "ccb10");
+        require(verifier.isBlockSizeSupported(blockChunks), "ccb11");
 
         // Create block commitment for verification proof
         bytes32 commitment = createBlockCommitment(
@@ -404,7 +415,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         uint256 pubdataOffset = 0;
 
-        uint32 ethWitnessOffset = 0;
+        uint64 ethWitnessOffset = 0;
         uint32 processedZKSyncOperation = 0;
 
         while (pubdataOffset < _publicData.length) {
@@ -421,6 +432,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             processedZKSyncOperation++;
         }
         require(pubdataOffset == _publicData.length, "fcs12"); // last chunk exceeds pubdata
+        require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
     }
 
     /// @notice Verifies ethereum signature for given message and recovers address of the signer
@@ -441,10 +453,16 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     }
 
     function verifyChangePubkeySignature(bytes memory _signature, bytes memory _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
-        bytes memory signedMessage = abi.encodePacked("\x19Ethereum Signed Message:\n135");
-        signedMessage = abi.encodePacked(signedMessage, "Register ZK Sync pubkey:\n\n");
-        signedMessage = abi.encodePacked(signedMessage, "sync:", Bytes.bytesToHexASCIIBytes(_newPkHash), " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n\n");
-        signedMessage = abi.encodePacked(signedMessage, "Only sign this message for a trusted client!");
+        require(_newPkHash.length == 20, "vpk11"); // unexpected hash length
+
+        bytes memory signedMessage = abi.encodePacked(
+            "\x19Ethereum Signed Message:\n135",
+            "Register ZK Sync pubkey:\n\n",
+            "sync:", Bytes.bytesToHexASCIIBytes(_newPkHash),
+            " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
+            "\n\n",
+            "Only sign this message for a trusted client!"
+        );
         address recoveredAddress = verifyEthereumSignature(_signature, signedMessage);
         return recoveredAddress == _ethAddress;
     }
@@ -459,27 +477,27 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         bytes memory _publicData,
         bytes memory _currentEthWitness
     ) internal returns (uint256 _bytesProcessed) {
-        uint8 opType = uint8(_publicData[_pubdataOffset]);
+        Operations.OpType opType = Operations.OpType(uint8(_publicData[_pubdataOffset]));
 
-        if (opType == uint8(Operations.OpType.Noop)) return NOOP_BYTES;
-        if (opType == uint8(Operations.OpType.TransferToNew)) return TRANSFER_TO_NEW_BYTES;
-        if (opType == uint8(Operations.OpType.Transfer)) return TRANSFER_BYTES;
-        if (opType == uint8(Operations.OpType.CloseAccount)) return CLOSE_ACCOUNT_BYTES;
+        if (opType == Operations.OpType.Noop) return NOOP_BYTES;
+        if (opType == Operations.OpType.TransferToNew) return TRANSFER_TO_NEW_BYTES;
+        if (opType == Operations.OpType.Transfer) return TRANSFER_BYTES;
+        if (opType == Operations.OpType.CloseAccount) return CLOSE_ACCOUNT_BYTES;
 
-        if (opType == uint8(Operations.OpType.Deposit)) {
+        if (opType == Operations.OpType.Deposit) {
             bytes memory pubData = Bytes.slice(_publicData, _pubdataOffset + 1, DEPOSIT_BYTES - 1);
             onchainOps[totalOnchainOps] = OnchainOperation(
                 Operations.OpType.Deposit,
                 pubData
             );
-            verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
+            commitNextPriorityOperation(onchainOps[totalOnchainOps]);
 
             totalOnchainOps++;
 
             return DEPOSIT_BYTES;
         }
 
-        if (opType == uint8(Operations.OpType.PartialExit)) {
+        if (opType == Operations.OpType.PartialExit) {
             bytes memory pubData = Bytes.slice(_publicData, _pubdataOffset + 1, PARTIAL_EXIT_BYTES - 1);
             onchainOps[totalOnchainOps] = OnchainOperation(
                 Operations.OpType.PartialExit,
@@ -490,20 +508,20 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             return PARTIAL_EXIT_BYTES;
         }
 
-        if (opType == uint8(Operations.OpType.FullExit)) {
+        if (opType == Operations.OpType.FullExit) {
             bytes memory pubData = Bytes.slice(_publicData, _pubdataOffset + 1, FULL_EXIT_BYTES - 1);
             onchainOps[totalOnchainOps] = OnchainOperation(
                 Operations.OpType.FullExit,
                 pubData
             );
 
-            verifyNextPriorityOperation(onchainOps[totalOnchainOps]);
+            commitNextPriorityOperation(onchainOps[totalOnchainOps]);
 
             totalOnchainOps++;
             return FULL_EXIT_BYTES;
         }
 
-        if (opType == uint8(Operations.OpType.ChangePubKey)) {
+        if (opType == Operations.OpType.ChangePubKey) {
             Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, _pubdataOffset + 1);
             if (_currentEthWitness.length > 0) {
                 bool valid = verifyChangePubkeySignature(_currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
@@ -547,7 +565,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         return hash;
     }
 
-    function verifyNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
+    function commitNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
         require(totalOpenPriorityRequests > totalCommittedPriorityRequests, "vnp11"); // no more priority requests in queue
 
         uint64 _priorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
@@ -567,20 +585,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         totalCommittedPriorityRequests++;
     }
 
-    /// @notice Removes some onchain ops (for example in case of wrong priority comparison)
-    /// @param _startId Onchain op start id
-    /// @param _totalProcessed How many ops are procceeded
-    function revertOnchainOps(uint64 _startId, uint64 _totalProcessed) internal {
-        uint64 start = _startId;
-        uint64 end = start + _totalProcessed;
-
-        for (uint64 current = start; current < end; ++current) {
-            delete onchainOps[current];
-        }
-    }
-
     /// @notice Block verification.
-    /// @notice Verify proof -> consummate onchain ops (accrue balances from withdrawls) -> remove priority requests
+    /// @notice Verify proof -> consummate onchain ops (accrue balances from withdrawals) -> remove priority requests
     /// @param _blockNumber Block number
     /// @param _proof Block proof
     function verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof)
@@ -605,7 +611,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     }
 
     /// @notice When block with withdrawals is verified we store them and complete in separate tx. Withdrawals can be complete by calling withdrawEth, withdrawERC20 or completeWithdrawals.
-    /// @param _to Reciever
+    /// @param _to Receiver
     /// @param _tokenId Token id
     /// @param _amount Token amount
     function storeWithdrawalAsPending(address _to, uint16 _tokenId, uint128 _amount) internal {
@@ -630,46 +636,51 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             }
             if (op.opType == Operations.OpType.FullExit) {
                 // full exit was successful, accrue balance
-                Operations.FullExit memory data = Operations.readFullExitPubdata(op.pubData, 0);
+                Operations.FullExit memory data = Operations.readFullExitPubdata(op.pubData);
                 storeWithdrawalAsPending(data.owner, data.tokenId, data.amount);
             }
             delete onchainOps[current];
         }
     }
 
-    /// @notice Checks that commitment is expired and revert blocks if it really is
-    /// @return bool flag that indicates if blocks has been reverted
-    function triggerRevertIfBlockCommitmentExpired() internal returns (bool) {
-        if (
+    /// @notice Checks whether oldest unverified block has expired
+    /// @return bool flag that indicates whether oldest unverified block has expired
+    function isBlockCommitmentExpired() internal view returns (bool) {
+        return (
             totalBlocksCommitted > totalBlocksVerified &&
             blocks[totalBlocksVerified + 1].committedAtBlock > 0 &&
             block.number > blocks[totalBlocksVerified + 1].committedAtBlock + EXPECT_VERIFICATION_IN
-        ) {
-            revertBlocks();
-            return true;
-        }
-        return false;
+        );
     }
 
     /// @notice Reverts unverified blocks
-    function revertBlocks() internal {
-        for (uint32 i = totalBlocksVerified + 1; i <= totalBlocksCommitted; i++) {
-            Block memory reverted = blocks[i];
-            revertBlock(reverted);
+    /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
+    function revertBlocks(uint32 _maxBlocksToRevert) external {
+        // TODO: limit who can call this method
+
+        require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
+
+        uint32 blocksToRevert = minU32(_maxBlocksToRevert, totalBlocksCommitted - totalBlocksVerified);
+        uint64 revertedPriorityRequests = 0;
+        uint64 revertedOnchainOps = 0;
+
+        for (uint32 i = totalBlocksCommitted - blocksToRevert + 1; i <= totalBlocksCommitted; i++) {
+            Block memory revertedBlock = blocks[i];
+            require(revertedBlock.committedAtBlock > 0, "frk11"); // block not found
+
+            revertedOnchainOps += revertedBlock.onchainOperations;
+            revertedPriorityRequests += revertedBlock.priorityOperations;
+
             delete blocks[i];
         }
-        totalBlocksCommitted -= totalBlocksCommitted - totalBlocksVerified;
+
+        totalBlocksCommitted -= blocksToRevert;
+        totalOnchainOps -= revertedOnchainOps;
+        totalCommittedPriorityRequests -= revertedPriorityRequests;
+
         emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
     }
-
-    /// @notice Reverts block onchain operations
-    /// @param _reverted Reverted block
-    function revertBlock(Block memory _reverted) internal {
-        require(_reverted.committedAtBlock > 0, "frk11"); // block not found
-        revertOnchainOps(_reverted.operationStartId, _reverted.onchainOperations);
-        totalCommittedPriorityRequests -= _reverted.priorityOperations;
-    }
-
+    
     /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)
     function upgradePreparationLockStatus() public returns (bool) {
         return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;
@@ -680,7 +691,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         require(!exodusMode, "fre11"); // exodus mode activated
     }
 
-    /// @notice Checks if Exodus mode must be entered. If true - cancels outstanding deposits and emits ExodusMode event.
+    /// @notice Checks if Exodus mode must be entered. If true - enters exodus mode and emits ExodusMode event.
     /// @dev Exodus mode must be entered in case of current ethereum block number is higher than the oldest
     /// @dev of existed priority requests expiration block number.
     /// @return bool flag that is true if the Exodus mode must be entered.
@@ -688,8 +699,10 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         bool trigger = block.number >= priorityRequests[firstPriorityRequestId].expirationBlock &&
             priorityRequests[firstPriorityRequestId].expirationBlock != 0;
         if (trigger) {
-            exodusMode = true;
-            emit ExodusMode();
+            if (!exodusMode) {
+                exodusMode = true;
+                emit ExodusMode();
+            }
             return true;
         } else {
             return false;
@@ -735,7 +748,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         // Expiration block is: current block number + priority expiration delta
         uint256 expirationBlock = block.number + PRIORITY_EXPIRATION;
 
-        priorityRequests[firstPriorityRequestId + totalOpenPriorityRequests] = PriorityOperation({
+        uint64 nextPriorityRequestId =  firstPriorityRequestId + totalOpenPriorityRequests;
+
+        priorityRequests[nextPriorityRequestId] = PriorityOperation({
             opType: _opType,
             pubData: _pubData,
             expirationBlock: expirationBlock,
@@ -744,7 +759,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         emit NewPriorityRequest(
             msg.sender,
-            firstPriorityRequestId + totalOpenPriorityRequests,
+            nextPriorityRequestId,
             uint8(_opType),
             _pubData,
             expirationBlock,
@@ -760,7 +775,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _validator The address to pay fees
     /// @return validators fee
     function collectValidatorsFeeAndDeleteRequests(uint64 _number, address _validator) internal {
-        require(_number <= totalOpenPriorityRequests, "pcs21"); // number is heigher than total priority requests number
+        require(_number <= totalOpenPriorityRequests, "pcs21"); // number is higher than total priority requests number
 
         uint256 totalFee = 0;
         for (uint64 i = firstPriorityRequestId; i < firstPriorityRequestId + _number; i++) {

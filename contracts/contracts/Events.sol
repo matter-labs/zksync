@@ -29,6 +29,7 @@ contract Events {
         address indexed owner
     );
 
+    /// @notice Event emitted when user sends a authentication fact (e.g. pub-key hash)
     event FactAuth(
         address sender,
         uint32 nonce,
@@ -37,8 +38,8 @@ contract Events {
 
     /// @notice Event emitted when blocks are reverted
     event BlocksReverted(
-        uint32 indexed totalBlocksVerified,
-        uint32 indexed totalBlocksCommitted
+        uint32 totalBlocksVerified,
+        uint32 totalBlocksCommitted
     );
 
     /// @notice Exodus mode entered event

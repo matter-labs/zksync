@@ -1,11 +1,14 @@
+// Built-in imports
+use std::{fmt, sync::Mutex};
+// External uses
 use bigdecimal::BigDecimal;
+use web3::types::H256;
+// Workspace uses
 use crypto_exports::rand::{thread_rng, Rng};
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
     priv_key_from_fs, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
 };
-use std::sync::Mutex;
-use web3::types::H256;
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZksyncAccount {
@@ -14,6 +17,23 @@ pub struct ZksyncAccount {
     pub address: Address,
     pub eth_private_key: H256,
     nonce: Mutex<Nonce>,
+}
+
+impl fmt::Debug for ZksyncAccount {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // It is OK to disclose the private key contents for a testkit account.
+        let mut pk_contents = Vec::new();
+        self.private_key
+            .write(&mut pk_contents)
+            .expect("Failed writing the private key contents");
+
+        f.debug_struct("ZksyncAccount")
+            .field("private_key", &pk_contents)
+            .field("address", &self.address)
+            .field("eth_private_key", &self.eth_private_key)
+            .field("nonce", &self.nonce)
+            .finish()
+    }
 }
 
 impl ZksyncAccount {
