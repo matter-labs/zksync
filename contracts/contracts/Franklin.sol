@@ -417,16 +417,18 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         uint64 currentOnchainOps = 0;
 
         uint256 pubDataPtr = 0;
-        uint256 pubDataEnd = 0;
+        uint256 pubDataStartPtr = 0;
+        uint256 pubDataEndPtr = 0;
         assembly {
-            pubDataPtr := add(_publicData, 0x20)
-            pubDataEnd := add(pubDataPtr, mload(_publicData))
+            pubDataStartPtr := add(_publicData, 0x20)
+            pubDataPtr := pubDataStartPtr
+            pubDataEndPtr := add(pubDataStartPtr, mload(_publicData))
         }
 
         uint64 ethWitnessOffset = 0;
         uint16 processedOperationsRequiringEthWitness = 0;
 
-        while (pubDataPtr<pubDataEnd) {
+        while (pubDataPtr<pubDataEndPtr) {
             uint8 opType;
             // read operation type from public data (the first byte per each operation)
             assembly {
@@ -442,8 +444,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                 // calculation of public data offset
                 uint256 pubdataOffset;
                 assembly {
-                    // Number of pubdata bytes processed equal to current pubData memory pointer minus pubData memory start pointer (_publicData + 0x20)
-                    pubdataOffset := sub(pubDataPtr, add(_publicData, 0x20))
+                    // Number of pubdata bytes processed equal to current pubData memory pointer minus pubData memory start pointer
+                    pubdataOffset := sub(pubDataPtr, pubDataStartPtr)
                 }
 
                 if (opType == uint8(Operations.OpType.Noop)) {
@@ -504,7 +506,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                 }
             }
         }
-        require(pubDataPtr == pubDataEnd, "fcs12"); // last chunk exceeds pubdata
+        require(pubDataPtr == pubDataEndPtr, "fcs12"); // last chunk exceeds pubdata
         require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
         require(processedOperationsRequiringEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
 
