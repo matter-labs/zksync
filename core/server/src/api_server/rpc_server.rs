@@ -28,7 +28,7 @@ use crate::{
     mempool::{MempoolRequest, TxAddError},
     signature_checker::VerifyTxSignatureRequest,
     state_keeper::StateKeeperRequest,
-    utils::TokenDBCache,
+    utils::token_db_cache::TokenDBCache,
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
