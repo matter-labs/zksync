@@ -54,7 +54,7 @@ contract Storage {
     /// @member commitment Hash of the block circuit commitment
     /// @member stateRoot New tree root hash
     struct Block {
-        address validator;
+        uint24 validatorId;
         uint32 committedAtBlock;
         uint64 operationStartId;
         uint64 onchainOperations;

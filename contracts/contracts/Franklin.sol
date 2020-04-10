@@ -393,8 +393,10 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             _publicData
         );
 
+        uint24 validatorId = governance.getValidatorId(msg.sender);
+
         blocks[_blockNumber] = Block(
-            msg.sender, // validator
+            validatorId, // validatorId
             uint32(block.number), // committed at
             _firstOnchainOpId, // blocks' onchain ops start id in global operations
             _nOnchainOpsProcessed, // total number of onchain ops in block
@@ -600,9 +602,12 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         consummateOnchainOps(_blockNumber);
 
+        uint24 blockValidatorId = blocks[_blockNumber].validatorId;
+        address blockValidatorAddress = governance.getValidatorAddress(blockValidatorId);
+
         collectValidatorsFeeAndDeleteRequests(
             blocks[_blockNumber].priorityOperations,
-            blocks[_blockNumber].validator
+            blockValidatorAddress
         );
 
         totalBlocksVerified += 1;
