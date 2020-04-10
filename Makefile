@@ -173,9 +173,6 @@ prepare-contracts:
 ci-check:
 	@ci-check.sh
 	
-loadtest: confirm_action
-	@bin/loadtest.sh
-
 integration-testkit: build-contracts
 	cargo run --bin testkit --release
 	cargo run --bin exodus_test --release
@@ -206,20 +203,6 @@ circuit-tests:
 
 prover-tests:
 	f cargo test -p prover --release -- --ignored
-
-# Loadtest
-
-run-loadtest: confirm_action
-	@cd js/franklin_lib && yarn loadtest
-
-prepare-loadtest: confirm_action
-	@node js/loadtest/loadtest.js prepare
-
-rescue: confirm_action
-	@node js/loadtest/rescue.js
-
-deposit: confirm_action
-	@node contracts/scripts/deposit.js
 
 # Devops: main
 
