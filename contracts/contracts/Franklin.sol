@@ -564,10 +564,14 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
 
-        /// here will be computed sha256 of variable 'hash' concatenated with _publicData
-        /// hash will be stored in 32 byte slots at the front of _publicData memory (at the place of storing _publicData.length)
-        /// this is done to avoid copying _publicData
-        /// at the end of this function _publicData length will be correctly stored again at the rigth place
+        /// The code below is equivalent to `commitment = sha256(abi.encodePacked(hash, _publicData))`
+
+        /// We use inline assembly instead of this concise and readable code in order to avoid copying of `_publicData` (which saves ~90 gas per transfer operation).
+
+        /// Specifically, we perform the following trick:
+        /// First, replace the first 32 bytes of `_publicData` (where normally its length is stored) with the value of `hash`.
+        /// Then, we call `sha256` precompile passing the `_publicData` pointer and the length of the concatenated byte buffer.
+        /// Finally, we put the `_publicData.length` back to its original location (to the first word of `_publicData`).
         assembly {
             let hashResult := mload(0x40)
             let pubDataLen := mload(_publicData)
