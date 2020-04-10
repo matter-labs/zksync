@@ -1,0 +1,73 @@
+#!/bin/bash
+
+USAGE='Usage: zksync plonk-setup [ check | download ] [monomial | all] 
+
+Used to download and check plonk universal setup files.
+
+Options:
+
+check (default) | download     checks or downloads missing setup files for $SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS in your env
+monomial (default) | all       chose to download setup files in monomial form or monomial and lagrange form (for current prover lagrange form is not needed) 
+'
+
+set -e
+
+if [ -z $ZKSYNC_ENV ]; then
+    echo "$USAGE" && exit 1
+fi
+
+
+SETUP_DO_SPACE_DIR=https://universal-setup.ams3.digitaloceanspaces.com
+COMMAND=${1:-check}
+KEY_TYPE=${2:-monomial}
+case $KEY_TYPE in
+    monomial|all)
+        ;;
+    *)
+        echo "$USAGE" && exit 1
+        ;;
+esac
+
+
+cd $ZKSYNC_HOME
+mkdir -p keys/setup && cd keys/setup
+
+download() {
+    for i in ${SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS//,/ }; do
+        axel -c $SETUP_DO_SPACE_DIR/setup_2%5E$i.key || true #dont download file if it is already there
+        sleep 1 # to not receive “503 Slow Down”
+
+        if [ "$1" = "all" ]; then
+            axel -c $SETUP_DO_SPACE_DIR/setup_2%5E"$i"_lagrange.key || true
+            sleep 1 # to not receive “503 Slow Down”
+        fi
+    done
+    echo Setup is downloaded
+}
+
+check() {
+    for i in ${SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS//,/ }; do
+        F1=setup_2"^$i".key
+        [ -f "$F1" ] || (echo Setup file $F1 not found. && exit 1)
+        if [ "$1" = "all" ]; then
+            F2=setup_2"^$i"_lagrange.key
+            [ -f "$F2" ] || (echo Setup file $F2 not found. && exit 1)
+        fi
+    done
+    echo Setup is fine
+}
+
+case $COMMAND in 
+    check)
+        check $KEY_TYPE
+        ;;
+    download)
+        download $KEY_TYPE
+        ;;
+    -h|--h)
+        echo "$USAGE" && exit 0
+        ;;
+    *)
+        echo "$USAGE" && exit 1
+        ;;
+esac

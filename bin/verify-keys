@@ -24,7 +24,7 @@ cd $ZKSYNC_HOME
 
 unpack() {
     [ -f keys/packed/$VERIFY_KEYS_TARBAL ] || (echo Keys file $VERIFY_KEYS_TARBAL not found && exit 1)
-    tar xvf keys/packed/$VERIFY_KEYS_TARBAL
+    tar xf keys/packed/$VERIFY_KEYS_TARBAL
     echo "Keys unpacked"
 }
 
