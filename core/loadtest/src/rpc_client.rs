@@ -6,7 +6,7 @@ use models::node::tx::{FranklinTx, PackedEthSignature, TxHash};
 use models::node::Address;
 use server::api_server::rpc_server::AccountInfoResp;
 // Local uses
-use self::messages::{AccountStateRequest, EthopInfoRequest, SubmitTxMsg, TxInfoRequest};
+use self::messages::JsonRpcRequest;
 
 /// State of the ZKSync operation.
 #[derive(Debug)]
@@ -38,7 +38,7 @@ impl RpcClient {
         tx: FranklinTx,
         eth_signature: Option<PackedEthSignature>,
     ) -> Result<TxHash, failure::Error> {
-        let msg = SubmitTxMsg::new(tx, eth_signature);
+        let msg = JsonRpcRequest::submit_tx(tx, eth_signature);
 
         let ret = self.post(&msg).await?;
         let tx_hash = serde_json::from_value(ret).expect("failed to parse `send_tx` response");
@@ -50,7 +50,7 @@ impl RpcClient {
         &self,
         address: Address,
     ) -> Result<AccountInfoResp, failure::Error> {
-        let msg = AccountStateRequest::new(address);
+        let msg = JsonRpcRequest::account_state(address);
 
         let ret = self.post(&msg).await?;
         let account_state =
@@ -61,7 +61,7 @@ impl RpcClient {
     /// Requests and returns a tuple `(executed, verified)` (as `OperationState`) for
     /// an Ethereum operation given its `serial_id`.
     pub async fn ethop_info(&self, serial_id: u64) -> Result<OperationState, failure::Error> {
-        let msg = EthopInfoRequest::new(serial_id);
+        let msg = JsonRpcRequest::ethop_info(serial_id);
 
         let ret = self.post(&msg).await?;
         let obj = ret.as_object().unwrap();
@@ -79,7 +79,7 @@ impl RpcClient {
     /// Requests and returns a tuple `(executed, verified)` (as `OperationState`) for
     /// a transaction given its hash`.
     pub async fn tx_info(&self, tx_hash: TxHash) -> Result<OperationState, failure::Error> {
-        let msg = TxInfoRequest::new(tx_hash.clone());
+        let msg = JsonRpcRequest::tx_info(tx_hash);
 
         let ret = self.post(&msg).await?;
         let obj = ret.as_object().unwrap();
@@ -134,84 +134,49 @@ mod messages {
     use serde_derive::Serialize;
 
     #[derive(Debug, Serialize)]
-    pub struct SubmitTxMsg {
+    pub struct JsonRpcRequest {
         pub id: String,
         pub method: String,
         pub jsonrpc: String,
         pub params: Vec<serde_json::Value>,
     }
 
-    impl SubmitTxMsg {
-        pub fn new(tx: FranklinTx, eth_signature: Option<PackedEthSignature>) -> Self {
+    impl JsonRpcRequest {
+        fn create(method: impl ToString, params: Vec<serde_json::Value>) -> Self {
+            Self {
+                id: "1".to_owned(),
+                jsonrpc: "2.0".to_owned(),
+                method: method.to_string(),
+                params,
+            }
+        }
+
+        pub fn submit_tx(tx: FranklinTx, eth_signature: Option<PackedEthSignature>) -> Self {
             let mut params = Vec::new();
             params.push(serde_json::to_value(tx).expect("serialization fail"));
             params.push(
                 serde_json::to_value(eth_signature.map(TxEthSignature::EthereumSignature))
                     .expect("serialization fail"),
             );
-            Self {
-                id: "1".to_owned(),
-                method: "tx_submit".to_owned(),
-                jsonrpc: "2.0".to_owned(),
-                params,
-            }
+            Self::create("tx_submit", params)
         }
-    }
 
-    #[derive(Debug, Serialize)]
-    pub struct AccountStateRequest {
-        pub id: String,
-        pub method: String,
-        pub jsonrpc: String,
-        pub params: Vec<Address>,
-    }
-
-    impl AccountStateRequest {
-        pub fn new(address: Address) -> Self {
-            Self {
-                id: "2".to_owned(),
-                method: "account_info".to_owned(),
-                jsonrpc: "2.0".to_owned(),
-                params: vec![address],
-            }
+        pub fn account_state(address: Address) -> Self {
+            let mut params = Vec::new();
+            params.push(serde_json::to_value(address).expect("serialization fail"));
+            Self::create("account_info", params)
         }
-    }
 
-    #[derive(Debug, Serialize)]
-    pub struct EthopInfoRequest {
-        pub id: String,
-        pub method: String,
-        pub jsonrpc: String,
-        pub params: Vec<u64>,
-    }
-
-    impl EthopInfoRequest {
-        pub fn new(serial_id: u64) -> Self {
-            Self {
-                id: "3".to_owned(),
-                method: "ethop_info".to_owned(),
-                jsonrpc: "2.0".to_owned(),
-                params: vec![serial_id],
-            }
+        pub fn ethop_info(serial_id: u64) -> Self {
+            let mut params = Vec::new();
+            params.push(serde_json::to_value(serial_id).expect("serialization fail"));
+            Self::create("ethop_info", params)
         }
-    }
 
-    #[derive(Debug, Serialize)]
-    pub struct TxInfoRequest {
-        pub id: String,
-        pub method: String,
-        pub jsonrpc: String,
-        pub params: Vec<TxHash>,
-    }
-
-    impl TxInfoRequest {
-        pub fn new(h: TxHash) -> Self {
-            Self {
-                id: "4".to_owned(),
-                method: "tx_info".to_owned(),
-                jsonrpc: "2.0".to_owned(),
-                params: vec![h],
-            }
+        pub fn tx_info(tx_hash: TxHash) -> Self {
+            let mut params = Vec::new();
+            params.push(serde_json::to_value(tx_hash).expect("serialization fail"));
+            Self::create("tx_info", params)
         }
     }
 }

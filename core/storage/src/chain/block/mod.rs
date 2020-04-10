@@ -351,7 +351,6 @@ impl<'a> BlockSchema<'a> {
 
     pub fn load_unverified_commits_after_block(
         &self,
-        block_size: usize,
         block: BlockNumber,
         limit: i64,
     ) -> QueryResult<Vec<Operation>> {
@@ -362,7 +361,7 @@ impl<'a> BlockSchema<'a> {
                     SELECT operations.* FROM operations
                     LEFT JOIN blocks ON number = block_number
                     LEFT JOIN proofs USING (block_number)
-                    WHERE proof IS NULL AND block_size = {}
+                    WHERE proof IS NULL
                 )
                 SELECT * FROM sized_operations
                 WHERE action_type = 'COMMIT'
@@ -375,7 +374,7 @@ impl<'a> BlockSchema<'a> {
                 ORDER BY block_number
                 LIMIT {}
                 ",
-                block_size, block, limit
+                block, limit
             ))
             .load(self.0.conn())?;
             ops.into_iter().map(|o| o.into_op(self.0)).collect()

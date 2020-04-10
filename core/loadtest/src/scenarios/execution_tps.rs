@@ -11,13 +11,12 @@
 use std::{
     ops::Mul,
     sync::Arc,
-    thread,
     time::{Duration, Instant},
 };
 // External uses
 use bigdecimal::BigDecimal;
 use rand::Rng;
-use tokio::runtime::Handle;
+use tokio::{runtime::Handle, time};
 use web3::types::U256;
 // Workspace uses
 use models::node::tx::TxHash;
@@ -132,15 +131,7 @@ async fn send_transactions_from_acc(
     let wei_in_gwei = BigDecimal::from(1_000_000_000);
 
     // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
-    test_acc.update_eth_nonce().await?;
-
-    let zknonce = rpc_client
-        .account_state_info(test_acc.zk_acc.address)
-        .await
-        .expect("rpc error")
-        .committed
-        .nonce;
-    test_acc.zk_acc.set_nonce(zknonce);
+    test_acc.update_nonce_values(&rpc_client).await?;
 
     // Perform the deposit operation.
     let deposit_amount = BigDecimal::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei);
@@ -245,10 +236,11 @@ async fn wait_for_deposit_executed(
     let start = Instant::now();
     let timeout = Duration::from_secs(DEPOSIT_TIMEOUT_SEC);
     let polling_interval = Duration::from_millis(500);
+    let mut timer = time::interval(polling_interval);
 
     // Polling cycle.
     while !executed && start.elapsed() < timeout {
-        thread::sleep(polling_interval);
+        timer.tick().await;
         let state = rpc_client.ethop_info(serial_id).await?;
         executed = state.executed;
     }
@@ -269,10 +261,12 @@ async fn await_txs_execution(
 ) {
     async fn await_tx(tx_hash: TxHash, rpc_client: RpcClient, tps_counter: Arc<TPSCounter>) {
         let timeout = Duration::from_secs(TX_EXECUTION_TIMEOUT_SEC);
+        let start = Instant::now();
+
         // Small polling interval, so we won't wait too long between confirmation
         // check attempts.
         let polling_interval = Duration::from_millis(100);
-        let start = Instant::now();
+        let mut timer = time::interval(polling_interval);
         loop {
             let state = rpc_client
                 .tx_info(tx_hash.clone())
@@ -286,7 +280,7 @@ async fn await_txs_execution(
             if start.elapsed() > timeout {
                 panic!("[wait_for_verify] Timeout")
             }
-            thread::sleep(polling_interval);
+            timer.tick().await;
         }
     }
 
@@ -301,6 +295,7 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_clie
 
     let start = Instant::now();
     let polling_interval = Duration::from_millis(500);
+    let mut timer = time::interval(polling_interval);
 
     // Wait until all the transactions are verified.
     for &id in serial_ids.iter() {
@@ -316,7 +311,7 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_clie
             if start.elapsed() > timeout {
                 panic!("[wait_for_verify] Timeout")
             }
-            thread::sleep(polling_interval);
+            timer.tick().await;
         }
     }
 
@@ -334,7 +329,7 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_clie
             if start.elapsed() > timeout {
                 panic!("[wait_for_verify] Timeout")
             }
-            thread::sleep(polling_interval);
+            timer.tick().await;
         }
     }
 }
