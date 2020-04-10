@@ -10,14 +10,7 @@ describe("Bytes unit tests", function () {
         bytesTestContract = await deployTestContract('../../build/BytesTest')
     });
 
-    // concat
-
-    it("should concatenate bytes", async () => {
-        let r = await bytesTestContract.concat("0x010203", "0x11121314")
-        expect(r).equal("0x01020311121314")
-    });
-
-    // read 
+    // read
 
     it("should read bytes", async () => {
         let r = await bytesTestContract.read("0x0102030405060708", 4, 2)
