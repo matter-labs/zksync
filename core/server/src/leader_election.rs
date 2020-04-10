@@ -1,11 +1,11 @@
 //! Leader election is a always live routine that continuously votes to become the leader.
 
-use models::node::config::LEADER_ELECTION_INTERVAL;
+use models::node::config::LEADER_LOOKUP_INTERVAL;
 use std::thread;
 
-/// Continuously votes to be the leader and exits when it becomes the leader.
-/// Voting happens with `LEADER_ELECTION_INTERVAL`.
-/// The leader retirement handled by external service.
+/// Places itself as candidate to leader_election table and continuously looks up who is current leader.
+/// Lookups happen with `LEADER_LOOKUP_INTERVAL` period.
+/// Current leader is the oldest candidate in leader_election table who did not bail.
 ///
 /// # Panics
 ///
@@ -17,9 +17,6 @@ pub fn keep_voting_to_be_leader(
     let st = connection_pool
         .access_storage()
         .map_err(|e| failure::format_err!("could not to access store: {}", e))?;
-    st.leader_election_schema()
-        .bail(&name, None)
-        .map_err(|e| failure::format_err!("could not bail previous placements: {}", e))?;
     st.leader_election_schema()
         .place_candidate(&name)
         .map_err(|e| failure::format_err!("could not place candidate: {}", e))?;
@@ -34,7 +31,7 @@ pub fn keep_voting_to_be_leader(
                 break;
             }
         }
-        thread::sleep(LEADER_ELECTION_INTERVAL);
+        thread::sleep(LEADER_LOOKUP_INTERVAL);
     }
     Ok(())
 }

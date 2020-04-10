@@ -9,6 +9,7 @@ use circuit::witness::full_exit::apply_full_exit_tx;
 use circuit::witness::transfer::apply_transfer_tx;
 use circuit::witness::transfer_to_new::apply_transfer_to_new_tx;
 use circuit::witness::withdraw::apply_withdraw_tx;
+use log::info;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
 use models::node::{BlockNumber, FranklinOp};
@@ -22,7 +23,7 @@ pub struct ObservedState {
     pub state_keeper_init: PlasmaStateInitParams,
     /// Used to initialize pool of prover_server.
     pub circuit_acc_tree: CircuitAccountTree,
-    /// State updated till this value.
+    /// Block number corresponding to the circuit_acc_tree.
     pub last_seen_block: BlockNumber,
 
     storage: storage::StorageProcessor,
@@ -38,33 +39,46 @@ impl ObservedState {
         }
     }
 
-    /// Pulls state until last committed block.
+    /// Init state by pulling verified and committed state from db.
     fn init(&mut self) -> Result<(), failure::Error> {
+        self.init_circuit_tree()?;
+        self.state_keeper_init.load_from_db(&self.storage)?;
+        info!("updated circuit tree to block: {}", self.last_seen_block);
+        info!(
+            "updated state keeper init params to block: {}",
+            self.state_keeper_init.last_block_number
+        );
+        Ok(())
+    }
+
+    fn init_circuit_tree(&mut self) -> Result<(), failure::Error> {
         let (block_number, accounts) = self
             .storage
             .chain()
             .state_schema()
             .load_verified_state()
-            .map_err(|e| failure::format_err!("couldn't load commited state: {}", e))?;
+            .map_err(|e| failure::format_err!("couldn't load committed state: {}", e))?;
         for (account_id, account) in accounts.into_iter() {
             let circuit_account = CircuitAccount::from(account.clone());
             self.circuit_acc_tree.insert(account_id, circuit_account);
         }
         self.last_seen_block = block_number;
-        self.state_keeper_init.load_from_db(&self.storage)?;
         Ok(())
     }
 
-    // Pulls new changes from db and updates itself.
+    /// Pulls new changes from db and update.
     fn update(&mut self) -> Result<(), failure::Error> {
-        let last_committed_block_num = self.update_circuit_account_tree()?;
-        self.state_keeper_init
-            .load_state_diff(&self.storage, last_committed_block_num)?;
-        self.last_seen_block = last_committed_block_num;
+        self.update_circuit_account_tree()?;
+        self.state_keeper_init.load_state_diff(&self.storage)?;
+        info!("updated circuit tree to block: {}", self.last_seen_block);
+        info!(
+            "updated state keeper init params to block: {}",
+            self.state_keeper_init.last_block_number
+        );
         Ok(())
     }
 
-    fn update_circuit_account_tree(&mut self) -> Result<BlockNumber, failure::Error> {
+    fn update_circuit_account_tree(&mut self) -> Result<(), failure::Error> {
         let block_number = self
             .storage
             .chain()
@@ -110,7 +124,8 @@ impl ObservedState {
                 }
             }
         }
-        Ok(block_number)
+        self.last_seen_block = block_number;
+        Ok(())
     }
 }
 
@@ -123,6 +138,7 @@ pub fn run(
     interval: Duration,
     stop: mpsc::Receiver<()>,
 ) -> ObservedState {
+    info!("starting observer mode");
     let storage = conn_pool.access_storage().expect("failed to access db");
     let mut observed_state = ObservedState::new(storage);
     observed_state
