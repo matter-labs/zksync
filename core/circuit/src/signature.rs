@@ -539,7 +539,7 @@ where
         &params,
     )?;
 
-    let challenge = fs_challenge.clone();
+    let challenge = fs_challenge;
 
     let pk_mul_hash = signature
         .pk

@@ -14,8 +14,7 @@ use log::*;
 use crypto_exports::franklin_crypto;
 use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
-use models::node::Engine;
-use models::prover_utils::plonk::EncodedProofPlonk;
+use models::prover_utils::EncodedProofPlonk;
 use models::prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 
 /// We prepare some data before making proof for each block size, so we cache it in case next block

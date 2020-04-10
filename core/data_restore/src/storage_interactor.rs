@@ -10,7 +10,7 @@ use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
 use models::node::block::Block;
 use models::node::{AccountMap, AccountUpdate, AccountUpdates, FranklinOp};
-use models::prover_utils::plonk::EncodedProofPlonk;
+use models::prover_utils::EncodedProofPlonk;
 use models::TokenAddedEvent;
 use models::{Action, Operation};
 use storage::{

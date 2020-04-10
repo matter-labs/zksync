@@ -23,7 +23,7 @@ pub(crate) fn create_verifier_contract(config: AvailableBlockSizesConfig) {
     let mut template_params = HashMap::new();
 
     let sizes = to_json(config.blocks_chunks.clone());
-    template_params.insert("chunks".to_string(), sizes.clone());
+    template_params.insert("chunks".to_string(), sizes);
 
     let mut templates_for_key_getters = config
         .blocks_chunks

@@ -23,13 +23,13 @@ pub use crypto_exports::rand;
 use crate::node::block::Block;
 use crate::node::BlockNumber;
 use crate::node::{AccountUpdates, TokenId};
-use crate::prover_utils::plonk::EncodedProofPlonk;
+use crate::prover_utils::EncodedProofPlonk;
 use ethabi::{decode, ParamType};
 use failure::format_err;
 use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use serde_bytes;
 use std::convert::TryFrom;
-use web3::types::{Address, Log, U256};
+use web3::types::{Address, Log};
 
 /// Returns hex representation of the field element without `0x` prefix.
 pub fn fe_to_hex<F: PrimeField>(value: &F) -> String {
@@ -70,8 +70,6 @@ pub struct NetworkStatus {
     pub total_transactions: u32,
     pub outstanding_txs: u32,
 }
-
-pub type EncodedProof = [U256; 8];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type")]

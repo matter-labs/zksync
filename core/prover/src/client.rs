@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
-use models::prover_utils::plonk::EncodedProofPlonk;
+use models::prover_utils::EncodedProofPlonk;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {
@@ -34,7 +34,7 @@ pub struct WorkingOnReq {
 #[derive(Serialize, Deserialize)]
 pub struct PublishReq {
     pub block: u32,
-    pub proof: models::prover_utils::plonk::EncodedProofPlonk,
+    pub proof: EncodedProofPlonk,
 }
 
 #[derive(Debug, Clone)]
@@ -230,7 +230,7 @@ impl crate::ApiClient for ApiClient {
                 .post(&self.publish_url)
                 .json(&client::PublishReq {
                     block: block as u32,
-                    proof: proof.clone(),
+                    proof,
                 })
                 .send()
                 .map_err(|e| format_err!("failed to send publish request: {}", e))?;

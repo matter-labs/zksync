@@ -5,7 +5,7 @@ use std::time::Duration;
 use log::info;
 // Workspace deps
 use models::node::config::PROVER_CYCLE_WAIT;
-use models::prover_utils::plonk::EncodedProofPlonk;
+use models::prover_utils::EncodedProofPlonk;
 use storage::ConnectionPool;
 
 fn main() {

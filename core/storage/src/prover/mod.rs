@@ -8,7 +8,7 @@ use models::node::BlockNumber;
 // Local imports
 use self::records::{ActiveProver, IntegerNumber, NewProof, ProverRun, StoredProof};
 use crate::StorageProcessor;
-use models::prover_utils::plonk::EncodedProofPlonk;
+use models::prover_utils::EncodedProofPlonk;
 
 pub mod records;
 

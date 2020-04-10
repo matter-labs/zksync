@@ -33,10 +33,6 @@ impl PlonkVerificationKey {
     }
 }
 
-pub mod plonk {
-    pub use super::*;
-}
-
 pub fn get_keys_root_dir() -> PathBuf {
     let mut out_dir = PathBuf::new();
     out_dir.push(&std::env::var("ZKSYNC_HOME").unwrap_or_else(|_| "/".to_owned()));

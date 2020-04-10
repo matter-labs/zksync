@@ -34,29 +34,29 @@ pub(crate) fn rendered_key(
     for (i, c) in vk.selector_commitments.iter().enumerate() {
         let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
 
-        for j in 0..2 {
+        for (j, rendered) in rendered.iter().enumerate() {
             map.insert(
                 format!("selector_commitment_{}_{}", i, j),
-                to_json(&rendered[j]),
+                to_json(rendered),
             );
         }
     }
     for (i, c) in vk.next_step_selector_commitments.iter().enumerate() {
         let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
 
-        for j in 0..2 {
+        for (j, rendered) in rendered.iter().enumerate() {
             map.insert(
                 format!("next_step_selector_commitment_{}_{}", i, j),
-                to_json(&rendered[j]),
+                to_json(rendered),
             );
         }
     }
     for (i, c) in vk.permutation_commitments.iter().enumerate() {
         let rendered = render_g1_affine_to_hex::<NodeEngine>(&c);
-        for j in 0..2 {
+        for (j, rendered) in rendered.iter().enumerate() {
             map.insert(
                 format!("permutation_commitment_{}_{}", i, j),
-                to_json(&rendered[j]),
+                to_json(rendered),
             );
         }
     }

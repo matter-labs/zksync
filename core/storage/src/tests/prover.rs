@@ -6,7 +6,7 @@ use models::Action;
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, StorageProcessor};
-use models::prover_utils::plonk::EncodedProofPlonk;
+use models::prover_utils::EncodedProofPlonk;
 
 /// Checks that the proof can be stored and loaded.
 #[test]
