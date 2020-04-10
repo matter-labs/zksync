@@ -33,14 +33,14 @@ const DEFAULT_THRESHOLD: f64 = 5.0f64;
 ///             metrics_counter: MetricsCounter::new(
 ///                 "SomeProcessor metrics", // Prefix for a message.
 ///                 0.0f64, // Noise threshold.
-///                 Duration::from_millis(0), // Report interval.
+///                 Duration::from_millis(100), // Report interval.
 ///             ),
 ///         }
 ///     }
 ///
-///     pub fn do_work(&mut self) {
-///         // Do some work... Let's imagine that here we process one element at the time.
-///         self.metrics_counter.add_samples(1);
+///     pub fn do_work(&mut self, elements_to_process: Vec<i32>) {
+///         // Do some work...
+///         self.metrics_counter.add_samples(elements_to_process.len());
 ///     }
 /// }
 ///
@@ -48,7 +48,9 @@ const DEFAULT_THRESHOLD: f64 = 5.0f64;
 ///     env_logger::init();
 ///     let mut processor = SomeProcessor::new();
 ///     for _ in 0..5 {
-///         processor.do_work();
+///         let elements = // ...
+///             #  vec![1, 2, 3];
+///         processor.do_work(elements);
 ///         processor.metrics_counter.output_stats();
 ///     }
 /// }
