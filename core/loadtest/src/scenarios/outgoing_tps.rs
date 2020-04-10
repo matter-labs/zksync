@@ -10,13 +10,12 @@
 use std::{
     ops::Mul,
     sync::Arc,
-    thread,
     time::{Duration, Instant},
 };
 // External uses
 use bigdecimal::BigDecimal;
 use rand::Rng;
-use tokio::runtime::Handle;
+use tokio::{runtime::Handle, time};
 use web3::types::U256;
 // Workspace uses
 // Local uses
@@ -225,10 +224,11 @@ async fn wait_for_deposit_executed(
     let start = Instant::now();
     let timeout = Duration::from_secs(DEPOSIT_TIMEOUT_SEC);
     let polling_interval = Duration::from_millis(500);
+    let mut timer = time::interval(polling_interval);
 
     // Polling cycle.
     while !executed && start.elapsed() < timeout {
-        thread::sleep(polling_interval);
+        timer.tick().await;
         let state = rpc_client.ethop_info(serial_id).await?;
         executed = state.executed;
     }
@@ -247,6 +247,7 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_clie
 
     let start = Instant::now();
     let polling_interval = Duration::from_millis(500);
+    let mut timer = time::interval(polling_interval);
 
     // Wait until all the transactions are verified.
     for &id in serial_ids.iter() {
@@ -262,7 +263,7 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_clie
             if start.elapsed() > timeout {
                 panic!("[wait_for_verify] Timeout")
             }
-            thread::sleep(polling_interval);
+            timer.tick().await;
         }
     }
 
@@ -280,7 +281,7 @@ async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_clie
             if start.elapsed() > timeout {
                 panic!("[wait_for_verify] Timeout")
             }
-            thread::sleep(polling_interval);
+            timer.tick().await;
         }
     }
 }
