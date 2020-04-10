@@ -48,20 +48,20 @@ contract Storage {
     /// @notice Rollup block data (once per block)
     /// @member validator Block producer
     /// @member committedAtBlock ETH block number at which this block was committed
-    /// @member operationStartId Index of the first operation to process for this block
-    /// @member onchainOperations Total number of operations to process for this block
+    /// @member cumulativeOnchainOperations Total number of operations in this and all previous blocks
     /// @member priorityOperations Total number of priority operations for this block
     /// @member commitment Hash of the block circuit commitment
     /// @member stateRoot New tree root hash
+    ///
+    /// Consider memory alignment when changing field order: https://solidity.readthedocs.io/en/v0.4.21/miscellaneous.html
     struct Block {
         uint24 validatorId;
         uint32 committedAtBlock;
-        uint64 operationStartId;
-        uint64 onchainOperations;
+        uint64 cumulativeOnchainOperations;
         uint64 priorityOperations;
+        uint32 chunks;
         bytes32 commitment;
         bytes32 stateRoot;
-        uint32 chunks;
     }
 
     /// @notice Blocks by Franklin block id
