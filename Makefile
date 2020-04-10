@@ -108,6 +108,12 @@ rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 dummy-prover:
 	cargo run --bin dummy_prover
 
+setup-dummy-prover:
+	@bin/dummy-prover-setup.sh
+
+disable-dummy-prover:
+	@bin/dummy-prover-disable.sh
+
 prover:
 	@bin/provers-launch-dev
 
