@@ -42,6 +42,7 @@
       - [Check for active validator](#check-for-active-validator)
       - [Check that token id is valid](#check-that-token-id-is-valid)
       - [Check that token address is valid](#check-that-token-address-is-valid)
+  * [Block state transition circuit](#block-state-transition-circuit) 
   * [Appendix I: Cryptographic primitives](#appendix-i--cryptographic-primitives)
     + [Pedersen signature](#pedersen-signature)
     + [Pedersen hash](#pedersen-hash)
@@ -933,7 +934,7 @@ commitBlock(
 - _newRoot: New tree root
 - _publicData: Operations pubdata
 - _ethWitness - data that can be used by smart contract for block commit that is posted outside of `_publicData` (e.g ETH signatures for pubkey change verification).
-- _ethWitnessSizes - number of bytes from _ethWitness that is used for each onchain operation.
+- _ethWitnessSizes - number of bytes from _ethWitness that is used for each onchain operation which needed them.
 
 ##### Verify block
 
@@ -1059,6 +1060,27 @@ validateTokenAddress(address _tokenAddr) returns (uint16)
 - _tokenAddr: Token address
 
 Returns: token id.
+
+## Block state transition circuit
+
+Block circuit describes state transition function (STF) from previous state to the new one by applying a number of transactions.
+
+Public inputs:
+
+- pub_data_commitment: commitment to the state transition of the block; this is a hash that includes `old_root`, `new_root`, `block_number`, `validator_address`, `pub_data_rolling_hash` (see smart the contract code).
+
+Witness:
+
+- old_root,
+- new_root,
+- block_number,
+- validator_address,
+- pub_data,
+- pub_data_rolling_hash,
+- list of transactions,
+- state Merkle treees.
+
+If the proof is valid (the circuit is satisfied), it means that there exists a set of transactions which transitions the state from the previous one (cryptographically fingerprinted by the Merkle root `old_root`) into the new one (cryptographically fingerprinted by the Merkle root `new_root`) such that concatenated `pub_data` of this transactions in the order of application is cryptographically fingerprinted by `pub_data_commitment`.
 
 ## Appendix I: Cryptographic primitives
 

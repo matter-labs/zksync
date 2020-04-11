@@ -333,7 +333,7 @@ describe("ZK Sync withdraw unit tests", function () {
         const withdrawAmount = parseEther("1.0");
 
         const {revertReason} = await getCallRevertReason(async () => await performWithdraw(wallet, incorrectTokenContract.address, 1, withdrawAmount.add(1)));
-        expect(revertReason, "wrong revert reason").eq("gvs12");
+        expect(revertReason, "wrong revert reason").eq("gvs11");
     });
 
     it("Complete pending withdawals, eth, known erc20", async () => {
@@ -466,7 +466,7 @@ describe("ZK Sync test process next operation", function () {
         const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
 
         const pubdata = Buffer.alloc(8, 0);
-        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+        await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
         const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
@@ -482,7 +482,7 @@ describe("ZK Sync test process next operation", function () {
 
         const pubdata = Buffer.alloc(8 * 2, 0xff);
         pubdata[0] = 0x05;
-        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+        await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
         const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
@@ -497,7 +497,7 @@ describe("ZK Sync test process next operation", function () {
 
         const pubdata = Buffer.alloc(8 * 5, 0xff);
         pubdata[0] = 0x02;
-        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+        await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
         const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
@@ -521,7 +521,7 @@ describe("ZK Sync test process next operation", function () {
         Buffer.from(depositAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, 6);
         Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 22);
 
-        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+        await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
         const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
@@ -539,7 +539,7 @@ describe("ZK Sync test process next operation", function () {
         const pubdata = Buffer.alloc(8 * 6, 0);
         pubdata[0] = 0x03;
 
-        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+        await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
         const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
@@ -566,7 +566,7 @@ describe("ZK Sync test process next operation", function () {
         pubdata.writeUInt16BE(tokenId, 24);
         Buffer.from(fullExitAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, 26);
 
-        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+        await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
         const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
@@ -594,7 +594,7 @@ describe("ZK Sync test process next operation", function () {
         Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 24);
         pubdata.writeUInt32BE(nonce, 44);
 
-        await zksyncContract.testProcessNextOperation(0, pubdata, "0x", pubdata.length);
+        await zksyncContract.testProcessOperation(pubdata, "0x", [0]);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
         const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
@@ -622,7 +622,7 @@ describe("ZK Sync test process next operation", function () {
         Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 24);
         pubdata.writeUInt32BE(nonce, 44);
 
-        await zksyncContract.testProcessNextOperation(0, pubdata, ethWitness, pubdata.length);
+        await zksyncContract.testProcessOperation(pubdata, ethWitness, [(ethWitness.length - 2) / 2]); // (ethWitness.length - 2) / 2   ==   len of ethWitness in bytes
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
         const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();

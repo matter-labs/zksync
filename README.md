@@ -172,6 +172,15 @@ zksync dockerhub-push
   f cargo bench
   ```
 
+- Running  the loadtest:
+
+  ```sh
+  zksync server # Has to be run in the 1st terminal
+  zksync prover # Has to be run in the 2nd terminal
+  zksync loadtest # Has to be run in the 3rd terminal
+  ```
+
+
 ## Developing circuit
 
 * To generate proofs you need universal setup files that you downloaded during first init. 
