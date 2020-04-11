@@ -19,6 +19,7 @@ check_tool jq
 check_tool psql
 check_tool pg_isready
 check_tool diesel
+check_tool solc
 
 ( (sed --version | grep GNU) &> /dev/null || (gsed --version | grep GNU) &> /dev/null ) || (echo "sed or gsed should be GNU-sed" && exit 1)
 
