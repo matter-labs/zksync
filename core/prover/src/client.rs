@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
+use circuit::circuit::FranklinCircuit;
+use models::node::Engine;
 use models::prover_utils::EncodedProofPlonk;
 use reqwest::Url;
 use time::Duration;
@@ -94,7 +96,11 @@ impl ApiClient {
     }
 
     fn get_backoff() -> backoff::ExponentialBackoff {
-        backoff::ExponentialBackoff::default()
+        let mut backoff = backoff::ExponentialBackoff::default();
+        backoff.current_interval = Duration::from_secs(5);
+        backoff.initial_interval = Duration::from_secs(5);
+        backoff.max_interval = Duration::from_secs(40);
+        backoff
     }
 
     pub fn register_prover(&self, block_size: usize) -> Result<i32, failure::Error> {
@@ -179,7 +185,7 @@ impl crate::ApiClient for ApiClient {
         Ok(self.with_retries(&op)?)
     }
 
-    fn prover_data(&self, block: i64) -> Result<ProverData, failure::Error> {
+    fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
         let op = || -> Result<ProverData, failure::Error> {
             trace!("sending prover_data");
             let res = self
@@ -196,7 +202,8 @@ impl crate::ApiClient for ApiClient {
             Ok(res.ok_or_else(|| format_err!("couldn't get ProverData for block {}", block))?)
         };
 
-        Ok(self.with_retries(&op)?)
+        let prover_data = self.with_retries(&op)?;
+        Ok(prover_data.into_circuit(block))
     }
 
     fn publish(&self, block: i64, proof: EncodedProofPlonk) -> Result<(), failure::Error> {

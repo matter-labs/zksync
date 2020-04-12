@@ -1,20 +1,101 @@
-// TODO: normal dummy prover
-// Built-in deps
-// External deps
-// use log::info;
-// // Workspace deps
-// use models::config_options::{get_env, parse_env};
-// use models::node::config::PROVER_CYCLE_WAIT;
-// use models::prover_utils::EncodedProofPlonk;
-// use prover::client;
-// use std::time::Duration;
-// use storage::ConnectionPool;
+use models::config_options::get_env;
+use models::prover_utils::EncodedProofPlonk;
+use prover::cli_utils::main_for_prover_impl;
+use prover::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
+use std::sync::mpsc;
+use std::time::Duration;
+
+pub struct DummyProverConfig {
+    pub block_sizes: Vec<usize>,
+}
+
+impl ProverConfig for DummyProverConfig {
+    fn from_env() -> Self {
+        Self {
+            block_sizes: get_env("SUPPORTED_BLOCK_CHUNKS_SIZES")
+                .split(',')
+                .map(|p| p.parse().unwrap())
+                .collect(),
+        }
+    }
+}
+
+struct DummyProver<C> {
+    api_client: C,
+    heartbeat_interval: Duration,
+    config: DummyProverConfig,
+}
+
+impl<C: ApiClient> ProverImpl<C> for DummyProver<C> {
+    type Config = DummyProverConfig;
+
+    fn create_from_config(
+        config: DummyProverConfig,
+        api_client: C,
+        heartbeat_interval: Duration,
+    ) -> Self {
+        DummyProver {
+            api_client,
+            heartbeat_interval,
+            config,
+        }
+    }
+
+    fn next_round(
+        &self,
+        start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
+    ) -> Result<(), BabyProverError> {
+        let mut block = 0;
+        let mut job_id = 0;
+
+        for block_size in &self.config.block_sizes {
+            let block_to_prove = self.api_client.block_to_prove(*block_size).map_err(|e| {
+                let e = format!("failed to get block to prove {}", e);
+                BabyProverError::Api(e)
+            })?;
+
+            let (current_request_block, current_request_job_id) =
+                block_to_prove.unwrap_or_else(|| {
+                    log::trace!("no block to prove from the server for size: {}", block_size);
+                    (0, 0)
+                });
+
+            if current_request_job_id != 0 {
+                block = current_request_block;
+                job_id = current_request_job_id;
+                break;
+            }
+        }
+
+        // Notify heartbeat routine on new proving block job or None.
+        start_heartbeats_tx
+            .send((job_id, false))
+            .expect("failed to send new job to heartbeat routine");
+        if job_id == 0 {
+            return Ok(());
+        }
+        let _instance = self.api_client.prover_data(block).map_err(|err| {
+            BabyProverError::Api(format!(
+                "could not get prover data for block {}: {}",
+                block, err
+            ))
+        })?;
+
+        log::info!("starting to compute proof for block {}", block,);
+
+        self.api_client
+            .publish(block, EncodedProofPlonk::default())
+            .map_err(|e| BabyProverError::Api(format!("failed to publish proof: {}", e)))?;
+
+        log::info!("finished and published proof for block {}", block);
+        Ok(())
+    }
+
+    fn get_heartbeat_options(&self) -> (&C, Duration) {
+        (&self.api_client, self.heartbeat_interval)
+    }
+}
 
 fn main() {
-    env_logger::init();
-    // let api_client = {
-    //     let api_url = parse_env("PROVER_SERVER_URL");
-    //     let req_server_timeout = Duration::from_secs(parse_env::<u64>("REQ_SERVER_TIMEOUT"));
-    //     client::ApiClient::new(&api_url, &worker_name, req_server_timeout)
-    // };
+    main_for_prover_impl::<DummyProver<prover::client::ApiClient>>();
 }

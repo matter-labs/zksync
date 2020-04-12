@@ -10,4 +10,4 @@ echo POD_NAME=$POD_NAME
 
 echo key download complete, starting prover
 
-exec prover $BLOCK_SIZE_CHUNKS "$POD_NAME" 2>&1
+exec prover "$POD_NAME" 2>&1

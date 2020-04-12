@@ -1318,7 +1318,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#4b975983ddf32619b3a4bbc41f0458b7d99f7596"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?rev=88376464a3c558efd99430e4ed6689224af2368c#88376464a3c558efd99430e4ed6689224af2368c"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -2823,7 +2823,6 @@ dependencies = [
  "env_logger",
  "failure",
  "fnv",
- "futures 0.1.29",
  "hex",
  "log 0.4.8",
  "models",
