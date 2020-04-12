@@ -8,7 +8,7 @@ use handlebars::Handlebars;
 
 use crate::verifier_contract_generator::render_vk::rendered_key;
 use models::config_options::{parse_env, AvailableBlockSizesConfig};
-use models::prover_utils::{
+use models::prover_utils::fs_utils::{
     get_block_verification_key_path, get_exodus_verification_key_path,
     get_verifier_contract_key_path,
 };

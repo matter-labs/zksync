@@ -13,7 +13,7 @@ use crypto_exports::bellman::Circuit;
 use models::config_options::AvailableBlockSizesConfig;
 use models::node::Engine;
 use models::params;
-use models::prover_utils::{
+use models::prover_utils::fs_utils::{
     get_block_verification_key_path, get_exodus_verification_key_path,
     get_universal_setup_monomial_form,
 };
