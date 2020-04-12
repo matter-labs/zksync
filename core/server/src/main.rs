@@ -16,7 +16,6 @@ use server::mempool::run_mempool_task;
 use server::prover_server::start_prover_server;
 use server::state_keeper::{start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper};
 use std::cell::RefCell;
-use std::time::Duration;
 use storage::ConnectionPool;
 use tokio::runtime::Runtime;
 use web3::types::H160;
@@ -35,16 +34,16 @@ fn main() {
         )
         .get_matches();
 
-    let connection_pool = ConnectionPool::new();
-
     if cli.is_present("genesis") {
         info!("Generating genesis block.");
         PlasmaStateKeeper::create_genesis_block(
-            connection_pool,
+            ConnectionPool::new(Some(1)),
             &config_opts.operator_franklin_addr,
         );
         return;
     }
+
+    let connection_pool = ConnectionPool::new(None);
 
     debug!("starting server");
 
@@ -137,8 +136,8 @@ fn main() {
     start_prover_server(
         connection_pool.clone(),
         config_opts.prover_server_address,
-        Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
-        Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
+        PROVER_GONE_TIMEOUT,
+        PROVER_PREPARE_DATA_INTERVAL,
         stop_signal_sender,
     );
 

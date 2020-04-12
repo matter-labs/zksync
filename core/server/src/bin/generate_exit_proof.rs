@@ -58,7 +58,7 @@ fn main() {
 
     let timer = Instant::now();
     info!("Restoring state from db");
-    let connection_pool = ConnectionPool::new();
+    let connection_pool = ConnectionPool::new(Some(1));
     let storage = connection_pool
         .access_storage()
         .expect("Storage access failed");

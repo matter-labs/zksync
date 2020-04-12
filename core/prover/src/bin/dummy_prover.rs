@@ -1,32 +1,20 @@
+// TODO: normal dummy prover
 // Built-in deps
-use std::time;
-use std::time::Duration;
 // External deps
-use log::info;
-// Workspace deps
-use models::node::config::PROVER_CYCLE_WAIT;
-use models::prover_utils::EncodedProofPlonk;
-use storage::ConnectionPool;
+// use log::info;
+// // Workspace deps
+// use models::config_options::{get_env, parse_env};
+// use models::node::config::PROVER_CYCLE_WAIT;
+// use models::prover_utils::EncodedProofPlonk;
+// use prover::client;
+// use std::time::Duration;
+// use storage::ConnectionPool;
 
 fn main() {
     env_logger::init();
-
-    let pool = ConnectionPool::new();
-    let worker = "dummy_worker";
-    info!("Started prover");
-    for &block_size in models::params::block_chunk_sizes().iter().cycle() {
-        let storage = pool.access_storage().expect("Storage access");
-        let job = storage
-            .prover_schema()
-            .prover_run_for_next_commit(worker, time::Duration::from_secs(10), block_size)
-            .expect("prover job, db access");
-        if let Some(job) = job {
-            info!("Received job for block: {}", job.block_number);
-            storage
-                .prover_schema()
-                .store_proof(job.block_number as u32, &EncodedProofPlonk::default())
-                .expect("db error");
-        }
-        std::thread::sleep(Duration::from_secs(PROVER_CYCLE_WAIT));
-    }
+    // let api_client = {
+    //     let api_url = parse_env("PROVER_SERVER_URL");
+    //     let req_server_timeout = Duration::from_secs(parse_env::<u64>("REQ_SERVER_TIMEOUT"));
+    //     client::ApiClient::new(&api_url, &worker_name, req_server_timeout)
+    // };
 }

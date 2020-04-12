@@ -4,7 +4,6 @@ pub mod prover_data;
 pub mod serialization;
 
 // Built-in deps
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{fmt, thread, time};
 // External deps
@@ -14,6 +13,7 @@ use log::*;
 use crypto_exports::franklin_crypto;
 use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
+use models::node::config::PROVER_CYCLE_WAIT;
 use models::prover_utils::EncodedProofPlonk;
 use models::prover_utils::{PlonkVerificationKey, SetupForStepByStepProver};
 
@@ -29,7 +29,6 @@ pub struct BabyProver<C: ApiClient> {
     prepared_computations: Mutex<Option<PreparedComputations>>,
     api_client: C,
     heartbeat_interval: time::Duration,
-    stop_signal: Arc<AtomicBool>,
 }
 
 pub trait ApiClient {
@@ -80,28 +79,20 @@ pub fn start<C: 'static + Sync + Send + ApiClient>(
 }
 
 impl<C: ApiClient> BabyProver<C> {
-    pub fn new(
-        block_sizes: Vec<usize>,
-        api_client: C,
-        heartbeat_interval: time::Duration,
-        stop_signal: Arc<AtomicBool>,
-    ) -> Self {
+    pub fn new(block_sizes: Vec<usize>, api_client: C, heartbeat_interval: time::Duration) -> Self {
         assert!(!block_sizes.is_empty());
         BabyProver {
             block_sizes,
             prepared_computations: Mutex::new(None),
             api_client,
             heartbeat_interval,
-            stop_signal,
         }
     }
 
     fn run_rounds(&self, start_heartbeats_tx: mpsc::Sender<(i32, bool)>) -> BabyProverError {
-        let pause_duration = time::Duration::from_secs(models::node::config::PROVER_CYCLE_WAIT);
-
         info!("Running worker rounds");
 
-        while !self.stop_signal.load(Ordering::SeqCst) {
+        loop {
             trace!("Starting a next round");
             let ret = self.next_round(&start_heartbeats_tx);
             if let Err(err) = ret {
@@ -116,9 +107,8 @@ impl<C: ApiClient> BabyProver<C> {
                 };
             }
             trace!("round completed.");
-            thread::sleep(pause_duration);
+            thread::sleep(PROVER_CYCLE_WAIT);
         }
-        BabyProverError::Stop
     }
 
     fn next_round(

@@ -1318,7 +1318,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#88376464a3c558efd99430e4ed6689224af2368c"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#4b975983ddf32619b3a4bbc41f0458b7d99f7596"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -1548,7 +1548,7 @@ dependencies = [
  "indexmap",
  "log 0.4.8",
  "slab 0.4.2",
- "tokio 0.2.16",
+ "tokio 0.2.17",
  "tokio-util",
 ]
 
@@ -1757,7 +1757,7 @@ dependencies = [
  "net2",
  "pin-project",
  "time",
- "tokio 0.2.16",
+ "tokio 0.2.17",
  "tower-service",
  "want 0.3.0",
 ]
@@ -1784,7 +1784,7 @@ dependencies = [
  "bytes 0.5.4",
  "hyper 0.13.4",
  "native-tls",
- "tokio 0.2.16",
+ "tokio 0.2.17",
  "tokio-tls 0.3.0",
 ]
 
@@ -1971,7 +1971,7 @@ dependencies = [
  "jsonrpc-server-utils",
  "log 0.4.8",
  "net2",
- "parking_lot 0.10.0",
+ "parking_lot 0.10.2",
  "unicase 2.6.0",
 ]
 
@@ -1983,7 +1983,7 @@ checksum = "5b31c9b90731276fdd24d896f31bb10aecf2e5151733364ae81123186643d939"
 dependencies = [
  "jsonrpc-core 14.0.5",
  "log 0.4.8",
- "parking_lot 0.10.0",
+ "parking_lot 0.10.2",
  "serde",
 ]
 
@@ -2012,7 +2012,7 @@ dependencies = [
  "jsonrpc-core 14.0.5",
  "jsonrpc-server-utils",
  "log 0.4.8",
- "parking_lot 0.10.0",
+ "parking_lot 0.10.2",
  "slab 0.4.2",
  "ws",
 ]
@@ -2095,7 +2095,7 @@ dependencies = [
  "server",
  "structopt",
  "testkit",
- "tokio 0.2.16",
+ "tokio 0.2.17",
  "web3",
 ]
 
@@ -2110,9 +2110,9 @@ dependencies = [
 
 [[package]]
 name = "lock_api"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79b2de95ecb4691949fea4716ca53cdbcfccb2c612e19644a8bad05edcf9f47b"
+checksum = "c4da24a77a3d8a6d4862d95f72e6fdb9c09a643ecdb402d754004a557f2bec75"
 dependencies = [
  "scopeguard",
 ]
@@ -2521,19 +2521,19 @@ version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f842b1982eb6c2fe34036a4fbfb06dd185a3f5c8edfaacdf7d1ea10b07de6252"
 dependencies = [
- "lock_api 0.3.3",
+ "lock_api 0.3.4",
  "parking_lot_core 0.6.2",
  "rustc_version",
 ]
 
 [[package]]
 name = "parking_lot"
-version = "0.10.0"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92e98c49ab0b7ce5b222f2cc9193fc4efe11c6d0bd4f648e374684a6857b1cfc"
+checksum = "d3a704eb390aafdc107b0e392f56a82b668e3a71366993b5340f5833fd62505e"
 dependencies = [
- "lock_api 0.3.3",
- "parking_lot_core 0.7.0",
+ "lock_api 0.3.4",
+ "parking_lot_core 0.7.1",
 ]
 
 [[package]]
@@ -2569,15 +2569,15 @@ dependencies = [
 
 [[package]]
 name = "parking_lot_core"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7582838484df45743c8434fbff785e8edf260c28748353d44bc0da32e0ceabf1"
+checksum = "0e136c1904604defe99ce5fd71a28d473fa60a12255d511aa78a9ddf11237aeb"
 dependencies = [
  "cfg-if",
  "cloudabi",
  "libc",
  "redox_syscall",
- "smallvec 1.2.0",
+ "smallvec 1.3.0",
  "winapi 0.3.8",
 ]
 
@@ -2818,6 +2818,7 @@ dependencies = [
  "circuit",
  "clap",
  "crypto_exports",
+ "ctrlc",
  "diesel",
  "env_logger",
  "failure",
@@ -2828,7 +2829,7 @@ dependencies = [
  "models",
  "num-traits",
  "plasma",
- "reqwest 0.9.24",
+ "reqwest 0.10.4",
  "rust-crypto",
  "serde",
  "serde_derive",
@@ -2884,7 +2885,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1497e40855348e4a8a40767d8e55174bce1e445a3ac9254ad44ad468ee0485af"
 dependencies = [
  "log 0.4.8",
- "parking_lot 0.10.0",
+ "parking_lot 0.10.2",
  "scheduled-thread-pool",
 ]
 
@@ -3207,7 +3208,7 @@ dependencies = [
  "serde_json",
  "serde_urlencoded 0.6.1",
  "time",
- "tokio 0.2.16",
+ "tokio 0.2.17",
  "tokio-tls 0.3.0",
  "url 2.1.1",
  "wasm-bindgen",
@@ -3323,7 +3324,7 @@ version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0988d7fdf88d5e5fcf5923a0f1e8ab345f3e98ab4bc6bc45a2d5ff7f7458fbf6"
 dependencies = [
- "parking_lot 0.10.0",
+ "parking_lot 0.10.2",
 ]
 
 [[package]]
@@ -3502,7 +3503,7 @@ dependencies = [
  "serde_json",
  "storage",
  "testhelper",
- "tokio 0.2.16",
+ "tokio 0.2.17",
  "web3",
 ]
 
@@ -3582,9 +3583,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.2.0"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c2fb2ec9bcd216a5b0d0ccf31ab17b5ed1d627960edff65bbe95d3ce221cefc"
+checksum = "05720e22615919e4734f6a99ceae50d00226c3c5aca406e102ebc33298214e0a"
 
 [[package]]
 name = "socket2"
@@ -3808,7 +3809,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "server",
- "tokio 0.2.16",
+ "tokio 0.2.17",
  "web3",
 ]
 
@@ -3895,9 +3896,9 @@ dependencies = [
 
 [[package]]
 name = "tokio"
-version = "0.2.16"
+version = "0.2.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ee5a0dd887e37d37390c13ff8ac830f992307fe30a1fff0ab8427af67211ba28"
+checksum = "39fb9142eb6e9cc37f4f29144e62618440b149a138eee01a7bbe9b9226aaf17c"
 dependencies = [
  "bytes 0.5.4",
  "fnv",
@@ -4128,7 +4129,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7bde02a3a5291395f59b06ec6945a3077602fac2b07eeeaf0dee2122f3619828"
 dependencies = [
  "native-tls",
- "tokio 0.2.16",
+ "tokio 0.2.17",
 ]
 
 [[package]]
@@ -4192,7 +4193,7 @@ dependencies = [
  "futures-sink",
  "log 0.4.8",
  "pin-project-lite",
- "tokio 0.2.16",
+ "tokio 0.2.17",
 ]
 
 [[package]]
@@ -4338,7 +4339,7 @@ version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5479532badd04e128284890390c1e876ef7a993d0570b3597ae43dfa1d59afa4"
 dependencies = [
- "smallvec 1.2.0",
+ "smallvec 1.3.0",
 ]
 
 [[package]]
