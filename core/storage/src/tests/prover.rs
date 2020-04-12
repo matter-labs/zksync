@@ -6,6 +6,7 @@ use models::Action;
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, StorageProcessor};
+use models::params::block_chunk_sizes;
 use models::prover_utils::EncodedProofPlonk;
 
 /// Checks that the proof can be stored and loaded.
@@ -88,7 +89,7 @@ fn prover_run() {
     db_test(conn.conn(), || {
         // Add the prover.
         let prover_name = "prover_10";
-        let block_size = 10;
+        let block_size = block_chunk_sizes()[0]; //smallest block size
         let _prover_id = ProverSchema(&conn)
             .register_prover(prover_name, block_size)
             .expect("Can't add a prover");
