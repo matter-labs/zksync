@@ -8,24 +8,6 @@ use crypto_exports::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeFi
 use crypto_exports::franklin_crypto::eddsa::PublicKey;
 use web3::types::Address;
 
-// fn pub_key_hash_bits<E: JubjubEngine, H: Hasher<E::Fr>>(
-//     pub_key: &PublicKey<E>,
-//     hasher: &H,
-// ) -> Vec<bool> {
-//     let (pub_x, pub_y) = pub_key.0.into_xy();
-//     let mut pub_key_bits = vec![];
-//     append_le_fixed_width(&mut pub_key_bits, &pub_x, params::FR_BIT_WIDTH_PADDED);
-//     append_le_fixed_width(&mut pub_key_bits, &pub_y, params::FR_BIT_WIDTH_PADDED);
-//     let pub_key_hash = hasher.hash_bits(pub_key_bits);
-//     let mut pub_key_hash_bits = vec![];
-//     append_le_fixed_width(
-//         &mut pub_key_hash_bits,
-//         &pub_key_hash,
-//         params::NEW_PUBKEY_HASH_WIDTH,
-//     );
-//     pub_key_hash_bits
-// }
-
 fn pub_key_hash_self<E: JubjubEngine, H: Hasher<E::Fr>>(
     pub_key: &PublicKey<E>,
     hasher: &H,

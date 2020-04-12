@@ -45,31 +45,6 @@ impl<E: RescueEngine> GetBits for CircuitAccount<E> {
         // calculate hash of the subroot using algebraic hash
         let state_root = self.get_state_root();
 
-        // let mut balance_root_bits = self
-        //     .subtree
-        //     .root_hash()
-        //     .get_bits_le_fixed(params::FR_BIT_WIDTH);
-
-        // balance_root_bits.resize(params::FR_BIT_WIDTH_PADDED, false); //256
-
-        // // In future some other subtree can be added here instead of the empty hash.
-        // let state_root_bits = vec![false; params::FR_BIT_WIDTH_PADDED];
-
-        // let mut subtree_hash_input_bits = Vec::with_capacity(params::FR_BIT_WIDTH_PADDED * 2);
-        // subtree_hash_input_bits.extend(balance_root_bits.into_iter());
-        // subtree_hash_input_bits.extend(state_root_bits.into_iter());
-
-        // // let root_hash = self.subtree.root_hash();
-        // // let state_padding = E::Fr::zero();
-
-        // let mut state_tree_hash_bits = self
-        //     .subtree
-        //     .hasher
-        //     .hash_bits(subtree_hash_input_bits.into_iter())
-        //     .get_bits_le_fixed(params::FR_BIT_WIDTH);
-
-        // state_tree_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false);
-
         let mut state_tree_hash_bits = state_root.get_bits_le_fixed(params::FR_BIT_WIDTH);
         state_tree_hash_bits.resize(params::FR_BIT_WIDTH_PADDED, false);
 
@@ -86,18 +61,6 @@ impl<E: RescueEngine> GetBits for CircuitAccount<E> {
 }
 
 impl<E: RescueEngine> CircuitAccount<E> {
-    // //we temporary pass it as repr. TODO: return Fr, when we could provide proper trait bound
-    // pub fn empty_balances_root_hash() -> Vec<u8> {
-    //     let balances_smt = CircuitBalanceTree::new(params::BALANCE_TREE_DEPTH as u32);
-    //     let mut tmp = [0u8; 32];
-    //     balances_smt
-    //         .root_hash()
-    //         .into_repr()
-    //         .write_be(&mut tmp[..])
-    //         .unwrap();
-    //     tmp.to_vec()
-    // }
-
     fn get_state_root(&self) -> E::Fr {
         let balance_root = self.subtree.root_hash();
 

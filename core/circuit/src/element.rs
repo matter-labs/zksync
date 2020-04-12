@@ -318,36 +318,7 @@ impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
 
         Self::from_xy(cs, x_num, y_num, params)
     }
-    // pub fn from_xy<CS: ConstraintSystem<E>>(
-    //     mut cs: CS,
-    //     x: AllocatedNum<E>,
-    //     y: AllocatedNum<E>,
-    //     params: &E::Params,
-    // ) -> Result<Self, SynthesisError> {
-    //     let x_ce = CircuitElement::from_number(cs.namespace(|| "x"), x)?;
-    //     let y_ce = CircuitElement::from_number(cs.namespace(|| "y"), y)?;
-    //     let mut to_hash = vec![];
-    //     to_hash.extend(x_ce.clone().into_padded_le_bits(256));
-    //     to_hash.extend(y_ce.clone().into_padded_le_bits(256));
-    //     let hash = pedersen_hash::pedersen_hash(
-    //         cs.namespace(|| "hash"),
-    //         pedersen_hash::Personalization::NoteCommitment,
-    //         &to_hash,
-    //         params,
-    //     )?;
-    //     debug!("hash when fromxy: {:?}", hash.get_x().get_value());
-    //     let mut hash_bits = hash
-    //         .get_x()
-    //         .into_bits_le(cs.namespace(|| "hash into_bits"))?;
-    //     hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
-    //     let element = CircuitElement::from_le_bits(cs.namespace(|| "repack_hash"), hash_bits)?;
 
-    //     Ok(CircuitPubkey {
-    //         x: x_ce,
-    //         y: y_ce,
-    //         hash: element,
-    //     })
-    // }
     pub fn from_xy<CS: ConstraintSystem<E>>(
         mut cs: CS,
         x: AllocatedNum<E>,
