@@ -153,7 +153,7 @@ build-contracts: confirm_action prepare-contracts
 	@cd contracts && yarn build
 
 prepare-contracts:
-	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/Verifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
+	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
 # testing
 

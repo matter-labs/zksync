@@ -4,6 +4,7 @@ extern crate log;
 // External uses
 use clap::{App, Arg};
 // Workspace uses
+use failure::_core::time::Duration;
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use models::config_options::ConfigurationOptions;
 use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL};
@@ -154,4 +155,5 @@ fn main() {
     );
 
     main_runtime.block_on(async move { stop_signal_receiver.next().await });
+    main_runtime.shutdown_timeout(Duration::from_secs(0));
 }

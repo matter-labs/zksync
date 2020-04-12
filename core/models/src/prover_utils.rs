@@ -114,7 +114,7 @@ pub fn get_block_verification_key_path(block_chunks: usize) -> PathBuf {
 
 pub fn get_verifier_contract_key_path() -> PathBuf {
     let mut contract = get_keys_root_dir();
-    contract.push("Verifier.sol");
+    contract.push("KeysWithPlonkVerifier.sol");
     contract
 }
 

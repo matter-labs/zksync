@@ -74,6 +74,8 @@ impl<C: ApiClient> ProverImpl<C> for DummyProver<C> {
         if job_id == 0 {
             return Ok(());
         }
+
+        log::info!("got job id: {}, block {}", job_id, block);
         let _instance = self.api_client.prover_data(block).map_err(|err| {
             BabyProverError::Api(format!(
                 "could not get prover data for block {}: {}",

@@ -41,7 +41,7 @@ gen() {
     case $SUBCOMMAND in 
         contract)
             cargo run --bin key_generator --release -- contract
-            cp $OUTPUT_DIR/Verifier.sol $ZKSYNC_HOME/contracts/contracts
+            cp $OUTPUT_DIR/KeysWithPlonkVerifier.sol $ZKSYNC_HOME/contracts/contracts
             echo "Contract regenerated"
             ;;
         all)
@@ -50,7 +50,7 @@ gen() {
             mkdir -p $OUTPUT_DIR
             cargo run --bin key_generator --release -- keys
             cargo run --bin key_generator --release -- contract
-            cp $OUTPUT_DIR/Verifier.sol $ZKSYNC_HOME/contracts/contracts
+            cp $OUTPUT_DIR/KeysWithPlonkVerifier.sol $ZKSYNC_HOME/contracts/contracts
             echo "Keys and contract generated"
             ;;
         *)
