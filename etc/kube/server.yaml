@@ -3,6 +3,8 @@ kind: Ingress
 metadata:
   name: api-ingress
   namespace: ${ZKSYNC_ENV}
+  annotations:
+    nginx.ingress.kubernetes.io/enable-cors: "true"
 spec:
   rules:
   - http:
