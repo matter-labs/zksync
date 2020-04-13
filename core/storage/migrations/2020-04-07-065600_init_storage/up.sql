@@ -274,8 +274,14 @@ CREATE TABLE data_restore_last_watched_eth_block (
 -- Indexes section --
 -- --------------- --
 
+-- Indexes are built for tables on the columns which are used intensively in queries.
 CREATE INDEX operations_block_index ON operations (block_number);
 CREATE INDEX accounts_block_index ON accounts (last_block);
+CREATE INDEX tokens_symbol_index ON tokens (symbol);
+CREATE INDEX executed_transactions_hash_index ON executed_transactions (tx_hash);
+CREATE INDEX executed_priority_operations_block_index ON executed_priority_operations (block_number);
+CREATE INDEX eth_ops_binding_op_id_index ON eth_ops_binding (op_id);
+CREATE INDEX eth_tx_hashes_eth_op_id_index ON eth_tx_hashes (eth_op_id);
 
 -- ------------------ --
 -- Extensions section --
