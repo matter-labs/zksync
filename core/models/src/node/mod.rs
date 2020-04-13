@@ -47,6 +47,12 @@ pub enum TokenLike {
     Symbol(String),
 }
 
+impl From<TokenId> for TokenLike {
+    fn from(id: TokenId) -> Self {
+        Self::Id(id)
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 /// Token supported in ZK Sync protocol
 pub struct Token {
