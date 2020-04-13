@@ -12,6 +12,8 @@ pub mod eth_sender;
 pub mod eth_watch;
 pub mod mempool;
 pub mod prover_server;
+pub mod signature_checker;
 pub mod state_keeper;
+pub mod utils;
 
 use crypto_exports::franklin_crypto;

@@ -131,6 +131,7 @@ fn main() {
         mempool_request_sender.clone(),
         executed_tx_notify_receiver,
         state_keeper_req_sender.clone(),
+        eth_watch_req_sender.clone(),
         config_opts.clone(),
     );
     start_prover_server(

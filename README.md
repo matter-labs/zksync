@@ -177,6 +177,15 @@ zksync dockerhub-push
   f cargo bench
   ```
 
+- Running  the loadtest:
+
+  ```sh
+  zksync server # Has to be run in the 1st terminal
+  zksync prover # Has to be run in the 2nd terminal
+  zksync loadtest # Has to be run in the 3rd terminal
+  ```
+
+
 ## Using Dummy Prover
 
 Using the real prover for the development can be not really handy, since it's pretty slow and resource consuming.
@@ -187,7 +196,7 @@ but acts like it does.
 To enable the dummy prover, run:
 
 ```sh
-zksync setup-dummy-prover
+zksync setup
 ```
 
 And after that you will be able to use the dummy prover instead of actual prover:
