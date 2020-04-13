@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# Colors for the terminal output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+NC='\033[0m' # No Color
+
+USAGE='Usage: zksync dummy-prover [-h|--help|run|status|enable|disable]
+where:
+    -h | --help     show this message
+    run           run the Dummy Prover (default)
+    status        get the status of the Dummy Prover (enabled/disabled)
+    enable        enables the Dummy Prover support
+    disable       disables the Dummy Prover support'
+
+if [ -z $ZKSYNC_ENV ];
+then 
+    echo "$USAGE"
+    exit 1
+fi
+
+COMMAND=${1:-run}
+
+function perform_redeployment {
+    # Reset the database and redeploy contracts.
+    zksync build-contracts   
+    zksync db-reset
+    zksync genesis
+    zksync redeploy
+}
+
+function run_dummy_prover {
+    cargo run --bin dummy_prover
+    exit 0
+}
+
+function dummy_prover_status {
+    # Get the `DUMMY_VERFIFIER` constant value from the `Verifier.sol` contract.
+    if f grep -lq 'constant DUMMY_VERIFIER = true' $ZKSYNC_HOME/contracts/contracts/Verifier.sol; then
+      echo -e "Dummy Verifier status: ${GREEN}enabled${NC}"
+    else
+      echo -e "Dummy Verifier status: ${RED}disabled${NC}"
+    fi
+    exit 0
+}
+
+function enable_dummy_prover {
+    # Set the `DUMMY_VERIFIER` constant value in the contract to `true`.
+    ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
+    echo "Enabled the Dummy Prover in the contract..."
+
+    echo "Redeploying the contract..."
+    perform_redeployment
+    echo "All done"
+
+    dummy_prover_status
+
+    exit 0
+}
+
+function disable_dummy_prover {
+    # Set the `DUMMY_VERIFIER` constant value in the contract to `false`.
+    ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = false\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
+    echo "Disabled the Dummy Prover in the contract..."
+
+    echo "Redeploying the contract..."
+    perform_redeployment
+    echo "All done"
+
+    dummy_prover_status
+
+    exit 0
+}
+
+case $COMMAND in
+  run)
+      run_dummy_prover
+    ;;
+  status)
+      dummy_prover_status
+    ;;
+  enable)
+      enable_dummy_prover
+    ;;
+  disable)
+      disable_dummy_prover
+    ;;
+  -h | --help)
+      echo "$USAGE"
+      exit 0
+    ;;
+  *)
+      echo "Unknown Dummy Prover command"
+      echo "$USAGE"
+      exit 1
+    ;;
+esac
