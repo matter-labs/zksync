@@ -16,7 +16,7 @@ set -e
 SETUP_DO_SPACE_DIR=https://universal-setup.ams3.digitaloceanspaces.com
 COMMAND=${1:-check}
 KEY_TYPE=${2:-monomial}
-POWERS=${3-$SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS}
+POWERS=${3-`eval echo {20..26}`}
 case $KEY_TYPE in
     monomial|all)
         ;;

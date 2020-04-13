@@ -1,28 +1,28 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ${ZKSYNC_ENV}-prover-${BLOCK_CHUNK_SIZES}
+  name: ${ZKSYNC_ENV}-prover
   namespace: ${ZKSYNC_ENV}
   labels:
-    app: ${ZKSYNC_ENV}-prover-${BLOCK_CHUNK_SIZES}
+    app: ${ZKSYNC_ENV}-prover
 spec:
   selector:
     matchLabels:
-      app: ${ZKSYNC_ENV}-prover-${BLOCK_CHUNK_SIZES}
+      app: ${ZKSYNC_ENV}-prover
   template:
     metadata:
       labels:
-        app: ${ZKSYNC_ENV}-prover-${BLOCK_CHUNK_SIZES}
+        app: ${ZKSYNC_ENV}-prover
     spec:
       volumes:
       - name: keys-dir
         hostPath:
           path: /home/docker
       containers:
-      - name: ${ZKSYNC_ENV}-prover-${BLOCK_SIZE_CHUNKS}
+      - name: ${ZKSYNC_ENV}-prover
         image: matterlabs/prover:${IMAGE_TAG}
         imagePullPolicy: Always
-        resources: ${PROVER_CONTAINER_RESOURCES}
+        resources: ${PROVER_MIN_RESOURCES}
         volumeMounts:
         - name: keys-dir
           mountPath: /keys

@@ -258,7 +258,7 @@ start-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=1
 
 stop-provers:
-	@bin/provers-scale 0
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=0

@@ -18,7 +18,7 @@ COPY target/x86_64-unknown-linux-musl/release/plonk_step_by_step_prover /bin/
 COPY docker/prover/prover-entry.sh /bin/
 COPY bin/plonk-setup /bin/
 COPY bin/verify-keys /bin/
-COPY keys/packed /keys/packed
+COPY keys/packed /keys-packed
 COPY contracts/build/ /contracts/build/
 RUN apk add --no-cache axel curl bash
 

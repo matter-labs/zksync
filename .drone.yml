@@ -25,7 +25,7 @@ steps:
     restore: true
     mount:
       - ./target/cargo
-      - ./keys
+      - ./keys/setup
 - name: init
   image: matterlabs/ci
   commands:
@@ -37,6 +37,8 @@ steps:
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
+  - zksync plonk-setup check || zksync plonk-setup download
+  - zksync verify-keys unpack
   depends_on:
   - restore-cache
 - name: run-genesis
@@ -54,13 +56,13 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - cargo fmt -- --check
+  - f cargo clippy --tests --benches -- -D warnings
   - zksync circuit-tests
   - zksync prover-tests
   - zksync db-test
   - f cargo test --release
-  - cargo fmt -- --check
-  - f cargo clippy --tests --benches -- -D warnings
-  - pushd js/zksync_crypto
+  - pushd js/zksync-crypto
   - f cargo test --release
   - cargo fmt -- --check
   - f cargo clippy --tests --benches -- -D warnings
@@ -105,7 +107,7 @@ steps:
     rebuild: true
     mount:
       - ./target/cargo
-      - ./keys
+      - ./keys/setup
   depends_on:
      - redeploy-and-integration-testkit
      - rust-tests-and-checks
@@ -137,7 +139,7 @@ steps:
     restore: true
     mount:
       - ./target/cargo
-      - ./keys
+      - ./keys/setup
 - name: preparations-for-integration-simple
   image: matterlabs/ci
   commands:
@@ -149,6 +151,7 @@ steps:
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
+  - zksync verify-keys unpack
   - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
   - zksync build-contracts
   - zksync db-reset
@@ -228,7 +231,7 @@ steps:
     restore: true
     mount:
       - ./target/cargo
-      - ./keys
+      - ./keys/setup
 
 - name: init
   image: matterlabs/ci
@@ -243,7 +246,8 @@ steps:
   - echo -n $STAGE_ENV_BASE64| base64 --decode > $ZKSYNC_HOME/etc/env/stage.env
   - zksync env stage
   - zksync yarn
-  - zksync gen-keys-if-not-present
+  - zksync plonk-setup check || zksync plonk-setup download
+  - zksync verify-keys unpack
   - zksync build-contracts
   depends_on:
   - restore-cache
