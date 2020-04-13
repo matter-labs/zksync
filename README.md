@@ -196,7 +196,7 @@ but acts like it does.
 To enable the dummy prover, run:
 
 ```sh
-zksync setup
+zksync dummy-prover enable
 ```
 
 And after that you will be able to use the dummy prover instead of actual prover:
@@ -211,10 +211,17 @@ Be sure not to commit these changes when using the dummy prover!
 If one will need to switch back to the real prover, a following command is required:
 
 ```sh
-zksync disable-dummy-prover
+zksync dummy-prover disable
 ```
 
 This command will revert changes in the contract and redeploy it, so the actual prover will be usable again.
+
+Also you can always check the current status of the dummy verifier:
+
+```sh
+$ zksync dummy-prover status
+Dummy Verifier status: disabled
+```
 
 ## Generating keys
 
