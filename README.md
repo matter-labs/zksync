@@ -186,6 +186,43 @@ zksync dockerhub-push
   ```
 
 
+## Using Dummy Prover
+
+Using the real prover for the development can be not really handy, since it's pretty slow and resource consuming.
+
+Instead, one may want to use the Dummy Prover: lightweight version of prover, which does not actually proves anything,
+but acts like it does.
+
+To enable the dummy prover, run:
+
+```sh
+zksync dummy-prover enable
+```
+
+And after that you will be able to use the dummy prover instead of actual prover:
+
+```sh
+zksync dummy-prover # Instead of `zksync prover`
+```
+
+**Warning:** `setup-dummy-prover` subcommand changes the `Verifier.sol` contract, which is a part of `git` repository.
+Be sure not to commit these changes when using the dummy prover!
+
+If one will need to switch back to the real prover, a following command is required:
+
+```sh
+zksync dummy-prover disable
+```
+
+This command will revert changes in the contract and redeploy it, so the actual prover will be usable again.
+
+Also you can always check the current status of the dummy verifier:
+
+```sh
+$ zksync dummy-prover status
+Dummy Verifier status: disabled
+```
+
 ## Generating keys
 
 To generate a proving key, from `server` dir run:
