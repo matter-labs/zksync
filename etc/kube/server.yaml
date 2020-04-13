@@ -85,3 +85,9 @@ spec:
           env:
           - name: ZKSYNC_ENV
             value: "${ZKSYNC_ENV}"
+          - name: OPERATOR_PRIVATE_KEY
+            value:
+              valueFrom:
+                secretKeyRef:
+                  name: ${ZKSYNC_ENV}-operator
+                  key: private_key
