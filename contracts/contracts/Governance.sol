@@ -38,7 +38,7 @@ contract Governance is Config {
     mapping(uint24 => address) public validatorAddresses;
 
     /// @notice Next validator id to insert into `validators` (0 for invalid)
-    uint24 nextValidatorId = 1;
+    uint24 totalValidators;
 
     constructor() public {}
 
@@ -50,11 +50,12 @@ contract Governance is Config {
 
         networkGovernor = _networkGovernor;
 
-        Validator memory validator = Validator(nextValidatorId, true);
+        uint24 validatorId = totalValidators + 1;
+        Validator memory validator = Validator(validatorId, true);
         validators[_networkGovernor] = validator;
-        validatorAddresses[nextValidatorId] = _networkGovernor;
+        validatorAddresses[validatorId] = _networkGovernor;
 
-        nextValidatorId += 1;
+        totalValidators += 1;
     }
 
     /// @notice Change current governor
@@ -88,9 +89,9 @@ contract Governance is Config {
         Validator memory validator = validators[_validatorAddress];
 
         if (validator.id == 0) {
-            validator.id = nextValidatorId;
+            validator.id = totalValidators + 1;
             validatorAddresses[validator.id] = _validatorAddress;
-            nextValidatorId += 1;
+            totalValidators += 1;
         }
 
         validator.isActive = _active;
