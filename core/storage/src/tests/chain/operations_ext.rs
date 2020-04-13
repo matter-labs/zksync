@@ -92,14 +92,17 @@ fn get_account_transactions_history() {
 
     let executed_transfer_to_new_op = {
         let transfer_to_new_op = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
-            tx: from_zksync_account.sign_transfer(
-                tokens[1].id,
-                amount.clone(),
-                BigDecimal::from(0),
-                &to_account_address,
-                None,
-                true,
-            ),
+            tx: from_zksync_account
+                .sign_transfer(
+                    tokens[1].id,
+                    &tokens[1].symbol,
+                    amount.clone(),
+                    BigDecimal::from(0),
+                    &to_account_address,
+                    None,
+                    true,
+                )
+                .0,
             from: from_account_id,
             to: to_account_id,
         }));
@@ -117,14 +120,17 @@ fn get_account_transactions_history() {
 
     let executed_transfer_op = {
         let transfer_op = FranklinOp::Transfer(Box::new(TransferOp {
-            tx: from_zksync_account.sign_transfer(
-                tokens[1].id,
-                amount.clone(),
-                BigDecimal::from(0),
-                &to_account_address,
-                None,
-                true,
-            ),
+            tx: from_zksync_account
+                .sign_transfer(
+                    tokens[1].id,
+                    &tokens[1].symbol,
+                    amount.clone(),
+                    BigDecimal::from(0),
+                    &to_account_address,
+                    None,
+                    true,
+                )
+                .0,
             from: from_account_id,
             to: to_account_id,
         }));
@@ -142,14 +148,17 @@ fn get_account_transactions_history() {
 
     let executed_withdraw_op = {
         let withdraw_op = FranklinOp::Withdraw(Box::new(WithdrawOp {
-            tx: from_zksync_account.sign_withdraw(
-                tokens[2].id,
-                amount.clone(),
-                BigDecimal::from(0),
-                &to_account_address,
-                None,
-                true,
-            ),
+            tx: from_zksync_account
+                .sign_withdraw(
+                    tokens[2].id,
+                    &tokens[2].symbol,
+                    amount.clone(),
+                    BigDecimal::from(0),
+                    &to_account_address,
+                    None,
+                    true,
+                )
+                .0,
             account_id: from_account_id,
         }));
 

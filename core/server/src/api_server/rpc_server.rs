@@ -1,32 +1,42 @@
-use crate::mempool::MempoolRequest;
-use crate::mempool::TxAddError;
-use crate::state_keeper::StateKeeperRequest;
-use bigdecimal::BigDecimal;
-use futures::channel::{mpsc, oneshot};
-use futures::{FutureExt, SinkExt, TryFutureExt};
-use jsonrpc_core::{Error, ErrorCode, Result};
-use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
-use jsonrpc_derive::rpc;
-use jsonrpc_http_server::ServerBuilder;
-use models::config_options::ThreadPanicNotify;
-use models::node::tx::TxEthSignature;
-use models::node::tx::TxHash;
-use models::node::{
-    closest_packable_fee_amount, Account, AccountId, FranklinTx, Nonce, PubKeyHash, Token, TokenId,
-    TokenLike,
-};
-use models::primitives::floor_big_decimal;
+// Built-in deps
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use storage::{ConnectionPool, StorageProcessor};
+
+// External uses
+use bigdecimal::BigDecimal;
+use futures::{
+    channel::{mpsc, oneshot},
+    FutureExt, SinkExt, TryFutureExt,
+};
+use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
+use jsonrpc_derive::rpc;
+use jsonrpc_http_server::ServerBuilder;
 use web3::types::Address;
+// Workspace uses
+use models::{
+    config_options::ThreadPanicNotify,
+    node::{
+        closest_packable_fee_amount,
+        tx::{TxEthSignature, TxHash},
+        Account, AccountId, FranklinTx, Nonce, PubKeyHash, Token, TokenId, TokenLike,
+    },
+    primitives::floor_big_decimal,
+};
+use storage::{ConnectionPool, StorageProcessor};
+// Local uses
+use crate::{
+    mempool::{MempoolRequest, TxAddError},
+    signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
+    state_keeper::StateKeeperRequest,
+    utils::token_db_cache::TokenDBCache,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
-    balances: HashMap<String, BigDecimal>,
-    nonce: Nonce,
-    pub_key_hash: PubKeyHash,
+    pub balances: HashMap<String, BigDecimal>,
+    pub nonce: Nonce,
+    pub pub_key_hash: PubKeyHash,
 }
 
 impl ResponseAccountState {
@@ -52,10 +62,10 @@ impl ResponseAccountState {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfoResp {
-    address: Address,
-    id: Option<AccountId>,
-    committed: ResponseAccountState,
-    verified: ResponseAccountState,
+    pub address: Address,
+    pub id: Option<AccountId>,
+    pub committed: ResponseAccountState,
+    pub verified: ResponseAccountState,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -95,7 +105,8 @@ pub enum TxFeeTypes {
     Transfer,
 }
 
-enum RpcErrorCodes {
+#[derive(Debug)]
+pub enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
 
@@ -163,11 +174,66 @@ pub struct RpcApp {
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub connection_pool: ConnectionPool,
+    pub sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    pub token_cache: TokenDBCache,
 }
 
 impl RpcApp {
+    pub fn new(
+        connection_pool: ConnectionPool,
+        mempool_request_sender: mpsc::Sender<MempoolRequest>,
+        state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    ) -> Self {
+        let token_cache = TokenDBCache::new(connection_pool.clone());
+
+        RpcApp {
+            connection_pool,
+            mempool_request_sender,
+            state_keeper_request_sender,
+            sign_verify_request_sender,
+            token_cache,
+        }
+    }
+
     pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
+    }
+
+    fn token_symbol_from_id(&self, token_id: TokenId) -> Result<String> {
+        fn rpc_message(error: impl ToString) -> Error {
+            Error {
+                code: RpcErrorCodes::Other.into(),
+                message: error.to_string(),
+                data: None,
+            }
+        }
+
+        let symbol = self
+            .token_cache
+            .get_token(token_id)
+            .map_err(rpc_message)?
+            .map(|t| t.symbol);
+
+        match symbol {
+            Some(symbol) => Ok(symbol),
+            None => Err(rpc_message("Token not found in the DB")),
+        }
+    }
+
+    /// Returns a message that user has to sign to send the transaction.
+    /// If the transaction doesn't need a message signature, returns `None`.
+    /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
+    fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
+        match tx {
+            FranklinTx::Transfer(tx) => Ok(Some(
+                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
+            )),
+            FranklinTx::Withdraw(tx) => Ok(Some(
+                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
+            )),
+            _ => Ok(None),
+        }
     }
 }
 
@@ -312,12 +378,22 @@ impl Rpc for RpcApp {
             }));
         }
 
+        let msg_to_sign = match self.get_tx_info_message_to_sign(&tx) {
+            Ok(res) => res,
+            Err(e) => return Box::new(futures01::future::err(e)),
+        };
+
         let mut mempool_sender = self.mempool_request_sender.clone();
+        let sign_verify_channel = self.sign_verify_request_sender.clone();
         let mempool_resp = async move {
+            let verified_tx =
+                verify_tx_info_message_signature(&tx, *signature, msg_to_sign, sign_verify_channel)
+                    .await?;
+
             let hash = tx.hash();
             let mempool_resp = oneshot::channel();
             mempool_sender
-                .send(MempoolRequest::NewTx(tx, signature, mempool_resp.0))
+                .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
                 .await
                 .expect("mempool receiver dropped");
             let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
@@ -381,6 +457,7 @@ pub fn start_rpc_server(
     connection_pool: ConnectionPool,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -389,18 +466,64 @@ pub fn start_rpc_server(
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
             let mut io = IoHandler::new();
 
-            let rpc_app = RpcApp {
+            let rpc_app = RpcApp::new(
                 connection_pool,
                 mempool_request_sender,
                 state_keeper_request_sender,
-            };
+                sign_verify_request_sender,
+            );
             rpc_app.extend(&mut io);
 
-            let server = ServerBuilder::new(io).threads(1).start_http(&addr).unwrap();
+            let server = ServerBuilder::new(io).threads(8).start_http(&addr).unwrap();
 
             server.wait();
         })
         .expect("JSON-RPC http thread");
+}
+
+async fn verify_tx_info_message_signature(
+    tx: &FranklinTx,
+    signature: Option<TxEthSignature>,
+    msg_to_sign: Option<String>,
+    mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+) -> Result<VerifiedTx> {
+    fn rpc_message(error: TxAddError) -> Error {
+        Error {
+            code: RpcErrorCodes::from(error).into(),
+            message: error.to_string(),
+            data: None,
+        }
+    }
+
+    let eth_sign_data = match msg_to_sign {
+        Some(message_to_sign) => {
+            let signature =
+                signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
+
+            Some((signature, message_to_sign))
+        }
+        None => None,
+    };
+
+    let resp = oneshot::channel();
+
+    let request = VerifyTxSignatureRequest {
+        tx: tx.clone(),
+        eth_sign_data,
+        response: resp.0,
+    };
+
+    // Send the check request.
+    req_channel
+        .send(request)
+        .await
+        .expect("verifier pool receiver dropped");
+
+    // Wait for the check result.
+    resp.1
+        .await
+        .map_err(|_| Error::internal_error())?
+        .map_err(rpc_message)
 }
 
 #[cfg(test)]
