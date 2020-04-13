@@ -659,12 +659,11 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @notice (user must have possibility to withdraw funds if withdrawed)
     /// @param _blockNumber Number of block
     function consummateOnchainOps(uint32 _blockNumber) internal {
-        uint64 start;
-        if (_blockNumber == 0) {
-            start = 0;
-        } else {
+        uint64 start = 0;
+        if (_blockNumber != 0) {
             start = blocks[_blockNumber - 1].cumulativeOnchainOperations;
         }
+
         uint64 end = blocks[_blockNumber].cumulativeOnchainOperations;
 
         for (uint64 current = start; current < end; ++current) {
