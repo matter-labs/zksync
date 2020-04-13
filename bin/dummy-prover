@@ -75,11 +75,11 @@ function disable_dummy_prover {
 
 function ensure_dummy_prover_disabled {
     # Checks for the `DUMMY_VERIFIER` constant to be `false`.
-    # This is mandatory for CI and deploy since we don't want to accidentally obtain
+    # This is mandatory e.g. for CI and deploy since we don't want to accidentally obtain
     # a dummy verifier deployed.
 
     if f grep -lq 'constant DUMMY_VERIFIER = true' $ZKSYNC_HOME/contracts/contracts/Verifier.sol; then
-      # Dummy verifier enabled, not allowed on CI.
+      # Dummy verifier enabled, the restriction is violated.
       echo "DUMMY_VERIFIER constant in Verifier.sol is set to 'true', which is not allowed."
       echo "Change the DUMMY_VERIFIER constant value to 'false'"
       exit 1
