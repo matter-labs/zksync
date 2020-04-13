@@ -14,13 +14,10 @@ pack                           reverse of unpack
 
 set -e
 
-if [ -z $ZKSYNC_ENV ]; then
-    echo "$USAGE" && exit 1
-fi
-
 COMMAND=${1:-unpack}
 VERIFY_KEYS_TARBAL="verify-keys-`basename $KEY_DIR`-account-"$ACCOUNT_TREE_DEPTH"_-balance-$BALANCE_TREE_DEPTH.tar.gz"
 cd $ZKSYNC_HOME
+
 
 unpack() {
     [ -f keys/packed/$VERIFY_KEYS_TARBAL ] || (echo Keys file $VERIFY_KEYS_TARBAL not found && exit 1)

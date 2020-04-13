@@ -1,18 +1,18 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ${ZKSYNC_ENV}-prover-${BLOCK_SIZE_CHUNKS}
+  name: ${ZKSYNC_ENV}-prover-${BLOCK_CHUNK_SIZES}
   namespace: ${ZKSYNC_ENV}
   labels:
-    app: ${ZKSYNC_ENV}-prover-${BLOCK_SIZE_CHUNKS}
+    app: ${ZKSYNC_ENV}-prover-${BLOCK_CHUNK_SIZES}
 spec:
   selector:
     matchLabels:
-      app: ${ZKSYNC_ENV}-prover-${BLOCK_SIZE_CHUNKS}
+      app: ${ZKSYNC_ENV}-prover-${BLOCK_CHUNK_SIZES}
   template:
     metadata:
       labels:
-        app: ${ZKSYNC_ENV}-prover-${BLOCK_SIZE_CHUNKS}
+        app: ${ZKSYNC_ENV}-prover-${BLOCK_CHUNK_SIZES}
     spec:
       volumes:
       - name: keys-dir
@@ -28,30 +28,26 @@ spec:
           mountPath: /keys
           readOnly: false
         env:
-        - name: RUST_BACKTRACE
-          value: "${RUST_BACKTRACE}"
-        - name: CONTRACT_ADDR
-          value: "${CONTRACT_ADDR}"
+        - name: SUPPORTED_BLOCK_CHUNKS_SIZES
+          value: "${SUPPORTED_BLOCK_CHUNKS_SIZES}"
+        - name: SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS
+          value: "${SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS}"
+        - name: BLOCK_CHUNK_SIZES
+          value: "${BLOCK_CHUNK_SIZES}"
         - name: KEY_DIR
           value: "${KEY_DIR}"
-        - name: TX_BATCH_SIZE
-          value: "${TX_BATCH_SIZE}"
-        - name: MAX_OUTSTANDING_TXS
-          value: "${MAX_OUTSTANDING_TXS}"
-        - name: DB_POOL_SIZE
-          value: "${DB_POOL_SIZE}"
         - name: ACCOUNT_TREE_DEPTH
           value: "${ACCOUNT_TREE_DEPTH}"
-        - name: BLOCK_SIZE_CHUNKS
-          value: "${BLOCK_SIZE_CHUNKS}"
-        - name: KEYS_SPACE_URL
-          value: "${KEYS_SPACE_URL}"
+        - name: BALANCE_TREE_DEPTH
+          value: "${BALANCE_TREE_DEPTH}"
         - name: PROVER_SERVER_URL
           value: "${PROVER_SERVER_URL}"
         - name: REQ_SERVER_TIMEOUT
           value: "${REQ_SERVER_TIMEOUT}"
-        - name: BLOCK_CHUNK_SIZES
-          value: "${BLOCK_CHUNK_SIZES}"
+        - name: RUST_BACKTRACE
+          value: "${RUST_BACKTRACE}"
+        - name: RUST_LOG
+          value: "${RUST_LOG}"
         - name: NODE_NAME
           valueFrom:
             fieldRef:

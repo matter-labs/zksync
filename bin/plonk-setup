@@ -1,25 +1,22 @@
 #!/bin/bash
 
-USAGE='Usage: zksync plonk-setup [ check | download ] [monomial | all] 
+USAGE='Usage: zksync plonk-setup [ check | download ] [monomial | all] [powers] 
 
 Used to download and check plonk universal setup files.
 
 Options:
 
-check (default) | download     checks or downloads missing setup files for $SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS in your env
+check (default) | download     checks or downloads missing setup files for powers defined in powers argument
 monomial (default) | all       chose to download setup files in monomial form or monomial and lagrange form (for current prover lagrange form is not needed) 
+powers (optional)              coma separated setup powers of two to downaload/check
 '
 
 set -e
 
-if [ -z $ZKSYNC_ENV ]; then
-    echo "$USAGE" && exit 1
-fi
-
-
 SETUP_DO_SPACE_DIR=https://universal-setup.ams3.digitaloceanspaces.com
 COMMAND=${1:-check}
 KEY_TYPE=${2:-monomial}
+POWERS=${3-$SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS}
 case $KEY_TYPE in
     monomial|all)
         ;;
@@ -33,7 +30,7 @@ cd $ZKSYNC_HOME
 mkdir -p keys/setup && cd keys/setup
 
 download() {
-    for i in ${SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS//,/ }; do
+    for i in ${POWERS//,/ }; do
         axel -c $SETUP_DO_SPACE_DIR/setup_2%5E$i.key || true #dont download file if it is already there
         sleep 1 # to not receive “503 Slow Down”
 
@@ -46,7 +43,7 @@ download() {
 }
 
 check() {
-    for i in ${SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS//,/ }; do
+    for i in ${POWERS//,/ }; do
         F1=setup_2"^$i".key
         [ -f "$F1" ] || (echo Setup file $F1 not found. && exit 1)
         if [ "$1" = "all" ]; then

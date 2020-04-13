@@ -1,9 +1,10 @@
 *
 !target/x86_64-unknown-linux-musl/release/server
-!target/x86_64-unknown-linux-musl/release/prover
+!target/x86_64-unknown-linux-musl/release/plonk_step_by_step_prover
 !docker/prover/prover-entry.sh
+!keys/packed
 !docker/nginx/nginx.conf
-!bin/load_keys
+!bin/
 !contracts/build
 !js/client/index.html
 !js/client/dist
