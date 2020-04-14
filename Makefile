@@ -249,7 +249,7 @@ endif
 restart: stop start
 
 start-provers:
-	@bin/provers-scale 1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=1
