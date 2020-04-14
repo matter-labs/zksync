@@ -38,10 +38,5 @@
     "prettier": "^1.18.2",
     "sass-loader": "^8.0.0",
     "vue-template-compiler": "^2.6.10"
-  },
-  "resolutions": {
-    "minimist": "1.2.5",
-    "kind-of": "6.0.3",
-    "acorn": "6.4.1"
   }
 }
