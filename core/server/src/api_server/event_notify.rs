@@ -14,12 +14,18 @@ use jsonrpc_pubsub::{
     typed::{Sink, Subscriber},
     SubscriptionId,
 };
+use lru_cache::LruCache;
 use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::BlockNumber;
 use models::{node::block::ExecutedOperations, node::AccountId, ActionType, Operation};
 use std::collections::BTreeMap;
 use std::str::FromStr;
+use storage::chain::operations::records::{
+    NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
+    StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+};
+use storage::chain::operations_ext::records::TxReceiptResponse;
 use storage::ConnectionPool;
 use web3::types::Address;
 
@@ -57,6 +63,9 @@ struct SubscriptionSender<T> {
 }
 
 struct OperationNotifier {
+    cache_of_executed_priority_operation: LruCache<u32, StoredExecutedPriorityOperation>,
+    cache_of_transaction_receipts: LruCache<Vec<u8>, TxReceiptResponse>,
+    cache_of_block_info: LruCache<BlockNumber, BlockInfo>,
     db_pool: ConnectionPool,
     state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
@@ -204,34 +213,63 @@ impl OperationNotifier {
             }
         }
 
-        let storage = self.db_pool.access_storage_fragile()?;
-        let executed_op = storage
-            .chain()
-            .operations_schema()
-            .get_executed_priority_operation(serial_id as u32)?;
-        if let Some(executed_op) = executed_op {
-            let block_info = if let Some(block_with_op) = storage
+        let executed_op = if let Some(executed_op) = self
+            .cache_of_executed_priority_operation
+            .get_mut(&(serial_id as u32))
+        {
+            Some(executed_op.clone())
+        } else {
+            let storage = self.db_pool.access_storage_fragile()?;
+            let executed_op = storage
                 .chain()
-                .block_schema()
-                .get_block(executed_op.block_number as u32)?
+                .operations_schema()
+                .get_executed_priority_operation(serial_id as u32)?;
+
+            if let Some(executed_op) = executed_op.clone() {
+                self.cache_of_executed_priority_operation
+                    .insert(serial_id as u32, executed_op);
+            }
+
+            executed_op
+        };
+        if let Some(executed_op) = executed_op {
+            let block_info = if let Some(block_info) = self
+                .cache_of_block_info
+                .get_mut(&(executed_op.block_number as u32))
             {
-                let verified = if let Some(block_verify) = storage
+                block_info.clone()
+            } else {
+                let storage = self.db_pool.access_storage_fragile()?;
+                let block_info = if let Some(block_with_op) = storage
                     .chain()
-                    .operations_schema()
-                    .get_operation(executed_op.block_number as u32, ActionType::VERIFY)
+                    .block_schema()
+                    .get_block(executed_op.block_number as u32)?
                 {
-                    block_verify.confirmed
+                    let verified = if let Some(block_verify) = storage
+                        .chain()
+                        .operations_schema()
+                        .get_operation(executed_op.block_number as u32, ActionType::VERIFY)
+                    {
+                        block_verify.confirmed
+                    } else {
+                        false
+                    };
+
+                    BlockInfo {
+                        block_number: i64::from(block_with_op.block_number),
+                        committed: true,
+                        verified,
+                    }
                 } else {
-                    false
+                    bail!("Transaction is executed but block is not committed. (bug)");
                 };
 
-                BlockInfo {
-                    block_number: i64::from(block_with_op.block_number),
-                    committed: true,
-                    verified,
+                if block_info.verified {
+                    self.cache_of_block_info
+                        .insert(executed_op.block_number as u32, block_info.clone());
                 }
-            } else {
-                bail!("Transaction is executed but block is not committed. (bug)");
+
+                block_info
             };
 
             match action {
@@ -318,12 +356,29 @@ impl OperationNotifier {
             }
         }
 
-        let storage = self.db_pool.access_storage_fragile()?;
-        if let Some(receipt) = storage
-            .chain()
-            .operations_ext_schema()
-            .tx_receipt(hash.as_ref())?
+        let tx_receipt = if let Some(tx_receipt) = self
+            .cache_of_transaction_receipts
+            .get_mut(&hash.as_ref().to_vec())
         {
+            Some(tx_receipt.clone())
+        } else {
+            let storage = self.db_pool.access_storage_fragile()?;
+            let tx_receipt = storage
+                .chain()
+                .operations_ext_schema()
+                .tx_receipt(hash.as_ref())?;
+
+            if let Some(tx_receipt) = tx_receipt.clone() {
+                if tx_receipt.verified {
+                    self.cache_of_transaction_receipts
+                        .insert(hash.as_ref().to_vec(), tx_receipt);
+                }
+            }
+
+            tx_receipt
+        };
+
+        if let Some(receipt) = tx_receipt {
             let tx_info_resp = TransactionInfoResp {
                 executed: true,
                 success: Some(receipt.success),
@@ -547,6 +602,9 @@ pub fn start_sub_notifier(
             let mut local_pool = executor::LocalPool::new();
 
             let mut notifier = OperationNotifier {
+                cache_of_executed_priority_operation: LruCache::new(2),
+                cache_of_transaction_receipts: LruCache::new(2),
+                cache_of_block_info: LruCache::new(2),
                 db_pool,
                 state_keeper_requests,
                 tx_subs: BTreeMap::new(),

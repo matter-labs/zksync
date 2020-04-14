@@ -1,4 +1,5 @@
 // Built-in deps
+use std::boxed::Box;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
@@ -11,6 +12,13 @@ use futures::{
 use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
+use lru_cache::LruCache;
+use storage::chain::block::records::BlockDetails;
+use storage::chain::operations::records::{
+    NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
+    StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+};
+use storage::chain::operations_ext::records::TxReceiptResponse;
 use web3::types::Address;
 // Workspace uses
 use models::{
@@ -171,6 +179,9 @@ pub trait Rpc {
 }
 
 pub struct RpcApp {
+    cache_of_executed_priority_operation: Box<LruCache<u32, StoredExecutedPriorityOperation>>,
+    cache_of_block_info: Box<LruCache<i64, BlockDetails>>,
+    cache_of_transaction_receipts: Box<LruCache<Vec<u8>, TxReceiptResponse>>,
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub connection_pool: ConnectionPool,
@@ -188,6 +199,9 @@ impl RpcApp {
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
         RpcApp {
+            cache_of_executed_priority_operation: Box::new(LruCache::new(2)),
+            cache_of_block_info: Box::new(LruCache::new(2)),
+            cache_of_transaction_receipts: Box::new(LruCache::new(2)),
             connection_pool,
             mempool_request_sender,
             state_keeper_request_sender,
@@ -310,17 +324,45 @@ impl Rpc for RpcApp {
     }
 
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
-        let storage = self.access_storage()?;
-        let executed_op = storage
-            .chain()
-            .operations_schema()
-            .get_executed_priority_operation(serial_id)
-            .map_err(|_| Error::internal_error())?;
+        let mut cache_of_executed_priority_operation =
+            self.cache_of_executed_priority_operation.clone();
+        let executed_op =
+            if let Some(executed_op) = cache_of_executed_priority_operation.get_mut(&serial_id) {
+                Some(executed_op.clone())
+            } else {
+                let storage = self.access_storage()?;
+                let executed_op = storage
+                    .chain()
+                    .operations_schema()
+                    .get_executed_priority_operation(serial_id)
+                    .map_err(|_| Error::internal_error())?;
+
+                if let Some(executed_op) = executed_op.clone() {
+                    cache_of_executed_priority_operation.insert(serial_id, executed_op);
+                }
+
+                executed_op
+            };
         Ok(if let Some(executed_op) = executed_op {
-            let block = storage
-                .chain()
-                .block_schema()
-                .find_block_by_height_or_hash(executed_op.block_number.to_string());
+            let mut cache_of_block_info = self.cache_of_block_info.clone();
+            let block = if let Some(block) = cache_of_block_info.get_mut(&executed_op.block_number)
+            {
+                Some(block.clone())
+            } else {
+                let storage = self.access_storage()?;
+                let block = storage
+                    .chain()
+                    .block_schema()
+                    .find_block_by_height_or_hash(executed_op.block_number.to_string());
+
+                if let Some(block) = block.clone() {
+                    if block.verified_at.is_some() {
+                        cache_of_block_info.insert(executed_op.block_number, block);
+                    }
+                }
+
+                block
+            };
             ETHOpInfoResp {
                 executed: true,
                 block: Some(BlockInfo {
@@ -338,12 +380,27 @@ impl Rpc for RpcApp {
     }
 
     fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
-        let storage = self.access_storage()?;
-        let stored_receipt = storage
-            .chain()
-            .operations_ext_schema()
-            .tx_receipt(tx_hash.as_ref())
-            .map_err(|_| Error::internal_error())?;
+        let mut cache_of_transaction_receipts = self.cache_of_transaction_receipts.clone();
+        let stored_receipt = if let Some(tx_receipt) =
+            cache_of_transaction_receipts.get_mut(&tx_hash.as_ref().to_vec())
+        {
+            Some(tx_receipt.clone())
+        } else {
+            let storage = self.access_storage()?;
+            let tx_receipt = storage
+                .chain()
+                .operations_ext_schema()
+                .tx_receipt(tx_hash.as_ref())
+                .map_err(|_| Error::internal_error())?;
+
+            if let Some(tx_receipt) = tx_receipt.clone() {
+                if tx_receipt.verified {
+                    cache_of_transaction_receipts.insert(tx_hash.as_ref().to_vec(), tx_receipt);
+                }
+            }
+
+            tx_receipt
+        };
         Ok(if let Some(stored_receipt) = stored_receipt {
             TransactionInfoResp {
                 executed: true,

@@ -45,6 +45,8 @@ failure = "0.1"
 futures01 = { package = "futures", version = "0.1" }
 reqwest = "0.9.22"
 
+lru-cache = "0.1.2"
+
 [dev-dependencies]
 testhelper = { path = "../testhelper", version = "0.1.0"}
 lazy_static = "1.4"
