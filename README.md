@@ -112,6 +112,17 @@ zksync dockerhub-push
 
 # Development
 
+## Committing changes
+
+`zksync` uses pre-commit git hooks for basic code integrity checks. Hooks are set up automatically
+within the workspace initialization process. These hooks will not allow to commit the code which does
+not pass several checks.
+
+Currently the following criteria are checked:
+
+- Code should always be formatted via `cargo fmt`.
+- Dummy Prover should not be staged for commit (see below for the explanation).
+
 ## Database migrations
 
 - 

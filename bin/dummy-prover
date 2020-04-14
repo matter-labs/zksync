@@ -7,11 +7,12 @@ NC='\033[0m' # No Color
 
 USAGE='Usage: zksync dummy-prover [-h|--help|run|status|enable|disable]
 where:
-    -h | --help     show this message
-    run           run the Dummy Prover (default)
-    status        get the status of the Dummy Prover (enabled/disabled)
-    enable        enables the Dummy Prover support
-    disable       disables the Dummy Prover support'
+    -h | --help       show this message
+    run               run the Dummy Prover (default)
+    status            get the status of the Dummy Prover (enabled/disabled)
+    enable            enables the Dummy Prover support
+    disable           disables the Dummy Prover support
+    ensure-disabled   checks that Dummy Prover is disabled and exits with code 1 otherwise'
 
 if [ -z $ZKSYNC_ENV ];
 then 
@@ -72,6 +73,22 @@ function disable_dummy_prover {
     exit 0
 }
 
+function ensure_dummy_prover_disabled {
+    # Checks for the `DUMMY_VERIFIER` constant to be `false`.
+    # This is mandatory e.g. for CI and deploy since we don't want to accidentally obtain
+    # a dummy verifier deployed.
+
+    if f grep -lq 'constant DUMMY_VERIFIER = true' $ZKSYNC_HOME/contracts/contracts/Verifier.sol; then
+      # Dummy verifier enabled, the restriction is violated.
+      echo "DUMMY_VERIFIER constant in Verifier.sol is set to 'true', which is not allowed."
+      echo "Change the DUMMY_VERIFIER constant value to 'false'"
+      exit 1
+    else
+      # Dummy verifier disabled, it's OK.
+      exit 0
+    fi
+}
+
 case $COMMAND in
   run)
       run_dummy_prover
@@ -84,6 +101,9 @@ case $COMMAND in
     ;;
   disable)
       disable_dummy_prover
+    ;;
+  ensure-disabled)
+      ensure_dummy_prover_disabled
     ;;
   -h | --help)
       echo "$USAGE"

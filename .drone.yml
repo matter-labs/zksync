@@ -33,6 +33,7 @@ steps:
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - ci-prepare-env.sh
+  - zksync dummy-prover ensure-disabled
   - zksync env ci
   - zksync yarn
   - zksync db-wait
