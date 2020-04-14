@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+# Pre-commit hook verifying that inappropriate code will not be committed.
+
+# Colors for the terminal output
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Check that `rustfmt` rules are not violated.
+if ! cargo fmt -- --check; then
+    echo "${RED}Commit error!${NC}"
+    echo "Please format the code via 'cargo fmt', cannot commit unformatted code"
+    exit 1
+fi
+
+VERFIER_CONTRACT_FILE="contracts/contracts/Verifier.sol"
+
+# Check if diff for contract contains setting the `DUMMY_VERIFIER` to the true.
+if git diff --cached $VERFIER_CONTRACT_FILE | grep -lq 'constant DUMMY_VERIFIER = true'; then
+    echo "${RED}Commit error!${NC}"
+    echo "It seems that line 'constant DUMMY_VERIFIER = true' is staged to be committed"
+    echo "Cannot commit the code with enabled DUMMY_VERIFIER"
+    echo "Please disable the DUMMY_VERIFIER and try to commit changes again"
+    exit 1
+fi
