@@ -45,7 +45,7 @@ pub fn save_genesis_tree_state(
         .expect("Cant update genesis state");
 }
 
-/// Updates stored tree state: saves block transactions in storage mempool, stores blocks and account updates
+/// Updates stored tree state: saves block transactions in storage, stores blocks and account updates
 ///
 /// # Arguments
 ///
