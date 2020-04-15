@@ -340,25 +340,25 @@ impl Rpc for RpcApp {
                 executed_op
             };
         Ok(if let Some(executed_op) = executed_op {
-            let block = if let Some(block) = self.cache_of_blocks_info.get(&executed_op.block_number)
-            {
-                Some(block)
-            } else {
-                let storage = self.access_storage()?;
-                let block = storage
-                    .chain()
-                    .block_schema()
-                    .find_block_by_height_or_hash(executed_op.block_number.to_string());
+            let block =
+                if let Some(block) = self.cache_of_blocks_info.get(&executed_op.block_number) {
+                    Some(block)
+                } else {
+                    let storage = self.access_storage()?;
+                    let block = storage
+                        .chain()
+                        .block_schema()
+                        .find_block_by_height_or_hash(executed_op.block_number.to_string());
 
-                if let Some(block) = block.clone() {
-                    if block.verified_at.is_some() {
-                        self.cache_of_blocks_info
-                            .insert(executed_op.block_number, block);
+                    if let Some(block) = block.clone() {
+                        if block.verified_at.is_some() {
+                            self.cache_of_blocks_info
+                                .insert(executed_op.block_number, block);
+                        }
                     }
-                }
 
-                block
-            };
+                    block
+                };
             ETHOpInfoResp {
                 executed: true,
                 block: Some(BlockInfo {

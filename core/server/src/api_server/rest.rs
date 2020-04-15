@@ -388,7 +388,8 @@ fn handle_get_block_by_id(
             .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
         if !blocks.is_empty() && blocks[0].verified_at.is_some() {
-            data.cache_of_blocks_info.insert(block_id, blocks[0].clone());
+            data.cache_of_blocks_info
+                .insert(block_id, blocks[0].clone());
         }
 
         blocks.pop()
@@ -406,31 +407,33 @@ fn handle_get_block_transactions(
 ) -> ActixResult<HttpResponse> {
     let block_id = path.into_inner();
 
-    let executed_ops = if let Some(executed_ops) = data.cache_of_block_executed_ops.get(&block_id) {
-        executed_ops
-    } else {
-        let storage = data.access_storage()?;
-        let executed_ops = storage
-            .chain()
-            .block_schema()
-            .get_block_executed_ops(block_id)
-            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    let executed_ops =
+        if let Some(executed_ops) = data.cache_of_block_executed_ops.get(&block_id) {
+            executed_ops
+        } else {
+            let storage = data.access_storage()?;
+            let executed_ops = storage
+                .chain()
+                .block_schema()
+                .get_block_executed_ops(block_id)
+                .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-        if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1) {
-            if !block_details.is_empty() && block_details[0].verified_at.is_some() {
-                data.cache_of_block_executed_ops
-                    .insert(block_id, executed_ops.clone());
+            if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1)
+            {
+                if !block_details.is_empty() && block_details[0].verified_at.is_some() {
+                    data.cache_of_block_executed_ops
+                        .insert(block_id, executed_ops.clone());
+                }
             }
-        }
 
-        executed_ops
-    }
-    .into_iter()
-    .filter(|op| match op {
-        ExecutedOperations::Tx(tx) => tx.op.is_some(),
-        _ => true,
-    })
-    .collect::<Vec<_>>();
+            executed_ops
+        }
+        .into_iter()
+        .filter(|op| match op {
+            ExecutedOperations::Tx(tx) => tx.op.is_some(),
+            _ => true,
+        })
+        .collect::<Vec<_>>();
 
     #[derive(Serialize)]
     struct ExecutedOperationWithHash {
