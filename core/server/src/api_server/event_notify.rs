@@ -60,9 +60,9 @@ struct SubscriptionSender<T> {
 }
 
 struct OperationNotifier {
-    cache_of_executed_priority_operation: LruCache<u32, StoredExecutedPriorityOperation>,
+    cache_of_executed_priority_operations: LruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_transaction_receipts: LruCache<Vec<u8>, TxReceiptResponse>,
-    cache_of_block_info: LruCache<BlockNumber, BlockInfo>,
+    cache_of_blocks_info: LruCache<BlockNumber, BlockInfo>,
     db_pool: ConnectionPool,
     state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
@@ -211,7 +211,7 @@ impl OperationNotifier {
         }
 
         let executed_op = if let Some(executed_op) = self
-            .cache_of_executed_priority_operation
+            .cache_of_executed_priority_operations
             .get_mut(&(serial_id as u32))
         {
             Some(executed_op.clone())
@@ -223,7 +223,7 @@ impl OperationNotifier {
                 .get_executed_priority_operation(serial_id as u32)?;
 
             if let Some(executed_op) = executed_op.clone() {
-                self.cache_of_executed_priority_operation
+                self.cache_of_executed_priority_operations
                     .insert(serial_id as u32, executed_op);
             }
 
@@ -231,7 +231,7 @@ impl OperationNotifier {
         };
         if let Some(executed_op) = executed_op {
             let block_info = if let Some(block_info) = self
-                .cache_of_block_info
+                .cache_of_blocks_info
                 .get_mut(&(executed_op.block_number as u32))
             {
                 block_info.clone()
@@ -262,7 +262,7 @@ impl OperationNotifier {
                 };
 
                 if block_info.verified {
-                    self.cache_of_block_info
+                    self.cache_of_blocks_info
                         .insert(executed_op.block_number as u32, block_info.clone());
                 }
 
@@ -600,9 +600,9 @@ pub fn start_sub_notifier(
             let mut local_pool = executor::LocalPool::new();
 
             let mut notifier = OperationNotifier {
-                cache_of_executed_priority_operation: LruCache::new(each_cache_size),
+                cache_of_executed_priority_operations: LruCache::new(each_cache_size),
                 cache_of_transaction_receipts: LruCache::new(each_cache_size),
-                cache_of_block_info: LruCache::new(each_cache_size),
+                cache_of_blocks_info: LruCache::new(each_cache_size),
                 db_pool,
                 state_keeper_requests,
                 tx_subs: BTreeMap::new(),

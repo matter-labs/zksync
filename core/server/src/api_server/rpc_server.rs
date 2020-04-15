@@ -1,5 +1,4 @@
 // Built-in deps
-use std::boxed::Box;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
@@ -176,8 +175,8 @@ pub trait Rpc {
 }
 
 pub struct RpcApp {
-    cache_of_executed_priority_operation: SharedLruCache<u32, StoredExecutedPriorityOperation>,
-    cache_of_block_info: SharedLruCache<i64, BlockDetails>,
+    cache_of_executed_priority_operations: SharedLruCache<u32, StoredExecutedPriorityOperation>,
+    cache_of_blocks_info: SharedLruCache<i64, BlockDetails>,
     cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
@@ -197,8 +196,8 @@ impl RpcApp {
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
         RpcApp {
-            cache_of_executed_priority_operation: SharedLruCache::new(each_cache_size),
-            cache_of_block_info: SharedLruCache::new(each_cache_size),
+            cache_of_executed_priority_operations: SharedLruCache::new(each_cache_size),
+            cache_of_blocks_info: SharedLruCache::new(each_cache_size),
             cache_of_transaction_receipts: SharedLruCache::new(each_cache_size),
             connection_pool,
             mempool_request_sender,
@@ -323,7 +322,7 @@ impl Rpc for RpcApp {
 
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
         let executed_op =
-            if let Some(executed_op) = self.cache_of_executed_priority_operation.get(&serial_id) {
+            if let Some(executed_op) = self.cache_of_executed_priority_operations.get(&serial_id) {
                 Some(executed_op)
             } else {
                 let storage = self.access_storage()?;
@@ -334,14 +333,14 @@ impl Rpc for RpcApp {
                     .map_err(|_| Error::internal_error())?;
 
                 if let Some(executed_op) = executed_op.clone() {
-                    self.cache_of_executed_priority_operation
+                    self.cache_of_executed_priority_operations
                         .insert(serial_id, executed_op);
                 }
 
                 executed_op
             };
         Ok(if let Some(executed_op) = executed_op {
-            let block = if let Some(block) = self.cache_of_block_info.get(&executed_op.block_number)
+            let block = if let Some(block) = self.cache_of_blocks_info.get(&executed_op.block_number)
             {
                 Some(block)
             } else {
@@ -353,7 +352,7 @@ impl Rpc for RpcApp {
 
                 if let Some(block) = block.clone() {
                     if block.verified_at.is_some() {
-                        self.cache_of_block_info
+                        self.cache_of_blocks_info
                             .insert(executed_op.block_number, block);
                     }
                 }

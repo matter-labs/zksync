@@ -34,9 +34,9 @@ impl SharedNetworkStatus {
 struct AppState {
     cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
     cache_of_priority_op_receipts: SharedLruCache<u32, PriorityOpReceiptResponse>,
-    cache_block_executed_ops: SharedLruCache<u32, Vec<ExecutedOperations>>,
-    cache_of_block_info: SharedLruCache<u32, BlockDetails>,
-    cache_of_block_by_height_or_hash: SharedLruCache<String, BlockDetails>,
+    cache_of_block_executed_ops: SharedLruCache<u32, Vec<ExecutedOperations>>,
+    cache_of_blocks_info: SharedLruCache<u32, BlockDetails>,
+    cache_blocks_by_height_or_hash: SharedLruCache<String, BlockDetails>,
     connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
     contract_address: String,
@@ -317,8 +317,8 @@ fn handle_get_transaction_by_id(
 ) -> ActixResult<HttpResponse> {
     let (block_id, tx_id) = path.into_inner();
 
-    let exec_op = if let Some(exec_op) = data.cache_block_executed_ops.get(&block_id) {
-        exec_op
+    let exec_ops = if let Some(exec_ops) = data.cache_of_block_executed_ops.get(&block_id) {
+        exec_ops
     } else {
         let storage = data.access_storage()?;
         let executed_ops = storage
@@ -329,7 +329,7 @@ fn handle_get_transaction_by_id(
 
         if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1) {
             if !block_details.is_empty() && block_details[0].verified_at.is_some() {
-                data.cache_block_executed_ops
+                data.cache_of_block_executed_ops
                     .insert(block_id, executed_ops.clone());
             }
         }
@@ -337,7 +337,7 @@ fn handle_get_transaction_by_id(
         executed_ops
     };
 
-    if let Some(exec_op) = exec_op.get(tx_id as usize) {
+    if let Some(exec_op) = exec_ops.get(tx_id as usize) {
         Ok(HttpResponse::Ok().json(exec_op))
     } else {
         Err(HttpResponse::NotFound().finish().into())
@@ -377,7 +377,7 @@ fn handle_get_block_by_id(
     block_id: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
     let block_id = block_id.into_inner();
-    let block = if let Some(block) = data.cache_of_block_info.get(&block_id) {
+    let block = if let Some(block) = data.cache_of_blocks_info.get(&block_id) {
         Some(block)
     } else {
         let storage = data.access_storage()?;
@@ -388,7 +388,7 @@ fn handle_get_block_by_id(
             .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
         if !blocks.is_empty() && blocks[0].verified_at.is_some() {
-            data.cache_of_block_info.insert(block_id, blocks[0].clone());
+            data.cache_of_blocks_info.insert(block_id, blocks[0].clone());
         }
 
         blocks.pop()
@@ -406,7 +406,7 @@ fn handle_get_block_transactions(
 ) -> ActixResult<HttpResponse> {
     let block_id = path.into_inner();
 
-    let executed_ops = if let Some(executed_ops) = data.cache_block_executed_ops.get(&block_id) {
+    let executed_ops = if let Some(executed_ops) = data.cache_of_block_executed_ops.get(&block_id) {
         executed_ops
     } else {
         let storage = data.access_storage()?;
@@ -418,7 +418,7 @@ fn handle_get_block_transactions(
 
         if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1) {
             if !block_details.is_empty() && block_details[0].verified_at.is_some() {
-                data.cache_block_executed_ops
+                data.cache_of_block_executed_ops
                     .insert(block_id, executed_ops.clone());
             }
         }
@@ -465,7 +465,7 @@ fn handle_block_search(
     query: web::Query<BlockSearchQuery>,
 ) -> ActixResult<HttpResponse> {
     let query = query.into_inner().query;
-    let block = if let Some(block) = data.cache_of_block_by_height_or_hash.get(&query) {
+    let block = if let Some(block) = data.cache_blocks_by_height_or_hash.get(&query) {
         Some(block)
     } else {
         let storage = data.access_storage()?;
@@ -476,7 +476,7 @@ fn handle_block_search(
 
         if let Some(block) = block.clone() {
             if block.verified_at.is_some() {
-                data.cache_of_block_by_height_or_hash
+                data.cache_blocks_by_height_or_hash
                     .insert(query, block.clone());
             }
         }
@@ -573,9 +573,9 @@ pub(super) fn start_server_thread_detached(
             let state = AppState {
                 cache_of_transaction_receipts: SharedLruCache::new(each_cache_size),
                 cache_of_priority_op_receipts: SharedLruCache::new(each_cache_size),
-                cache_block_executed_ops: SharedLruCache::new(each_cache_size),
-                cache_of_block_info: SharedLruCache::new(each_cache_size),
-                cache_of_block_by_height_or_hash: SharedLruCache::new(each_cache_size),
+                cache_of_block_executed_ops: SharedLruCache::new(each_cache_size),
+                cache_of_blocks_info: SharedLruCache::new(each_cache_size),
+                cache_blocks_by_height_or_hash: SharedLruCache::new(each_cache_size),
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{:?}", contract_address),
