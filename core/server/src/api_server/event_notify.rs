@@ -22,8 +22,7 @@ use models::{node::block::ExecutedOperations, node::AccountId, ActionType, Opera
 use std::collections::BTreeMap;
 use std::str::FromStr;
 use storage::chain::operations::records::{
-    NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
-    StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+    StoredExecutedPriorityOperation
 };
 use storage::chain::operations_ext::records::TxReceiptResponse;
 use storage::ConnectionPool;

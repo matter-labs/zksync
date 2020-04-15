@@ -12,11 +12,9 @@ use futures::{
 use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
-use lru_cache::LruCache;
 use storage::chain::block::records::BlockDetails;
 use storage::chain::operations::records::{
-    NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
-    StoredExecutedPriorityOperation, StoredExecutedTransaction, StoredOperation,
+    StoredExecutedPriorityOperation
 };
 use storage::chain::operations_ext::records::TxReceiptResponse;
 use web3::types::Address;
@@ -36,6 +34,7 @@ use crate::{
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
+    utils::shared_lru_cache::SharedLruCache,
     utils::token_db_cache::TokenDBCache,
 };
 
@@ -179,9 +178,9 @@ pub trait Rpc {
 }
 
 pub struct RpcApp {
-    cache_of_executed_priority_operation: Box<LruCache<u32, StoredExecutedPriorityOperation>>,
-    cache_of_block_info: Box<LruCache<i64, BlockDetails>>,
-    cache_of_transaction_receipts: Box<LruCache<Vec<u8>, TxReceiptResponse>>,
+    cache_of_executed_priority_operation: SharedLruCache<u32, StoredExecutedPriorityOperation>,
+    cache_of_block_info: SharedLruCache<i64, BlockDetails>,
+    cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub connection_pool: ConnectionPool,
@@ -199,9 +198,9 @@ impl RpcApp {
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
         RpcApp {
-            cache_of_executed_priority_operation: Box::new(LruCache::new(2)),
-            cache_of_block_info: Box::new(LruCache::new(2)),
-            cache_of_transaction_receipts: Box::new(LruCache::new(2)),
+            cache_of_executed_priority_operation: SharedLruCache::new(2),
+            cache_of_block_info: SharedLruCache::new(2),
+            cache_of_transaction_receipts: SharedLruCache::new(2),
             connection_pool,
             mempool_request_sender,
             state_keeper_request_sender,
@@ -324,11 +323,9 @@ impl Rpc for RpcApp {
     }
 
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
-        let mut cache_of_executed_priority_operation =
-            self.cache_of_executed_priority_operation.clone();
         let executed_op =
-            if let Some(executed_op) = cache_of_executed_priority_operation.get_mut(&serial_id) {
-                Some(executed_op.clone())
+            if let Some(executed_op) = self.cache_of_executed_priority_operation.get(&serial_id) {
+                Some(executed_op)
             } else {
                 let storage = self.access_storage()?;
                 let executed_op = storage
@@ -338,16 +335,16 @@ impl Rpc for RpcApp {
                     .map_err(|_| Error::internal_error())?;
 
                 if let Some(executed_op) = executed_op.clone() {
-                    cache_of_executed_priority_operation.insert(serial_id, executed_op);
+                    self.cache_of_executed_priority_operation
+                        .insert(serial_id, executed_op);
                 }
 
                 executed_op
             };
         Ok(if let Some(executed_op) = executed_op {
-            let mut cache_of_block_info = self.cache_of_block_info.clone();
-            let block = if let Some(block) = cache_of_block_info.get_mut(&executed_op.block_number)
+            let block = if let Some(block) = self.cache_of_block_info.get(&executed_op.block_number)
             {
-                Some(block.clone())
+                Some(block)
             } else {
                 let storage = self.access_storage()?;
                 let block = storage
@@ -357,7 +354,8 @@ impl Rpc for RpcApp {
 
                 if let Some(block) = block.clone() {
                     if block.verified_at.is_some() {
-                        cache_of_block_info.insert(executed_op.block_number, block);
+                        self.cache_of_block_info
+                            .insert(executed_op.block_number, block);
                     }
                 }
 
@@ -380,11 +378,11 @@ impl Rpc for RpcApp {
     }
 
     fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
-        let mut cache_of_transaction_receipts = self.cache_of_transaction_receipts.clone();
-        let stored_receipt = if let Some(tx_receipt) =
-            cache_of_transaction_receipts.get_mut(&tx_hash.as_ref().to_vec())
+        let stored_receipt = if let Some(tx_receipt) = self
+            .cache_of_transaction_receipts
+            .get(&tx_hash.as_ref().to_vec())
         {
-            Some(tx_receipt.clone())
+            Some(tx_receipt)
         } else {
             let storage = self.access_storage()?;
             let tx_receipt = storage
@@ -395,7 +393,8 @@ impl Rpc for RpcApp {
 
             if let Some(tx_receipt) = tx_receipt.clone() {
                 if tx_receipt.verified {
-                    cache_of_transaction_receipts.insert(tx_hash.as_ref().to_vec(), tx_receipt);
+                    self.cache_of_transaction_receipts
+                        .insert(tx_hash.as_ref().to_vec(), tx_receipt);
                 }
             }
 

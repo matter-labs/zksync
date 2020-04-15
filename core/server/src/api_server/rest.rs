@@ -1,4 +1,5 @@
 use crate::mempool::MempoolRequest;
+use crate::utils::shared_lru_cache::SharedLruCache;
 use actix_cors::Cors;
 use actix_web::{
     middleware,
@@ -12,6 +13,8 @@ use models::NetworkStatus;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use storage::chain::block::records::BlockDetails;
+use storage::chain::operations_ext::records::{PriorityOpReceiptResponse, TxReceiptResponse};
 use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
@@ -29,6 +32,11 @@ impl SharedNetworkStatus {
 /// AppState is a collection of records cloned by each thread to shara data between them
 #[derive(Clone)]
 struct AppState {
+    cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
+    cache_of_priority_op_receipts: SharedLruCache<u32, PriorityOpReceiptResponse>,
+    cache_block_executed_ops: SharedLruCache<u32, Vec<ExecutedOperations>>,
+    cache_of_block_info: SharedLruCache<u32, BlockDetails>,
+    cache_of_block_by_height_or_hash: SharedLruCache<String, BlockDetails>,
     connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
     contract_address: String,
@@ -218,12 +226,28 @@ fn handle_get_executed_transaction_by_hash(
     let transaction_hash = hex::decode(&tx_hash_hex.into_inner()[2..])
         .map_err(|_| HttpResponse::BadRequest().finish())?;
 
-    let storage = data.access_storage()?;
-    if let Ok(tx) = storage
-        .chain()
-        .operations_ext_schema()
-        .tx_receipt(transaction_hash.as_slice())
-    {
+    let tx_receipt =
+        if let Some(tx_receipt) = data.cache_of_transaction_receipts.get(&transaction_hash) {
+            Some(tx_receipt)
+        } else {
+            let storage = data.access_storage()?;
+            let tx_receipt = storage
+                .chain()
+                .operations_ext_schema()
+                .tx_receipt(transaction_hash.as_slice())
+                .unwrap_or(None);
+
+            if let Some(tx_receipt) = tx_receipt.clone() {
+                if tx_receipt.verified {
+                    data.cache_of_transaction_receipts
+                        .insert(transaction_hash, tx_receipt);
+                }
+            }
+
+            tx_receipt
+        };
+
+    if let Some(tx) = tx_receipt {
         Ok(HttpResponse::Ok().json(tx))
     } else {
         Ok(HttpResponse::Ok().json(()))
@@ -265,15 +289,26 @@ fn handle_get_priority_op_receipt(
     data: web::Data<AppState>,
     id: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
+    let id = id.into_inner();
+    let receipt = if let Some(receipt) = data.cache_of_priority_op_receipts.get(&id) {
+        receipt
+    } else {
+        let storage = data.access_storage()?;
+        let receipt = storage
+            .chain()
+            .operations_ext_schema()
+            .get_priority_op_receipt(id)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    let res = storage
-        .chain()
-        .operations_ext_schema()
-        .get_priority_op_receipt(id.into_inner())
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        if receipt.verified {
+            data.cache_of_priority_op_receipts
+                .insert(id, receipt.clone());
+        }
 
-    Ok(HttpResponse::Ok().json(res))
+        receipt
+    };
+
+    Ok(HttpResponse::Ok().json(receipt))
 }
 
 fn handle_get_transaction_by_id(
@@ -282,15 +317,27 @@ fn handle_get_transaction_by_id(
 ) -> ActixResult<HttpResponse> {
     let (block_id, tx_id) = path.into_inner();
 
-    let storage = data.access_storage()?;
+    let exec_op = if let Some(exec_op) = data.cache_block_executed_ops.get(&block_id) {
+        exec_op
+    } else {
+        let storage = data.access_storage()?;
+        let executed_ops = storage
+            .chain()
+            .block_schema()
+            .get_block_executed_ops(block_id)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    let executed_ops = storage
-        .chain()
-        .block_schema()
-        .get_block_executed_ops(block_id)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1) {
+            if !block_details.is_empty() && block_details[0].verified_at.is_some() {
+                data.cache_block_executed_ops
+                    .insert(block_id, executed_ops.clone());
+            }
+        }
 
-    if let Some(exec_op) = executed_ops.get(tx_id as usize) {
+        executed_ops
+    };
+
+    if let Some(exec_op) = exec_op.get(tx_id as usize) {
         Ok(HttpResponse::Ok().json(exec_op))
     } else {
         Err(HttpResponse::NotFound().finish().into())
@@ -329,13 +376,24 @@ fn handle_get_block_by_id(
     data: web::Data<AppState>,
     block_id: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
-    let mut blocks = storage
-        .chain()
-        .block_schema()
-        .load_block_range(block_id.into_inner(), 1)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
-    if let Some(block) = blocks.pop() {
+    let block_id = block_id.into_inner();
+    let block = if let Some(block) = data.cache_of_block_info.get(&block_id) {
+        Some(block)
+    } else {
+        let storage = data.access_storage()?;
+        let mut blocks = storage
+            .chain()
+            .block_schema()
+            .load_block_range(block_id, 1)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+        if !blocks.is_empty() && blocks[0].verified_at.is_some() {
+            data.cache_of_block_info.insert(block_id, blocks[0].clone());
+        }
+
+        blocks.pop()
+    };
+    if let Some(block) = block {
         Ok(HttpResponse::Ok().json(block))
     } else {
         Err(HttpResponse::NotFound().finish().into())
@@ -348,19 +406,31 @@ fn handle_get_block_transactions(
 ) -> ActixResult<HttpResponse> {
     let block_id = path.into_inner();
 
-    let storage = data.access_storage()?;
+    let executed_ops = if let Some(executed_ops) = data.cache_block_executed_ops.get(&block_id) {
+        executed_ops
+    } else {
+        let storage = data.access_storage()?;
+        let executed_ops = storage
+            .chain()
+            .block_schema()
+            .get_block_executed_ops(block_id)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    let executed_ops = storage
-        .chain()
-        .block_schema()
-        .get_block_executed_ops(block_id)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?
-        .into_iter()
-        .filter(|op| match op {
-            ExecutedOperations::Tx(tx) => tx.op.is_some(),
-            _ => true,
-        })
-        .collect::<Vec<_>>();
+        if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1) {
+            if !block_details.is_empty() && block_details[0].verified_at.is_some() {
+                data.cache_block_executed_ops
+                    .insert(block_id, executed_ops.clone());
+            }
+        }
+
+        executed_ops
+    }
+    .into_iter()
+    .filter(|op| match op {
+        ExecutedOperations::Tx(tx) => tx.op.is_some(),
+        _ => true,
+    })
+    .collect::<Vec<_>>();
 
     #[derive(Serialize)]
     struct ExecutedOperationWithHash {
@@ -394,12 +464,27 @@ fn handle_block_search(
     data: web::Data<AppState>,
     query: web::Query<BlockSearchQuery>,
 ) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
-    let result = storage
-        .chain()
-        .block_schema()
-        .find_block_by_height_or_hash(query.into_inner().query);
-    if let Some(block) = result {
+    let query = query.into_inner().query;
+    let block = if let Some(block) = data.cache_of_block_by_height_or_hash.get(&query) {
+        Some(block)
+    } else {
+        let storage = data.access_storage()?;
+        let block = storage
+            .chain()
+            .block_schema()
+            .find_block_by_height_or_hash(query.clone());
+
+        if let Some(block) = block.clone() {
+            if block.verified_at.is_some() {
+                data.cache_of_block_by_height_or_hash
+                    .insert(query, block.clone());
+            }
+        }
+
+        block
+    };
+
+    if let Some(block) = block {
         Ok(HttpResponse::Ok().json(block))
     } else {
         Err(HttpResponse::NotFound().finish().into())
@@ -485,6 +570,11 @@ pub(super) fn start_server_thread_detached(
             let runtime = actix_rt::System::new("api-server");
 
             let state = AppState {
+                cache_of_transaction_receipts: SharedLruCache::new(2),
+                cache_of_priority_op_receipts: SharedLruCache::new(2),
+                cache_block_executed_ops: SharedLruCache::new(2),
+                cache_of_block_info: SharedLruCache::new(2),
+                cache_of_block_by_height_or_hash: SharedLruCache::new(2),
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{:?}", contract_address),

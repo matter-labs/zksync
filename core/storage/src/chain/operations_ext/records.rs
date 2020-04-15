@@ -71,14 +71,14 @@ pub struct TxReceiptResponse {
 }
 
 // TODO: jazzandrock add more info(?)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PriorityOpReceiptResponse {
     pub committed: bool,
     pub verified: bool,
     pub prover_run: Option<ProverRun>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Queryable, QueryableByName)]
+#[derive(Debug, Serialize, Deserialize, Queryable, QueryableByName, Clone)]
 pub struct TxByHashResponse {
     #[sql_type = "Text"]
     pub tx_type: String, // all
