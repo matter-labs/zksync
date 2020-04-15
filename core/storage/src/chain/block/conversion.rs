@@ -8,7 +8,7 @@ use diesel::prelude::*;
 use models::{
     node::{
         block::{ExecutedPriorityOp, ExecutedTx},
-        BlockNumber, FranklinOp, FranklinTx, PriorityOp,
+        BlockNumber, FranklinOp, PriorityOp,
     },
     Action, ActionType, Operation,
 };
@@ -20,7 +20,6 @@ use crate::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
             StoredExecutedTransaction, StoredOperation,
         },
-        operations_ext::records::ReadTx,
         state::StateSchema,
     },
     prover::ProverSchema,
@@ -56,31 +55,18 @@ impl StoredOperation {
 }
 
 impl StoredExecutedTransaction {
-    pub fn into_executed_tx(self, stored_tx: Option<ReadTx>) -> Result<ExecutedTx, failure::Error> {
-        if let Some(op) = self.operation {
-            let franklin_op: FranklinOp =
-                serde_json::from_value(op).expect("Unparsable FranklinOp in db");
-            Ok(ExecutedTx {
-                tx: franklin_op
-                    .try_get_tx()
-                    .expect("FranklinOp should not have tx"),
-                success: true,
-                op: Some(franklin_op),
-                fail_reason: None,
-                block_index: Some(self.block_index.expect("Block idx should be set") as u32),
-            })
-        } else if let Some(stored_tx) = stored_tx {
-            let tx: FranklinTx = serde_json::from_value(stored_tx.tx).expect("Unparsable tx in db");
-            Ok(ExecutedTx {
-                tx,
-                success: false,
-                op: None,
-                fail_reason: self.fail_reason,
-                block_index: None,
-            })
-        } else {
-            failure::bail!("Unsuccessful tx was lost from db.");
-        }
+    pub fn into_executed_tx(self) -> Result<ExecutedTx, failure::Error> {
+        let franklin_op: FranklinOp =
+            serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db");
+        Ok(ExecutedTx {
+            tx: franklin_op
+                .try_get_tx()
+                .expect("FranklinOp should not have tx"),
+            success: self.success,
+            op: Some(franklin_op),
+            fail_reason: self.fail_reason,
+            block_index: Some(self.block_index.expect("Block idx should be set") as u32),
+        })
     }
 }
 
@@ -129,10 +115,12 @@ impl NewExecutedTransaction {
         Self {
             block_number: i64::from(block),
             tx_hash: exec_tx.tx.hash().as_ref().to_vec(),
-            operation: exec_tx.op.map(|o| serde_json::to_value(o).unwrap()),
+            operation: serde_json::to_value(&exec_tx.tx).unwrap_or_default(),
             success: exec_tx.success,
             fail_reason: exec_tx.fail_reason,
             block_index: exec_tx.block_index.map(|idx| idx as i32),
+            primary_account_address: exec_tx.tx.account().as_bytes().to_vec(),
+            nonce: exec_tx.tx.nonce() as i64,
         }
     }
 }

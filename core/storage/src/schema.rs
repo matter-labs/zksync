@@ -153,21 +153,13 @@ table! {
     executed_transactions (id) {
         id -> Int4,
         block_number -> Int8,
+        block_index -> Nullable<Int4>,
+        operation -> Jsonb,
         tx_hash -> Bytea,
-        operation -> Nullable<Jsonb>,
         success -> Bool,
         fail_reason -> Nullable<Text>,
-        block_index -> Nullable<Int4>,
-    }
-}
-
-table! {
-    mempool (hash) {
-        hash -> Bytea,
         primary_account_address -> Bytea,
         nonce -> Int8,
-        tx -> Jsonb,
-        created_at -> Timestamp,
     }
 }
 
@@ -237,7 +229,6 @@ joinable!(balances -> tokens (coin_id));
 joinable!(eth_ops_binding -> eth_operations (eth_op_id));
 joinable!(eth_ops_binding -> operations (op_id));
 joinable!(eth_tx_hashes -> eth_operations (eth_op_id));
-joinable!(executed_transactions -> mempool (tx_hash));
 
 allow_tables_to_appear_in_same_query!(
     account_balance_updates,
@@ -256,7 +247,6 @@ allow_tables_to_appear_in_same_query!(
     events_state,
     executed_priority_operations,
     executed_transactions,
-    mempool,
     operations,
     proofs,
     prover_runs,

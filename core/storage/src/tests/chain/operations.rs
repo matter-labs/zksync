@@ -4,13 +4,9 @@ use models::ActionType;
 // Local imports
 use crate::tests::db_test;
 use crate::{
-    chain::{
-        mempool::MempoolSchema,
-        operations::{
-            records::{NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation},
-            OperationsSchema,
-        },
-        operations_ext::records::InsertTx,
+    chain::operations::{
+        records::{NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation},
+        OperationsSchema,
     },
     StorageProcessor,
 };
@@ -49,21 +45,13 @@ fn executed_operations() {
         let executed_tx = NewExecutedTransaction {
             block_number: 1,
             tx_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
-            operation: None,
+            operation: Default::default(),
             success: true,
             fail_reason: None,
             block_index: None,
-        };
-
-        // We have to store the transaction in mempool before storing it
-        // as executed.
-        let mempool_tx = InsertTx {
-            hash: executed_tx.tx_hash.clone(),
             primary_account_address: Default::default(),
             nonce: Default::default(),
-            tx: Default::default(),
         };
-        MempoolSchema(&conn).insert_tx(mempool_tx)?;
 
         OperationsSchema(&conn).store_executed_operation(executed_tx.clone())?;
 
@@ -77,6 +65,11 @@ fn executed_operations() {
         assert_eq!(stored_operation.success, executed_tx.success);
         assert_eq!(stored_operation.fail_reason, executed_tx.fail_reason);
         assert_eq!(stored_operation.block_index, executed_tx.block_index);
+        assert_eq!(stored_operation.nonce, executed_tx.nonce);
+        assert_eq!(
+            stored_operation.primary_account_address,
+            executed_tx.primary_account_address
+        );
 
         Ok(())
     });

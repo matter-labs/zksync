@@ -16,7 +16,6 @@ use crate::schema::*;
 use crate::StorageProcessor;
 use crate::{
     chain::{
-        mempool::MempoolSchema,
         operations::{
             records::{
                 NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
@@ -24,7 +23,6 @@ use crate::{
             },
             OperationsSchema,
         },
-        operations_ext::records::{InsertTx, ReadTx},
         state::StateSchema,
     },
     ethereum::records::ETHBinding,
@@ -76,25 +74,8 @@ impl<'a> BlockSchema<'a> {
         for block_tx in block.block_transactions.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
-                    // Copy the tx data.
-                    let hash = tx.tx.hash().as_ref().to_vec();
-                    let primary_account_address = tx.tx.account().as_bytes().to_vec();
-                    let nonce = tx.tx.nonce() as i64;
-                    let serialized_tx = serde_json::to_value(&tx.tx).unwrap_or_default();
-
-                    // Create records for `operations` and `mempool` tables.
+                    // Store the executed operation in the corresponding schema.
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block.block_number);
-                    let mempool_tx = InsertTx {
-                        hash,
-                        primary_account_address,
-                        nonce,
-                        tx: serialized_tx,
-                    };
-
-                    // Store the transaction in `mempool` and `operations` tables.
-                    // Note that `mempool` table should be updated *first*, since hash there
-                    // is a foreign key in `operations` table.
-                    MempoolSchema(self.0).insert_tx(mempool_tx)?;
                     OperationsSchema(self.0).store_executed_operation(new_tx)?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
@@ -169,16 +150,10 @@ impl<'a> BlockSchema<'a> {
         // from the database.
         let (executed_ops, executed_priority_ops) =
             self.0.conn().transaction::<_, DieselError, _>(|| {
-                // To load executed transactions, we join `executed_transactions` table (which
-                // contains the header of the transaction) and `mempool` which contains the
-                // transactions body.
                 let executed_ops = executed_transactions::table
-                    .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
                     .filter(executed_transactions::block_number.eq(i64::from(block)))
-                    .load::<(StoredExecutedTransaction, Option<ReadTx>)>(self.0.conn())?;
+                    .load::<StoredExecutedTransaction>(self.0.conn())?;
 
-                // For priority operations, we simply load them from
-                // `executed_priority_operations` table.
                 let executed_priority_ops = executed_priority_operations::table
                     .filter(executed_priority_operations::block_number.eq(i64::from(block)))
                     .load::<StoredExecutedPriorityOperation>(self.0.conn())?;
@@ -189,7 +164,7 @@ impl<'a> BlockSchema<'a> {
         // Transform executed operations to be `ExecutedOperations`.
         let executed_ops = executed_ops
             .into_iter()
-            .filter_map(|(stored_exec, stored_tx)| stored_exec.into_executed_tx(stored_tx).ok())
+            .filter_map(|stored_exec| stored_exec.into_executed_tx().ok())
             .map(|tx| ExecutedOperations::Tx(Box::new(tx)));
         executed_operations.extend(executed_ops);
 

@@ -8,18 +8,6 @@ use models::node::{AccountId, BlockNumber, FranklinOp};
 use crate::schema::*;
 
 #[derive(Debug, Clone, Insertable)]
-#[table_name = "executed_priority_operations"]
-pub struct NewExecutedPriorityOperation {
-    pub block_number: i64,
-    pub block_index: i32,
-    pub operation: Value,
-    pub priority_op_serialid: i64,
-    pub deadline_block: i64,
-    pub eth_fee: BigDecimal,
-    pub eth_hash: Vec<u8>,
-}
-
-#[derive(Debug, Clone, Insertable)]
 #[table_name = "operations"]
 pub struct NewOperation {
     pub block_number: i64,
@@ -36,6 +24,18 @@ pub struct StoredOperation {
     pub confirmed: bool,
 }
 
+#[derive(Debug, Clone, Insertable)]
+#[table_name = "executed_priority_operations"]
+pub struct NewExecutedPriorityOperation {
+    pub block_number: i64,
+    pub block_index: i32,
+    pub operation: Value,
+    pub priority_op_serialid: i64,
+    pub deadline_block: i64,
+    pub eth_fee: BigDecimal,
+    pub eth_hash: Vec<u8>,
+}
+
 #[derive(Debug, Clone, Queryable, QueryableByName)]
 #[table_name = "executed_priority_operations"]
 pub struct StoredExecutedPriorityOperation {
@@ -47,6 +47,33 @@ pub struct StoredExecutedPriorityOperation {
     pub deadline_block: i64,
     pub eth_fee: BigDecimal,
     pub eth_hash: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[table_name = "executed_transactions"]
+pub struct NewExecutedTransaction {
+    pub block_number: i64,
+    pub block_index: Option<i32>,
+    pub operation: Value,
+    pub tx_hash: Vec<u8>,
+    pub success: bool,
+    pub fail_reason: Option<String>,
+    pub primary_account_address: Vec<u8>,
+    pub nonce: i64,
+}
+
+#[derive(Debug, Clone, Queryable, QueryableByName)]
+#[table_name = "executed_transactions"]
+pub struct StoredExecutedTransaction {
+    pub id: i32,
+    pub block_number: i64,
+    pub block_index: Option<i32>,
+    pub operation: Value,
+    pub tx_hash: Vec<u8>,
+    pub success: bool,
+    pub fail_reason: Option<String>,
+    pub primary_account_address: Vec<u8>,
+    pub nonce: i64,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
@@ -83,27 +110,4 @@ impl NewFranklinOp {
             fee_account: i64::from(fee_account),
         }
     }
-}
-
-#[derive(Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "executed_transactions"]
-pub struct StoredExecutedTransaction {
-    pub id: i32,
-    pub block_number: i64,
-    pub tx_hash: Vec<u8>,
-    pub operation: Option<Value>,
-    pub success: bool,
-    pub fail_reason: Option<String>,
-    pub block_index: Option<i32>,
-}
-
-#[derive(Debug, Clone, Insertable)]
-#[table_name = "executed_transactions"]
-pub struct NewExecutedTransaction {
-    pub block_number: i64,
-    pub tx_hash: Vec<u8>,
-    pub operation: Option<Value>,
-    pub success: bool,
-    pub fail_reason: Option<String>,
-    pub block_index: Option<i32>,
 }

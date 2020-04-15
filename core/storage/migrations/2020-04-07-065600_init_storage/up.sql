@@ -50,15 +50,6 @@ CREATE TABLE rollup_ops (
     fee_account BIGINT NOT NULL
 );
 
--- Storage for all the added transactions.
-CREATE TABLE mempool (
-    HASH bytea PRIMARY KEY,
-    primary_account_address bytea NOT NULL,
-    nonce BIGINT NOT NULL,
-    tx jsonb NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now()
-);
-
 -- Table for the executed priority operations (e.g. deposit).
 CREATE TABLE executed_priority_operations (
     id serial PRIMARY KEY,
@@ -77,12 +68,17 @@ CREATE TABLE executed_priority_operations (
 -- Table for the executed common operations (e.g. transfer).
 CREATE TABLE executed_transactions (
     id serial PRIMARY KEY,
+    -- sidechain block info
     block_number BIGINT NOT NULL,
-    tx_hash bytea NOT NULL REFERENCES mempool(HASH),
-    operation jsonb,
+    block_index INT,
+    -- operation data
+    operation jsonb NOT NULL,
+    -- operation metadata
+    tx_hash bytea NOT NULL,
     success bool NOT NULL,
     fail_reason TEXT,
-    block_index INT
+    primary_account_address bytea NOT NULL,
+    nonce BIGINT NOT NULL
 );
 
 -- -------------- --

@@ -2,14 +2,13 @@
 // External imports
 use diesel::prelude::*;
 use itertools::Itertools;
-use serde_json::value::Value;
 // Workspace imports
 use models::node::{Address, PubKeyHash, TokenId};
 use models::ActionType;
 // Local imports
 use self::records::{
-    AccountTransaction, PriorityOpReceiptResponse, ReadTx, TransactionsHistoryItem,
-    TxByHashResponse, TxReceiptResponse,
+    AccountTransaction, PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse,
+    TxReceiptResponse,
 };
 use crate::schema::*;
 use crate::tokens::TokensSchema;
@@ -141,10 +140,7 @@ impl<'a> OperationsExtSchema<'a> {
 
         if let Some(tx) = tx {
             let block_number = tx.block_number;
-            let operation = tx.operation.unwrap_or_else(|| {
-                log::debug!("operation empty in executed_transactions");
-                Value::default()
-            });
+            let operation = tx.operation;
 
             let tx_type = operation["type"].as_str().unwrap_or("unknown type");
             let tx_token = operation["tx"]["token"].as_i64().unwrap_or(-1);
@@ -284,8 +280,6 @@ impl<'a> OperationsExtSchema<'a> {
         // TODO: txs are not ordered
 
         // This query does the following:
-        // - joins the `mempool` table (which contains the tx body) and
-        //   the `executed_transaction` (which contains the tx header);
         // - creates a union of data above and the `executed_priority_operations`
         // - unifies the information to match the `TransactionsHistoryItem`
         //   structure layout
@@ -305,24 +299,20 @@ impl<'a> OperationsExtSchema<'a> {
                     *
                 from (
                     select
-                        tx,
-                        'sync-tx:' || encode(hash, 'hex') as hash,
+                        operation as tx,
+                        'sync-tx:' || encode(tx_hash, 'hex') as hash,
                         null as pq_id,
                         success,
                         fail_reason,
                         block_number
                     from
-                        mempool
-                    left join
                         executed_transactions
-                    on
-                        tx_hash = hash
                     where
-                        tx->>'from' = '{address}'
+                        operation->>'from' = '{address}'
                         or
-                        tx->>'to' = '{address}'
+                        operation->>'to' = '{address}'
                         or
-                        tx->>'account' = '{address}'
+                        operation->>'account' = '{address}'
                     union all
                     select
                         operation as tx,
@@ -411,40 +401,29 @@ impl<'a> OperationsExtSchema<'a> {
         &self,
         address: &PubKeyHash,
     ) -> QueryResult<Vec<AccountTransaction>> {
-        let all_txs: Vec<_> = mempool::table
-            .filter(mempool::primary_account_address.eq(address.data.to_vec()))
-            .left_join(
-                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
-            )
+        let all_txs: Vec<_> = executed_transactions::table
+            .filter(executed_transactions::primary_account_address.eq(address.data.to_vec()))
             .left_join(
                 operations::table
                     .on(operations::block_number.eq(executed_transactions::block_number)),
             )
-            .load::<(
-                ReadTx,
-                Option<StoredExecutedTransaction>,
-                Option<StoredOperation>,
-            )>(self.0.conn())?;
+            .load::<(StoredExecutedTransaction, Option<StoredOperation>)>(self.0.conn())?;
 
         let res = all_txs
             .into_iter()
-            .group_by(|(mempool_tx, _, _)| mempool_tx.hash.clone())
+            .group_by(|(stored_tx, _)| stored_tx.tx_hash.clone())
             .into_iter()
             .map(|(_op_id, mut group_iter)| {
                 // TODO: replace the query with pivot
-                let (mempool_tx, executed_tx, operation) = group_iter.next().unwrap();
+                let (executed_tx, operation) = group_iter.next().unwrap();
                 let mut res = AccountTransaction {
-                    tx: mempool_tx.tx,
-                    tx_hash: hex::encode(mempool_tx.hash.as_slice()),
-                    success: false,
-                    fail_reason: None,
+                    tx: executed_tx.operation,
+                    tx_hash: hex::encode(executed_tx.tx_hash.as_slice()),
+                    success: executed_tx.success,
+                    fail_reason: executed_tx.fail_reason,
                     committed: false,
                     verified: false,
                 };
-                if let Some(executed_tx) = executed_tx {
-                    res.success = executed_tx.success;
-                    res.fail_reason = executed_tx.fail_reason;
-                }
                 if let Some(operation) = operation {
                     if operation.action_type == ActionType::COMMIT.to_string() {
                         res.committed = operation.confirmed;
@@ -452,7 +431,7 @@ impl<'a> OperationsExtSchema<'a> {
                         res.verified = operation.confirmed;
                     }
                 }
-                if let Some((_mempool_tx, _executed_tx, operation)) = group_iter.next() {
+                if let Some((_executed_tx, operation)) = group_iter.next() {
                     if let Some(operation) = operation {
                         if operation.action_type == ActionType::COMMIT.to_string() {
                             res.committed = operation.confirmed;
