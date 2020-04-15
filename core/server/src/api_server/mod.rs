@@ -33,6 +33,11 @@ pub fn start_api_server(
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
     config_options: ConfigurationOptions,
 ) {
+    let api_server_each_cache_size: usize = std::env::var("API_SERVER_EACH_CACHE_SIZE")
+        .expect("API_SERVER_EACH_CACHE_SIZE env var not found")
+        .parse()
+        .expect("can't parse API_SERVER_EACH_CACHE_SIZE env var");
+
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(8192);
 
     signature_checker::start_sign_checker_detached(
@@ -47,6 +52,7 @@ pub fn start_api_server(
         config_options.contract_eth_addr,
         mempool_request_sender.clone(),
         panic_notify.clone(),
+        api_server_each_cache_size,
     );
     rpc_subscriptions::start_ws_server(
         op_notify_receiver,
@@ -57,6 +63,7 @@ pub fn start_api_server(
         state_keeper_request_sender.clone(),
         sign_check_sender.clone(),
         panic_notify.clone(),
+        api_server_each_cache_size,
     );
 
     rpc_server::start_rpc_server(
@@ -66,5 +73,6 @@ pub fn start_api_server(
         state_keeper_request_sender,
         sign_check_sender,
         panic_notify,
+        api_server_each_cache_size,
     );
 }

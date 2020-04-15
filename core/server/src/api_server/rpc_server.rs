@@ -13,9 +13,7 @@ use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middlew
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
 use storage::chain::block::records::BlockDetails;
-use storage::chain::operations::records::{
-    StoredExecutedPriorityOperation
-};
+use storage::chain::operations::records::StoredExecutedPriorityOperation;
 use storage::chain::operations_ext::records::TxReceiptResponse;
 use web3::types::Address;
 // Workspace uses
@@ -194,13 +192,14 @@ impl RpcApp {
         mempool_request_sender: mpsc::Sender<MempoolRequest>,
         state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        each_cache_size: usize,
     ) -> Self {
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
         RpcApp {
-            cache_of_executed_priority_operation: SharedLruCache::new(2),
-            cache_of_block_info: SharedLruCache::new(2),
-            cache_of_transaction_receipts: SharedLruCache::new(2),
+            cache_of_executed_priority_operation: SharedLruCache::new(each_cache_size),
+            cache_of_block_info: SharedLruCache::new(each_cache_size),
+            cache_of_transaction_receipts: SharedLruCache::new(each_cache_size),
             connection_pool,
             mempool_request_sender,
             state_keeper_request_sender,
@@ -515,6 +514,7 @@ pub fn start_rpc_server(
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
+    each_cache_size: usize,
 ) {
     std::thread::Builder::new()
         .name("json_rpc_http".to_string())
@@ -527,6 +527,7 @@ pub fn start_rpc_server(
                 mempool_request_sender,
                 state_keeper_request_sender,
                 sign_verify_request_sender,
+                each_cache_size,
             );
             rpc_app.extend(&mut io);
 

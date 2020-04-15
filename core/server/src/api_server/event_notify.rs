@@ -21,9 +21,7 @@ use models::node::BlockNumber;
 use models::{node::block::ExecutedOperations, node::AccountId, ActionType, Operation};
 use std::collections::BTreeMap;
 use std::str::FromStr;
-use storage::chain::operations::records::{
-    StoredExecutedPriorityOperation
-};
+use storage::chain::operations::records::StoredExecutedPriorityOperation;
 use storage::chain::operations_ext::records::TxReceiptResponse;
 use storage::ConnectionPool;
 use web3::types::Address;
@@ -593,6 +591,7 @@ pub fn start_sub_notifier(
     mut executed_tx_stream: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     panic_notify: mpsc::Sender<bool>,
+    each_cache_size: usize,
 ) {
     std::thread::Builder::new()
         .spawn(move || {
@@ -601,9 +600,9 @@ pub fn start_sub_notifier(
             let mut local_pool = executor::LocalPool::new();
 
             let mut notifier = OperationNotifier {
-                cache_of_executed_priority_operation: LruCache::new(2),
-                cache_of_transaction_receipts: LruCache::new(2),
-                cache_of_block_info: LruCache::new(2),
+                cache_of_executed_priority_operation: LruCache::new(each_cache_size),
+                cache_of_transaction_receipts: LruCache::new(each_cache_size),
+                cache_of_block_info: LruCache::new(each_cache_size),
                 db_pool,
                 state_keeper_requests,
                 tx_subs: BTreeMap::new(),
