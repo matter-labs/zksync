@@ -332,6 +332,6 @@ export async function signChangePubkeyMessage(
     const msgNonce = serializeNonce(nonce)
         .toString("hex")
         .toLowerCase();
-    const message = `Register ZK Sync pubkey:\n\n${pubKeyHash.toLowerCase()} nonce: 0x${msgNonce}\n\nOnly sign this message for a trusted client!`;
+    const message = `Register zkSync pubkey:\n\n${pubKeyHash.toLowerCase()} nonce: 0x${msgNonce}\n\nOnly sign this message for a trusted client!`;
     return signer.signMessage(message);
 }
