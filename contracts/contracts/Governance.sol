@@ -25,8 +25,20 @@ contract Governance is Config {
     /// @notice List of registered tokens by address
     mapping(address => uint16) public tokenIds;
 
+    /// @notice Validator information
+    struct Validator {
+        uint24 id;
+        bool isActive;
+    }
+
     /// @notice List of permitted validators
-    mapping(address => bool) public validators;
+    mapping(address => Validator) public validators;
+
+    /// @notice Mapping from validator address to id
+    mapping(uint24 => address) public validatorAddresses;
+
+    /// @notice Next validator id to insert into `validators` (0 for invalid)
+    uint24 totalValidators;
 
     constructor() public {}
 
@@ -37,7 +49,13 @@ contract Governance is Config {
         address _networkGovernor = abi.decode(initializationParameters, (address));
 
         networkGovernor = _networkGovernor;
-        validators[_networkGovernor] = true;
+
+        uint24 validatorId = totalValidators + 1;
+        Validator memory validator = Validator(validatorId, true);
+        validators[_networkGovernor] = validator;
+        validatorAddresses[validatorId] = _networkGovernor;
+
+        totalValidators += 1;
     }
 
     /// @notice Change current governor
@@ -63,11 +81,22 @@ contract Governance is Config {
     }
 
     /// @notice Change validator status (active or not active)
-    /// @param _validator Validator address
+    /// @param _validatorAddress Validator address
     /// @param _active Active flag
-    function setValidator(address _validator, bool _active) external {
+    function setValidator(address _validatorAddress, bool _active) external {
         requireGovernor(msg.sender);
-        validators[_validator] = _active;
+
+        Validator memory validator = validators[_validatorAddress];
+
+        if (validator.id == 0) {
+            validator.id = totalValidators + 1;
+            validatorAddresses[validator.id] = _validatorAddress;
+            totalValidators += 1;
+        }
+
+        validator.isActive = _active;
+
+        validators[_validatorAddress] = validator;
     }
 
     /// @notice Check if specified address is is governor
@@ -79,7 +108,25 @@ contract Governance is Config {
     /// @notice Checks if validator is active
     /// @param _address Validator address
     function requireActiveValidator(address _address) external view {
-        require(validators[_address], "grr21"); // validator is not active
+        require(validators[_address].isActive, "grr21"); // validator is not active
+    }
+
+    /// @notice Get validator's id, checking that _address is known validator's address
+    /// @param _address Validator's address
+    /// @return validator's id
+    function getValidatorId(address _address) external view returns (uint24) {
+        uint24 validatorId = validators[_address].id;
+        require(validatorId != 0, "gvi10");  // _address is not a validator's address
+        return validatorId;
+    }
+
+    /// @notice Get validator's address, checking that _validatorId is known validator's id
+    /// @param _validatorId Validator's id
+    /// @return validator's address
+    function getValidatorAddress(uint24 _validatorId) external view returns (address) {
+        address validatorAddress = validatorAddresses[_validatorId];
+        require(validatorAddress != address(0), "gva10");  // _validatorId is invalid
+        return validatorAddress;
     }
 
     /// @notice Validate token id (must be less than  or equal total tokens amount)
