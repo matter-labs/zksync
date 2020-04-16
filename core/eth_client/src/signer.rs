@@ -63,7 +63,7 @@ impl RawTransaction {
         hash.append(&U256::zero());
         hash.append(&U256::zero());
         hash.finalize_unbounded_list();
-        keccak256(&hash.out()).into()
+        keccak256(&hash.out())
     }
 
     fn encode(&self, s: &mut RlpStream) {
