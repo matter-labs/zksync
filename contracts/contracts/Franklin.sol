@@ -345,6 +345,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         bytes calldata _ethWitness,
         uint32[] calldata _ethWitnessSizes
     ) external {
+        bytes memory publicData = _publicData;
+
         requireActive();
         require(_blockNumber == totalBlocksCommitted + 1, "fck11"); // only commit next block
         governance.requireActiveValidator(msg.sender);
@@ -356,12 +358,11 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             uint64 firstOnchainOpId = totalOnchainOps;
             uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
-            collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
+            uint64 nOnchainOpsProcessed = collectOnchainOps(publicData, _ethWitness, _ethWitnessSizes);
 
             uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
-            uint64 nOnchainOpsProcessed = totalOnchainOps - firstOnchainOpId;
 
-            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, _publicData, firstOnchainOpId, nOnchainOpsProcessed, nPriorityRequestProcessed);
+            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, publicData, totalOnchainOps, nPriorityRequestProcessed);
             totalBlocksCommitted++;
 
             emit BlockCommitted(_blockNumber);
@@ -369,15 +370,14 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     }
 
     /// @notice Store committed block structure to the storage.
-    /// @param _firstOnchainOpId - blocks' onchain ops start id in global operations
-    /// @param _nOnchainOpsProcessed - total number of onchain ops in block
-    /// @param _nCommittedPriorityRequests - total number of priority requests in block
+    /// @param _nCumulativeOnchainOpsProcessed - cumulative number of onchain ops
+    /// @param _nCommittedPriorityRequests - number of priority requests in block
     function createCommittedBlock(
         uint32 _blockNumber,
         uint24 _feeAccount,
         bytes32 _newRoot,
         bytes memory _publicData,
-        uint64 _firstOnchainOpId, uint64 _nOnchainOpsProcessed, uint64 _nCommittedPriorityRequests
+        uint64 _nCumulativeOnchainOpsProcessed, uint64 _nCommittedPriorityRequests
     ) internal {
         require(_publicData.length % 8 == 0, "cbb10"); // Public data size is not multiple of 8
 
@@ -393,15 +393,16 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             _publicData
         );
 
+        uint24 validatorId = governance.getValidatorId(msg.sender);
+
         blocks[_blockNumber] = Block(
-            msg.sender, // validator
+            validatorId, // validatorId
             uint32(block.number), // committed at
-            _firstOnchainOpId, // blocks' onchain ops start id in global operations
-            _nOnchainOpsProcessed, // total number of onchain ops in block
-            _nCommittedPriorityRequests, // total number of priority onchain ops in block
+            _nCumulativeOnchainOpsProcessed, // cumulative number of onchain ops
+            _nCommittedPriorityRequests, // number of priority onchain ops in block
+            blockChunks,
             commitment, // blocks' commitment
-            _newRoot, // new root
-            blockChunks
+            _newRoot // new root
         );
     }
 
@@ -410,29 +411,107 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _ethWitness Eth witness that was posted with commit
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
     function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
-        internal {
+        internal returns (uint64 processedOnchainOperations) {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
 
-        uint256 pubdataOffset = 0;
+        uint64 currentOnchainOps = 0;
+
+        uint256 pubDataPtr = 0;
+        uint256 pubDataStartPtr = 0;
+        uint256 pubDataEndPtr = 0;
+        assembly {
+            pubDataStartPtr := add(_publicData, 0x20)
+            pubDataPtr := pubDataStartPtr
+            pubDataEndPtr := add(pubDataStartPtr, mload(_publicData))
+        }
 
         uint64 ethWitnessOffset = 0;
-        uint32 processedZKSyncOperation = 0;
+        uint16 processedOperationsRequiringEthWitness = 0;
 
-        while (pubdataOffset < _publicData.length) {
-            require(processedZKSyncOperation < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
-            bytes memory zksyncOperationETHWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedZKSyncOperation]);
+        while (pubDataPtr<pubDataEndPtr) {
+            uint8 opType;
+            // read operation type from public data (the first byte per each operation)
+            assembly {
+                opType := shr(0xf8, mload(pubDataPtr))
+            }
 
-            pubdataOffset += processNextOperation(
-                pubdataOffset,
-                _publicData,
-                zksyncOperationETHWitness
-            );
+            // cheap transfer operation processing
+            if (opType == uint8(Operations.OpType.Transfer)) {
+                pubDataPtr += TRANSFER_BYTES;
+            } else {
+                // other operations processing
 
-            ethWitnessOffset += _ethWitnessSizes[processedZKSyncOperation];
-            processedZKSyncOperation++;
+                // calculation of public data offset
+                uint256 pubdataOffset;
+                assembly {
+                    // Number of pubdata bytes processed equal to current pubData memory pointer minus pubData memory start pointer
+                    pubdataOffset := sub(pubDataPtr, pubDataStartPtr)
+                }
+
+                if (opType == uint8(Operations.OpType.Noop)) {
+                    pubDataPtr += NOOP_BYTES;
+                } else if (opType == uint8(Operations.OpType.TransferToNew)) {
+                    pubDataPtr += TRANSFER_TO_NEW_BYTES;
+                } else if (opType == uint8(Operations.OpType.CloseAccount)) {
+                    pubDataPtr += CLOSE_ACCOUNT_BYTES;
+                } else if (opType == uint8(Operations.OpType.Deposit)) {
+                    bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
+                    onchainOps[totalOnchainOps + currentOnchainOps] = OnchainOperation(
+                        Operations.OpType.Deposit,
+                        pubData
+                    );
+                    commitNextPriorityOperation(onchainOps[totalOnchainOps + currentOnchainOps]);
+                    currentOnchainOps++;
+
+                    pubDataPtr += DEPOSIT_BYTES;
+                } else if (opType == uint8(Operations.OpType.PartialExit)) {
+                    bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, PARTIAL_EXIT_BYTES - 1);
+                    onchainOps[totalOnchainOps + currentOnchainOps] = OnchainOperation(
+                        Operations.OpType.PartialExit,
+                        pubData
+                    );
+                    currentOnchainOps++;
+
+                    pubDataPtr += PARTIAL_EXIT_BYTES;
+                } else if (opType == uint8(Operations.OpType.FullExit)) {
+                    bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
+                    onchainOps[totalOnchainOps + currentOnchainOps] = OnchainOperation(
+                        Operations.OpType.FullExit,
+                        pubData
+                    );
+                    commitNextPriorityOperation(onchainOps[totalOnchainOps + currentOnchainOps]);
+                    currentOnchainOps++;
+
+                    pubDataPtr += FULL_EXIT_BYTES;
+                } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
+                    require(processedOperationsRequiringEthWitness < _ethWitnessSizes.length, "fcs13"); // eth witness data malformed
+                    Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, pubdataOffset + 1);
+
+                    if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
+                        bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsRequiringEthWitness]);
+
+                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
+                        require(valid, "fpp15"); // failed to verify change pubkey hash signature
+                    } else {
+                        bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
+                        require(valid, "fpp16"); // new pub key hash is not authenticated properly
+                    }
+
+                    ethWitnessOffset += _ethWitnessSizes[processedOperationsRequiringEthWitness];
+                    processedOperationsRequiringEthWitness++;
+
+                    pubDataPtr += CHANGE_PUBKEY_BYTES;
+                } else {
+                    revert("fpp14"); // unsupported op
+                }
+            }
         }
-        require(pubdataOffset == _publicData.length, "fcs12"); // last chunk exceeds pubdata
+        require(pubDataPtr == pubDataEndPtr, "fcs12"); // last chunk exceeds pubdata
         require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
+        require(processedOperationsRequiringEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
+
+        totalOnchainOps += currentOnchainOps;
+        return currentOnchainOps;
     }
 
     /// @notice Verifies ethereum signature for given message and recovers address of the signer
@@ -467,75 +546,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         return recoveredAddress == _ethAddress;
     }
 
-    /// @notice On the first byte determines the type of operation, if it is an onchain operation - saves it in storage
-    /// @param _pubdataOffset Current offset in pubdata
-    /// @param _publicData Operation pubdata
-    /// @param _currentEthWitness current eth witness for operation
-    /// @return pubdata bytes processed
-    function processNextOperation(
-        uint256 _pubdataOffset,
-        bytes memory _publicData,
-        bytes memory _currentEthWitness
-    ) internal returns (uint256 _bytesProcessed) {
-        Operations.OpType opType = Operations.OpType(uint8(_publicData[_pubdataOffset]));
-
-        if (opType == Operations.OpType.Noop) return NOOP_BYTES;
-        if (opType == Operations.OpType.TransferToNew) return TRANSFER_TO_NEW_BYTES;
-        if (opType == Operations.OpType.Transfer) return TRANSFER_BYTES;
-        if (opType == Operations.OpType.CloseAccount) return CLOSE_ACCOUNT_BYTES;
-
-        if (opType == Operations.OpType.Deposit) {
-            bytes memory pubData = Bytes.slice(_publicData, _pubdataOffset + 1, DEPOSIT_BYTES - 1);
-            onchainOps[totalOnchainOps] = OnchainOperation(
-                Operations.OpType.Deposit,
-                pubData
-            );
-            commitNextPriorityOperation(onchainOps[totalOnchainOps]);
-
-            totalOnchainOps++;
-
-            return DEPOSIT_BYTES;
-        }
-
-        if (opType == Operations.OpType.PartialExit) {
-            bytes memory pubData = Bytes.slice(_publicData, _pubdataOffset + 1, PARTIAL_EXIT_BYTES - 1);
-            onchainOps[totalOnchainOps] = OnchainOperation(
-                Operations.OpType.PartialExit,
-                pubData
-            );
-            totalOnchainOps++;
-
-            return PARTIAL_EXIT_BYTES;
-        }
-
-        if (opType == Operations.OpType.FullExit) {
-            bytes memory pubData = Bytes.slice(_publicData, _pubdataOffset + 1, FULL_EXIT_BYTES - 1);
-            onchainOps[totalOnchainOps] = OnchainOperation(
-                Operations.OpType.FullExit,
-                pubData
-            );
-
-            commitNextPriorityOperation(onchainOps[totalOnchainOps]);
-
-            totalOnchainOps++;
-            return FULL_EXIT_BYTES;
-        }
-
-        if (opType == Operations.OpType.ChangePubKey) {
-            Operations.ChangePubKey memory op = Operations.readChangePubKeyPubdata(_publicData, _pubdataOffset + 1);
-            if (_currentEthWitness.length > 0) {
-                bool valid = verifyChangePubkeySignature(_currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
-                require(valid, "fpp15"); // failed to verify change pubkey hash signature
-            } else {
-                bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
-                require(valid, "fpp16"); // new pub key hash is not authenticated properly
-            }
-            return CHANGE_PUBKEY_BYTES;
-        }
-
-        revert("fpp14"); // unsupported op
-    }
-
     /// @notice Creates block commitment from its data
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
@@ -549,20 +559,41 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         bytes32 _oldRoot,
         bytes32 _newRoot,
         bytes memory _publicData
-    ) internal pure returns (bytes32) {
+    ) internal view returns (bytes32 commitment) {
         bytes32 hash = sha256(
             abi.encodePacked(uint256(_blockNumber), uint256(_feeAccount))
         );
         hash = sha256(abi.encodePacked(hash, uint256(_oldRoot)));
         hash = sha256(abi.encodePacked(hash, uint256(_newRoot)));
-        // public data is committed with padding (TODO: check assembly and optimize to avoid copying data)
-        hash = sha256(
-            abi.encodePacked(
-                hash,
-                _publicData
+
+        /// The code below is equivalent to `commitment = sha256(abi.encodePacked(hash, _publicData))`
+
+        /// We use inline assembly instead of this concise and readable code in order to avoid copying of `_publicData` (which saves ~90 gas per transfer operation).
+
+        /// Specifically, we perform the following trick:
+        /// First, replace the first 32 bytes of `_publicData` (where normally its length is stored) with the value of `hash`.
+        /// Then, we call `sha256` precompile passing the `_publicData` pointer and the length of the concatenated byte buffer.
+        /// Finally, we put the `_publicData.length` back to its original location (to the first word of `_publicData`).
+        assembly {
+            let hashResult := mload(0x40)
+            let pubDataLen := mload(_publicData)
+            mstore(_publicData, hash)
+            // staticcall to the sha256 precompile at address 0x2
+            let success := staticcall(
+                gas,
+                0x2,
+                _publicData,
+                add(pubDataLen, 0x20),
+                hashResult,
+                0x20
             )
-        );
-        return hash;
+            mstore(_publicData, pubDataLen)
+
+            // Use "invalid" to make gas estimation work
+            switch success case 0 { invalid() }
+
+            commitment := mload(hashResult)
+        }
     }
 
     function commitNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
@@ -600,9 +631,12 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         consummateOnchainOps(_blockNumber);
 
+        uint24 blockValidatorId = blocks[_blockNumber].validatorId;
+        address blockValidatorAddress = governance.getValidatorAddress(blockValidatorId);
+
         collectValidatorsFeeAndDeleteRequests(
             blocks[_blockNumber].priorityOperations,
-            blocks[_blockNumber].validator
+            blockValidatorAddress
         );
 
         totalBlocksVerified += 1;
@@ -625,8 +659,13 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @notice (user must have possibility to withdraw funds if withdrawed)
     /// @param _blockNumber Number of block
     function consummateOnchainOps(uint32 _blockNumber) internal {
-        uint64 start = blocks[_blockNumber].operationStartId;
-        uint64 end = start + blocks[_blockNumber].onchainOperations;
+        uint64 start = 0;
+        if (_blockNumber != 0) {
+            start = blocks[_blockNumber - 1].cumulativeOnchainOperations;
+        }
+
+        uint64 end = blocks[_blockNumber].cumulativeOnchainOperations;
+
         for (uint64 current = start; current < end; ++current) {
             OnchainOperation memory op = onchainOps[current];
             if (op.opType == Operations.OpType.PartialExit) {
@@ -662,25 +701,23 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         uint32 blocksToRevert = minU32(_maxBlocksToRevert, totalBlocksCommitted - totalBlocksVerified);
         uint64 revertedPriorityRequests = 0;
-        uint64 revertedOnchainOps = 0;
 
         for (uint32 i = totalBlocksCommitted - blocksToRevert + 1; i <= totalBlocksCommitted; i++) {
             Block memory revertedBlock = blocks[i];
             require(revertedBlock.committedAtBlock > 0, "frk11"); // block not found
 
-            revertedOnchainOps += revertedBlock.onchainOperations;
             revertedPriorityRequests += revertedBlock.priorityOperations;
 
             delete blocks[i];
         }
 
         totalBlocksCommitted -= blocksToRevert;
-        totalOnchainOps -= revertedOnchainOps;
+        totalOnchainOps = blocks[totalBlocksCommitted].cumulativeOnchainOperations;
         totalCommittedPriorityRequests -= revertedPriorityRequests;
 
         emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
     }
-    
+
     /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)
     function upgradePreparationLockStatus() public returns (bool) {
         return upgradePreparationActive && now < upgradePreparationActivationTime + UPGRADE_PREPARATION_LOCK_PERIOD;

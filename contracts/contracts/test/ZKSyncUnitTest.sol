@@ -19,13 +19,12 @@ contract ZKSyncUnitTest is FranklinTest {
         storeWithdrawalAsPending(_to, _tokenId, _amount);
     }
 
-    function testProcessNextOperation(
-        uint256 _pubdataOffset,
+    function testProcessOperation(
         bytes calldata _publicData,
-        bytes calldata _currentEthWitness,
-        uint256 _expectedBytesProcessed
+        bytes calldata _ethWitness,
+        uint32[] calldata _ethWitnessSizes
     ) external {
-        require(processNextOperation(_pubdataOffset, _publicData, _currentEthWitness) == _expectedBytesProcessed, "bytes processed incorrect");
+        collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
     }
 
     function testVerifyEthereumSignature(bytes calldata _signature, bytes calldata _message) external pure returns (address) {

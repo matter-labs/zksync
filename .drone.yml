@@ -7,11 +7,6 @@ volumes:
   - name: cache
     host:
       path: /drone-cache
-services:
-  - name: geth
-    image: matterlabs/geth:latest
-  - name: postgres
-    image: postgres:10.4
 trigger:
   event:
   - pull_request
@@ -26,6 +21,16 @@ steps:
     mount:
       - ./target/cargo
       - ./keys
+- name: geth
+  image: matterlabs/geth:latest
+  detach: true
+  depends-on:
+  - restore-cache
+- name: postgres
+  image: postgres:10.4
+  detach: true
+  depends-on:
+  - restore-cache
 - name: init
   image: matterlabs/ci
   commands:
@@ -37,8 +42,11 @@ steps:
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
+  - f cargo build --release
   depends_on:
   - restore-cache
+  - postgres
+  - geth
 - name: run-genesis
   image: matterlabs/ci
   commands:
@@ -54,6 +62,7 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
+  - zksync dummy-prover ensure-disabled
   - zksync circuit-tests
   - zksync prover-tests
   - zksync db-test
@@ -71,6 +80,12 @@ steps:
   - zksync build-contracts
   depends_on:
   - init
+- name: ganache
+  image: matterlabs/ganache
+  detach: true
+  depends_on:
+  - build-contracts
+  - run-genesis
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
@@ -79,12 +94,10 @@ steps:
   - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync redeploy
   - zksync integration-testkit
-  services:
-  - name: ganache
-    image: matterlabs/ganache
   depends_on:
   - run-genesis
   - build-contracts
+  - ganache
 - name: contract-test
   image: matterlabs/ci
   commands:
