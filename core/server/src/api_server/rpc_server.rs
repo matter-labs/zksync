@@ -254,6 +254,81 @@ impl RpcApp {
             .access_storage_fragile()
             .map_err(|_| Error::internal_error())
     }
+
+    // cache access functions
+    fn get_executed_priority_operation(
+        &self,
+        serial_id: u32,
+    ) -> Result<Option<StoredExecutedPriorityOperation>> {
+        Ok(
+            if let Some(executed_op) = self.cache_of_executed_priority_operations.get(&serial_id) {
+                Some(executed_op)
+            } else {
+                let storage = self.access_storage()?;
+                let executed_op = storage
+                    .chain()
+                    .operations_schema()
+                    .get_executed_priority_operation(serial_id)
+                    .map_err(|_| Error::internal_error())?;
+
+                if let Some(executed_op) = executed_op.clone() {
+                    self.cache_of_executed_priority_operations
+                        .insert(serial_id, executed_op);
+                }
+
+                executed_op
+            },
+        )
+    }
+
+    fn get_block_info(&self, block_number: i64) -> Result<Option<BlockDetails>> {
+        Ok(
+            if let Some(block) = self.cache_of_blocks_info.get(&block_number) {
+                Some(block)
+            } else {
+                let storage = self.access_storage()?;
+                let block = storage
+                    .chain()
+                    .block_schema()
+                    .find_block_by_height_or_hash(block_number.to_string());
+
+                if let Some(block) = block.clone() {
+                    if block.verified_at.is_some() {
+                        self.cache_of_blocks_info.insert(block_number, block);
+                    }
+                }
+
+                block
+            },
+        )
+    }
+
+    fn get_tx_receipt(&self, tx_hash: TxHash) -> Result<Option<TxReceiptResponse>> {
+        Ok(
+            if let Some(tx_receipt) = self
+                .cache_of_transaction_receipts
+                .get(&tx_hash.as_ref().to_vec())
+            {
+                Some(tx_receipt)
+            } else {
+                let storage = self.access_storage()?;
+                let tx_receipt = storage
+                    .chain()
+                    .operations_ext_schema()
+                    .tx_receipt(tx_hash.as_ref())
+                    .map_err(|_| Error::internal_error())?;
+
+                if let Some(tx_receipt) = tx_receipt.clone() {
+                    if tx_receipt.verified {
+                        self.cache_of_transaction_receipts
+                            .insert(tx_hash.as_ref().to_vec(), tx_receipt);
+                    }
+                }
+
+                tx_receipt
+            },
+        )
+    }
 }
 
 impl Rpc for RpcApp {
@@ -321,44 +396,9 @@ impl Rpc for RpcApp {
     }
 
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
-        let executed_op =
-            if let Some(executed_op) = self.cache_of_executed_priority_operations.get(&serial_id) {
-                Some(executed_op)
-            } else {
-                let storage = self.access_storage()?;
-                let executed_op = storage
-                    .chain()
-                    .operations_schema()
-                    .get_executed_priority_operation(serial_id)
-                    .map_err(|_| Error::internal_error())?;
-
-                if let Some(executed_op) = executed_op.clone() {
-                    self.cache_of_executed_priority_operations
-                        .insert(serial_id, executed_op);
-                }
-
-                executed_op
-            };
+        let executed_op = self.get_executed_priority_operation(serial_id)?;
         Ok(if let Some(executed_op) = executed_op {
-            let block =
-                if let Some(block) = self.cache_of_blocks_info.get(&executed_op.block_number) {
-                    Some(block)
-                } else {
-                    let storage = self.access_storage()?;
-                    let block = storage
-                        .chain()
-                        .block_schema()
-                        .find_block_by_height_or_hash(executed_op.block_number.to_string());
-
-                    if let Some(block) = block.clone() {
-                        if block.verified_at.is_some() {
-                            self.cache_of_blocks_info
-                                .insert(executed_op.block_number, block);
-                        }
-                    }
-
-                    block
-                };
+            let block = self.get_block_info(executed_op.block_number)?;
             ETHOpInfoResp {
                 executed: true,
                 block: Some(BlockInfo {
@@ -376,28 +416,7 @@ impl Rpc for RpcApp {
     }
 
     fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
-        let stored_receipt = if let Some(tx_receipt) = self
-            .cache_of_transaction_receipts
-            .get(&tx_hash.as_ref().to_vec())
-        {
-            Some(tx_receipt)
-        } else {
-            let storage = self.access_storage()?;
-            let tx_receipt = storage
-                .chain()
-                .operations_ext_schema()
-                .tx_receipt(tx_hash.as_ref())
-                .map_err(|_| Error::internal_error())?;
-
-            if let Some(tx_receipt) = tx_receipt.clone() {
-                if tx_receipt.verified {
-                    self.cache_of_transaction_receipts
-                        .insert(tx_hash.as_ref().to_vec(), tx_receipt);
-                }
-            }
-
-            tx_receipt
-        };
+        let stored_receipt = self.get_tx_receipt(tx_hash)?;
         Ok(if let Some(stored_receipt) = stored_receipt {
             TransactionInfoResp {
                 executed: true,

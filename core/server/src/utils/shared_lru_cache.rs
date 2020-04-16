@@ -2,7 +2,10 @@ use lru_cache::LruCache;
 use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 
-#[derive(Clone)]
+/// SharedLruCache is a analog of LruCache
+/// SharedLruCache can be shared between threads safely
+/// The interface differs from LruCache in getter function - here it returns clone of result value
+#[derive(Clone, Debug)]
 pub struct SharedLruCache<K: Eq + Hash, V: Clone>(Arc<Mutex<LruCache<K, V>>>);
 
 impl<K: Eq + Hash, V: Clone> SharedLruCache<K, V> {
