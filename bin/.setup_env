@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Setup env itself
 if [ -z "$ZKSYNC_ENV" ]
 then
 
@@ -29,4 +30,9 @@ then
     set +o allexport
 
     popd > /dev/null
+fi
+
+# Setup the git hooks folder.
+if ! git config --local core.hooksPath > /dev/null; then
+    git config --local core.hooksPath $ZKSYNC_HOME/.githooks/ > /dev/null
 fi

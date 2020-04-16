@@ -77,7 +77,7 @@ impl OperationsQueue {
         Ok(())
     }
 
-    /// Takes the oldest non-processed operation out of the queue.
+    /// Takes the oldest non-processed operation out of the queue and whether it has a proof or not.
     /// Returns `None` if there are no non-processed operations.
     fn take_next_operation(&mut self) -> Option<(Operation, bool)> {
         self.operations.pop_front()

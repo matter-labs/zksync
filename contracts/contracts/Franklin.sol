@@ -362,7 +362,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
             uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
 
-            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, publicData, firstOnchainOpId, nOnchainOpsProcessed, nPriorityRequestProcessed);
+            createCommittedBlock(_blockNumber, _feeAccount, _newRoot, publicData, totalOnchainOps, nPriorityRequestProcessed);
             totalBlocksCommitted++;
 
             emit BlockCommitted(_blockNumber);
@@ -370,15 +370,14 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     }
 
     /// @notice Store committed block structure to the storage.
-    /// @param _firstOnchainOpId - blocks' onchain ops start id in global operations
-    /// @param _nOnchainOpsProcessed - total number of onchain ops in block
-    /// @param _nCommittedPriorityRequests - total number of priority requests in block
+    /// @param _nCumulativeOnchainOpsProcessed - cumulative number of onchain ops
+    /// @param _nCommittedPriorityRequests - number of priority requests in block
     function createCommittedBlock(
         uint32 _blockNumber,
         uint24 _feeAccount,
         bytes32 _newRoot,
         bytes memory _publicData,
-        uint64 _firstOnchainOpId, uint64 _nOnchainOpsProcessed, uint64 _nCommittedPriorityRequests
+        uint64 _nCumulativeOnchainOpsProcessed, uint64 _nCommittedPriorityRequests
     ) internal {
         require(_publicData.length % 8 == 0, "cbb10"); // Public data size is not multiple of 8
 
@@ -394,15 +393,16 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             _publicData
         );
 
+        uint24 validatorId = governance.getValidatorId(msg.sender);
+
         blocks[_blockNumber] = Block(
-            msg.sender, // validator
+            validatorId, // validatorId
             uint32(block.number), // committed at
-            _firstOnchainOpId, // blocks' onchain ops start id in global operations
-            _nOnchainOpsProcessed, // total number of onchain ops in block
-            _nCommittedPriorityRequests, // total number of priority onchain ops in block
+            _nCumulativeOnchainOpsProcessed, // cumulative number of onchain ops
+            _nCommittedPriorityRequests, // number of priority onchain ops in block
+            blockChunks,
             commitment, // blocks' commitment
-            _newRoot, // new root
-            blockChunks
+            _newRoot // new root
         );
     }
 
@@ -631,9 +631,12 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         consummateOnchainOps(_blockNumber);
 
+        uint24 blockValidatorId = blocks[_blockNumber].validatorId;
+        address blockValidatorAddress = governance.getValidatorAddress(blockValidatorId);
+
         collectValidatorsFeeAndDeleteRequests(
             blocks[_blockNumber].priorityOperations,
-            blocks[_blockNumber].validator
+            blockValidatorAddress
         );
 
         totalBlocksVerified += 1;
@@ -656,8 +659,13 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @notice (user must have possibility to withdraw funds if withdrawed)
     /// @param _blockNumber Number of block
     function consummateOnchainOps(uint32 _blockNumber) internal {
-        uint64 start = blocks[_blockNumber].operationStartId;
-        uint64 end = start + blocks[_blockNumber].onchainOperations;
+        uint64 start = 0;
+        if (_blockNumber != 0) {
+            start = blocks[_blockNumber - 1].cumulativeOnchainOperations;
+        }
+
+        uint64 end = blocks[_blockNumber].cumulativeOnchainOperations;
+
         for (uint64 current = start; current < end; ++current) {
             OnchainOperation memory op = onchainOps[current];
             if (op.opType == Operations.OpType.PartialExit) {
@@ -693,20 +701,18 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         uint32 blocksToRevert = minU32(_maxBlocksToRevert, totalBlocksCommitted - totalBlocksVerified);
         uint64 revertedPriorityRequests = 0;
-        uint64 revertedOnchainOps = 0;
 
         for (uint32 i = totalBlocksCommitted - blocksToRevert + 1; i <= totalBlocksCommitted; i++) {
             Block memory revertedBlock = blocks[i];
             require(revertedBlock.committedAtBlock > 0, "frk11"); // block not found
 
-            revertedOnchainOps += revertedBlock.onchainOperations;
             revertedPriorityRequests += revertedBlock.priorityOperations;
 
             delete blocks[i];
         }
 
         totalBlocksCommitted -= blocksToRevert;
-        totalOnchainOps -= revertedOnchainOps;
+        totalOnchainOps = blocks[totalBlocksCommitted].cumulativeOnchainOperations;
         totalCommittedPriorityRequests -= revertedPriorityRequests;
 
         emit BlocksReverted(totalBlocksVerified, totalBlocksCommitted);
