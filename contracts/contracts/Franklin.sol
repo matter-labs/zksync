@@ -493,7 +493,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                         bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
                         require(valid, "fpp15"); // failed to verify change pubkey hash signature
                     } else {
-                        bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
+                        bool valid = authFacts[op.owner][op.nonce] == keccak256(op.pubKeyHash);
                         require(valid, "fpp16"); // new pub key hash is not authenticated properly
                     }
 
@@ -761,9 +761,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
     function authPubkeyHash(bytes calldata _fact, uint32 _nonce) external {
         require(_fact.length == PUBKEY_HASH_BYTES, "ahf10"); // PubKeyHash should be 20 bytes.
-        require(authFacts[msg.sender][_nonce].length == 0, "ahf11"); // auth fact for nonce should be empty
+        require(authFacts[msg.sender][_nonce] == bytes32(0), "ahf11"); // auth fact for nonce should be empty
 
-        authFacts[msg.sender][_nonce] = _fact;
+        authFacts[msg.sender][_nonce] = keccak256(_fact);
 
         emit FactAuth(msg.sender, _nonce, _fact);
     }

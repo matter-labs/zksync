@@ -89,8 +89,8 @@ contract Storage {
     /// @notice Once it was raised, it can not be cleared again, and all users must exit
     bool public exodusMode;
 
-    /// @notice User authenticated facts for some nonce.
-    mapping(address => mapping(uint32 => bytes)) public authFacts;
+    /// @notice User authenticated fact hashes for some nonce.
+    mapping(address => mapping(uint32 => bytes32)) public authFacts;
 
     /// @notice Priority Operation container
     /// @member opType Priority operation type

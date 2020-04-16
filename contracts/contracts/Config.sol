@@ -33,12 +33,15 @@ contract Config {
     uint256 constant FEE_GAS_PRICE_MULTIPLIER = 2;
 
     /// @notice Base gas for deposit eth transaction
+    /// NOTE: Gas fee may vary with time when ethereum is updated
     uint256 constant BASE_DEPOSIT_ETH_GAS = 179000;
 
     /// @notice Base gas for deposit erc20 transaction
+    /// NOTE: Gas fee may vary for different tokens
     uint256 constant BASE_DEPOSIT_ERC_GAS = 214000;
 
     /// @notice Base gas for full exit transaction
+    /// NOTE: Gas fee may vary with time when ethereum is updated
     uint256 constant BASE_FULL_EXIT_GAS = 170000;
 
     /// @notice Expected average period of block creation
