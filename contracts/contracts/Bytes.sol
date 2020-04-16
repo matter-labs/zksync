@@ -38,42 +38,41 @@ library Bytes {
         bts = toBytesFromUIntTruncated(uint(self), 20);
     }
 
-    function bytesToAddress(bytes memory self) internal pure returns (address addr) {
-        require(self.length == 20, "bbs11");
+    function bytesToAddress(bytes memory self, uint256 _start) internal pure returns (address addr) {
+        require(self.length >= (_start + 20), "bta11");
         assembly {
-            // Load 32 bytes, address is only 20 bytes, discard 12 bytes (96 bits)
-            addr := shr(96, mload(add(self, 0x20)))
+            addr := mload(add(add(self, 20), _start))
         }
     }
 
-    function bytesToUInt16(bytes memory self) internal pure returns (uint16 r) {
-        require(self.length >= 2, "bb611");
+    function bytesToUInt16(bytes memory _bytes, uint256 _start) internal pure returns (uint16 r) {
+        require(_bytes.length >= (_start + 2), "btu02");
         assembly {
-            r := mload(add(add(self, 0x2), 0))
+            r := mload(add(add(_bytes, 0x2), _start))
         }
     }
 
-    function bytesToUInt24(bytes memory self) internal pure returns (uint24 r) {
-        require(self.length >= 3, "bb411");
+    function bytesToUInt24(bytes memory _bytes, uint256 _start) internal pure returns (uint24 r) {
+        require(_bytes.length >= (_start + 3), "btu03");
         assembly {
-            r := mload(add(add(self, 0x3), 0))
+            r := mload(add(add(_bytes, 0x3), _start))
         }
     }
 
-    function bytesToUInt32(bytes memory self) internal pure returns (uint32 r) {
-        require(self.length >= 4, "bb411");
+    function bytesToUInt32(bytes memory _bytes, uint256 _start) internal pure returns (uint32 r) {
+        require(_bytes.length >= (_start + 4), "btu04");
         assembly {
-            r := mload(add(add(self, 0x4), 0))
+            r := mload(add(add(_bytes, 0x4), _start))
         }
     }
 
-    function bytesToUInt128(bytes memory self) internal pure returns (uint128 r)
-    {
-        require(self.length >= 16, "bb811");
+    function bytesToUInt128(bytes memory _bytes, uint256 _start) internal pure returns (uint128 r) {
+        require(_bytes.length >= (_start + 16), "btu16");
         assembly {
-            r := mload(add(add(self, 0x10), 0))
+            r := mload(add(add(_bytes, 0x10), _start))
         }
     }
+
 
     function bytesToBytes32(bytes memory  _input) internal pure returns (bytes32 _output) {
         require (_input.length == 0x20);
@@ -129,43 +128,36 @@ library Bytes {
     }
 
     function readUInt16(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint16 r) {
-        bytes memory buf;
-        (new_offset, buf) = read(_data, _offset, 2);
-        r = bytesToUInt16(buf);
+        new_offset = _offset + 2;
+        r = bytesToUInt16(_data, _offset);
     }
 
     function readUInt24(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint24 r) {
-        bytes memory buf;
-        (new_offset, buf) = read(_data, _offset, 3);
-        r = bytesToUInt24(buf);
+        new_offset = _offset + 3;
+        r = bytesToUInt24(_data, _offset);
     }
 
     function readUInt32(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint32 r) {
-        bytes memory buf;
-        (new_offset, buf) = read(_data, _offset, 4);
-        r = bytesToUInt32(buf);
+        new_offset = _offset + 4;
+        r = bytesToUInt32(_data, _offset);
     }
 
     function readUInt128(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint128 r) {
-        bytes memory buf;
-        (new_offset, buf) = read(_data, _offset, 16);
-        r = bytesToUInt128(buf);
+        new_offset = _offset + 16;
+        r = bytesToUInt128(_data, _offset);
     }
 
     function readAddress(bytes memory _data, uint _offset) internal pure returns (uint new_offset, address r) {
-        bytes memory buf;
-        (new_offset, buf) = read(_data, _offset, 20);
-        r = bytesToAddress(buf);
+        new_offset = _offset + 20;
+        r = bytesToAddress(_data, _offset);
     }
 
     // Helper function for hex conversion.
     function halfByteToHex(byte _byte) internal pure returns (byte _hexByte) {
-        uint8 numByte = uint8(_byte);
-        if (numByte >= 0 && numByte <= 9) {
-            return byte(0x30 + numByte); // ASCII 0-9
-        } else if (numByte <= 15) {
-            return byte(0x57 + numByte); // ASCII a-f
-        }
+        require(uint8(_byte) | 0xf == 0xf, "hbh11");  // half byte's value is out of 0..15 range.
+
+        // "FEDCBA9876543210" ASCII-encoded, shifted and automatically truncated.
+        return byte (uint8 (0x66656463626139383736353433323130 >> (uint8 (_byte) * 8)));
     }
 
     // Convert bytes to ASCII hex representation

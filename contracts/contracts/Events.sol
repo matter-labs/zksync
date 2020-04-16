@@ -1,6 +1,7 @@
 pragma solidity 0.5.16;
 
 import "./Upgradeable.sol";
+import "./Operations.sol";
 
 
 /// @title zkSync events
@@ -49,7 +50,7 @@ contract Events {
     event NewPriorityRequest(
         address sender,
         uint64 serialId,
-        uint8 opType,
+        Operations.OpType opType,
         bytes pubData,
         uint256 expirationBlock,
         uint256 fee

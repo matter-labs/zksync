@@ -797,7 +797,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         emit NewPriorityRequest(
             msg.sender,
             nextPriorityRequestId,
-            uint8(_opType),
+            _opType,
             _pubData,
             expirationBlock,
             _fee

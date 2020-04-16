@@ -13,6 +13,17 @@ contract Governance is Config {
         uint16 tokenId
     );
 
+    /// @notice Governor changed
+    event GovernorChanged(
+        address newGovernor
+    );
+
+    /// @notice Validator's status changed
+    event ValidatorStatusChanged(
+        address validatorAddress,
+        bool isActive
+    );
+
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
 
@@ -63,6 +74,7 @@ contract Governance is Config {
     function changeGovernor(address _newGovernor) external {
         requireGovernor(msg.sender);
         networkGovernor = _newGovernor;
+        emit GovernorChanged(_newGovernor);
     }
 
     /// @notice Add token to the list of networks tokens
@@ -97,6 +109,8 @@ contract Governance is Config {
         validator.isActive = _active;
 
         validators[_validatorAddress] = validator;
+
+        emit ValidatorStatusChanged(_validatorAddress, _active);
     }
 
     /// @notice Check if specified address is is governor
@@ -131,7 +145,7 @@ contract Governance is Config {
 
     /// @notice Validate token id (must be less than  or equal total tokens amount)
     /// @param _tokenId Token id
-    /// @return bool flag that indicates if token id is less than total tokens amount
+    /// @return bool flag that indicates if token id is less than or equal total tokens amount
     function isValidTokenId(uint16 _tokenId) external view returns (bool) {
         return _tokenId <= totalTokens;
     }
