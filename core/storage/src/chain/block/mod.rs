@@ -12,6 +12,7 @@ use models::node::{
 use models::{fe_from_hex, fe_to_hex, Action, ActionType, Operation};
 // Local imports
 use self::records::{BlockDetails, StorageBlock};
+use crate::prover::records::StoredProof;
 use crate::schema::*;
 use crate::StorageProcessor;
 use crate::{
@@ -349,35 +350,44 @@ impl<'a> BlockSchema<'a> {
         })
     }
 
-    pub fn load_unverified_commits_after_block(
+    /// Returns tuple (commit operation, true if there is proof for the operation).
+    pub fn load_commits_after_block(
         &self,
         block: BlockNumber,
         limit: i64,
-    ) -> QueryResult<Vec<Operation>> {
+    ) -> QueryResult<Vec<(Operation, bool)>> {
         self.0.conn().transaction(|| {
-            let ops: Vec<StoredOperation> = diesel::sql_query(format!(
+            let ops: Vec<(StoredOperation, Option<StoredProof>)> = diesel::sql_query(format!(
                 "
                 WITH sized_operations AS (
-                    SELECT operations.* FROM operations
-                    LEFT JOIN blocks ON number = block_number
-                    LEFT JOIN proofs USING (block_number)
-                    WHERE proof IS NULL
+                    SELECT operations.*, proofs.*, operations.block_number as the_block_number
+                      FROM operations
+                           LEFT JOIN blocks
+                                  ON number = block_number
+                           LEFT JOIN proofs
+                               USING (block_number)
                 )
-                SELECT * FROM sized_operations
-                WHERE action_type = 'COMMIT'
-                    AND block_number > (
-                        SELECT COALESCE(max(block_number), 0)
-                        FROM sized_operations
-                        WHERE action_type = 'VERIFY'
+                SELECT *
+                  FROM sized_operations
+                 WHERE action_type = 'COMMIT'
+                   AND the_block_number > (
+                        SELECT COALESCE(max(the_block_number), 0)
+                          FROM sized_operations
+                         WHERE action_type = 'VERIFY'
                     )
-                    AND block_number > {}
-                ORDER BY block_number
+                   AND the_block_number > {}
+                ORDER BY the_block_number
                 LIMIT {}
                 ",
                 block, limit
             ))
             .load(self.0.conn())?;
-            ops.into_iter().map(|o| o.into_op(self.0)).collect()
+            ops.into_iter()
+                .map(|(o, p)| {
+                    let op = o.into_op(self.0)?;
+                    Ok((op, p.is_some()))
+                })
+                .collect()
         })
     }
 
