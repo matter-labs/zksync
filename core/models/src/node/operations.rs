@@ -394,11 +394,7 @@ impl ChangePubKeyOp {
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
         if let Some(eth_signature) = &self.tx.eth_signature {
-            let mut data = Vec::with_capacity(65);
-            data.extend_from_slice(&eth_signature.0.r);
-            data.extend_from_slice(&eth_signature.0.s);
-            data.push(eth_signature.0.v);
-            data
+            eth_signature.serialize_packed().to_vec()
         } else {
             Vec::new()
         }

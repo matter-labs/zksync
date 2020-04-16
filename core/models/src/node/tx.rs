@@ -625,15 +625,29 @@ impl Serialize for EIP1271Signature {
 
 /// Struct used for working with ethereum signatures created using eth_sign (using geth, ethers.js, etc)
 /// message is serialized as 65 bytes long `0x` prefixed string.
+///
+/// Some notes on implementation of methods of this structure:
+///
+/// Ethereum signed messages expect v parameter to be 27 + recovery_id(0,1,2,3)
+/// Library that we use for signature verification (written for bitcoin) expects v = recovery_id
+///
+/// That is why:
+/// 1) when we create this structure by deserialization of message produced by user we subtract 27 from v in `ETHSignature`
+/// and store it in ETHSignature structure this way.
+/// 2) When we serialize/create this structure we add 27 to v in `ETHSignature`.
+///
+/// This way when we have methods that consumes &self we can be sure that ETHSignature::recover_signer works
+/// And we can be sure that we are compatible with Ethereum clients.
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackedEthSignature(pub ETHSignature);
+pub struct PackedEthSignature(ETHSignature);
 
 impl PackedEthSignature {
     pub fn serialize_packed(&self) -> [u8; 65] {
         let mut result = [0u8; 65];
         result[0..32].copy_from_slice(&self.0.r);
         result[32..64].copy_from_slice(&self.0.s);
-        result[64] = self.0.v;
+        result[64] = self.0.v + 27;
         result
     }
 
@@ -642,8 +656,19 @@ impl PackedEthSignature {
         Ok(PackedEthSignature(ETHSignature {
             r: bytes[0..32].try_into().unwrap(),
             s: bytes[32..64].try_into().unwrap(),
-            v: bytes[64],
+            v: bytes[64]
+                .checked_sub(27)
+                .ok_or_else(|| format_err!("signature v should be 27 + recovery_id"))?,
         }))
+    }
+
+    /// Signs message using ethereum private key, results are identical to signature created
+    /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
+    pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, failure::Error> {
+        let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
+        let signed_bytes = Self::message_to_signed_bytes(msg);
+        let signed_message = secret_key.sign(&signed_bytes)?;
+        Ok(PackedEthSignature(signed_message))
     }
 
     fn message_to_signed_bytes(msg: &[u8]) -> Vec<u8> {
@@ -658,33 +683,12 @@ impl PackedEthSignature {
     /// message should be the same message that was passed to `eth.sign`(or similar) method
     /// as argument. No hashing and prefixes required.
     pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, failure::Error> {
-        let mut signature = self.0.clone();
-        // workaround for ethsign library limitations
-        signature.v = signature
-            .v
-            .checked_sub(27)
-            .ok_or_else(|| format_err!("signature v should be 27 + recovery_id"))?;
         let signed_bytes = Self::message_to_signed_bytes(msg);
-        let pk = signature.recover(&signed_bytes)?;
+        let pk = self.0.recover(&signed_bytes)?;
         Ok(Address::from_slice(pk.address()))
     }
 
-    /// Signs message using ethereum private key, results are identical to signature created
-    /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
-    pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, failure::Error> {
-        let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
-        let signed_bytes = Self::message_to_signed_bytes(msg);
-        let mut signed_message = secret_key.sign(&signed_bytes)?;
-        // workaround for ethsign library limitations
-        signed_message.v = signed_message
-            .v
-            .checked_add(27)
-            .ok_or_else(|| format_err!("failed to add 27 to signature v"))?;
-        Ok(PackedEthSignature(signed_message))
-    }
-
     /// Get Ethereum address from private key,
-    /// TODO: refactor eth signing with utils to other module.
     pub fn address_from_private_key(private_key: &H256) -> Result<Address, failure::Error> {
         let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
         Ok(Address::from_slice(secret_key.public().address()))
