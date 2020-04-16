@@ -350,7 +350,7 @@ steps:
   - prover-image-publish
 
 ---
-# This pipeline udpates testnet
+# This pipeline updates testnet rinkeby demo or ropsten demo
 kind: pipeline
 type: docker
 name: update-testnet
@@ -380,8 +380,6 @@ steps:
       from_secret: docker_username
     PASSWORD:
       from_secret: docker_password
-    ENV_BASE64:
-      from_secret: testnet_env_base64
   commands:
   - docker login -u $USERNAME -p $PASSWORD
   - docker pull matterlabs/server:${DRONE_COMMIT_SHA:0:8}
@@ -394,15 +392,15 @@ steps:
   image: matterlabs/ci
   environment:
     ENV_BASE64:
-      from_secret: testnet_env_base64
+      from_secret: ${ZKSYNC_ENV}_env_base64
     KUBECONFIG_BASE64:
-      from_secret: testnet_kubeconfig_base64
+      from_secret: ${ZKSYNC_ENV}_kubeconfig_base64
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/testnet.env
-  - zksync env testnet
+  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/${ZKSYNC_ENV}.env
+  - zksync env ${ZKSYNC_ENV}
   - echo -n $KUBECONFIG_BASE64 | base64 --decode > `pwd`/kubeconfig.yaml
-  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/testnet.env KUBECONFIG=`pwd`/kubeconfig.yaml
+  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/${ZKSYNC_ENV}z.env KUBECONFIG=`pwd`/kubeconfig.yaml
   - zksync apply-kubeconfig
   - zksync restart
