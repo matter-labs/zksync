@@ -298,6 +298,7 @@ impl<'a> OperationsExtSchema<'a> {
                 select
                     *
                 from (
+                    with vars (address_bytes) as ( select decode('{address}', 'hex') )
                     select
                         operation as tx,
                         'sync-tx:' || encode(tx_hash, 'hex') as hash,
@@ -306,13 +307,13 @@ impl<'a> OperationsExtSchema<'a> {
                         fail_reason,
                         block_number
                     from
-                        executed_transactions
+                        executed_transactions, vars
                     where
-                        from_account = decode('{address}', 'hex')
+                        from_account = address_bytes
                         or
-                        to_account = decode('{address}', 'hex')
+                        to_account = address_bytes
                         or
-                        primary_account_address = decode('{address}', 'hex')
+                        primary_account_address = address_bytes
                     union all
                     select
                         operation as tx,
@@ -322,11 +323,11 @@ impl<'a> OperationsExtSchema<'a> {
                         null as fail_reason,
                         block_number
                     from 
-                        executed_priority_operations
+                        executed_priority_operations, vars
                     where 
-                        from_account = decode('{address}', 'hex')
+                        from_account = address_bytes
                         or
-                        to_account = decode('{address}', 'hex')
+                        to_account = address_bytes
                         or
                         operation->'priority_op'->>'account' = '{address}'
                         or
