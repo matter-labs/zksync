@@ -30,7 +30,7 @@ fn smt_create(b: &mut Bencher<'_>) {
     let depth = models::params::account_tree_depth();
 
     b.iter(|| {
-        RealSMT::new(black_box(depth.try_into().unwrap()));
+        RealSMT::new(black_box(depth));
     });
 }
 
@@ -39,7 +39,7 @@ fn smt_insert_empty(b: &mut Bencher<'_>) {
     let depth = models::params::account_tree_depth();
 
     // Create an empty SMT and one account in setup.
-    let tree = RealSMT::new(depth.try_into().unwrap());
+    let tree = RealSMT::new(depth);
     let account = gen_account(0);
 
     let setup = || (tree.clone(), account.clone());
@@ -60,7 +60,7 @@ fn smt_insert_filled(b: &mut Bencher<'_>) {
     let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
-    let mut tree = RealSMT::new(depth.try_into().unwrap());
+    let mut tree = RealSMT::new(depth);
     for (id, account) in accounts.into_iter().enumerate() {
         tree.insert(id as u32, account.clone())
     }
@@ -84,7 +84,7 @@ fn smt_root_hash(b: &mut Bencher<'_>) {
     let accounts: Vec<_> = (0..N_ACCOUNTS).map(gen_account).collect();
 
     // Create a tree and fill it with some accounts.
-    let mut tree = RealSMT::new(depth.try_into().unwrap());
+    let mut tree = RealSMT::new(depth);
     for (id, account) in accounts.into_iter().enumerate() {
         tree.insert(id as u32, account.clone())
     }

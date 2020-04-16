@@ -1,7 +1,7 @@
 //! Leader election is a always live routine that continuously votes to become the leader.
 
 use models::node::config::LEADER_LOOKUP_INTERVAL;
-use std::thread;
+use tokio::time;
 
 /// Places itself as candidate to leader_election table and continuously looks up who is current leader.
 /// Lookups happen with `LEADER_LOOKUP_INTERVAL` period.
@@ -10,16 +10,17 @@ use std::thread;
 /// # Panics
 ///
 /// Panics on failed connection to db.
-pub fn keep_voting_to_be_leader(
+pub async fn keep_voting_to_be_leader(
     name: String,
     connection_pool: storage::ConnectionPool,
 ) -> Result<(), failure::Error> {
     let st = connection_pool
         .access_storage()
-        .map_err(|e| failure::format_err!("could not to access store: {}", e))?;
+        .map_err(|e| failure::format_err!("could not access storage: {}", e))?;
     st.leader_election_schema()
         .place_candidate(&name)
         .map_err(|e| failure::format_err!("could not place candidate: {}", e))?;
+    let mut ticker = time::interval(LEADER_LOOKUP_INTERVAL);
     log::info!("placed candidate to leader election board {}", name);
     loop {
         let leader = st
@@ -31,7 +32,7 @@ pub fn keep_voting_to_be_leader(
                 break;
             }
         }
-        thread::sleep(LEADER_LOOKUP_INTERVAL);
+        ticker.tick().await;
     }
     Ok(())
 }

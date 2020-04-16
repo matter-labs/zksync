@@ -31,10 +31,6 @@ impl<'a> LeaderElectionSchema<'a> {
     /// Returns current leader name.
     /// Current leader is the longest waiting candidate in leader election table.
     pub fn current_leader(&self) -> QueryResult<Option<records::LeaderElection>> {
-        self.next_candidate()
-    }
-
-    fn next_candidate(&self) -> QueryResult<Option<records::LeaderElection>> {
         leader_election::table
             .filter(dsl::bail_at.is_null())
             .order_by(dsl::created_at.asc())

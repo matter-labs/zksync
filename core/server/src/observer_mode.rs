@@ -14,8 +14,8 @@ use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
 use models::node::{BlockNumber, FranklinOp};
 use std::sync::mpsc;
-use std::thread;
 use std::time::Duration;
+use tokio::time;
 
 /// The state being observed during observer mode. Meant to be used later to initialize server actors.
 pub struct ObservedState {
@@ -99,39 +99,40 @@ impl ObservedState {
                 .block_schema()
                 .get_block_operations(bn + 1)
                 .map_err(|e| failure::format_err!("failed to get block operations {}", e))?;
-            for op in ops {
-                match op {
-                    FranklinOp::Deposit(deposit) => {
-                        apply_deposit_tx(&mut self.circuit_acc_tree, &deposit);
-                    }
-                    FranklinOp::Transfer(transfer) => {
-                        apply_transfer_tx(&mut self.circuit_acc_tree, &transfer);
-                    }
-                    FranklinOp::TransferToNew(transfer_to_new) => {
-                        apply_transfer_to_new_tx(&mut self.circuit_acc_tree, &transfer_to_new);
-                    }
-                    FranklinOp::Withdraw(withdraw) => {
-                        apply_withdraw_tx(&mut self.circuit_acc_tree, &withdraw);
-                    }
-                    FranklinOp::Close(close) => {
-                        apply_close_account_tx(&mut self.circuit_acc_tree, &close);
-                    }
-                    FranklinOp::FullExit(full_exit_op) => {
-                        let success = full_exit_op.withdraw_amount.is_some();
-                        apply_full_exit_tx(&mut self.circuit_acc_tree, &full_exit_op, success);
-                    }
-                    FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
-                        apply_change_pubkey_offchain_tx(
-                            &mut self.circuit_acc_tree,
-                            &change_pkhash_op,
-                        );
-                    }
-                    FranklinOp::Noop(_) => {}
-                }
-            }
+            self.apply(ops);
         }
         self.circuit_tree_block = block_number;
         Ok(())
+    }
+
+    fn apply(&mut self, ops: Vec<FranklinOp>) {
+        for op in ops {
+            match op {
+                FranklinOp::Deposit(deposit) => {
+                    apply_deposit_tx(&mut self.circuit_acc_tree, &deposit);
+                }
+                FranklinOp::Transfer(transfer) => {
+                    apply_transfer_tx(&mut self.circuit_acc_tree, &transfer);
+                }
+                FranklinOp::TransferToNew(transfer_to_new) => {
+                    apply_transfer_to_new_tx(&mut self.circuit_acc_tree, &transfer_to_new);
+                }
+                FranklinOp::Withdraw(withdraw) => {
+                    apply_withdraw_tx(&mut self.circuit_acc_tree, &withdraw);
+                }
+                FranklinOp::Close(close) => {
+                    apply_close_account_tx(&mut self.circuit_acc_tree, &close);
+                }
+                FranklinOp::FullExit(full_exit_op) => {
+                    let success = full_exit_op.withdraw_amount.is_some();
+                    apply_full_exit_tx(&mut self.circuit_acc_tree, &full_exit_op, success);
+                }
+                FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
+                    apply_change_pubkey_offchain_tx(&mut self.circuit_acc_tree, &change_pkhash_op);
+                }
+                FranklinOp::Noop(_) => {}
+            }
+        }
     }
 }
 
@@ -139,7 +140,7 @@ impl ObservedState {
 ///
 /// # Panics
 /// Panics on failed connection to db.
-pub fn run(
+pub async fn run(
     conn_pool: storage::ConnectionPool,
     interval: Duration,
     stop: mpsc::Receiver<()>,
@@ -150,6 +151,7 @@ pub fn run(
     observed_state
         .init()
         .expect("failed to init observed state");
+    let mut ticker = time::interval(interval);
     loop {
         let exit = match stop.try_recv() {
             Err(mpsc::TryRecvError::Empty) => false,
@@ -158,7 +160,7 @@ pub fn run(
             }
             Ok(_) => true,
         };
-        thread::sleep(interval);
+        ticker.tick().await;
         observed_state
             .update()
             .expect("failed to update observed state");
