@@ -16,7 +16,7 @@ CREATE TABLE eth_stats (
 );
 
 -- Table connection `eth_operations` and `operations` table.
--- Each entry provides a mapping between the Ethereum transaction and the ZK Sync operation.
+-- Each entry provides a mapping between the Ethereum transaction and the zkSync operation.
 CREATE TABLE eth_ops_binding
 (
     id             bigserial PRIMARY KEY,

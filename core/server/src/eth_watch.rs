@@ -1,6 +1,6 @@
 //! Ethereum watcher polls the Ethereum node for new events
 //! such as PriorityQueue events or NewToken events.
-//! New events are accepted to the ZK Sync network once they have the sufficient amount of confirmations.
+//! New events are accepted to the zkSync network once they have the sufficient amount of confirmations.
 //!
 //! Poll interval is configured using the `ETH_POLL_INTERVAL` constant.
 //! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.

@@ -227,7 +227,7 @@ export class Wallet {
         const isAccountInTheTree = await this.getAccountId();
         if (isAccountInTheTree === undefined) {
             throw new Error(
-                "Account should exist in the ZK Sync network before setting signing key"
+                "Account should exist in the zkSync network before setting signing key"
             );
         }
 
@@ -510,7 +510,7 @@ export class Wallet {
             const accountState = await this.getAccountState();
             if (!accountState.id) {
                 throw new Error(
-                    "Can't resolve account id from the ZK Sync node"
+                    "Can't resolve account id from the zkSync node"
                 );
             }
             accountId = accountState.id;

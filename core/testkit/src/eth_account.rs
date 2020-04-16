@@ -45,7 +45,7 @@ fn priority_op_fee() -> BigDecimal {
     parse_ether("0.3").unwrap()
 }
 
-/// Used to sign and post ETH transactions for the ZK Sync contracts.
+/// Used to sign and post ETH transactions for the zkSync contracts.
 #[derive(Debug)]
 pub struct EthereumAccount<T: Transport> {
     pub private_key: H256,

@@ -326,7 +326,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         )
     }
 
-    /// Helper method to obtain the string representation of the ZK Sync operation.
+    /// Helper method to obtain the string representation of the zkSync operation.
     /// Intended to be used for log entries.
     fn zksync_operation_description(&self, operation: &ETHOperation) -> String {
         if let Some(op) = &operation.op {
@@ -589,7 +589,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         }
     }
 
-    /// Encodes the ZK Sync operation to the tx payload and adds it to the queue.
+    /// Encodes the zkSync operation to the tx payload and adds it to the queue.
     fn add_operation_to_queue(&mut self, op: Operation) {
         let raw_tx = self.operation_to_raw_tx(&op);
 

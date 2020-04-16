@@ -19,7 +19,7 @@ import * as zksync from "zksync";
 const TEST_PRIORITY_EXPIRATION = 16;
 
 
-describe("ZK Sync signature verification unit tests", function () {
+describe("zkSync signature verification unit tests", function () {
     this.timeout(50000);
 
     let testContract;
@@ -216,7 +216,7 @@ async function onchainBalance(ethWallet: ethers.Wallet, token: Address): Promise
     }
 }
 
-describe("ZK Sync withdraw unit tests", function () {
+describe("zkSync withdraw unit tests", function () {
     this.timeout(50000);
 
     let zksyncContract;
@@ -367,7 +367,7 @@ describe("ZK Sync withdraw unit tests", function () {
     });
 });
 
-describe("ZK Sync auth pubkey onchain unit tests", function () {
+describe("zkSync auth pubkey onchain unit tests", function () {
     this.timeout(50000);
 
     let zksyncContract;
@@ -436,7 +436,7 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
     });
 });
 
-describe("ZK Sync test process next operation", function () {
+describe("zkSync test process next operation", function () {
     this.timeout(50000);
 
     let zksyncContract;

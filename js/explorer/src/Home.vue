@@ -2,11 +2,11 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand>ZK Sync Network</b-navbar-brand>
+        <b-navbar-brand>zkSync Network</b-navbar-brand>
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
-            <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">ZK Sync Wallet</b-nav-item>
+            <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">zkSync Wallet</b-nav-item>
             <b-nav-item v-bind:href="`${blockchainExplorerAddress}/${contractAddress}`" target="_blank" rel="noopener noreferrer">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
@@ -26,7 +26,7 @@
             {{updateError}}. Try again later.
         </b-alert>
         <b-card bg-variant="light" >
-            <h4>ZK Sync Devnet Block Explorer</h4> 
+            <h4>zkSync Devnet Block Explorer</h4> 
             <SearchField :searchFieldInMenu="false" />
         </b-card>
         <br>

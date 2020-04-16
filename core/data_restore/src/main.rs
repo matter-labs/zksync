@@ -20,7 +20,7 @@ const ETH_BLOCKS_STEP: u64 = 1;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
 fn main() {
-    info!("Restoring ZK Sync state from the contract");
+    info!("Restoring zkSync state from the contract");
     env_logger::init();
     let connection_pool = ConnectionPool::new();
     let config_opts = ConfigurationOptions::from_env();
