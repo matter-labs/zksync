@@ -33,6 +33,6 @@ then
 fi
 
 # Setup the git hooks folder.
-if ! git config --local core.hooksPath; then
-    git config --local core.hooksPath $ZKSYNC_HOME/.githooks/
+if ! git config --local core.hooksPath > /dev/null; then
+    git config --local core.hooksPath $ZKSYNC_HOME/.githooks/ > /dev/null
 fi
