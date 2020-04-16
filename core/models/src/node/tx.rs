@@ -83,6 +83,20 @@ impl<'de> Deserialize<'de> for TxHash {
     }
 }
 
+/// Stores precomputed signature to speedup execution
+#[derive(Debug, Clone)]
+pub enum CachedSigner {
+    /// No cache scenario
+    NotCached,
+    /// Cached: None if signature is incorrect.
+    Cached(Option<PubKeyHash>),
+}
+impl Default for CachedSigner {
+    fn default() -> Self {
+        Self::NotCached
+    }
+}
+
 /// Signed by user.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,6 +109,8 @@ pub struct Transfer {
     pub fee: BigDecimal,
     pub nonce: Nonce,
     pub signature: TxSignature,
+    #[serde(skip)]
+    pub cached_signer: CachedSigner,
 }
 
 impl Transfer {
@@ -112,19 +128,25 @@ impl Transfer {
         out
     }
 
-    pub fn check_correctness(&self) -> bool {
-        self.amount.is_integer() // TODO: remove after # 366
+    pub fn check_correctness(&mut self) -> bool {
+        let mut valid = self.amount.is_integer() // TODO: remove after # 366
             && self.fee.is_integer()
             && is_token_amount_packable(&self.amount)
-            && is_fee_amount_packable(&self.fee)
-            && self.verify_signature().is_some()
+            && is_fee_amount_packable(&self.fee);
+        let signer = self.verify_signature();
+        valid = valid && signer.is_some();
+        self.cached_signer = CachedSigner::Cached(signer);
+        valid
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        self.signature
-            .verify_musig_sha256(&self.get_bytes())
-            .as_ref()
-            .map(PubKeyHash::from_pubkey)
+        if let CachedSigner::Cached(cached_signer) = &self.cached_signer {
+            cached_signer.clone()
+        } else if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
+            Some(PubKeyHash::from_pubkey(&pub_key))
+        } else {
+            None
+        }
     }
 
     /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
@@ -153,6 +175,8 @@ pub struct Withdraw {
     pub fee: BigDecimal,
     pub nonce: Nonce,
     pub signature: TxSignature,
+    #[serde(skip)]
+    pub cached_signer: CachedSigner,
 }
 
 impl Withdraw {
@@ -170,16 +194,22 @@ impl Withdraw {
         out
     }
 
-    pub fn check_correctness(&self) -> bool {
-        self.amount <= u128_to_bigdecimal(u128::max_value())
-            && self.verify_signature().is_some()
+    pub fn check_correctness(&mut self) -> bool {
+        let mut valid = self.amount <= u128_to_bigdecimal(u128::max_value())
             && self.amount.is_integer() // TODO: remove after # 366
             && self.fee.is_integer()
-            && is_fee_amount_packable(&self.fee)
+            && is_fee_amount_packable(&self.fee);
+
+        let signer = self.verify_signature();
+        valid = valid && signer.is_some();
+        self.cached_signer = CachedSigner::Cached(signer);
+        valid
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
+        if let CachedSigner::Cached(cached_signer) = &self.cached_signer {
+            cached_signer.clone()
+        } else if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -338,7 +368,7 @@ impl FranklinTx {
         }
     }
 
-    pub fn check_correctness(&self) -> bool {
+    pub fn check_correctness(&mut self) -> bool {
         match self {
             FranklinTx::Transfer(tx) => tx.check_correctness(),
             FranklinTx::Withdraw(tx) => tx.check_correctness(),

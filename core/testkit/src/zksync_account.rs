@@ -107,6 +107,7 @@ impl ZksyncAccount {
             fee,
             nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         transfer.signature =
             TxSignature::sign_musig_sha256(&self.private_key, &transfer.get_bytes());
@@ -143,6 +144,7 @@ impl ZksyncAccount {
             fee,
             nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         withdraw.signature =
             TxSignature::sign_musig_sha256(&self.private_key, &withdraw.get_bytes());

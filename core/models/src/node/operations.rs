@@ -176,6 +176,7 @@ impl TransferToNewOp {
                 fee,
                 nonce,
                 signature,
+                cached_signer: Default::default(),
             },
             from: from_id,
             to: to_id,
@@ -250,6 +251,7 @@ impl TransferOp {
                 fee,
                 nonce,
                 signature,
+                cached_signer: Default::default(),
             },
             from: from_id,
             to: to_id,
@@ -322,6 +324,7 @@ impl WithdrawOp {
                 fee,
                 nonce,
                 signature,
+                cached_signer: Default::default(),
             },
             account_id,
         })

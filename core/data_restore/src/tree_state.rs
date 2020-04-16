@@ -426,6 +426,7 @@ mod test {
             fee: BigDecimal::from(1),
             nonce: 1,
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
             tx: tx2,
@@ -448,6 +449,7 @@ mod test {
             fee: BigDecimal::from(1),
             nonce: 3,
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         let op3 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx: tx3,
@@ -471,6 +473,7 @@ mod test {
             fee: BigDecimal::from(1),
             nonce: 1,
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         let op4 = FranklinOp::Transfer(Box::new(TransferOp {
             tx: tx4,
@@ -550,6 +553,7 @@ mod test {
             fee: BigDecimal::from(1),
             nonce: 1,
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
             tx: tx2,
@@ -565,6 +569,7 @@ mod test {
             fee: BigDecimal::from(1),
             nonce: 3,
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         let op3 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx: tx3,
@@ -581,6 +586,7 @@ mod test {
             fee: BigDecimal::from(1),
             nonce: 1,
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         let op4 = FranklinOp::Transfer(Box::new(TransferOp {
             tx: tx4,

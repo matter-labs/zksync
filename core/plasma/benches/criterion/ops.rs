@@ -16,6 +16,7 @@ use models::node::{
     TokenId,
 };
 // Local uses
+use models::node::tx::CachedSigner;
 use plasma::state::PlasmaState;
 
 const ETH_TOKEN_ID: TokenId = 0x00;
@@ -75,9 +76,13 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
         fee: 1.into(),
         nonce: 0,
         signature: TxSignature::default(),
+        cached_signer: Default::default(),
     };
 
     transfer.signature = TxSignature::sign_musig_sha256(&private_key, &transfer.get_bytes());
+    transfer.check_correctness();
+
+    assert!(matches!(transfer, Transfer{ cached_signer: CachedSigner::Cached(..),..}));
 
     let transfer_tx = FranklinTx::Transfer(Box::new(transfer));
 
@@ -110,9 +115,12 @@ fn apply_transfer_op(b: &mut Bencher<'_>) {
         fee: 1.into(),
         nonce: 0,
         signature: TxSignature::default(),
+        cached_signer: Default::default(),
     };
 
     transfer.signature = TxSignature::sign_musig_sha256(&private_key, &transfer.get_bytes());
+    transfer.check_correctness();
+    assert!(matches!(transfer, Transfer{ cached_signer: CachedSigner::Cached(..),..}));
 
     let transfer_tx = FranklinTx::Transfer(Box::new(transfer));
 
@@ -195,9 +203,12 @@ fn apply_withdraw_op(b: &mut Bencher<'_>) {
         fee: 1.into(),
         nonce: 0,
         signature: TxSignature::default(),
+        cached_signer: Default::default(),
     };
 
     withdraw.signature = TxSignature::sign_musig_sha256(&private_key, &withdraw.get_bytes());
+    withdraw.check_correctness();
+    assert!(matches!(withdraw, Withdraw{ cached_signer: CachedSigner::Cached(..),..}));
 
     let withdraw_tx = FranklinTx::Withdraw(Box::new(withdraw));
 

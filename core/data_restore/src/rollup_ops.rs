@@ -138,6 +138,7 @@ mod test {
             fee: BigDecimal::from(10),
             nonce: 2,
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         let op1 = FranklinOp::Withdraw(Box::new(WithdrawOp { tx, account_id: 3 }));
         let pub_data1 = op1.public_data();
@@ -199,6 +200,7 @@ mod test {
             fee: BigDecimal::from(10),
             nonce: 3,
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         let op1 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx,
@@ -224,6 +226,7 @@ mod test {
             fee: BigDecimal::from(10),
             nonce: 3,
             signature: TxSignature::default(),
+            cached_signer: Default::default(),
         };
         let op1 = FranklinOp::Transfer(Box::new(TransferOp {
             tx,
