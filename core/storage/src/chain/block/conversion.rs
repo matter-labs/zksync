@@ -103,7 +103,7 @@ impl NewExecutedPriorityOperation {
             FranklinOp::Deposit(deposit) => (deposit.priority_op.from, deposit.priority_op.to),
             FranklinOp::FullExit(full_exit) => {
                 let eth_address = full_exit.priority_op.eth_address;
-                (eth_address.clone(), eth_address)
+                (eth_address, eth_address)
             }
             _ => panic!(
                 "Incorrect type of priority op: {:?}",
