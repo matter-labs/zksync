@@ -19,8 +19,10 @@ use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
-use ethsign::{SecretKey, Signature as ETHSignature};
 use failure::{ensure, format_err};
+use parity_crypto::publickey::{
+    public_to_address, recover, sign, KeyPair, Signature as ETHSignature,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
 use std::fmt;
@@ -644,39 +646,31 @@ pub struct PackedEthSignature(ETHSignature);
 
 impl PackedEthSignature {
     pub fn serialize_packed(&self) -> [u8; 65] {
-        let mut result = [0u8; 65];
-        result[0..32].copy_from_slice(&self.0.r);
-        result[32..64].copy_from_slice(&self.0.s);
-        result[64] = self.0.v + 27;
-        result
+        // adds 27 to v
+        self.0.clone().into_electrum()
     }
 
     pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(bytes.len() == 65, "eth signature length should be 65 bytes");
-        Ok(PackedEthSignature(ETHSignature {
-            r: bytes[0..32].try_into().unwrap(),
-            s: bytes[32..64].try_into().unwrap(),
-            v: bytes[64]
-                .checked_sub(27)
-                .ok_or_else(|| format_err!("signature v should be 27 + recovery_id"))?,
-        }))
+        // assumes v = recover + 27
+        Ok(PackedEthSignature(ETHSignature::from_electrum(&bytes)))
     }
 
     /// Signs message using ethereum private key, results are identical to signature created
     /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
     pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, failure::Error> {
-        let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
+        let secret_key = (*private_key).into();
         let signed_bytes = Self::message_to_signed_bytes(msg);
-        let signed_message = secret_key.sign(&signed_bytes)?;
-        Ok(PackedEthSignature(signed_message))
+        let signature = sign(&secret_key, &signed_bytes)?;
+        Ok(PackedEthSignature(signature))
     }
 
-    fn message_to_signed_bytes(msg: &[u8]) -> Vec<u8> {
+    fn message_to_signed_bytes(msg: &[u8]) -> H256 {
         let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
         let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
         bytes.extend_from_slice(prefix.as_bytes());
         bytes.extend_from_slice(msg);
-        tiny_keccak::keccak256(&bytes).to_vec()
+        tiny_keccak::keccak256(&bytes).into()
     }
 
     /// Checks signature and returns ethereum address of the signer.
@@ -684,14 +678,13 @@ impl PackedEthSignature {
     /// as argument. No hashing and prefixes required.
     pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, failure::Error> {
         let signed_bytes = Self::message_to_signed_bytes(msg);
-        let pk = self.0.recover(&signed_bytes)?;
-        Ok(Address::from_slice(pk.address()))
+        let public_key = recover(&self.0, &signed_bytes)?;
+        Ok(public_to_address(&public_key))
     }
 
     /// Get Ethereum address from private key,
     pub fn address_from_private_key(private_key: &H256) -> Result<Address, failure::Error> {
-        let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
-        Ok(Address::from_slice(secret_key.public().address()))
+        Ok(KeyPair::from_secret((*private_key).into())?.address())
     }
 }
 

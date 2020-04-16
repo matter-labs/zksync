@@ -1,7 +1,6 @@
-use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion};
+use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
 use crypto_exports::franklin_crypto::eddsa::PrivateKey;
 use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
-use ethsign::SecretKey;
 use models::node::tx::{PackedEthSignature, TxSignature};
 use web3::types::H256;
 
@@ -53,43 +52,7 @@ fn bench_signature_verify_eth_packed(b: &mut Bencher<'_>) {
     );
 }
 
-fn bench_signature_verify_eth_raw_from_lib(b: &mut Bencher<'_>) {
-    let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
-    const TYPICAL_ETH_SIGNATURE_LEN: usize = 150;
-
-    let secret_key = SecretKey::from_raw(H256(rng.gen()).as_bytes()).expect("secret key creation");
-    let signed_bytes = {
-        let msg = rng
-            .gen_iter::<u8>()
-            .take(TYPICAL_ETH_SIGNATURE_LEN)
-            .collect::<Vec<_>>();
-        tiny_keccak::keccak256(&msg)
-    };
-    let raw_signature = secret_key
-        .sign(&signed_bytes)
-        .expect("raw eth signature creation");
-
-    let setup = || (raw_signature.clone(), signed_bytes);
-
-    b.iter_batched(
-        setup,
-        |(signature, msg)| {
-            let _ = black_box(signature.recover(&msg));
-        },
-        BatchSize::SmallInput,
-    );
-}
-
-fn bench_signature_seckp_init(b: &mut Bencher<'_>) {
-    b.iter_batched(
-        || (),
-        |_| {
-            let _ = black_box(secp256k1::Secp256k1::verification_only());
-        },
-        BatchSize::SmallInput,
-    );
-}
-
+/// For reference, raw speed of optimized signature library
 fn bench_signature_seckp_recover(b: &mut Bencher<'_>) {
     let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
 
@@ -113,23 +76,21 @@ fn bench_signature_seckp_recover(b: &mut Bencher<'_>) {
 }
 
 pub fn bench_signatures(c: &mut Criterion) {
-    c.bench_function(
+    let mut group = c.benchmark_group("Signature verify");
+    group.throughput(Throughput::Elements(1));
+    group.bench_function(
         "bench_signature_verify_zksync_musig",
         bench_signature_zksync_musig_verify,
     );
-    c.bench_function(
+    group.bench_function(
         "bench_signature_verify_eth_packed",
         bench_signature_verify_eth_packed,
     );
-    c.bench_function(
-        "bench_signature_verify_eth_raw_from_lib",
-        bench_signature_verify_eth_raw_from_lib,
-    );
-    c.bench_function("bench_signature_seckp_init", bench_signature_seckp_init);
-    c.bench_function(
-        "benc_signature_seckp_recover",
+    group.bench_function(
+        "bench_signature_seckp_recover",
         bench_signature_seckp_recover,
     );
+    group.finish();
 }
 
 criterion_group!(signature_benches, bench_signatures);

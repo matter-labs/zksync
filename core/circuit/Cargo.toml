@@ -23,4 +23,4 @@ serde_json = "1.0.0"
 [dev-dependencies]
 bigdecimal = { version = "0.1.0", features = ["serde"]}
 testkit = { path = "../testkit", version = "0.1.0"}
-web3 = "0.8.0"
+web3 = "0.10.0"

@@ -146,9 +146,9 @@ impl EventsState {
             from_block_number_u64 + eth_blocks_step
         };
 
-        let to_block_number = BlockNumber::Number(to_block_number_u64);
+        let to_block_number = BlockNumber::Number(to_block_number_u64.into());
 
-        let from_block_number = BlockNumber::Number(from_block_number_u64);
+        let from_block_number = BlockNumber::Number(from_block_number_u64.into());
 
         let block_logs = EventsState::get_block_logs(
             web3,
