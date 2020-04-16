@@ -154,8 +154,6 @@ impl NewExecutedTransaction {
             ),
         };
 
-        println!("FROM {:?}, TO {:?}", from_account_hex, to_account_hex);
-
         let from_account: Vec<u8> = hex::decode(cut_prefix(&from_account_hex)).unwrap();
         let to_account: Option<Vec<u8>> =
             to_account_hex.map(|value| hex::decode(cut_prefix(&value)).unwrap());

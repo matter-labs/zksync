@@ -67,7 +67,7 @@ table! {
 table! {
     blocks (number) {
         number -> Int8,
-        root_hash -> Text,
+        root_hash -> Bytea,
         fee_account_id -> Int8,
         unprocessed_prior_op_before -> Int8,
         unprocessed_prior_op_after -> Int8,

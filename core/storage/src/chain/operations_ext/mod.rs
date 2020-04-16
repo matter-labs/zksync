@@ -327,11 +327,7 @@ impl<'a> OperationsExtSchema<'a> {
                     where 
                         from_account = address_bytes
                         or
-                        to_account = address_bytes
-                        or
-                        operation->'priority_op'->>'account' = '{address}'
-                        or
-                        operation->'priority_op'->>'eth_address' = '{address}') t
+                        to_account = address_bytes) t
                 order by
                     block_number desc
                 offset 

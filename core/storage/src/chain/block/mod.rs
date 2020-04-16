@@ -3,13 +3,12 @@
 use diesel::dsl::max;
 use diesel::prelude::*;
 use diesel::result::Error as DieselError;
-use diesel::sql_types::Text;
 // Workspace imports
 use models::node::{
     block::{Block, ExecutedOperations},
-    AccountId, BlockNumber, Fr, FranklinOp,
+    AccountId, BlockNumber, FranklinOp,
 };
-use models::{fe_from_hex, fe_to_hex, Action, ActionType, Operation};
+use models::{fe_from_bytes, fe_to_bytes, Action, ActionType, Operation};
 // Local imports
 use self::records::{BlockDetails, StorageBlock};
 use crate::schema::*;
@@ -108,10 +107,8 @@ impl<'a> BlockSchema<'a> {
         // Load transactions for this block.
         let block_transactions = self.get_block_executed_ops(block)?;
 
-        // Change the root hash format from `sync-bl:FF..FF` to `0xFF..FF`.
-        assert!(stored_block.root_hash.starts_with("sync-bl:"));
-        let new_root_hash = fe_from_hex::<Fr>(&format!("0x{}", &stored_block.root_hash[8..]))
-            .expect("Unparsable root hash");
+        // Encode the root hash as `0xFF..FF`.
+        let new_root_hash = fe_from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
 
         // Return the obtained block in the expected format.
         Ok(Some(Block {
@@ -211,7 +208,7 @@ impl<'a> BlockSchema<'a> {
             with eth_ops as ( \
                 select \
                     operations.block_number, \
-                    '0x' || encode(eth_tx_hashes.tx_hash::bytea, 'hex') as tx_hash, \
+                    eth_tx_hashes.tx_hash, \
                     operations.action_type, \
                     operations.created_at \
                 from operations \
@@ -242,6 +239,23 @@ impl<'a> BlockSchema<'a> {
         diesel::sql_query(query).load(self.0.conn())
     }
 
+    /// Helper method for `find_block_by_height_or_hash`. It checks whether
+    /// provided string can be interpreted like a hash, and if so, returns the
+    /// hexadecimal string without prefix.
+    fn try_parse_hex(&self, query: &str) -> Option<String> {
+        const HASH_STRING_SIZE: usize = 32 * 2; // 32 bytes, 2 symbols per byte.
+
+        if query.starts_with("0x") {
+            Some(query[2..].into())
+        } else if query.starts_with("sync-bl:") {
+            Some(query[8..].into())
+        } else if query.len() == HASH_STRING_SIZE && hex::decode(query).is_ok() {
+            Some(query.into())
+        } else {
+            None
+        }
+    }
+
     /// Performs a database search with an uncertain query, which can be either of:
     /// - Hash of commit/verify Ethereum transaction for the block.
     /// - The state root hash of the block.
@@ -250,8 +264,36 @@ impl<'a> BlockSchema<'a> {
     /// Will return `None` if the query is malformed or there is no block that matches
     /// the query.
     pub fn find_block_by_height_or_hash(&self, query: String) -> Option<BlockDetails> {
-        let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
-        let l_query = query.to_lowercase();
+        // Adapt the SQL query based on the input data format.
+        let mut where_condition = String::new();
+
+        // If the input looks like hash, add the hash lookup part.
+        if let Some(hex_query) = self.try_parse_hex(&query) {
+            let hash_lookup = format!(
+                " \
+                or committed.tx_hash = decode('{hex_query}', 'hex') \
+                or verified.tx_hash = decode('{hex_query}', 'hex') \
+                or blocks.root_hash = decode('{hex_query}', 'hex') \
+                ",
+                hex_query = hex_query
+            );
+
+            where_condition += &hash_lookup;
+        };
+
+        // If the input can be interpreted as integer, add the block number lookup part.
+        if let Ok(int_query) = query.parse::<i64>() {
+            let block_lookup = format!("or blocks.number = {}", int_query);
+
+            where_condition += &block_lookup;
+        }
+
+        // If `where` condition is empty (input doesn't look like hash or integer), no query
+        // should be performed.
+        if where_condition.is_empty() {
+            return None;
+        }
+
         // This query does the following:
         // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
         //   tables to collect the data:
@@ -268,7 +310,7 @@ impl<'a> BlockSchema<'a> {
             with eth_ops as ( \
                 select \
                     operations.block_number, \
-                    '0x' || encode(eth_tx_hashes.tx_hash::bytea, 'hex') as tx_hash, \
+                    eth_tx_hashes.tx_hash, \
                     operations.action_type, \
                     operations.created_at \
                 from operations \
@@ -289,19 +331,14 @@ impl<'a> BlockSchema<'a> {
             left join eth_ops verified on \
                 verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
             where false \
-                or lower(committed.tx_hash) = $1 \
-                or lower(verified.tx_hash) = $1 \
-                or lower(blocks.root_hash) = $1 \
-                or blocks.number = {block_number} \
+                {where_condition} \
             order by blocks.number desc \
             limit 1; \
             ",
-            block_number = block_number
+            where_condition = where_condition
         );
-        diesel::sql_query(sql_query)
-            .bind::<Text, _>(l_query)
-            .get_result(self.0.conn())
-            .ok()
+
+        diesel::sql_query(sql_query).get_result(self.0.conn()).ok()
     }
 
     pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
@@ -377,7 +414,7 @@ impl<'a> BlockSchema<'a> {
     pub(crate) fn save_block(&self, block: Block) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             let number = i64::from(block.block_number);
-            let root_hash = format!("sync-bl:{}", fe_to_hex(&block.new_root_hash));
+            let root_hash = fe_to_bytes(&block.new_root_hash);
             let fee_account_id = i64::from(block.fee_account);
             let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
             let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;

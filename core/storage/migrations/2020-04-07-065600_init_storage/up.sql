@@ -34,7 +34,7 @@ CREATE TABLE operations (
 -- Block header entry.
 CREATE TABLE blocks (
     number BIGINT PRIMARY KEY,
-    root_hash TEXT NOT NULL,
+    root_hash BYTEA NOT NULL,
     fee_account_id BIGINT NOT NULL,
     unprocessed_prior_op_before BIGINT NOT NULL,
     unprocessed_prior_op_after BIGINT NOT NULL,
