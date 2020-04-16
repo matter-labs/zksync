@@ -278,8 +278,6 @@ CREATE TABLE data_restore_last_watched_eth_block (
 CREATE INDEX operations_block_index ON operations (block_number);
 CREATE INDEX blocks_root_hash_index ON blocks (root_hash);
 CREATE INDEX tokens_symbol_index ON tokens (symbol);
-CREATE INDEX executed_transactions_hash_index ON executed_transactions (tx_hash);
-CREATE INDEX executed_priority_operations_block_index ON executed_priority_operations (block_number);
 CREATE INDEX eth_ops_binding_op_id_index ON eth_ops_binding (op_id);
 CREATE INDEX eth_tx_hashes_eth_op_id_index ON eth_tx_hashes (eth_op_id);
 
@@ -288,6 +286,17 @@ CREATE INDEX accounts_address_index ON accounts (address);
 CREATE INDEX account_balance_updates_block_index ON account_balance_updates (block_number);
 CREATE INDEX account_creates_block_index ON account_creates (block_number);
 CREATE INDEX account_pubkey_updates_block_index ON account_pubkey_updates (block_number);
+
+CREATE INDEX executed_transactions_block_number_index ON executed_transactions (block_number);
+CREATE INDEX executed_transactions_hash_index ON executed_transactions (tx_hash);
+CREATE INDEX executed_transactions_from_account_index ON executed_transactions (from_account);
+CREATE INDEX executed_transactions_to_account_index ON executed_transactions (to_account);
+
+CREATE INDEX executed_priority_operations_block_index ON executed_priority_operations (block_number);
+CREATE INDEX executed_priority_operations_serialid_index ON executed_priority_operations (priority_op_serialid);
+CREATE INDEX executed_priority_operations_eth_hash_index ON executed_priority_operations (eth_hash);
+CREATE INDEX executed_priority_operations_from_account_index ON executed_priority_operations (from_account);
+CREATE INDEX executed_priority_operations_to_account_index ON executed_priority_operations (to_account);
 
 -- ------------------ --
 -- Extensions section --

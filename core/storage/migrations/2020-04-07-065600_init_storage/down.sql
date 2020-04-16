@@ -1,3 +1,27 @@
+-- Drop all the indexes.
+DROP INDEX operations_block_index;
+DROP INDEX blocks_root_hash_index;
+DROP INDEX tokens_symbol_index;
+DROP INDEX eth_ops_binding_op_id_index;
+DROP INDEX eth_tx_hashes_eth_op_id_index;
+
+DROP INDEX accounts_block_index;
+DROP INDEX accounts_address_index;
+DROP INDEX account_balance_updates_block_index;
+DROP INDEX account_creates_block_index;
+DROP INDEX account_pubkey_updates_block_index;
+
+DROP INDEX executed_transactions_block_number_index;
+DROP INDEX executed_transactions_hash_index;
+DROP INDEX executed_transactions_from_account_index;
+DROP INDEX executed_transactions_to_account_index;
+
+DROP INDEX executed_priority_operations_block_index;
+DROP INDEX executed_priority_operations_serialid_index;
+DROP INDEX executed_priority_operations_eth_hash_index;
+DROP INDEX executed_priority_operations_from_account_index;
+DROP INDEX executed_priority_operations_to_account_index;
+
 -- Clear transactions/operations section
 DROP TABLE IF EXISTS blocks;
 DROP TABLE IF EXISTS operations;
