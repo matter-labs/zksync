@@ -5,7 +5,6 @@ use criterion::{black_box, BatchSize, Bencher, Criterion};
 use models::circuit::account::CircuitAccount;
 use models::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
 use models::merkle_tree::{pedersen_hasher::PedersenHasher, sequential_smt::SparseMerkleTree};
-use std::convert::TryInto;
 
 // This value should be not to high, since the bench will be run for thousands
 // of iterations. Despite the tree cloning time won't affect the bench results
@@ -62,7 +61,7 @@ fn smt_insert_filled(b: &mut Bencher<'_>) {
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
     for (id, account) in accounts.into_iter().enumerate() {
-        tree.insert(id as u32, account.clone())
+        tree.insert(id, account.clone())
     }
     let latest_account = gen_account(N_ACCOUNTS);
 
@@ -72,7 +71,7 @@ fn smt_insert_filled(b: &mut Bencher<'_>) {
         setup,
         |(mut tree, account)| {
             let id = N_ACCOUNTS;
-            tree.insert(black_box(id), account);
+            tree.insert(black_box(id as usize), account);
         },
         BatchSize::SmallInput,
     );
@@ -86,7 +85,7 @@ fn smt_root_hash(b: &mut Bencher<'_>) {
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
     for (id, account) in accounts.into_iter().enumerate() {
-        tree.insert(id as u32, account.clone())
+        tree.insert(id, account.clone())
     }
 
     let setup = || (tree.clone());
