@@ -156,6 +156,7 @@ table! {
         id -> Int4,
         block_number -> Int8,
         block_index -> Nullable<Int4>,
+        tx -> Jsonb,
         operation -> Jsonb,
         tx_hash -> Bytea,
         from_account -> Bytea,

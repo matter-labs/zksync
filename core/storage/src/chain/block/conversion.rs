@@ -2,6 +2,8 @@
 //! These methods are only needed for the `block` module, so they're kept in a
 //! private module.
 
+// Built-in deps
+use std::convert::TryFrom;
 // External imports
 // Workspace imports
 use diesel::prelude::*;
@@ -56,16 +58,18 @@ impl StoredOperation {
 
 impl StoredExecutedTransaction {
     pub fn into_executed_tx(self) -> Result<ExecutedTx, failure::Error> {
-        let franklin_op: FranklinOp =
+        let franklin_tx: FranklinTx =
+            serde_json::from_value(self.tx).expect("Unparsable FranklinTx in db");
+        let franklin_op: Option<FranklinOp> =
             serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db");
         Ok(ExecutedTx {
-            tx: franklin_op
-                .try_get_tx()
-                .expect("FranklinOp should not have tx"),
+            tx: franklin_tx,
             success: self.success,
-            op: Some(franklin_op),
+            op: franklin_op,
             fail_reason: self.fail_reason,
-            block_index: Some(self.block_index.expect("Block idx should be set") as u32),
+            block_index: self
+                .block_index
+                .map(|val| u32::try_from(val).expect("Invalid block index")),
         })
     }
 }
@@ -137,20 +141,21 @@ impl NewExecutedTransaction {
             }
         }
 
-        let operation = serde_json::to_value(&exec_tx.tx).expect("No operation provided");
+        let tx = serde_json::to_value(&exec_tx.tx).expect("Cannot serialize tx");
+        let operation = serde_json::to_value(&exec_tx.op).expect("Cannot serialize operation");
 
         let (from_account_hex, to_account_hex): (String, Option<String>) = match exec_tx.tx {
             FranklinTx::Withdraw(_) | FranklinTx::Transfer(_) => (
-                serde_json::from_value(operation["from"].clone()).unwrap(),
-                serde_json::from_value(operation["to"].clone()).unwrap(),
+                serde_json::from_value(tx["from"].clone()).unwrap(),
+                serde_json::from_value(tx["to"].clone()).unwrap(),
             ),
             FranklinTx::ChangePubKey(_) => (
-                serde_json::from_value(operation["account"].clone()).unwrap(),
-                serde_json::from_value(operation["newPkHash"].clone()).unwrap(),
+                serde_json::from_value(tx["account"].clone()).unwrap(),
+                serde_json::from_value(tx["newPkHash"].clone()).unwrap(),
             ),
             FranklinTx::Close(_) => (
-                serde_json::from_value(operation["account"].clone()).unwrap(),
-                serde_json::from_value(operation["account"].clone()).unwrap(),
+                serde_json::from_value(tx["account"].clone()).unwrap(),
+                serde_json::from_value(tx["account"].clone()).unwrap(),
             ),
         };
 
@@ -163,6 +168,7 @@ impl NewExecutedTransaction {
             tx_hash: exec_tx.tx.hash().as_ref().to_vec(),
             from_account,
             to_account,
+            tx,
             operation,
             success: exec_tx.success,
             fail_reason: exec_tx.fail_reason,

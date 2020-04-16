@@ -58,6 +58,7 @@ pub struct StoredExecutedPriorityOperation {
 pub struct NewExecutedTransaction {
     pub block_number: i64,
     pub block_index: Option<i32>,
+    pub tx: Value,
     pub operation: Value,
     pub tx_hash: Vec<u8>,
     pub from_account: Vec<u8>,
@@ -74,6 +75,7 @@ pub struct StoredExecutedTransaction {
     pub id: i32,
     pub block_number: i64,
     pub block_index: Option<i32>,
+    pub tx: Value,
     pub operation: Value,
     pub tx_hash: Vec<u8>,
     pub from_account: Vec<u8>,

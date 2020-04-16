@@ -300,7 +300,7 @@ impl<'a> OperationsExtSchema<'a> {
                 from (
                     with vars (address_bytes) as ( select decode('{address}', 'hex') )
                     select
-                        operation as tx,
+                        tx,
                         'sync-tx:' || encode(tx_hash, 'hex') as hash,
                         null as pq_id,
                         success,

@@ -74,6 +74,7 @@ CREATE TABLE executed_transactions (
     block_number BIGINT NOT NULL,
     block_index INT,
     -- operation data
+    tx jsonb NOT NULL,
     operation jsonb NOT NULL,
     -- operation metadata
     tx_hash bytea NOT NULL,

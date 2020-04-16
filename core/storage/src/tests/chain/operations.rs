@@ -45,6 +45,7 @@ fn executed_operations() {
         let executed_tx = NewExecutedTransaction {
             block_number: 1,
             tx_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
+            tx: Default::default(),
             operation: Default::default(),
             from_account: Default::default(),
             to_account: None,
@@ -63,6 +64,7 @@ fn executed_operations() {
 
         assert_eq!(stored_operation.block_number, executed_tx.block_number);
         assert_eq!(stored_operation.tx_hash, executed_tx.tx_hash);
+        assert_eq!(stored_operation.tx, executed_tx.tx);
         assert_eq!(stored_operation.operation, executed_tx.operation);
         assert_eq!(stored_operation.from_account, executed_tx.from_account);
         assert_eq!(stored_operation.to_account, executed_tx.to_account);
