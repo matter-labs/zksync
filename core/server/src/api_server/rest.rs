@@ -479,8 +479,7 @@ fn handle_block_search(
 
         if let Some(block) = block.clone() {
             if block.verified_at.is_some() {
-                data.cache_blocks_by_height_or_hash
-                    .insert(query, block.clone());
+                data.cache_blocks_by_height_or_hash.insert(query, block);
             }
         }
 

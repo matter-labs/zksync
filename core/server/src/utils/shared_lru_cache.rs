@@ -15,6 +15,6 @@ impl<K: Eq + Hash, V: Clone> SharedLruCache<K, V> {
     }
 
     pub fn get(&self, key: &K) -> Option<V> {
-        self.0.lock().unwrap().get_mut(&key).map(|a| a.clone())
+        self.0.lock().unwrap().get_mut(&key).cloned()
     }
 }
