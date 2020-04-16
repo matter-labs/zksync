@@ -176,65 +176,63 @@ impl OperationNotifier {
         &mut self,
         serial_id: u32,
     ) -> Result<Option<StoredExecutedPriorityOperation>, failure::Error> {
-        Ok(
-            if let Some(executed_op) = self
-                .cache_of_executed_priority_operations
-                .get_mut(&serial_id)
-            {
-                Some(executed_op.clone())
-            } else {
-                let storage = self.db_pool.access_storage_fragile()?;
-                let executed_op = storage
-                    .chain()
-                    .operations_schema()
-                    .get_executed_priority_operation(serial_id)?;
+        let res = if let Some(executed_op) = self
+            .cache_of_executed_priority_operations
+            .get_mut(&serial_id)
+        {
+            Some(executed_op.clone())
+        } else {
+            let storage = self.db_pool.access_storage_fragile()?;
+            let executed_op = storage
+                .chain()
+                .operations_schema()
+                .get_executed_priority_operation(serial_id)?;
 
-                if let Some(executed_op) = executed_op.clone() {
-                    self.cache_of_executed_priority_operations
-                        .insert(serial_id, executed_op);
-                }
+            if let Some(executed_op) = executed_op.clone() {
+                self.cache_of_executed_priority_operations
+                    .insert(serial_id, executed_op);
+            }
 
-                executed_op
-            },
-        )
+            executed_op
+        };
+        Ok(res)
     }
 
     fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, failure::Error> {
-        Ok(
-            if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
-                block_info.clone()
-            } else {
-                let storage = self.db_pool.access_storage_fragile()?;
-                let block_info = if let Some(block_with_op) =
-                    storage.chain().block_schema().get_block(block_number)?
+        let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
+            block_info.clone()
+        } else {
+            let storage = self.db_pool.access_storage_fragile()?;
+            let block_info = if let Some(block_with_op) =
+                storage.chain().block_schema().get_block(block_number)?
+            {
+                let verified = if let Some(block_verify) = storage
+                    .chain()
+                    .operations_schema()
+                    .get_operation(block_number, ActionType::VERIFY)
                 {
-                    let verified = if let Some(block_verify) = storage
-                        .chain()
-                        .operations_schema()
-                        .get_operation(block_number, ActionType::VERIFY)
-                    {
-                        block_verify.confirmed
-                    } else {
-                        false
-                    };
-
-                    BlockInfo {
-                        block_number: i64::from(block_with_op.block_number),
-                        committed: true,
-                        verified,
-                    }
+                    block_verify.confirmed
                 } else {
-                    bail!("Transaction is executed but block is not committed. (bug)");
+                    false
                 };
 
-                if block_info.verified {
-                    self.cache_of_blocks_info
-                        .insert(block_number, block_info.clone());
+                BlockInfo {
+                    block_number: i64::from(block_with_op.block_number),
+                    committed: true,
+                    verified,
                 }
+            } else {
+                bail!("Transaction is executed but block is not committed. (bug)");
+            };
 
-                block_info
-            },
-        )
+            if block_info.verified {
+                self.cache_of_blocks_info
+                    .insert(block_number, block_info.clone());
+            }
+
+            block_info
+        };
+        Ok(res)
     }
 
     async fn handle_priority_op_sub(
@@ -329,29 +327,28 @@ impl OperationNotifier {
         &mut self,
         hash: &TxHash,
     ) -> Result<Option<TxReceiptResponse>, failure::Error> {
-        Ok(
-            if let Some(tx_receipt) = self
-                .cache_of_transaction_receipts
-                .get_mut(&hash.as_ref().to_vec())
-            {
-                Some(tx_receipt.clone())
-            } else {
-                let storage = self.db_pool.access_storage_fragile()?;
-                let tx_receipt = storage
-                    .chain()
-                    .operations_ext_schema()
-                    .tx_receipt(hash.as_ref())?;
+        let res = if let Some(tx_receipt) = self
+            .cache_of_transaction_receipts
+            .get_mut(&hash.as_ref().to_vec())
+        {
+            Some(tx_receipt.clone())
+        } else {
+            let storage = self.db_pool.access_storage_fragile()?;
+            let tx_receipt = storage
+                .chain()
+                .operations_ext_schema()
+                .tx_receipt(hash.as_ref())?;
 
-                if let Some(tx_receipt) = tx_receipt.clone() {
-                    if tx_receipt.verified {
-                        self.cache_of_transaction_receipts
-                            .insert(hash.as_ref().to_vec(), tx_receipt);
-                    }
+            if let Some(tx_receipt) = tx_receipt.clone() {
+                if tx_receipt.verified {
+                    self.cache_of_transaction_receipts
+                        .insert(hash.as_ref().to_vec(), tx_receipt);
                 }
+            }
 
-                tx_receipt
-            },
-        )
+            tx_receipt
+        };
+        Ok(res)
     }
 
     async fn handle_transaction_sub(

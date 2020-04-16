@@ -107,7 +107,7 @@ impl AppState {
         &self,
         transaction_hash: Vec<u8>,
     ) -> Result<Option<TxReceiptResponse>, actix_web::error::Error> {
-        Ok(
+        let res =
             if let Some(tx_receipt) = self.cache_of_transaction_receipts.get(&transaction_hash) {
                 Some(tx_receipt)
             } else {
@@ -126,112 +126,107 @@ impl AppState {
                 }
 
                 tx_receipt
-            },
-        )
+            };
+        Ok(res)
     }
 
     fn get_priority_op_receipt(
         &self,
         id: u32,
     ) -> Result<PriorityOpReceiptResponse, actix_web::error::Error> {
-        Ok(
-            if let Some(receipt) = self.cache_of_priority_op_receipts.get(&id) {
-                receipt
-            } else {
-                let storage = self.access_storage()?;
-                let receipt = storage
-                    .chain()
-                    .operations_ext_schema()
-                    .get_priority_op_receipt(id)
-                    .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        let res = if let Some(receipt) = self.cache_of_priority_op_receipts.get(&id) {
+            receipt
+        } else {
+            let storage = self.access_storage()?;
+            let receipt = storage
+                .chain()
+                .operations_ext_schema()
+                .get_priority_op_receipt(id)
+                .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-                if receipt.verified {
-                    self.cache_of_priority_op_receipts
-                        .insert(id, receipt.clone());
-                }
+            if receipt.verified {
+                self.cache_of_priority_op_receipts
+                    .insert(id, receipt.clone());
+            }
 
-                receipt
-            },
-        )
+            receipt
+        };
+        Ok(res)
     }
 
     fn get_block_executed_ops(
         &self,
         block_id: u32,
     ) -> Result<Vec<ExecutedOperations>, actix_web::error::Error> {
-        Ok(
-            if let Some(executed_ops) = self.cache_of_block_executed_ops.get(&block_id) {
-                executed_ops
-            } else {
-                let storage = self.access_storage()?;
-                let executed_ops = storage
-                    .chain()
-                    .block_schema()
-                    .get_block_executed_ops(block_id)
-                    .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        let res = if let Some(executed_ops) = self.cache_of_block_executed_ops.get(&block_id) {
+            executed_ops
+        } else {
+            let storage = self.access_storage()?;
+            let executed_ops = storage
+                .chain()
+                .block_schema()
+                .get_block_executed_ops(block_id)
+                .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-                if let Ok(block_details) =
-                    storage.chain().block_schema().load_block_range(block_id, 1)
-                {
-                    if !block_details.is_empty() && block_details[0].verified_at.is_some() {
-                        self.cache_of_block_executed_ops
-                            .insert(block_id, executed_ops.clone());
-                    }
+            if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1)
+            {
+                if !block_details.is_empty() && block_details[0].verified_at.is_some() {
+                    self.cache_of_block_executed_ops
+                        .insert(block_id, executed_ops.clone());
                 }
+            }
 
-                executed_ops
-            },
-        )
+            executed_ops
+        };
+        Ok(res)
     }
 
     fn get_block_info(
         &self,
         block_id: u32,
     ) -> Result<Option<BlockDetails>, actix_web::error::Error> {
-        Ok(
-            if let Some(block) = self.cache_of_blocks_info.get(&block_id) {
-                Some(block)
-            } else {
-                let storage = self.access_storage()?;
-                let mut blocks = storage
-                    .chain()
-                    .block_schema()
-                    .load_block_range(block_id, 1)
-                    .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        let res = if let Some(block) = self.cache_of_blocks_info.get(&block_id) {
+            Some(block)
+        } else {
+            let storage = self.access_storage()?;
+            let mut blocks = storage
+                .chain()
+                .block_schema()
+                .load_block_range(block_id, 1)
+                .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-                if !blocks.is_empty() && blocks[0].verified_at.is_some() {
-                    self.cache_of_blocks_info
-                        .insert(block_id, blocks[0].clone());
-                }
+            if !blocks.is_empty() && blocks[0].verified_at.is_some() {
+                self.cache_of_blocks_info
+                    .insert(block_id, blocks[0].clone());
+            }
 
-                blocks.pop()
-            },
-        )
+            blocks.pop()
+        };
+        Ok(res)
     }
 
     fn get_block_by_height_or_hash(
         &self,
         query: String,
     ) -> Result<Option<BlockDetails>, actix_web::error::Error> {
-        Ok(
-            if let Some(block) = self.cache_blocks_by_height_or_hash.get(&query) {
-                Some(block)
-            } else {
-                let storage = self.access_storage()?;
-                let block = storage
-                    .chain()
-                    .block_schema()
-                    .find_block_by_height_or_hash(query.clone());
+        let res = if let Some(block) = self.cache_blocks_by_height_or_hash.get(&query) {
+            Some(block)
+        } else {
+            let storage = self.access_storage()?;
+            let block = storage
+                .chain()
+                .block_schema()
+                .find_block_by_height_or_hash(query.clone());
 
-                if let Some(block) = block.clone() {
-                    if block.verified_at.is_some() {
-                        self.cache_blocks_by_height_or_hash.insert(query, block);
-                    }
+            if let Some(block) = block.clone() {
+                if block.verified_at.is_some() {
+                    self.cache_blocks_by_height_or_hash.insert(query, block);
                 }
+            }
 
-                block
-            },
-        )
+            block
+        };
+        Ok(res)
     }
 }
 
