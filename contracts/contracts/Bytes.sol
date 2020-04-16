@@ -73,6 +73,12 @@ library Bytes {
         }
     }
 
+    function bytesToUInt160(bytes memory _bytes, uint256 _start) internal pure returns (uint160 r) {
+        require(_bytes.length >= (_start + 20), "btu20");
+        assembly {
+            r := mload(add(add(_bytes, 0x14), _start))
+        }
+    }
 
     function bytesToBytes32(bytes memory  _input) internal pure returns (bytes32 _output) {
         require (_input.length == 0x20);
@@ -145,6 +151,11 @@ library Bytes {
     function readUInt128(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint128 r) {
         new_offset = _offset + 16;
         r = bytesToUInt128(_data, _offset);
+    }
+
+    function readUInt160(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint160 r) {
+        new_offset = _offset + 20;
+        r = bytesToUInt160(_data, _offset);
     }
 
     function readAddress(bytes memory _data, uint _offset) internal pure returns (uint new_offset, address r) {

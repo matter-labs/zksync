@@ -14,8 +14,7 @@ contract OperationsTest {
 
         bytes memory pubdata = Operations.writeDepositPubdata(x);
         //require(pubdata.length == Operations.PackedFullExitPubdataBytes());
-        (uint offset, Operations.Deposit memory r) = Operations.readDepositPubdata(pubdata, 0);
-        require(offset == pubdata.length, "incorrect offset");
+        Operations.Deposit memory r = Operations.readDepositPubdata(pubdata, 0);
 
         require(x.tokenId == r.tokenId, "tokenId mismatch");
         require(x.amount == r.amount,   "amount mismatch");
@@ -71,7 +70,7 @@ contract OperationsTest {
         });
 
         bytes memory pubdata = Operations.writePartialExitPubdata(x);
-        Operations.PartialExit memory r = Operations.readPartialExitPubdata(pubdata, 0);
+        Operations.PartialExit memory r = Operations.readPartialExitPubdata(pubdata);
 
         require(x.owner == r.owner,     "owner mismatch");
         require(x.tokenId == r.tokenId, "tokenId mismatch");
@@ -79,7 +78,7 @@ contract OperationsTest {
     }
 
     function parseDepositFromPubdata(bytes calldata _pubdata) external pure returns (uint16 tokenId, uint128 amount, address owner) {
-        (, Operations.Deposit memory r) = Operations.readDepositPubdata(_pubdata, 0);
+        Operations.Deposit memory r = Operations.readDepositPubdata(_pubdata, 0);
         return (r.tokenId, r.amount, r.owner);
     }
 

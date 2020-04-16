@@ -150,7 +150,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         for (uint64 i = 0; i < toProcess; i++) {
             uint64 id = firstPriorityRequestId + i;
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
-                ( , Operations.Deposit memory op) = Operations.readDepositPubdata(priorityRequests[id].pubData, 0);
+                Operations.Deposit memory op = Operations.readDepositPubdata(priorityRequests[id].pubData, 0);
                 balancesToWithdraw[op.owner][op.tokenId] += op.amount;
             }
             delete priorityRequests[id];
@@ -670,7 +670,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             OnchainOperation memory op = onchainOps[current];
             if (op.opType == Operations.OpType.PartialExit) {
                 // partial exit was successful, accrue balance
-                Operations.PartialExit memory data = Operations.readPartialExitPubdata(op.pubData, 0);
+                Operations.PartialExit memory data = Operations.readPartialExitPubdata(op.pubData);
                 storeWithdrawalAsPending(data.owner, data.tokenId, data.amount);
             }
             if (op.opType == Operations.OpType.FullExit) {
