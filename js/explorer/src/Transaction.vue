@@ -39,7 +39,7 @@
 <script>
 
 import store from './store';
-import { readableEther } from './utils';
+import { readableEther, formatDate } from './utils';
 import { clientPromise } from './Client';
 import timeConstants from './timeConstants';
 
@@ -119,11 +119,9 @@ export default {
             if (Object.keys(this.txData).length == 0) 
                 return [];
 
-            const tx_hash = (() => {if (this.txData.tx_type  == "Deposit" || this.txData.tx_type == "FullExit") {
-                return `<code><a href="${this.blockchainExplorerTx}/${this.tx_hash}">${this.tx_hash}</a></code> <span class="onchain_icon">onchain</span>`;
-            } else {
-                return `<code>${this.tx_hash}</code>`;
-            }})();
+            const tx_hash = this.txData.tx_type  == "Deposit" || this.txData.tx_type == "FullExit"
+                ? `<code><a href="${this.blockchainExplorerTx}/${this.tx_hash}">${this.tx_hash}</a></code> <span class="onchain_icon">onchain</span>`
+                : `<code>${this.tx_hash}</code>`;
 
             const link_from 
                 = this.txData.tx_type == 'Deposit' ? `${this.blockchainExplorerAddress}/${this.txData.from}`
@@ -131,7 +129,7 @@ export default {
 
             const link_to 
                 = this.txData.tx_type == 'Withdraw' ? `${this.blockchainExplorerAddress}/${this.txData.to}`
-                : this.txData.tx_type == 'ChangePubKeyOffchain' ? ''
+                : this.txData.tx_type == 'ChangePubKey' ? ''
                 : `${this.routerBase}accounts/${this.txData.to}`;
 
             const onchain_from
@@ -150,13 +148,14 @@ export default {
                 = this.txData.tx_type == 'Withdraw' ? `target="_blank" rel="noopener noreferrer"`
                 : '';
 
-            const rows = this.txData.tx_type == "ChangePubKeyOffchain"
+            const rows = this.txData.tx_type == "ChangePubKey"
                 ? [
                     { name: 'Tx hash',                  value: tx_hash},
                     { name: "Type",                     value: `<b>${this.txData.tx_type}</b>`   },
                     { name: "Status",                   value: `<b>${this.txData.status}</b>` },
                     { name: "Account",                  value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
                     { name: "New signer key hash",      value: `<code>${this.txData.to}</code>`},
+                    { name: "Created at",               value: formatDate(this.txData.created_at) },
                 ]
                 : [
                     { name: 'Tx hash',        value: tx_hash},
@@ -166,10 +165,15 @@ export default {
                     { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
                     { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${readableEther(this.txData.amount)}`    },
                     { name: "fee",            value: `<b>${this.txData.feeTokenName}</b> ${readableEther(this.txData.fee)}` },
+                    { name: "Created at",               value: formatDate(this.txData.created_at) },
                 ];
 
             if (this.txData.nonce != -1) {
                 rows.push({ name: "Nonce",      value: this.txData.nonce });
+            }
+
+            if (this.txData.fail_reason) {
+                rows.push({ name: "Fail reason:", value: `<b>${this.txData.fail_reason}</b>` });
             }
 
             return rows;

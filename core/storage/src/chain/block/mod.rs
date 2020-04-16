@@ -11,7 +11,7 @@ use models::node::{
 };
 use models::{fe_from_hex, fe_to_hex, Action, ActionType, Operation};
 // Local imports
-use self::records::{BlockDetails, StorageBlock};
+use self::records::{BlockDetails, BlockTransactionItem, StorageBlock};
 use crate::schema::*;
 use crate::StorageProcessor;
 use crate::{
@@ -156,6 +156,42 @@ impl<'a> BlockSchema<'a> {
                 ExecutedOperations::PriorityOp(priorop) => Some(priorop.op),
             })
             .collect())
+    }
+
+    pub fn get_block_transactions(
+        &self,
+        block: BlockNumber,
+    ) -> QueryResult<Vec<BlockTransactionItem>> {
+        let query = format!(
+            "\
+            with transactions as ( \
+                select \
+                    '0x' || encode(tx_hash, 'hex') as tx_hash, \
+                    tx as op, \
+                    block_number, \
+                    created_at \
+                from executed_transactions \
+                left join mempool on hash = tx_hash \
+            ), priority_ops as ( \
+                select \
+                    '0x' || encode(eth_hash, 'hex') as tx_hash, \
+                    operation as op, \
+                    block_number, \
+                    created_at \
+                from executed_priority_operations \
+            ), everything as ( \
+                select * from transactions \
+                union all \
+                select * from priority_ops \
+            ) \
+            select * from everything \
+            where block_number = {block} \
+            order by created_at
+        ",
+            block = block
+        );
+
+        diesel::sql_query(query).load(self.0.conn())
     }
 
     /// Given the block number, loads all the operations that were executed in that block.

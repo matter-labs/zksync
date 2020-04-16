@@ -63,16 +63,11 @@ import store from './store';
 import { Client, clientPromise } from './Client';
 import ClosableJumbotron from './ClosableJumbotron.vue';
 import SearchField from './SearchField.vue';
+import { formatDate } from './utils';
 const components = { 
     ClosableJumbotron,
     SearchField,
 };
-
-function formatTime(timeStr) {
-    return timeStr 
-        ? timeStr.toString().split('T')[0] + " " + timeStr.toString().split('T')[1].split('.')[0]
-        : null;
-}
 
 export default {
     name: 'home',
@@ -173,8 +168,8 @@ export default {
                     block_number:   b.block_number,
                     status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
                     new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
-                    committed_at:   formatTime(b.committed_at),
-                    verified_at:    formatTime(b.verified_at),
+                    committed_at:   formatDate(b.committed_at),
+                    verified_at:    formatDate(b.verified_at),
                 }));
                 this.currentPage = this.page;
                 this.ready = true;

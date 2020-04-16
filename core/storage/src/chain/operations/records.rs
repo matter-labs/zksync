@@ -47,6 +47,7 @@ pub struct StoredExecutedPriorityOperation {
     pub deadline_block: i64,
     pub eth_fee: BigDecimal,
     pub eth_hash: Vec<u8>,
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]

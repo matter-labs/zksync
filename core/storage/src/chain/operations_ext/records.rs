@@ -1,22 +1,12 @@
 // External imports
 use chrono::prelude::*;
-use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text};
+use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value;
 // Workspace imports
 // Local imports
 use crate::prover::records::ProverRun;
 use crate::schema::*;
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct AccountTransaction {
-    pub tx: Value,
-    pub tx_hash: String,
-    pub success: bool,
-    pub fail_reason: Option<String>,
-    pub committed: bool,
-    pub verified: bool,
-}
 
 #[derive(Debug, Insertable)]
 #[table_name = "mempool"]
@@ -58,6 +48,9 @@ pub struct TransactionsHistoryItem {
 
     #[sql_type = "Bool"]
     pub verified: bool,
+
+    #[sql_type = "Timestamp"]
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,4 +96,10 @@ pub struct TxByHashResponse {
 
     #[sql_type = "BigInt"]
     pub nonce: i64, // all txs
+
+    #[sql_type = "Timestamp"]
+    pub created_at: String,
+
+    #[sql_type = "Nullable<Text>"]
+    pub fail_reason: Option<String>,
 }

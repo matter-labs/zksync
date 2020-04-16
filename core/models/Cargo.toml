@@ -23,6 +23,7 @@ log = "0.4"
 futures = { version = "0.3", features = ["compat"] }
 ethsign = "0.7.3"
 tiny-keccak = "1.4.2"
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 
 [dev-dependencies]
 criterion = "0.3.0"

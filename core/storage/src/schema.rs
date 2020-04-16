@@ -146,6 +146,7 @@ table! {
         deadline_block -> Int8,
         eth_fee -> Numeric,
         eth_hash -> Bytea,
+        created_at -> Timestamp,
     }
 }
 

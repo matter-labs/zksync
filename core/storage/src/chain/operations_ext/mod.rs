@@ -1,15 +1,13 @@
 // Built-in deps
 // External imports
 use diesel::prelude::*;
-use itertools::Itertools;
 use serde_json::value::Value;
 // Workspace imports
-use models::node::{Address, PubKeyHash, TokenId};
+use models::node::{Address, TokenId};
 use models::ActionType;
 // Local imports
 use self::records::{
-    AccountTransaction, PriorityOpReceiptResponse, ReadTx, TransactionsHistoryItem,
-    TxByHashResponse, TxReceiptResponse,
+    PriorityOpReceiptResponse, ReadTx, TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
 };
 use crate::schema::*;
 use crate::tokens::TokensSchema;
@@ -136,40 +134,46 @@ impl<'a> OperationsExtSchema<'a> {
     /// in the list of executed operations.
     fn find_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
         // TODO: Maybe move the transformations to api_server?
-        let tx: Option<StoredExecutedTransaction> =
-            OperationsSchema(self.0).get_executed_operation(hash)?;
+        let query_result = executed_transactions::table
+            .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
+            .filter(executed_transactions::tx_hash.eq(hash))
+            .first::<(StoredExecutedTransaction, Option<ReadTx>)>(self.0.conn())
+            .optional()?;
 
-        if let Some(tx) = tx {
+        if let Some((tx, mempool_tx)) = query_result {
             let block_number = tx.block_number;
-            let operation = tx.operation.unwrap_or_else(|| {
-                log::debug!("operation empty in executed_transactions");
-                Value::default()
+            let fail_reason = tx.fail_reason.clone();
+            let created_at = mempool_tx
+                .as_ref()
+                .map(|tx| format!("{:?}", tx.created_at))
+                .unwrap_or_else(|| "unknown created at".to_owned());
+            let operation = mempool_tx.map(|tx| tx.tx).unwrap_or_else(|| {
+                log::debug!("operation empty in mempool");
+                tx.operation.map(|op| op["tx"].clone()).unwrap_or_else(|| {
+                    log::debug!("operation empty in executed_transactions");
+                    Value::default()
+                })
             });
 
-            let tx_type = operation["type"].as_str().unwrap_or("unknown type");
-            let tx_token = operation["tx"]["token"].as_i64().unwrap_or(-1);
-            let tx_amount = operation["tx"]["amount"]
-                .as_str()
-                .unwrap_or("unknown amount");
-            let nonce = operation["tx"]["nonce"].as_i64().unwrap_or(-1);
+            let tx_token = operation["token"].as_i64().unwrap_or(-1);
+            let tx_type = operation["type"].as_str().unwrap_or("unknown tx_type");
+            let tx_amount = operation["amount"].as_str().unwrap_or("unknown amount");
+            let nonce = operation["nonce"].as_i64().unwrap_or(-1);
             let (tx_from, tx_to, tx_fee) = match tx_type {
                 "Withdraw" | "Transfer" | "TransferToNew" => (
-                    operation["tx"]["from"]
+                    operation["from"]
                         .as_str()
                         .unwrap_or("unknown from")
                         .to_string(),
-                    operation["tx"]["to"]
-                        .as_str()
-                        .unwrap_or("unknown to")
-                        .to_string(),
-                    operation["tx"]["fee"].as_str().map(|v| v.to_string()),
+                    operation["to"].as_str().unwrap_or("unknown to").to_string(),
+                    operation["fee"].as_str().map(|v| v.to_string()),
                 ),
-                "ChangePubKeyOffchain" => (
-                    operation["tx"]["account"]
+                "ChangePubKey" => (
+                    operation["account"]
                         .as_str()
                         .unwrap_or("unknown from")
                         .to_string(),
-                    operation["tx"]["newPkHash"]
+                    operation["newPkHash"]
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
@@ -197,6 +201,8 @@ impl<'a> OperationsExtSchema<'a> {
                 fee: tx_fee,
                 block_number,
                 nonce,
+                created_at,
+                fail_reason,
             }));
         };
 
@@ -215,6 +221,7 @@ impl<'a> OperationsExtSchema<'a> {
         if let Some(tx) = tx {
             let operation = tx.operation;
             let block_number = tx.block_number;
+            let created_at = format!("{:?}", &tx.created_at);
 
             let tx_type = operation["type"].as_str().unwrap_or("unknown type");
             let tx_token = operation["priority_op"]["token"]
@@ -267,6 +274,8 @@ impl<'a> OperationsExtSchema<'a> {
                 fee: tx_fee,
                 block_number,
                 nonce: -1,
+                created_at,
+                fail_reason: None,
             }));
         };
 
@@ -299,7 +308,8 @@ impl<'a> OperationsExtSchema<'a> {
                 success,
                 fail_reason,
                 coalesce(commited, false) as commited,
-                coalesce(verified, false) as verified
+                coalesce(verified, false) as verified,
+                created_at
             from (
                 select
                     *
@@ -310,7 +320,8 @@ impl<'a> OperationsExtSchema<'a> {
                         null as pq_id,
                         success,
                         fail_reason,
-                        block_number
+                        block_number,
+                        created_at
                     from
                         mempool
                     left join
@@ -330,7 +341,8 @@ impl<'a> OperationsExtSchema<'a> {
                         priority_op_serialid as pq_id,
                         null as success,
                         null as fail_reason,
-                        block_number
+                        block_number,
+                        created_at
                     from 
                         executed_priority_operations
                     where 
@@ -404,67 +416,5 @@ impl<'a> OperationsExtSchema<'a> {
             }
         }
         Ok(tx_history)
-    }
-
-    /// Loads all the transactions that affected the certain account.
-    pub fn get_account_transactions(
-        &self,
-        address: &PubKeyHash,
-    ) -> QueryResult<Vec<AccountTransaction>> {
-        let all_txs: Vec<_> = mempool::table
-            .filter(mempool::primary_account_address.eq(address.data.to_vec()))
-            .left_join(
-                executed_transactions::table.on(executed_transactions::tx_hash.eq(mempool::hash)),
-            )
-            .left_join(
-                operations::table
-                    .on(operations::block_number.eq(executed_transactions::block_number)),
-            )
-            .load::<(
-                ReadTx,
-                Option<StoredExecutedTransaction>,
-                Option<StoredOperation>,
-            )>(self.0.conn())?;
-
-        let res = all_txs
-            .into_iter()
-            .group_by(|(mempool_tx, _, _)| mempool_tx.hash.clone())
-            .into_iter()
-            .map(|(_op_id, mut group_iter)| {
-                // TODO: replace the query with pivot
-                let (mempool_tx, executed_tx, operation) = group_iter.next().unwrap();
-                let mut res = AccountTransaction {
-                    tx: mempool_tx.tx,
-                    tx_hash: hex::encode(mempool_tx.hash.as_slice()),
-                    success: false,
-                    fail_reason: None,
-                    committed: false,
-                    verified: false,
-                };
-                if let Some(executed_tx) = executed_tx {
-                    res.success = executed_tx.success;
-                    res.fail_reason = executed_tx.fail_reason;
-                }
-                if let Some(operation) = operation {
-                    if operation.action_type == ActionType::COMMIT.to_string() {
-                        res.committed = operation.confirmed;
-                    } else {
-                        res.verified = operation.confirmed;
-                    }
-                }
-                if let Some((_mempool_tx, _executed_tx, operation)) = group_iter.next() {
-                    if let Some(operation) = operation {
-                        if operation.action_type == ActionType::COMMIT.to_string() {
-                            res.committed = operation.confirmed;
-                        } else {
-                            res.verified = operation.confirmed;
-                        }
-                    };
-                }
-                res
-            })
-            .collect::<Vec<AccountTransaction>>();
-
-        Ok(res)
     }
 }
