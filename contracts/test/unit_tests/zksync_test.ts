@@ -76,7 +76,7 @@ describe("ZK Sync signature verification unit tests", function () {
         for (const message of [Buffer.from("msg", "ascii"), Buffer.alloc(0), Buffer.alloc(10, 1)]) {
             const signature = await wallet.signMessage(message);
             const sinedMessage = Buffer.concat([Buffer.from(`\x19Ethereum Signed Message:\n${message.length}`, "ascii"), message]);
-            const address = await testContract.testVerifyEthereumSignature(signature, sinedMessage);
+            const address = await testContract.testRecoverAddressFromEthSignature(signature, sinedMessage);
             expect(address, `address mismatch, message ${message.toString("hex")}`).eq(wallet.address);
         }
     });
