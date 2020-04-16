@@ -59,6 +59,8 @@ CREATE TABLE executed_priority_operations (
     -- operation data
     operation jsonb NOT NULL,
     -- operation metadata
+    from_account bytea NOT NULL,
+    to_account bytea NOT NULL,
     priority_op_serialid BIGINT NOT NULL,
     deadline_block BIGINT NOT NULL,
     eth_fee NUMERIC NOT NULL,
@@ -75,6 +77,8 @@ CREATE TABLE executed_transactions (
     operation jsonb NOT NULL,
     -- operation metadata
     tx_hash bytea NOT NULL,
+    from_account bytea NOT NULL,
+    to_account bytea,
     success bool NOT NULL,
     fail_reason TEXT,
     primary_account_address bytea NOT NULL,

@@ -308,11 +308,11 @@ impl<'a> OperationsExtSchema<'a> {
                     from
                         executed_transactions
                     where
-                        operation->>'from' = '{address}'
+                        from_account = decode('{address}', 'hex')
                         or
-                        operation->>'to' = '{address}'
+                        to_account = decode('{address}', 'hex')
                         or
-                        operation->>'account' = '{address}'
+                        primary_account_address = decode('{address}', 'hex')
                     union all
                     select
                         operation as tx,
@@ -324,9 +324,9 @@ impl<'a> OperationsExtSchema<'a> {
                     from 
                         executed_priority_operations
                     where 
-                        operation->'priority_op'->>'from' = '{address}'
+                        from_account = decode('{address}', 'hex')
                         or
-                        operation->'priority_op'->>'to' = '{address}'
+                        to_account = decode('{address}', 'hex')
                         or
                         operation->'priority_op'->>'account' = '{address}'
                         or
@@ -355,7 +355,7 @@ impl<'a> OperationsExtSchema<'a> {
             using 
                 (block_number)
             ",
-            address = format!("{:#?}", address),
+            address = hex::encode(address.as_ref().to_vec()),
             offset = offset,
             limit = limit
         );

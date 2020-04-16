@@ -46,6 +46,8 @@ fn executed_operations() {
             block_number: 1,
             tx_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
             operation: Default::default(),
+            from_account: Default::default(),
+            to_account: None,
             success: true,
             fail_reason: None,
             block_index: None,
@@ -62,6 +64,8 @@ fn executed_operations() {
         assert_eq!(stored_operation.block_number, executed_tx.block_number);
         assert_eq!(stored_operation.tx_hash, executed_tx.tx_hash);
         assert_eq!(stored_operation.operation, executed_tx.operation);
+        assert_eq!(stored_operation.from_account, executed_tx.from_account);
+        assert_eq!(stored_operation.to_account, executed_tx.to_account);
         assert_eq!(stored_operation.success, executed_tx.success);
         assert_eq!(stored_operation.fail_reason, executed_tx.fail_reason);
         assert_eq!(stored_operation.block_index, executed_tx.block_index);
@@ -85,6 +89,8 @@ fn executed_priority_operations() {
             block_number: 1,
             block_index: 1,
             operation: Default::default(),
+            from_account: Default::default(),
+            to_account: Default::default(),
             priority_op_serialid: 0,
             deadline_block: 100,
             eth_fee: Default::default(),
@@ -99,6 +105,8 @@ fn executed_priority_operations() {
         assert_eq!(stored_operation.block_number, executed_tx.block_number);
         assert_eq!(stored_operation.block_index, executed_tx.block_index);
         assert_eq!(stored_operation.operation, executed_tx.operation);
+        assert_eq!(stored_operation.from_account, executed_tx.from_account);
+        assert_eq!(stored_operation.to_account, executed_tx.to_account);
         assert_eq!(
             stored_operation.priority_op_serialid,
             executed_tx.priority_op_serialid

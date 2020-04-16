@@ -8,7 +8,7 @@ use diesel::prelude::*;
 use models::{
     node::{
         block::{ExecutedPriorityOp, ExecutedTx},
-        BlockNumber, FranklinOp, PriorityOp,
+        BlockNumber, FranklinOp, FranklinTx, PriorityOp,
     },
     Action, ActionType, Operation,
 };
@@ -98,10 +98,25 @@ impl NewExecutedPriorityOperation {
         let mut operation = serde_json::to_value(&exec_prior_op.op).unwrap();
         operation["eth_fee"] =
             serde_json::to_value(exec_prior_op.priority_op.eth_fee.to_string()).unwrap();
+
+        let (from_account, to_account) = match exec_prior_op.op {
+            FranklinOp::Deposit(deposit) => (deposit.priority_op.from, deposit.priority_op.to),
+            FranklinOp::FullExit(full_exit) => {
+                let eth_address = full_exit.priority_op.eth_address;
+                (eth_address.clone(), eth_address)
+            }
+            _ => panic!(
+                "Incorrect type of priority op: {:?}",
+                exec_prior_op.priority_op
+            ),
+        };
+
         Self {
             block_number: i64::from(block),
             block_index: exec_prior_op.block_index as i32,
             operation,
+            from_account: from_account.as_ref().to_vec(),
+            to_account: to_account.as_ref().to_vec(),
             priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
             deadline_block: exec_prior_op.priority_op.deadline_block as i64,
             eth_fee: exec_prior_op.priority_op.eth_fee,
@@ -112,10 +127,45 @@ impl NewExecutedPriorityOperation {
 
 impl NewExecutedTransaction {
     pub fn prepare_stored_tx(exec_tx: ExecutedTx, block: BlockNumber) -> Self {
+        fn cut_prefix(input: &str) -> String {
+            if input.starts_with("0x") {
+                input[2..].into()
+            } else if input.starts_with("sync:") {
+                input[5..].into()
+            } else {
+                input.into()
+            }
+        }
+
+        let operation = serde_json::to_value(&exec_tx.tx).expect("No operation provided");
+
+        let (from_account_hex, to_account_hex): (String, Option<String>) = match exec_tx.tx {
+            FranklinTx::Withdraw(_) | FranklinTx::Transfer(_) => (
+                serde_json::from_value(operation["from"].clone()).unwrap(),
+                serde_json::from_value(operation["to"].clone()).unwrap(),
+            ),
+            FranklinTx::ChangePubKey(_) => (
+                serde_json::from_value(operation["account"].clone()).unwrap(),
+                serde_json::from_value(operation["newPkHash"].clone()).unwrap(),
+            ),
+            FranklinTx::Close(_) => (
+                serde_json::from_value(operation["account"].clone()).unwrap(),
+                serde_json::from_value(operation["account"].clone()).unwrap(),
+            ),
+        };
+
+        println!("FROM {:?}, TO {:?}", from_account_hex, to_account_hex);
+
+        let from_account: Vec<u8> = hex::decode(cut_prefix(&from_account_hex)).unwrap();
+        let to_account: Option<Vec<u8>> =
+            to_account_hex.map(|value| hex::decode(cut_prefix(&value)).unwrap());
+
         Self {
             block_number: i64::from(block),
             tx_hash: exec_tx.tx.hash().as_ref().to_vec(),
-            operation: serde_json::to_value(&exec_tx.tx).unwrap_or_default(),
+            from_account,
+            to_account,
+            operation,
             success: exec_tx.success,
             fail_reason: exec_tx.fail_reason,
             block_index: exec_tx.block_index.map(|idx| idx as i32),
