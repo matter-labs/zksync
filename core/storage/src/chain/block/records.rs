@@ -5,6 +5,7 @@ use serde_derive::{Deserialize, Serialize};
 // Workspace imports
 // Local imports
 use crate::schema::*;
+use crate::utils::{BytesToHexSerde, OptionBytesToHexSerde, SyncBlockPrefix, ZeroxPrefix};
 
 #[derive(Debug, Insertable, Queryable)]
 #[table_name = "blocks"]
@@ -23,15 +24,18 @@ pub struct BlockDetails {
     pub block_number: i64,
 
     #[sql_type = "Binary"]
+    #[serde(with = "BytesToHexSerde::<SyncBlockPrefix>")]
     pub new_state_root: Vec<u8>,
 
     #[sql_type = "BigInt"]
     pub block_size: i64,
 
     #[sql_type = "Nullable<Binary>"]
+    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
     pub commit_tx_hash: Option<Vec<u8>>,
 
     #[sql_type = "Nullable<Binary>"]
+    #[serde(with = "OptionBytesToHexSerde::<ZeroxPrefix>")]
     pub verify_tx_hash: Option<Vec<u8>>,
 
     #[sql_type = "Timestamp"]

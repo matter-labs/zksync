@@ -94,6 +94,7 @@ pub mod diff;
 pub mod ethereum;
 pub mod prover;
 pub mod tokens;
+pub mod utils;
 
 pub use crate::connection::ConnectionPool;
 
