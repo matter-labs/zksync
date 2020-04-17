@@ -418,10 +418,10 @@ fn block_range() {
     });
 }
 
-/// Tests for the `load_unverified_commits_after_block` method.
+/// Tests for the `load_commits_after_block` method.
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
-fn load_unverified_commits_after_block() {
+fn load_commits_after_block() {
     let _ = env_logger::try_init();
     let mut rng = create_rng();
 
@@ -452,30 +452,33 @@ fn load_unverified_commits_after_block() {
             },
             Vec::new(),
         ))?;
+        ProverSchema(&conn).store_proof(3, &Default::default())?;
 
         // Now test the method.
         let empty_vec = vec![];
         let test_vector = vec![
             // Blocks 2 & 3.
-            ((1, 2), &operations[1..3]),
+            ((1, 2), &operations[1..3], vec![false, true]),
             // Block 2.
-            ((1, 1), &operations[1..2]),
+            ((1, 1), &operations[1..2], vec![false]),
             // Block 3.
-            ((2, 1), &operations[2..3]),
-            // No block (there are no unverified blocks AFTER block 3.
-            ((3, 1), &empty_vec),
+            ((2, 1), &operations[2..3], vec![true]),
+            // No block (there are no blocks AFTER block 3.
+            ((3, 1), &empty_vec, vec![]),
             // Obviously none.
-            ((4, 100), &empty_vec),
+            ((4, 100), &empty_vec, vec![]),
         ];
 
-        for ((block, limit), expected_slice) in test_vector {
-            let unverified_commits =
-                BlockSchema(&conn).load_unverified_commits_after_block(block, limit)?;
+        for ((block, limit), expected_slice, has_proof) in test_vector {
+            let commits = BlockSchema(&conn).load_commits_after_block(block, limit)?;
 
-            assert_eq!(unverified_commits.len(), expected_slice.len());
+            assert_eq!(commits.len(), expected_slice.len());
 
-            for (expected, got) in expected_slice.iter().zip(unverified_commits) {
+            for ((expected, (got, got_hash_proof)), expect_hash_proof) in
+                expected_slice.iter().zip(commits).zip(has_proof)
+            {
                 assert_eq!(expected.id, got.id);
+                assert_eq!(expect_hash_proof, got_hash_proof);
             }
         }
 
