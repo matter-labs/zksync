@@ -88,12 +88,14 @@ async fn verify_eth_signature(
                 }
             }
             TxEthSignature::EIP1271Signature(signature) => {
+                let message = format!("\x19Ethereum Signed Message:\n{}{}", message.len(), message);
+
                 let eth_watch_resp = oneshot::channel();
                 eth_watch_req
                     .clone()
                     .send(EthWatchRequest::CheckEIP1271Signature {
                         address: request.tx.account(),
-                        data: message.as_bytes().to_vec(),
+                        message: message.into_bytes(),
                         signature: signature.clone(),
                         resp: eth_watch_resp.0,
                     })
