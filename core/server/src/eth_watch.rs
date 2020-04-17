@@ -48,7 +48,7 @@ pub enum EthWatchRequest {
     },
     CheckEIP1271Signature {
         address: Address,
-        data: Vec<u8>,
+        message: Vec<u8>,
         signature: EIP1271Signature,
         resp: oneshot::Sender<Result<bool, failure::Error>>,
     },
@@ -305,14 +305,14 @@ impl<T: Transport> EthWatch<T> {
     async fn is_eip1271_signature_correct(
         &self,
         address: Address,
-        data: Vec<u8>,
+        message: Vec<u8>,
         signature: EIP1271Signature,
     ) -> Result<bool, failure::Error> {
         let received: [u8; 4] = self
             .get_eip1271_contract(address)
             .query(
                 "isValidSignature",
-                (data, signature.0),
+                (message, signature.0),
                 None,
                 Options::default(),
                 None,
@@ -399,12 +399,12 @@ impl<T: Transport> EthWatch<T> {
                 }
                 EthWatchRequest::CheckEIP1271Signature {
                     address,
-                    data,
+                    message,
                     signature,
                     resp,
                 } => {
                     let signature_correct = self
-                        .is_eip1271_signature_correct(address, data, signature)
+                        .is_eip1271_signature_correct(address, message, signature)
                         .await;
 
                     resp.send(signature_correct).unwrap_or_default();
