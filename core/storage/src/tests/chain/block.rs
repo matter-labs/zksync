@@ -446,17 +446,17 @@ fn load_commits_after_block() {
             },
             Vec::new(),
         ))?;
-        ProverSchema(&conn).store_proof(2, &Default::default())?;
+        ProverSchema(&conn).store_proof(3, &Default::default())?;
 
         // Now test the method.
         let empty_vec = vec![];
         let test_vector = vec![
             // Blocks 2 & 3.
-            ((1, 2), &operations[1..3], vec![true, false]),
+            ((1, 2), &operations[1..3], vec![false, true]),
             // Block 2.
-            ((1, 1), &operations[1..2], vec![true]),
+            ((1, 1), &operations[1..2], vec![false]),
             // Block 3.
-            ((2, 1), &operations[2..3], vec![false]),
+            ((2, 1), &operations[2..3], vec![true]),
             // No block (there are no blocks AFTER block 3.
             ((3, 1), &empty_vec, vec![]),
             // Obviously none.

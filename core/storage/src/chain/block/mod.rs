@@ -370,26 +370,16 @@ impl<'a> BlockSchema<'a> {
     ) -> QueryResult<Vec<(Operation, bool)>> {
         self.0.conn().transaction(|| {
             let ops: Vec<(StoredOperation, Option<StoredProof>)> = diesel::sql_query(format!(
-                "
-                WITH sized_operations AS (
-                    SELECT operations.*, proofs.*, operations.block_number as the_block_number
-                      FROM operations
-                           LEFT JOIN blocks
-                                  ON number = block_number
-                           LEFT JOIN proofs
-                               USING (block_number)
-                )
-                SELECT *
-                  FROM sized_operations
-                 WHERE action_type = 'COMMIT'
-                   AND the_block_number > (
-                        SELECT COALESCE(max(the_block_number), 0)
-                          FROM sized_operations
-                         WHERE action_type = 'VERIFY'
-                    )
-                   AND the_block_number > {}
-                ORDER BY the_block_number
-                LIMIT {}
+                "SELECT operations.*, proofs.*
+                   FROM operations
+                        LEFT JOIN blocks
+                               ON number = block_number
+                        LEFT JOIN proofs
+                            USING (block_number)
+                  WHERE operations.action_type = 'COMMIT'
+                    AND operations.block_number > {}
+                  ORDER BY operations.block_number
+                  LIMIT {}
                 ",
                 block, limit
             ))

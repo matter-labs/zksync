@@ -19,7 +19,9 @@ pub fn account_tree_depth() -> usize {
 
     unsafe {
         if ACCOUNT_TREE_DEPTH_VALUE == 0 {
-            let value: &'static str = env!("ACCOUNT_TREE_DEPTH");
+            let value: &'static str = option_env!("ACCOUNT_TREE_DEPTH")
+                .expect("ACCOUNT_TREE_DEPTH variable was not set during compilation. \
+                        Make sure that ACCOUNT_TREE_DEPTH is set in `dev.env` file and recompile the project");
             ACCOUNT_TREE_DEPTH_VALUE =
                 usize::from_str(value).expect("account tree depth value is invalid");
             let runtime_value = env::var("ACCOUNT_TREE_DEPTH").expect("ACCOUNT_TREE_DEPTH missing");
