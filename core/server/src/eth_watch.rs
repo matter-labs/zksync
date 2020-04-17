@@ -343,7 +343,7 @@ impl<T: Transport> EthWatch<T> {
             .compat()
             .await
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))?;
-        Ok(auth_fact.as_slice() == &pub_key_hash.data[..])
+        Ok(auth_fact.as_slice() == &tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
     pub async fn run(mut self) {

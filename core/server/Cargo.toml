@@ -44,6 +44,7 @@ failure = "0.1"
 # TODO: should be removed after json rpc deps are updated is updated, current version (14.0)
 futures01 = { package = "futures", version = "0.1" }
 reqwest = "0.9.22"
+tiny-keccak = "1.4.2"
 
 [dev-dependencies]
 testhelper = { path = "../testhelper", version = "0.1.0"}
