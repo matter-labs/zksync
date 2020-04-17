@@ -41,15 +41,6 @@ CREATE TABLE blocks (
     block_size BIGINT NOT NULL
 );
 
--- Table for the executed franklin operations, used by
--- the `data_restore` module.
-CREATE TABLE rollup_ops (
-    id SERIAL PRIMARY KEY,
-    block_num BIGINT NOT NULL,
-    operation JSONB NOT NULL,
-    fee_account BIGINT NOT NULL
-);
-
 -- Table for the executed priority operations (e.g. deposit).
 CREATE TABLE executed_priority_operations (
     id serial PRIMARY KEY,
@@ -161,20 +152,37 @@ CREATE TABLE balances (
 );
 
 -- ------------- --
--- State section --
+-- Data restore section --
 -- ------------- --
 
-CREATE TABLE events_state (
+CREATE TABLE data_restore_events_state (
     id SERIAL PRIMARY KEY,
     block_type TEXT NOT NULL,
     transaction_hash BYTEA NOT NULL,
     block_num BIGINT NOT NULL
 );
 
-CREATE TABLE storage_state_update (
+CREATE TABLE data_restore_storage_state_update
+(
     id SERIAL PRIMARY KEY,
     storage_state TEXT NOT NULL
 );
+
+CREATE TABLE data_restore_last_watched_eth_block
+(
+    id SERIAL PRIMARY KEY,
+    block_number TEXT NOT NULL
+);
+
+-- Table for the executed franklin operations, used by
+CREATE TABLE data_restore_rollup_ops
+(
+    id SERIAL PRIMARY KEY,
+    block_num BIGINT NOT NULL,
+    operation JSONB  NOT NULL,
+    fee_account BIGINT NOT NULL
+);
+
 
 -- -------------- --
 -- Prover section --
@@ -264,11 +272,6 @@ CREATE TABLE eth_tx_hashes (
     id bigserial PRIMARY KEY,
     eth_op_id bigserial NOT NULL REFERENCES eth_operations(id),
     tx_hash bytea NOT NULL
-);
-
-CREATE TABLE data_restore_last_watched_eth_block (
-    id SERIAL PRIMARY KEY,
-    block_number TEXT NOT NULL
 );
 
 -- --------------- --

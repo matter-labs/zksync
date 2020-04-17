@@ -76,9 +76,34 @@ table! {
 }
 
 table! {
+    data_restore_events_state (id) {
+        id -> Int4,
+        block_type -> Text,
+        transaction_hash -> Bytea,
+        block_num -> Int8,
+    }
+}
+
+table! {
     data_restore_last_watched_eth_block (id) {
         id -> Int4,
         block_number -> Text,
+    }
+}
+
+table! {
+    data_restore_rollup_ops (id) {
+        id -> Int4,
+        block_num -> Int8,
+        operation -> Jsonb,
+        fee_account -> Int8,
+    }
+}
+
+table! {
+    data_restore_storage_state_update (id) {
+        id -> Int4,
+        storage_state -> Text,
     }
 }
 
@@ -124,15 +149,6 @@ table! {
         id -> Int8,
         eth_op_id -> Int8,
         tx_hash -> Bytea,
-    }
-}
-
-table! {
-    events_state (id) {
-        id -> Int4,
-        block_type -> Text,
-        transaction_hash -> Bytea,
-        block_num -> Int8,
     }
 }
 
@@ -197,26 +213,10 @@ table! {
 }
 
 table! {
-    rollup_ops (id) {
-        id -> Int4,
-        block_num -> Int8,
-        operation -> Jsonb,
-        fee_account -> Int8,
-    }
-}
-
-table! {
     server_config (id) {
         id -> Bool,
         contract_addr -> Nullable<Text>,
         gov_contract_addr -> Nullable<Text>,
-    }
-}
-
-table! {
-    storage_state_update (id) {
-        id -> Int4,
-        storage_state -> Text,
     }
 }
 
@@ -243,20 +243,20 @@ allow_tables_to_appear_in_same_query!(
     active_provers,
     balances,
     blocks,
+    data_restore_events_state,
     data_restore_last_watched_eth_block,
+    data_restore_rollup_ops,
+    data_restore_storage_state_update,
     eth_nonce,
     eth_operations,
     eth_ops_binding,
     eth_stats,
     eth_tx_hashes,
-    events_state,
     executed_priority_operations,
     executed_transactions,
     operations,
     proofs,
     prover_runs,
-    rollup_ops,
     server_config,
-    storage_state_update,
     tokens,
 );

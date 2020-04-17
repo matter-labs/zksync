@@ -13,8 +13,9 @@ use models::node::{AccountMap, AccountUpdate, AccountUpdates, FranklinOp};
 use models::TokenAddedEvent;
 use models::{Action, EncodedProof, Operation};
 use storage::{
-    chain::state::records::{NewBlockEvent, StoredBlockEvent},
-    data_restore::records::{NewLastWatchedEthBlockNumber, StoredRollupOpsBlock},
+    data_restore::records::{
+        NewBlockEvent, NewLastWatchedEthBlockNumber, StoredBlockEvent, StoredRollupOpsBlock,
+    },
     ConnectionPool,
 };
 
@@ -202,8 +203,7 @@ pub fn get_storage_state(connection_pool: &ConnectionPool) -> StorageUpdateState
     let storage = connection_pool.access_storage().expect("db failed");
 
     let storage_state_string = storage
-        .chain()
-        .state_schema()
+        .data_restore_schema()
         .load_storage_state()
         .expect("Cant load storage state")
         .storage_state;
@@ -248,8 +248,7 @@ pub fn get_block_events_state_from_storage(connection_pool: &ConnectionPool) -> 
     let storage = connection_pool.access_storage().expect("db failed");
 
     let committed = storage
-        .chain()
-        .state_schema()
+        .data_restore_schema()
         .load_committed_events_state()
         .expect("Cant load committed state");
 
@@ -260,8 +259,7 @@ pub fn get_block_events_state_from_storage(connection_pool: &ConnectionPool) -> 
     }
 
     let verified = storage
-        .chain()
-        .state_schema()
+        .data_restore_schema()
         .load_verified_events_state()
         .expect("Cant load verified state");
     let mut verified_events: Vec<BlockEvent> = vec![];
