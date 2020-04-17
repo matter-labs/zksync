@@ -127,7 +127,8 @@ impl ProversDataPool {
 ///
 /// The essential part of this structure is `maintain` function
 /// which runs forever and adds data to the externally owned
-/// pool.
+/// pool. It maintains its own circuit tree to generates witness.
+/// Initial circuit tree is substituted in constructor.
 ///
 /// `migrate` function is private and is invoked by the
 /// public `start` function, which starts

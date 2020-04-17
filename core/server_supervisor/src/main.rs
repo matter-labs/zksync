@@ -1,3 +1,9 @@
+//! Supervisor is part of leader election procedure within server replicas.
+//! It participates in regular pod lifetime and replicas rolling updates.
+//! Use #1, pod lifecycle:
+//! Whenever pod is deleted, it is removed from leader election by supervisor.
+//! Whenever leader pod is having terminated status, it bails and next candidate becomes leader.
+//! Use #2,
 #[macro_use]
 extern crate log;
 use futures::{StreamExt, TryStreamExt};
