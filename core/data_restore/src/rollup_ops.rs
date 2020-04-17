@@ -130,16 +130,15 @@ mod test {
 
     #[test]
     fn test_part_exit() {
-        let tx = Withdraw {
-            from: "7777777777777777777777777777777777777777".parse().unwrap(),
-            to: [9u8; 20].into(),
-            token: 1,
-            amount: BigDecimal::from(20),
-            fee: BigDecimal::from(10),
-            nonce: 2,
-            signature: TxSignature::default(),
-            cached_signer: Default::default(),
-        };
+        let tx = Withdraw::new(
+            "7777777777777777777777777777777777777777".parse().unwrap(),
+            [9u8; 20].into(),
+            1,
+            BigDecimal::from(20),
+            BigDecimal::from(10),
+            2,
+            None,
+        );
         let op1 = FranklinOp::Withdraw(Box::new(WithdrawOp { tx, account_id: 3 }));
         let pub_data1 = op1.public_data();
         let op2 = RollupOpsBlock::get_rollup_ops_from_data(&pub_data1)
@@ -192,16 +191,15 @@ mod test {
 
     #[test]
     fn test_transfer_to_new() {
-        let tx = Transfer {
-            from: "7777777777777777777777777777777777777777".parse().unwrap(),
-            to: "8888888888888888888888888888888888888888".parse().unwrap(),
-            token: 1,
-            amount: BigDecimal::from(20),
-            fee: BigDecimal::from(10),
-            nonce: 3,
-            signature: TxSignature::default(),
-            cached_signer: Default::default(),
-        };
+        let tx = Transfer::new(
+            "7777777777777777777777777777777777777777".parse().unwrap(),
+            "8888888888888888888888888888888888888888".parse().unwrap(),
+            1,
+            BigDecimal::from(20),
+            BigDecimal::from(10),
+            3,
+            None,
+        );
         let op1 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx,
             from: 11,
@@ -218,16 +216,15 @@ mod test {
 
     #[test]
     fn test_transfer() {
-        let tx = Transfer {
-            from: "7777777777777777777777777777777777777777".parse().unwrap(),
-            to: "8888888888888888888888888888888888888888".parse().unwrap(),
-            token: 1,
-            amount: BigDecimal::from(20),
-            fee: BigDecimal::from(10),
-            nonce: 3,
-            signature: TxSignature::default(),
-            cached_signer: Default::default(),
-        };
+        let tx = Transfer::new(
+            "7777777777777777777777777777777777777777".parse().unwrap(),
+            "8888888888888888888888888888888888888888".parse().unwrap(),
+            1,
+            BigDecimal::from(20),
+            BigDecimal::from(10),
+            3,
+            None,
+        );
         let op1 = FranklinOp::Transfer(Box::new(TransferOp {
             tx,
             from: 11,

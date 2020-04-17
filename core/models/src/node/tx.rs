@@ -19,7 +19,7 @@ use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
-use failure::{ensure, format_err};
+use failure::{bail, ensure, format_err};
 use parity_crypto::publickey::{
     public_to_address, recover, sign, KeyPair, Signature as ETHSignature,
 };
@@ -83,15 +83,16 @@ impl<'de> Deserialize<'de> for TxHash {
     }
 }
 
-/// Stores precomputed signature to speedup execution
+/// Stores precomputed signature verification result to speedup tx execution
 #[derive(Debug, Clone)]
-pub enum CachedSigner {
+enum VerifiedSignatureCache {
     /// No cache scenario
     NotCached,
     /// Cached: None if signature is incorrect.
     Cached(Option<PubKeyHash>),
 }
-impl Default for CachedSigner {
+
+impl Default for VerifiedSignatureCache {
     fn default() -> Self {
         Self::NotCached
     }
@@ -110,11 +111,56 @@ pub struct Transfer {
     pub nonce: Nonce,
     pub signature: TxSignature,
     #[serde(skip)]
-    pub cached_signer: CachedSigner,
+    cached_signer: VerifiedSignatureCache,
 }
 
 impl Transfer {
     const TX_TYPE: u8 = 5;
+
+    /// Creates transaction from parts
+    /// signature is optional, because sometimes we don't know it (i.e. data_restore)
+    pub fn new(
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+        signature: Option<TxSignature>,
+    ) -> Self {
+        let mut tx = Self {
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            nonce,
+            signature: signature.clone().unwrap_or_default(),
+            cached_signer: VerifiedSignatureCache::NotCached,
+        };
+        if signature.is_some() {
+            tx.cached_signer = VerifiedSignatureCache::Cached(tx.verify_signature());
+        }
+        tx
+    }
+
+    /// Creates signed transaction using private key, checks for correcteness
+    pub fn new_signed(
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+        private_key: &PrivateKey<Engine>,
+    ) -> Result<Self, failure::Error> {
+        let mut tx = Self::new(from, to, token, amount, fee, nonce, None);
+        tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
+        if !tx.check_correctness() {
+            bail!("Transfer is incorrect, check amounts");
+        }
+        Ok(tx)
+    }
 
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
@@ -133,14 +179,16 @@ impl Transfer {
             && self.fee.is_integer()
             && is_token_amount_packable(&self.amount)
             && is_fee_amount_packable(&self.fee);
-        let signer = self.verify_signature();
-        valid = valid && signer.is_some();
-        self.cached_signer = CachedSigner::Cached(signer);
+        if valid {
+            let signer = self.verify_signature();
+            valid = valid && signer.is_some();
+            self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        };
         valid
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let CachedSigner::Cached(cached_signer) = &self.cached_signer {
+        if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             cached_signer.clone()
         } else if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
@@ -176,11 +224,56 @@ pub struct Withdraw {
     pub nonce: Nonce,
     pub signature: TxSignature,
     #[serde(skip)]
-    pub cached_signer: CachedSigner,
+    cached_signer: VerifiedSignatureCache,
 }
 
 impl Withdraw {
     const TX_TYPE: u8 = 3;
+
+    /// Creates transaction from parts
+    /// signature is optional, because sometimes we don't know it (i.e. data_restore)
+    pub fn new(
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+        signature: Option<TxSignature>,
+    ) -> Self {
+        let mut tx = Self {
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            nonce,
+            signature: signature.clone().unwrap_or_default(),
+            cached_signer: VerifiedSignatureCache::NotCached,
+        };
+        if signature.is_some() {
+            tx.cached_signer = VerifiedSignatureCache::Cached(tx.verify_signature());
+        }
+        tx
+    }
+
+    /// Creates signed transaction using private key, checks for correcteness
+    pub fn new_signed(
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+        private_key: &PrivateKey<Engine>,
+    ) -> Result<Self, failure::Error> {
+        let mut tx = Self::new(from, to, token, amount, fee, nonce, None);
+        tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
+        if !tx.check_correctness() {
+            bail!("Transfer is incorrect, check amounts");
+        }
+        Ok(tx)
+    }
 
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
@@ -200,14 +293,16 @@ impl Withdraw {
             && self.fee.is_integer()
             && is_fee_amount_packable(&self.fee);
 
-        let signer = self.verify_signature();
-        valid = valid && signer.is_some();
-        self.cached_signer = CachedSigner::Cached(signer);
+        if valid {
+            let signer = self.verify_signature();
+            valid = valid && signer.is_some();
+            self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        }
         valid
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let CachedSigner::Cached(cached_signer) = &self.cached_signer {
+        if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             cached_signer.clone()
         } else if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
@@ -418,7 +513,16 @@ pub struct TxSignature {
 }
 
 impl TxSignature {
-    pub fn verify_musig_pedersen(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+    pub fn sign_musig(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
+        Self::sign_musig_sha256(pk, msg)
+    }
+
+    pub fn verify_musig(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        self.verify_musig_sha256(msg)
+    }
+
+    #[allow(dead_code)]
+    fn verify_musig_pedersen(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_pedersen(
             &hashed_msg,
@@ -433,7 +537,7 @@ impl TxSignature {
         }
     }
 
-    pub fn verify_musig_sha256(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+    fn verify_musig_sha256(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_sha256(
             &hashed_msg,
@@ -448,7 +552,8 @@ impl TxSignature {
         }
     }
 
-    pub fn sign_musig_pedersen(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
+    #[allow(dead_code)]
+    fn sign_musig_pedersen(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let seed = Seed::deterministic_seed(&pk, &hashed_msg);
         let signature = pk.musig_pedersen_sign(
@@ -468,7 +573,7 @@ impl TxSignature {
         }
     }
 
-    pub fn sign_musig_sha256(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
+    fn sign_musig_sha256(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let seed = Seed::deterministic_seed(&pk, &hashed_msg);
         let signature = pk.musig_sha256_sign(
@@ -664,8 +769,8 @@ impl Serialize for EIP1271Signature {
 /// Library that we use for signature verification (written for bitcoin) expects v = recovery_id
 ///
 /// That is why:
-/// 1) when we create this structure by deserialization of message produced by user we subtract 27 from v in `ETHSignature`
-/// and store it in ETHSignature structure this way.
+/// 1) when we create this structure by deserialization of message produced by user
+/// we subtract 27 from v in `ETHSignature` and store it in ETHSignature structure this way.
 /// 2) When we serialize/create this structure we add 27 to v in `ETHSignature`.
 ///
 /// This way when we have methods that consumes &self we can be sure that ETHSignature::recover_signer works

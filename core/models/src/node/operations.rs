@@ -165,19 +165,9 @@ impl TransferToNewOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from transfer to new pubdata"))?;
         let nonce = 0; // It is unknown from pubdata
-        let signature = TxSignature::default(); // It is unknown from pubdata
 
         Ok(Self {
-            tx: Transfer {
-                from,
-                to,
-                token,
-                amount,
-                fee,
-                nonce,
-                signature,
-                cached_signer: Default::default(),
-            },
+            tx: Transfer::new(from, to, token, amount, fee, nonce, None),
             from: from_id,
             to: to_id,
         })
@@ -235,7 +225,6 @@ impl TransferOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from transfer pubdata"))?;
         let nonce = 0; // It is unknown from pubdata
-        let signature = TxSignature::default(); // It is unknown from pubdata
         let from_id =
             bytes_slice_to_uint32(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
                 .ok_or_else(|| format_err!("Cant get from account id from transfer pubdata"))?;
@@ -243,16 +232,7 @@ impl TransferOp {
             .ok_or_else(|| format_err!("Cant get to account id from transfer pubdata"))?;
 
         Ok(Self {
-            tx: Transfer {
-                from: from_address,
-                to: to_address,
-                token,
-                amount,
-                fee,
-                nonce,
-                signature,
-                cached_signer: Default::default(),
-            },
+            tx: Transfer::new(from_address, to_address, token, amount, fee, nonce, None),
             from: from_id,
             to: to_id,
         })
@@ -313,19 +293,9 @@ impl WithdrawOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from withdraw pubdata"))?;
         let nonce = 0; // From pubdata it is unknown
-        let signature = TxSignature::default(); // From pubdata it is unknown
 
         Ok(Self {
-            tx: Withdraw {
-                from,
-                to,
-                token,
-                amount,
-                fee,
-                nonce,
-                signature,
-                cached_signer: Default::default(),
-            },
+            tx: Withdraw::new(from, to, token, amount, fee, nonce, None),
             account_id,
         })
     }

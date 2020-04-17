@@ -14,17 +14,12 @@ fn bench_signature_zksync_musig_verify(b: &mut Bencher<'_>) {
         .take(WITHDRAW_TX_LEN)
         .collect::<Vec<_>>();
 
-    let setup = || {
-        (
-            TxSignature::sign_musig_sha256(&pk, &message),
-            message.clone(),
-        )
-    };
+    let setup = || (TxSignature::sign_musig(&pk, &message), message.clone());
 
     b.iter_batched(
         setup,
         |(signature, msg)| {
-            black_box(signature.verify_musig_sha256(&msg));
+            black_box(signature.verify_musig(&msg));
         },
         BatchSize::SmallInput,
     );
