@@ -1,6 +1,7 @@
 // Built-in deps
 // External imports
 use diesel::prelude::*;
+use diesel::update;
 use itertools::Itertools;
 // Workspace imports
 use models::node::block::Block;
@@ -42,8 +43,16 @@ impl<'a> DataRestoreSchema<'a> {
         verify_op: Operation,
     ) -> QueryResult<()> {
         self.0.conn().transaction(|| {
-            BlockSchema(self.0).execute_operation(commit_op)?;
-            BlockSchema(self.0).execute_operation(verify_op)?;
+            let commit_op = BlockSchema(self.0).execute_operation(commit_op)?;
+            let verify_op = BlockSchema(self.0).execute_operation(verify_op)?;
+            update(
+                operations::table.filter(
+                    operations::id.eq_any(vec![commit_op.id.unwrap(), verify_op.id.unwrap()]),
+                ),
+            )
+            .set(operations::confirmed.eq(true))
+            .execute(self.0.conn())
+            .map(drop)?;
             self.update_storage_state(self.new_storage_state("None"))?;
             Ok(())
         })

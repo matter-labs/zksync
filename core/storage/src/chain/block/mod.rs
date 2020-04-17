@@ -12,6 +12,7 @@ use models::{fe_from_bytes, fe_to_bytes, Action, ActionType, Operation};
 // Local imports
 use self::records::{BlockDetails, StorageBlock};
 use crate::prover::records::StoredProof;
+use crate::prover::ProverSchema;
 use crate::schema::*;
 use crate::StorageProcessor;
 use crate::{
@@ -50,12 +51,19 @@ impl<'a> BlockSchema<'a> {
 
             match &op.action {
                 Action::Commit => {
-                    StateSchema(self.0)
-                        .commit_state_update(op.block.block_number, &op.accounts_updated)?;
+                    StateSchema(self.0).commit_state_update(block_number, &op.accounts_updated)?;
                     self.save_block(op.block)?;
                 }
-                Action::Verify { .. } => {
-                    StateSchema(self.0).apply_state_update(op.block.block_number)?
+                Action::Verify { proof } => {
+                    let stored_proof = ProverSchema(self.0).load_proof(block_number);
+                    match stored_proof {
+                        Err(DieselError::NotFound) => {
+                            ProverSchema(self.0).store_proof(block_number, proof)?;
+                        }
+                        Err(e) => return Err(e),
+                        Ok(_) => {}
+                    };
+                    StateSchema(self.0).apply_state_update(block_number)?
                 }
             };
 
