@@ -75,18 +75,18 @@ fn main() {
     let jh = std::thread::Builder::new()
         .name("Observer mode".to_owned())
         .spawn(move || {
-            let state = block_on(observer_mode::run(
+            let state = observer_mode::run(
                 conn_pool_clone.clone(),
                 OBSERVER_MODE_PULL_INTERVAL,
                 stop_observer_mode_rx,
-            ));
+            );
             observed_state_tx.send(state).expect("unexpected failure");
         })
         .expect("failed to start observer mode");
-    block_on(leader_election::keep_voting_to_be_leader(
+    leader_election::keep_voting_to_be_leader(
         config_opts.replica_name.clone(),
         connection_pool.clone(),
-    ))
+    )
     .expect("voting for leader fail");
     stop_observer_mode_tx.send(()).expect("unexpected failure");
     let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");

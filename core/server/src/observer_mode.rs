@@ -14,8 +14,8 @@ use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
 use models::node::{BlockNumber, FranklinOp};
 use std::sync::mpsc;
+use std::thread;
 use std::time::Duration;
-use tokio::time;
 
 /// The state being observed during observer mode. Meant to be used later to initialize server actors.
 pub struct ObservedState {
@@ -140,7 +140,7 @@ impl ObservedState {
 ///
 /// # Panics
 /// Panics on failed connection to db.
-pub async fn run(
+pub fn run(
     conn_pool: storage::ConnectionPool,
     interval: Duration,
     stop: mpsc::Receiver<()>,
@@ -151,7 +151,6 @@ pub async fn run(
     observed_state
         .init()
         .expect("failed to init observed state");
-    let mut ticker = time::interval(interval);
     loop {
         let exit = match stop.try_recv() {
             Err(mpsc::TryRecvError::Empty) => false,
@@ -160,7 +159,7 @@ pub async fn run(
             }
             Ok(_) => true,
         };
-        ticker.tick().await;
+        thread::sleep(interval);
         observed_state
             .update()
             .expect("failed to update observed state");
