@@ -130,7 +130,7 @@ pub fn generate_vk_contract(
         r#"
 // This contract is generated programmatically
 
-pragma solidity 0.5.16;
+pragma solidity ^0.5.0;
 
 
 // Hardcoded constants to avoid accessing store
