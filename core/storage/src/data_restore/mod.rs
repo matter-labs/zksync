@@ -1,7 +1,7 @@
 // Built-in deps
 // External imports
+use diesel::dsl::update;
 use diesel::prelude::*;
-use diesel::update;
 use itertools::Itertools;
 // Workspace imports
 use models::node::block::Block;
@@ -157,6 +157,27 @@ impl<'a> DataRestoreSchema<'a> {
             self.update_storage_state(self.new_storage_state("Operations"))?;
             Ok(())
         })
+    }
+
+    /// Method that initializes the `eth_stats` table.
+    /// Since `eth_sender` module uses this table to identify the expected next block numbers
+    /// for sending operations to the Ethereum, we must initialize it with actual values.
+    pub fn initialize_eth_stats(
+        &self,
+        last_committed_block: BlockNumber,
+        last_verified_block: BlockNumber,
+    ) -> QueryResult<()> {
+        // Withdraw ops counter is set equal to the `verify` ops counter
+        // since we assume that we've sent a withdraw for every `verify` op.
+        update(eth_stats::table.filter(eth_stats::id.eq(true)))
+            .set((
+                eth_stats::commit_ops.eq(last_committed_block as i64),
+                eth_stats::verify_ops.eq(last_verified_block as i64),
+                eth_stats::withdraw_ops.eq(last_verified_block as i64),
+            ))
+            .execute(self.0.conn())?;
+
+        Ok(())
     }
 
     pub fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {

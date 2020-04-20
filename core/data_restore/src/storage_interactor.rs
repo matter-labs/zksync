@@ -1,22 +1,24 @@
 // Built-in deps
-use std::convert::TryFrom;
-use std::str::FromStr;
+use std::{convert::TryFrom, str::FromStr};
 // External deps
 use web3::types::H256;
 // Workspace deps
-use crate::data_restore_driver::StorageUpdateState;
-use crate::events::{BlockEvent, EventType};
-use crate::events_state::EventsState;
-use crate::rollup_ops::RollupOpsBlock;
-use models::node::block::Block;
-use models::node::{AccountMap, AccountUpdate, AccountUpdates, FranklinOp};
-use models::TokenAddedEvent;
-use models::{Action, EncodedProof, Operation};
+use models::{
+    node::{block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
+    Action, EncodedProof, Operation, TokenAddedEvent,
+};
 use storage::{
     data_restore::records::{
         NewBlockEvent, NewLastWatchedEthBlockNumber, StoredBlockEvent, StoredRollupOpsBlock,
     },
     ConnectionPool,
+};
+// Local deps
+use crate::{
+    data_restore_driver::StorageUpdateState,
+    events::{BlockEvent, EventType},
+    events_state::EventsState,
+    rollup_ops::RollupOpsBlock,
 };
 
 /// Saves genesis account state in storage
@@ -319,4 +321,27 @@ pub fn get_tree_state(connection_pool: &ConnectionPool) -> (u32, AccountMap, u64
     let (unprocessed_prior_ops, fee_acc_id) = (block.processed_priority_ops.1, block.fee_account);
 
     (last_block, account_map, unprocessed_prior_ops, fee_acc_id)
+}
+
+/// Updates the `eth_stats` table with the currently last available committed/verified blocks
+/// data for `eth_sender` module to operate correctly.
+pub fn update_eth_stats(connection_pool: &ConnectionPool) {
+    let storage = connection_pool.access_storage().expect("db failed");
+
+    let last_committed_block = storage
+        .chain()
+        .block_schema()
+        .get_last_committed_block()
+        .expect("Can't get the last committed block");
+
+    let last_verified_block = storage
+        .chain()
+        .block_schema()
+        .get_last_verified_block()
+        .expect("Can't get the last verified block");
+
+    storage
+        .data_restore_schema()
+        .initialize_eth_stats(last_committed_block, last_verified_block)
+        .expect("Can't update the eth_stats table")
 }
