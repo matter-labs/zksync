@@ -45,6 +45,14 @@ library Bytes {
         }
     }
 
+    function bytesToBytes20(bytes memory self, uint256 _start) internal pure returns (bytes20 r) {
+        require(self.length >= (_start + 20), "btb20");
+        assembly {
+            // Note that bytes1..32 is stored in the beginning of the word unlike other primitive types
+            r := mload(add(add(self, 0x20), _start))
+        }
+    }
+
     function bytesToUInt16(bytes memory _bytes, uint256 _start) internal pure returns (uint16 r) {
         require(_bytes.length >= (_start + 2), "btu02");
         assembly {
@@ -161,6 +169,11 @@ library Bytes {
     function readAddress(bytes memory _data, uint _offset) internal pure returns (uint new_offset, address r) {
         new_offset = _offset + 20;
         r = bytesToAddress(_data, _offset);
+    }
+
+    function readBytes20(bytes memory _data, uint _offset) internal pure returns (uint new_offset, bytes20 r) {
+        new_offset = _offset + 20;
+        r = bytesToBytes20(_data, _offset);
     }
 
     // Helper function for hex conversion.

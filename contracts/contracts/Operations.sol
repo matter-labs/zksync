@@ -170,7 +170,7 @@ library Operations {
 
     struct ChangePubKey {
         // uint24 accountId; -- present in pubdata, ignored at serialization
-        bytes pubKeyHash;
+        bytes20 pubKeyHash;
         address owner;
         uint32 nonce;
     }
@@ -182,7 +182,7 @@ library Operations {
 
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
         uint offset = _offset + ACCOUNT_ID_BYTES;                                    // accountId (ignored)
-        (offset, parsed.pubKeyHash) = Bytes.read(_data, offset, PUBKEY_HASH_BYTES);  // pubKeyHash
+        (offset, parsed.pubKeyHash) = Bytes.readBytes20(_data, offset);              // pubKeyHash
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);                   // owner
         (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);                    // nonce
     }

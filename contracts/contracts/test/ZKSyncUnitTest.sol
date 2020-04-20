@@ -5,7 +5,7 @@ import "../generated/FranklinTest.sol";
 
 contract ZKSyncUnitTest is FranklinTest {
 
-    function changePubkeySignatureCheck(bytes calldata _signature, bytes calldata _newPkHash, uint32 _nonce, address _ethAddress) external pure returns (bool) {
+    function changePubkeySignatureCheck(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) external pure returns (bool) {
         return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress);
     }
 

@@ -220,7 +220,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _token Token address
     /// @param _amount Token amount
     /// @param _franklinAddr Receiver Layer 2 address
-    function depositERC20(IERC20 _token, uint128 _amount, address _franklinAddr) external payable nonReentrant {
+    function depositERC20(IERC20 _token, uint128 _amount, address _franklinAddr) external payable {
         requireActive();
 
         // Fee is:
@@ -492,7 +492,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
                         bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
                         require(valid, "fpp15"); // failed to verify change pubkey hash signature
                     } else {
-                        bool valid = authFacts[op.owner][op.nonce] == keccak256(op.pubKeyHash);
+                        bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
                         require(valid, "fpp16"); // new pub key hash is not authenticated properly
                     }
 
@@ -530,13 +530,13 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         return ecrecover(keccak256(_message), signV, signR, signS);
     }
 
-    function verifyChangePubkeySignature(bytes memory _signature, bytes memory _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
+    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
         require(_newPkHash.length == 20, "vpk11"); // unexpected hash length
 
         bytes memory signedMessage = abi.encodePacked(
             "\x19Ethereum Signed Message:\n135",
             "Register ZK Sync pubkey:\n\n",
-            "sync:", Bytes.bytesToHexASCIIBytes(_newPkHash),
+            "sync:", Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)),
             " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
             "\n\n",
             "Only sign this message for a trusted client!"
