@@ -36,11 +36,17 @@ fn scale_gas() {
     eth_sender.ethereum.gas_price = 1000.into();
 
     // Check that gas price of 1000 is increased to 1150.
-    let scaled_gas = eth_sender.scale_gas(1000.into()).unwrap();
+    let scaled_gas = eth_sender
+        .gas_adjuster
+        .get_gas_price(&eth_sender.ethereum, Some(1000.into()))
+        .unwrap();
     assert_eq!(scaled_gas, 1150.into());
 
     // Check that gas price of 100 is increased to 1000 (price in Ethereum object).
-    let scaled_gas = eth_sender.scale_gas(100.into()).unwrap();
+    let scaled_gas = eth_sender
+        .gas_adjuster
+        .get_gas_price(&eth_sender.ethereum, Some(100.into()))
+        .unwrap();
     assert_eq!(scaled_gas, 1000.into());
 }
 

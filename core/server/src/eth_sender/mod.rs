@@ -10,7 +10,7 @@ use futures::channel::mpsc;
 use tokio::runtime::Runtime;
 use tokio::time;
 use web3::contract::Options;
-use web3::types::{TransactionReceipt, H256, U256};
+use web3::types::{TransactionReceipt, H256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
@@ -24,12 +24,14 @@ use storage::ConnectionPool;
 use self::{
     database::{Database, DatabaseAccess},
     ethereum_interface::{EthereumHttpClient, EthereumInterface},
+    gas_adjuster::GasAdjuster,
     transactions::*,
     tx_queue::{TxData, TxQueue, TxQueueBuilder},
 };
 
 mod database;
 mod ethereum_interface;
+mod gas_adjuster;
 mod transactions;
 mod tx_queue;
 
@@ -114,6 +116,8 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     op_notify: mpsc::Sender<Operation>,
     /// Queue for ordered transaction processing.
     tx_queue: TxQueue,
+    /// Utility for managing the gas price for transactions.
+    gas_adjuster: GasAdjuster<ETH, DB>,
     /// Settings for the `ETHSender`.
     options: EthSenderOptions,
 }
@@ -139,6 +143,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .with_withdraw_operations_count(stats.withdraw_ops)
             .build();
 
+        let gas_adjuster = GasAdjuster::new();
+
         let mut sender = Self {
             ethereum,
             ongoing_ops,
@@ -146,6 +152,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             rx_for_eth,
             op_notify,
             tx_queue,
+            gas_adjuster,
             options,
         };
 
@@ -174,6 +181,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
             // ...and proceed them.
             self.proceed_next_operations();
+
+            // Update the gas adjuster to maintain the up-to-date max gas price limit.
+            self.gas_adjuster.keep_updated();
         }
     }
 
@@ -259,7 +269,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     fn initialize_operation(&mut self, tx: TxData) -> Result<(), failure::Error> {
         let current_block = self.ethereum.block_number()?;
         let deadline_block = self.get_deadline_block(current_block);
-        let gas_price = self.ethereum.gas_price()?;
+        let gas_price = self.gas_adjuster.get_gas_price(&self.ethereum, None)?;
 
         let (new_op, signed_tx) = self.db.transaction(|| {
             // First, we should store the operation in the database and obtain the assigned
@@ -500,7 +510,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// Creates a new transaction for the existing Ethereum operation.
     /// This method is used to create supplement transactions instead of the stuck one.
     fn create_supplement_tx(
-        &self,
+        &mut self,
         deadline_block: u64,
         stuck_tx: &mut ETHOperation,
     ) -> Result<SignedCallResult, failure::Error> {
@@ -516,20 +526,17 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         Ok(signed_tx)
     }
 
-    // Calculates a new gas amount for the replacement of the stuck tx.
-    // Replacement price should be at least 10% higher, we make it 15% higher.
-    fn scale_gas(&self, old_tx_gas_price: U256) -> Result<U256, failure::Error> {
-        let network_price = self.ethereum.gas_price()?;
-        let replacement_price = (old_tx_gas_price * U256::from(115)) / U256::from(100);
-        Ok(std::cmp::max(network_price, replacement_price))
-    }
-
     /// Creates a new tx options from a stuck transaction, with updated gas amount
     /// and nonce.
-    fn tx_options_from_stuck_tx(&self, stuck_tx: &ETHOperation) -> Result<Options, failure::Error> {
+    fn tx_options_from_stuck_tx(
+        &mut self,
+        stuck_tx: &ETHOperation,
+    ) -> Result<Options, failure::Error> {
         let old_tx_gas_price = stuck_tx.last_used_gas_price;
 
-        let new_gas_price = self.scale_gas(old_tx_gas_price)?;
+        let new_gas_price = self
+            .gas_adjuster
+            .get_gas_price(&self.ethereum, Some(old_tx_gas_price))?;
         let nonce = stuck_tx.nonce;
 
         info!(
