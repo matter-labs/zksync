@@ -3,21 +3,8 @@ use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use serde_json::value::Value;
 // Workspace imports
-use models::node::{AccountId, BlockNumber, FranklinOp};
 // Local imports
 use crate::schema::*;
-
-#[derive(Debug, Clone, Insertable)]
-#[table_name = "executed_priority_operations"]
-pub struct NewExecutedPriorityOperation {
-    pub block_number: i64,
-    pub block_index: i32,
-    pub operation: Value,
-    pub priority_op_serialid: i64,
-    pub deadline_block: i64,
-    pub eth_fee: BigDecimal,
-    pub eth_hash: Vec<u8>,
-}
 
 #[derive(Debug, Clone, Insertable)]
 #[table_name = "operations"]
@@ -36,13 +23,14 @@ pub struct StoredOperation {
     pub confirmed: bool,
 }
 
-#[derive(Debug, Clone, Queryable, QueryableByName)]
+#[derive(Debug, Clone, Insertable)]
 #[table_name = "executed_priority_operations"]
-pub struct StoredExecutedPriorityOperation {
-    pub id: i32,
+pub struct NewExecutedPriorityOperation {
     pub block_number: i64,
     pub block_index: i32,
     pub operation: Value,
+    pub from_account: Vec<u8>,
+    pub to_account: Vec<u8>,
     pub priority_op_serialid: i64,
     pub deadline_block: i64,
     pub eth_fee: BigDecimal,
@@ -50,39 +38,34 @@ pub struct StoredExecutedPriorityOperation {
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
-#[table_name = "rollup_ops"]
-pub struct StoredFranklinOp {
+#[table_name = "executed_priority_operations"]
+pub struct StoredExecutedPriorityOperation {
     pub id: i32,
-    pub block_num: i64,
+    pub block_number: i64,
+    pub block_index: i32,
     pub operation: Value,
-    pub fee_account: i64,
+    pub from_account: Vec<u8>,
+    pub to_account: Vec<u8>,
+    pub priority_op_serialid: i64,
+    pub deadline_block: i64,
+    pub eth_fee: BigDecimal,
+    pub eth_hash: Vec<u8>,
 }
 
-impl StoredFranklinOp {
-    pub fn into_franklin_op(self) -> FranklinOp {
-        serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db")
-    }
-}
 #[derive(Debug, Clone, Insertable)]
-#[table_name = "rollup_ops"]
-pub struct NewFranklinOp {
-    pub block_num: i64,
+#[table_name = "executed_transactions"]
+pub struct NewExecutedTransaction {
+    pub block_number: i64,
+    pub block_index: Option<i32>,
+    pub tx: Value,
     pub operation: Value,
-    pub fee_account: i64,
-}
-
-impl NewFranklinOp {
-    pub fn prepare_stored_op(
-        franklin_op: &FranklinOp,
-        block: BlockNumber,
-        fee_account: AccountId,
-    ) -> Self {
-        Self {
-            block_num: i64::from(block),
-            operation: serde_json::to_value(franklin_op.clone()).unwrap(),
-            fee_account: i64::from(fee_account),
-        }
-    }
+    pub tx_hash: Vec<u8>,
+    pub from_account: Vec<u8>,
+    pub to_account: Option<Vec<u8>>,
+    pub success: bool,
+    pub fail_reason: Option<String>,
+    pub primary_account_address: Vec<u8>,
+    pub nonce: i64,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
@@ -90,20 +73,14 @@ impl NewFranklinOp {
 pub struct StoredExecutedTransaction {
     pub id: i32,
     pub block_number: i64,
+    pub block_index: Option<i32>,
+    pub tx: Value,
+    pub operation: Value,
     pub tx_hash: Vec<u8>,
-    pub operation: Option<Value>,
+    pub from_account: Vec<u8>,
+    pub to_account: Option<Vec<u8>>,
     pub success: bool,
     pub fail_reason: Option<String>,
-    pub block_index: Option<i32>,
-}
-
-#[derive(Debug, Clone, Insertable)]
-#[table_name = "executed_transactions"]
-pub struct NewExecutedTransaction {
-    pub block_number: i64,
-    pub tx_hash: Vec<u8>,
-    pub operation: Option<Value>,
-    pub success: bool,
-    pub fail_reason: Option<String>,
-    pub block_index: Option<i32>,
+    pub primary_account_address: Vec<u8>,
+    pub nonce: i64,
 }
