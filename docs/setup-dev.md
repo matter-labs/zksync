@@ -33,7 +33,8 @@ The problem should be solved at this step.
 
 ## `Node` & `Yarn`
 
-1. Install `Node`.
+1. Install `Node`. Be sure to install `Node` v10.20.1. Other 10x versions (e.g. v10.16.1) can cause mysterious errors,
+which won't look related to the `Node` itself.
 
 2. Install `yarn`. Instructions can be found on the [official site](https://classic.yarnpkg.com/en/docs/install/).
 

@@ -27,6 +27,9 @@
     "typescript": "^3.5.3",
     "zksync": "link:../js/zksync.js"
   },
+  "resolutions": {
+    "ethereum-waffle/ethers": "4.0.33"
+  },
   "scripts": {
     "build": "waffle .waffle.json",
     "test": "yarn build && mocha -r ts-node/register test/**/*.ts",

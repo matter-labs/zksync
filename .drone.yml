@@ -351,6 +351,7 @@ steps:
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - echo -n $KUBECONFIG_BASE64 | base64 --decode > `pwd`/kubeconfig.yaml
   - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/stage.env KUBECONFIG=`pwd`/kubeconfig.yaml
+  - zksync db-migrate
   - zksync apply-kubeconfig
   - zksync restart
   depends_on:
@@ -413,5 +414,6 @@ steps:
   - zksync env testnet
   - echo -n $KUBECONFIG_BASE64 | base64 --decode > `pwd`/kubeconfig.yaml
   - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/testnet.env KUBECONFIG=`pwd`/kubeconfig.yaml
+  - zksync db-migrate
   - zksync apply-kubeconfig
   - zksync restart

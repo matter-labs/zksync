@@ -62,8 +62,6 @@ impl<'a> OperationsSchema<'a> {
     }
 
     /// Stores the executed operation in the database.
-    /// Note: This method should only be called after the transaction is stored in
-    /// the `mempool` table, since `executed_transactions` has a foreign key relying on it.
     pub(crate) fn store_executed_operation(
         &self,
         operation: NewExecutedTransaction,

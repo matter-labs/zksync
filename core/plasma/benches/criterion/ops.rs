@@ -11,7 +11,7 @@ use models::node::{
     account::{Account, PubKeyHash},
     priority_ops::{Deposit, FullExit},
     priv_key_from_fs,
-    tx::{ChangePubKey, PackedEthSignature, Transfer, TxSignature, Withdraw},
+    tx::{ChangePubKey, PackedEthSignature, Transfer, Withdraw},
     AccountId, AccountMap, Address, BlockNumber, FranklinPriorityOp, FranklinTx, PrivateKey,
     TokenId,
 };
@@ -67,18 +67,16 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
 
     let from_account = state.get_account(0).expect("Can't get the account");
 
-    let mut transfer = Transfer {
-        from: from_account.address,
-        to: Address::random(),
-        token: ETH_TOKEN_ID,
-        amount: 10.into(),
-        fee: 1.into(),
-        nonce: 0,
-        signature: TxSignature::default(),
-    };
-
-    transfer.signature = TxSignature::sign_musig_rescue(&private_key, &transfer.get_bytes());
-
+    let transfer = Transfer::new_signed(
+        from_account.address,
+        Address::random(),
+        ETH_TOKEN_ID,
+        10.into(),
+        1.into(),
+        0,
+        private_key,
+    )
+    .expect("failed to sign transfer");
     let transfer_tx = FranklinTx::Transfer(Box::new(transfer));
 
     let setup = || (state.clone(), transfer_tx.clone());
@@ -102,17 +100,16 @@ fn apply_transfer_tx(b: &mut Bencher<'_>) {
     let from_account = state.get_account(0).expect("Can't get the account");
     let to_account = state.get_account(1).expect("Can't get the account");
 
-    let mut transfer = Transfer {
-        from: from_account.address,
-        to: to_account.address,
-        token: ETH_TOKEN_ID,
-        amount: 10.into(),
-        fee: 1.into(),
-        nonce: 0,
-        signature: TxSignature::default(),
-    };
-
-    transfer.signature = TxSignature::sign_musig_rescue(&private_key, &transfer.get_bytes());
+    let transfer = Transfer::new_signed(
+        from_account.address,
+        to_account.address,
+        ETH_TOKEN_ID,
+        10.into(),
+        1.into(),
+        0,
+        private_key,
+    )
+    .expect("failed to sign transfer");
 
     let transfer_tx = FranklinTx::Transfer(Box::new(transfer));
 
@@ -187,17 +184,16 @@ fn apply_withdraw_tx(b: &mut Bencher<'_>) {
     let from_account = state.get_account(0).expect("Can't get the account");
     let (private_key, _) = keys.get(&0).expect("Can't key the private key");
 
-    let mut withdraw = Withdraw {
-        from: from_account.address,
-        to: Address::random(),
-        token: ETH_TOKEN_ID,
-        amount: 10.into(),
-        fee: 1.into(),
-        nonce: 0,
-        signature: TxSignature::default(),
-    };
-
-    withdraw.signature = TxSignature::sign_musig_rescue(&private_key, &withdraw.get_bytes());
+    let withdraw = Withdraw::new_signed(
+        from_account.address,
+        Address::random(),
+        ETH_TOKEN_ID,
+        10.into(),
+        1.into(),
+        0,
+        private_key,
+    )
+    .expect("failed to sign withdraw");
 
     let withdraw_tx = FranklinTx::Withdraw(Box::new(withdraw));
 

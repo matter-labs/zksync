@@ -99,18 +99,16 @@ impl ZksyncAccount {
         increment_nonce: bool,
     ) -> (Transfer, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
-        let mut transfer = Transfer {
-            from: self.address,
-            to: *to,
-            token: token_id,
+        let transfer = Transfer::new_signed(
+            self.address,
+            *to,
+            token_id,
             amount,
             fee,
-            nonce: nonce.unwrap_or_else(|| *stored_nonce),
-            signature: TxSignature::default(),
-        };
-
-        transfer.signature =
-            TxSignature::sign_musig_rescue(&self.private_key, &transfer.get_bytes());
+            nonce.unwrap_or_else(|| *stored_nonce),
+            &self.private_key,
+        )
+        .expect("Failed to sign transfer");
 
         if increment_nonce {
             *stored_nonce += 1;
@@ -136,17 +134,16 @@ impl ZksyncAccount {
         increment_nonce: bool,
     ) -> (Withdraw, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
-        let mut withdraw = Withdraw {
-            from: self.address,
-            to: *eth_address,
-            token: token_id,
+        let withdraw = Withdraw::new_signed(
+            self.address,
+            *eth_address,
+            token_id,
             amount,
             fee,
-            nonce: nonce.unwrap_or_else(|| *stored_nonce),
-            signature: TxSignature::default(),
-        };
-        withdraw.signature =
-            TxSignature::sign_musig_rescue(&self.private_key, &withdraw.get_bytes());
+            nonce.unwrap_or_else(|| *stored_nonce),
+            &self.private_key,
+        )
+        .expect("Failed to sign withdraw");
 
         if increment_nonce {
             *stored_nonce += 1;
@@ -167,7 +164,7 @@ impl ZksyncAccount {
             nonce: nonce.unwrap_or_else(|| *stored_nonce),
             signature: TxSignature::default(),
         };
-        close.signature = TxSignature::sign_musig_rescue(&self.private_key, &close.get_bytes());
+        close.signature = TxSignature::sign_musig(&self.private_key, &close.get_bytes());
 
         if increment_nonce {
             *stored_nonce += 1;
