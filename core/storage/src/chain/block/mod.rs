@@ -3,21 +3,20 @@
 use diesel::dsl::max;
 use diesel::prelude::*;
 use diesel::result::Error as DieselError;
-use diesel::sql_types::Text;
 // Workspace imports
 use models::node::{
     block::{Block, ExecutedOperations},
-    AccountId, BlockNumber, Fr, FranklinOp,
+    AccountId, BlockNumber, FranklinOp,
 };
-use models::{fe_from_hex, fe_to_hex, Action, ActionType, Operation};
+use models::{fe_from_bytes, fe_to_bytes, Action, ActionType, Operation};
 // Local imports
 use self::records::{BlockDetails, StorageBlock};
 use crate::prover::records::StoredProof;
+use crate::prover::ProverSchema;
 use crate::schema::*;
 use crate::StorageProcessor;
 use crate::{
     chain::{
-        mempool::MempoolSchema,
         operations::{
             records::{
                 NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation,
@@ -25,7 +24,6 @@ use crate::{
             },
             OperationsSchema,
         },
-        operations_ext::records::{InsertTx, ReadTx},
         state::StateSchema,
     },
     ethereum::records::ETHBinding,
@@ -53,12 +51,19 @@ impl<'a> BlockSchema<'a> {
 
             match &op.action {
                 Action::Commit => {
-                    StateSchema(self.0)
-                        .commit_state_update(op.block.block_number, &op.accounts_updated)?;
+                    StateSchema(self.0).commit_state_update(block_number, &op.accounts_updated)?;
                     self.save_block(op.block)?;
                 }
-                Action::Verify { .. } => {
-                    StateSchema(self.0).apply_state_update(op.block.block_number)?
+                Action::Verify { proof } => {
+                    let stored_proof = ProverSchema(self.0).load_proof(block_number);
+                    match stored_proof {
+                        Err(DieselError::NotFound) => {
+                            ProverSchema(self.0).store_proof(block_number, proof)?;
+                        }
+                        Err(e) => return Err(e),
+                        Ok(_) => {}
+                    };
+                    StateSchema(self.0).apply_state_update(block_number)?
                 }
             };
 
@@ -77,25 +82,8 @@ impl<'a> BlockSchema<'a> {
         for block_tx in block.block_transactions.into_iter() {
             match block_tx {
                 ExecutedOperations::Tx(tx) => {
-                    // Copy the tx data.
-                    let hash = tx.tx.hash().as_ref().to_vec();
-                    let primary_account_address = tx.tx.account().as_bytes().to_vec();
-                    let nonce = tx.tx.nonce() as i64;
-                    let serialized_tx = serde_json::to_value(&tx.tx).unwrap_or_default();
-
-                    // Create records for `operations` and `mempool` tables.
+                    // Store the executed operation in the corresponding schema.
                     let new_tx = NewExecutedTransaction::prepare_stored_tx(*tx, block.block_number);
-                    let mempool_tx = InsertTx {
-                        hash,
-                        primary_account_address,
-                        nonce,
-                        tx: serialized_tx,
-                    };
-
-                    // Store the transaction in `mempool` and `operations` tables.
-                    // Note that `mempool` table should be updated *first*, since hash there
-                    // is a foreign key in `operations` table.
-                    MempoolSchema(self.0).insert_tx(mempool_tx)?;
                     OperationsSchema(self.0).store_executed_operation(new_tx)?;
                 }
                 ExecutedOperations::PriorityOp(prior_op) => {
@@ -128,10 +116,8 @@ impl<'a> BlockSchema<'a> {
         // Load transactions for this block.
         let block_transactions = self.get_block_executed_ops(block)?;
 
-        // Change the root hash format from `sync-bl:FF..FF` to `0xFF..FF`.
-        assert!(stored_block.root_hash.starts_with("sync-bl:"));
-        let new_root_hash = fe_from_hex::<Fr>(&format!("0x{}", &stored_block.root_hash[8..]))
-            .expect("Unparsable root hash");
+        // Encode the root hash as `0xFF..FF`.
+        let new_root_hash = fe_from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
 
         // Return the obtained block in the expected format.
         Ok(Some(Block {
@@ -170,16 +156,10 @@ impl<'a> BlockSchema<'a> {
         // from the database.
         let (executed_ops, executed_priority_ops) =
             self.0.conn().transaction::<_, DieselError, _>(|| {
-                // To load executed transactions, we join `executed_transactions` table (which
-                // contains the header of the transaction) and `mempool` which contains the
-                // transactions body.
                 let executed_ops = executed_transactions::table
-                    .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
                     .filter(executed_transactions::block_number.eq(i64::from(block)))
-                    .load::<(StoredExecutedTransaction, Option<ReadTx>)>(self.0.conn())?;
+                    .load::<StoredExecutedTransaction>(self.0.conn())?;
 
-                // For priority operations, we simply load them from
-                // `executed_priority_operations` table.
                 let executed_priority_ops = executed_priority_operations::table
                     .filter(executed_priority_operations::block_number.eq(i64::from(block)))
                     .load::<StoredExecutedPriorityOperation>(self.0.conn())?;
@@ -190,7 +170,7 @@ impl<'a> BlockSchema<'a> {
         // Transform executed operations to be `ExecutedOperations`.
         let executed_ops = executed_ops
             .into_iter()
-            .filter_map(|(stored_exec, stored_tx)| stored_exec.into_executed_tx(stored_tx).ok())
+            .filter_map(|stored_exec| stored_exec.into_executed_tx().ok())
             .map(|tx| ExecutedOperations::Tx(Box::new(tx)));
         executed_operations.extend(executed_ops);
 
@@ -237,7 +217,7 @@ impl<'a> BlockSchema<'a> {
             with eth_ops as ( \
                 select \
                     operations.block_number, \
-                    '0x' || encode(eth_tx_hashes.tx_hash::bytea, 'hex') as tx_hash, \
+                    eth_tx_hashes.tx_hash, \
                     operations.action_type, \
                     operations.created_at \
                 from operations \
@@ -268,6 +248,23 @@ impl<'a> BlockSchema<'a> {
         diesel::sql_query(query).load(self.0.conn())
     }
 
+    /// Helper method for `find_block_by_height_or_hash`. It checks whether
+    /// provided string can be interpreted like a hash, and if so, returns the
+    /// hexadecimal string without prefix.
+    fn try_parse_hex(&self, query: &str) -> Option<String> {
+        const HASH_STRING_SIZE: usize = 32 * 2; // 32 bytes, 2 symbols per byte.
+
+        if query.starts_with("0x") {
+            Some(query[2..].into())
+        } else if query.starts_with("sync-bl:") {
+            Some(query[8..].into())
+        } else if query.len() == HASH_STRING_SIZE && hex::decode(query).is_ok() {
+            Some(query.into())
+        } else {
+            None
+        }
+    }
+
     /// Performs a database search with an uncertain query, which can be either of:
     /// - Hash of commit/verify Ethereum transaction for the block.
     /// - The state root hash of the block.
@@ -276,8 +273,36 @@ impl<'a> BlockSchema<'a> {
     /// Will return `None` if the query is malformed or there is no block that matches
     /// the query.
     pub fn find_block_by_height_or_hash(&self, query: String) -> Option<BlockDetails> {
-        let block_number = query.parse::<i64>().unwrap_or(i64::max_value());
-        let l_query = query.to_lowercase();
+        // Adapt the SQL query based on the input data format.
+        let mut where_condition = String::new();
+
+        // If the input looks like hash, add the hash lookup part.
+        if let Some(hex_query) = self.try_parse_hex(&query) {
+            let hash_lookup = format!(
+                " \
+                or committed.tx_hash = decode('{hex_query}', 'hex') \
+                or verified.tx_hash = decode('{hex_query}', 'hex') \
+                or blocks.root_hash = decode('{hex_query}', 'hex') \
+                ",
+                hex_query = hex_query
+            );
+
+            where_condition += &hash_lookup;
+        };
+
+        // If the input can be interpreted as integer, add the block number lookup part.
+        if let Ok(int_query) = query.parse::<i64>() {
+            let block_lookup = format!("or blocks.number = {}", int_query);
+
+            where_condition += &block_lookup;
+        }
+
+        // If `where` condition is empty (input doesn't look like hash or integer), no query
+        // should be performed.
+        if where_condition.is_empty() {
+            return None;
+        }
+
         // This query does the following:
         // - joins the `operations` and `eth_tx_hashes` (using the intermediate `eth_ops_binding` table)
         //   tables to collect the data:
@@ -294,7 +319,7 @@ impl<'a> BlockSchema<'a> {
             with eth_ops as ( \
                 select \
                     operations.block_number, \
-                    '0x' || encode(eth_tx_hashes.tx_hash::bytea, 'hex') as tx_hash, \
+                    eth_tx_hashes.tx_hash, \
                     operations.action_type, \
                     operations.created_at \
                 from operations \
@@ -315,19 +340,14 @@ impl<'a> BlockSchema<'a> {
             left join eth_ops verified on \
                 verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
             where false \
-                or lower(committed.tx_hash) = $1 \
-                or lower(verified.tx_hash) = $1 \
-                or lower(blocks.root_hash) = $1 \
-                or blocks.number = {block_number} \
+                {where_condition} \
             order by blocks.number desc \
             limit 1; \
             ",
-            block_number = block_number
+            where_condition = where_condition
         );
-        diesel::sql_query(sql_query)
-            .bind::<Text, _>(l_query)
-            .get_result(self.0.conn())
-            .ok()
+
+        diesel::sql_query(sql_query).get_result(self.0.conn()).ok()
     }
 
     pub fn load_commit_op(&self, block_number: BlockNumber) -> Option<Operation> {
@@ -358,26 +378,16 @@ impl<'a> BlockSchema<'a> {
     ) -> QueryResult<Vec<(Operation, bool)>> {
         self.0.conn().transaction(|| {
             let ops: Vec<(StoredOperation, Option<StoredProof>)> = diesel::sql_query(format!(
-                "
-                WITH sized_operations AS (
-                    SELECT operations.*, proofs.*, operations.block_number as the_block_number
-                      FROM operations
-                           LEFT JOIN blocks
-                                  ON number = block_number
-                           LEFT JOIN proofs
-                               USING (block_number)
-                )
-                SELECT *
-                  FROM sized_operations
-                 WHERE action_type = 'COMMIT'
-                   AND the_block_number > (
-                        SELECT COALESCE(max(the_block_number), 0)
-                          FROM sized_operations
-                         WHERE action_type = 'VERIFY'
-                    )
-                   AND the_block_number > {}
-                ORDER BY the_block_number
-                LIMIT {}
+                "SELECT operations.*, proofs.*
+                   FROM operations
+                        LEFT JOIN blocks
+                               ON number = block_number
+                        LEFT JOIN proofs
+                            USING (block_number)
+                  WHERE operations.action_type = 'COMMIT'
+                    AND operations.block_number > {}
+                  ORDER BY operations.block_number
+                  LIMIT {}
                 ",
                 block, limit
             ))
@@ -412,7 +422,7 @@ impl<'a> BlockSchema<'a> {
     pub(crate) fn save_block(&self, block: Block) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             let number = i64::from(block.block_number);
-            let root_hash = format!("sync-bl:{}", fe_to_hex(&block.new_root_hash));
+            let root_hash = fe_to_bytes(&block.new_root_hash);
             let fee_account_id = i64::from(block.fee_account);
             let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
             let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;

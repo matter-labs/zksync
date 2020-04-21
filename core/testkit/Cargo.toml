@@ -17,8 +17,8 @@ futures = { version = "0.3", features = ["compat"] }
 log = "0.4"
 env_logger = "0.6"
 bigdecimal = { version = "0.1.0", features = ["serde"]}
-web3 = "0.8.0"
-ethabi = "8.0.0"
+ethabi = "9.0.0"
+web3 = "0.10.0"
 failure = "0.1"
 serde = "1.0.90"
 serde_derive = "1.0.90"

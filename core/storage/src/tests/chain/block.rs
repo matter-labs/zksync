@@ -3,7 +3,7 @@ use web3::types::H256;
 // Workspace imports
 use crypto_exports::rand::XorShiftRng;
 use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, Fr};
-use models::{ethereum::OperationType, Action, Operation};
+use models::{ethereum::OperationType, fe_to_bytes, Action, Operation};
 // Local imports
 use super::utils::{acc_create_random_updates, get_operation};
 use crate::tests::{create_rng, db_test};
@@ -151,15 +151,11 @@ fn find_block_by_height_or_hash() {
     ) -> diesel::QueryResult<()> {
         let mut queries = vec![
             expected_block_detail.block_number.to_string(),
-            expected_block_detail.new_state_root.clone(),
-            expected_block_detail
-                .commit_tx_hash
-                .as_ref()
-                .unwrap()
-                .clone(),
+            hex::encode(&expected_block_detail.new_state_root),
+            hex::encode(&expected_block_detail.commit_tx_hash.as_ref().unwrap()),
         ];
         if let Some(verify_tx_hash) = expected_block_detail.verify_tx_hash.as_ref() {
-            queries.push(verify_tx_hash.clone());
+            queries.push(hex::encode(&verify_tx_hash));
         }
 
         for query in queries {
@@ -248,10 +244,9 @@ fn find_block_by_height_or_hash() {
 
             // Initialize reference sample fields.
             current_block_detail.block_number = operation.block.block_number as i64;
-            current_block_detail.new_state_root =
-                format!("sync-bl:{}", operation.block.new_root_hash.to_hex());
+            current_block_detail.new_state_root = fe_to_bytes(&operation.block.new_root_hash);
             current_block_detail.block_size = operation.block.block_transactions.len() as i64;
-            current_block_detail.commit_tx_hash = Some(format!("0x{}", hex::encode(eth_tx_hash)));
+            current_block_detail.commit_tx_hash = Some(eth_tx_hash.as_ref().to_vec());
 
             // Add verification for the block if required.
             if block_number <= n_verified {
@@ -279,8 +274,7 @@ fn find_block_by_height_or_hash() {
                     )?;
                     EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
                     EthereumSchema(&conn).confirm_eth_tx(&eth_tx_hash)?;
-                    current_block_detail.verify_tx_hash =
-                        Some(format!("0x{}", hex::encode(eth_tx_hash)));
+                    current_block_detail.verify_tx_hash = Some(eth_tx_hash.as_ref().to_vec());
                 }
             }
 
@@ -452,17 +446,17 @@ fn load_commits_after_block() {
             },
             Vec::new(),
         ))?;
-        ProverSchema(&conn).store_proof(2, &Default::default())?;
+        ProverSchema(&conn).store_proof(3, &Default::default())?;
 
         // Now test the method.
         let empty_vec = vec![];
         let test_vector = vec![
             // Blocks 2 & 3.
-            ((1, 2), &operations[1..3], vec![true, false]),
+            ((1, 2), &operations[1..3], vec![false, true]),
             // Block 2.
-            ((1, 1), &operations[1..2], vec![true]),
+            ((1, 1), &operations[1..2], vec![false]),
             // Block 3.
-            ((2, 1), &operations[2..3], vec![false]),
+            ((2, 1), &operations[2..3], vec![true]),
             // No block (there are no blocks AFTER block 3.
             ((3, 1), &empty_vec, vec![]),
             // Obviously none.
