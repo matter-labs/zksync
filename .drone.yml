@@ -15,6 +15,7 @@ services:
 trigger:
   event:
   - pull_request
+  - cron
 steps:
 - name: restore-cache
   image: drillster/drone-volume-cache
@@ -123,6 +124,7 @@ services:
 trigger:
   event:
   - pull_request
+  - cron
 steps:
 - name: restore-cache
   image: drillster/drone-volume-cache
