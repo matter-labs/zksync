@@ -25,8 +25,8 @@ contract Storage {
     /// @notice Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
     Governance internal governance;
 
-    /// @notice Root-chain balances (per owner and token id) to withdraw
-    mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
+    /// @notice Root-chain balances (per owner and token id, see packAddressAndTokenId) to withdraw
+    mapping(bytes22 => uint128) public balancesToWithdraw;
 
     /// @notice verified withdrawal pending to be executed.
     struct PendingWithdrawal {
@@ -82,8 +82,8 @@ contract Storage {
     /// @notice Onchain operations by index
     mapping(uint64 => OnchainOperation) public onchainOps;
 
-    /// @notice Flag indicates that a user has exited certain token balance (per owner and tokenId)
-    mapping(address => mapping(uint16 => bool)) public exited;
+    /// @notice Flag indicates that a user has exited certain token balance (per owner and tokenId, see packAddressAndTokenId)
+    mapping(bytes22 => bool) public exited;
 
     /// @notice Flag indicates that exodus (mass exit) mode is triggered
     /// @notice Once it was raised, it can not be cleared again, and all users must exit
@@ -119,4 +119,13 @@ contract Storage {
     /// @dev Used in checks: if the request matches the operation on Rollup contract and if provided number of requests is not too big
     uint64 public totalCommittedPriorityRequests;
 
+    /// @notice Packs address and token id into single word to use as a key in balances mapping
+    function packAddressAndTokenId(address _address, uint16 _tokenId) internal pure returns (bytes22) {
+        return bytes22(uint176(uint(_address) | (_tokenId << 160)));
+    }
+
+    /// @notice Gets value from balancesToWithdraw
+    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
+        return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)];
+    }
 }

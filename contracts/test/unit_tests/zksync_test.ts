@@ -245,7 +245,7 @@ describe("ZK Sync withdraw unit tests", function () {
     async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
         let gasFee: BigNumber;
         const balanceBefore = await onchainBalance(ethWallet, token);
-        const contractBalanceBefore = bigNumberify(await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId));
+        const contractBalanceBefore = bigNumberify(await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId));
         if (token === ethers.constants.AddressZero) {
             const tx = await zksyncContract.withdrawETH(amount, {gasLimit: 70000});
             const receipt = await tx.wait();
@@ -258,7 +258,7 @@ describe("ZK Sync withdraw unit tests", function () {
         const expectedBalance = token == AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
         expect(balanceAfter.toString(), "withdraw account balance mismatch").eq(expectedBalance.toString());
 
-        const contractBalanceAfter = bigNumberify(await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId));
+        const contractBalanceAfter = bigNumberify(await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId));
         const expectedContractBalance = contractBalanceBefore.sub(amount);
         expect(contractBalanceAfter.toString(), "withdraw contract balance mismatch").eq(expectedContractBalance.toString());
     }

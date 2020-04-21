@@ -161,7 +161,7 @@ async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: 
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
     const tokenId = await withdrawTo.provider.tokenSet.resolveTokenId(token);
-    const pendingToBeOnchainBalance = await contract.balancesToWithdraw(
+    const pendingToBeOnchainBalance = await contract.getBalanceToWithdraw(
         await withdrawTo.address(),
         tokenId,
     );

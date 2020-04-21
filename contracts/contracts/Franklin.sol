@@ -74,7 +74,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// _verifierAddress The address of Verifier contract
     /// _ // FIXME: remove _genesisAccAddress
     /// _genesisRoot Genesis blocks (first block) root
-    function initialize(bytes calldata initializationParameters) external {
+    function initialize(bytes calldata initializationParameters) external nonReentrant {
         (
         address _governanceAddress,
         address _verifierAddress,
@@ -107,11 +107,12 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             // send fails are ignored hence there is always a direct way to withdraw.
             delete pendingWithdrawals[i];
 
-            uint128 amount = balancesToWithdraw[to][tokenId];
+            bytes22 packedBalanceKey = packAddressAndTokenId(to, tokenId);
+            uint128 amount = balancesToWithdraw[packedBalanceKey];
             // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
             if (amount != 0) {
                 // avoid reentrancy attack by using subtract and not "= 0" and changing local state before external call
-                balancesToWithdraw[to][tokenId] -= amount;
+                balancesToWithdraw[packedBalanceKey] -= amount;
                 bool sent = false;
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
@@ -122,7 +123,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
                     sent = IERC20(tokenAddr).transfer(to, amount);
                 }
                 if (!sent) {
-                    balancesToWithdraw[to][tokenId] += amount;
+                    balancesToWithdraw[packedBalanceKey] += amount;
                 }
             }
         }
@@ -149,7 +150,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             uint64 id = firstPriorityRequestId + i;
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
                 Operations.Deposit memory op = Operations.readDepositPubdata(priorityRequests[id].pubData, 0);
-                balancesToWithdraw[op.owner][op.tokenId] += op.amount;
+                bytes22 packedBalanceKey = packAddressAndTokenId(op.owner, op.tokenId);
+                balancesToWithdraw[packedBalanceKey] += op.amount;
             }
             delete priorityRequests[id];
         }
@@ -220,7 +222,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _token Token address
     /// @param _amount Token amount
     /// @param _franklinAddr Receiver Layer 2 address
-    function depositERC20(IERC20 _token, uint128 _amount, address _franklinAddr) external payable {
+    function depositERC20(IERC20 _token, uint128 _amount, address _franklinAddr) external payable nonReentrant {
         requireActive();
 
         // Fee is:
@@ -317,9 +319,10 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _token - token by id
     /// @param _amount - token amount
     function registerSingleWithdrawal(uint16 _token, uint128 _amount) internal {
-        uint128 balance = balancesToWithdraw[msg.sender][_token];
+        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _token);
+        uint128 balance = balancesToWithdraw[packedBalanceKey];
         require(balance >= _amount, "frw11"); // insufficient balance withdraw
-        balancesToWithdraw[msg.sender][_token] = balance - _amount;
+        balancesToWithdraw[packedBalanceKey] = balance - _amount;
         emit OnchainWithdrawal(
             msg.sender,
             _token,
@@ -649,13 +652,14 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _tokenId Token id
     /// @param _amount Token amount
     function storeWithdrawalAsPending(address _to, uint16 _tokenId, uint128 _amount) internal {
-        uint128 balance = balancesToWithdraw[_to][_tokenId];
+        bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
+        uint128 balance = balancesToWithdraw[packedBalanceKey];
         if (balance == 0) {
             pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
             numberOfPendingWithdrawals++;
         }
 
-        balancesToWithdraw[_to][_tokenId] += _amount;
+        balancesToWithdraw[packedBalanceKey] += _amount;
     }
 
     /// @notice If block is verified the onchain operations from it must be completed
@@ -757,12 +761,14 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner (must be total amount, not part of it)
     function exit(uint16 _tokenId, uint128 _amount, uint256[8] calldata _proof) external nonReentrant {
+        bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
+
         require(exodusMode, "fet11"); // must be in exodus mode
-        require(!exited[msg.sender][_tokenId], "fet12"); // already exited
+        require(!exited[packedBalanceKey], "fet12"); // already exited
         require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
 
-        balancesToWithdraw[msg.sender][_tokenId] += _amount;
-        exited[msg.sender][_tokenId] = true;
+        balancesToWithdraw[packedBalanceKey] += _amount;
+        exited[packedBalanceKey] = true;
     }
 
     function authPubkeyHash(bytes calldata _fact, uint32 _nonce) external nonReentrant {
@@ -829,7 +835,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         firstPriorityRequestId += _number;
         totalCommittedPriorityRequests -= _number;
 
-        balancesToWithdraw[_validator][0] += uint128(totalFee);
+        bytes22 packedBalanceKey = packAddressAndTokenId(_validator, 0);
+        balancesToWithdraw[packedBalanceKey] += uint128(totalFee);
     }
 
 }
