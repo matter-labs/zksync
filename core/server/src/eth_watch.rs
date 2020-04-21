@@ -205,8 +205,8 @@ impl<T: Transport> EthWatch<T> {
         // restore priority queue
         let prior_queue_events = self
             .get_priority_op_events(
-                BlockNumber::Number(previous_block_with_accepted_events),
-                BlockNumber::Number(new_block_with_accepted_events),
+                BlockNumber::Number(previous_block_with_accepted_events.into()),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await
             .expect("Failed to restore priority queue events from ETH");
@@ -220,7 +220,7 @@ impl<T: Transport> EthWatch<T> {
         let new_tokens = self
             .get_new_token_events(
                 BlockNumber::Earliest,
-                BlockNumber::Number(new_block_with_accepted_events),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await
             .expect("Failed to restore token list from ETH");
@@ -242,14 +242,14 @@ impl<T: Transport> EthWatch<T> {
 
         let new_tokens = self
             .get_new_token_events(
-                BlockNumber::Number(previous_block_with_accepted_events),
-                BlockNumber::Number(new_block_with_accepted_events),
+                BlockNumber::Number(previous_block_with_accepted_events.into()),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await?;
         let priority_op_events = self
             .get_priority_op_events(
-                BlockNumber::Number(previous_block_with_accepted_events),
-                BlockNumber::Number(new_block_with_accepted_events),
+                BlockNumber::Number(previous_block_with_accepted_events.into()),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await?;
 
