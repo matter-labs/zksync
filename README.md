@@ -28,8 +28,8 @@ Setup:
 zksync init
 ```
 
-During first init you have to download around 8 GB of setup files, this should be done once.
-If you have problem on this step of init see help of the `zksync plonk-setup`.
+During the first initialization you have to download around 8 GB of setup files, this should be done once.
+If you have a problem on this step of the initialization, see help for the `zksync plonk-setup` command.
 
 To completely reset the dev environment:
 
@@ -68,14 +68,15 @@ Run server:
 ```sh
 zksync server
 ```
+
 Server is configured using env files in `./etc/env` directory. 
-After first init you should have `./etc/env/dev.env` file copied from `./etc/env/dev.env.example`.
+After the first initialization, file `./etc/env/dev.env` will be created. By default, this file is copied from the `./etc/env/dev.env.example` template.
 
-Server can produce block of different sizes, all available sizes are in the `SUPPORTED_BLOCK_CHUNKS_SIZES` env variable.
-You can select wich of these block sizes are produced by you server using `BLOCK_CHUNK_SIZES` env variable.
+Server can produce block of different sizes, the list of available sizes is determined by the `SUPPORTED_BLOCK_CHUNKS_SIZES` environment variable.
+Block sizes which will actually be produced by the server can be configured using the `BLOCK_CHUNK_SIZES` environment variable.
 
-Note: for proof generation for large blocks you need a lot of resources and on average user machine 
-you should be able to proof only the smallest of the available block sizes.
+Note: for proof generation for large blocks requires a lot of resources and an average user machine 
+is only capable of creating proofs for the smallest block sizes.
 
 After that you may need to invalidate `cargo` cache by touching the files of `models`:
 
@@ -231,8 +232,8 @@ Dummy Verifier status: disabled
 
 ## Developing circuit
 
-* To generate proofs you need universal setup files that you downloaded during first init. 
-* To verify generated proofs you need verification keys for generated for specific circuit and Verifier.sol contract to check proofs on the Ethereum network.
+* To generate proofs one must have the universal setup files (which are downloaded during the first initialization).
+* To verify generated proofs one must have verification keys. Verification keys are generated for specific circuit & Verifier.sol contract; without these keys it is impossible to verify proofs on the Ethereum network.
 
 Steps to do after updating circuit:
 1. Update circuit version by updating `KEY_DIR` in your env file (don't forget to place it to `dev.env.example`)

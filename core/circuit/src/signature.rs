@@ -396,7 +396,7 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
     jubjub_params: &<E as JubjubEngine>::Params,
     generator: ecc::EdwardsPoint<E>,
 ) -> Result<Boolean, SynthesisError> {
-    // this contant is also used inside franklin_crypto verify rescue(enforce version of this check)
+    // This constant is also used inside `franklin_crypto` verify rescue(enforce version of this check)
     const INPUT_PAD_LEN_FOR_RESCUE: usize = 768;
     let mut sig_data_bits = sig_data_bits.to_vec();
     assert!(
