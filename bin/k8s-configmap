@@ -4,7 +4,7 @@
 
 #. .setup_env prod
 
-kubectl create secret generic $ZKSYNC_ENV-secret --namespace $ZKSYNC_ENV --dry-run -o yaml
+kubectl create configmap $ZKSYNC_ENV-configmap --namespace $ZKSYNC_ENV --dry-run -o yaml
 echo data:
 grep -v '^#' $ENV_FILE | grep -v '^$' | while read -r line; do
     VAR=`sed 's/=.*//' <<< $line`

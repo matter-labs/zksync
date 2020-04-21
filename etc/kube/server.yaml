@@ -64,8 +64,6 @@ spec:
   selector:
     matchLabels:
       app: ${ZKSYNC_ENV}-server
-  strategy:
-    type: Recreate
   template:
     metadata:
       labels:
@@ -82,14 +80,18 @@ spec:
             - containerPort: 3031
             - containerPort: 8088
           envFrom:
-            - secretRef:
-                name: ${ZKSYNC_ENV}-secret
+            - configMapRef:
+                name: ${ZKSYNC_ENV}-configmap
           env:
           - name: ZKSYNC_ENV
             value: "${ZKSYNC_ENV}"
           - name: OPERATOR_PRIVATE_KEY
-            value:
-              valueFrom:
-                secretKeyRef:
-                  name: ${ZKSYNC_ENV}-operator
-                  key: private_key
+            valueFrom:
+              secretKeyRef:
+                name: ${ZKSYNC_ENV}-operator
+                key: private_key
+          - name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: ${ZKSYNC_ENV}-secret
+                key: DATABASE_URL

@@ -5,8 +5,8 @@ mkdir -p etc/kube/gen/$ZKSYNC_ENV
 envsubst < etc/kube/server.yaml > etc/kube/gen/$ZKSYNC_ENV/server.yaml
 envsubst < etc/kube/nginx.yaml > etc/kube/gen/$ZKSYNC_ENV/nginx.yaml
 
-# Generate and apply secret for env config
-. bin/k8s-secret > etc/kube/gen/$ZKSYNC_ENV/secret.yaml
+# Generate and apply configmap for env config
+. bin/k8s-configmap > etc/kube/gen/$ZKSYNC_ENV/configmap.yaml
 
 for BLOCK_SIZE_CHUNKS in $(echo $BLOCK_CHUNK_SIZES | sed "s/,/ /g"); do
     export BLOCK_SIZE_CHUNKS=$BLOCK_SIZE_CHUNKS
