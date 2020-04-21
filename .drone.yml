@@ -36,6 +36,11 @@ steps:
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
+  - f cargo build --release --all-targets
+  - f cargo test --release --all-targets --no-run
+  - pushd core/storage
+  - f cargo test --release -p storage --features "db_test" --no-run
+  - popd
   depends_on:
   - restore-cache
 - name: run-genesis
