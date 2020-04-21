@@ -13,7 +13,8 @@ use crate::eth_sender::{database::DatabaseAccess, ethereum_interface::EthereumIn
 
 /// Constant to be used as the maximum gas price upon a first launch
 /// of the server until the gas price statistics are gathered.
-const INITIAL_MAX_GAS_PRICE: u64 = 0;
+/// Currently set to 200 gwei.
+const INITIAL_MAX_GAS_PRICE: u64 = 200 * 10e9 as u64;
 /// Amount of entries in the gas price statistics pool.
 const GAS_PRICE_SAMPLES_AMOUNT: usize = 10;
 /// Name of the environment variable responsible for the `max_gas_price` renewing interval.
