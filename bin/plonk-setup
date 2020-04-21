@@ -7,8 +7,8 @@ Used to download and check plonk universal setup files.
 Options:
 
 check (default) | download     checks or downloads missing setup files for powers defined in powers argument
-monomial (default) | all       chose to download setup files in monomial form or monomial and lagrange form (for current prover lagrange form is not needed) 
-powers (optional)              coma separated setup powers of two to downaload/check
+monomial (default) | all       option to download setup files in monomial form or monomial and lagrange form (for current prover lagrange form is not required) 
+powers (optional)              comma separated setup powers of two to download/check
 '
 
 set -e
