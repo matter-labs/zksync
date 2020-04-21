@@ -24,14 +24,13 @@ steps:
   settings:
     restore: true
     mount:
-      - ./target/cargo
+      - ./target/rust-ci-cache
       - ./keys
 - name: init
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
@@ -44,7 +43,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync genesis
   depends_on:
   - init
@@ -53,7 +51,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync dummy-prover ensure-disabled
   - zksync circuit-tests
   - zksync prover-tests
@@ -68,7 +65,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync build-contracts
   depends_on:
   - init
@@ -77,7 +73,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync redeploy
   - zksync integration-testkit
   depends_on:
@@ -88,7 +83,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync test-contracts
   depends_on:
   - build-contracts
@@ -100,7 +94,7 @@ steps:
   settings:
     rebuild: true
     mount:
-      - ./target/cargo
+      - ./target/rust-ci-cache
       - ./keys
   depends_on:
      - redeploy-and-integration-testkit
@@ -132,14 +126,13 @@ steps:
   settings:
     restore: true
     mount:
-      - ./target/cargo
+      - ./target/rust-ci-cache
       - ./keys
 - name: preparations-for-integration-simple
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
@@ -160,7 +153,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync server
   depends_on:
   - preparations-for-integration-simple
@@ -170,7 +162,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync dummy-prover
   depends_on:
   - preparations-for-integration-simple
@@ -179,7 +170,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - sleep 15
   - zksync integration-simple
   - zksync integration-full-exit
@@ -223,7 +213,7 @@ steps:
   settings:
     restore: true
     mount:
-      - ./target/cargo
+      - ./target/rust-ci-cache
       - ./keys
 
 - name: init
@@ -235,7 +225,6 @@ steps:
   - git checkout ${DRONE_COMMIT_SHA}
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - echo -n $STAGE_ENV_BASE64| base64 --decode > $ZKSYNC_HOME/etc/env/stage.env
   - zksync env stage
   - zksync yarn
@@ -249,7 +238,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync env stage
   # too much logs and pipeline is failing
   - zksync yarn
