@@ -68,7 +68,7 @@ async function main() {
         await expect(await proxyContract.getTarget())
             .to.equal(newTargetFranklin.address, "upgrade was unsuccessful");
     } catch (e) {
-        console.log(JSON.stringify(e));
+        console.error(JSON.stringify(e));
         process.exit(0);
     }
 }

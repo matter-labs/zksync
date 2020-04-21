@@ -26,15 +26,15 @@ impl PlonkVerificationKey {
     pub fn read_verification_key_for_main_circuit(
         block_chunks: usize,
     ) -> Result<Self, failure::Error> {
-        Ok(Self(VerificationKey::read(File::open(
-            get_block_verification_key_path(block_chunks),
-        )?)?))
+        let verification_key =
+            VerificationKey::read(File::open(get_block_verification_key_path(block_chunks))?)?;
+        Ok(Self(verification_key))
     }
 
     pub fn read_verification_key_for_exit_circuit() -> Result<Self, failure::Error> {
-        Ok(Self(VerificationKey::read(File::open(
-            get_exodus_verification_key_path(),
-        )?)?))
+        let verification_key =
+            VerificationKey::read(File::open(get_exodus_verification_key_path())?)?;
+        Ok(Self(verification_key))
     }
 }
 

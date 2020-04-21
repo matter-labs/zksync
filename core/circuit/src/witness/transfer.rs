@@ -362,7 +362,7 @@ mod test {
     use testkit::zksync_account::ZksyncAccount;
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn test_transfer_success() {
         let from_zksync_account = ZksyncAccount::rand();
         let from_account_id = 1;

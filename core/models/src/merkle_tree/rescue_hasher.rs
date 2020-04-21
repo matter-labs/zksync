@@ -36,9 +36,6 @@ impl<E: RescueEngine> Hasher<E::Fr> for RescueHasher<E> {
         let sponge_output = rescue_hash::<E>(self.params, &packed);
 
         assert_eq!(sponge_output.len(), 1);
-
-        // println!("Hashed bits into {}", sponge_output[0]);
-
         sponge_output[0]
     }
 
@@ -47,9 +44,6 @@ impl<E: RescueEngine> Hasher<E::Fr> for RescueHasher<E> {
         let sponge_output = rescue_hash::<E>(self.params, &packed);
 
         assert_eq!(sponge_output.len(), 1);
-
-        // println!("Hashed elements into {}", sponge_output[0]);
-
         sponge_output[0]
     }
 
@@ -57,9 +51,6 @@ impl<E: RescueEngine> Hasher<E::Fr> for RescueHasher<E> {
         let sponge_output = rescue_hash::<E>(self.params, &[*lhs, *rhs]);
 
         assert_eq!(sponge_output.len(), 1);
-
-        // println!("Hashed node on level {} into {}", _i, sponge_output[0]);
-
         sponge_output[0]
     }
 }
@@ -75,17 +66,10 @@ impl Default for RescueHasher<Bn256> {
 }
 
 #[test]
-fn test_pedersen_hash() {
+fn test_resue_hash() {
     let hasher = BabyRescueHasher::default();
 
     let hash = hasher.hash_bits(vec![false, false, false, true, true, true, true, true]);
-    //debug!("hash:  {:?}", &hash);
-
     hasher.compress(&hash, &hash, 0);
-    //debug!("compr: {:?}", &hash2);
-
     hasher.compress(&hash, &hash, 1);
-    //debug!("compr: {:?}", &hash3);
-
-    //assert_eq!(hasher.empty_hash(),
 }

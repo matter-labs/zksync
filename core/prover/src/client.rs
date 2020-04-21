@@ -1,12 +1,13 @@
 // Built-in deps
 use std::str::FromStr;
-use std::time;
+use std::time::{self, Duration};
 // External deps
 use backoff;
 use backoff::Operation;
 use failure::bail;
 use failure::format_err;
 use log::*;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
@@ -14,8 +15,6 @@ use crate::prover_data::ProverData;
 use circuit::circuit::FranklinCircuit;
 use models::node::Engine;
 use models::prover_utils::EncodedProofPlonk;
-use reqwest::Url;
-use time::Duration;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {

@@ -175,7 +175,6 @@ impl<'a> WitnessBuilder<'a> {
 
 pub fn generate_dummy_sig_data(
     bits: &[bool],
-    // phasher: &PedersenHasher<Bn256>,
     rescue_hasher: &RescueHasher<Bn256>,
     rescue_params: &Bn256RescueParams,
     jubjub_params: &AltJubjubBn256,
@@ -195,15 +194,12 @@ pub fn generate_dummy_sig_data(
     let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
     let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
     let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
-    // let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
     let sig_msg = rescue_hasher.hash_bits(sig_bits_to_hash.clone());
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
     let signature_data = sign_rescue(&sig_bits, &private_key, p_g, rescue_params, jubjub_params);
-    // let signature_data = sign_sha256(&sig_bits, &private_key, p_g, params);
-    // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
     (
         signature_data,
         first_sig_part,
@@ -266,8 +262,6 @@ pub fn generate_sig_data(
         hex::encode(be_bit_vector_into_bytes(&sig_bits))
     );
     let signature_data = sign_rescue(&sig_bits, &private_key, p_g, rescue_params, jubjub_params);
-    // let signature_data = sign_sha256(&sig_bits, &private_key, p_g, jubjub_params);
-    // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
 
     (
         signature_data,

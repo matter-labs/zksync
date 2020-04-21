@@ -1,11 +1,12 @@
-//use tokio::runtime::Runtime;
-#[macro_use]
-extern crate log;
+// Built-in deps
+use std::cell::RefCell;
+use std::time::Duration;
 // External uses
 use clap::{App, Arg};
-// Workspace uses
-use failure::_core::time::Duration;
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
+use tokio::runtime::Runtime;
+use web3::types::H160;
+// Workspace uses
 use models::config_options::ConfigurationOptions;
 use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL};
 use server::api_server::start_api_server;
@@ -16,10 +17,7 @@ use server::eth_watch::start_eth_watch;
 use server::mempool::run_mempool_task;
 use server::prover_server::start_prover_server;
 use server::state_keeper::{start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper};
-use std::cell::RefCell;
 use storage::ConnectionPool;
-use tokio::runtime::Runtime;
-use web3::types::H160;
 
 fn main() {
     env_logger::init();
@@ -36,7 +34,7 @@ fn main() {
         .get_matches();
 
     if cli.is_present("genesis") {
-        info!("Generating genesis block.");
+        log::info!("Generating genesis block.");
         PlasmaStateKeeper::create_genesis_block(
             ConnectionPool::new(Some(1)),
             &config_opts.operator_franklin_addr,
@@ -46,7 +44,7 @@ fn main() {
 
     let connection_pool = ConnectionPool::new(None);
 
-    debug!("starting server");
+    log::debug!("starting server");
 
     let storage = connection_pool
         .access_storage()
@@ -69,7 +67,7 @@ fn main() {
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
 
-    info!("starting actors");
+    log::info!("starting actors");
 
     let mut main_runtime = Runtime::new().expect("main runtime start");
 

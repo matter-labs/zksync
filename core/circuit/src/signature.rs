@@ -163,16 +163,6 @@ pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSy
         franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS
     );
 
-    // // signature msg is the hash of serialized transaction
-    // let sig_msg = pedersen_hash::pedersen_hash(
-    //     cs.namespace(|| "sig_msg"),
-    //     pedersen_hash::Personalization::NoteCommitment,
-    //     &serialized_tx_bits,
-    //     jubjub_params,
-    // )?
-    // .get_x()
-    // .clone();
-
     let input = multipack::pack_into_witness(
         cs.namespace(|| "pack transaction bits into field elements for rescue"),
         &serialized_tx_bits,
@@ -196,22 +186,6 @@ pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSy
         generator,
     )?;
 
-    // let is_sig_verified = is_sha256_signature_verified(
-    //     cs.namespace(|| "musig sha256"),
-    //     &sig_msg_bits,
-    //     &signature,
-    //     params,
-    //     generator,
-    // )?;
-
-    //    let is_sig_verified = is_pedersen_signature_verified(
-    //        cs.namespace(|| "musig pedersen"),
-    //        &sig_msg_bits,
-    //        &signature,
-    //        params,
-    //        generator,
-    //    )?;
-
     debug!("is_sig_verified={:?}", is_sig_verified.get_value());
     debug!("is_sig_r_correct={:?}", is_sig_r_correct.get_value());
     debug!(
@@ -234,8 +208,6 @@ pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSy
         sig_r_x_bit: Boolean::from(r_x_bit),
         sig_r_y_bits: r_y.into_padded_be_bits(franklin_constants::FR_BIT_WIDTH_PADDED - 1),
         sig_s_bits: signature_s.into_padded_be_bits(franklin_constants::FR_BIT_WIDTH_PADDED),
-        // sig_r_y_bits: r_y.get_bits_be(),
-        // sig_s_bits: signature_s.get_bits_be(),
     })
 }
 pub fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSystem<E>>(

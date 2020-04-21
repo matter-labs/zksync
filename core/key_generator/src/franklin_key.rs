@@ -43,7 +43,7 @@ pub(crate) fn make_plonk_blocks_verify_keys(config: AvailableBlockSizesConfig) {
         let result_setup_power = generate_verification_key(zksync_circuit(block_chunks), key_path);
         assert_eq!(
             result_setup_power, setup_power,
-            "resulting setup power don't match config setup power, check you config."
+            "setup power actually needed by circuit of size {} is not equal to that from SUPPORTED_BLOCK_CHUNKS_SIZES env variable", block_chunks
         );
     }
 }

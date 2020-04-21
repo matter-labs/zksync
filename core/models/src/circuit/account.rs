@@ -9,15 +9,11 @@ use crate::merkle_tree::hasher::Hasher;
 use crate::merkle_tree::{RescueHasher, SparseMerkleTree};
 use crate::primitives::{GetBits, GetBitsFixed};
 
-// pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
-// pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, PedersenHasher<Bn256>>;
-
 pub type CircuitAccountTree = SparseMerkleTree<CircuitAccount<Bn256>, Fr, RescueHasher<Bn256>>;
 pub type CircuitBalanceTree = SparseMerkleTree<Balance<Bn256>, Fr, RescueHasher<Bn256>>;
 
 #[derive(Clone)]
 pub struct CircuitAccount<E: RescueEngine> {
-    // pub subtree: SparseMerkleTree<Balance<E>, E::Fr, PedersenHasher<E>>,
     pub subtree: SparseMerkleTree<Balance<E>, E::Fr, RescueHasher<E>>,
     pub nonce: E::Fr,
     pub pub_key_hash: E::Fr,

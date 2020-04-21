@@ -3,9 +3,8 @@ use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::Assignment;
 // Workspace deps
 use crate::element::CircuitElement;
-use models::circuit::account::CircuitAccount;
-
 use crypto_exports::franklin_crypto::rescue::RescueEngine;
+use models::circuit::account::CircuitAccount;
 
 #[derive(Clone, Debug)]
 pub struct AccountWitness<E: RescueEngine> {

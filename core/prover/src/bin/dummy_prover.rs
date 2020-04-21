@@ -5,6 +5,7 @@ use prover::{ApiClient, BabyProverError, ProverConfig, ProverImpl};
 use std::sync::mpsc;
 use std::time::Duration;
 
+#[derive(Debug)]
 pub struct DummyProverConfig {
     pub block_sizes: Vec<usize>,
 }
@@ -20,6 +21,7 @@ impl ProverConfig for DummyProverConfig {
     }
 }
 
+#[derive(Debug)]
 struct DummyProver<C> {
     api_client: C,
     heartbeat_interval: Duration,

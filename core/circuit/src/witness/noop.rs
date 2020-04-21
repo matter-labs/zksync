@@ -120,7 +120,6 @@ mod test {
         let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
         let block_number = Fr::from_str("1").unwrap();
         let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
-        // let phasher = PedersenHasher::<Bn256>::default();
         let phasher = RescueHasher::<Bn256>::default();
 
         let mut tree: CircuitAccountTree =

@@ -31,7 +31,6 @@ pub type Fs = <Engine as JubjubEngine>::Fs;
 
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
-// pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
 pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
 
 pub type PrivateKey = PrivateKeyImport<Engine>;

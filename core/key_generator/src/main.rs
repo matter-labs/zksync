@@ -1,10 +1,14 @@
 //! This is Verification key generator for PLONK prover.
-//! Verification keys depends on universal setup and circuit, that is why for each version of circuit they can be generated only once.
-//! Process of generation of this keys is CPU and memory consuming, so developers are expected to download verification keys from public space.
-//! After Verification keys are generated for all of our circuits we can generate verifying contract, that is also deterministic for current circuit version.
+//! Verification keys depends on universal setup and circuit,
+//! jthat is why for each version of circuit they can be generated only once.
+//! Process of generation of this keys is CPU and memory consuming,
+//! so developers are expected to download verification keys from public space.
+//! After Verification keys are generated for all of our circuits
+//! we can generate verifying contract, that is also deterministic for current circuit version.
 //!
-//! Only parameters that determine process of these generation is `SUPPORTED_BLOCK_CHUNKS_SIZES` and `SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS` that are read from env in config files.
-//! Before generating parameters universal setup keys should be downloaded using `setup_keys_load.sh` script.
+//! Only parameters that determine process of these generation is `SUPPORTED_BLOCK_CHUNKS_SIZES`
+//! and `SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS` that are read from env in config files.
+//! Before generating parameters universal setup keys should be downloaded using `zksync plonk-setup` command.
 
 mod franklin_key;
 mod verifier_contract_generator;

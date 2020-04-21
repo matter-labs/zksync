@@ -1,4 +1,5 @@
 // Built-in deps
+use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 use std::{thread, time};
 // External deps
@@ -146,11 +147,17 @@ fn new_test_data_for_prover() -> ProverData {
     }
 }
 
-struct MockApiClient<F: Fn() -> Option<ProverData>> {
+struct MockApiClient<F> {
     block_to_prove: Mutex<Option<(i64, i32)>>,
     heartbeats_tx: Arc<Mutex<mpsc::Sender<()>>>,
     publishes_tx: Arc<Mutex<mpsc::Sender<EncodedProofPlonk>>>,
     prover_data_fn: F,
+}
+
+impl<F> fmt::Debug for MockApiClient<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MockApiClient").finish()
+    }
 }
 
 impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {

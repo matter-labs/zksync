@@ -5,10 +5,10 @@ use diesel::dsl::{insert_into, now, sql_query};
 use diesel::prelude::*;
 // Workspace imports
 use models::node::BlockNumber;
+use models::prover_utils::EncodedProofPlonk;
 // Local imports
 use self::records::{ActiveProver, IntegerNumber, NewProof, ProverRun, StoredProof};
 use crate::StorageProcessor;
-use models::prover_utils::EncodedProofPlonk;
 
 pub mod records;
 

@@ -7,30 +7,41 @@ pub mod serialization;
 
 // Built-in deps
 use std::sync::{mpsc, Arc};
-use std::{fmt, thread};
+use std::time::Duration;
+use std::{
+    fmt::{self, Debug},
+    thread,
+};
 // External deps
 use log::*;
 // Workspace deps
 use models::node::config::PROVER_CYCLE_WAIT;
 use models::node::Engine;
 use models::prover_utils::EncodedProofPlonk;
-use std::time::Duration;
 
+/// Trait that provides type needed by prover to initialize.
 pub trait ProverConfig {
     fn from_env() -> Self;
 }
 
+/// Trait that tries to separate prover from networking (API)
+/// It is still assumed that prover will use ApiClient methods to fetch data from server, but it
+/// allows to use common code for all provers (like sending heartbeats, registering prover, etc.)
 pub trait ProverImpl<C: ApiClient> {
+    /// Config concrete type used by current prover
     type Config: ProverConfig;
+    /// Creates prover from config and API client.
     fn create_from_config(config: Self::Config, client: C, heartbeat: Duration) -> Self;
+    /// Fetches job from the server and creates proof for it
     fn next_round(
         &self,
         start_heartbeats_tx: mpsc::Sender<(i32, bool)>,
     ) -> Result<(), BabyProverError>;
+    /// Returns client reference and config needed for heartbeat.
     fn get_heartbeat_options(&self) -> (&C, Duration);
 }
 
-pub trait ApiClient {
+pub trait ApiClient: Debug {
     fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error>;
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error>;
     fn prover_data(
@@ -44,7 +55,6 @@ pub trait ApiClient {
 pub enum BabyProverError {
     Api(String),
     Internal(String),
-    Stop,
 }
 
 impl fmt::Display for BabyProverError {
@@ -52,16 +62,16 @@ impl fmt::Display for BabyProverError {
         let desc = match self {
             BabyProverError::Api(s) => s,
             BabyProverError::Internal(s) => s,
-            BabyProverError::Stop => "stop",
         };
         write!(f, "{}", desc)
     }
 }
 
-pub fn start<C: 'static + Sync + Send + ApiClient, P: ProverImpl<C> + Send + Sync + 'static>(
-    prover: P,
-    exit_err_tx: mpsc::Sender<BabyProverError>,
-) {
+pub fn start<C, P>(prover: P, exit_err_tx: mpsc::Sender<BabyProverError>)
+where
+    C: 'static + Sync + Send + ApiClient,
+    P: ProverImpl<C> + Send + Sync + 'static,
+{
     let (tx_block_start, rx_block_start) = mpsc::channel();
     let prover = Arc::new(prover);
     let prover_rc = Arc::clone(&prover);
@@ -97,7 +107,6 @@ fn run_rounds<P: ProverImpl<C>, C: ApiClient>(
                 BabyProverError::Internal(_) => {
                     return err;
                 }
-                _ => {}
             };
         }
         trace!("round completed.");
