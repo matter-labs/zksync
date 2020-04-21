@@ -1,15 +1,11 @@
 // Built-in deps
-use std::{
-    collections::VecDeque,
-    marker::PhantomData,
-    time::{Duration, Instant},
-};
+use std::{collections::VecDeque, marker::PhantomData, time::Instant};
 // External deps
 use web3::types::U256;
-// Workspace deps
-use models::config_options::parse_env;
 // Local deps
 use crate::eth_sender::{database::DatabaseAccess, ethereum_interface::EthereumInterface};
+
+mod parameters;
 
 /// Constant to be used as the maximum gas price upon a first launch
 /// of the server until the gas price statistics are gathered.
@@ -17,10 +13,6 @@ use crate::eth_sender::{database::DatabaseAccess, ethereum_interface::EthereumIn
 const INITIAL_MAX_GAS_PRICE: u64 = 200 * 10e9 as u64;
 /// Amount of entries in the gas price statistics pool.
 const GAS_PRICE_SAMPLES_AMOUNT: usize = 10;
-/// Name of the environment variable responsible for the `max_gas_price` renewing interval.
-const MAX_GAS_PRICE_RENEWAL_INTERVAL_VAR: &'static str = "ETH_MAX_GAS_PRICE_RENEWAL_INTERVAL";
-/// Name of the environment variable responsible for the `max_gas_price` scaling multiplier.
-const MAX_GAS_PRICE_SCALE_FACTOR_VAR: &'static str = "ETH_MAX_GAS_PRICE_SCALE_FACTOR";
 
 /// Gas adjuster is an entity capable of scaling the gas price for
 /// all the Ethereum transactions.
@@ -83,9 +75,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
     /// This method is intended to be invoked periodically, and it updates the
     /// current max gas price limit according to the configurable update interval.
     pub fn keep_updated(&mut self) {
-        if self.last_price_renewal.elapsed() >= self.get_max_price_interval() {
+        if self.last_price_renewal.elapsed() >= parameters::get_max_price_interval() {
             // It's time to update the maximum price.
-            let scale_factor = self.get_max_price_scale();
+            let scale_factor = parameters::get_max_price_scale();
             self.statistics.update_max_price(scale_factor);
             self.last_price_renewal = Instant::now();
         }
@@ -104,26 +96,6 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
 
     fn get_current_max_price(&self) -> U256 {
         self.statistics.get_max_price()
-    }
-
-    /// Obtains the interval for renewing the maximum gas price.
-    ///
-    /// This value is not cached internally, as it may be changed for the already running
-    /// server by an administrator. This may be required if existing settings aren't flexible
-    /// enough to match the current network price.
-    fn get_max_price_interval(&self) -> Duration {
-        let renew_interval: u64 = parse_env(MAX_GAS_PRICE_RENEWAL_INTERVAL_VAR);
-
-        Duration::from_secs(renew_interval)
-    }
-
-    /// Obtains the scaling factor for the maximum gas price.
-    ///
-    /// This value is not cached internally, as it may be changed for the already running
-    /// server by an administrator. This may be required if existing settings aren't flexible
-    /// enough to match the current network price.
-    fn get_max_price_scale(&self) -> f64 {
-        parse_env(MAX_GAS_PRICE_SCALE_FACTOR_VAR)
     }
 }
 
@@ -179,4 +151,15 @@ impl GasStatistics {
     pub fn get_max_price(&self) -> U256 {
         self.current_max_price
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Test for the lower gas limit: it should be a network-suggested price for new transactions,
+    /// and for stuck transactions it should be the maximum of either price increased by 15% or
+    /// the network-suggested price.
+    #[test]
+    fn lower_gas_limit() {}
 }
