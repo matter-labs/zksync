@@ -243,17 +243,15 @@ CREATE TABLE eth_operations (
     last_used_gas_price NUMERIC NOT NULL
 );
 
--- Locally stored Ethereum nonce
-CREATE TABLE eth_nonce (
+-- Data related to the interaction with the Ethereum network.
+CREATE TABLE eth_parameters (
     -- enforce single record
     id bool PRIMARY KEY NOT NULL DEFAULT true,
-    nonce BIGINT NOT NULL
-);
-
--- Gathered operations statistics
-CREATE TABLE eth_stats (
-    -- enforce single record
-    id bool PRIMARY KEY NOT NULL DEFAULT true,
+    -- Locally stored Ethereum nonce
+    nonce BIGINT NOT NULL,
+    -- Last gas price limit used by GasAdjuster
+    gas_price_limit BIGINT NOT NULL,
+    -- Gathered operations statistics
     commit_ops BIGINT NOT NULL,
     verify_ops BIGINT NOT NULL,
     withdraw_ops BIGINT NOT NULL
