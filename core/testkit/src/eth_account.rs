@@ -645,10 +645,7 @@ async fn get_revert_reason<T: Transport>(
                     value: Some(value),
                     data: Some(input),
                 },
-                receipt
-                    .block_number
-                    .clone()
-                    .map(|n| BlockNumber::Number(n.as_u64())),
+                receipt.block_number.clone().map(BlockNumber::Number),
             )
             .compat()
             .await?;

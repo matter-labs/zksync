@@ -1,15 +1,24 @@
-use crate::contract_functions::{get_genesis_account, get_total_verified_blocks};
-use crate::eth_tx_helpers::get_ethereum_transaction;
-use crate::events_state::EventsState;
-use crate::rollup_ops::RollupOpsBlock;
-use crate::storage_interactor;
-use crate::tree_state::TreeState;
-use models::abi::{governance_contract, zksync_contract};
-use models::node::{AccountMap, AccountUpdate};
+// External deps
+use web3::{
+    contract::Contract,
+    types::{H160, H256},
+    Transport, Web3,
+};
+// Workspace deps
+use models::{
+    abi::{governance_contract, zksync_contract},
+    node::{AccountMap, AccountUpdate},
+};
 use storage::ConnectionPool;
-use web3::contract::Contract;
-use web3::types::{H160, H256};
-use web3::{Transport, Web3};
+// Local deps
+use crate::{
+    contract_functions::{get_genesis_account, get_total_verified_blocks},
+    eth_tx_helpers::get_ethereum_transaction,
+    events_state::EventsState,
+    rollup_ops::RollupOpsBlock,
+    storage_interactor,
+    tree_state::TreeState,
+};
 
 /// Storage state update:
 /// - None - The state is updated completely last time - start from fetching the new events
@@ -26,8 +35,11 @@ pub enum StorageUpdateState {
 /// It is actually a finite state machine, that has following states:
 /// - Empty - The state is new
 /// - None - The state is completely updated last time, driver will load state from storage and fetch new events
-/// - Events - The events has been fetched and saved successfully and firstly driver will load state from storage and get new operation for last saved events
-/// - Operations - The operations and events has been fetched and saved successfully and firstly driver will load state from storage and update merkle tree by last saved operations
+/// - Events - The events has been fetched and saved successfully and firstly driver will load state from storage
+///   and get new operation for last saved events
+/// - Operations - The operations and events has been fetched and saved successfully and firstly driver will load
+///   state from storage and update merkle tree by last saved operations
+///
 /// Driver can interact with other restoring components for their updating:
 /// - Events
 /// - Operations
@@ -229,6 +241,11 @@ impl<T: Transport> DataRestoreDriver<T> {
 
                     let total_verified_blocks = get_total_verified_blocks(&self.franklin_contract);
                     let last_verified_block = self.tree_state.state.block_number;
+
+                    // We must update the Ethereum stats table to match the actual stored state
+                    // to keep the `state_keeper` consistent with the `eth_sender`.
+                    storage_interactor::update_eth_stats(&self.connection_pool);
+
                     info!(
                         "State updated\nProcessed {:?} blocks of total {:?} verified on contract\nRoot hash: {:?}\n",
                         last_verified_block,

@@ -19,8 +19,10 @@ use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::JUBJUB_PARAMS;
 use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
-use ethsign::{SecretKey, Signature as ETHSignature};
-use failure::{ensure, format_err};
+use failure::{bail, ensure, format_err};
+use parity_crypto::publickey::{
+    public_to_address, recover, sign, KeyPair, Signature as ETHSignature,
+};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::convert::TryInto;
 use std::fmt;
@@ -81,6 +83,21 @@ impl<'de> Deserialize<'de> for TxHash {
     }
 }
 
+/// Stores precomputed signature verification result to speedup tx execution
+#[derive(Debug, Clone)]
+enum VerifiedSignatureCache {
+    /// No cache scenario
+    NotCached,
+    /// Cached: None if signature is incorrect.
+    Cached(Option<PubKeyHash>),
+}
+
+impl Default for VerifiedSignatureCache {
+    fn default() -> Self {
+        Self::NotCached
+    }
+}
+
 /// Signed by user.
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,10 +110,57 @@ pub struct Transfer {
     pub fee: BigDecimal,
     pub nonce: Nonce,
     pub signature: TxSignature,
+    #[serde(skip)]
+    cached_signer: VerifiedSignatureCache,
 }
 
 impl Transfer {
     const TX_TYPE: u8 = 5;
+
+    /// Creates transaction from parts
+    /// signature is optional, because sometimes we don't know it (i.e. data_restore)
+    pub fn new(
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+        signature: Option<TxSignature>,
+    ) -> Self {
+        let mut tx = Self {
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            nonce,
+            signature: signature.clone().unwrap_or_default(),
+            cached_signer: VerifiedSignatureCache::NotCached,
+        };
+        if signature.is_some() {
+            tx.cached_signer = VerifiedSignatureCache::Cached(tx.verify_signature());
+        }
+        tx
+    }
+
+    /// Creates signed transaction using private key, checks for correcteness
+    pub fn new_signed(
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+        private_key: &PrivateKey<Engine>,
+    ) -> Result<Self, failure::Error> {
+        let mut tx = Self::new(from, to, token, amount, fee, nonce, None);
+        tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
+        if !tx.check_correctness() {
+            bail!("Transfer is incorrect, check amounts");
+        }
+        Ok(tx)
+    }
 
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
@@ -110,19 +174,27 @@ impl Transfer {
         out
     }
 
-    pub fn check_correctness(&self) -> bool {
-        self.amount.is_integer() // TODO: remove after # 366
+    pub fn check_correctness(&mut self) -> bool {
+        let mut valid = self.amount.is_integer() // TODO: remove after # 366
             && self.fee.is_integer()
             && is_token_amount_packable(&self.amount)
-            && is_fee_amount_packable(&self.fee)
-            && self.verify_signature().is_some()
+            && is_fee_amount_packable(&self.fee);
+        if valid {
+            let signer = self.verify_signature();
+            valid = valid && signer.is_some();
+            self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        };
+        valid
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        self.signature
-            .verify_musig_sha256(&self.get_bytes())
-            .as_ref()
-            .map(PubKeyHash::from_pubkey)
+        if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
+            cached_signer.clone()
+        } else if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
+            Some(PubKeyHash::from_pubkey(&pub_key))
+        } else {
+            None
+        }
     }
 
     /// Get message that should be signed by Ethereum keys of the account for 2F authentication.
@@ -151,10 +223,57 @@ pub struct Withdraw {
     pub fee: BigDecimal,
     pub nonce: Nonce,
     pub signature: TxSignature,
+    #[serde(skip)]
+    cached_signer: VerifiedSignatureCache,
 }
 
 impl Withdraw {
     const TX_TYPE: u8 = 3;
+
+    /// Creates transaction from parts
+    /// signature is optional, because sometimes we don't know it (i.e. data_restore)
+    pub fn new(
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+        signature: Option<TxSignature>,
+    ) -> Self {
+        let mut tx = Self {
+            from,
+            to,
+            token,
+            amount,
+            fee,
+            nonce,
+            signature: signature.clone().unwrap_or_default(),
+            cached_signer: VerifiedSignatureCache::NotCached,
+        };
+        if signature.is_some() {
+            tx.cached_signer = VerifiedSignatureCache::Cached(tx.verify_signature());
+        }
+        tx
+    }
+
+    /// Creates signed transaction using private key, checks for correcteness
+    pub fn new_signed(
+        from: Address,
+        to: Address,
+        token: TokenId,
+        amount: BigDecimal,
+        fee: BigDecimal,
+        nonce: Nonce,
+        private_key: &PrivateKey<Engine>,
+    ) -> Result<Self, failure::Error> {
+        let mut tx = Self::new(from, to, token, amount, fee, nonce, None);
+        tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
+        if !tx.check_correctness() {
+            bail!("Transfer is incorrect, check amounts");
+        }
+        Ok(tx)
+    }
 
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
@@ -168,16 +287,24 @@ impl Withdraw {
         out
     }
 
-    pub fn check_correctness(&self) -> bool {
-        self.amount <= u128_to_bigdecimal(u128::max_value())
-            && self.verify_signature().is_some()
+    pub fn check_correctness(&mut self) -> bool {
+        let mut valid = self.amount <= u128_to_bigdecimal(u128::max_value())
             && self.amount.is_integer() // TODO: remove after # 366
             && self.fee.is_integer()
-            && is_fee_amount_packable(&self.fee)
+            && is_fee_amount_packable(&self.fee);
+
+        if valid {
+            let signer = self.verify_signature();
+            valid = valid && signer.is_some();
+            self.cached_signer = VerifiedSignatureCache::Cached(signer);
+        }
+        valid
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
+        if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
+            cached_signer.clone()
+        } else if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -336,7 +463,7 @@ impl FranklinTx {
         }
     }
 
-    pub fn check_correctness(&self) -> bool {
+    pub fn check_correctness(&mut self) -> bool {
         match self {
             FranklinTx::Transfer(tx) => tx.check_correctness(),
             FranklinTx::Withdraw(tx) => tx.check_correctness(),
@@ -386,7 +513,16 @@ pub struct TxSignature {
 }
 
 impl TxSignature {
-    pub fn verify_musig_pedersen(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+    pub fn sign_musig(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
+        Self::sign_musig_sha256(pk, msg)
+    }
+
+    pub fn verify_musig(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        self.verify_musig_sha256(msg)
+    }
+
+    #[allow(dead_code)]
+    fn verify_musig_pedersen(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_pedersen(
             &hashed_msg,
@@ -401,7 +537,7 @@ impl TxSignature {
         }
     }
 
-    pub fn verify_musig_sha256(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+    fn verify_musig_sha256(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_sha256(
             &hashed_msg,
@@ -416,7 +552,8 @@ impl TxSignature {
         }
     }
 
-    pub fn sign_musig_pedersen(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
+    #[allow(dead_code)]
+    fn sign_musig_pedersen(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let seed = Seed::deterministic_seed(&pk, &hashed_msg);
         let signature = pk.musig_pedersen_sign(
@@ -436,7 +573,7 @@ impl TxSignature {
         }
     }
 
-    pub fn sign_musig_sha256(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
+    fn sign_musig_sha256(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let seed = Seed::deterministic_seed(&pk, &hashed_msg);
         let signature = pk.musig_sha256_sign(
@@ -625,69 +762,64 @@ impl Serialize for EIP1271Signature {
 
 /// Struct used for working with ethereum signatures created using eth_sign (using geth, ethers.js, etc)
 /// message is serialized as 65 bytes long `0x` prefixed string.
+///
+/// Some notes on implementation of methods of this structure:
+///
+/// Ethereum signed messages expect v parameter to be 27 + recovery_id(0,1,2,3)
+/// Library that we use for signature verification (written for bitcoin) expects v = recovery_id
+///
+/// That is why:
+/// 1) when we create this structure by deserialization of message produced by user
+/// we subtract 27 from v in `ETHSignature` and store it in ETHSignature structure this way.
+/// 2) When we serialize/create this structure we add 27 to v in `ETHSignature`.
+///
+/// This way when we have methods that consumes &self we can be sure that ETHSignature::recover_signer works
+/// And we can be sure that we are compatible with Ethereum clients.
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PackedEthSignature(pub ETHSignature);
+pub struct PackedEthSignature(ETHSignature);
 
 impl PackedEthSignature {
     pub fn serialize_packed(&self) -> [u8; 65] {
-        let mut result = [0u8; 65];
-        result[0..32].copy_from_slice(&self.0.r);
-        result[32..64].copy_from_slice(&self.0.s);
-        result[64] = self.0.v;
-        result
+        // adds 27 to v
+        self.0.clone().into_electrum()
     }
 
     pub fn deserialize_packed(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(bytes.len() == 65, "eth signature length should be 65 bytes");
-        Ok(PackedEthSignature(ETHSignature {
-            r: bytes[0..32].try_into().unwrap(),
-            s: bytes[32..64].try_into().unwrap(),
-            v: bytes[64],
-        }))
+        // assumes v = recover + 27
+        Ok(PackedEthSignature(ETHSignature::from_electrum(&bytes)))
     }
 
-    fn message_to_signed_bytes(msg: &[u8]) -> Vec<u8> {
+    /// Signs message using ethereum private key, results are identical to signature created
+    /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
+    pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, failure::Error> {
+        let secret_key = (*private_key).into();
+        let signed_bytes = Self::message_to_signed_bytes(msg);
+        let signature = sign(&secret_key, &signed_bytes)?;
+        Ok(PackedEthSignature(signature))
+    }
+
+    fn message_to_signed_bytes(msg: &[u8]) -> H256 {
         let prefix = format!("\x19Ethereum Signed Message:\n{}", msg.len());
         let mut bytes = Vec::with_capacity(prefix.len() + msg.len());
         bytes.extend_from_slice(prefix.as_bytes());
         bytes.extend_from_slice(msg);
-        tiny_keccak::keccak256(&bytes).to_vec()
+        tiny_keccak::keccak256(&bytes).into()
     }
 
     /// Checks signature and returns ethereum address of the signer.
     /// message should be the same message that was passed to `eth.sign`(or similar) method
     /// as argument. No hashing and prefixes required.
     pub fn signature_recover_signer(&self, msg: &[u8]) -> Result<Address, failure::Error> {
-        let mut signature = self.0.clone();
-        // workaround for ethsign library limitations
-        signature.v = signature
-            .v
-            .checked_sub(27)
-            .ok_or_else(|| format_err!("signature v should be 27 + recovery_id"))?;
         let signed_bytes = Self::message_to_signed_bytes(msg);
-        let pk = signature.recover(&signed_bytes)?;
-        Ok(Address::from_slice(pk.address()))
-    }
-
-    /// Signs message using ethereum private key, results are identical to signature created
-    /// using `geth`, `ethers.js`, etc. No hashing and prefixes required.
-    pub fn sign(private_key: &H256, msg: &[u8]) -> Result<PackedEthSignature, failure::Error> {
-        let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
-        let signed_bytes = Self::message_to_signed_bytes(msg);
-        let mut signed_message = secret_key.sign(&signed_bytes)?;
-        // workaround for ethsign library limitations
-        signed_message.v = signed_message
-            .v
-            .checked_add(27)
-            .ok_or_else(|| format_err!("failed to add 27 to signature v"))?;
-        Ok(PackedEthSignature(signed_message))
+        let public_key = recover(&self.0, &signed_bytes)?;
+        Ok(public_to_address(&public_key))
     }
 
     /// Get Ethereum address from private key,
-    /// TODO: refactor eth signing with utils to other module.
     pub fn address_from_private_key(private_key: &H256) -> Result<Address, failure::Error> {
-        let secret_key = SecretKey::from_raw(private_key.as_bytes())?;
-        Ok(Address::from_slice(secret_key.public().address()))
+        Ok(KeyPair::from_secret((*private_key).into())?.address())
     }
 }
 
