@@ -1,29 +1,19 @@
 // External imports
-use chrono::prelude::*;
-use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
+use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value;
 // Workspace imports
 // Local imports
 use crate::prover::records::ProverRun;
-use crate::schema::*;
 
-#[derive(Debug, Insertable)]
-#[table_name = "mempool"]
-pub struct InsertTx {
-    pub hash: Vec<u8>,
-    pub primary_account_address: Vec<u8>,
-    pub nonce: i64,
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AccountTransaction {
     pub tx: Value,
-}
-
-#[derive(Debug, Queryable)]
-pub struct ReadTx {
-    pub hash: Vec<u8>,
-    pub primary_account_address: Vec<u8>,
-    pub nonce: i64,
-    pub tx: Value,
-    pub created_at: NaiveDateTime,
+    pub tx_hash: String,
+    pub success: bool,
+    pub fail_reason: Option<String>,
+    pub committed: bool,
+    pub verified: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, QueryableByName)]

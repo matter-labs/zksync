@@ -2,12 +2,14 @@
 // External imports
 use diesel::prelude::*;
 use serde_json::value::Value;
+use itertools::Itertools;
 // Workspace imports
 use models::node::{Address, TokenId};
 use models::ActionType;
 // Local imports
 use self::records::{
-    PriorityOpReceiptResponse, ReadTx, TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
+    AccountTransaction, PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse,
+    TxReceiptResponse,
 };
 use crate::schema::*;
 use crate::tokens::TokensSchema;
@@ -154,6 +156,7 @@ impl<'a> OperationsExtSchema<'a> {
                     Value::default()
                 })
             });
+            let operation = tx.operation;
 
             let tx_token = operation["token"].as_i64().unwrap_or(-1);
             let tx_type = operation["type"].as_str().unwrap_or("unknown tx_type");
@@ -293,8 +296,6 @@ impl<'a> OperationsExtSchema<'a> {
         // TODO: txs are not ordered
 
         // This query does the following:
-        // - joins the `mempool` table (which contains the tx body) and
-        //   the `executed_transaction` (which contains the tx header);
         // - creates a union of data above and the `executed_priority_operations`
         // - unifies the information to match the `TransactionsHistoryItem`
         //   structure layout
@@ -314,26 +315,23 @@ impl<'a> OperationsExtSchema<'a> {
                 select
                     *
                 from (
+                    with vars (address_bytes) as ( select decode('{address}', 'hex') )
                     select
                         tx,
-                        'sync-tx:' || encode(hash, 'hex') as hash,
+                        'sync-tx:' || encode(tx_hash, 'hex') as hash,
                         null as pq_id,
                         success,
                         fail_reason,
                         block_number,
                         created_at
                     from
-                        mempool
-                    left join
-                        executed_transactions
-                    on
-                        tx_hash = hash
+                        executed_transactions, vars
                     where
-                        tx->>'from' = '{address}'
+                        from_account = address_bytes
                         or
-                        tx->>'to' = '{address}'
+                        to_account = address_bytes
                         or
-                        tx->>'account' = '{address}'
+                        primary_account_address = address_bytes
                     union all
                     select
                         operation as tx,
@@ -344,15 +342,11 @@ impl<'a> OperationsExtSchema<'a> {
                         block_number,
                         created_at
                     from 
-                        executed_priority_operations
+                        executed_priority_operations, vars
                     where 
-                        operation->'priority_op'->>'from' = '{address}'
+                        from_account = address_bytes
                         or
-                        operation->'priority_op'->>'to' = '{address}'
-                        or
-                        operation->'priority_op'->>'account' = '{address}'
-                        or
-                        operation->'priority_op'->>'eth_address' = '{address}') t
+                        to_account = address_bytes) t
                 order by
                     block_number desc
                 offset 
@@ -377,7 +371,7 @@ impl<'a> OperationsExtSchema<'a> {
             using 
                 (block_number)
             ",
-            address = format!("{:#?}", address),
+            address = hex::encode(address.as_ref().to_vec()),
             offset = offset,
             limit = limit
         );

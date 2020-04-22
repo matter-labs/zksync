@@ -347,13 +347,13 @@ fn handle_get_block_transactions(
 }
 
 #[derive(Deserialize)]
-struct BlockSearchQuery {
+struct BlockExplorerSearchQuery {
     query: String,
 }
 
-fn handle_block_search(
+fn handle_block_explorer_search(
     data: web::Data<AppState>,
-    query: web::Query<BlockSearchQuery>,
+    query: web::Query<BlockExplorerSearchQuery>,
 ) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
     let result = storage
@@ -412,7 +412,7 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                     )
                     .route("/blocks/{block_id}", web::get().to(handle_get_block_by_id))
                     .route("/blocks", web::get().to(handle_get_blocks))
-                    .route("/search", web::get().to(handle_block_search)),
+                    .route("/search", web::get().to(handle_block_explorer_search)),
             )
             // Endpoint needed for js isReachable
             .route(

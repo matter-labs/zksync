@@ -37,8 +37,8 @@ impl VerifiedTx {
     ) -> Result<Self, TxAddError> {
         verify_eth_signature(&request, eth_watch_req)
             .await
-            .map(|_| verify_tx_correctness(&request.tx))
-            .map(|_| Self(request.tx.clone()))
+            .and_then(|_| verify_tx_correctness(request.tx.clone()))
+            .map(Self)
     }
 
     /// Takes the `FranklinTx` out of the wrapper.
@@ -88,12 +88,14 @@ async fn verify_eth_signature(
                 }
             }
             TxEthSignature::EIP1271Signature(signature) => {
+                let message = format!("\x19Ethereum Signed Message:\n{}{}", message.len(), message);
+
                 let eth_watch_resp = oneshot::channel();
                 eth_watch_req
                     .clone()
                     .send(EthWatchRequest::CheckEIP1271Signature {
                         address: request.tx.account(),
-                        data: message.as_bytes().to_vec(),
+                        message: message.into_bytes(),
                         signature: signature.clone(),
                         resp: eth_watch_resp.0,
                     })
@@ -119,12 +121,12 @@ async fn verify_eth_signature(
 
 /// Verifies the correctness of the ZKSync transaction (including the
 /// signature check).
-fn verify_tx_correctness(tx: &FranklinTx) -> Result<(), TxAddError> {
+fn verify_tx_correctness(mut tx: FranklinTx) -> Result<FranklinTx, TxAddError> {
     if !tx.check_correctness() {
         return Err(TxAddError::IncorrectTx);
     }
 
-    Ok(())
+    Ok(tx)
 }
 
 /// Request for the signature check.

@@ -7,7 +7,6 @@ use diesel::prelude::*;
 use models::node::PubKeyHash;
 use models::node::{apply_updates, reverse_updates, AccountMap, AccountUpdate, AccountUpdates};
 // Local imports
-use self::records::{NewBlockEvent, NewStorageState, StoredBlockEvent, StoredStorageState};
 use crate::chain::{
     account::{
         records::{
@@ -22,8 +21,6 @@ use crate::chain::{
 use crate::diff::StorageAccountDiff;
 use crate::schema::*;
 use crate::StorageProcessor;
-
-pub mod records;
 
 /// State schema is capable of managing... well, the state of the chain.
 ///
@@ -416,47 +413,5 @@ impl<'a> StateSchema<'a> {
     pub fn load_state_diff_for_block(&self, block_number: u32) -> QueryResult<AccountUpdates> {
         self.load_state_diff(block_number - 1, Some(block_number))
             .map(|diff| diff.unwrap_or_default().1)
-    }
-
-    pub fn load_committed_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
-        let events = events_state::table
-            .filter(events_state::block_type.eq("Committed".to_string()))
-            .order(events_state::block_num.asc())
-            .load::<StoredBlockEvent>(self.0.conn())?;
-        Ok(events)
-    }
-
-    pub fn load_verified_events_state(&self) -> QueryResult<Vec<StoredBlockEvent>> {
-        let events = events_state::table
-            .filter(events_state::block_type.eq("Verified".to_string()))
-            .order(events_state::block_num.asc())
-            .load::<StoredBlockEvent>(self.0.conn())?;
-        Ok(events)
-    }
-
-    pub fn load_storage_state(&self) -> QueryResult<StoredStorageState> {
-        storage_state_update::table.first(self.0.conn())
-    }
-
-    pub(crate) fn update_storage_state(&self, state: NewStorageState) -> QueryResult<()> {
-        self.0.conn().transaction(|| {
-            diesel::delete(storage_state_update::table).execute(self.0.conn())?;
-            diesel::insert_into(storage_state_update::table)
-                .values(state)
-                .execute(self.0.conn())?;
-            Ok(())
-        })
-    }
-
-    pub(crate) fn update_block_events(&self, events: &[NewBlockEvent]) -> QueryResult<()> {
-        self.0.conn().transaction(|| {
-            diesel::delete(events_state::table).execute(self.0.conn())?;
-            for event in events.iter() {
-                diesel::insert_into(events_state::table)
-                    .values(event)
-                    .execute(self.0.conn())?;
-            }
-            Ok(())
-        })
     }
 }

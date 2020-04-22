@@ -284,7 +284,6 @@ fn get_account_transactions_history() {
                 let tx_token = tx_info["token"].as_str().map(String::from);
                 let tx_amount = tx_info["amount"].as_str().map(String::from);
 
-                println!("tx_type: {} info: {:#?}", tx_type, tx_info);
                 assert_eq!(tx_from_addr, *from);
                 assert_eq!(tx_to_addr, *to);
                 assert_eq!(tx_token, *token);

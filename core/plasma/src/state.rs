@@ -6,6 +6,7 @@ use models::node::operations::{
     WithdrawOp,
 };
 use models::node::tx::ChangePubKey;
+use models::node::Address;
 use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
@@ -13,7 +14,6 @@ use models::node::{
 use models::node::{Close, Deposit, FranklinTx, FullExit, Transfer, Withdraw};
 use models::params;
 use std::collections::HashMap;
-use web3::types::Address;
 
 #[derive(Debug)]
 pub struct OpSuccess {
