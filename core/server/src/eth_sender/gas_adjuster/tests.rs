@@ -69,6 +69,19 @@ fn lower_gas_limit() {
     }
 }
 
+// Checks that after re-creation the price limit is restored from the database.
+#[test]
+fn gas_price_limit_restore() {
+    // Price limit to set (should be obtained from the DB by GasAdjuster).
+    const PRICE_LIMIT: u64 = 1000;
+
+    let (_, db) = eth_and_db_clients();
+    db.update_gas_price_limit(PRICE_LIMIT.into()).unwrap();
+    let gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db);
+
+    assert_eq!(gas_adjuster.get_current_max_price(), PRICE_LIMIT.into());
+}
+
 /// Checks that price is clamped according to the current limit.
 /// This check works with the initial value only, and does not update it
 /// with the gathered stats.
