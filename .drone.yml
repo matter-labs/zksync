@@ -104,8 +104,28 @@ steps:
       - ./target/cargo
       - ./keys
   depends_on:
-     - redeploy-and-integration-testkit
-     - rust-tests-and-checks
+  - redeploy-and-integration-testkit
+  - rust-tests-and-checks
+# SEND NOTIFICATION STEPS
+- name: notify-success
+  image: matterlabs/ci
+  environment:
+    ALERT_WEBHOOK_URL:
+      from_secret: alert_webhook_url
+  commands:
+  - curl $ALERT_WEBHOOK_URL\?msg="Nightly build passed https://${DRONE_SYSTEM_HOST}/${DRONE_REPO}/${DRONE_BUILD_NUMBER}"
+  depends_on:
+  - rebuild_cache
+- name: notify-failure
+  image: matterlabs/ci
+  environment:
+    ALERT_WEBHOOK_URL:
+      from_secret: alert_webhook_url
+  commands:
+  - curl $ALERT_WEBHOOK_URL\?msg="Nightly build is failed https://${DRONE_SYSTEM_HOST}/${DRONE_REPO}/${DRONE_BUILD_NUMBER}"
+  when:
+    status:
+    - failure
 ---
 kind: pipeline
 type: docker
