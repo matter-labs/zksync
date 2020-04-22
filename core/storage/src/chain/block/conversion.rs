@@ -2,6 +2,8 @@
 //! These methods are only needed for the `block` module, so they're kept in a
 //! private module.
 
+// Built-in deps
+use std::convert::TryFrom;
 // External imports
 // Workspace imports
 use diesel::prelude::*;
@@ -20,7 +22,6 @@ use crate::{
             NewExecutedPriorityOperation, NewExecutedTransaction, StoredExecutedPriorityOperation,
             StoredExecutedTransaction, StoredOperation,
         },
-        operations_ext::records::ReadTx,
         state::StateSchema,
     },
     prover::ProverSchema,
@@ -56,31 +57,20 @@ impl StoredOperation {
 }
 
 impl StoredExecutedTransaction {
-    pub fn into_executed_tx(self, stored_tx: Option<ReadTx>) -> Result<ExecutedTx, failure::Error> {
-        if let Some(op) = self.operation {
-            let franklin_op: FranklinOp =
-                serde_json::from_value(op).expect("Unparsable FranklinOp in db");
-            Ok(ExecutedTx {
-                tx: franklin_op
-                    .try_get_tx()
-                    .expect("FranklinOp should not have tx"),
-                success: true,
-                op: Some(franklin_op),
-                fail_reason: None,
-                block_index: Some(self.block_index.expect("Block idx should be set") as u32),
-            })
-        } else if let Some(stored_tx) = stored_tx {
-            let tx: FranklinTx = serde_json::from_value(stored_tx.tx).expect("Unparsable tx in db");
-            Ok(ExecutedTx {
-                tx,
-                success: false,
-                op: None,
-                fail_reason: self.fail_reason,
-                block_index: None,
-            })
-        } else {
-            failure::bail!("Unsuccessful tx was lost from db.");
-        }
+    pub fn into_executed_tx(self) -> Result<ExecutedTx, failure::Error> {
+        let franklin_tx: FranklinTx =
+            serde_json::from_value(self.tx).expect("Unparsable FranklinTx in db");
+        let franklin_op: Option<FranklinOp> =
+            serde_json::from_value(self.operation).expect("Unparsable FranklinOp in db");
+        Ok(ExecutedTx {
+            tx: franklin_tx,
+            success: self.success,
+            op: franklin_op,
+            fail_reason: self.fail_reason,
+            block_index: self
+                .block_index
+                .map(|val| u32::try_from(val).expect("Invalid block index")),
+        })
     }
 }
 
@@ -112,10 +102,25 @@ impl NewExecutedPriorityOperation {
         let mut operation = serde_json::to_value(&exec_prior_op.op).unwrap();
         operation["eth_fee"] =
             serde_json::to_value(exec_prior_op.priority_op.eth_fee.to_string()).unwrap();
+
+        let (from_account, to_account) = match exec_prior_op.op {
+            FranklinOp::Deposit(deposit) => (deposit.priority_op.from, deposit.priority_op.to),
+            FranklinOp::FullExit(full_exit) => {
+                let eth_address = full_exit.priority_op.eth_address;
+                (eth_address, eth_address)
+            }
+            _ => panic!(
+                "Incorrect type of priority op: {:?}",
+                exec_prior_op.priority_op
+            ),
+        };
+
         Self {
             block_number: i64::from(block),
             block_index: exec_prior_op.block_index as i32,
             operation,
+            from_account: from_account.as_ref().to_vec(),
+            to_account: to_account.as_ref().to_vec(),
             priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
             deadline_block: exec_prior_op.priority_op.deadline_block as i64,
             eth_fee: exec_prior_op.priority_op.eth_fee,
@@ -126,13 +131,50 @@ impl NewExecutedPriorityOperation {
 
 impl NewExecutedTransaction {
     pub fn prepare_stored_tx(exec_tx: ExecutedTx, block: BlockNumber) -> Self {
+        fn cut_prefix(input: &str) -> String {
+            if input.starts_with("0x") {
+                input[2..].into()
+            } else if input.starts_with("sync:") {
+                input[5..].into()
+            } else {
+                input.into()
+            }
+        }
+
+        let tx = serde_json::to_value(&exec_tx.tx).expect("Cannot serialize tx");
+        let operation = serde_json::to_value(&exec_tx.op).expect("Cannot serialize operation");
+
+        let (from_account_hex, to_account_hex): (String, Option<String>) = match exec_tx.tx {
+            FranklinTx::Withdraw(_) | FranklinTx::Transfer(_) => (
+                serde_json::from_value(tx["from"].clone()).unwrap(),
+                serde_json::from_value(tx["to"].clone()).unwrap(),
+            ),
+            FranklinTx::ChangePubKey(_) => (
+                serde_json::from_value(tx["account"].clone()).unwrap(),
+                serde_json::from_value(tx["newPkHash"].clone()).unwrap(),
+            ),
+            FranklinTx::Close(_) => (
+                serde_json::from_value(tx["account"].clone()).unwrap(),
+                serde_json::from_value(tx["account"].clone()).unwrap(),
+            ),
+        };
+
+        let from_account: Vec<u8> = hex::decode(cut_prefix(&from_account_hex)).unwrap();
+        let to_account: Option<Vec<u8>> =
+            to_account_hex.map(|value| hex::decode(cut_prefix(&value)).unwrap());
+
         Self {
             block_number: i64::from(block),
             tx_hash: exec_tx.tx.hash().as_ref().to_vec(),
-            operation: exec_tx.op.map(|o| serde_json::to_value(o).unwrap()),
+            from_account,
+            to_account,
+            tx,
+            operation,
             success: exec_tx.success,
             fail_reason: exec_tx.fail_reason,
             block_index: exec_tx.block_index.map(|idx| idx as i32),
+            primary_account_address: exec_tx.tx.account().as_bytes().to_vec(),
+            nonce: exec_tx.tx.nonce() as i64,
         }
     }
 }

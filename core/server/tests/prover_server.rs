@@ -179,6 +179,7 @@ pub fn test_operation_and_wanted_prover_data(
         models::circuit::account::CircuitAccount::from(validator_account.clone()),
     );
     let initial_root = circuit_tree.root_hash();
+    let initial_root2 = circuit_tree.root_hash();
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
         from: validator_test_account.address,
         token: 0,
@@ -304,7 +305,7 @@ pub fn test_operation_and_wanted_prover_data(
         },
         prover::prover_data::ProverData {
             public_data_commitment,
-            old_root: initial_root,
+            old_root: initial_root2,
             new_root: block.new_root_hash,
             validator_address: models::node::Fr::from_str(&block.fee_account.to_string()).unwrap(),
             operations,
