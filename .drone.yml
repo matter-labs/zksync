@@ -309,6 +309,25 @@ steps:
   depends_on:
   - init
 
+- name: server-supervisor-image-publish
+  image: docker
+  environment:
+    USERNAME:
+      from_secret: docker_username
+    PASSWORD:
+      from_secret: docker_password
+    DOCKERFILE: ./docker/server_supervisor/Dockerfile
+    REPO: matterlabs/server_supervisor
+  commands:
+  - docker login -u $USERNAME -p $PASSWORD
+  - docker build -t $REPO:${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
+  - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
+  volumes:
+  - name: docker-sock
+    path: /var/run/docker.sock
+  depends_on:
+  - build-rust
+
 - name: server-image-publish
   image: docker
   environment:
