@@ -63,6 +63,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
         // Now, cut the price if it's too big.
         let price = self.limit_max(scaled_price);
 
+        if price == self.get_current_max_price() {
+            // We're suggesting the max price, so we must notify the log
+            // entry about it.
+            log::warn!("Maximum possible gas price will be used: <{}>", price);
+        }
+
         // Report used price to be gathered by the statistics module.
         self.statistics.add_sample(price);
 
