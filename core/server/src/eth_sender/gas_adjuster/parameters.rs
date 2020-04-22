@@ -19,8 +19,8 @@ use std::time::Duration;
 /// This value is not cached internally, as it may be changed for the already running
 /// server by an administrator. This may be required if existing settings aren't flexible
 /// enough to match the current network price.
-pub fn get_max_price_interval() -> Duration {
-    parameters_impl::get_max_price_interval()
+pub fn limit_update_interval() -> Duration {
+    parameters_impl::limit_update_interval()
 }
 
 /// Obtains the scaling factor for the maximum gas price.
@@ -28,8 +28,8 @@ pub fn get_max_price_interval() -> Duration {
 /// This value is not cached internally, as it may be changed for the already running
 /// server by an administrator. This may be required if existing settings aren't flexible
 /// enough to match the current network price.
-pub fn get_max_price_scale() -> f64 {
-    parameters_impl::get_max_price_scale()
+pub fn limit_scale_factor() -> f64 {
+    parameters_impl::limit_scale_factor()
 }
 
 // Actual methods implementation for non-test purposes.
@@ -40,18 +40,18 @@ mod parameters_impl {
     // Workspace deps
     use models::config_options::parse_env;
 
-    /// Name of the environment variable responsible for the `max_gas_price` renewing interval.
-    const MAX_GAS_PRICE_RENEWAL_INTERVAL_VAR: &'static str = "ETH_MAX_GAS_PRICE_RENEWAL_INTERVAL";
-    /// Name of the environment variable responsible for the `max_gas_price` scaling multiplier.
-    const MAX_GAS_PRICE_SCALE_FACTOR_VAR: &'static str = "ETH_MAX_GAS_PRICE_SCALE_FACTOR";
+    /// Name of the environment variable responsible for the `gas_price_limit` renewing interval.
+    const GAS_PRICE_LIMIT_UPDATE_INTERVAL: &'static str = "ETH_GAS_PRICE_LIMIT_UPDATE_INTERVAL";
+    /// Name of the environment variable responsible for the `gas_price_limit` scaling multiplier.
+    const GAS_PRICE_LIMIT_SCALE_FACTOR: &'static str = "ETH_GAS_PRICE_LIMIT_SCALE_FACTOR";
 
     /// Obtains the interval for renewing the maximum gas price.
     ///
     /// This value is not cached internally, as it may be changed for the already running
     /// server by an administrator. This may be required if existing settings aren't flexible
     /// enough to match the current network price.
-    pub fn get_max_price_interval() -> Duration {
-        let renew_interval: u64 = parse_env(MAX_GAS_PRICE_RENEWAL_INTERVAL_VAR);
+    pub fn limit_update_interval() -> Duration {
+        let renew_interval: u64 = parse_env(GAS_PRICE_LIMIT_UPDATE_INTERVAL);
 
         Duration::from_secs(renew_interval)
     }
@@ -61,8 +61,8 @@ mod parameters_impl {
     /// This value is not cached internally, as it may be changed for the already running
     /// server by an administrator. This may be required if existing settings aren't flexible
     /// enough to match the current network price.
-    pub fn get_max_price_scale() -> f64 {
-        parse_env(MAX_GAS_PRICE_SCALE_FACTOR_VAR)
+    pub fn limit_scale_factor() -> f64 {
+        parse_env(GAS_PRICE_LIMIT_SCALE_FACTOR)
     }
 }
 
@@ -72,15 +72,15 @@ mod parameters_impl {
     // Built-in deps.
     use std::time::Duration;
 
-    /// `get_max_price_interval` version for tests not looking for an environment variable value
+    /// `limit_update_interval` version for tests not looking for an environment variable value
     /// but using a zero interval instead.
-    pub fn get_max_price_interval() -> Duration {
+    pub fn limit_update_interval() -> Duration {
         Duration::from_secs(0)
     }
 
-    /// `get_max_price_scale` version for tests not looking for an environment variable value
+    /// `limit_scale_factor` version for tests not looking for an environment variable value
     /// but using a fixed scale factor (1.5) instead.
-    pub fn get_max_price_scale() -> f64 {
+    pub fn limit_scale_factor() -> f64 {
         1.5f64
     }
 }

@@ -7,13 +7,6 @@ use crate::eth_sender::{database::DatabaseAccess, ethereum_interface::EthereumIn
 
 mod parameters;
 
-/// Constant to be used as the maximum gas price upon a first launch
-/// of the server until the gas price statistics are gathered.
-/// Currently set to 200 gwei.
-const INITIAL_MAX_GAS_PRICE: u64 = 200 * 10e9 as u64;
-/// Amount of entries in the gas price statistics pool.
-const GAS_PRICE_SAMPLES_AMOUNT: usize = 10;
-
 /// Gas adjuster is an entity capable of scaling the gas price for
 /// all the Ethereum transactions.
 ///
@@ -35,9 +28,12 @@ pub(super) struct GasAdjuster<ETH: EthereumInterface, DB: DatabaseAccess> {
 }
 
 impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
-    pub fn new() -> Self {
+    pub fn new(db: &DB) -> Self {
+        let gas_price_limit = db
+            .load_gas_price_limit()
+            .expect("Can't load the gas price limit");
         Self {
-            statistics: GasStatistics::new(INITIAL_MAX_GAS_PRICE.into()),
+            statistics: GasStatistics::new(gas_price_limit),
             last_price_renewal: Instant::now(),
 
             _etherum_client: PhantomData,
@@ -74,12 +70,21 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
     /// Performs an actualization routine for `GasAdjuster`:
     /// This method is intended to be invoked periodically, and it updates the
     /// current max gas price limit according to the configurable update interval.
-    pub fn keep_updated(&mut self) {
-        if self.last_price_renewal.elapsed() >= parameters::get_max_price_interval() {
+    pub fn keep_updated(&mut self, db: &DB) {
+        if self.last_price_renewal.elapsed() >= parameters::limit_update_interval() {
             // It's time to update the maximum price.
-            let scale_factor = parameters::get_max_price_scale();
-            self.statistics.update_max_price(scale_factor);
+            let scale_factor = parameters::limit_scale_factor();
+            self.statistics.update_limit(scale_factor);
             self.last_price_renewal = Instant::now();
+
+            // Update the value in the database as well.
+            let result = db.update_gas_price_limit(self.statistics.get_limit());
+
+            if let Err(err) = result {
+                // Inability of update the value in the DB is not critical as it's not
+                // an essential logic part, so just report the error to the log.
+                log::warn!("Cannot update the gas limit value in the database: {}", err);
+            }
         }
     }
 
@@ -95,10 +100,12 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
     }
 
     fn get_current_max_price(&self) -> U256 {
-        self.statistics.get_max_price()
+        self.statistics.get_limit()
     }
 }
 
+/// Helper structure responsible for collecting the data about recent transactions,
+/// calculating the average gas price, and providing the gas price limit.
 #[derive(Debug)]
 struct GasStatistics {
     samples: VecDeque<U256>,
@@ -107,16 +114,19 @@ struct GasStatistics {
 }
 
 impl GasStatistics {
+    /// Amount of entries in the gas price statistics pool.
+    const GAS_PRICE_SAMPLES_AMOUNT: usize = 10;
+
     pub fn new(initial_max_price: U256) -> Self {
         Self {
-            samples: VecDeque::with_capacity(GAS_PRICE_SAMPLES_AMOUNT),
+            samples: VecDeque::with_capacity(Self::GAS_PRICE_SAMPLES_AMOUNT),
             current_sum: 0.into(),
             current_max_price: initial_max_price,
         }
     }
 
     pub fn add_sample(&mut self, price: U256) {
-        if self.samples.len() >= GAS_PRICE_SAMPLES_AMOUNT {
+        if self.samples.len() >= Self::GAS_PRICE_SAMPLES_AMOUNT {
             let popped_price = self.samples.pop_front().unwrap();
 
             self.current_sum -= popped_price;
@@ -126,8 +136,8 @@ impl GasStatistics {
         self.current_sum += price;
     }
 
-    pub fn update_max_price(&mut self, scale_factor: f64) {
-        if self.samples.len() < GAS_PRICE_SAMPLES_AMOUNT {
+    pub fn update_limit(&mut self, scale_factor: f64) {
+        if self.samples.len() < Self::GAS_PRICE_SAMPLES_AMOUNT {
             // Not enough data, do nothing.
             return;
         }
@@ -148,7 +158,7 @@ impl GasStatistics {
         self.current_max_price = average_price * multiplier / divider;
     }
 
-    pub fn get_max_price(&self) -> U256 {
+    pub fn get_limit(&self) -> U256 {
         self.current_max_price
     }
 }

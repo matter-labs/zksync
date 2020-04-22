@@ -143,7 +143,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             .with_withdraw_operations_count(stats.withdraw_ops)
             .build();
 
-        let gas_adjuster = GasAdjuster::new();
+        let gas_adjuster = GasAdjuster::new(&db);
 
         let mut sender = Self {
             ethereum,
@@ -183,7 +183,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
             self.proceed_next_operations();
 
             // Update the gas adjuster to maintain the up-to-date max gas price limit.
-            self.gas_adjuster.keep_updated();
+            self.gas_adjuster.keep_updated(&self.db);
         }
     }
 

@@ -29,6 +29,7 @@ pub(super) struct MockDatabase {
     unconfirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
     confirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
     nonce: Cell<i64>,
+    gas_price_limit: Cell<U256>,
     pending_op_id: Cell<EthOpId>,
     stats: RefCell<ETHStats>,
 }
@@ -48,9 +49,12 @@ impl MockDatabase {
         let unconfirmed_operations: HashMap<i64, ETHOperation> =
             restore_state.iter().map(|op| (op.id, op.clone())).collect();
 
+        let gas_price_limit: u64 = models::config_options::parse_env("ETH_GAS_PRICE_DEFAULT_LIMIT");
+
         Self {
             restore_state,
             nonce: Cell::new(nonce as i64),
+            gas_price_limit: Cell::new(gas_price_limit.into()),
             pending_op_id: Cell::new(pending_op_id as EthOpId),
             stats: RefCell::new(stats),
             unconfirmed_operations: RefCell::new(unconfirmed_operations),
@@ -185,6 +189,16 @@ impl DatabaseAccess for MockDatabase {
         self.confirmed_operations
             .borrow_mut()
             .insert(op_idx, operation);
+
+        Ok(())
+    }
+
+    fn load_gas_price_limit(&self) -> Result<U256, failure::Error> {
+        Ok(self.gas_price_limit.get())
+    }
+
+    fn update_gas_price_limit(&self, value: U256) -> Result<(), failure::Error> {
+        self.gas_price_limit.set(value);
 
         Ok(())
     }
