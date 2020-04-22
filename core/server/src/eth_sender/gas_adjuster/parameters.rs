@@ -41,9 +41,9 @@ mod parameters_impl {
     use models::config_options::parse_env;
 
     /// Name of the environment variable responsible for the `gas_price_limit` renewing interval.
-    const GAS_PRICE_LIMIT_UPDATE_INTERVAL: &'static str = "ETH_GAS_PRICE_LIMIT_UPDATE_INTERVAL";
+    const GAS_PRICE_LIMIT_UPDATE_INTERVAL: &str = "ETH_GAS_PRICE_LIMIT_UPDATE_INTERVAL";
     /// Name of the environment variable responsible for the `gas_price_limit` scaling multiplier.
-    const GAS_PRICE_LIMIT_SCALE_FACTOR: &'static str = "ETH_GAS_PRICE_LIMIT_SCALE_FACTOR";
+    const GAS_PRICE_LIMIT_SCALE_FACTOR: &str = "ETH_GAS_PRICE_LIMIT_SCALE_FACTOR";
 
     /// Obtains the interval for renewing the maximum gas price.
     ///
