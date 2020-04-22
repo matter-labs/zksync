@@ -55,7 +55,8 @@ CREATE TABLE executed_priority_operations (
     priority_op_serialid BIGINT NOT NULL,
     deadline_block BIGINT NOT NULL,
     eth_fee NUMERIC NOT NULL,
-    eth_hash bytea NOT NULL
+    eth_hash bytea NOT NULL,
+    created_at timestamp not null default now(),
 );
 
 -- Table for the executed common operations (e.g. transfer).

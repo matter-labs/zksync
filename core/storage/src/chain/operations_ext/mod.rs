@@ -190,6 +190,7 @@ impl<'a> OperationsExtSchema<'a> {
                 nonce,
                 created_at,
                 fail_reason,
+                tx: tx.tx,
             }));
         };
 
@@ -263,6 +264,7 @@ impl<'a> OperationsExtSchema<'a> {
                 nonce: -1,
                 created_at,
                 fail_reason: None,
+                tx: operation,
             }));
         };
 

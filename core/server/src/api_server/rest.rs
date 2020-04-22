@@ -26,6 +26,42 @@ impl SharedNetworkStatus {
     }
 }
 
+fn remove_prefix(query: &str) -> &str {
+    if query.starts_with("0x") {
+        &query[2..]
+    } else if query.starts_with("sync-bl:") || query.starts_with("sync-tx:") {
+        &query[8..]
+    } else {
+        &query
+    }
+}
+
+fn try_parse_address(query: &str) -> Option<Address> {
+    const ADDRESS_SIZE: usize = 20; // 20 bytes
+
+    let query = remove_prefix(query);
+    let b = hex::decode(query).ok()?;
+
+    if b.len() == ADDRESS_SIZE {
+        Some(Address::from_slice(&b))
+    } else {
+        None
+    }
+}
+
+fn try_parse_hash(query: &str) -> Option<Vec<u8>> {
+    const HASH_SIZE: usize = 32; // 32 bytes
+
+    let query = remove_prefix(query);
+    let b = hex::decode(query).ok()?;
+
+    if b.len() == HASH_SIZE {
+        Some(b)
+    } else {
+        None
+    }
+}
+
 /// AppState is a collection of records cloned by each thread to shara data between them
 #[derive(Clone)]
 struct AppState {
@@ -121,8 +157,11 @@ struct AccountStateResponse {
 
 fn handle_get_account_state(
     data: web::Data<AppState>,
-    account_address: web::Path<Address>,
+    account_address: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
+    let account_address =
+        try_parse_address(&account_address).ok_or_else(|| HttpResponse::BadRequest().finish())?;
+
     let storage = data.access_storage()?;
 
     let (id, verified, commited) = {
@@ -221,22 +260,8 @@ fn handle_get_tx_by_hash(
     data: web::Data<AppState>,
     hash_hex_with_prefix: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
-    if hash_hex_with_prefix.len() < 2 {
-        return Err(HttpResponse::BadRequest().finish().into());
-    }
-
-    let hash = {
-        let hash = if hash_hex_with_prefix.starts_with("0x") {
-            hex::decode(&hash_hex_with_prefix.into_inner()[2..])
-        } else if hash_hex_with_prefix.starts_with("sync-tx:") {
-            hex::decode(&hash_hex_with_prefix.into_inner()[8..])
-        } else {
-            return Err(HttpResponse::BadRequest().finish().into());
-        };
-
-        hash.map_err(|_| HttpResponse::BadRequest().finish())?
-    };
-
+    let hash =
+        try_parse_hash(&hash_hex_with_prefix).ok_or_else(|| HttpResponse::BadRequest().finish())?;
     let storage = data.access_storage()?;
 
     let res = storage
