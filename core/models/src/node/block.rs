@@ -5,6 +5,7 @@ use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::params::{block_chunk_sizes, max_block_chunk_size};
 use crate::serialization::*;
+use chrono::NaiveDateTime;
 use web3::types::H256;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -14,6 +15,18 @@ pub struct ExecutedTx {
     pub op: Option<FranklinOp>,
     pub fail_reason: Option<String>,
     pub block_index: Option<u32>,
+    pub created_at: NaiveDateTime,
+}
+
+impl ExecutedTx {
+    pub fn created_now() -> NaiveDateTime {
+        use std::time::SystemTime;
+        let secs_elapsed = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Problem retrieving system time")
+            .as_secs();
+        NaiveDateTime::from_timestamp(secs_elapsed as i64, 0)
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

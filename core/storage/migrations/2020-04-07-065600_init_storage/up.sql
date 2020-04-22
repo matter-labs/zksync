@@ -74,7 +74,8 @@ CREATE TABLE executed_transactions (
     success bool NOT NULL,
     fail_reason TEXT,
     primary_account_address bytea NOT NULL,
-    nonce BIGINT NOT NULL
+    nonce BIGINT NOT NULL,
+    created_at TIMESTAMP NOT NULL
 );
 
 -- -------------- --

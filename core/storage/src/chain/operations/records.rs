@@ -35,7 +35,6 @@ pub struct NewExecutedPriorityOperation {
     pub deadline_block: i64,
     pub eth_fee: BigDecimal,
     pub eth_hash: Vec<u8>,
-    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
@@ -51,6 +50,7 @@ pub struct StoredExecutedPriorityOperation {
     pub deadline_block: i64,
     pub eth_fee: BigDecimal,
     pub eth_hash: Vec<u8>,
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -67,6 +67,7 @@ pub struct NewExecutedTransaction {
     pub fail_reason: Option<String>,
     pub primary_account_address: Vec<u8>,
     pub nonce: i64,
+    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
@@ -84,4 +85,5 @@ pub struct StoredExecutedTransaction {
     pub fail_reason: Option<String>,
     pub primary_account_address: Vec<u8>,
     pub nonce: i64,
+    pub created_at: NaiveDateTime,
 }

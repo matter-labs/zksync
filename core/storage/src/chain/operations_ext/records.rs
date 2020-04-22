@@ -1,5 +1,6 @@
 // External imports
-use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text};
+use chrono::NaiveDateTime;
+use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text, Timestamp};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value;
 // Workspace imports

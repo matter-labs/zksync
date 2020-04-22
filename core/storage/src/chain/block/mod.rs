@@ -11,7 +11,6 @@ use models::node::{
 use models::{fe_from_bytes, fe_to_bytes, Action, ActionType, Operation};
 // Local imports
 use self::records::{BlockDetails, BlockTransactionItem, StorageBlock};
-use self::records::{BlockDetails, StorageBlock};
 use crate::prover::records::StoredProof;
 use crate::prover::ProverSchema;
 use crate::schema::*;
@@ -159,7 +158,6 @@ impl<'a> BlockSchema<'a> {
                     block_number, \
                     created_at \
                 from executed_transactions \
-                left join mempool on hash = tx_hash \
             ), priority_ops as ( \
                 select \
                     '0x' || encode(eth_hash, 'hex') as tx_hash, \

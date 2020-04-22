@@ -1,15 +1,12 @@
 // Built-in deps
 // External imports
 use diesel::prelude::*;
-use serde_json::value::Value;
-use itertools::Itertools;
 // Workspace imports
 use models::node::{Address, TokenId};
 use models::ActionType;
 // Local imports
 use self::records::{
-    AccountTransaction, PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse,
-    TxReceiptResponse,
+    PriorityOpReceiptResponse, TransactionsHistoryItem, TxByHashResponse, TxReceiptResponse,
 };
 use crate::schema::*;
 use crate::tokens::TokensSchema;
@@ -33,50 +30,48 @@ pub struct OperationsExtSchema<'a>(pub &'a StorageProcessor);
 
 impl<'a> OperationsExtSchema<'a> {
     pub fn tx_receipt(&self, hash: &[u8]) -> QueryResult<Option<TxReceiptResponse>> {
-        self.0.conn().transaction(|| {
-            let tx = OperationsSchema(self.0).get_executed_operation(hash)?;
+        let tx = OperationsSchema(self.0).get_executed_operation(hash)?;
 
-            if let Some(tx) = tx {
-                // Check whether transaction was committed.
-                let committed = operations::table
-                    .filter(operations::block_number.eq(tx.block_number))
-                    .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
-                    .first::<StoredOperation>(self.0.conn())
-                    .optional()?
-                    .is_some();
+        if let Some(tx) = tx {
+            // Check whether transaction was committed.
+            let committed = operations::table
+                .filter(operations::block_number.eq(tx.block_number))
+                .filter(operations::action_type.eq(ActionType::COMMIT.to_string()))
+                .first::<StoredOperation>(self.0.conn())
+                .optional()?
+                .is_some();
 
-                // We can't provide a receipt for non-committed transaction.
-                if !committed {
-                    return Ok(None);
-                }
-
-                // Check whether transaction was verified.
-                let verified = operations::table
-                    .filter(operations::block_number.eq(tx.block_number))
-                    .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
-                    .first::<StoredOperation>(self.0.conn())
-                    .optional()?
-                    .map(|v| v.confirmed)
-                    .unwrap_or(false);
-
-                // Get the prover job details.
-                let prover_run: Option<ProverRun> = prover_runs::table
-                    .filter(prover_runs::block_number.eq(tx.block_number))
-                    .first::<ProverRun>(self.0.conn())
-                    .optional()?;
-
-                Ok(Some(TxReceiptResponse {
-                    tx_hash: hex::encode(hash),
-                    block_number: tx.block_number,
-                    success: tx.success,
-                    verified,
-                    fail_reason: tx.fail_reason,
-                    prover_run,
-                }))
-            } else {
-                Ok(None)
+            // We can't provide a receipt for non-committed transaction.
+            if !committed {
+                return Ok(None);
             }
-        })
+
+            // Check whether transaction was verified.
+            let verified = operations::table
+                .filter(operations::block_number.eq(tx.block_number))
+                .filter(operations::action_type.eq(ActionType::VERIFY.to_string()))
+                .first::<StoredOperation>(self.0.conn())
+                .optional()?
+                .map(|v| v.confirmed)
+                .unwrap_or(false);
+
+            // Get the prover job details.
+            let prover_run: Option<ProverRun> = prover_runs::table
+                .filter(prover_runs::block_number.eq(tx.block_number))
+                .first::<ProverRun>(self.0.conn())
+                .optional()?;
+
+            Ok(Some(TxReceiptResponse {
+                tx_hash: hex::encode(hash),
+                block_number: tx.block_number,
+                success: tx.success,
+                verified,
+                fail_reason: tx.fail_reason,
+                prover_run,
+            }))
+        } else {
+            Ok(None)
+        }
     }
 
     pub fn get_priority_op_receipt(&self, op_id: u32) -> QueryResult<PriorityOpReceiptResponse> {
@@ -137,26 +132,15 @@ impl<'a> OperationsExtSchema<'a> {
     fn find_tx_by_hash(&self, hash: &[u8]) -> QueryResult<Option<TxByHashResponse>> {
         // TODO: Maybe move the transformations to api_server?
         let query_result = executed_transactions::table
-            .left_join(mempool::table.on(executed_transactions::tx_hash.eq(mempool::hash)))
             .filter(executed_transactions::tx_hash.eq(hash))
-            .first::<(StoredExecutedTransaction, Option<ReadTx>)>(self.0.conn())
+            .first::<StoredExecutedTransaction>(self.0.conn())
             .optional()?;
 
-        if let Some((tx, mempool_tx)) = query_result {
+        if let Some(tx) = query_result {
             let block_number = tx.block_number;
             let fail_reason = tx.fail_reason.clone();
-            let created_at = mempool_tx
-                .as_ref()
-                .map(|tx| format!("{:?}", tx.created_at))
-                .unwrap_or_else(|| "unknown created at".to_owned());
-            let operation = mempool_tx.map(|tx| tx.tx).unwrap_or_else(|| {
-                log::debug!("operation empty in mempool");
-                tx.operation.map(|op| op["tx"].clone()).unwrap_or_else(|| {
-                    log::debug!("operation empty in executed_transactions");
-                    Value::default()
-                })
-            });
-            let operation = tx.operation;
+            let created_at = format!("{:?}", &tx.created_at);
+            let operation = &tx.tx;
 
             let tx_token = operation["token"].as_i64().unwrap_or(-1);
             let tx_type = operation["type"].as_str().unwrap_or("unknown tx_type");
@@ -171,7 +155,7 @@ impl<'a> OperationsExtSchema<'a> {
                     operation["to"].as_str().unwrap_or("unknown to").to_string(),
                     operation["fee"].as_str().map(|v| v.to_string()),
                 ),
-                "ChangePubKey" => (
+                "ChangePubKey" | "ChangePubKeyOffchain" => (
                     operation["account"]
                         .as_str()
                         .unwrap_or("unknown from")

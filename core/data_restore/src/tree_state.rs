@@ -361,6 +361,7 @@ impl TreeState {
             op: Some(executed_op),
             fail_reason: None,
             block_index: Some(block_index),
+            created_at: ExecutedTx::created_now(),
         };
         ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
         current_op_block_index + 1

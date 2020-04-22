@@ -355,6 +355,7 @@ impl PlasmaStateKeeper {
                     op: Some(executed_op),
                     fail_reason: None,
                     block_index: Some(block_index),
+                    created_at: ExecutedTx::created_now(),
                 }));
                 self.pending_block
                     .success_operations
@@ -369,6 +370,7 @@ impl PlasmaStateKeeper {
                     op: None,
                     fail_reason: Some(e.to_string()),
                     block_index: None,
+                    created_at: ExecutedTx::created_now(),
                 };
                 self.pending_block.failed_txs.push(failed_tx.clone());
                 ExecutedOperations::Tx(Box::new(failed_tx))

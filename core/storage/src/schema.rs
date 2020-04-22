@@ -182,6 +182,7 @@ table! {
         fail_reason -> Nullable<Text>,
         primary_account_address -> Bytea,
         nonce -> Int8,
+        created_at -> Timestamp,
     }
 }
 
