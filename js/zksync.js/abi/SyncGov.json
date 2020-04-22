@@ -28,7 +28,7 @@
           "type": "uint16"
         }
       ],
-      "name": "TokenAdded",
+      "name": "NewToken",
       "type": "event"
     },
     {

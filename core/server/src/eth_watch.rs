@@ -26,7 +26,7 @@ use models::misc::constants::EIP1271_SUCCESS_RETURN_VALUE;
 use models::node::tx::EIP1271Signature;
 use models::node::{Nonce, PriorityOp, PubKeyHash, Token, TokenId};
 use models::params::PRIORITY_EXPIRATION;
-use models::TokenAddedEvent;
+use models::NewTokenEvent;
 use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 use web3::transports::EventLoopHandle;
@@ -129,7 +129,7 @@ impl<T: Transport> EthWatch<T> {
         let new_token_event_topic = self
             .gov_contract
             .0
-            .event("TokenAdded")
+            .event("NewToken")
             .expect("gov contract abi error")
             .signature();
         FilterBuilder::default()
@@ -144,7 +144,7 @@ impl<T: Transport> EthWatch<T> {
         &self,
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<TokenAddedEvent>, failure::Error> {
+    ) -> Result<Vec<NewTokenEvent>, failure::Error> {
         let filter = self.get_new_token_event_filter(from, to);
 
         self.web3
@@ -154,9 +154,8 @@ impl<T: Transport> EthWatch<T> {
             .await?
             .into_iter()
             .map(|event| {
-                TokenAddedEvent::try_from(event).map_err(|e| {
-                    format_err!("Failed to parse TokenAdded event log from ETH: {}", e)
-                })
+                NewTokenEvent::try_from(event)
+                    .map_err(|e| format_err!("Failed to parse NewToken event log from ETH: {}", e))
             })
             .collect()
     }

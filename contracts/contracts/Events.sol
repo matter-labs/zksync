@@ -9,10 +9,10 @@ import "./Operations.sol";
 contract Events {
 
     /// @notice Event emitted when a block is committed
-    event BlockCommitted(uint32 indexed blockNumber);
+    event BlockCommit(uint32 indexed blockNumber);
 
     /// @notice Event emitted when a block is verified
-    event BlockVerified(uint32 indexed blockNumber);
+    event BlockVerification(uint32 indexed blockNumber);
 
     /// @notice Event emitted when user send a transaction to withdraw her funds from onchain balance
     event OnchainWithdrawal(
@@ -38,7 +38,7 @@ contract Events {
     );
 
     /// @notice Event emitted when blocks are reverted
-    event BlocksReverted(
+    event BlocksRevert(
         uint32 totalBlocksVerified,
         uint32 totalBlocksCommitted
     );

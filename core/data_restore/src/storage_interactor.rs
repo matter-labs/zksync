@@ -10,7 +10,7 @@ use crate::events_state::EventsState;
 use crate::rollup_ops::RollupOpsBlock;
 use models::node::block::Block;
 use models::node::{AccountMap, AccountUpdate, AccountUpdates, FranklinOp};
-use models::TokenAddedEvent;
+use models::NewTokenEvent;
 use models::{Action, EncodedProof, Operation};
 use storage::{
     chain::state::records::{NewBlockEvent, StoredBlockEvent},
@@ -101,7 +101,7 @@ pub fn update_tree_state(
 pub fn save_events_state(
     connection_pool: &ConnectionPool,
     block_events: &[BlockEvent],
-    tokens: &[TokenAddedEvent],
+    tokens: &[NewTokenEvent],
     last_watched_eth_block_number: u64,
 ) {
     let storage = connection_pool.access_storage().expect("db failed");

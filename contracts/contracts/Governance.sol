@@ -8,18 +8,18 @@ import "./Config.sol";
 contract Governance is Config {
 
     /// @notice Token added to Franklin net
-    event TokenAdded(
+    event NewToken(
         address token,
         uint16 tokenId
     );
 
     /// @notice Governor changed
-    event GovernorChanged(
+    event NewGovernor(
         address newGovernor
     );
 
     /// @notice Validator's status changed
-    event ValidatorStatusChanged(
+    event ValidatorStatusUpdate(
         address validatorAddress,
         bool isActive
     );
@@ -74,7 +74,7 @@ contract Governance is Config {
     function changeGovernor(address _newGovernor) external {
         requireGovernor(msg.sender);
         networkGovernor = _newGovernor;
-        emit GovernorChanged(_newGovernor);
+        emit NewGovernor(_newGovernor);
     }
 
     /// @notice Add token to the list of networks tokens
@@ -89,7 +89,7 @@ contract Governance is Config {
 
         tokenAddresses[newTokenId] = _token;
         tokenIds[_token] = newTokenId;
-        emit TokenAdded(_token, newTokenId);
+        emit NewToken(_token, newTokenId);
     }
 
     /// @notice Change validator status (active or not active)
@@ -110,7 +110,7 @@ contract Governance is Config {
 
         validators[_validatorAddress] = validator;
 
-        emit ValidatorStatusChanged(_validatorAddress, _active);
+        emit ValidatorStatusUpdate(_validatorAddress, _active);
     }
 
     /// @notice Check if specified address is is governor

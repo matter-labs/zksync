@@ -330,7 +330,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         );
     }
 
-    /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommitted event
+    /// @notice Commit block - collect onchain operations, create its commitment, emit BlockCommit event
     /// @param _blockNumber Block number
     /// @param _feeAccount Account to collect fees
     /// @param _newRoot New tree root
@@ -367,7 +367,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             createCommittedBlock(_blockNumber, _feeAccount, _newRoot, publicData, totalOnchainOps, nPriorityRequestProcessed);
             totalBlocksCommitted++;
 
-            emit BlockCommitted(_blockNumber);
+            emit BlockCommit(_blockNumber);
         }
     }
 
@@ -644,7 +644,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
 
         totalBlocksVerified += 1;
 
-        emit BlockVerified(_blockNumber);
+        emit BlockVerification(_blockNumber);
     }
 
     /// @notice When block with withdrawals is verified we store them and complete in separate tx. Withdrawals can be complete by calling withdrawEth, withdrawERC20 or completeWithdrawals.
@@ -725,7 +725,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         totalOnchainOps = blocks[blocksCommited].cumulativeOnchainOperations;
         totalCommittedPriorityRequests -= revertedPriorityRequests;
 
-        emit BlocksReverted(totalBlocksVerified, blocksCommited);
+        emit BlocksRevert(totalBlocksVerified, blocksCommited);
     }
 
     /// @notice Checks that upgrade preparation is active and it is in lock period (period when contract will not add any new priority requests)

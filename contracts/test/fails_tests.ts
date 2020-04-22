@@ -591,7 +591,7 @@ describe("PLANNED FAILS", function () {
     //     const receipt = await tx.wait();
     //
     //     const event = receipt.events.pop();
-    //     if (event.event == "BlocksReverted") {
+    //     if (event.event == "BlocksRevert") {
     //         expect(await franklinDeployedContract.totalBlocksCommitted()).equal(0);
     //         reverted = true;
     //     }

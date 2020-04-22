@@ -157,18 +157,18 @@ impl std::str::FromStr for ActionType {
 }
 
 #[derive(Debug)]
-pub struct TokenAddedEvent {
+pub struct NewTokenEvent {
     pub address: Address,
     pub id: TokenId,
 }
 
-impl TryFrom<Log> for TokenAddedEvent {
+impl TryFrom<Log> for NewTokenEvent {
     type Error = failure::Error;
 
-    fn try_from(event: Log) -> Result<TokenAddedEvent, failure::Error> {
+    fn try_from(event: Log) -> Result<NewTokenEvent, failure::Error> {
         let mut dec_ev = decode(&[ParamType::Address, ParamType::Uint(32)], &event.data.0)
             .map_err(|e| format_err!("Event data decode: {:?}", e))?;
-        Ok(TokenAddedEvent {
+        Ok(NewTokenEvent {
             address: dec_ev.remove(0).to_address().unwrap(),
             id: dec_ev
                 .remove(0)
