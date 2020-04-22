@@ -8,11 +8,11 @@ use futures::channel::mpsc;
 use circuit::witness::deposit::apply_deposit_tx;
 use circuit::witness::deposit::calculate_deposit_operations_from_witness;
 use models::circuit::CircuitAccountTree;
+use models::node::Address;
 use models::params::{account_tree_depth, block_chunk_sizes};
 use prover::client;
 use prover::ApiClient;
 use server::prover_server;
-use testhelper::TestAccount;
 
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
     // TODO: make single server spawn for all tests
@@ -160,12 +160,9 @@ pub fn test_operation_and_wanted_prover_data(
     // insert account and its balance
     let storage = access_storage();
 
-    let validator_test_account = TestAccount::new();
-
     // Fee account
     let mut accounts = models::node::AccountMap::default();
-    let mut validator_account = models::node::Account::default();
-    validator_account.address = validator_test_account.address;
+    let validator_account = models::node::Account::default_with_address(&Address::random());
     let validator_account_id: u32 = 0;
     accounts.insert(validator_account_id, validator_account.clone());
 
@@ -181,10 +178,10 @@ pub fn test_operation_and_wanted_prover_data(
     let initial_root = circuit_tree.root_hash();
     let initial_root2 = circuit_tree.root_hash();
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
-        from: validator_test_account.address,
+        from: validator_account.address,
         token: 0,
         amount: bigdecimal::BigDecimal::from(10),
-        to: validator_test_account.address,
+        to: validator_account.address,
     });
     let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
     let mut fees = Vec::new();
