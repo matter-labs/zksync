@@ -187,13 +187,10 @@ steps:
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
-  - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
-  - zksync build-contracts
-  - zksync db-reset
   - zksync genesis
-  - zksync redeploy
+  - zksync dummy-prover enable
   - f cargo build --release --bin server
-  - f cargo build --bin dummy_prover
+  - f cargo build --release --bin dummy_prover
   depends_on:
   - restore-cache
 
