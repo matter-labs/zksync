@@ -153,7 +153,7 @@ export default {
                         token              = tx.priority_op.data.token;
                         token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.priority_op.data.amount, token)} ${token}`;
-                        fee                = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
+                        fee                = '';
                         break;
                     case "Transfer":
                         from               = shortenHash(tx.tx.from, 'unknown from');
@@ -200,7 +200,7 @@ export default {
                         token              = tx.priority_op.data.token;
                         token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.priority_op.withdraw_amount || 0, token)} ${token}`;
-                        fee                = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
+                        fee                = '';
                         break;
                     default:
                         throw new Error('switch reached default');

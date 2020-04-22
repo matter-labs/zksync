@@ -129,9 +129,9 @@ impl Transfer {
     pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
         format!(
             "Transfer {amount} {token}\n\
-            To: {to:?}\n\
-            Nonce: {nonce}\n\
-            Fee: {fee} {token}",
+             To: {to:?}\n\
+             Nonce: {nonce}\n\
+             Fee: {fee} {token}",
             amount = format_ether(&self.amount),
             token = token_symbol,
             to = self.to,
@@ -188,9 +188,9 @@ impl Withdraw {
     pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
         format!(
             "Withdraw {amount} {token}\n\
-            To: {to:?}\n\
-            Nonce: {nonce}\n\
-            Fee: {fee} {token}",
+             To: {to:?}\n\
+             Nonce: {nonce}\n\
+             Fee: {fee} {token}",
             amount = format_ether(&self.amount),
             token = token_symbol,
             to = self.to,

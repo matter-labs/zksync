@@ -212,20 +212,6 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
         ethWallet,
         syncProvider,
     );
-
-    try {
-        const tx = await zksyncDepositorWallet.depositToSyncFromEthereum({
-            depositTo: syncWallet.address(),
-            token: "ETH",
-            amount: utils.parseEther('0.01'),
-            maxFeeInETHToken: utils.parseEther('0'),
-            approveDepositAmountForERC20: true,
-        });
-        await tx.awaitVerifyReceipt();
-        testPassed = false;
-    } catch (e) {
-        console.log(`Error (expected) on priorityop fail:${e}`.slice(0,50));
-    }
     
     try {
         const tx = await syncWallet.syncTransfer({

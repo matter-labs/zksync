@@ -98,10 +98,10 @@ library Operations {
     uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
         ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
 
-    function readFullExitPubdata(bytes memory _data) internal pure
+    function readFullExitPubdata(bytes memory _data, uint _offset) internal pure
         returns (FullExit memory parsed)
     {
-        uint offset = 0;
+        uint offset = _offset;
         (offset, parsed.accountId) = Bytes.readUInt24(_data, offset);      // accountId
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);         // owner
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);        // tokenId
@@ -171,6 +171,17 @@ library Operations {
         (offset, parsed.pubKeyHash) = Bytes.read(_data, offset, PUBKEY_HASH_BYTES);  // pubKeyHash
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);                   // owner
         (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);                    // nonce
+    }
+
+    // Withdrawal data process
+
+    function readWithdrawalData(bytes memory _data, uint _offset) internal pure
+        returns (address _to, uint16 _tokenId, uint128 _amount)
+    {
+        uint offset = _offset;
+        (offset, _to) = Bytes.readAddress(_data, offset);
+        (offset, _tokenId) = Bytes.readUInt16(_data, offset);
+        (offset, _amount) = Bytes.readUInt128(_data, offset);
     }
 
 }

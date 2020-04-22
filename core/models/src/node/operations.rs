@@ -279,6 +279,14 @@ impl WithdrawOp {
         data
     }
 
+    fn get_withdrawal_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(self.tx.to.as_bytes());
+        data.extend_from_slice(&self.tx.token.to_be_bytes());
+        data.extend_from_slice(&big_decimal_to_u128(&self.tx.amount).to_be_bytes());
+        data
+    }
+
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
             bytes.len() == Self::CHUNKS * 8,
@@ -476,6 +484,16 @@ impl FullExitOp {
         data
     }
 
+    fn get_withdrawal_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(self.priority_op.eth_address.as_bytes());
+        data.extend_from_slice(&self.priority_op.token.to_be_bytes());
+        data.extend_from_slice(
+            &big_decimal_to_u128(&self.withdraw_amount.clone().unwrap_or_default()).to_be_bytes(),
+        );
+        data
+    }
+
     pub fn from_public_data(bytes: &[u8]) -> Result<Self, failure::Error> {
         ensure!(
             bytes.len() == Self::CHUNKS * 8,
@@ -551,6 +569,14 @@ impl FranklinOp {
     pub fn eth_witness(&self) -> Option<Vec<u8>> {
         match self {
             FranklinOp::ChangePubKeyOffchain(op) => Some(op.get_eth_witness()),
+            _ => None,
+        }
+    }
+
+    pub fn withdrawal_data(&self) -> Option<Vec<u8>> {
+        match self {
+            FranklinOp::Withdraw(op) => Some(op.get_withdrawal_data()),
+            FranklinOp::FullExit(op) => Some(op.get_withdrawal_data()),
             _ => None,
         }
     }

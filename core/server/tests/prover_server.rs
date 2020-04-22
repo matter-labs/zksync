@@ -213,7 +213,6 @@ pub fn test_operation_and_wanted_prover_data(
                 serial_id: 0,
                 data: deposit_priority_op.clone(),
                 deadline_block: 2,
-                eth_fee: bigdecimal::BigDecimal::from(0),
                 eth_hash: vec![0; 8],
             },
             block_index: 0,

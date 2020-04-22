@@ -559,7 +559,6 @@ signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19
 
 Deposits funds from ethereum account to the specified Rollup account.
 Deposit starts as priority operation - user calls contract method `depositEth` to deposit ethereum, or `depositErc` to deposit ERC-20 tokens. After that operator includes this operation in a block. In the account tree, the new account will be created if needed.
-A fee for deposit is taken in the smart contract. It depends on a transaction gas price. It is not included in pubdata.
 
 #### Onchain operation
 
@@ -602,16 +601,7 @@ The following must be concatenated into single bytes string and placed into **tr
 |to_address|RollupAddress|The address that will represent the rollup account that will receive the funds (recipient)|
 
 If transaction currency is Ether, provide the proper Ether amount in transaction value field.
-value >= full_amount + tx.gas_price * fee_gas_price_multiplier * base_tx_gas, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 179000 - base gas for deposit Ether transaction.
-
-If transaction currency is not Ether, provide the proper Ether amount in transaction value field.
-value >= tx.gas_price * fee_gas_price_multiplier * base_tx_gas, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 214000 - base gas for deposit ERC20 transaction.
-
-Fee will be accumulated on the validators balance after she commit the block that contains this operation.
+value is full_amount
 
 ##### Example
 
@@ -621,7 +611,6 @@ from_address: "0x03e69588c1f4155dec60da3bf5113e029911ce33",
 token: 2,
 full_amount: "0x000000000000000002c68af0bb140000",
 to_address: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef",
-fee: "0x0012",
 nonce: 5,
 signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce330124"
 ```
@@ -647,7 +636,6 @@ It is possible that the operator for some reason does not include this operation
 The user can request this operation to withdraw funds if he thinks that his transactions are censored by validators.
 
 It starts as a priority operation - user calls contract method `fullExit`. After that operator includes this operation in a block.
-A fee for full exit is taken in the smart contract. It depends on a transaction gas price. It is not included in pubdata.
 
 #### Onchain operation
 
@@ -690,13 +678,6 @@ The following must be concatenated into single bytes string and placed into **tr
 
 User provides `account_id` and token address (zero address for ETH), token id is determined using governance contract and 
 owner is determined using transaction sender.
-
-Provide the proper Ether amount in transaction value field.
-value >= tx.gas_price * fee_gas_price_multiplier * base_tx_gas, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 170000 - base gas for full exit transaction.
-
-Fee will be accumulated on the validators balance after she commit the block that contains this operation.
 
 ##### Example
 
@@ -807,20 +788,11 @@ signature: "0x8b7385c7bb8913b9fd176247efab0ccc72e3197abe8e2d4c6596ba58a32a91675f
 #### Deposit Ether
 Deposit Ether to Rollup - transfer Ether from user L1 address into Rollup address
 ```solidity
-depositETH(uint128 _amount, bytes calldata _rollupAddr) payable
+depositETH(address _franklinAddr)
 ```
-- _amount: Amount to deposit
-- _rollupAddr: The receiver Rollup address
+- _franklinAddr: The receiver Layer 2 address
 
-The user must specify value of Ether to send:
-
-*msg.value >= _amount + fee*
-
-*fee = tx.gas_price * fee_gas_price_multiplier * base_tx_gas*, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 179000 - base gas for deposit Ether transaction.
-
-If sender specified msg.value more than this _amount + fee - she will recieve difference.
+msg.value equals amount to deposit.
 
 #### Deposit ERC-20 token
 Deposit ERC-20 token to Rollup - transfer token from user L1 address into Rollup address
@@ -830,16 +802,6 @@ depositERC20(address _token, uint128 _amount, bytes calldata _rollupAddr) payabl
 - _token: Token address in L1 chain
 - _amount: Amount to deposit 
 - _rollupAddr: The receiver Rollup address
-
-The user must specify msg.value of Ether to send:
-
-*msg.value >= fee*
-
-*fee = tx.gas_price * fee_gas_price_multiplier * base_tx_gas*, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 214000 - base gas for deposit ERC20 transaction.
-
-If sender specified msg.value more than this fee - she will recieve difference.
 
 #### Withdraw Ether
 
@@ -878,16 +840,6 @@ fullExit (
 ```
 - _accountId: Numerical id of the Rollup account
 - _token: Token address in L1 chain
-
-The user must specify msg.value of Ether to send:
-
-*msg.value >= fee*
-
-*fee = tx.gas_price * fee_gas_price_multiplier * base_tx_gas*, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 170000 - base gas for full exit transaction.
-
-If sender specified msg.value more than this fee - she will recieve difference.
 
 #### Exodus mode
 
@@ -940,11 +892,12 @@ commitBlock(
 
 Submit verified block proof. Only active validator can make it. This block onchain operations will be fulfilled.
 ```solidity
-verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof)
+verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof, bytes calldata _withdrawalsData)
 ```
 
 - _blockNumber: Block number
 - _proof Block proof
+- _withdrawalsData Withdrawals data
 
 ### Priority Queue contract
 

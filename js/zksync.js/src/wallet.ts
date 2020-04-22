@@ -387,7 +387,6 @@ export class Wallet {
         depositTo: Address;
         token: TokenLike;
         amount: utils.BigNumberish;
-        maxFeeInETHToken?: utils.BigNumberish;
         ethTxOptions?: ethers.providers.TransactionRequest;
         approveDepositAmountForERC20?: boolean;
     }): Promise<ETHOperation> {
@@ -398,18 +397,6 @@ export class Wallet {
             this.provider.contractAddress
         );
 
-        let maxFeeInETHToken;
-        if (deposit.maxFeeInETHToken != null) {
-            maxFeeInETHToken = deposit.maxFeeInETHToken;
-        } else {
-            maxFeeInETHToken = await ethProxy.estimateDepositFeeInETHToken(
-                deposit.token,
-                gasPrice
-            );
-            maxFeeInETHToken = maxFeeInETHToken.mul(
-                metamaskIncreaseGasPriceFactor
-            );
-        }
         const mainZkSyncContract = new Contract(
             this.provider.contractAddress.mainContract,
             SYNC_MAIN_CONTRACT_INTERFACE,
@@ -420,12 +407,10 @@ export class Wallet {
 
         if (isTokenETH(deposit.token)) {
             ethTransaction = await mainZkSyncContract.depositETH(
-                deposit.amount,
                 deposit.depositTo,
                 {
                     value: utils
-                        .bigNumberify(deposit.amount)
-                        .add(maxFeeInETHToken),
+                        .bigNumberify(deposit.amount),
                     gasLimit: utils.bigNumberify("200000"),
                     gasPrice,
                     ...deposit.ethTxOptions
@@ -452,7 +437,7 @@ export class Wallet {
                     deposit.depositTo,
                     {
                         gasLimit: utils.bigNumberify("250000"),
-                        value: maxFeeInETHToken,
+                        value: 0,
                         nonce: approveTx.nonce + 1,
                         gasPrice,
                         ...deposit.ethTxOptions
@@ -468,7 +453,7 @@ export class Wallet {
                     deposit.depositTo,
                     {
                         gasLimit: utils.bigNumberify("250000"),
-                        value: maxFeeInETHToken,
+                        value: 0,
                         gasPrice,
                         ...deposit.ethTxOptions
                     }
@@ -481,7 +466,6 @@ export class Wallet {
 
     async emergencyWithdraw(withdraw: {
         token: TokenLike;
-        maxFeeInETHToken?: utils.BigNumberish;
         accountId?: number;
         ethTxOptions?: ethers.providers.TransactionRequest;
     }): Promise<ETHOperation> {
@@ -490,18 +474,6 @@ export class Wallet {
             this.ethSigner.provider,
             this.provider.contractAddress
         );
-
-        let maxFeeInETHToken;
-        if (withdraw.maxFeeInETHToken != null) {
-            maxFeeInETHToken = withdraw.maxFeeInETHToken;
-        } else {
-            maxFeeInETHToken = await ethProxy.estimateEmergencyWithdrawFeeInETHToken(
-                gasPrice
-            );
-            maxFeeInETHToken = maxFeeInETHToken.mul(
-                metamaskIncreaseGasPriceFactor
-            );
-        }
 
         let accountId;
         if (withdraw.accountId != null) {
@@ -530,7 +502,7 @@ export class Wallet {
             tokenAddress,
             {
                 gasLimit: utils.bigNumberify("500000"),
-                value: maxFeeInETHToken,
+                value: 0,
                 gasPrice,
                 ...withdraw.ethTxOptions
             }

@@ -231,7 +231,7 @@ impl<'a> OperationsExtSchema<'a> {
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
-                    operation["eth_fee"].as_str().map(|v| v.to_string()),
+                    None,
                     operation["priority_op"]["amount"]
                         .as_str()
                         .unwrap_or("unknown amount"),
@@ -245,7 +245,7 @@ impl<'a> OperationsExtSchema<'a> {
                         .as_str()
                         .unwrap_or("unknown to")
                         .to_string(),
-                    operation["eth_fee"].as_str().map(|v| v.to_string()),
+                    None,
                     operation["withdraw_amount"]
                         .as_str()
                         .unwrap_or("unknown amount"),

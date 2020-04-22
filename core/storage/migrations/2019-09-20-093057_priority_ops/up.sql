@@ -8,8 +8,7 @@ create table executed_priority_operations
     operation            jsonb   not null,
     -- operation metadata
     priority_op_serialid bigint  not null,
-    deadline_block       bigint  not null,
-    eth_fee              numeric not null
+    deadline_block       bigint  not null
 );
 
 

@@ -1,5 +1,4 @@
 // External imports
-use bigdecimal::BigDecimal;
 use chrono::prelude::*;
 use serde_json::value::Value;
 // Workspace imports
@@ -15,7 +14,6 @@ pub struct NewExecutedPriorityOperation {
     pub operation: Value,
     pub priority_op_serialid: i64,
     pub deadline_block: i64,
-    pub eth_fee: BigDecimal,
     pub eth_hash: Vec<u8>,
 }
 
@@ -45,7 +43,6 @@ pub struct StoredExecutedPriorityOperation {
     pub operation: Value,
     pub priority_op_serialid: i64,
     pub deadline_block: i64,
-    pub eth_fee: BigDecimal,
     pub eth_hash: Vec<u8>,
 }
 
