@@ -59,7 +59,7 @@ async function main() {
         
         await deployer.setGovernanceValidator();
         
-        const erc20 = await deployer.addTestERC20Token();
+        const erc20 = await deployer.addTestERC20Token("GovernanceApprove");
         console.log("TEST_ERC20=" + erc20.address);
         await deployer.mintTestERC20Token(testWallet.address);
     }

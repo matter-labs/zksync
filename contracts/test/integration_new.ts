@@ -1,11 +1,8 @@
 import { ethers } from "ethers";
 import {
-    addTestERC20Token,
-    mintTestERC20Token,
     franklinTestContractCode,
     verifierTestContractCode,
     governanceTestContractCode,
-    priorityQueueTestContractCode,
     Deployer,
 } from "../src.ts/deploy";
 
@@ -56,8 +53,8 @@ describe("Integration test", async function () {
         governanceDeployedContract = await deployer.deployGovernance();
         franklinDeployedContract = await deployer.deployFranklin();
         await governanceDeployedContract.setValidator(wallet.address, true);
-        erc20DeployedToken = await addTestERC20Token(wallet, governanceDeployedContract);
-        await mintTestERC20Token(wallet, erc20DeployedToken);
+        erc20DeployedToken = await deployer.addTestERC20Token("GovernanceApprove");
+        await deployer.mintTestERC20Token(wallet.address, erc20DeployedToken);
         // Make sure that exit wallet can execute transactions.
         await wallet.sendTransaction({ to: exitWallet.address, value: parseEther("1.0") });
     });

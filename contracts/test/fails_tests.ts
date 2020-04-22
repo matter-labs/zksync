@@ -53,8 +53,8 @@ describe("PLANNED FAILS", function () {
         governanceDeployedContract = await deployer.deployGovernance();
         franklinDeployedContract = await deployer.deployFranklin();
         await deployer.setGovernanceValidator();
-        erc20DeployedToken1 = await deployer.addTestERC20Token(true);
-        erc20DeployedToken2 = await deployer.addTestERC20Token(false);
+        erc20DeployedToken1 = await deployer.addTestERC20Token("GovernanceApprove");
+        erc20DeployedToken2 = await deployer.addTestERC20Token("GovernanceNotApprove");
         await deployer.mintTestERC20Token(wallet.address, erc20DeployedToken1);
         await deployer.mintTestERC20Token(wallet.address, erc20DeployedToken2);
         // Make sure that exit wallet can execute transactions.
@@ -110,7 +110,7 @@ describe("PLANNED FAILS", function () {
             null,
             franklinAddress,
             correctFeeValue,
-            "gvs12",
+            "gvs11",
         );
 
         console.log(" + ERC20 deposit: Wrong token address passed");
@@ -136,7 +136,7 @@ describe("PLANNED FAILS", function () {
             erc20DeployedToken2,
             1,
             balanceToWithdraw1,
-            "gvs12",
+            "gvs11",
         );
         console.log(" + ERC20 withdraw: Wrong token address passed");
 
@@ -150,7 +150,7 @@ describe("PLANNED FAILS", function () {
             accountId,
             erc20DeployedToken2.address,
             value,
-            "gvs12",
+            "gvs11",
         );
         console.log(" + Full Exit: Wrong token address passed");
 
@@ -252,7 +252,7 @@ describe("PLANNED FAILS", function () {
             {
                 blockNumber: 1,
                 feeAcc: 22,
-                newRoot: "0x",
+                newRoot: "0000000000000000000000000000000000000000000000000000000000000000",
                 pubData: noopBlockPublicData,
                 witnessData: "0x",
                 witnessSizes: [0],
@@ -260,7 +260,7 @@ describe("PLANNED FAILS", function () {
             0,
             0,
             "0000000000000000000000000000000000000000000000000000000000000000",
-            noopBlockPublicData,
+            '',
             true,
         );
 

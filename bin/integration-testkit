@@ -9,7 +9,12 @@ PREV_WEB3_URL=$WEB3_URL
 
 function clean_up() {
     exitcode=$?
-    docker kill $CONTAINER_ID > /dev/null || echo "no container to kill"
+    if [[ $ZKSYNC_ENV == dev ]]; then
+        docker kill $CONTAINER_ID > /dev/null;
+        if [[ $? != 0 && $CONTAINER_ID != '' ]]; then
+            echo "problem killing $CONTAINER_ID"
+        fi
+    fi
     export WEB3_URL=$PREV_WEB3_URL
     exit $exitcode
 }
@@ -17,13 +22,14 @@ function clean_up() {
 # run with usual geth
 cargo run --bin exodus_test --release
 
+# set up ganache
 if [[ $ZKSYNC_ENV == ci ]]; then
     export WEB3_URL=http://ganache:7545
-else
+elif [[ $ZKSYNC_ENV == dev ]]; then
     CONTAINER_ID=$(docker run -d -p 7545:7545 matterlabs/ganache)
     export WEB3_URL=http://localhost:7545
-    echo $CONTAINER_ID
 fi
 
+# run with ganache
 cargo run --bin testkit --release
 cargo run --bin migration_test --release

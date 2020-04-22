@@ -95,7 +95,7 @@ describe("ZK priority queue ops unit tests", function () {
         process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
         zksyncContract = await deployer.deployFranklin();
         await deployer.setGovernanceValidator();
-        tokenContract = await deployer.addTestERC20Token(true);
+        tokenContract = await deployer.addTestERC20Token("GovernanceApprove");
         await deployer.mintTestERC20Token(wallet.address, tokenContract);
         ethProxy = new ETHProxy(wallet.provider, {
             mainContract: zksyncContract.address,
@@ -230,14 +230,14 @@ describe("ZK Sync withdraw unit tests", function () {
         deployer.bytecodes.FranklinTarget = require("../../build/ZKSyncUnitTest");
         zksyncContract = await deployer.deployFranklin();
         await deployer.setGovernanceValidator();
-        tokenContract = await deployer.addTestERC20Token(true);
+        tokenContract = await deployer.addTestERC20Token("GovernanceApprove");
         await deployer.mintTestERC20Token(wallet.address, tokenContract);
         ethProxy = new ETHProxy(wallet.provider, {
             mainContract: zksyncContract.address,
             govContract: governanceDeployedContract.address
         });
 
-        incorrectTokenContract = await deployer.addTestERC20Token(false);
+        incorrectTokenContract = await deployer.addTestERC20Token("GovernanceNotApprove");
         await deployer.mintTestERC20Token(wallet.address, tokenContract);
     });
 
@@ -380,7 +380,7 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
         deployer.bytecodes.FranklinTarget = require("../../build/ZKSyncUnitTest");
         zksyncContract = await deployer.deployFranklin();
         await deployer.setGovernanceValidator();
-        tokenContract = await deployer.addTestERC20Token(true);
+        tokenContract = await deployer.addTestERC20Token("GovernanceApprove");
         await deployer.mintTestERC20Token(wallet.address, tokenContract);
         ethProxy = new ETHProxy(wallet.provider, {
             mainContract: zksyncContract.address,
@@ -450,7 +450,7 @@ describe("ZK Sync test process next operation", function () {
         deployer.bytecodes.FranklinTarget = require("../../build/ZKSyncUnitTest");
         zksyncContract = await deployer.deployFranklin();
         await deployer.setGovernanceValidator();
-        tokenContract = await deployer.addTestERC20Token(true);
+        tokenContract = await deployer.addTestERC20Token("GovernanceApprove");
         await deployer.mintTestERC20Token(wallet.address, tokenContract);
         ethProxy = new ETHProxy(wallet.provider, {
             mainContract: zksyncContract.address,
