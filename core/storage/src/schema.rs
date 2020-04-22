@@ -230,6 +230,15 @@ table! {
     }
 }
 
+table! {
+    leader_election (id) {
+        id -> Int4,
+        name -> Text,
+        created_at -> Timestamp,
+        bail_at -> Nullable<Timestamp>,
+    }
+}
+
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
@@ -261,4 +270,5 @@ allow_tables_to_appear_in_same_query!(
     prover_runs,
     server_config,
     tokens,
+    leader_election,
 );

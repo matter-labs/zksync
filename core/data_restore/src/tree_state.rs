@@ -52,7 +52,7 @@ impl TreeState {
         current_unprocessed_priority_op: u64,
         fee_account: AccountId,
     ) -> Self {
-        let state = PlasmaState::new(accounts, current_block);
+        let state = PlasmaState::from_acc_map(accounts, current_block);
         let last_fee_account_address = state
             .get_account(fee_account)
             .expect("Cant get fee account from tree state")
