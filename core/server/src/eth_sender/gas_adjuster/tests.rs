@@ -150,7 +150,7 @@ fn gas_price_limit_scaling() {
 /// Checks that if the price suggested by the Ethereum client is below the price limit,
 /// the limit is calculated as (average of samples) * scale_factor.
 #[test]
-fn gas_price_limit_preservation() {
+fn gas_price_limit_average_basis() {
     // Increases the gas price value by 15%.
     fn increase_gas_price(value: u64) -> u64 {
         value * 115 / 100
@@ -199,7 +199,7 @@ fn gas_price_limit_preservation() {
             samples_sum += expected_price;
         }
 
-        // Keep the limit updated (it should not .
+        // Keep the limit updated (it should become (avg of prices) * (scale factor).
         gas_adjuster.keep_updated(&db);
 
         // Check that new limit is based on the average of previous N samples.
@@ -207,5 +207,42 @@ fn gas_price_limit_preservation() {
 
         current_limit = scale_gas_limit(samples_sum / N_SAMPLES as u64);
         assert_eq!(new_limit, current_limit.into());
+    }
+}
+
+/// Checks that if the gas price limit is never achieved, it never increased as well.
+#[test]
+fn gas_price_limit_preservation() {
+    // Amount of times we'll call `GasAdjuster::keep_updated`.
+    // The value is lower than in tests above, since the limit must not change.
+    const PRICE_UPDATES: u64 = 2;
+    // Amount of samples to gather statistics.
+    const N_SAMPLES: usize = GasStatistics::GAS_PRICE_SAMPLES_AMOUNT;
+    // Price suggested by Ethereum client;
+    const SUGGESTED_PRICE: u64 = 10;
+    // Price limit to set: it's based on the suggested price, so it won't ever change.
+    let price_limit = scale_gas_limit(SUGGESTED_PRICE);
+
+    let (mut ethereum, db) = eth_and_db_clients();
+    db.update_gas_price_limit(price_limit.into()).unwrap();
+    let mut gas_adjuster: GasAdjuster<MockEthereum, MockDatabase> = GasAdjuster::new(&db);
+
+    // Set the client price way beyond the limit.
+    ethereum.gas_price = SUGGESTED_PRICE.into();
+
+    for _ in 0..PRICE_UPDATES {
+        // Request the gas price N times to gather statistics in GasAdjuster.
+        for _ in 0..N_SAMPLES {
+            // Every time we get the new price (without old price provided), so no scaling
+            // involved, every time an Ethereum client price is provided (since it's lower
+            // than the limit).
+            let suggested_price = gas_adjuster.get_gas_price(&ethereum, None).unwrap();
+            assert_eq!(suggested_price, SUGGESTED_PRICE.into());
+        }
+
+        // Keep the limit updated (it should not change).
+        gas_adjuster.keep_updated(&db);
+        let new_limit = db.load_gas_price_limit().unwrap();
+        assert_eq!(new_limit, price_limit.into());
     }
 }
