@@ -194,4 +194,16 @@ library Bytes {
         return outStringBytes;
     }
 
+    /// Trim bytes into single word
+    function trim(bytes memory _data, uint _new_length) internal pure returns (uint r) {
+        require(_new_length <= 0x20, "trm10");  // new_length is longer than word
+        require(_data.length >= _new_length, "trm11");  // data is to short
+
+        uint a;
+        assembly {
+            a := mload(add(_data, 0x20)) // load bytes into uint256
+        }
+
+        return a >> ((0x20 - _new_length) * 8);
+    }
 }

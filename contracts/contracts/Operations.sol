@@ -120,19 +120,10 @@ library Operations {
 
     /// @notice Check that full exit pubdata from request and block matches
     function fullExitPubdataMatch(bytes memory _lhs, bytes memory _rhs) internal pure returns (bool) {
-        // We must ignore `amount` because it is present in block pubdata but not in priority queue
-        require(PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES == 25, "edm11");  // expected PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES to be 25
-        require(_lhs.length >= 25, "edm12");  // _lhs too short
-        require(_rhs.length >= 25, "edm13");  // _rhs too short
-
-        bool equals;
-        assembly {
-            let a := mload(add(_lhs, 0x20))
-            let b := mload(add(_rhs, 0x20))
-            equals := eq(shr(56, a), shr(56, b)) // discard 32 - 25 = 7 bytes (56 bits)
-        }
-
-        return equals;
+        // `amount` is ignored because it is present in block pubdata but not in priority queue
+        uint lhs = Bytes.trim(_lhs, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
+        uint rhs = Bytes.trim(_rhs, PACKED_FULL_EXIT_PUBDATA_BYTES - AMOUNT_BYTES);
+        return lhs == rhs;
     }
 
     // PartialExit pubdata
