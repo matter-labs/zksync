@@ -36,7 +36,17 @@ steps:
   depends_on:
   - restore-cache
 
-- name: rust-checks-and-build
+- name: rust-checks
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - cargo fmt -- --check
+  - f cargo clippy --tests --benches -- -D warnings
+  depends_on:
+  - init
+
+- name: rust-build
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
@@ -50,6 +60,7 @@ steps:
   - pushd core/storage
   - f cargo test --release -p storage --features "db_test" --no-run
   - popd
+  - sscache -s
   depends_on:
   - init
 
@@ -60,7 +71,7 @@ steps:
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - zksync genesis
   depends_on:
-  - rust-checks-and-build
+  - rust-build
 
 - name: circuit-rust-tests
   image: matterlabs/ci
