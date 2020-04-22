@@ -51,8 +51,6 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - cargo fmt -- --check
-  - f cargo clippy --tests --benches -- -D warnings
   - f cargo build --release --all-targets
   - f cargo test --release --all-targets --no-run
   - f cargo test --release -p prover --no-run
@@ -60,7 +58,7 @@ steps:
   - pushd core/storage
   - f cargo test --release -p storage --features "db_test" --no-run
   - popd
-  - sscache -s
+  - sccache --show-stats
   depends_on:
   - init
 
