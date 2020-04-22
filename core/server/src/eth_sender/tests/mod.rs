@@ -14,7 +14,7 @@ use super::{
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const WAIT_CONFIRMATIONS: u64 = 1;
 
-mod mock;
+pub mod mock;
 mod test_data;
 
 /// Basic test that `ETHSender` creation does not panic and initializes correctly.
@@ -24,30 +24,6 @@ fn basic_test() {
 
     // Check that there are no unconfirmed operations by default.
     assert!(eth_sender.ongoing_ops.is_empty());
-}
-
-/// Check for the gas scaling: gas is expected to be increased by 15% or set equal
-/// to gas cost suggested by Ethereum (if it's greater).
-#[test]
-fn scale_gas() {
-    let (mut eth_sender, _, _) = default_eth_sender();
-
-    // Set the gas price in Ethereum to 1000.
-    eth_sender.ethereum.gas_price = 1000.into();
-
-    // Check that gas price of 1000 is increased to 1150.
-    let scaled_gas = eth_sender
-        .gas_adjuster
-        .get_gas_price(&eth_sender.ethereum, Some(1000.into()))
-        .unwrap();
-    assert_eq!(scaled_gas, 1150.into());
-
-    // Check that gas price of 100 is increased to 1000 (price in Ethereum object).
-    let scaled_gas = eth_sender
-        .gas_adjuster
-        .get_gas_price(&eth_sender.ethereum, Some(100.into()))
-        .unwrap();
-    assert_eq!(scaled_gas, 1000.into());
 }
 
 /// Checks that deadline block is chosen according to the expected policy.

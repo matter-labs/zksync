@@ -6,6 +6,8 @@ use web3::types::U256;
 use crate::eth_sender::{database::DatabaseAccess, ethereum_interface::EthereumInterface};
 
 mod parameters;
+#[cfg(test)]
+mod tests;
 
 /// Gas adjuster is an entity capable of scaling the gas price for
 /// all the Ethereum transactions.
@@ -161,15 +163,4 @@ impl GasStatistics {
     pub fn get_limit(&self) -> U256 {
         self.current_max_price
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Test for the lower gas limit: it should be a network-suggested price for new transactions,
-    /// and for stuck transactions it should be the maximum of either price increased by 15% or
-    /// the network-suggested price.
-    #[test]
-    fn lower_gas_limit() {}
 }
