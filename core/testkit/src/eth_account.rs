@@ -500,7 +500,7 @@ impl<T: Transport> EthereumAccount<T> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "authPubkeyHash",
+                "setAuthPubkeyHash",
                 (fact.to_vec(), u64::from(nonce)),
                 Options::default(),
             )

@@ -253,7 +253,7 @@
           "type": "uint32"
         }
       ],
-      "name": "authPubkeyHash",
+      "name": "setAuthPubkeyHash",
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",

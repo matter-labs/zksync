@@ -395,7 +395,7 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
         const nonce = 0x1234;
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
 
-        const receipt = await (await zksyncContract.authPubkeyHash(pubkeyHash, nonce)).wait();
+        const receipt = await (await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce)).wait();
         let authEvent;
         for (const event of receipt.logs) {
             const parsedLog = zksyncContract.interface.parseLog(event);
@@ -416,10 +416,10 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
         const nonce = 0xdead;
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
 
-        await zksyncContract.authPubkeyHash(pubkeyHash, nonce);
+        await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce);
         //
         const otherPubkeyHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        const {revertReason} = await getCallRevertReason(async () => await zksyncContract.authPubkeyHash(otherPubkeyHash, nonce));
+        const {revertReason} = await getCallRevertReason(async () => await zksyncContract.setAuthPubkeyHash(otherPubkeyHash, nonce));
         expect(revertReason, "revert reason incorrect").eq("ahf11");
     });
 
@@ -430,7 +430,7 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
         const longPubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefefe";
 
         for (const pkHash of [shortPubkeyHash, longPubkeyHash]) {
-            const {revertReason} = await getCallRevertReason(async () => await zksyncContract.authPubkeyHash(shortPubkeyHash, nonce));
+            const {revertReason} = await getCallRevertReason(async () => await zksyncContract.setAuthPubkeyHash(shortPubkeyHash, nonce));
             expect(revertReason, "revert reason incorrect").eq("ahf10");
         }
     });
@@ -579,7 +579,7 @@ describe("ZK Sync test process next operation", function () {
 
         const nonce = 0x1234;
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
-        await zksyncContract.authPubkeyHash(pubkeyHash, nonce);
+        await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce);
 
         const accountId = 0xffee12;
 

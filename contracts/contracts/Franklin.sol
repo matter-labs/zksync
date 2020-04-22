@@ -771,13 +771,13 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         exited[packedBalanceKey] = true;
     }
 
-    function authPubkeyHash(bytes calldata _fact, uint32 _nonce) external nonReentrant {
-        require(_fact.length == PUBKEY_HASH_BYTES, "ahf10"); // PubKeyHash should be 20 bytes.
+    function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external nonReentrant {
+        require(_pubkey_hash.length == PUBKEY_HASH_BYTES, "ahf10"); // PubKeyHash should be 20 bytes.
         require(authFacts[msg.sender][_nonce] == bytes32(0), "ahf11"); // auth fact for nonce should be empty
 
-        authFacts[msg.sender][_nonce] = keccak256(_fact);
+        authFacts[msg.sender][_nonce] = keccak256(_pubkey_hash);
 
-        emit FactAuth(msg.sender, _nonce, _fact);
+        emit FactAuth(msg.sender, _nonce, _pubkey_hash);
     }
 
     // Priority queue
