@@ -34,6 +34,7 @@ mod chain;
 mod config;
 mod data_restore;
 mod ethereum;
+mod leader_election;
 mod prover;
 mod tokens;
 
