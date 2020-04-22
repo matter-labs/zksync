@@ -28,7 +28,7 @@ fn main() {
 
     let config_opts = ConfigurationOptions::from_env();
 
-    let cli = App::new("ZKSync operator node")
+    let cli = App::new("zkSync operator node")
         .author("Matter Labs")
         .arg(
             Arg::with_name("genesis")
