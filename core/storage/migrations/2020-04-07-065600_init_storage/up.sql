@@ -54,7 +54,6 @@ CREATE TABLE executed_priority_operations (
     to_account bytea NOT NULL,
     priority_op_serialid BIGINT NOT NULL,
     deadline_block BIGINT NOT NULL,
-    eth_fee NUMERIC NOT NULL,
     eth_hash bytea NOT NULL
 );
 

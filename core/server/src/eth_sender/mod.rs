@@ -588,10 +588,13 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 )
             }
             Action::Verify { proof } => {
-                // function verifyBlock(uint32 _blockNumber, uint256[8] calldata proof) external {
+                // function verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof, bytes calldata _withdrawalsData)
                 let block_number = op.block.block_number;
-                self.ethereum
-                    .encode_tx_data("verifyBlock", (u64::from(block_number), *proof.clone()))
+                let withdrawals_data = op.block.get_withdrawals_data();
+                self.ethereum.encode_tx_data(
+                    "verifyBlock",
+                    (u64::from(block_number), *proof.clone(), withdrawals_data),
+                )
             }
         }
     }

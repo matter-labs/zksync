@@ -157,7 +157,6 @@ table! {
         to_account -> Bytea,
         priority_op_serialid -> Int8,
         deadline_block -> Int8,
-        eth_fee -> Numeric,
         eth_hash -> Bytea,
     }
 }

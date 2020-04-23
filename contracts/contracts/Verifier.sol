@@ -14,7 +14,7 @@ contract Verifier is VerificationKey {
 
     constructor() public {}
 
-    /// @notice Verifier contract initialization
+    /// @notice Verifier contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters
     function initialize(bytes calldata initializationParameters) external {
         // parameters are not used during initialization
