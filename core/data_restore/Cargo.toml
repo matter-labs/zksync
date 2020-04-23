@@ -18,6 +18,7 @@ signal-hook = { version = "0.1.8", features = ["tokio-support"] }
 failure = "0.1"
 clap = "2.33.0"
 futures = { version = "0.3", features = ["compat"] }
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 
 plasma = { path = "../plasma", version = "0.1.1" }
 models = { path = "../models", version = "0.0.1" }

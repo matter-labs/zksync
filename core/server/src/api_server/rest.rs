@@ -8,6 +8,7 @@ use actix_web::{
 };
 use futures::channel::mpsc;
 use models::config_options::ThreadPanicNotify;
+use models::node::block::ExecutedOperations;
 use models::node::{Account, AccountId, Address};
 use models::NetworkStatus;
 use std::net::SocketAddr;

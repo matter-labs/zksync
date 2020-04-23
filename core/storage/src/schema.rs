@@ -182,7 +182,16 @@ table! {
         fail_reason -> Nullable<Text>,
         primary_account_address -> Bytea,
         nonce -> Int8,
+        created_at -> Timestamptz,
+    }
+}
+
+table! {
+    leader_election (id) {
+        id -> Int4,
+        name -> Text,
         created_at -> Timestamp,
+        bail_at -> Nullable<Timestamp>,
     }
 }
 
@@ -230,15 +239,6 @@ table! {
     }
 }
 
-table! {
-    leader_election (id) {
-        id -> Int4,
-        name -> Text,
-        created_at -> Timestamp,
-        bail_at -> Nullable<Timestamp>,
-    }
-}
-
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
@@ -265,10 +265,10 @@ allow_tables_to_appear_in_same_query!(
     eth_tx_hashes,
     executed_priority_operations,
     executed_transactions,
+    leader_election,
     operations,
     proofs,
     prover_runs,
     server_config,
     tokens,
-    leader_election,
 );

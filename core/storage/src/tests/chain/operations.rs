@@ -10,7 +10,6 @@ use crate::{
     },
     StorageProcessor,
 };
-use models::node::block::ExecutedTx;
 
 /// Checks the save&load routine for unconfirmed operations.
 #[test]
@@ -55,7 +54,7 @@ fn executed_operations() {
             block_index: None,
             primary_account_address: Default::default(),
             nonce: Default::default(),
-            created_at: ExecutedTx::created_now(),
+            created_at: chrono::Utc::now(),
         };
 
         OperationsSchema(&conn).store_executed_operation(executed_tx.clone())?;

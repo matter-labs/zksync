@@ -70,7 +70,7 @@ impl StoredExecutedTransaction {
             block_index: self
                 .block_index
                 .map(|val| u32::try_from(val).expect("Invalid block index")),
-            created_at: ExecutedTx::created_now(),
+            created_at: chrono::Utc::now(),
         })
     }
 }

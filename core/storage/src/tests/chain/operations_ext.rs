@@ -113,7 +113,7 @@ fn get_account_transactions_history() {
             op: Some(transfer_to_new_op),
             fail_reason: None,
             block_index: None,
-            created_at: ExecutedTx::created_now(),
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_transfer_to_new_op))
@@ -142,7 +142,7 @@ fn get_account_transactions_history() {
             op: Some(transfer_op),
             fail_reason: None,
             block_index: None,
-            created_at: ExecutedTx::created_now(),
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_transfer_op))
@@ -170,7 +170,7 @@ fn get_account_transactions_history() {
             op: Some(withdraw_op),
             fail_reason: None,
             block_index: None,
-            created_at: ExecutedTx::created_now(),
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_withdraw_op))
@@ -188,7 +188,7 @@ fn get_account_transactions_history() {
             op: Some(close_op),
             fail_reason: None,
             block_index: None,
-            created_at: ExecutedTx::created_now(),
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_close_op))
@@ -206,7 +206,7 @@ fn get_account_transactions_history() {
             op: Some(change_pubkey_op),
             fail_reason: None,
             block_index: None,
-            created_at: ExecutedTx::created_now(),
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_change_pubkey_op))
