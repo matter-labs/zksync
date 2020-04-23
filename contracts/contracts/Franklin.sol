@@ -109,11 +109,11 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             // send fails are ignored hence there is always a direct way to withdraw.
             delete pendingWithdrawals[i];
 
-            uint128 amount = balancesToWithdraw[to][tokenId];
+            uint128 amount = balancesToWithdraw[to][tokenId].balanceToWithdraw;
             // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
             if (amount != 0) {
                 // avoid reentrancy attack by using subtract and not "= 0" and changing local state before external call
-                balancesToWithdraw[to][tokenId] -= amount;
+                balancesToWithdraw[to][tokenId].balanceToWithdraw -= amount;
                 bool sent = false;
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
@@ -124,7 +124,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                     sent = IERC20(tokenAddr).transfer(to, amount);
                 }
                 if (!sent) {
-                    balancesToWithdraw[to][tokenId] += amount;
+                    balancesToWithdraw[to][tokenId].balanceToWithdraw += amount;
                 }
             }
         }
@@ -151,7 +151,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             uint64 id = firstPriorityRequestId + i;
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
                 ( , Operations.Deposit memory op) = Operations.readDepositPubdata(priorityRequests[id].pubData, 0);
-                balancesToWithdraw[op.owner][op.tokenId] += op.amount;
+                balancesToWithdraw[op.owner][op.tokenId].balanceToWithdraw += op.amount;
             }
             delete priorityRequests[id];
         }
@@ -246,6 +246,12 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         });
         bytes memory pubData = Operations.writeFullExitPubdata(op);
         addPriorityRequest(Operations.OpType.FullExit, pubData);
+
+        // User must fill storage slot of balancesToWithdraw[msg.sender][tokenId] with nonzero value
+        // In this case operator should just overwrite this slot
+        balancesToWithdraw[msg.sender][tokenId].gagValue = 0xff;
+
+        makePendingWithdrawalsSlotsNonzero(3);
     }
 
     /// @notice Register deposit request - pack pubdata, add priority request and emit OnchainDeposit event
@@ -280,8 +286,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _token - token by id
     /// @param _amount - token amount
     function registerSingleWithdrawal(uint16 _token, uint128 _amount) internal {
-        require(balancesToWithdraw[msg.sender][_token] >= _amount, "frw11"); // insufficient balance withdraw
-        balancesToWithdraw[msg.sender][_token] -= _amount;
+        require(balancesToWithdraw[msg.sender][_token].balanceToWithdraw >= _amount, "frw11"); // insufficient balance withdraw
+        balancesToWithdraw[msg.sender][_token].balanceToWithdraw -= _amount;
         emit OnchainWithdrawal(
             msg.sender,
             _token,
@@ -626,9 +632,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _amount Token amount
     /// @param _pendingWithdrawalIndex Index of pending withdrawal
     function storeWithdrawalAsPending(address _to, uint16 _tokenId, uint128 _amount, uint32 _pendingWithdrawalIndex) internal {
-        pendingWithdrawals[_pendingWithdrawalIndex] = PendingWithdrawal(_to, _tokenId);
+        pendingWithdrawals[_pendingWithdrawalIndex] = PendingWithdrawal(_to, _tokenId, 0xff);
 
-        balancesToWithdraw[_to][_tokenId] += _amount;
+        balancesToWithdraw[_to][_tokenId].balanceToWithdraw += _amount;
     }
 
     /// @notice Checks whether oldest unverified block has expired
@@ -703,7 +709,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         require(exited[msg.sender][_tokenId] == false, "fet12"); // already exited
         require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
 
-        balancesToWithdraw[msg.sender][_tokenId] += _amount;
+        balancesToWithdraw[msg.sender][_tokenId].balanceToWithdraw += _amount;
         exited[msg.sender][_tokenId] = true;
     }
 

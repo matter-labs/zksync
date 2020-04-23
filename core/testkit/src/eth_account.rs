@@ -318,7 +318,7 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .compat()
             .await
-            .map(u256_to_big_dec)
+            .map(|a: (U256, U256)| u256_to_big_dec(a.0))
             .map_err(|e| format_err!("Contract query fail: {}", e))?)
     }
 

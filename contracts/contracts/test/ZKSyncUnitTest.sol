@@ -10,7 +10,7 @@ contract ZKSyncUnitTest is FranklinTest {
     }
 
     function setBalanceToWithdraw(address _owner, uint16 _token, uint128 _amount) external {
-        balancesToWithdraw[_owner][_token] = _amount;
+        balancesToWithdraw[_owner][_token].balanceToWithdraw = _amount;
     }
 
     function receiveETH() payable external{}

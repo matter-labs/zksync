@@ -25,19 +25,41 @@ contract Storage {
     /// @notice Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
     Governance internal governance;
 
+    struct BalanceToWithdraw {
+        uint128 balanceToWithdraw;
+        uint8 gagValue; // gives user opportunity to fill storage slot with nonzero value
+    }
+
     /// @notice Root-chain balances (per owner and token id) to withdraw
-    mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
+    mapping(address => mapping(uint16 => BalanceToWithdraw)) public balancesToWithdraw;
 
     /// @notice verified withdrawal pending to be executed.
     struct PendingWithdrawal {
         address to;
         uint16 tokenId;
+        uint8 gagValue; // gives user opportunity to fill storage slot with nonzero value
     }
     
     /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index)
     mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
     uint32 public firstPendingWithdrawalIndex;
     uint32 public numberOfPendingWithdrawals;
+
+    /// @notice maximum id of PendingWithdrawal which storage slot is nonzero
+    uint32 lastNonzeroPendingWithdrawalId;
+
+    /// @notice fills following storage slots in pendingWithdrawals mapping with nonzero value
+    /// @param _n number of slots to fill
+    function makePendingWithdrawalsSlotsNonzero(uint32 _n) public {
+        uint32 startIndex = lastNonzeroPendingWithdrawalId;
+        if (startIndex < firstPendingWithdrawalIndex + numberOfPendingWithdrawals) {
+            startIndex = firstPendingWithdrawalIndex + numberOfPendingWithdrawals;
+        }
+        for (uint32 i = 0; i < _n; i++) {
+            pendingWithdrawals[startIndex + i].gagValue = 0xff;
+        }
+        lastNonzeroPendingWithdrawalId = startIndex + _n;
+    }
 
     /// @notice Total number of verified blocks i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
     uint32 public totalBlocksVerified;
