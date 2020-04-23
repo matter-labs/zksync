@@ -242,48 +242,6 @@ pub fn spawn_state_keeper(
     )
 }
 
-fn basic_operations_full_exit(
-    token: u16,
-    test_setup: &mut TestSetup,
-) -> Result<(), failure::Error> {
-    let balance_to_withdraw_before_full_exit =
-        test_setup.get_balance_to_withdraw(ETHAccountId(0), Token(token));
-    let expected_diff = test_setup.get_expected_zksync_account_balance(ZKSyncAccountId(1), token);
-
-    test_setup.start_block();
-    test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
-    test_setup
-        .execute_commit_and_verify_block()
-        .expect("Block execution failed");
-
-    let balance_to_withdraw_after_full_exit =
-        test_setup.get_balance_to_withdraw(ETHAccountId(0), Token(token));
-
-    let actual_diff = &balance_to_withdraw_after_full_exit - &balance_to_withdraw_before_full_exit;
-    let valid_full_exit = if actual_diff == expected_diff {
-        let balance_after =
-            test_setup.get_expected_zksync_account_balance(ZKSyncAccountId(1), token);
-        balance_after == 0.into()
-    } else {
-        false
-    };
-
-    if !valid_full_exit {
-        println!(
-            "Balance to withdraw before :: {:?}, after :: {:?}, expected diff :: {:?}",
-            balance_to_withdraw_before_full_exit,
-            balance_to_withdraw_after_full_exit,
-            expected_diff
-        );
-        println!(
-            "Balance after :: {:?}, ",
-            test_setup.get_expected_zksync_account_balance(ZKSyncAccountId(1), token)
-        );
-        bail!("Full exit check failed")
-    }
-    Ok(())
-}
-
 pub fn perform_basic_operations(
     token: u16,
     test_setup: &mut TestSetup,
@@ -379,7 +337,11 @@ pub fn perform_basic_operations(
         .expect("Block execution failed");
     println!("Transfer test success, token_id: {}", token);
 
-    basic_operations_full_exit(token, test_setup).expect("Full exit failed");
+    test_setup.start_block();
+    test_setup.full_exit(ETHAccountId(0), ZKSyncAccountId(1), Token(token));
+    test_setup
+        .execute_commit_and_verify_block()
+        .expect("Block execution failed");
     println!("Full exit test success, token_id: {}", token);
 }
 
@@ -632,9 +594,16 @@ impl TestSetup {
             *self.tokens.get(&token.0).expect("Token does not exist")
         };
 
+        let zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
         self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((from, token.0), BigDecimal::from(0));
+
+        let mut post_by_eth_balance = self.get_expected_eth_account_balance(post_by, token.0);
+        post_by_eth_balance.0 += zksync0_old;
+        self.expected_changes_for_current_block
+            .eth_accounts_state
+            .insert((post_by, token.0), post_by_eth_balance);
 
         if let Some(mut eth_balance) = self
             .expected_changes_for_current_block
@@ -723,7 +692,6 @@ impl TestSetup {
 
         let mut to_eth_balance = self.get_expected_eth_account_balance(to, token.0);
         to_eth_balance.0 += &amount;
-        to_eth_balance.0 += &self.get_balance_to_withdraw(to, token);
         self.expected_changes_for_current_block
             .eth_accounts_state
             .insert((to, token.0), to_eth_balance);
@@ -844,12 +812,13 @@ impl TestSetup {
 
     fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigDecimal {
         let account = &self.accounts.eth_accounts[eth_account_id.0];
-        if token == 0 {
+        let result = if token == 0 {
             block_on(account.eth_balance()).expect("Failed to get eth balance")
         } else {
             block_on(account.erc20_balance(&self.tokens[&token]))
                 .expect("Failed to get erc20 balance")
-        }
+        };
+        result + self.get_balance_to_withdraw(eth_account_id, Token(token))
     }
 
     pub fn get_balance_to_withdraw(
