@@ -17,6 +17,10 @@ services:
     - type: bind
       source: ./volumes/geth
       target: /var/lib/geth/data
+  dev-ticker:
+    image: "matterlabs/dev-ticker:latest"
+    ports:
+      - "9876:9876"
   tesseracts:
     image: "adria0/tesseracts"
     command: --cfg /tesseracts.toml -vvv

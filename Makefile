@@ -3,6 +3,7 @@ export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
+export DEV_TICKER_DOCKER_IMAGE ?= matterlabs/dev-ticker:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
 
 # Getting started
@@ -295,13 +296,13 @@ nodes:
 # Dev environment
 
 dev-up:
-	@docker-compose up -d postgres geth
+	@docker-compose up -d postgres geth dev-ticker
 	@docker-compose up -d tesseracts
 
 
 dev-down:
 	@docker-compose stop tesseracts
-	@docker-compose stop postgres geth
+	@docker-compose stop postgres geth dev-ticker
 
 geth-up: geth
 	@docker-compose up geth
@@ -314,6 +315,12 @@ dev-build-geth:
 
 dev-push-geth:
 	@docker push "${GETH_DOCKER_IMAGE}"
+
+image-dev-ticker:
+	@docker build -t "${DEV_TICKER_DOCKER_IMAGE}" ./docker/dev-ticker
+
+push-image-dev-ticker: image-dev-ticker
+	@docker push "${DEV_TICKER_DOCKER_IMAGE}"
 
 # Data Restore
 
