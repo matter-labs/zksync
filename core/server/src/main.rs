@@ -6,15 +6,17 @@ use clap::{App, Arg};
 // Workspace uses
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use models::config_options::ConfigurationOptions;
-use models::node::config::{PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL};
+use models::node::config::{
+    OBSERVER_MODE_PULL_INTERVAL, PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL,
+};
 use server::api_server::start_api_server;
 use server::block_proposer::run_block_proposer_task;
 use server::committer::run_committer;
-use server::eth_sender;
 use server::eth_watch::start_eth_watch;
 use server::mempool::run_mempool_task;
 use server::prover_server::start_prover_server;
-use server::state_keeper::{start_state_keeper, PlasmaStateInitParams, PlasmaStateKeeper};
+use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
+use server::{eth_sender, leader_election, observer_mode};
 use std::cell::RefCell;
 use std::time::Duration;
 use storage::ConnectionPool;
@@ -26,7 +28,7 @@ fn main() {
 
     let config_opts = ConfigurationOptions::from_env();
 
-    let cli = App::new("Franklin operator node")
+    let cli = App::new("zkSync operator node")
         .author("Matter Labs")
         .arg(
             Arg::with_name("genesis")
@@ -66,6 +68,30 @@ fn main() {
         );
     }
 
+    // Start observing the state and try to become leader.
+    let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
+    let (observed_state_tx, observed_state_rx) = std::sync::mpsc::channel();
+    let conn_pool_clone = connection_pool.clone();
+    let jh = std::thread::Builder::new()
+        .name("Observer mode".to_owned())
+        .spawn(move || {
+            let state = observer_mode::run(
+                conn_pool_clone.clone(),
+                OBSERVER_MODE_PULL_INTERVAL,
+                stop_observer_mode_rx,
+            );
+            observed_state_tx.send(state).expect("unexpected failure");
+        })
+        .expect("failed to start observer mode");
+    leader_election::keep_voting_to_be_leader(
+        config_opts.replica_name.clone(),
+        connection_pool.clone(),
+    )
+    .expect("voting for leader fail");
+    stop_observer_mode_tx.send(()).expect("unexpected failure");
+    let observer_mode_final_state = observed_state_rx.recv().expect("unexpected failure");
+    jh.join().unwrap();
+
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
 
@@ -98,7 +124,7 @@ fn main() {
     let (executed_tx_notify_sender, executed_tx_notify_receiver) = mpsc::channel(256);
     let (mempool_request_sender, mempool_request_receiver) = mpsc::channel(256);
     let state_keeper = PlasmaStateKeeper::new(
-        PlasmaStateInitParams::restore_from_db(connection_pool.clone()),
+        observer_mode_final_state.state_keeper_init,
         config_opts.operator_franklin_addr,
         state_keeper_req_receiver,
         proposed_blocks_sender,
@@ -140,6 +166,8 @@ fn main() {
         Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
         Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
         stop_signal_sender,
+        observer_mode_final_state.circuit_acc_tree,
+        observer_mode_final_state.circuit_tree_block,
     );
 
     run_mempool_task(

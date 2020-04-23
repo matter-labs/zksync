@@ -1,12 +1,10 @@
 // External imports
-use chrono::prelude::*;
 use diesel::sql_types::{BigInt, Bool, Int4, Jsonb, Nullable, Text};
 use serde_derive::{Deserialize, Serialize};
 use serde_json::value::Value;
 // Workspace imports
 // Local imports
 use crate::prover::records::ProverRun;
-use crate::schema::*;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AccountTransaction {
@@ -16,24 +14,6 @@ pub struct AccountTransaction {
     pub fail_reason: Option<String>,
     pub committed: bool,
     pub verified: bool,
-}
-
-#[derive(Debug, Insertable)]
-#[table_name = "mempool"]
-pub struct InsertTx {
-    pub hash: Vec<u8>,
-    pub primary_account_address: Vec<u8>,
-    pub nonce: i64,
-    pub tx: Value,
-}
-
-#[derive(Debug, Queryable)]
-pub struct ReadTx {
-    pub hash: Vec<u8>,
-    pub primary_account_address: Vec<u8>,
-    pub nonce: i64,
-    pub tx: Value,
-    pub created_at: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, QueryableByName)]
@@ -71,14 +51,14 @@ pub struct TxReceiptResponse {
 }
 
 // TODO: jazzandrock add more info(?)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PriorityOpReceiptResponse {
     pub committed: bool,
     pub verified: bool,
     pub prover_run: Option<ProverRun>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Queryable, QueryableByName)]
+#[derive(Debug, Serialize, Deserialize, Queryable, QueryableByName, Clone)]
 pub struct TxByHashResponse {
     #[sql_type = "Text"]
     pub tx_type: String, // all

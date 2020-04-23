@@ -78,6 +78,7 @@ impl EthSenderOptions {
 
 #[derive(Debug, Clone)]
 pub struct ConfigurationOptions {
+    pub replica_name: String,
     pub rest_api_server_address: SocketAddr,
     pub json_rpc_http_server_address: SocketAddr,
     pub json_rpc_ws_server_address: SocketAddr,
@@ -94,6 +95,7 @@ pub struct ConfigurationOptions {
     pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
     pub confirmations_for_eth_event: u64,
+    pub api_requests_caches_size: usize,
 }
 
 impl ConfigurationOptions {
@@ -101,6 +103,7 @@ impl ConfigurationOptions {
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
         Self {
+            replica_name: parse_env("SERVER_REPLICA_NAME"),
             rest_api_server_address: parse_env("REST_API_BIND"),
             json_rpc_http_server_address: parse_env("HTTP_RPC_API_BIND"),
             json_rpc_ws_server_address: parse_env("WS_API_BIND"),
@@ -117,6 +120,7 @@ impl ConfigurationOptions {
             tx_batch_size: parse_env("TX_BATCH_SIZE"),
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
+            api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
         }
     }
 }
