@@ -47,6 +47,7 @@ pub fn start_api_server(
         config_options.contract_eth_addr,
         mempool_request_sender.clone(),
         panic_notify.clone(),
+        config_options.api_requests_caches_size,
     );
     rpc_subscriptions::start_ws_server(
         op_notify_receiver,
@@ -57,6 +58,7 @@ pub fn start_api_server(
         state_keeper_request_sender.clone(),
         sign_check_sender.clone(),
         panic_notify.clone(),
+        config_options.api_requests_caches_size,
     );
 
     rpc_server::start_rpc_server(
@@ -66,5 +68,6 @@ pub fn start_api_server(
         state_keeper_request_sender,
         sign_check_sender,
         panic_notify,
+        config_options.api_requests_caches_size,
     );
 }
