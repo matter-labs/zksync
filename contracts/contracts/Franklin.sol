@@ -203,7 +203,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _token Token address
     /// @param _amount Token amount
     /// @param _franklinAddr Receiver Layer 2 address
-    function depositERC20(address _token, uint128 _amount, address _franklinAddr) external payable {
+    function depositERC20(address _token, uint128 _amount, address _franklinAddr) external {
         requireActive();
 
         // Get token id by its address
@@ -226,7 +226,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @notice Register full exit request - pack pubdata, add priority request
     /// @param _accountId Numerical id of the account
     /// @param _token Token address, 0 address for ether
-    function fullExit (uint24 _accountId, address _token) external payable {
+    function fullExit (uint24 _accountId, address _token) external {
         requireActive();
 
         uint16 tokenId;
