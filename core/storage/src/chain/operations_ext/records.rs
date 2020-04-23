@@ -55,7 +55,7 @@ pub struct TxReceiptResponse {
 }
 
 // TODO: jazzandrock add more info(?)
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PriorityOpReceiptResponse {
     pub committed: bool,
     pub verified: bool,
