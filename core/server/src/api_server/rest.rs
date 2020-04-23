@@ -337,11 +337,11 @@ fn handle_get_account_transactions(
 
 fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
-    request_path: web::Path<(Address, i64, i64)>,
+    request_path: web::Path<(Address, u64, u64)>,
 ) -> ActixResult<HttpResponse> {
     let (address, offset, limit) = request_path.into_inner();
 
-    const MAX_LIMIT: i64 = 100;
+    const MAX_LIMIT: u64 = 100;
     if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
