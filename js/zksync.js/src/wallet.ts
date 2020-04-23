@@ -437,7 +437,6 @@ export class Wallet {
                     deposit.depositTo,
                     {
                         gasLimit: utils.bigNumberify("250000"),
-                        value: 0,
                         nonce: approveTx.nonce + 1,
                         gasPrice,
                         ...deposit.ethTxOptions
@@ -453,7 +452,6 @@ export class Wallet {
                     deposit.depositTo,
                     {
                         gasLimit: utils.bigNumberify("250000"),
-                        value: 0,
                         gasPrice,
                         ...deposit.ethTxOptions
                     }
@@ -502,7 +500,6 @@ export class Wallet {
             tokenAddress,
             {
                 gasLimit: utils.bigNumberify("500000"),
-                value: 0,
                 gasPrice,
                 ...withdraw.ethTxOptions
             }
