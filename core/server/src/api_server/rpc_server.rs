@@ -292,6 +292,7 @@ impl RpcApp {
                 .find_block_by_height_or_hash(block_number.to_string());
 
             if let Some(block) = block.clone() {
+                // Unverified blocks can still change, so we can't cache them.
                 if block.verified_at.is_some() {
                     self.cache_of_blocks_info.insert(block_number, block);
                 }

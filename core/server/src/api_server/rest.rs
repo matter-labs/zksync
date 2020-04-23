@@ -119,6 +119,7 @@ impl AppState {
                     .unwrap_or(None);
 
                 if let Some(tx_receipt) = tx_receipt.clone() {
+                    // Unverified blocks can still change, so we can't cache them.
                     if tx_receipt.verified {
                         self.cache_of_transaction_receipts
                             .insert(transaction_hash, tx_receipt);
@@ -144,6 +145,7 @@ impl AppState {
                 .get_priority_op_receipt(id)
                 .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
+            // Unverified blocks can still change, so we can't cache them.
             if receipt.verified {
                 self.cache_of_priority_op_receipts
                     .insert(id, receipt.clone());
@@ -170,6 +172,7 @@ impl AppState {
 
             if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1)
             {
+                // Unverified blocks can still change, so we can't cache them.
                 if !block_details.is_empty() && block_details[0].verified_at.is_some() {
                     self.cache_of_block_executed_ops
                         .insert(block_id, executed_ops.clone());
