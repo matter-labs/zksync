@@ -214,34 +214,34 @@ impl<'a> BlockSchema<'a> {
         // - collects the {limit} blocks in the descending order with the data gathered above.
         let query = format!(
             " \
-             with eth_ops as ( \
-             select \
-             operations.block_number, \
-             eth_tx_hashes.tx_hash, \
-             operations.action_type, \
-             operations.created_at \
-             from operations \
-             left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
-             left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
-             ) \
-             select \
-             DISTINCT blocks.number as block_number, \
-             blocks.root_hash as new_state_root, \
-             blocks.block_size as block_size, \
-             committed.tx_hash as commit_tx_hash, \
-             verified.tx_hash as verify_tx_hash, \
-             committed.created_at as committed_at, \
-             verified.created_at as verified_at \
-             from blocks \
-             inner join eth_ops committed on \
-             committed.block_number = blocks.number and committed.action_type = 'COMMIT' \
-             left join eth_ops verified on \
-             verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
-             where \
-             blocks.number <= {max_block} \
-             order by blocks.number desc \
-             limit {limit}; \
-             ",
+            with eth_ops as ( \
+                select \
+                    operations.block_number, \
+                    eth_tx_hashes.tx_hash, \
+                    operations.action_type, \
+                    operations.created_at \
+                from operations \
+                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
+            ) \
+            select \
+                DISTINCT blocks.number as block_number, \
+                blocks.root_hash as new_state_root, \
+                blocks.block_size as block_size, \
+                committed.tx_hash as commit_tx_hash, \
+                verified.tx_hash as verify_tx_hash, \
+                committed.created_at as committed_at, \
+                verified.created_at as verified_at \
+            from blocks \
+            inner join eth_ops committed on \
+                committed.block_number = blocks.number and committed.action_type = 'COMMIT' \
+            left join eth_ops verified on \
+                verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
+            where \
+                blocks.number <= {max_block} \
+            order by blocks.number desc \
+            limit {limit}; \
+            ",
             max_block = i64::from(max_block),
             limit = i64::from(limit)
         );
@@ -280,10 +280,10 @@ impl<'a> BlockSchema<'a> {
         if let Some(hex_query) = self.try_parse_hex(&query) {
             let hash_lookup = format!(
                 " \
-                 or committed.tx_hash = decode('{hex_query}', 'hex') \
-                 or verified.tx_hash = decode('{hex_query}', 'hex') \
-                 or blocks.root_hash = decode('{hex_query}', 'hex') \
-                 ",
+                or committed.tx_hash = decode('{hex_query}', 'hex') \
+                or verified.tx_hash = decode('{hex_query}', 'hex') \
+                or blocks.root_hash = decode('{hex_query}', 'hex') \
+                ",
                 hex_query = hex_query
             );
 
@@ -316,34 +316,34 @@ impl<'a> BlockSchema<'a> {
         //   + query equals to the number of the block.
         let sql_query = format!(
             " \
-             with eth_ops as ( \
-             select \
-             operations.block_number, \
-             eth_tx_hashes.tx_hash, \
-             operations.action_type, \
-             operations.created_at \
-             from operations \
-             left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
-             left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
-             ) \
-             select \
-             blocks.number as block_number, \
-             blocks.root_hash as new_state_root, \
-             blocks.block_size as block_size, \
-             committed.tx_hash as commit_tx_hash, \
-             verified.tx_hash as verify_tx_hash, \
-             committed.created_at as committed_at, \
-             verified.created_at as verified_at \
-             from blocks \
-             inner join eth_ops committed on \
-             committed.block_number = blocks.number and committed.action_type = 'COMMIT' \
-             left join eth_ops verified on \
-             verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
-             where false \
-             {where_condition} \
-             order by blocks.number desc \
-             limit 1; \
-             ",
+            with eth_ops as ( \
+                select \
+                    operations.block_number, \
+                    eth_tx_hashes.tx_hash, \
+                    operations.action_type, \
+                    operations.created_at \
+                from operations \
+                    left join eth_ops_binding on eth_ops_binding.op_id = operations.id \
+                    left join eth_tx_hashes on eth_tx_hashes.eth_op_id = eth_ops_binding.eth_op_id \
+            ) \
+            select \
+                blocks.number as block_number, \
+                blocks.root_hash as new_state_root, \
+                blocks.block_size as block_size, \
+                committed.tx_hash as commit_tx_hash, \
+                verified.tx_hash as verify_tx_hash, \
+                committed.created_at as committed_at, \
+                verified.created_at as verified_at \
+            from blocks \
+            inner join eth_ops committed on \
+                committed.block_number = blocks.number and committed.action_type = 'COMMIT' \
+            left join eth_ops verified on \
+                verified.block_number = blocks.number and verified.action_type = 'VERIFY' \
+            where false \
+                {where_condition} \
+            order by blocks.number desc \
+            limit 1; \
+            ",
             where_condition = where_condition
         );
 
