@@ -11,6 +11,9 @@ use futures::{
 use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
+use storage::chain::block::records::BlockDetails;
+use storage::chain::operations::records::StoredExecutedPriorityOperation;
+use storage::chain::operations_ext::records::TxReceiptResponse;
 use web3::types::Address;
 // Workspace uses
 use models::{
@@ -28,6 +31,7 @@ use crate::{
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
+    utils::shared_lru_cache::SharedLruCache,
     utils::token_db_cache::TokenDBCache,
 };
 
@@ -171,6 +175,9 @@ pub trait Rpc {
 }
 
 pub struct RpcApp {
+    cache_of_executed_priority_operations: SharedLruCache<u32, StoredExecutedPriorityOperation>,
+    cache_of_blocks_info: SharedLruCache<i64, BlockDetails>,
+    cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub connection_pool: ConnectionPool,
@@ -184,10 +191,14 @@ impl RpcApp {
         mempool_request_sender: mpsc::Sender<MempoolRequest>,
         state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        api_requests_caches_size: usize,
     ) -> Self {
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
         RpcApp {
+            cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
+            cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
+            cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
             connection_pool,
             mempool_request_sender,
             state_keeper_request_sender,
@@ -242,6 +253,80 @@ impl RpcApp {
         self.connection_pool
             .access_storage_fragile()
             .map_err(|_| Error::internal_error())
+    }
+
+    // cache access functions
+    fn get_executed_priority_operation(
+        &self,
+        serial_id: u32,
+    ) -> Result<Option<StoredExecutedPriorityOperation>> {
+        let res =
+            if let Some(executed_op) = self.cache_of_executed_priority_operations.get(&serial_id) {
+                Some(executed_op)
+            } else {
+                let storage = self.access_storage()?;
+                let executed_op = storage
+                    .chain()
+                    .operations_schema()
+                    .get_executed_priority_operation(serial_id)
+                    .map_err(|_| Error::internal_error())?;
+
+                if let Some(executed_op) = executed_op.clone() {
+                    self.cache_of_executed_priority_operations
+                        .insert(serial_id, executed_op);
+                }
+
+                executed_op
+            };
+        Ok(res)
+    }
+
+    fn get_block_info(&self, block_number: i64) -> Result<Option<BlockDetails>> {
+        let res = if let Some(block) = self.cache_of_blocks_info.get(&block_number) {
+            Some(block)
+        } else {
+            let storage = self.access_storage()?;
+            let block = storage
+                .chain()
+                .block_schema()
+                .find_block_by_height_or_hash(block_number.to_string());
+
+            if let Some(block) = block.clone() {
+                // Unverified blocks can still change, so we can't cache them.
+                if block.verified_at.is_some() {
+                    self.cache_of_blocks_info.insert(block_number, block);
+                }
+            }
+
+            block
+        };
+        Ok(res)
+    }
+
+    fn get_tx_receipt(&self, tx_hash: TxHash) -> Result<Option<TxReceiptResponse>> {
+        let res = if let Some(tx_receipt) = self
+            .cache_of_transaction_receipts
+            .get(&tx_hash.as_ref().to_vec())
+        {
+            Some(tx_receipt)
+        } else {
+            let storage = self.access_storage()?;
+            let tx_receipt = storage
+                .chain()
+                .operations_ext_schema()
+                .tx_receipt(tx_hash.as_ref())
+                .map_err(|_| Error::internal_error())?;
+
+            if let Some(tx_receipt) = tx_receipt.clone() {
+                if tx_receipt.verified {
+                    self.cache_of_transaction_receipts
+                        .insert(tx_hash.as_ref().to_vec(), tx_receipt);
+                }
+            }
+
+            tx_receipt
+        };
+        Ok(res)
     }
 }
 
@@ -310,17 +395,9 @@ impl Rpc for RpcApp {
     }
 
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
-        let storage = self.access_storage()?;
-        let executed_op = storage
-            .chain()
-            .operations_schema()
-            .get_executed_priority_operation(serial_id)
-            .map_err(|_| Error::internal_error())?;
+        let executed_op = self.get_executed_priority_operation(serial_id)?;
         Ok(if let Some(executed_op) = executed_op {
-            let block = storage
-                .chain()
-                .block_schema()
-                .find_block_by_height_or_hash(executed_op.block_number.to_string());
+            let block = self.get_block_info(executed_op.block_number)?;
             ETHOpInfoResp {
                 executed: true,
                 block: Some(BlockInfo {
@@ -338,12 +415,7 @@ impl Rpc for RpcApp {
     }
 
     fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
-        let storage = self.access_storage()?;
-        let stored_receipt = storage
-            .chain()
-            .operations_ext_schema()
-            .tx_receipt(tx_hash.as_ref())
-            .map_err(|_| Error::internal_error())?;
+        let stored_receipt = self.get_tx_receipt(tx_hash)?;
         Ok(if let Some(stored_receipt) = stored_receipt {
             TransactionInfoResp {
                 executed: true,
@@ -459,6 +531,7 @@ pub fn start_rpc_server(
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
+    api_requests_caches_size: usize,
 ) {
     std::thread::Builder::new()
         .name("json_rpc_http".to_string())
@@ -471,6 +544,7 @@ pub fn start_rpc_server(
                 mempool_request_sender,
                 state_keeper_request_sender,
                 sign_verify_request_sender,
+                api_requests_caches_size,
             );
             rpc_app.extend(&mut io);
 
