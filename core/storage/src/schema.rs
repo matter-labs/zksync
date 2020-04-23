@@ -108,13 +108,6 @@ table! {
 }
 
 table! {
-    eth_nonce (id) {
-        id -> Bool,
-        nonce -> Int8,
-    }
-}
-
-table! {
     eth_operations (id) {
         id -> Int8,
         nonce -> Int8,
@@ -136,8 +129,10 @@ table! {
 }
 
 table! {
-    eth_stats (id) {
+    eth_parameters (id) {
         id -> Bool,
+        nonce -> Int8,
+        gas_price_limit -> Int8,
         commit_ops -> Int8,
         verify_ops -> Int8,
         withdraw_ops -> Int8,
@@ -256,10 +251,9 @@ allow_tables_to_appear_in_same_query!(
     data_restore_last_watched_eth_block,
     data_restore_rollup_ops,
     data_restore_storage_state_update,
-    eth_nonce,
     eth_operations,
     eth_ops_binding,
-    eth_stats,
+    eth_parameters,
     eth_tx_hashes,
     executed_priority_operations,
     executed_transactions,
