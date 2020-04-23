@@ -201,9 +201,9 @@ impl Transfer {
     pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
         format!(
             "Transfer {amount} {token}\n\
-             To: {to:?}\n\
-             Nonce: {nonce}\n\
-             Fee: {fee} {token}",
+            To: {to:?}\n\
+            Nonce: {nonce}\n\
+            Fee: {fee} {token}",
             amount = format_ether(&self.amount),
             token = token_symbol,
             to = self.to,
@@ -315,9 +315,9 @@ impl Withdraw {
     pub fn get_ethereum_sign_message(&self, token_symbol: &str) -> String {
         format!(
             "Withdraw {amount} {token}\n\
-             To: {to:?}\n\
-             Nonce: {nonce}\n\
-             Fee: {fee} {token}",
+            To: {to:?}\n\
+            Nonce: {nonce}\n\
+            Fee: {fee} {token}",
             amount = format_ether(&self.amount),
             token = token_symbol,
             to = self.to,
@@ -957,7 +957,7 @@ mod test {
             ("0x8a91dc2d28b689474298d91899f0c1baf62cb85b", "0x", "0xd98f51c2ee0fd589e421348002dffec5d1b38e5bef9a41a699030456dc39298d12698158dc2a814b5f9ac6d433009dec87484a4579107be3f8f33907e92938291b"),
             // this example has v = 28, unlike others
             ("0x8a91dc2d28b689474298d91899f0c1baf62cb85b", "0x14", "0xd288b623af654c9d805e132812edf09ce244040376ca49112e91d437ecceed7c518690d4ae14149cd533f1ca4f081e6d2252c980fccc63de4d6bb818f1b668921c"),
-            ];
+        ];
 
         for (address, msg, signature) in examples {
             println!("addr: {}, msg: {}, sign: {}", address, msg, signature);
