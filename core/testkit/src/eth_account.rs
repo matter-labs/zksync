@@ -1,6 +1,6 @@
-use crate::external_commands::get_revert_reason;
 use bigdecimal::BigDecimal;
 use eth_client::ETHClient;
+use ethabi::ParamType;
 use failure::{ensure, format_err};
 use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
@@ -13,8 +13,10 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
 use web3::contract::{Contract, Options};
-use web3::types::{TransactionReceipt, H256, U128, U256, U64};
-use web3::Transport;
+use web3::types::{
+    BlockNumber, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
+};
+use web3::{Transport, Web3};
 
 const WEB3_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
@@ -174,7 +176,7 @@ impl<T: Transport> EthereumAccount<T> {
             .await
             .map_err(|e| format_err!("Exit wait confirm err: {}", e))?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     pub async fn cancel_outstanding_deposits_for_exodus_mode(
@@ -204,7 +206,7 @@ impl<T: Transport> EthereumAccount<T> {
                 )
             })?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     pub async fn change_pubkey_priority_op(
@@ -424,7 +426,7 @@ impl<T: Transport> EthereumAccount<T> {
             .await
             .map_err(|e| format_err!("Commit block confirm err: {}", e))?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     // Verifies block using empty proof. (`DUMMY_VERIFIER` should be enabled on the contract).
@@ -445,7 +447,7 @@ impl<T: Transport> EthereumAccount<T> {
             .compat()
             .await
             .map_err(|e| format_err!("Verify block confirm err: {}", e))?;
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     // Completes pending withdrawals.
@@ -468,7 +470,7 @@ impl<T: Transport> EthereumAccount<T> {
             .await
             .map_err(|e| format_err!("Complete withdrawals confirm err: {}", e))?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     pub async fn trigger_exodus_if_needed(&self) -> Result<ETHExecResult, failure::Error> {
@@ -485,7 +487,7 @@ impl<T: Transport> EthereumAccount<T> {
             .await
             .map_err(|e| format_err!("Trigger exodus if needed confirm err: {}", e))?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     pub async fn eth_block_number(&self) -> Result<u64, failure::Error> {
@@ -528,12 +530,13 @@ pub struct ETHExecResult {
 }
 
 impl ETHExecResult {
-    pub fn new(receipt: TransactionReceipt) -> Self {
+    pub async fn new<T: Transport>(receipt: TransactionReceipt, web3: &Web3<T>) -> Self {
         let (success, revert_reason) = if receipt.status == Some(U64::from(1)) {
             (true, String::from(""))
         } else {
-            let hash = format!("{:#?}", &receipt.transaction_hash);
-            let reason = get_revert_reason(&hash);
+            let reason = get_revert_reason(&receipt, web3)
+                .await
+                .expect("Failed to get revert reason");
             (false, reason)
         };
 
@@ -562,5 +565,58 @@ impl ETHExecResult {
         } else if self.revert_reason != code {
             panic!("Transaction failed with incorrect return code, expected: {}, found: {}, tx: 0x{:x}", code, self.revert_reason, self.receipt.transaction_hash);
         }
+    }
+}
+
+/// Gets revert reason of failed transactions (i.e. if contract executes `require(false, "msg")` this function returns "msg")
+async fn get_revert_reason<T: Transport>(
+    receipt: &TransactionReceipt,
+    web3: &Web3<T>,
+) -> Result<String, failure::Error> {
+    let tx = web3
+        .eth()
+        .transaction(TransactionId::Hash(receipt.transaction_hash))
+        .compat()
+        .await?;
+    if let Some(Transaction {
+        from,
+        to: Some(to),
+        gas,
+        gas_price,
+        value,
+        input,
+        ..
+    }) = tx
+    {
+        // To get revert reason we have to make call to contract using the same args as function.
+        let encoded_revert_reason = web3
+            .eth()
+            .call(
+                CallRequest {
+                    from: Some(from),
+                    to,
+                    gas: Some(gas),
+                    gas_price: Some(gas_price),
+                    value: Some(value),
+                    data: Some(input),
+                },
+                receipt.block_number.clone().map(BlockNumber::Number),
+            )
+            .compat()
+            .await?;
+        // This function returns ABI encoded retrun value for function with signature "Error(string)"
+        // we strip first 4 bytes because they encode function name "Error", the rest is encoded string.
+        let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
+        Ok(
+            ethabi::decode(&[ParamType::String], encoded_string_without_function_hash)
+                .map_err(|e| format_err!("ABI decode error {}", e))?
+                .into_iter()
+                .next()
+                .unwrap()
+                .to_string()
+                .unwrap(),
+        )
+    } else {
+        Ok("".to_string())
     }
 }
