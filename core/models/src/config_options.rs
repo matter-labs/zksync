@@ -78,6 +78,7 @@ impl EthSenderOptions {
 
 #[derive(Debug, Clone)]
 pub struct ConfigurationOptions {
+    pub replica_name: String,
     pub rest_api_server_address: SocketAddr,
     pub json_rpc_http_server_address: SocketAddr,
     pub json_rpc_ws_server_address: SocketAddr,
@@ -101,6 +102,7 @@ impl ConfigurationOptions {
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
         Self {
+            replica_name: parse_env("SERVER_REPLICA_NAME"),
             rest_api_server_address: parse_env("REST_API_BIND"),
             json_rpc_http_server_address: parse_env("HTTP_RPC_API_BIND"),
             json_rpc_ws_server_address: parse_env("WS_API_BIND"),
