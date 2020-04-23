@@ -212,7 +212,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         require(IERC20(_token).transferFrom(msg.sender, address(this), _amount), "fd012"); // token transfer failed deposit
 
         registerDeposit(tokenId, _amount, _franklinAddr);
-
     }
 
     /// @notice Withdraw ERC20 token to Layer 1 - register withdrawal and transfer ERC20 to sender
@@ -250,10 +249,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         // User must fill storage slot of balancesToWithdraw[msg.sender][tokenId] with nonzero value
         // In this case operator should just overwrite this slot
         balancesToWithdraw[msg.sender][tokenId].gasReserveValue = 0xff;
-
-        // User must reserve gas in pendingWithdrawals mapping storage slots with nonzero value
-        // In this case operator should just overwrite this slots
-        reserveGasForPendingWithdrawals(3);
     }
 
     /// @notice Register deposit request - pack pubdata, add priority request and emit OnchainDeposit event
@@ -429,15 +424,19 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
                     pubDataPtr += DEPOSIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.PartialExit)) {
+                    uint8 addToPendingWithdrawalsQueue = 0x01;
+
                     Operations.PartialExit memory data = Operations.readPartialExitPubdata(_publicData, pubdataOffset + 1);
-                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, data.owner, data.tokenId, data.amount));
+                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
 
                     pubDataPtr += PARTIAL_EXIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.FullExit)) {
+                    uint8 addToPendingWithdrawalsQueue = 0x00;
+
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
 
                     Operations.FullExit memory data = Operations.readFullExitPubdata(pubData, 0);
-                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, data.owner, data.tokenId, data.amount));
+                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
 
                     OnchainOperation memory onchainOp = OnchainOperation(
                         Operations.OpType.FullExit,
@@ -585,22 +584,20 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     {
         require(withdrawalsData.length % ONCHAIN_WITHDRAWAL_BYTES == 0, "pow11"); // pow11 - withdrawalData length is not multiple of ONCHAIN_WITHDRAWAL_BYTES
 
-        uint32 currentFirstPendingWithdrawalIndex = firstPendingWithdrawalIndex + numberOfPendingWithdrawals;
-        uint32 currentNumberOfPendingWithdrawals = 0;
         bytes32 withdrawalsDataHash = keccak256("");
 
         uint offset = 0;
         while (offset < withdrawalsData.length) {
-            (address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
-            storeWithdrawalAsPending(_to, _tokenId, _amount, currentFirstPendingWithdrawalIndex + currentNumberOfPendingWithdrawals);
-            currentNumberOfPendingWithdrawals++;
+            (uint8 addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
+            balancesToWithdraw[_to][_tokenId].balanceToWithdraw += _amount;
+            if (addToPendingWithdrawalsQueue == 0x01) {
+                storeWithdrawalAsPending(_to, _tokenId);
+            }
 
-            withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, _to, _tokenId, _amount));
+            withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, _to, _tokenId, _amount));
             offset += ONCHAIN_WITHDRAWAL_BYTES;
         }
         require(withdrawalsDataHash == expectedWithdrawalsDataHash, "pow12"); // pow12 - withdrawals data hash not matches with expected value
-
-        numberOfPendingWithdrawals += currentNumberOfPendingWithdrawals;
     }
 
     /// @notice Block verification.
@@ -631,12 +628,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @notice When block with withdrawals is verified we store them and complete in separate tx. Withdrawals can be complete by calling withdrawEth, withdrawERC20 or completeWithdrawals.
     /// @param _to Receiver
     /// @param _tokenId Token id
-    /// @param _amount Token amount
-    /// @param _pendingWithdrawalIndex Index of pending withdrawal
-    function storeWithdrawalAsPending(address _to, uint16 _tokenId, uint128 _amount, uint32 _pendingWithdrawalIndex) internal {
-        pendingWithdrawals[_pendingWithdrawalIndex] = PendingWithdrawal(_to, _tokenId, 0xff);
-
-        balancesToWithdraw[_to][_tokenId].balanceToWithdraw += _amount;
+    function storeWithdrawalAsPending(address _to, uint16 _tokenId) internal {
+        pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
+        numberOfPendingWithdrawals++;
     }
 
     /// @notice Checks whether oldest unverified block has expired

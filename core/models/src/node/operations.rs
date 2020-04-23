@@ -263,6 +263,7 @@ impl WithdrawOp {
 
     fn get_withdrawal_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
+        data.push(1); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
         data.extend_from_slice(self.tx.to.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&big_decimal_to_u128(&self.tx.amount).to_be_bytes());
@@ -455,6 +456,7 @@ impl FullExitOp {
 
     fn get_withdrawal_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
+        data.push(0); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
         data.extend_from_slice(self.priority_op.eth_address.as_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(

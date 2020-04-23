@@ -37,29 +37,12 @@ contract Storage {
     struct PendingWithdrawal {
         address to;
         uint16 tokenId;
-        uint8 gasReserveValue; // gives user opportunity to fill storage slot with nonzero value
     }
     
     /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index)
     mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
     uint32 public firstPendingWithdrawalIndex;
     uint32 public numberOfPendingWithdrawals;
-
-    /// @notice maximum id of PendingWithdrawal which storage slot is nonzero
-    uint32 lastNonzeroPendingWithdrawalId;
-
-    /// @notice fills following storage slots in pendingWithdrawals mapping with nonzero value
-    /// @param _n number of slots to fill
-    function reserveGasForPendingWithdrawals(uint32 _n) public {
-        uint32 startIndex = lastNonzeroPendingWithdrawalId;
-        if (startIndex < firstPendingWithdrawalIndex + numberOfPendingWithdrawals) {
-            startIndex = firstPendingWithdrawalIndex + numberOfPendingWithdrawals;
-        }
-        for (uint32 i = 0; i < _n; i++) {
-            pendingWithdrawals[startIndex + i].gasReserveValue = 0xff;
-        }
-        lastNonzeroPendingWithdrawalId = startIndex + _n;
-    }
 
     /// @notice Total number of verified blocks i.e. blocks[totalBlocksVerified] points at the latest verified block (block 0 is genesis)
     uint32 public totalBlocksVerified;

@@ -128,6 +128,11 @@ library Bytes {
         new_offset = _offset + _length;
     }
 
+    function readUint8(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint8 r) {
+        new_offset = _offset + 1;
+        r = uint8(_data[_offset]);
+    }
+
     function readUInt16(bytes memory _data, uint _offset) internal pure returns (uint new_offset, uint16 r) {
         bytes memory buf;
         (new_offset, buf) = read(_data, _offset, 2);

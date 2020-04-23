@@ -176,9 +176,10 @@ library Operations {
     // Withdrawal data process
 
     function readWithdrawalData(bytes memory _data, uint _offset) internal pure
-        returns (address _to, uint16 _tokenId, uint128 _amount)
+        returns (uint8 _addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount)
     {
         uint offset = _offset;
+        (offset, _addToPendingWithdrawalsQueue) = Bytes.readUint8(_data, offset);
         (offset, _to) = Bytes.readAddress(_data, offset);
         (offset, _tokenId) = Bytes.readUInt16(_data, offset);
         (offset, _amount) = Bytes.readUInt128(_data, offset);
