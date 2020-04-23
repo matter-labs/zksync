@@ -259,11 +259,14 @@ fn basic_operations_full_exit(
     let balance_to_withdraw_after_full_exit =
         test_setup.get_balance_to_withdraw(ETHAccountId(0), Token(token));
 
-    let mut valid_full_exit = &balance_to_withdraw_after_full_exit
-        - &balance_to_withdraw_before_full_exit
-        == expected_diff;
-    valid_full_exit &= test_setup.get_expected_zksync_account_balance(ZKSyncAccountId(1), token)
-        == BigDecimal::from(0);
+    let actual_diff = &balance_to_withdraw_after_full_exit - &balance_to_withdraw_before_full_exit;
+    let valid_full_exit = if actual_diff == expected_diff {
+        let balance_after =
+            test_setup.get_expected_zksync_account_balance(ZKSyncAccountId(1), token);
+        balance_after == 0.into()
+    } else {
+        false
+    };
 
     if !valid_full_exit {
         println!(
