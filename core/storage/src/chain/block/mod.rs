@@ -158,6 +158,7 @@ impl<'a> BlockSchema<'a> {
                     block_number, \
                     created_at \
                 from executed_transactions \
+                where block_number = {block} \
             ), priority_ops as ( \
                 select \
                     '0x' || encode(eth_hash, 'hex') as tx_hash, \
@@ -165,14 +166,14 @@ impl<'a> BlockSchema<'a> {
                     block_number, \
                     created_at \
                 from executed_priority_operations \
+                where block_number = {block} \
             ), everything as ( \
                 select * from transactions \
                 union all \
                 select * from priority_ops \
             ) \
             select * from everything \
-            where block_number = {block} \
-            order by created_at
+            order by created_at \
         ",
             block = block
         );

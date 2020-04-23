@@ -139,7 +139,7 @@ impl<'a> OperationsExtSchema<'a> {
         if let Some(tx) = query_result {
             let block_number = tx.block_number;
             let fail_reason = tx.fail_reason.clone();
-            let created_at = format!("{:?}", &tx.created_at);
+            let created_at = tx.created_at.format("%Y-%m-%dT%H:%M:%S%.6f").to_string();
             let operation = &tx.tx;
 
             let tx_token = operation["token"].as_i64().unwrap_or(-1);
@@ -209,7 +209,7 @@ impl<'a> OperationsExtSchema<'a> {
         if let Some(tx) = tx {
             let operation = tx.operation;
             let block_number = tx.block_number;
-            let created_at = format!("{:?}", &tx.created_at);
+            let created_at = tx.created_at.format("%Y-%m-%dT%H:%M:%S%.6f").to_string();
 
             let tx_type = operation["type"].as_str().unwrap_or("unknown type");
             let tx_token = operation["priority_op"]["token"]
