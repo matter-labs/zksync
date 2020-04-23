@@ -1,246 +1,283 @@
+---
 kind: pipeline
 type: docker
 name: tests
+
+platform:
+  os: linux
+  arch: amd64
+
 clone:
-    depth: 10
-volumes:
-  - name: cache
-    host:
-      path: /drone-cache
-services:
-  - name: geth
-    image: matterlabs/geth:latest
-  - name: postgres
-    image: postgres:10.4
-trigger:
-  event:
-  - pull_request
+  depth: 10
+
 steps:
 - name: restore-cache
   image: drillster/drone-volume-cache
+  settings:
+    mount:
+    - ./target/rust-ci-cache
+    - ./keys
+    restore: true
   volumes:
   - name: cache
     path: /cache
-  settings:
-    restore: true
-    mount:
-      - ./target/cargo
-      - ./keys
+
 - name: init
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
+  - zksync dummy-prover ensure-disabled
   depends_on:
   - restore-cache
+
+- name: rust-checks
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - cargo fmt -- --check
+  - f cargo clippy --tests --benches -- -D warnings
+  depends_on:
+  - init
+
+- name: rust-build
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - f cargo build --release --all-targets
+  - f cargo test --release --all-targets --no-run
+  - f cargo test --release -p prover --no-run
+  - f cargo test --release -p circuit --no-run
+  - pushd core/storage
+  - f cargo test --release -p storage --features "db_test" --no-run
+  - popd
+  - sccache --show-stats
+  depends_on:
+  - init
+
 - name: run-genesis
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync genesis
   depends_on:
-  - init
-- name: rust-tests-and-checks
+  - rust-build
+
+- name: circuit-rust-tests
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
-  - zksync dummy-prover ensure-disabled
   - zksync circuit-tests
+  depends_on:
+  - run-genesis
+
+- name: non-circuit-rust-tests
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
   - zksync prover-tests
   - zksync db-test
   - f cargo test --release
-  - cargo fmt -- --check
-  - f cargo clippy --tests --benches -- -D warnings
   depends_on:
   - run-genesis
+
 - name: build-contracts
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync build-contracts
   depends_on:
   - init
+
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync redeploy
   - zksync integration-testkit
   depends_on:
   - run-genesis
   - build-contracts
+
 - name: contract-test
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync test-contracts
   depends_on:
   - build-contracts
+
 - name: rebuild-cache
   image: drillster/drone-volume-cache
+  settings:
+    mount:
+    - ./target/rust-ci-cache
+    - ./keys
+    rebuild: true
   volumes:
   - name: cache
     path: /cache
-  settings:
-    rebuild: true
-    mount:
-      - ./target/cargo
-      - ./keys
   depends_on:
-     - redeploy-and-integration-testkit
-     - rust-tests-and-checks
+  - redeploy-and-integration-testkit
+  - circuit-rust-tests
+  - non-circuit-rust-tests
+
+services:
+- name: geth
+  image: matterlabs/geth:latest
+
+- name: postgres
+  image: postgres:10.4
+
+volumes:
+- name: cache
+  host:
+    path: /drone-cache
+
+trigger:
+  event:
+  - pull_request
+
 ---
 kind: pipeline
 type: docker
 name: integration-simple-fullexit
+
+platform:
+  os: linux
+  arch: amd64
+
 clone:
-    depth: 10
-volumes:
-  - name: cache
-    host:
-      path: /drone-cache
-services:
-  - name: geth
-    image: matterlabs/geth:latest
-  - name: postgres
-    image: postgres:10.4
-trigger:
-  event:
-  - pull_request
+  depth: 10
+
 steps:
 - name: restore-cache
   image: drillster/drone-volume-cache
+  settings:
+    mount:
+    - ./target/rust-ci-cache
+    - ./keys
+    restore: true
   volumes:
   - name: cache
     path: /cache
-  settings:
-    restore: true
-    mount:
-      - ./target/cargo
-      - ./keys
+
 - name: preparations-for-integration-simple
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
-  - ssed -E "s/(.*constant DUMMY_VERIFIER)(.*)\;/\1 = true\;/" -i $ZKSYNC_HOME/contracts/contracts/Verifier.sol
-  - zksync build-contracts
-  - zksync db-reset
   - zksync genesis
-  - zksync redeploy
+  - zksync dummy-prover enable
   - f cargo build --release --bin server
-  - f cargo build --bin dummy_prover
+  - f cargo build --release --bin dummy_prover
   depends_on:
   - restore-cache
+
 - name: start-server-detached
   image: matterlabs/ci
   detach: true
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync server
   depends_on:
   - preparations-for-integration-simple
+
 - name: start-prover-detached
   image: matterlabs/ci
   detach: true
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync dummy-prover
   depends_on:
   - preparations-for-integration-simple
+
 - name: integration-simple
   image: matterlabs/ci
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - sleep 15
   - zksync integration-simple
   - zksync integration-full-exit
   depends_on:
   - start-server-detached
   - start-prover-detached
+
+services:
+- name: geth
+  image: matterlabs/geth:latest
+
+- name: postgres
+  image: postgres:10.4
+
+volumes:
+- name: cache
+  host:
+    path: /drone-cache
+
+trigger:
+  event:
+  - pull_request
+
 ---
-# This pipeline publishes images and updates stage
 kind: pipeline
 type: docker
 name: update-stage
+
+platform:
+  os: linux
+  arch: amd64
+
 clone:
-    depth: 10
-
-volumes:
-  - name: cache
-    host:
-      path: /drone-cache
-  - name: docker-sock
-    host:
-      path: /var/run/docker.sock
-  - name: cargo-git-musl
-    host:
-      path: /tmp/cargo-git-musl
-  - name: cargo-registry-musl
-    host:
-      path: /tmp/cargo-registry-musl
-
-trigger:
-  target:
-  - stage
-  event:
-  - promote
+  depth: 10
 
 steps:
 - name: restore-cache
   image: drillster/drone-volume-cache
+  settings:
+    mount:
+    - ./target/rust-ci-cache
+    - ./keys
+    restore: true
   volumes:
   - name: cache
     path: /cache
-  settings:
-    restore: true
-    mount:
-      - ./target/cargo
-      - ./keys
 
 - name: init
   image: matterlabs/ci
-  environment:
-    STAGE_ENV_BASE64:
-      from_secret: stage_env_base64
   commands:
   - git checkout ${DRONE_COMMIT_SHA}
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - echo -n $STAGE_ENV_BASE64| base64 --decode > $ZKSYNC_HOME/etc/env/stage.env
   - zksync env stage
   - zksync yarn
   - zksync gen-keys-if-not-present
   - zksync build-contracts
+  environment:
+    STAGE_ENV_BASE64:
+      from_secret: stage_env_base64
   depends_on:
   - restore-cache
 
@@ -249,9 +286,7 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - export CARGO_HOME=$ZKSYNC_HOME/target/cargo
   - zksync env stage
-  # too much logs and pipeline is failing
   - zksync yarn
   - zksync dist-client > /dev/null
   - zksync dist-explorer > /dev/null
@@ -265,12 +300,12 @@ steps:
   - docker build -t $REPO:${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
   - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
   environment:
-    USERNAME:
-      from_secret: docker_username
+    DOCKERFILE: ./docker/nginx/Dockerfile
     PASSWORD:
       from_secret: docker_password
-    DOCKERFILE: ./docker/nginx/Dockerfile
     REPO: matterlabs/nginx
+    USERNAME:
+      from_secret: docker_username
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
@@ -279,11 +314,6 @@ steps:
 
 - name: build-rust
   image: ekidd/rust-musl-builder
-  volumes:
-  - name: cargo-git-musl
-    path: /home/rust/.cargo/git
-  - name: cargo-registry-musl
-    path: /home/rust/.cargo/registry
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
@@ -291,22 +321,46 @@ steps:
   - sudo chown -R rust:rust /home/rust/.cargo/git /home/rust/.cargo/registry
   - sudo chown -R rust:rust ./target
   - f cargo build --release
+  volumes:
+  - name: cargo-git-musl
+    path: /home/rust/.cargo/git
+  - name: cargo-registry-musl
+    path: /home/rust/.cargo/registry
   depends_on:
   - init
 
-- name: server-image-publish
+- name: server-supervisor-image-publish
   image: docker
-  environment:
-    USERNAME:
-      from_secret: docker_username
-    PASSWORD:
-      from_secret: docker_password
-    DOCKERFILE: ./docker/server/Dockerfile
-    REPO: matterlabs/server
   commands:
   - docker login -u $USERNAME -p $PASSWORD
   - docker build -t $REPO:${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
   - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
+  environment:
+    DOCKERFILE: ./docker/server_supervisor/Dockerfile
+    PASSWORD:
+      from_secret: docker_password
+    REPO: matterlabs/server_supervisor
+    USERNAME:
+      from_secret: docker_username
+  volumes:
+  - name: docker-sock
+    path: /var/run/docker.sock
+  depends_on:
+  - build-rust
+
+- name: server-image-publish
+  image: docker
+  commands:
+  - docker login -u $USERNAME -p $PASSWORD
+  - docker build -t $REPO:${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
+  - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
+  environment:
+    DOCKERFILE: ./docker/server/Dockerfile
+    PASSWORD:
+      from_secret: docker_password
+    REPO: matterlabs/server
+    USERNAME:
+      from_secret: docker_username
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
@@ -315,17 +369,17 @@ steps:
 
 - name: prover-image-publish
   image: docker
-  environment:
-    USERNAME:
-      from_secret: docker_username
-    PASSWORD:
-      from_secret: docker_password
-    DOCKERFILE: ./docker/prover/Dockerfile
-    REPO: matterlabs/prover
   commands:
   - docker login -u $USERNAME -p $PASSWORD
   - docker build -t $REPO:${DRONE_COMMIT_SHA:0:8} -f $DOCKERFILE .
   - docker push $REPO:${DRONE_COMMIT_SHA:0:8}
+  environment:
+    DOCKERFILE: ./docker/prover/Dockerfile
+    PASSWORD:
+      from_secret: docker_password
+    REPO: matterlabs/prover
+    USERNAME:
+      from_secret: docker_username
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
@@ -334,9 +388,6 @@ steps:
 
 - name: stage-deploy
   image: matterlabs/ci
-  environment:
-    KUBECONFIG_BASE64:
-      from_secret: stage_kubeconfig_base64
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
@@ -345,66 +396,97 @@ steps:
   - zksync db-migrate
   - zksync apply-kubeconfig
   - zksync restart
+  environment:
+    KUBECONFIG_BASE64:
+      from_secret: stage_kubeconfig_base64
   depends_on:
   - nginx-image-publish
   - server-image-publish
   - prover-image-publish
 
+volumes:
+- name: cache
+  host:
+    path: /drone-cache
+- name: docker-sock
+  host:
+    path: /var/run/docker.sock
+- name: cargo-git-musl
+  host:
+    path: /tmp/cargo-git-musl
+- name: cargo-registry-musl
+  host:
+    path: /tmp/cargo-registry-musl
+
+trigger:
+  event:
+  - promote
+  target:
+  - stage
+
 ---
-# This pipeline udpates testnet
 kind: pipeline
 type: docker
 name: update-testnet
+
+platform:
+  os: linux
+  arch: amd64
+
 clone:
-    depth: 1
-
-volumes:
-  - name: docker-sock
-    host:
-      path: /var/run/docker.sock
-
-trigger:
-  target:
-  - testnet
-  event:
-  - promote
+  depth: 1
 
 steps:
 - name: check out to commit
   image: matterlabs/ci
   commands:
   - git checkout ${DRONE_COMMIT_SHA}
+
 - name: check-images-exist
   image: docker
-  environment:
-    USERNAME:
-      from_secret: docker_username
-    PASSWORD:
-      from_secret: docker_password
-    ENV_BASE64:
-      from_secret: testnet_env_base64
   commands:
   - docker login -u $USERNAME -p $PASSWORD
   - docker pull matterlabs/server:${DRONE_COMMIT_SHA:0:8}
   - docker pull matterlabs/prover:${DRONE_COMMIT_SHA:0:8}
   - docker pull matterlabs/nginx:${DRONE_COMMIT_SHA:0:8}
+  environment:
+    ENV_BASE64:
+      from_secret: ${ZKSYNC_ENV}_env_base64
+    PASSWORD:
+      from_secret: docker_password
+    USERNAME:
+      from_secret: docker_username
   volumes:
   - name: docker-sock
     path: /var/run/docker.sock
+
 - name: testnet-deploy
   image: matterlabs/ci
-  environment:
-    ENV_BASE64:
-      from_secret: testnet_env_base64
-    KUBECONFIG_BASE64:
-      from_secret: testnet_kubeconfig_base64
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/testnet.env
-  - zksync env testnet
+  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/${ZKSYNC_ENV}.env
+  - zksync env ${ZKSYNC_ENV}
   - echo -n $KUBECONFIG_BASE64 | base64 --decode > `pwd`/kubeconfig.yaml
-  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/testnet.env KUBECONFIG=`pwd`/kubeconfig.yaml
+  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/${ZKSYNC_ENV}.env KUBECONFIG=`pwd`/kubeconfig.yaml
   - zksync db-migrate
   - zksync apply-kubeconfig
   - zksync restart
+  environment:
+    ENV_BASE64:
+      from_secret: ${ZKSYNC_ENV}_env_base64
+    KUBECONFIG_BASE64:
+      from_secret: ${ZKSYNC_ENV}_kubeconfig_base64
+
+volumes:
+- name: docker-sock
+  host:
+    path: /var/run/docker.sock
+
+trigger:
+  event:
+  - promote
+  target:
+  - testnet
+
+...
