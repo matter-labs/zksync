@@ -25,8 +25,13 @@ contract Storage {
     /// @notice Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
     Governance internal governance;
 
+    struct BalanceToWithdraw {
+        uint128 balanceToWithdraw;
+        uint8 gasReserveValue; // gives user opportunity to fill storage slot with nonzero value
+    }
+
     /// @notice Root-chain balances (per owner and token id) to withdraw
-    mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
+    mapping(address => mapping(uint16 => BalanceToWithdraw)) public balancesToWithdraw;
 
     /// @notice verified withdrawal pending to be executed.
     struct PendingWithdrawal {
@@ -55,11 +60,10 @@ contract Storage {
     ///
     /// Consider memory alignment when changing field order: https://solidity.readthedocs.io/en/v0.4.21/miscellaneous.html
     struct Block {
-        uint24 validatorId;
         uint32 committedAtBlock;
-        uint64 cumulativeOnchainOperations;
         uint64 priorityOperations;
         uint32 chunks;
+        bytes32 withdrawalsDataHash; /// can be restricted to 16 bytes to reduce number of required storage slots
         bytes32 commitment;
         bytes32 stateRoot;
     }
@@ -76,12 +80,6 @@ contract Storage {
         bytes pubData;
     }
 
-    /// @notice Total number of registered onchain operations
-    uint64 public totalOnchainOps;
-
-    /// @notice Onchain operations by index
-    mapping(uint64 => OnchainOperation) public onchainOps;
-
     /// @notice Flag indicates that a user has exited certain token balance (per owner and tokenId)
     mapping(address => mapping(uint16 => bool)) public exited;
 
@@ -96,16 +94,14 @@ contract Storage {
     /// @member opType Priority operation type
     /// @member pubData Priority operation public data
     /// @member expirationBlock Expiration block number (ETH block) for this request (must be satisfied before)
-    /// @member fee Validators fee
     struct PriorityOperation {
         Operations.OpType opType;
         bytes pubData;
         uint256 expirationBlock;
-        uint256 fee;
     }
 
     /// @notice Priority Requests mapping (request id - operation)
-    /// @dev Contains op type, pubdata, fee and expiration block of unsatisfied requests.
+    /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
     /// @dev Numbers are in order of requests receiving
     mapping(uint64 => PriorityOperation) public priorityRequests;
 

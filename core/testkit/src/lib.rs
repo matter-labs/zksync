@@ -812,12 +812,13 @@ impl TestSetup {
 
     fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigDecimal {
         let account = &self.accounts.eth_accounts[eth_account_id.0];
-        if token == 0 {
+        let result = if token == 0 {
             block_on(account.eth_balance()).expect("Failed to get eth balance")
         } else {
             block_on(account.erc20_balance(&self.tokens[&token]))
                 .expect("Failed to get erc20 balance")
-        }
+        };
+        result + self.get_balance_to_withdraw(eth_account_id, Token(token))
     }
 
     pub fn get_balance_to_withdraw(
