@@ -22,16 +22,9 @@ fn address(req: web::Json<PubkeyPoint>) -> impl Responder {
 }
 
 #[derive(Deserialize)]
-enum SignatureType {
-    MusigPedersen,
-    MusigSha256,
-}
-
-#[derive(Deserialize)]
 struct SignedMessage {
     msg: Vec<u8>,
     signature: TxSignature,
-    variant: SignatureType,
 }
 
 #[derive(Serialize)]
@@ -42,11 +35,10 @@ struct SignedMessageKey {
 
 fn check_signature(req: web::Json<SignedMessage>) -> impl Responder {
     let signed_msg = req.0;
-    let pk = match signed_msg.variant {
-        SignatureType::MusigPedersen => signed_msg.signature.verify_musig_pedersen(&signed_msg.msg),
-        SignatureType::MusigSha256 => signed_msg.signature.verify_musig_sha256(&signed_msg.msg),
-    }
-    .map(PackedPublicKey);
+    let pk = signed_msg
+        .signature
+        .verify_musig(&signed_msg.msg)
+        .map(PackedPublicKey);
 
     web::Json(SignedMessageKey {
         correct: pk.is_some(),

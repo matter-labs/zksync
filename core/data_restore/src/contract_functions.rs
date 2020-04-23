@@ -1,4 +1,3 @@
-extern crate ethabi;
 use crate::eth_tx_helpers::get_input_data_from_ethereum_transaction;
 use models::node::account::Account;
 use models::params::{INPUT_DATA_ADDRESS_BYTES_WIDTH, INPUT_DATA_ROOT_HASH_BYTES_WIDTH};

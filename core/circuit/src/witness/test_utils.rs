@@ -30,7 +30,7 @@ pub fn test_genesis_plasma_state(
         .into_iter()
         .chain(accounts.into_iter())
         .collect();
-    let plasma_state = PlasmaState::new(validator_account, 1);
+    let plasma_state = PlasmaState::from_acc_map(validator_account, 1);
 
     let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
     for (id, account) in plasma_state.get_accounts() {

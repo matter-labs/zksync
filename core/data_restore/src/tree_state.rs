@@ -52,7 +52,7 @@ impl TreeState {
         current_unprocessed_priority_op: u64,
         fee_account: AccountId,
     ) -> Self {
-        let state = PlasmaState::new(accounts, current_block);
+        let state = PlasmaState::from_acc_map(accounts, current_block);
         let last_fee_account_address = state
             .get_account(fee_account)
             .expect("Cant get fee account from tree state")
@@ -392,7 +392,6 @@ mod test {
     use crate::rollup_ops::RollupOpsBlock;
     use crate::tree_state::TreeState;
     use bigdecimal::BigDecimal;
-    use models::node::tx::TxSignature;
     use models::node::{
         Deposit, DepositOp, FranklinOp, Transfer, TransferOp, TransferToNewOp, Withdraw, WithdrawOp,
     };
@@ -418,15 +417,15 @@ mod test {
             fee_account: 0,
         };
 
-        let tx2 = Withdraw {
-            from: [7u8; 20].into(),
-            to: [7u8; 20].into(),
-            token: 1,
-            amount: BigDecimal::from(20),
-            fee: BigDecimal::from(1),
-            nonce: 1,
-            signature: TxSignature::default(),
-        };
+        let tx2 = Withdraw::new(
+            [7u8; 20].into(),
+            [7u8; 20].into(),
+            1,
+            BigDecimal::from(20),
+            BigDecimal::from(1),
+            1,
+            None,
+        );
         let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
             tx: tx2,
             account_id: 0,
@@ -440,15 +439,15 @@ mod test {
             fee_account: 0,
         };
 
-        let tx3 = Transfer {
-            from: [7u8; 20].into(),
-            to: [8u8; 20].into(),
-            token: 1,
-            amount: BigDecimal::from(20),
-            fee: BigDecimal::from(1),
-            nonce: 3,
-            signature: TxSignature::default(),
-        };
+        let tx3 = Transfer::new(
+            [7u8; 20].into(),
+            [8u8; 20].into(),
+            1,
+            BigDecimal::from(20),
+            BigDecimal::from(1),
+            3,
+            None,
+        );
         let op3 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx: tx3,
             from: 0,
@@ -463,15 +462,15 @@ mod test {
             fee_account: 0,
         };
 
-        let tx4 = Transfer {
-            from: [8u8; 20].into(),
-            to: [7u8; 20].into(),
-            token: 1,
-            amount: BigDecimal::from(19),
-            fee: BigDecimal::from(1),
-            nonce: 1,
-            signature: TxSignature::default(),
-        };
+        let tx4 = Transfer::new(
+            [8u8; 20].into(),
+            [7u8; 20].into(),
+            1,
+            BigDecimal::from(19),
+            BigDecimal::from(1),
+            1,
+            None,
+        );
         let op4 = FranklinOp::Transfer(Box::new(TransferOp {
             tx: tx4,
             from: 1,
@@ -542,30 +541,30 @@ mod test {
         }));
         let pub_data1 = op1.public_data();
 
-        let tx2 = Withdraw {
-            from: [7u8; 20].into(),
-            to: [9u8; 20].into(),
-            token: 1,
-            amount: BigDecimal::from(20),
-            fee: BigDecimal::from(1),
-            nonce: 1,
-            signature: TxSignature::default(),
-        };
+        let tx2 = Withdraw::new(
+            [7u8; 20].into(),
+            [9u8; 20].into(),
+            1,
+            BigDecimal::from(20),
+            BigDecimal::from(1),
+            1,
+            None,
+        );
         let op2 = FranklinOp::Withdraw(Box::new(WithdrawOp {
             tx: tx2,
             account_id: 0,
         }));
         let pub_data2 = op2.public_data();
 
-        let tx3 = Transfer {
-            from: [7u8; 20].into(),
-            to: [8u8; 20].into(),
-            token: 1,
-            amount: BigDecimal::from(20),
-            fee: BigDecimal::from(1),
-            nonce: 3,
-            signature: TxSignature::default(),
-        };
+        let tx3 = Transfer::new(
+            [7u8; 20].into(),
+            [8u8; 20].into(),
+            1,
+            BigDecimal::from(20),
+            BigDecimal::from(1),
+            3,
+            None,
+        );
         let op3 = FranklinOp::TransferToNew(Box::new(TransferToNewOp {
             tx: tx3,
             from: 0,
@@ -573,15 +572,15 @@ mod test {
         }));
         let pub_data3 = op3.public_data();
 
-        let tx4 = Transfer {
-            from: [8u8; 20].into(),
-            to: [7u8; 20].into(),
-            token: 1,
-            amount: BigDecimal::from(19),
-            fee: BigDecimal::from(1),
-            nonce: 1,
-            signature: TxSignature::default(),
-        };
+        let tx4 = Transfer::new(
+            [8u8; 20].into(),
+            [7u8; 20].into(),
+            1,
+            BigDecimal::from(19),
+            BigDecimal::from(1),
+            1,
+            None,
+        );
         let op4 = FranklinOp::Transfer(Box::new(TransferOp {
             tx: tx4,
             from: 1,
