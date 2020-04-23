@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [ -z $ZKSYNC_HOME ]; then
+    export ZKSYNC_HOME="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/../"
+fi
+
 cd $ZKSYNC_HOME
 
 . .setup_env
