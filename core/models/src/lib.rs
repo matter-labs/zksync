@@ -165,17 +165,13 @@ pub struct NewTokenEvent {
 impl TryFrom<Log> for NewTokenEvent {
     type Error = failure::Error;
 
-    fn try_from(event: Log) -> Result<NewTokenEvent, failure::Error> {
-        let mut dec_ev = decode(&[ParamType::Address, ParamType::Uint(32)], &event.data.0)
-            .map_err(|e| format_err!("Event data decode: {:?}", e))?;
+    fn try_from(mut event: Log) -> Result<NewTokenEvent, failure::Error> {
+        if event.topics.len() != 3 {
+            return Err(format_err!("Failed to parse NewTokenEvent: {:#?}", event));
+        }
         Ok(NewTokenEvent {
-            address: dec_ev.remove(0).to_address().unwrap(),
-            id: dec_ev
-                .remove(0)
-                .to_uint()
-                .as_ref()
-                .map(|id| id.as_u32() as TokenId)
-                .unwrap(),
+            address: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
+            id: U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32() as u16,
         })
     }
 }

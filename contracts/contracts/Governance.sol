@@ -9,8 +9,8 @@ contract Governance is Config {
 
     /// @notice Token added to Franklin net
     event NewToken(
-        address token,
-        uint16 tokenId
+        address indexed token,
+        uint16 indexed tokenId
     );
 
     /// @notice Governor changed
