@@ -67,7 +67,7 @@ table! {
 table! {
     blocks (number) {
         number -> Int8,
-        root_hash -> Text,
+        root_hash -> Bytea,
         fee_account_id -> Int8,
         unprocessed_prior_op_before -> Int8,
         unprocessed_prior_op_after -> Int8,
@@ -76,9 +76,34 @@ table! {
 }
 
 table! {
+    data_restore_events_state (id) {
+        id -> Int4,
+        block_type -> Text,
+        transaction_hash -> Bytea,
+        block_num -> Int8,
+    }
+}
+
+table! {
     data_restore_last_watched_eth_block (id) {
         id -> Int4,
         block_number -> Text,
+    }
+}
+
+table! {
+    data_restore_rollup_ops (id) {
+        id -> Int4,
+        block_num -> Int8,
+        operation -> Jsonb,
+        fee_account -> Int8,
+    }
+}
+
+table! {
+    data_restore_storage_state_update (id) {
+        id -> Int4,
+        storage_state -> Text,
     }
 }
 
@@ -128,20 +153,13 @@ table! {
 }
 
 table! {
-    events_state (id) {
-        id -> Int4,
-        block_type -> Text,
-        transaction_hash -> Bytea,
-        block_num -> Int8,
-    }
-}
-
-table! {
     executed_priority_operations (id) {
         id -> Int4,
         block_number -> Int8,
         block_index -> Int4,
         operation -> Jsonb,
+        from_account -> Bytea,
+        to_account -> Bytea,
         priority_op_serialid -> Int8,
         deadline_block -> Int8,
         eth_fee -> Numeric,
@@ -153,28 +171,16 @@ table! {
     executed_transactions (id) {
         id -> Int4,
         block_number -> Int8,
+        block_index -> Nullable<Int4>,
+        tx -> Jsonb,
+        operation -> Jsonb,
         tx_hash -> Bytea,
-        operation -> Nullable<Jsonb>,
+        from_account -> Bytea,
+        to_account -> Nullable<Bytea>,
         success -> Bool,
         fail_reason -> Nullable<Text>,
-        block_index -> Nullable<Int4>,
-    }
-}
-
-table! {
-    mempool (hash) {
-        hash -> Bytea,
         primary_account_address -> Bytea,
         nonce -> Int8,
-        tx -> Jsonb,
-        created_at -> Timestamp,
-    }
-}
-
-table! {
-    op_config (addr) {
-        addr -> Text,
-        next_nonce -> Nullable<Int8>,
     }
 }
 
@@ -207,26 +213,10 @@ table! {
 }
 
 table! {
-    rollup_ops (id) {
-        id -> Int4,
-        block_num -> Int8,
-        operation -> Jsonb,
-        fee_account -> Int8,
-    }
-}
-
-table! {
     server_config (id) {
         id -> Bool,
         contract_addr -> Nullable<Text>,
         gov_contract_addr -> Nullable<Text>,
-    }
-}
-
-table! {
-    storage_state_update (id) {
-        id -> Int4,
-        storage_state -> Text,
     }
 }
 
@@ -238,13 +228,21 @@ table! {
     }
 }
 
+table! {
+    leader_election (id) {
+        id -> Int4,
+        name -> Text,
+        created_at -> Timestamp,
+        bail_at -> Nullable<Timestamp>,
+    }
+}
+
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
 joinable!(eth_ops_binding -> eth_operations (eth_op_id));
 joinable!(eth_ops_binding -> operations (op_id));
 joinable!(eth_tx_hashes -> eth_operations (eth_op_id));
-joinable!(executed_transactions -> mempool (tx_hash));
 
 allow_tables_to_appear_in_same_query!(
     account_balance_updates,
@@ -254,22 +252,21 @@ allow_tables_to_appear_in_same_query!(
     active_provers,
     balances,
     blocks,
+    data_restore_events_state,
     data_restore_last_watched_eth_block,
+    data_restore_rollup_ops,
+    data_restore_storage_state_update,
     eth_nonce,
     eth_operations,
     eth_ops_binding,
     eth_stats,
     eth_tx_hashes,
-    events_state,
     executed_priority_operations,
     executed_transactions,
-    mempool,
-    op_config,
     operations,
     proofs,
     prover_runs,
-    rollup_ops,
     server_config,
-    storage_state_update,
     tokens,
+    leader_election,
 );

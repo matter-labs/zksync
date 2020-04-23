@@ -54,13 +54,13 @@ fn cross_trees_merkle_path_comparison() {
     let mut par_tree =
         parallel_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth);
     let mut seq_tree =
-        sequential_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth as u32);
+        sequential_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth);
 
     for (idx, item) in elements.into_iter().enumerate() {
         // Insert the same element in both trees and verify that the root hash is the same.
         let idx = idx as u32;
         par_tree.insert(idx, item);
-        seq_tree.insert(idx, item);
+        seq_tree.insert(idx as usize, item);
         assert_eq!(
             par_tree.root_hash(),
             seq_tree.root_hash(),
@@ -70,7 +70,7 @@ fn cross_trees_merkle_path_comparison() {
         );
 
         let par_merkle_path = par_tree.merkle_path(idx);
-        let seq_merkle_path = seq_tree.merkle_path(idx);
+        let seq_merkle_path = seq_tree.merkle_path(idx as usize);
 
         // Check that proofs are equal.
         assert_eq!(
@@ -108,7 +108,7 @@ fn simulate_transfer_to_new_par_tree_seq_tree() {
     let mut par_tree =
         parallel_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth);
     let mut seq_tree =
-        sequential_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth as u32);
+        sequential_smt::SparseMerkleTree::<u64, Fr, PedersenHasher<Engine>>::new(depth);
 
     let from_account_id = 1;
     let from_account_before_bal = 5;
@@ -128,9 +128,9 @@ fn simulate_transfer_to_new_par_tree_seq_tree() {
 
     let (seq_root_before, seq_audit_to_before) = {
         let tree = &mut seq_tree;
-        tree.insert(from_account_id, from_account_before_bal);
+        tree.insert(from_account_id as usize, from_account_before_bal);
         let root_before = tree.root_hash();
-        let audit_to_before = tree.merkle_path(to_account_id);
+        let audit_to_before = tree.merkle_path(to_account_id as usize);
         (root_before, audit_to_before)
     };
 

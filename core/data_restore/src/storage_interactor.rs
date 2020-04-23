@@ -1,21 +1,24 @@
 // Built-in deps
-use std::convert::TryFrom;
-use std::str::FromStr;
+use std::{convert::TryFrom, str::FromStr};
 // External deps
 use web3::types::H256;
 // Workspace deps
-use crate::data_restore_driver::StorageUpdateState;
-use crate::events::{BlockEvent, EventType};
-use crate::events_state::EventsState;
-use crate::rollup_ops::RollupOpsBlock;
-use models::node::block::Block;
-use models::node::{AccountMap, AccountUpdate, AccountUpdates, FranklinOp};
-use models::NewTokenEvent;
-use models::{Action, EncodedProof, Operation};
+use models::{
+    node::{block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
+    Action, EncodedProof, NewTokenEvent, Operation,
+};
 use storage::{
-    chain::state::records::{NewBlockEvent, StoredBlockEvent},
-    data_restore::records::{NewLastWatchedEthBlockNumber, StoredRollupOpsBlock},
+    data_restore::records::{
+        NewBlockEvent, NewLastWatchedEthBlockNumber, StoredBlockEvent, StoredRollupOpsBlock,
+    },
     ConnectionPool,
+};
+// Local deps
+use crate::{
+    data_restore_driver::StorageUpdateState,
+    events::{BlockEvent, EventType},
+    events_state::EventsState,
+    rollup_ops::RollupOpsBlock,
 };
 
 /// Saves genesis account state in storage
@@ -45,7 +48,7 @@ pub fn save_genesis_tree_state(
         .expect("Cant update genesis state");
 }
 
-/// Updates stored tree state: saves block transactions in storage mempool, stores blocks and account updates
+/// Updates stored tree state: saves block transactions in storage, stores blocks and account updates
 ///
 /// # Arguments
 ///
@@ -202,8 +205,7 @@ pub fn get_storage_state(connection_pool: &ConnectionPool) -> StorageUpdateState
     let storage = connection_pool.access_storage().expect("db failed");
 
     let storage_state_string = storage
-        .chain()
-        .state_schema()
+        .data_restore_schema()
         .load_storage_state()
         .expect("Cant load storage state")
         .storage_state;
@@ -248,8 +250,7 @@ pub fn get_block_events_state_from_storage(connection_pool: &ConnectionPool) -> 
     let storage = connection_pool.access_storage().expect("db failed");
 
     let committed = storage
-        .chain()
-        .state_schema()
+        .data_restore_schema()
         .load_committed_events_state()
         .expect("Cant load committed state");
 
@@ -260,8 +261,7 @@ pub fn get_block_events_state_from_storage(connection_pool: &ConnectionPool) -> 
     }
 
     let verified = storage
-        .chain()
-        .state_schema()
+        .data_restore_schema()
         .load_verified_events_state()
         .expect("Cant load verified state");
     let mut verified_events: Vec<BlockEvent> = vec![];
@@ -321,4 +321,27 @@ pub fn get_tree_state(connection_pool: &ConnectionPool) -> (u32, AccountMap, u64
     let (unprocessed_prior_ops, fee_acc_id) = (block.processed_priority_ops.1, block.fee_account);
 
     (last_block, account_map, unprocessed_prior_ops, fee_acc_id)
+}
+
+/// Updates the `eth_stats` table with the currently last available committed/verified blocks
+/// data for `eth_sender` module to operate correctly.
+pub fn update_eth_stats(connection_pool: &ConnectionPool) {
+    let storage = connection_pool.access_storage().expect("db failed");
+
+    let last_committed_block = storage
+        .chain()
+        .block_schema()
+        .get_last_committed_block()
+        .expect("Can't get the last committed block");
+
+    let last_verified_block = storage
+        .chain()
+        .block_schema()
+        .get_last_verified_block()
+        .expect("Can't get the last verified block");
+
+    storage
+        .data_restore_schema()
+        .initialize_eth_stats(last_committed_block, last_verified_block)
+        .expect("Can't update the eth_stats table")
 }
