@@ -248,6 +248,7 @@ pub struct WithdrawOp {
 impl WithdrawOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x03;
+    pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [1];
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -263,7 +264,7 @@ impl WithdrawOp {
 
     fn get_withdrawal_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
-        data.push(1); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
+        data.extend_from_slice(&Self::WITHDRAW_DATA_PREFIX); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
         data.extend_from_slice(self.tx.to.as_bytes());
         data.extend_from_slice(&self.tx.token.to_be_bytes());
         data.extend_from_slice(&big_decimal_to_u128(&self.tx.amount).to_be_bytes());
@@ -440,6 +441,7 @@ pub struct FullExitOp {
 impl FullExitOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x06;
+    pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [0];
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -456,7 +458,7 @@ impl FullExitOp {
 
     fn get_withdrawal_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
-        data.push(0); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
+        data.extend_from_slice(&Self::WITHDRAW_DATA_PREFIX); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
         data.extend_from_slice(self.priority_op.eth_address.as_bytes());
         data.extend_from_slice(&self.priority_op.token.to_be_bytes());
         data.extend_from_slice(
