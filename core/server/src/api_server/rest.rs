@@ -23,7 +23,6 @@ use web3::types::H160;
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
 impl SharedNetworkStatus {
-    #[allow(dead_code)]
     fn read(&self) -> NetworkStatus {
         (*self.0.as_ref().read().unwrap()).clone()
     }
@@ -84,7 +83,13 @@ impl AppState {
                     loop {
                         timer.tick().await;
 
-                        let storage = state.connection_pool.access_storage().expect("db failed");
+                        let storage = match state.connection_pool.access_storage() {
+                            Ok(storage) => storage,
+                            Err(err) => {
+                                log::warn!("Unable to update the network status. Storage access failed: {}", err);
+                                continue;
+                            }
+                        };
 
                         let last_verified = storage
                             .chain()
