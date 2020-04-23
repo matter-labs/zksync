@@ -3,8 +3,10 @@ const { bigNumberify, parseEther } = ethers.utils;
 
 const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
 
+const parentPid = process.argv[2];
+
 async function createWallets() {
-    while (true) {
+    for (let numRetries = 0; numRetries < 15; ++numRetries) {
         try {
             console.log('connecting to provider...');
 
@@ -20,9 +22,15 @@ async function createWallets() {
             const wallet3 = ethers.Wallet.createRandom().connect(ethersProvider);
             return [ wallet1, wallet2, wallet3 ];
         } catch (e) {
-            await sleep(1000);
+            if (e.toString().includes('invalid response - 0')) {
+                await sleep(1000);
+            } else {
+                throw e;
+            }
         }
     }
+
+    throw new Error("Couldn't await provider.");
 }
 
 async function generateBlocks() {
@@ -39,4 +47,8 @@ async function generateBlocks() {
     }
 }
 
-generateBlocks();
+generateBlocks()
+    .catch(e => {
+        console.log(e);
+        process.kill(parentPid);
+    });

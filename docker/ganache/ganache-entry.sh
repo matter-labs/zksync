@@ -1,6 +1,6 @@
 #!/bin/sh
 
-node ./generate-blocks.js & pid="$!"
+node ./generate-blocks.js "$$" & pid="$!"
 
 trap ctrl_c INT TERM EXIT
 
