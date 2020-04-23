@@ -212,8 +212,12 @@ prover-tests:
 promote-to-stage:
 	@bin/promote-to.sh stage $(ci-build)
 
-promote-to-testnet:
+promote-to-rinkeby:
+    # TODO: change testnet to rinkeby with #447 issue.
 	@bin/promote-to.sh testnet $(ci-build)
+
+promote-to-ropsten:
+	@bin/promote-to.sh ropsten $(ci-build)
 
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-insert-contract

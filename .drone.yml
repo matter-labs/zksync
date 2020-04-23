@@ -469,7 +469,7 @@ steps:
   - docker pull matterlabs/nginx:${DRONE_COMMIT_SHA:0:8}
   environment:
     ENV_BASE64:
-      from_secret: testnet_env_base64
+      from_secret: ${ZKSYNC_ENV}_env_base64
     PASSWORD:
       from_secret: docker_password
     USERNAME:
@@ -483,18 +483,18 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/testnet.env
-  - zksync env testnet
+  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/${ZKSYNC_ENV}.env
+  - zksync env ${ZKSYNC_ENV}
   - echo -n $KUBECONFIG_BASE64 | base64 --decode > `pwd`/kubeconfig.yaml
-  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/testnet.env KUBECONFIG=`pwd`/kubeconfig.yaml
+  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/${ZKSYNC_ENV}.env KUBECONFIG=`pwd`/kubeconfig.yaml
   - zksync db-migrate
   - zksync apply-kubeconfig
   - zksync restart
   environment:
     ENV_BASE64:
-      from_secret: testnet_env_base64
+      from_secret: ${ZKSYNC_ENV}_env_base64
     KUBECONFIG_BASE64:
-      from_secret: testnet_kubeconfig_base64
+      from_secret: ${ZKSYNC_ENV}_kubeconfig_base64
 
 volumes:
 - name: docker-sock
