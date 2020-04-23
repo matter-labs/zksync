@@ -43,8 +43,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
         }
     }
 
-    // /// Calculates a new gas amount for the replacement of the stuck tx.
-    // /// Replacement price should be at least 10% higher, we make it 15% higher.
+    /// Calculates a new gas amount for the replacement of the stuck tx.
+    /// Replacement price is usually suggested to be at least 10% higher, we make it 15% higher.
     pub fn get_gas_price(
         &mut self,
         ethereum: &ETH,
