@@ -723,6 +723,7 @@ impl TestSetup {
 
         let mut to_eth_balance = self.get_expected_eth_account_balance(to, token.0);
         to_eth_balance.0 += &amount;
+        to_eth_balance.0 += &self.get_balance_to_withdraw(to, token);
         self.expected_changes_for_current_block
             .eth_accounts_state
             .insert((to, token.0), to_eth_balance);
