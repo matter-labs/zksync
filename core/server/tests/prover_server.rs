@@ -9,7 +9,7 @@ use circuit::witness::deposit::apply_deposit_tx;
 use circuit::witness::deposit::calculate_deposit_operations_from_witness;
 use models::circuit::CircuitAccountTree;
 use models::node::Address;
-use models::params::{account_tree_depth, block_chunk_sizes};
+use models::params::{account_tree_depth, block_chunk_sizes, total_tokens};
 use models::prover_utils::EncodedProofPlonk;
 use prover::client;
 use prover::ApiClient;
@@ -274,7 +274,7 @@ pub fn test_operation_and_wanted_prover_data(
         .get(block.fee_account as u32)
         .expect("fee_account is not empty");
     let mut validator_balances = vec![];
-    for i in 0..1 << models::params::BALANCE_TREE_DEPTH {
+    for i in 0..total_tokens() {
         let balance_value = match validator_acc.subtree.get(i as u32) {
             None => models::node::Fr::zero(),
             Some(bal) => bal.value,

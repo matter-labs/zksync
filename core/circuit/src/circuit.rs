@@ -21,8 +21,7 @@ use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams
 use crate::franklin_crypto::rescue::RescueEngine;
 use models::node::operations::{ChangePubKeyOp, NoopOp};
 use models::node::{CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp};
-use models::params as franklin_constants;
-use models::params::FR_BIT_WIDTH_PADDED;
+use models::params::{self, FR_BIT_WIDTH_PADDED};
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
 pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
@@ -94,30 +93,23 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
         let validator_address_padded = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "validator_address"),
             || self.validator_address.grab(),
-            franklin_constants::ACCOUNT_ID_BIT_WIDTH,
+            params::ACCOUNT_ID_BIT_WIDTH,
         )?;
 
         let validator_address_bits = validator_address_padded.get_bits_le();
-        assert!(validator_address_bits.len() == franklin_constants::ACCOUNT_ID_BIT_WIDTH);
-        // validator_address_bits.truncate(franklin_constants::ACCOUNT_ID_BIT_WIDTH);
+        assert_eq!(validator_address_bits.len(), params::ACCOUNT_ID_BIT_WIDTH);
 
         let mut validator_balances = allocate_numbers_vec(
             cs.namespace(|| "validator_balances"),
             &self.validator_balances,
         )?;
-        assert_eq!(
-            validator_balances.len(),
-            (1 << franklin_constants::BALANCE_TREE_DEPTH) as usize
-        );
+        assert_eq!(validator_balances.len(), params::total_tokens());
 
         let validator_audit_path = allocate_numbers_vec(
             cs.namespace(|| "validator_audit_path"),
             &self.validator_audit_path,
         )?;
-        assert_eq!(
-            validator_audit_path.len(),
-            franklin_constants::account_tree_depth() as usize
-        );
+        assert_eq!(validator_audit_path.len(), params::account_tree_depth());
 
         let validator_account = AccountContent::from_witness(
             cs.namespace(|| "validator account"),
@@ -134,7 +126,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
 
         // declare vector of fees, that will be collected during block processing
         let mut fees = vec![];
-        let fees_len = 1 << franklin_constants::BALANCE_TREE_DEPTH;
+        let fees_len = params::total_tokens();
         for _ in 0..fees_len {
             fees.push(zero_circuit_element.get_number());
         }
@@ -163,7 +155,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let operation_pub_data_chunk = CircuitElement::from_fe_with_known_length(
                 cs.namespace(|| "operation_pub_data_chunk"),
                 || operation.clone().pubdata_chunk.grab(),
-                franklin_constants::CHUNK_BIT_WIDTH,
+                params::CHUNK_BIT_WIDTH,
             )?;
             block_pub_data_bits.extend(operation_pub_data_chunk.get_bits_le());
 
@@ -322,7 +314,7 @@ impl<'a, E: RescueEngine + JubjubEngine> Circuit<E> for FranklinCircuit<'a, E> {
             let block_number = CircuitElement::from_fe_with_known_length(
                 cs.namespace(|| "block_number"),
                 || self.block_number.grab(),
-                franklin_constants::BLOCK_NUMBER_BIT_WIDTH,
+                params::BLOCK_NUMBER_BIT_WIDTH,
             )?;
 
             initial_hash_data.extend(block_number.into_padded_be_bits(256));
@@ -380,7 +372,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let tx_type = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "tx_type"),
             || op.tx_type.grab(),
-            franklin_constants::TX_TYPE_BIT_WIDTH,
+            params::TX_TYPE_BIT_WIDTH,
         )?;
 
         let max_chunks_powers = generate_powers(
@@ -635,7 +627,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
 
         let diff_a_b_bits = diff_a_b.into_bits_le_fixed(
             cs.namespace(|| "balance-fee bits"),
-            franklin_constants::BALANCE_BIT_WIDTH,
+            params::BALANCE_BIT_WIDTH,
         )?;
 
         let diff_a_b_bits_repacked = Expression::from_le_bits::<CS>(&diff_a_b_bits);
@@ -725,11 +717,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             &op_valid,
             &Boolean::constant(true),
         )?;
-        for (i, fee) in fees
-            .iter_mut()
-            .enumerate()
-            .take(1 << franklin_constants::BALANCE_TREE_DEPTH)
-        {
+        for (i, fee) in fees.iter_mut().enumerate().take(params::total_tokens()) {
             let sum = Expression::from(&*fee) + Expression::from(&op_data.fee.get_number());
 
             let is_token_correct = Boolean::from(Expression::equals(
@@ -778,7 +766,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_ADDRESS=160
                                                                 //        assert_eq!(pubdata_bits.len(), 30 * 8);
         pubdata_bits.resize(
-            WithdrawOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
+            WithdrawOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -943,7 +931,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 pub_data.extend(cur.token.get_bits_be()); // 2
                 pub_data.extend(op_data.full_amount.get_bits_be());
                 pub_data.resize(
-                    FullExitOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
+                    FullExitOp::CHUNKS * params::CHUNK_BIT_WIDTH,
                     Boolean::constant(false),
                 );
                 pub_data
@@ -1049,7 +1037,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.resize(
-            DepositOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH, //TODO: move to constant
+            DepositOp::CHUNKS * params::CHUNK_BIT_WIDTH, //TODO: move to constant
             Boolean::constant(false),
         );
 
@@ -1154,7 +1142,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                                                                 // NOTE: nonce if verified implicitly here. Current account nonce goes to pubdata and to contract.
         pubdata_bits.extend(op_data.pub_nonce.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.resize(
-            ChangePubKeyOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
+            ChangePubKeyOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -1256,7 +1244,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
     //     pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
     //     pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
     //     pubdata_bits.resize(
-    //         franklin_constants::CHUNK_BIT_WIDTH,
+    //         params::CHUNK_BIT_WIDTH,
     //         Boolean::constant(false),
     //     );
 
@@ -1346,10 +1334,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut is_valid_flags = vec![];
         //construct pubdata (it's all 0 for noop)
         let mut pubdata_bits = vec![];
-        pubdata_bits.resize(
-            franklin_constants::CHUNK_BIT_WIDTH,
-            Boolean::constant(false),
-        );
+        pubdata_bits.resize(params::CHUNK_BIT_WIDTH, Boolean::constant(false));
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -1400,7 +1385,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
         pubdata_bits.resize(
-            TransferToNewOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
+            TransferToNewOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -1607,7 +1592,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
 
         pubdata_bits.resize(
-            TransferOp::CHUNKS * franklin_constants::CHUNK_BIT_WIDTH,
+            TransferOp::CHUNKS * params::CHUNK_BIT_WIDTH,
             Boolean::constant(false),
         );
 
@@ -1840,8 +1825,7 @@ pub fn allocate_account_leaf_bits<E: RescueEngine, CS: ConstraintSystem<E>>(
     )?;
 
     // this is safe and just allows the convention. TODO: may be cut to Fr width only?
-    account_data
-        .extend(state_tree_root.into_padded_le_bits(franklin_constants::FR_BIT_WIDTH_PADDED)); // !!!!!
+    account_data.extend(state_tree_root.into_padded_le_bits(params::FR_BIT_WIDTH_PADDED)); // !!!!!
 
     Ok((
         account_data,
@@ -1946,10 +1930,7 @@ fn select_pubdata_chunk<E: JubjubEngine, CS: ConstraintSystem<E>>(
     chunk_number: &AllocatedNum<E>,
     total_chunks: usize,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
-    assert_eq!(
-        pubdata_bits.len(),
-        total_chunks * franklin_constants::CHUNK_BIT_WIDTH
-    );
+    assert_eq!(pubdata_bits.len(), total_chunks * params::CHUNK_BIT_WIDTH);
     let mut result =
         AllocatedNum::alloc(
             cs.namespace(|| "result pubdata chunk"),
@@ -1958,9 +1939,8 @@ fn select_pubdata_chunk<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
     for i in 0..total_chunks {
         let cs = &mut cs.namespace(|| format!("chunk number {}", i));
-        let pub_chunk_bits = pubdata_bits[i * franklin_constants::CHUNK_BIT_WIDTH
-            ..(i + 1) * franklin_constants::CHUNK_BIT_WIDTH]
-            .to_vec();
+        let pub_chunk_bits =
+            pubdata_bits[i * params::CHUNK_BIT_WIDTH..(i + 1) * params::CHUNK_BIT_WIDTH].to_vec();
         let current_chunk =
             pack_bits_to_element(cs.namespace(|| "chunk as field element"), &pub_chunk_bits)?;
 
@@ -2000,14 +1980,14 @@ fn calculate_root_from_full_representation_fees<E: RescueEngine, CS: ConstraintS
     fees: &[AllocatedNum<E>],
     params: &E::Params,
 ) -> Result<AllocatedNum<E>, SynthesisError> {
-    assert_eq!(fees.len(), 1 << franklin_constants::BALANCE_TREE_DEPTH);
+    assert_eq!(fees.len(), params::total_tokens());
     let mut fee_hashes = vec![];
     for (index, fee) in fees.iter().cloned().enumerate() {
         let cs = &mut cs.namespace(|| format!("fee hashing index number {}", index));
 
         fee.limit_number_of_bits(
             cs.namespace(|| "ensure that fees are short enough"),
-            franklin_constants::BALANCE_BIT_WIDTH,
+            params::BALANCE_BIT_WIDTH,
         )?;
 
         let mut sponge_output =
@@ -2021,7 +2001,7 @@ fn calculate_root_from_full_representation_fees<E: RescueEngine, CS: ConstraintS
     }
     let mut hash_vec = fee_hashes;
 
-    for i in 0..franklin_constants::BALANCE_TREE_DEPTH {
+    for i in 0..params::balance_tree_depth() {
         let cs = &mut cs.namespace(|| format!("merkle tree level index number {}", i));
         let chunks = hash_vec.chunks(2);
         let mut new_hashes = vec![];

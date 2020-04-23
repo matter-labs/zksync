@@ -75,7 +75,7 @@ impl std::default::Default for CircuitAccount<Bn256> {
             nonce: Fr::zero(),
             pub_key_hash: Fr::zero(),
             address: Fr::zero(),
-            subtree: SparseMerkleTree::new(params::BALANCE_TREE_DEPTH),
+            subtree: SparseMerkleTree::new(params::balance_tree_depth()),
         }
     }
 }
@@ -87,9 +87,9 @@ pub struct Balance<E: Engine> {
 impl<E: Engine> GetBits for Balance<E> {
     fn get_bits_le(&self) -> Vec<bool> {
         let mut leaf_content = Vec::new();
-        leaf_content.extend(self.value.get_bits_le_fixed(params::BALANCE_BIT_WIDTH));
+        leaf_content.extend(self.value.get_bits_le_fixed(params::balance_tree_depth()));
         assert!(
-            params::BALANCE_BIT_WIDTH < E::Fr::CAPACITY as usize,
+            params::balance_tree_depth() < E::Fr::CAPACITY as usize,
             "due to algebraic nature of the hash we should not overflow the capacity"
         );
 

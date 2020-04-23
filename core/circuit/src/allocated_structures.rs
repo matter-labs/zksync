@@ -59,7 +59,7 @@ impl<E: RescueEngine> AllocatedOperationBranch<E> {
         let token = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "token"),
             || Ok(operation_branch.token.grab()?),
-            franklin_constants::BALANCE_TREE_DEPTH,
+            franklin_constants::balance_tree_depth(),
         )?;
         let token = token.pad(franklin_constants::TOKEN_BIT_WIDTH);
         let balance_audit_path = utils::allocate_numbers_vec(
@@ -68,7 +68,7 @@ impl<E: RescueEngine> AllocatedOperationBranch<E> {
         )?;
         assert_eq!(
             balance_audit_path.len(),
-            franklin_constants::BALANCE_TREE_DEPTH
+            franklin_constants::balance_tree_depth()
         );
 
         Ok(AllocatedOperationBranch {

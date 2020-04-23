@@ -5,6 +5,7 @@ use std::str::FromStr;
 use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
 use lazy_static::lazy_static;
 // Workspace deps
+use crate::config_options::parse_env;
 use crate::franklin_crypto::group_hash::BlakeHasher;
 use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
@@ -25,10 +26,8 @@ pub fn account_tree_depth() -> usize {
                 .expect("ACCOUNT_TREE_DEPTH variable was not set during compilation. \
                         Make sure that ACCOUNT_TREE_DEPTH is set in `dev.env` file and recompile the project");
             ACCOUNT_TREE_DEPTH_VALUE =
-                usize::from_str(value).expect("account tree depth value is invalid");
-            let runtime_value = env::var("ACCOUNT_TREE_DEPTH").expect("ACCOUNT_TREE_DEPTH missing");
-            let runtime_value =
-                usize::from_str(&runtime_value).expect("ACCOUNT_TREE_DEPTH invalid");
+                usize::from_str(value).expect("ACCOUNT_TREE_DEPTH compile value is invalid");
+            let runtime_value = parse_env::<usize>("ACCOUNT_TREE_DEPTH");
             if runtime_value != ACCOUNT_TREE_DEPTH_VALUE {
                 panic!(
                     "ACCOUNT_TREE_DEPTH want runtime value: {}, got: {}",
@@ -39,6 +38,39 @@ pub fn account_tree_depth() -> usize {
         ACCOUNT_TREE_DEPTH_VALUE
     }
 }
+
+static mut BALANCE_TREE_DEPTH_VALUE: usize = 0;
+/// balance tree_depth.
+/// Value must be specified as environment variable at compile time under `BALANCE_TREE_DEPTH_VALUE` key.
+pub fn balance_tree_depth() -> usize {
+    // use of mutable static is unsafe as it can be mutated by multiple threads.
+    // There's no risk of data race, the worst that can happen is that we parse
+    // and set environment value multuple times, which is ok.
+
+    unsafe {
+        if BALANCE_TREE_DEPTH_VALUE == 0 {
+            let value: &'static str = option_env!("BALANCE_TREE_DEPTH")
+                .expect("BALANCE_TREE_DEPTH variable was not set during compilation. \
+                        Make sure that BALANCE_TREE_DEPTH is set in `dev.env` file and recompile the project");
+            BALANCE_TREE_DEPTH_VALUE =
+                usize::from_str(value).expect("BALANCE_TREE_DEPTH compile value is invalid");
+            let runtime_value = parse_env::<usize>("BALANCE_TREE_DEPTH");
+            if runtime_value != BALANCE_TREE_DEPTH_VALUE {
+                panic!(
+                    "BALANCE_TREE_DEPTH want runtime value: {}, got: {}",
+                    BALANCE_TREE_DEPTH_VALUE, runtime_value
+                );
+            }
+        }
+        BALANCE_TREE_DEPTH_VALUE
+    }
+}
+/// Number of supported tokens.
+pub fn total_tokens() -> usize {
+    2usize.pow(account_tree_depth() as u32)
+}
+pub const ETH_TOKEN_ID: TokenId = 0;
+
 pub const ACCOUNT_ID_BIT_WIDTH: usize = 24;
 
 pub const INPUT_DATA_ADDRESS_BYTES_WIDTH: usize = 32;
@@ -49,12 +81,7 @@ pub const INPUT_DATA_ROOT_BYTES_WIDTH: usize = 32;
 pub const INPUT_DATA_EMPTY_BYTES_WIDTH: usize = 64;
 pub const INPUT_DATA_ROOT_HASH_BYTES_WIDTH: usize = 32;
 
-/// Balance tree depth
-pub const BALANCE_TREE_DEPTH: usize = 8;
-pub const MAX_SUPPORTED_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
 pub const TOKEN_BIT_WIDTH: usize = 16;
-
-/// Account tree depth
 pub const TX_TYPE_BIT_WIDTH: usize = 8;
 
 /// Account subtree hash width
@@ -98,10 +125,6 @@ pub const FR_BIT_WIDTH_PADDED: usize = 256;
 
 pub const LEAF_DATA_BIT_WIDTH: usize =
     NONCE_BIT_WIDTH + NEW_PUBKEY_HASH_WIDTH + FR_BIT_WIDTH_PADDED + ETH_ADDRESS_BIT_WIDTH;
-
-/// Number of supported tokens.
-pub const TOTAL_TOKENS: usize = 1 << BALANCE_TREE_DEPTH;
-pub const ETH_TOKEN_ID: TokenId = 0;
 
 static mut BLOCK_CHUNK_SIZES_VALUE: Vec<usize> = Vec::new();
 

@@ -65,7 +65,7 @@ fn exit_circuit() -> impl Circuit<Engine> + Clone {
                 },
                 account_path: vec![None; params::account_tree_depth()],
                 balance_value: None,
-                balance_subtree_path: vec![None; params::BALANCE_TREE_DEPTH],
+                balance_subtree_path: vec![None; params::balance_tree_depth()],
             },
         },
     }
@@ -104,7 +104,7 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
                 },
                 account_path: vec![None; params::account_tree_depth()],
                 balance_value: None,
-                balance_subtree_path: vec![None; params::BALANCE_TREE_DEPTH],
+                balance_subtree_path: vec![None; params::balance_tree_depth()],
             },
         },
         rhs: OperationBranch {
@@ -118,7 +118,7 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
                 },
                 account_path: vec![None; params::account_tree_depth()],
                 balance_value: None,
-                balance_subtree_path: vec![None; params::BALANCE_TREE_DEPTH],
+                balance_subtree_path: vec![None; params::balance_tree_depth()],
             },
         },
     };
@@ -132,7 +132,7 @@ fn zksync_circuit(block_chunks: usize) -> impl Circuit<Engine> + Clone {
         validator_address: None,
         block_number: None,
         pub_data_commitment: None,
-        validator_balances: vec![None; (1 << params::BALANCE_TREE_DEPTH) as usize],
+        validator_balances: vec![None; params::total_tokens()],
         validator_audit_path: vec![None; params::account_tree_depth()],
         operations: vec![empty_operation; block_chunks],
         validator_account: AccountWitness {

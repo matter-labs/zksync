@@ -104,7 +104,7 @@ mod test {
         Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree,
     };
     use models::circuit::utils::*;
-    use models::params as franklin_constants;
+    use models::params;
 
     use crate::rand::{Rng, SeedableRng, XorShiftRng};
 
@@ -122,8 +122,7 @@ mod test {
         let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
         let phasher = RescueHasher::<Bn256>::default();
 
-        let mut tree: CircuitAccountTree =
-            CircuitAccountTree::new(franklin_constants::account_tree_depth());
+        let mut tree: CircuitAccountTree = CircuitAccountTree::new(params::account_tree_depth());
 
         let sender_sk = PrivateKey::<Bn256>(rng.gen());
         let sender_pk = PublicKey::from_private(&sender_sk, p_g, jubjub_params);
@@ -138,14 +137,14 @@ mod test {
         let (validator_x, validator_y) = validator_pk.0.into_xy();
         println!("x = {}, y = {}", validator_x, validator_y);
         let validator_leaf = CircuitAccount::<Bn256> {
-            subtree: CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH),
+            subtree: CircuitBalanceTree::new(params::balance_tree_depth()),
             nonce: Fr::zero(),
             pub_key_hash: validator_pub_key_hash,
             address: Fr::zero(),
         };
 
         let mut validator_balances = vec![];
-        for _ in 0..1 << franklin_constants::BALANCE_TREE_DEPTH {
+        for _ in 0..params::total_tokens() {
             validator_balances.push(Some(Fr::zero()));
         }
         tree.insert(validator_address_number, validator_leaf);
@@ -159,8 +158,7 @@ mod test {
         let sender_balance_before_as_field_element =
             Fr::from_str(&sender_balance_before.to_string()).unwrap();
 
-        let mut sender_balance_tree =
-            CircuitBalanceTree::new(franklin_constants::BALANCE_TREE_DEPTH);
+        let mut sender_balance_tree = CircuitBalanceTree::new(params::balance_tree_depth());
         sender_balance_tree.insert(
             token,
             Balance {

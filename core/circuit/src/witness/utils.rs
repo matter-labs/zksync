@@ -25,6 +25,7 @@ use models::node::block::Block;
 use models::node::tx::PackedPublicKey;
 use models::node::{AccountId, BlockNumber, Engine, Fr};
 use models::params as franklin_constants;
+use models::params::total_tokens;
 use models::primitives::big_decimal_to_u128;
 use plasma::state::CollectedFee;
 
@@ -96,9 +97,8 @@ impl<'a> WitnessBuilder<'a> {
             .account_tree
             .get(self.fee_account_id)
             .expect("fee account is not in the tree");
-        let mut fee_circuit_account_balances =
-            Vec::with_capacity(1 << models::params::BALANCE_TREE_DEPTH);
-        for i in 0u32..1u32 << (models::params::BALANCE_TREE_DEPTH as u32) {
+        let mut fee_circuit_account_balances = Vec::with_capacity(models::params::total_tokens());
+        for i in 0u32..(total_tokens() as u32) {
             let balance_value = fee_circuit_account
                 .subtree
                 .get(i)

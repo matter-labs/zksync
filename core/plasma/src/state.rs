@@ -145,7 +145,7 @@ impl PlasmaState {
     fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
         // NOTE: Authroization of the FullExit is verified on the contract.
         assert!(
-            priority_op.token < params::TOTAL_TOKENS as TokenId,
+            priority_op.token < params::total_tokens() as TokenId,
             "Full exit token is out of range, this should be enforced by contract"
         );
         trace!("Processing {:?}", priority_op);
@@ -210,7 +210,7 @@ impl PlasmaState {
 
     fn apply_transfer(&mut self, tx: Transfer) -> Result<OpSuccess, Error> {
         ensure!(
-            tx.token < (params::TOTAL_TOKENS as TokenId),
+            tx.token < (params::total_tokens() as TokenId),
             "Token id is not supported"
         );
         let (from, from_account) = self
@@ -249,7 +249,7 @@ impl PlasmaState {
 
     fn apply_withdraw(&mut self, tx: Withdraw) -> Result<OpSuccess, Error> {
         ensure!(
-            tx.token < (params::TOTAL_TOKENS as TokenId),
+            tx.token < (params::total_tokens() as TokenId),
             "Token id is not supported"
         );
         let (account_id, account) = self
@@ -508,7 +508,7 @@ impl PlasmaState {
         let mut updates = Vec::new();
         let account = self.get_account(op.account_id).unwrap();
 
-        for token in 0..params::TOTAL_TOKENS {
+        for token in 0..params::total_tokens() {
             if account.get_balance(token as TokenId) != BigDecimal::from(0) {
                 bail!("Account is not empty, token id: {}", token);
             }

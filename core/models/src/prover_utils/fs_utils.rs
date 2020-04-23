@@ -1,6 +1,6 @@
 use super::{SETUP_MAX_POW2, SETUP_MIN_POW2};
 use crate::node::Engine;
-use crate::params::{account_tree_depth, BALANCE_TREE_DEPTH};
+use crate::params::{account_tree_depth, balance_tree_depth};
 use crypto_exports::bellman::kate_commitment::{Crs, CrsForLagrangeForm, CrsForMonomialForm};
 use failure::format_err;
 use std::fs::File;
@@ -14,7 +14,7 @@ pub fn get_keys_root_dir() -> PathBuf {
     out_dir.push(&format!(
         "account-{}_balance-{}",
         account_tree_depth(),
-        BALANCE_TREE_DEPTH
+        balance_tree_depth(),
     ));
     out_dir
 }
