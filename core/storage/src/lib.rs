@@ -92,6 +92,7 @@ pub mod connection;
 pub mod data_restore;
 pub mod diff;
 pub mod ethereum;
+pub mod leader_election;
 pub mod prover;
 pub mod tokens;
 pub mod utils;
@@ -155,6 +156,11 @@ impl StorageProcessor {
     /// Gains access to the `Tokens` schema.
     pub fn tokens_schema(&self) -> tokens::TokensSchema<'_> {
         tokens::TokensSchema(self)
+    }
+
+    // Gains access to the `LeaderElection` schema.
+    pub fn leader_election_schema(&self) -> leader_election::LeaderElectionSchema<'_> {
+        leader_election::LeaderElectionSchema(self)
     }
 
     /// Performs several database operations within one database transaction.
