@@ -10,18 +10,9 @@ echo SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS=$SUPPORTED_BLOCK_CHUNKS_SIZES_SET
 echo BLOCK_CHUNK_SIZES=$BLOCK_CHUNK_SIZES
 
 
-# we donwload only keys used in node (defined by $BLOCK_CHUNK_SIZES)
-SUP_CHUNKS_ARR=($(echo $SUPPORTED_BLOCK_CHUNKS_SIZES | tr ',' "\n"))
-SUP_CHUNKS_POW=($(echo $SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS | tr ',' "\n"))
-
-REQUIRED_SETUP_POWS=""
-for index in ${!SUP_CHUNKS_ARR[*]}; do
-    for my_size in ${BLOCK_CHUNK_SIZES//,/ }; do
-        if [ $my_size == ${SUP_CHUNKS_ARR[$index]} ]; then
-            REQUIRED_SETUP_POWS="$REQUIRED_SETUP_POS,${SUP_CHUNKS_POW[$index]}"
-        fi
-    done
-done
+# we download only keys used in node (defined by $BLOCK_CHUNK_SIZES)
+source /bin/utils.sh
+REQUIRED_SETUP_POWS=`get_required_plonk_setup_powers`
 
 echo Downloading setup powers $REQUIRED_SETUP_POWS
 

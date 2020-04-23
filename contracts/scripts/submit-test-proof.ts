@@ -5,12 +5,13 @@ const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 
 
+const MAX_CONTRACT_SIZE_BYTES = 24576;
 async function main() {
     const verifierContractCode = require('../build/ConcreteVerifier.json');
     let verifier = await deployContract(wallet, verifierContractCode, [], {
         gasLimit: 3000000,
     });
-    console.log(`bytecode size ${verifierContractCode.bytecode.length / 2}/24576`);
+    console.log(`bytecode size ${verifierContractCode.bytecode.length / 2}/${MAX_CONTRACT_SIZE_BYTES}`);
     console.log("contract deployed: ", verifier.address);
 
     const pubInput = ["9366919236262480046626087110386428225440480409139203903479219191712040973482"];

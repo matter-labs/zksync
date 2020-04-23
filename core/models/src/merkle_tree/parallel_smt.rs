@@ -697,7 +697,7 @@ mod tests {
         }
 
         fn hash_elements<I: IntoIterator<Item = u64>>(&self, _elements: I) -> u64 {
-            unimplemented!()
+            unreachable!("Hash elements is specific for rescue hash and used only for pubkey hash derivation")
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {

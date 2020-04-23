@@ -27,12 +27,11 @@ pub fn test_genesis_plasma_state(
         panic!("AccountId {} is existing fee account", FEE_ACCOUNT_ID);
     }
 
-    let validator_account = vec![(
+    let validator_account = std::iter::once((
         FEE_ACCOUNT_ID,
         Account::default_with_address(&Address::default()),
-    )]
-    .into_iter()
-    .chain(accounts.into_iter())
+    ))
+    .chain(accounts)
     .collect();
     let plasma_state = PlasmaState::new(validator_account, 1);
 
