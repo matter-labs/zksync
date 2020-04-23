@@ -249,9 +249,11 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         // User must fill storage slot of balancesToWithdraw[msg.sender][tokenId] with nonzero value
         // In this case operator should just overwrite this slot
-        balancesToWithdraw[msg.sender][tokenId].gagValue = 0xff;
+        balancesToWithdraw[msg.sender][tokenId].gasReserveValue = 0xff;
 
-        makePendingWithdrawalsSlotsNonzero(3);
+        // User must reserve gas in pendingWithdrawals mapping storage slots with nonzero value
+        // In this case operator should just overwrite this slots
+        reserveGasForPendingWithdrawals(3);
     }
 
     /// @notice Register deposit request - pack pubdata, add priority request and emit OnchainDeposit event

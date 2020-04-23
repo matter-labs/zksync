@@ -27,7 +27,7 @@ contract Storage {
 
     struct BalanceToWithdraw {
         uint128 balanceToWithdraw;
-        uint8 gagValue; // gives user opportunity to fill storage slot with nonzero value
+        uint8 gasReserveValue; // gives user opportunity to fill storage slot with nonzero value
     }
 
     /// @notice Root-chain balances (per owner and token id) to withdraw
@@ -37,7 +37,7 @@ contract Storage {
     struct PendingWithdrawal {
         address to;
         uint16 tokenId;
-        uint8 gagValue; // gives user opportunity to fill storage slot with nonzero value
+        uint8 gasReserveValue; // gives user opportunity to fill storage slot with nonzero value
     }
     
     /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index)
@@ -50,13 +50,13 @@ contract Storage {
 
     /// @notice fills following storage slots in pendingWithdrawals mapping with nonzero value
     /// @param _n number of slots to fill
-    function makePendingWithdrawalsSlotsNonzero(uint32 _n) public {
+    function reserveGasForPendingWithdrawals(uint32 _n) public {
         uint32 startIndex = lastNonzeroPendingWithdrawalId;
         if (startIndex < firstPendingWithdrawalIndex + numberOfPendingWithdrawals) {
             startIndex = firstPendingWithdrawalIndex + numberOfPendingWithdrawals;
         }
         for (uint32 i = 0; i < _n; i++) {
-            pendingWithdrawals[startIndex + i].gagValue = 0xff;
+            pendingWithdrawals[startIndex + i].gasReserveValue = 0xff;
         }
         lastNonzeroPendingWithdrawalId = startIndex + _n;
     }
