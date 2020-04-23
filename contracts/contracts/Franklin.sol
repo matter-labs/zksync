@@ -576,16 +576,23 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         internal
     {
         require(withdrawalsData.length % ONCHAIN_WITHDRAWAL_BYTES == 0, "pow11"); // pow11 - withdrawalData length is not multiple of ONCHAIN_WITHDRAWAL_BYTES
+
+        uint32 currentFirstPendingWithdrawalIndex = firstPendingWithdrawalIndex + numberOfPendingWithdrawals;
+        uint32 currentNumberOfPendingWithdrawals = 0;
         bytes32 withdrawalsDataHash = keccak256("");
+
         uint offset = 0;
         while (offset < withdrawalsData.length) {
             (address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
-            storeWithdrawalAsPending(_to, _tokenId, _amount);
+            storeWithdrawalAsPending(_to, _tokenId, _amount, currentFirstPendingWithdrawalIndex + currentNumberOfPendingWithdrawals);
+            currentNumberOfPendingWithdrawals++;
 
             withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, _to, _tokenId, _amount));
             offset += ONCHAIN_WITHDRAWAL_BYTES;
         }
         require(withdrawalsDataHash == expectedWithdrawalsDataHash, "pow12"); // pow12 - withdrawals data hash not matches with expected value
+
+        numberOfPendingWithdrawals += currentNumberOfPendingWithdrawals;
     }
 
     /// @notice Block verification.
@@ -617,9 +624,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _to Receiver
     /// @param _tokenId Token id
     /// @param _amount Token amount
-    function storeWithdrawalAsPending(address _to, uint16 _tokenId, uint128 _amount) internal {
-        pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
-        numberOfPendingWithdrawals++;
+    /// @param _pendingWithdrawalIndex Index of pending withdrawal
+    function storeWithdrawalAsPending(address _to, uint16 _tokenId, uint128 _amount, uint32 _pendingWithdrawalIndex) internal {
+        pendingWithdrawals[_pendingWithdrawalIndex] = PendingWithdrawal(_to, _tokenId);
 
         balancesToWithdraw[_to][_tokenId] += _amount;
     }
