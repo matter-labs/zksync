@@ -95,6 +95,7 @@ pub struct ConfigurationOptions {
     pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
     pub confirmations_for_eth_event: u64,
+    pub api_requests_caches_size: usize,
 }
 
 impl ConfigurationOptions {
@@ -119,6 +120,7 @@ impl ConfigurationOptions {
             tx_batch_size: parse_env("TX_BATCH_SIZE"),
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
+            api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
         }
     }
 }

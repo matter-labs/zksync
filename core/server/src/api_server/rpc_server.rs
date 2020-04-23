@@ -191,14 +191,14 @@ impl RpcApp {
         mempool_request_sender: mpsc::Sender<MempoolRequest>,
         state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
-        each_cache_size: usize,
+        api_requests_caches_size: usize,
     ) -> Self {
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
         RpcApp {
-            cache_of_executed_priority_operations: SharedLruCache::new(each_cache_size),
-            cache_of_blocks_info: SharedLruCache::new(each_cache_size),
-            cache_of_transaction_receipts: SharedLruCache::new(each_cache_size),
+            cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
+            cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
+            cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
             connection_pool,
             mempool_request_sender,
             state_keeper_request_sender,
@@ -531,7 +531,7 @@ pub fn start_rpc_server(
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
-    each_cache_size: usize,
+    api_requests_caches_size: usize,
 ) {
     std::thread::Builder::new()
         .name("json_rpc_http".to_string())
@@ -544,7 +544,7 @@ pub fn start_rpc_server(
                 mempool_request_sender,
                 state_keeper_request_sender,
                 sign_verify_request_sender,
-                each_cache_size,
+                api_requests_caches_size,
             );
             rpc_app.extend(&mut io);
 

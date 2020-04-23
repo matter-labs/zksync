@@ -589,7 +589,7 @@ pub(super) fn start_server_thread_detached(
     contract_address: H160,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     panic_notify: mpsc::Sender<bool>,
-    each_cache_size: usize,
+    api_requests_caches_size: usize,
 ) {
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
@@ -599,11 +599,11 @@ pub(super) fn start_server_thread_detached(
             let runtime = actix_rt::System::new("api-server");
 
             let state = AppState {
-                cache_of_transaction_receipts: SharedLruCache::new(each_cache_size),
-                cache_of_priority_op_receipts: SharedLruCache::new(each_cache_size),
-                cache_of_block_executed_ops: SharedLruCache::new(each_cache_size),
-                cache_of_blocks_info: SharedLruCache::new(each_cache_size),
-                cache_blocks_by_height_or_hash: SharedLruCache::new(each_cache_size),
+                cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
+                cache_of_priority_op_receipts: SharedLruCache::new(api_requests_caches_size),
+                cache_of_block_executed_ops: SharedLruCache::new(api_requests_caches_size),
+                cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
+                cache_blocks_by_height_or_hash: SharedLruCache::new(api_requests_caches_size),
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{:?}", contract_address),

@@ -608,7 +608,7 @@ pub fn start_sub_notifier(
     mut executed_tx_stream: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     panic_notify: mpsc::Sender<bool>,
-    each_cache_size: usize,
+    api_requests_caches_size: usize,
 ) {
     std::thread::Builder::new()
         .spawn(move || {
@@ -617,9 +617,9 @@ pub fn start_sub_notifier(
             let mut local_pool = executor::LocalPool::new();
 
             let mut notifier = OperationNotifier {
-                cache_of_executed_priority_operations: LruCache::new(each_cache_size),
-                cache_of_transaction_receipts: LruCache::new(each_cache_size),
-                cache_of_blocks_info: LruCache::new(each_cache_size),
+                cache_of_executed_priority_operations: LruCache::new(api_requests_caches_size),
+                cache_of_transaction_receipts: LruCache::new(api_requests_caches_size),
+                cache_of_blocks_info: LruCache::new(api_requests_caches_size),
                 db_pool,
                 state_keeper_requests,
                 tx_subs: BTreeMap::new(),
