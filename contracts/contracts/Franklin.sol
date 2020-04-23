@@ -247,7 +247,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         addPriorityRequest(Operations.OpType.FullExit, pubData);
 
         // User must fill storage slot of balancesToWithdraw[msg.sender][tokenId] with nonzero value
-        // In this case operator should just overwrite this slot
+        // In this case operator should just overwrite this slot during confirming withdrawal
         balancesToWithdraw[msg.sender][tokenId].gasReserveValue = 0xff;
     }
 
@@ -359,7 +359,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
             uint32(block.number), // committed at
             _nCommittedPriorityRequests, // number of priority onchain ops in block
             blockChunks,
-            _withdrawalDataHash, // hash of onchain withdrawals data
+            _withdrawalDataHash, // hash of onchain withdrawals data (will be used during checking block withdrawal data in verifyBlock function)
             commitment, // blocks' commitment
             _newRoot // new root
         );
@@ -424,14 +424,14 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
                     pubDataPtr += DEPOSIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.PartialExit)) {
-                    uint8 addToPendingWithdrawalsQueue = 0x01;
+                    bool addToPendingWithdrawalsQueue = true;
 
                     Operations.PartialExit memory data = Operations.readPartialExitPubdata(_publicData, pubdataOffset + 1);
                     withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
 
                     pubDataPtr += PARTIAL_EXIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.FullExit)) {
-                    uint8 addToPendingWithdrawalsQueue = 0x00;
+                    bool addToPendingWithdrawalsQueue = false;
 
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
 
@@ -575,7 +575,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         totalCommittedPriorityRequests++;
     }
 
-    /// @notice Processes onchain withdrawals.
+    /// @notice Processes onchain withdrawals. Full exit withdrawals will not be added to pending withdrawals queue
     /// @dev NOTICE: must process only withdrawals which hash matches with expectedWithdrawalsDataHash.
     /// @param withdrawalsData Withdrawals data
     /// @param expectedWithdrawalsDataHash Expected withdrawals data hash
@@ -588,10 +588,11 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
 
         uint offset = 0;
         while (offset < withdrawalsData.length) {
-            (uint8 addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
+            (bool addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
             balancesToWithdraw[_to][_tokenId].balanceToWithdraw += _amount;
-            if (addToPendingWithdrawalsQueue == 0x01) {
-                storeWithdrawalAsPending(_to, _tokenId);
+            if (addToPendingWithdrawalsQueue) {
+                pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
+                numberOfPendingWithdrawals++;
             }
 
             withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, _to, _tokenId, _amount));
@@ -623,14 +624,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         totalBlocksVerified += 1;
 
         emit BlockVerified(_blockNumber);
-    }
-
-    /// @notice When block with withdrawals is verified we store them and complete in separate tx. Withdrawals can be complete by calling withdrawEth, withdrawERC20 or completeWithdrawals.
-    /// @param _to Receiver
-    /// @param _tokenId Token id
-    function storeWithdrawalAsPending(address _to, uint16 _tokenId) internal {
-        pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
-        numberOfPendingWithdrawals++;
     }
 
     /// @notice Checks whether oldest unverified block has expired

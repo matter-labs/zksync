@@ -629,7 +629,6 @@ impl TestSetup {
             *self.tokens.get(&token.0).expect("Token does not exist")
         };
 
-        let _zksync0_old = self.get_expected_zksync_account_balance(from, token.0);
         self.expected_changes_for_current_block
             .sync_accounts_state
             .insert((from, token.0), BigDecimal::from(0));

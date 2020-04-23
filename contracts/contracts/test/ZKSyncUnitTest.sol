@@ -16,7 +16,8 @@ contract ZKSyncUnitTest is FranklinTest {
     function receiveETH() payable external{}
 
     function addPendingWithdrawal(address _to, uint16 _tokenId, uint128 _amount) external {
-        storeWithdrawalAsPending(_to, _tokenId);
+        pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
+        numberOfPendingWithdrawals++;
         balancesToWithdraw[_to][_tokenId].balanceToWithdraw += _amount;
     }
 
