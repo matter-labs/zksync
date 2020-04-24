@@ -211,7 +211,11 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         // Get token id by its address
         uint16 tokenId = governance.validateTokenAddress(address(_token));
 
+        uint256 balance_before = _token.balanceOf(address(this));
         require(_token.transferFrom(msg.sender, address(this), _amount), "fd012"); // token transfer failed deposit
+        uint256 balance_after = _token.balanceOf(address(this));
+        require(balance_after == balance_before + uint256(_amount), "det11"); // det11 - incorrect token balance diff
+        require(balance_after >= balance_before, "det12"); // det12 - token balance overflow
 
         registerDeposit(tokenId, _amount, _franklinAddr);
     }
