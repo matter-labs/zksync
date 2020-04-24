@@ -10,7 +10,7 @@ use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_ele
 use models::params as franklin_constants;
 
 use models::node::TransferOp;
-use models::primitives::big_decimal_to_u128;
+use num::ToPrimitive;
 
 #[derive(Debug)]
 pub struct TransferData {
@@ -125,8 +125,8 @@ pub fn apply_transfer_tx(
     transfer: &TransferOp,
 ) -> TransferWitness<Bn256> {
     let transfer_data = TransferData {
-        amount: big_decimal_to_u128(&transfer.tx.amount),
-        fee: big_decimal_to_u128(&transfer.tx.fee),
+        amount: transfer.tx.amount.to_u128().unwrap(),
+        fee: transfer.tx.fee.to_u128().unwrap(),
         token: u32::from(transfer.tx.token),
         from_account_address: transfer.from,
         to_account_address: transfer.to,
@@ -355,8 +355,8 @@ pub fn calculate_transfer_operations_from_witness(
 mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
-    use bigdecimal::BigDecimal;
     use models::node::Account;
+    use num::BigUint;
     use testkit::zksync_account::ZksyncAccount;
 
     #[test]
@@ -367,7 +367,7 @@ mod test {
         let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
-            account.add_balance(0, &BigDecimal::from(10));
+            account.add_balance(0, &BigUint::from(10u32));
             account.pub_key_hash = from_zksync_account.pubkey_hash.clone();
             account
         };
@@ -388,8 +388,8 @@ mod test {
                 .sign_transfer(
                     0,
                     "",
-                    BigDecimal::from(7),
-                    BigDecimal::from(3),
+                    7u32.into(),
+                    3u32.into(),
                     &to_account_address,
                     None,
                     true,
@@ -451,7 +451,7 @@ mod test {
         let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
-            account.add_balance(0, &BigDecimal::from(10));
+            account.add_balance(0, &BigUint::from(10u32));
             account.pub_key_hash = from_zksync_account.pubkey_hash.clone();
             account
         };
@@ -467,8 +467,8 @@ mod test {
                 .sign_transfer(
                     0,
                     "",
-                    BigDecimal::from(7),
-                    BigDecimal::from(3),
+                    7u32.into(),
+                    3u32.into(),
                     &from_account_address,
                     None,
                     true,

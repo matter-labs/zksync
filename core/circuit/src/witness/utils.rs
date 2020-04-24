@@ -23,7 +23,7 @@ use models::node::block::Block;
 use models::node::tx::PackedPublicKey;
 use models::node::{AccountId, BlockNumber, Engine, Fr};
 use models::params as franklin_constants;
-use models::primitives::big_decimal_to_u128;
+use num::ToPrimitive;
 use plasma::state::CollectedFee;
 
 /// Wrapper around `CircuitAccountTree`
@@ -113,7 +113,7 @@ impl<'a> WitnessBuilder<'a> {
                 &mut self.account_tree,
                 self.fee_account_id,
                 u32::from(*token),
-                big_decimal_to_u128(amount),
+                amount.to_u128().unwrap(),
             );
             root_after_fee = root;
             fee_account_witness = acc_witness;

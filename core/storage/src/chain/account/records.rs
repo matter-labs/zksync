@@ -1,6 +1,6 @@
 // External imports
 use crate::schema::*;
-use bigdecimal::BigDecimal;
+use crate::utils::StoredBigUint;
 
 #[derive(Debug, Identifiable, Insertable, QueryableByName, Queryable)]
 #[table_name = "accounts"]
@@ -30,8 +30,8 @@ pub struct StorageAccountUpdate {
     pub account_id: i64,
     pub block_number: i64,
     pub coin_id: i32,
-    pub old_balance: BigDecimal,
-    pub new_balance: BigDecimal,
+    pub old_balance: StoredBigUint,
+    pub new_balance: StoredBigUint,
     pub old_nonce: i64,
     pub new_nonce: i64,
     pub update_order_id: i32,
@@ -44,8 +44,8 @@ pub struct StorageAccountUpdateInsert {
     pub account_id: i64,
     pub block_number: i64,
     pub coin_id: i32,
-    pub old_balance: BigDecimal,
-    pub new_balance: BigDecimal,
+    pub old_balance: StoredBigUint,
+    pub new_balance: StoredBigUint,
     pub old_nonce: i64,
     pub new_nonce: i64,
 }
@@ -82,5 +82,5 @@ pub struct StorageAccountPubkeyUpdate {
 pub struct StorageBalance {
     pub account_id: i64,
     pub coin_id: i32,
-    pub balance: BigDecimal,
+    pub balance: StoredBigUint,
 }

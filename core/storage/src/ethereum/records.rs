@@ -1,8 +1,8 @@
 // External imports
-use bigdecimal::BigDecimal;
 // Workspace imports
 // Local imports
 use crate::schema::*;
+use crate::utils::StoredBigUint;
 
 #[derive(Debug, Clone, Queryable, QueryableByName, PartialEq)]
 #[table_name = "eth_operations"]
@@ -14,7 +14,7 @@ pub struct StorageETHOperation {
     pub op_type: String,
     pub final_hash: Option<Vec<u8>>,
     pub last_deadline_block: i64,
-    pub last_used_gas_price: BigDecimal,
+    pub last_used_gas_price: StoredBigUint,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName, PartialEq)]
@@ -39,7 +39,7 @@ pub struct NewETHOperation {
     pub raw_tx: Vec<u8>,
     pub op_type: String,
     pub last_deadline_block: i64,
-    pub last_used_gas_price: BigDecimal,
+    pub last_used_gas_price: StoredBigUint,
 }
 
 #[derive(Debug, Insertable, PartialEq)]

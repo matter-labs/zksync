@@ -227,8 +227,8 @@ mod test {
     };
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
     use crate::witness::utils::WitnessBuilder;
-    use bigdecimal::BigDecimal;
     use models::node::{Account, FullExit, FullExitOp};
+    use num::BigUint;
     use testkit::zksync_account::ZksyncAccount;
 
     #[test]
@@ -239,7 +239,7 @@ mod test {
         let account_address = zksync_account.address;
         let account = {
             let mut account = Account::default_with_address(&account_address);
-            account.add_balance(0, &BigDecimal::from(10));
+            account.add_balance(0, &BigUint::from(10u32));
             account.pub_key_hash = zksync_account.pubkey_hash;
             account
         };
@@ -249,19 +249,20 @@ mod test {
         let fee_account_id = 0;
         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
-        let full_exit_op = FullExitOp {
+        let mut full_exit_op = FullExitOp {
             priority_op: FullExit {
                 account_id,
                 eth_address: account_address,
                 token: 0,
             },
-            withdraw_amount: Some(BigDecimal::from(10)),
+            withdraw_amount: Some(BigUint::from(10u32)),
         };
 
         println!("node root hash before op: {:?}", plasma_state.root_hash());
         plasma_state.apply_full_exit_op(&full_exit_op);
         println!("node root hash after op: {:?}", plasma_state.root_hash());
 
+        full_exit_op.withdraw_amount = Some(BigUint::from(11u32));
         let full_exit_witness =
             apply_full_exit_tx(&mut witness_accum.account_tree, &full_exit_op, true);
         let full_exit_operations = calculate_full_exit_operations_from_witness(&full_exit_witness);

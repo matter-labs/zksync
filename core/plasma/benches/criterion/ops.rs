@@ -26,7 +26,7 @@ const CURRENT_BLOCK: BlockNumber = 1_000;
 
 /// Creates a random ZKSync account.
 fn generate_account() -> (H256, PrivateKey, Account) {
-    let default_balance = 1_000_000.into();
+    let default_balance = 1_000_000u32.into();
 
     let rng = &mut thread_rng();
     let sk = priv_key_from_fs(rng.gen());
@@ -71,8 +71,8 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
         from_account.address,
         Address::random(),
         ETH_TOKEN_ID,
-        10.into(),
-        1.into(),
+        10u32.into(),
+        1u32.into(),
         0,
         private_key,
     )
@@ -104,8 +104,8 @@ fn apply_transfer_op(b: &mut Bencher<'_>) {
         from_account.address,
         to_account.address,
         ETH_TOKEN_ID,
-        10.into(),
-        1.into(),
+        10u32.into(),
+        1u32.into(),
         0,
         private_key,
     )
@@ -161,7 +161,7 @@ fn apply_deposit_op(b: &mut Bencher<'_>) {
         from: Address::random(),
         to: to_account.address,
         token: ETH_TOKEN_ID,
-        amount: 10.into(),
+        amount: 10u32.into(),
     };
 
     let deposit_op = FranklinPriorityOp::Deposit(deposit);
@@ -188,8 +188,8 @@ fn apply_withdraw_op(b: &mut Bencher<'_>) {
         from_account.address,
         Address::random(),
         ETH_TOKEN_ID,
-        10.into(),
-        1.into(),
+        10u32.into(),
+        1u32.into(),
         0,
         private_key,
     )

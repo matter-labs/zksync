@@ -36,7 +36,8 @@ actix-rt = "0.2.5"
 actix-cors = "0.1.0"
 actix-web = "1.0.8"
 
-bigdecimal = { version = "0.1.0", features = ["serde"]}
+num = { version = "0.2", features = ["serde"] }
+bigdecimal = { version = "0.1", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
 diesel = { version = "1.4.3", features = ["postgres", "serde_json", "r2d2", "chrono"] }
 ctrlc = "3.1"

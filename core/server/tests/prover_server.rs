@@ -9,6 +9,7 @@ use circuit::witness::deposit::apply_deposit_tx;
 use circuit::witness::deposit::calculate_deposit_operations_from_witness;
 use models::node::Address;
 use models::params::block_chunk_sizes;
+use num::BigUint;
 use prover::client;
 use prover::ApiClient;
 use server::prover_server;
@@ -169,7 +170,7 @@ pub fn test_operation_and_wanted_prover_data(
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
         from: validator_account.address,
         token: 0,
-        amount: bigdecimal::BigDecimal::from(10),
+        amount: BigUint::from(10u32),
         to: validator_account.address,
     });
     let mut op_success = state.execute_priority_op(deposit_priority_op.clone());
@@ -210,7 +211,7 @@ pub fn test_operation_and_wanted_prover_data(
                 serial_id: 0,
                 data: deposit_priority_op.clone(),
                 deadline_block: 2,
-                eth_fee: bigdecimal::BigDecimal::from(0),
+                eth_fee: BigUint::from(0u32),
                 eth_hash: vec![0; 8],
             },
             block_index: 0,

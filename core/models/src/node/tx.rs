@@ -4,8 +4,8 @@ use crate::node::{
     is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount, CloseOp,
     TransferOp, WithdrawOp,
 };
-use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
+use num::{BigUint, ToPrimitive};
 
 use super::account::PubKeyHash;
 use super::Engine;
@@ -18,7 +18,7 @@ use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
 use crate::params::JUBJUB_PARAMS;
-use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
+use crate::primitives::pedersen_hash_tx_msg;
 use failure::{bail, ensure, format_err};
 use parity_crypto::publickey::{
     public_to_address, recover, sign, KeyPair, Signature as ETHSignature,
@@ -106,8 +106,8 @@ pub struct Transfer {
     pub from: Address,
     pub to: Address,
     pub token: TokenId,
-    pub amount: BigDecimal,
-    pub fee: BigDecimal,
+    pub amount: BigUint,
+    pub fee: BigUint,
     pub nonce: Nonce,
     pub signature: TxSignature,
     #[serde(skip)]
@@ -123,8 +123,8 @@ impl Transfer {
         from: Address,
         to: Address,
         token: TokenId,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Nonce,
         signature: Option<TxSignature>,
     ) -> Self {
@@ -149,8 +149,8 @@ impl Transfer {
         from: Address,
         to: Address,
         token: TokenId,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Nonce,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, failure::Error> {
@@ -175,10 +175,7 @@ impl Transfer {
     }
 
     pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.amount.is_integer() // TODO: remove after # 366
-            && self.fee.is_integer()
-            && is_token_amount_packable(&self.amount)
-            && is_fee_amount_packable(&self.fee);
+        let mut valid = is_token_amount_packable(&self.amount) && is_fee_amount_packable(&self.fee);
         if valid {
             let signer = self.verify_signature();
             valid = valid && signer.is_some();
@@ -219,8 +216,8 @@ pub struct Withdraw {
     pub from: Address,
     pub to: Address,
     pub token: TokenId,
-    pub amount: BigDecimal,
-    pub fee: BigDecimal,
+    pub amount: BigUint,
+    pub fee: BigUint,
     pub nonce: Nonce,
     pub signature: TxSignature,
     #[serde(skip)]
@@ -236,8 +233,8 @@ impl Withdraw {
         from: Address,
         to: Address,
         token: TokenId,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Nonce,
         signature: Option<TxSignature>,
     ) -> Self {
@@ -262,8 +259,8 @@ impl Withdraw {
         from: Address,
         to: Address,
         token: TokenId,
-        amount: BigDecimal,
-        fee: BigDecimal,
+        amount: BigUint,
+        fee: BigUint,
         nonce: Nonce,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, failure::Error> {
@@ -281,17 +278,15 @@ impl Withdraw {
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
-        out.extend_from_slice(&big_decimal_to_u128(&self.amount).to_be_bytes());
+        out.extend_from_slice(&self.amount.to_u128().unwrap().to_be_bytes());
         out.extend_from_slice(&pack_fee_amount(&self.fee));
         out.extend_from_slice(&self.nonce.to_be_bytes());
         out
     }
 
     pub fn check_correctness(&mut self) -> bool {
-        let mut valid = self.amount <= u128_to_bigdecimal(u128::max_value())
-            && self.amount.is_integer() // TODO: remove after # 366
-            && self.fee.is_integer()
-            && is_fee_amount_packable(&self.fee);
+        let mut valid =
+            self.amount <= BigUint::from(u128::max_value()) && is_fee_amount_packable(&self.fee);
 
         if valid {
             let signer = self.verify_signature();

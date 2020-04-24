@@ -1,7 +1,5 @@
 // Built-in deps
 use std::convert::TryInto;
-use std::ops::Rem;
-use std::str::FromStr;
 // External deps
 use crate::franklin_crypto::bellman::pairing::bn256::Bn256;
 use crate::franklin_crypto::bellman::pairing::ff::ScalarEngine;
@@ -10,8 +8,8 @@ use crate::franklin_crypto::bellman::pairing::ff::{
 };
 use crate::franklin_crypto::bellman::pairing::{CurveAffine, Engine};
 use crate::franklin_crypto::jubjub::{edwards, JubjubEngine, Unknown};
-use bigdecimal::BigDecimal;
 use failure::bail;
+use num::{BigUint, FromPrimitive, ToPrimitive};
 use web3::types::U256;
 // Workspace deps
 use crate::circuit::utils::append_le_fixed_width;
@@ -58,8 +56,8 @@ pub fn get_bits_le_fixed_u128(num: u128, n: usize) -> Vec<bool> {
     r
 }
 
-pub fn get_bits_le_fixed_big_decimal(num: BigDecimal, n: usize) -> Vec<bool> {
-    let as_u128 = big_decimal_to_u128(&num);
+pub fn get_bits_le_fixed_big_decimal(num: BigUint, n: usize) -> Vec<bool> {
+    let as_u128 = num.to_u128().unwrap();
 
     get_bits_le_fixed_u128(as_u128, n)
 }
@@ -295,8 +293,8 @@ pub fn unpack_float(data: &[u8], exponent_len: usize, mantissa_len: usize) -> Op
     mantissa.checked_mul(exponent)
 }
 
-pub fn pack_as_float(number: &BigDecimal, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
-    let uint = big_decimal_to_u128(number);
+pub fn pack_as_float(number: &BigUint, exponent_len: usize, mantissa_len: usize) -> Vec<u8> {
+    let uint = number.to_u128().expect("Only u128 allowed");
 
     let mut vec = convert_to_float(uint, exponent_len, mantissa_len, 10).expect("packing error");
     vec.reverse();
@@ -307,9 +305,9 @@ pub fn unpack_as_big_decimal(
     bytes: &[u8],
     exponent_len: usize,
     mantissa_len: usize,
-) -> Option<BigDecimal> {
-    let amount_u128: u128 = unpack_float(bytes, exponent_len, mantissa_len)?;
-    BigDecimal::from_str(&amount_u128.to_string()).ok()
+) -> Option<BigUint> {
+    let amount = unpack_float(bytes, exponent_len, mantissa_len)?;
+    BigUint::from_u128(amount)
 }
 
 pub fn convert_to_float(
@@ -407,26 +405,6 @@ pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     let mut hash_bits = Vec::new();
     append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
     pack_bits_into_bytes(hash_bits)
-}
-
-/// Its important to use this, instead of bit_decimal.to_u128()
-pub fn big_decimal_to_u128(big_decimal: &BigDecimal) -> u128 {
-    assert!(big_decimal.is_integer(), "big decimal should be integer");
-    big_decimal.to_string().parse().unwrap()
-}
-
-// TODO: HACK remove after task #366
-pub fn floor_big_decimal(big_decimal: &BigDecimal) -> BigDecimal {
-    BigDecimal::from(
-        (big_decimal - big_decimal.rem(BigDecimal::from(1)))
-            .as_bigint_and_exponent()
-            .0,
-    )
-}
-
-/// Its important to use this, instead of BigDecimal::from_u128()
-pub fn u128_to_bigdecimal(n: u128) -> BigDecimal {
-    n.to_string().parse().unwrap()
 }
 
 pub fn bytes_slice_to_uint32(bytes: &[u8]) -> Option<u32> {

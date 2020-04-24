@@ -3,9 +3,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{thread, time};
 // External deps
-use bigdecimal::BigDecimal;
 use crypto_exports::franklin_crypto::{self, bellman};
 use crypto_exports::pairing::ff::PrimeField;
+use num::BigUint;
 // Workspace deps
 use circuit::witness::deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness};
 use circuit::witness::utils::WitnessBuilder;
@@ -148,7 +148,7 @@ fn new_test_data_for_prover() -> ProverData {
         priority_op: Deposit {
             from: empty_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: empty_account_address,
         },
         account_id: empty_account_id,

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-bigdecimal = { version = "0.1.0", features = ["serde"]}
+num = { version = "0.2", features = ["serde"] }
 tiny-keccak = "1.4.2"
 ethabi = "9.0.0"
 web3 = "0.10.0"

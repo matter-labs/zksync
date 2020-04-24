@@ -15,7 +15,7 @@ use models::circuit::utils::{
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 use models::node::WithdrawOp;
 use models::params as franklin_constants;
-use models::primitives::big_decimal_to_u128;
+use num::ToPrimitive;
 
 pub struct WithdrawData {
     pub amount: u128,
@@ -116,8 +116,8 @@ pub fn apply_withdraw_tx(
     withdraw: &WithdrawOp,
 ) -> WithdrawWitness<Bn256> {
     let withdraw_data = WithdrawData {
-        amount: big_decimal_to_u128(&withdraw.tx.amount),
-        fee: big_decimal_to_u128(&withdraw.tx.fee),
+        amount: withdraw.tx.amount.to_u128().unwrap(),
+        fee: withdraw.tx.fee.to_u128().unwrap(),
         token: u32::from(withdraw.tx.token),
         account_address: withdraw.account_id,
         eth_address: eth_address_to_fr(&withdraw.tx.to),
@@ -341,8 +341,8 @@ mod test {
     use super::*;
 
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
-    use bigdecimal::BigDecimal;
     use models::node::Account;
+    use num::BigUint;
     use web3::types::Address;
 
     #[test]
@@ -355,7 +355,7 @@ mod test {
         let account_address = zksync_account.address;
         let account = {
             let mut account = Account::default_with_address(&account_address);
-            account.add_balance(0, &BigDecimal::from(10));
+            account.add_balance(0, &BigUint::from(10u32));
             account.pub_key_hash = zksync_account.pubkey_hash.clone();
             account
         };
@@ -370,8 +370,8 @@ mod test {
                 .sign_withdraw(
                     0,
                     "",
-                    BigDecimal::from(7),
-                    BigDecimal::from(3),
+                    7u32.into(),
+                    3u32.into(),
                     &Address::zero(),
                     None,
                     true,

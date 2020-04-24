@@ -1,4 +1,3 @@
-use bigdecimal::BigDecimal;
 use failure::{bail, ensure, format_err, Error};
 use log::trace;
 use models::node::operations::{
@@ -13,6 +12,7 @@ use models::node::{
 };
 use models::node::{Close, Deposit, FranklinTx, FullExit, Transfer, Withdraw};
 use models::params;
+use num::BigUint;
 use std::collections::HashMap;
 
 #[derive(Debug)]
@@ -36,7 +36,7 @@ pub struct PlasmaState {
 #[derive(Debug, Clone)]
 pub struct CollectedFee {
     pub token: TokenId,
-    pub amount: BigDecimal,
+    pub amount: BigUint,
 }
 
 impl PlasmaState {
@@ -178,7 +178,7 @@ impl PlasmaState {
         let new_balance = account.get_balance(op.priority_op.token);
         assert_eq!(
             new_balance,
-            BigDecimal::from(0),
+            BigUint::from(0u32),
             "Full exit amount is incorrect"
         );
         let new_nonce = account.nonce;
@@ -310,7 +310,7 @@ impl PlasmaState {
         });
 
         for fee in fees {
-            if fee.amount == BigDecimal::from(0) {
+            if fee.amount == BigUint::from(0u32) {
                 continue;
             }
 
@@ -497,7 +497,7 @@ impl PlasmaState {
         let account = self.get_account(op.account_id).unwrap();
 
         for token in 0..params::TOTAL_TOKENS {
-            if account.get_balance(token as TokenId) != BigDecimal::from(0) {
+            if account.get_balance(token as TokenId) != BigUint::from(0u32) {
                 bail!("Account is not empty, token id: {}", token);
             }
         }
@@ -516,7 +516,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: params::ETH_TOKEN_ID,
-            amount: BigDecimal::from(0),
+            amount: BigUint::from(0u32),
         };
 
         Ok((fee, updates))
@@ -553,7 +553,7 @@ impl PlasmaState {
 
         let fee = CollectedFee {
             token: params::ETH_TOKEN_ID,
-            amount: BigDecimal::from(0),
+            amount: BigUint::from(0u32),
         };
 
         Ok((fee, updates))

@@ -98,8 +98,8 @@ impl<'a> StateSchema<'a> {
                             account_id: i64::from(*id),
                             block_number: i64::from(block_number),
                             coin_id: i32::from(token),
-                            old_balance: old_balance.clone(),
-                            new_balance: new_balance.clone(),
+                            old_balance: old_balance.clone().into(),
+                            new_balance: new_balance.clone().into(),
                             old_nonce: i64::from(old_nonce),
                             new_nonce: i64::from(new_nonce),
                         };

@@ -1,10 +1,9 @@
 // External uses
-use bigdecimal::BigDecimal;
 use criterion::{black_box, criterion_group, BatchSize, Bencher, Criterion, Throughput};
 // Local uses
 use models::primitives::{
-    big_decimal_to_u128, bytes_into_be_bits, get_bits_le_fixed_u128, pack_bits_into_bytes,
-    pack_bits_into_bytes_in_order, u128_to_bigdecimal, BitIteratorLe, GetBits,
+    bytes_into_be_bits, get_bits_le_fixed_u128, pack_bits_into_bytes,
+    pack_bits_into_bytes_in_order, BitIteratorLe, GetBits,
 };
 
 /// Input size for byte slices (module-wide for calculating the throughput).
@@ -24,22 +23,6 @@ fn bench_get_bits_le_fixed_u128(b: &mut Bencher<'_>) {
 
     b.iter(|| {
         let _ = get_bits_le_fixed_u128(black_box(value), n);
-    });
-}
-
-fn bench_big_decimal_to_u128(b: &mut Bencher<'_>) {
-    let value: BigDecimal = 0x0EAD_BEEF.into();
-
-    b.iter(|| {
-        let _ = big_decimal_to_u128(&black_box(value.clone()));
-    });
-}
-
-fn bench_u128_to_bigdecimal(b: &mut Bencher<'_>) {
-    let value: u128 = 0xDEAD_BEEF_DEAD_BEEF_DEAD_BEEF_DEAD_BEEF;
-
-    b.iter(|| {
-        let _ = u128_to_bigdecimal(black_box(value));
     });
 }
 
@@ -100,8 +83,6 @@ fn bench_bit_iterator_le_next(b: &mut Bencher<'_>) {
 pub fn bench_primitives(c: &mut Criterion) {
     c.bench_function("u64_get_bits_le", bench_u64_get_bits_le);
     c.bench_function("get_bits_le_fixed_u128", bench_get_bits_le_fixed_u128);
-    c.bench_function("big_decimal_to_u128", bench_big_decimal_to_u128);
-    c.bench_function("u128_to_bigdecimal", bench_u128_to_bigdecimal);
 
     let mut group = c.benchmark_group("Bit Converters");
 

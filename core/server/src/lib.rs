@@ -10,6 +10,7 @@ pub mod block_proposer;
 pub mod committer;
 pub mod eth_sender;
 pub mod eth_watch;
+pub mod fee_ticker;
 pub mod mempool;
 pub mod prover_server;
 pub mod signature_checker;

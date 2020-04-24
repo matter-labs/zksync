@@ -1,6 +1,5 @@
 //! Generate exit proof for exodus mode given account and token
 
-use bigdecimal::BigDecimal;
 use circuit::exit_circuit::create_exit_circuit_with_public_input;
 use crypto_exports::bellman::groth16::Parameters;
 use failure::{ensure, format_err};
@@ -13,6 +12,7 @@ use models::prover_utils::{
     read_circuit_proving_parameters, verify_full_baby_proof,
 };
 use models::EncodedProof;
+use num::BigUint;
 use std::time::Instant;
 
 fn read_parameters() -> Result<Parameters<Engine>, failure::Error> {
@@ -24,7 +24,7 @@ pub fn create_exit_proof(
     accounts: AccountMap,
     owner: Address,
     token_id: TokenId,
-) -> Result<(EncodedProof, BigDecimal), failure::Error> {
+) -> Result<(EncodedProof, BigUint), failure::Error> {
     let timer = Instant::now();
     let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
 

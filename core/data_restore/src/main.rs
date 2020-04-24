@@ -35,7 +35,7 @@ fn main() {
         .arg(
             Arg::with_name("continue")
                 .long("continue")
-                .help("Continues data restoreing"),
+                .help("Continues data restoring"),
         )
         .get_matches();
 

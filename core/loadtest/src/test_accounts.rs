@@ -1,6 +1,6 @@
 // Built-in import
 // External uses
-use bigdecimal::BigDecimal;
+use num::BigUint;
 use rand::Rng;
 use tokio::sync::Mutex;
 use web3::transports::Http;
@@ -86,13 +86,13 @@ impl TestAccount {
     // Creates a signed withdraw transaction.
     pub fn sign_withdraw_single(
         &self,
-        amount: BigDecimal,
+        amount: BigUint,
     ) -> (FranklinTx, Option<PackedEthSignature>) {
         let (tx, eth_signature) = self.zk_acc.sign_withdraw(
             0, // ETH
             "ETH",
             amount,
-            BigDecimal::from(0),
+            BigUint::from(0u32),
             &self.eth_acc.address,
             None,
             true,
@@ -104,7 +104,7 @@ impl TestAccount {
     pub fn sign_transfer_to_random(
         &self,
         test_accounts: &[AccountInfo],
-        amount: BigDecimal,
+        amount: BigUint,
     ) -> (FranklinTx, Option<PackedEthSignature>) {
         let to = {
             let mut to_idx = rand::thread_rng().gen_range(0, test_accounts.len() - 1);
@@ -117,7 +117,7 @@ impl TestAccount {
             0, // ETH
             "ETH",
             amount,
-            BigDecimal::from(0),
+            BigUint::from(0u32),
             &to,
             None,
             true,

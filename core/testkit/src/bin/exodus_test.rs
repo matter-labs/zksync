@@ -11,11 +11,11 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
-use bigdecimal::BigDecimal;
 use log::*;
 use models::config_options::ConfigurationOptions;
 use models::node::AccountMap;
 use models::EncodedProof;
+use num::BigUint;
 use std::time::{Duration, Instant};
 use testkit::*;
 use web3::transports::Http;
@@ -27,7 +27,7 @@ const PRIORITY_EXPIRATION: u64 = 16;
 fn create_verified_initial_state(
     test_setup: &mut TestSetup,
     deposit_account: ETHAccountId,
-    deposit_amount: &BigDecimal,
+    deposit_amount: &BigUint,
     tokens: &[Token],
     zksync_accounts: &[ZKSyncAccountId],
 ) {
@@ -50,7 +50,7 @@ fn commit_deposit_to_expire(
     from: ETHAccountId,
     to: ZKSyncAccountId,
     token: Token,
-    deposit_amount: &BigDecimal,
+    deposit_amount: &BigUint,
 ) -> u64 {
     info!("Commit deposit to expire");
     test_setup.start_block();
@@ -86,7 +86,7 @@ fn cancel_outstanding_deposits(
     test_setup: &TestSetup,
     deposit_receiver_account: ETHAccountId,
     deposit_token: Token,
-    deposit_amount: &BigDecimal,
+    deposit_amount: &BigUint,
     call_cancel_account: ETHAccountId,
 ) {
     info!("Canceling outstangind deposits");
@@ -110,7 +110,7 @@ fn check_exit_garbage_proof(
     test_setup: &mut TestSetup,
     send_account: ETHAccountId,
     token: Token,
-    amount: &BigDecimal,
+    amount: &BigUint,
 ) {
     info!(
         "Checking exit with garbage proof token: {}, amount: {}",
@@ -129,7 +129,7 @@ fn check_exit_correct_proof(
     send_account: ETHAccountId,
     fund_owner: ZKSyncAccountId,
     token: Token,
-    amount: &BigDecimal,
+    amount: &BigUint,
 ) {
     info!("Checking exit with correct proof");
     let balance_to_withdraw_before = test_setup.get_balance_to_withdraw(send_account, token);
@@ -159,7 +159,7 @@ fn check_exit_correct_proof_second_time(
     send_account: ETHAccountId,
     fund_owner: ZKSyncAccountId,
     token: Token,
-    amount: &BigDecimal,
+    amount: &BigUint,
 ) {
     info!("Checking exit with correct proof twice");
     let balance_to_withdraw_before = test_setup.get_balance_to_withdraw(send_account, token);
@@ -188,7 +188,7 @@ fn check_exit_correct_proof_other_token(
     send_account: ETHAccountId,
     fund_owner: ZKSyncAccountId,
     token: Token,
-    amount: &BigDecimal,
+    amount: &BigUint,
     false_token: Token,
 ) {
     info!("Checking exit with correct proof other token");
@@ -218,8 +218,8 @@ fn check_exit_correct_proof_other_amount(
     send_account: ETHAccountId,
     fund_owner: ZKSyncAccountId,
     token: Token,
-    amount: &BigDecimal,
-    false_amount: &BigDecimal,
+    amount: &BigUint,
+    false_amount: &BigUint,
 ) {
     info!("Checking exit with correct proof other amount");
     let balance_to_withdraw_before = test_setup.get_balance_to_withdraw(send_account, token);
@@ -248,7 +248,7 @@ fn check_exit_correct_proof_incorrect_sender(
     send_account: ETHAccountId,
     fund_owner: ZKSyncAccountId,
     token: Token,
-    amount: &BigDecimal,
+    amount: &BigUint,
 ) {
     info!("Checking exit with correct proof and incorrect sender");
     let balance_to_withdraw_before = test_setup.get_balance_to_withdraw(send_account, token);
@@ -374,7 +374,7 @@ fn exit_test() {
         &deposit_amount,
         Token(1),
     );
-    let incorrect_amount = BigDecimal::from(2) * deposit_amount.clone();
+    let incorrect_amount = BigUint::from(2u32) * deposit_amount.clone();
     check_exit_correct_proof_other_amount(
         &mut test_setup,
         verified_accounts_state.clone(),

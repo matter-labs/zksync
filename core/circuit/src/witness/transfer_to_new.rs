@@ -439,8 +439,8 @@ pub fn calculate_transfer_to_new_operations_from_witness(
 mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
-    use bigdecimal::BigDecimal;
     use models::node::Account;
+    use num::BigUint;
     use testkit::zksync_account::ZksyncAccount;
 
     #[test]
@@ -451,7 +451,7 @@ mod test {
         let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
-            account.add_balance(0, &BigDecimal::from(10));
+            account.add_balance(0, &BigUint::from(10u32));
             account.pub_key_hash = from_zksync_account.pubkey_hash.clone();
             account
         };
@@ -469,8 +469,8 @@ mod test {
                 .sign_transfer(
                     0,
                     "",
-                    BigDecimal::from(7),
-                    BigDecimal::from(3),
+                    BigUint::from(7u32),
+                    BigUint::from(3u32),
                     &to_account_address,
                     None,
                     true,

@@ -3,10 +3,10 @@ use super::TokenId;
 use crate::params::{
     ACCOUNT_ID_BIT_WIDTH, BALANCE_BIT_WIDTH, ETH_ADDRESS_BIT_WIDTH, FR_ADDRESS_LEN, TOKEN_BIT_WIDTH,
 };
-use crate::primitives::{bytes_slice_to_uint32, u128_to_bigdecimal};
-use bigdecimal::BigDecimal;
+use crate::primitives::bytes_slice_to_uint32;
 use ethabi::{decode, ParamType};
 use failure::{bail, ensure, format_err};
+use num::BigUint;
 use std::convert::{TryFrom, TryInto};
 use std::str::FromStr;
 use web3::types::{Address, Log, U256};
@@ -17,7 +17,7 @@ use super::operations::{DepositOp, FullExitOp};
 pub struct Deposit {
     pub from: Address,
     pub token: TokenId,
-    pub amount: BigDecimal,
+    pub amount: BigUint,
     pub to: Address,
 }
 
@@ -59,7 +59,7 @@ impl FranklinPriorityOp {
                 let (amount, pub_data_left) = {
                     let (amount, left) = pub_data_left.split_at(BALANCE_BIT_WIDTH / 8);
                     let amount = u128::from_be_bytes(amount.try_into().unwrap());
-                    (u128_to_bigdecimal(amount), left)
+                    (BigUint::from(amount), left)
                 };
 
                 // account
@@ -130,7 +130,7 @@ pub struct PriorityOp {
     pub serial_id: u64,
     pub data: FranklinPriorityOp,
     pub deadline_block: u64,
-    pub eth_fee: BigDecimal,
+    pub eth_fee: BigUint,
     pub eth_hash: Vec<u8>,
 }
 
@@ -178,7 +178,7 @@ impl TryFrom<Log> for PriorityOp {
                 .unwrap(),
             eth_fee: {
                 let amount_uint = dec_ev.remove(0).to_uint().unwrap();
-                BigDecimal::from_str(&format!("{}", amount_uint)).unwrap()
+                BigUint::from_str(&format!("{}", amount_uint)).unwrap()
             },
             eth_hash: event
                 .transaction_hash

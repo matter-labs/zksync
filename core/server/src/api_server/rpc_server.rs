@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 
 // External uses
-use bigdecimal::BigDecimal;
 use futures::{
     channel::{mpsc, oneshot},
     FutureExt, SinkExt, TryFutureExt,
@@ -11,6 +10,7 @@ use futures::{
 use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
+use num::BigUint;
 use web3::types::Address;
 // Workspace uses
 use models::{
@@ -20,7 +20,6 @@ use models::{
         tx::{TxEthSignature, TxHash},
         Account, AccountId, FranklinTx, Nonce, PubKeyHash, Token, TokenId, TokenLike,
     },
-    primitives::floor_big_decimal,
 };
 use storage::{ConnectionPool, StorageProcessor};
 // Local uses
@@ -34,7 +33,7 @@ use crate::{
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
-    pub balances: HashMap<String, BigDecimal>,
+    pub balances: HashMap<String, BigUint>,
     pub nonce: Nonce,
     pub pub_key_hash: PubKeyHash,
 }
@@ -165,9 +164,9 @@ pub trait Rpc {
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
-        amount: BigDecimal,
+        amount: BigUint,
         token_like: TokenLike,
-    ) -> Result<BigDecimal>;
+    ) -> Result<BigUint>;
 }
 
 pub struct RpcApp {
@@ -442,13 +441,10 @@ impl Rpc for RpcApp {
     fn get_tx_fee(
         &self,
         _tx_type: TxFeeTypes,
-        amount: BigDecimal,
+        amount: BigUint,
         _token_like: TokenLike,
-    ) -> Result<BigDecimal> {
-        // first approximation - just give 1 percent
-        Ok(closest_packable_fee_amount(&floor_big_decimal(
-            &(amount / BigDecimal::from(100)),
-        )))
+    ) -> Result<BigUint> {
+        unimplemented!()
     }
 }
 

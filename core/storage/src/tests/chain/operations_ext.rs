@@ -1,7 +1,7 @@
 // Built-in imports
 use std::collections::HashMap;
 // External imports
-use bigdecimal::BigDecimal;
+use num::BigUint;
 // Workspace imports
 use crypto_exports::franklin_crypto::bellman::pairing::ff::Field;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -37,7 +37,7 @@ fn get_account_transactions_history() {
     let to_account_address = to_zksync_account.address;
     let to_account_address_string = format!("{:?}", &to_account_address);
 
-    let amount = BigDecimal::from(1);
+    let amount = BigUint::from(1u32);
 
     let executed_deposit_op = {
         let deposit_op = FranklinOp::Deposit(Box::new(DepositOp {
@@ -55,7 +55,7 @@ fn get_account_transactions_history() {
                 serial_id: 0,
                 data: deposit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_fee: 0.into(),
+                eth_fee: 0u32.into(),
                 eth_hash: b"1234567890".to_vec(),
             },
             op: deposit_op,
@@ -80,7 +80,7 @@ fn get_account_transactions_history() {
                 serial_id: 0,
                 data: full_exit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_fee: 0.into(),
+                eth_fee: 0u32.into(),
                 eth_hash: b"1234567890".to_vec(),
             },
             op: full_exit_op,
@@ -97,7 +97,7 @@ fn get_account_transactions_history() {
                     tokens[1].id,
                     &tokens[1].symbol,
                     amount.clone(),
-                    BigDecimal::from(0),
+                    BigUint::from(0u32),
                     &to_account_address,
                     None,
                     true,
@@ -125,7 +125,7 @@ fn get_account_transactions_history() {
                     tokens[1].id,
                     &tokens[1].symbol,
                     amount.clone(),
-                    BigDecimal::from(0),
+                    BigUint::from(0u32),
                     &to_account_address,
                     None,
                     true,
@@ -153,7 +153,7 @@ fn get_account_transactions_history() {
                     tokens[2].id,
                     &tokens[2].symbol,
                     amount.clone(),
-                    BigDecimal::from(0),
+                    BigUint::from(0u32),
                     &to_account_address,
                     None,
                     true,

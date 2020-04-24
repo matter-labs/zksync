@@ -2,9 +2,9 @@
 use std::collections::VecDeque;
 use std::str::FromStr;
 // External imports
-use bigdecimal::BigDecimal;
 use diesel::dsl::{insert_into, update};
 use diesel::prelude::*;
+use num::BigUint;
 use web3::types::{H256, U256};
 // Workspace imports
 use models::{
@@ -18,6 +18,7 @@ use self::records::{
 };
 use crate::chain::operations::records::StoredOperation;
 use crate::schema::*;
+use crate::utils::StoredBigUint;
 use crate::StorageProcessor;
 
 pub mod records;
@@ -80,7 +81,7 @@ impl<'a> EthereumSchema<'a> {
                 let op_type = OperationType::from_str(eth_op.op_type.as_ref())
                     .expect("Stored operation type must have a valid value");
                 let last_used_gas_price =
-                    U256::from_str(&eth_op.last_used_gas_price.to_string()).unwrap();
+                    U256::from_str(&eth_op.last_used_gas_price.0.to_string()).unwrap();
                 let used_tx_hashes = eth_tx_hashes
                     .iter()
                     .map(|entry| H256::from_slice(&entry.tx_hash))
@@ -143,7 +144,7 @@ impl<'a> EthereumSchema<'a> {
         op_type: OperationType,
         op_id: Option<i64>,
         last_deadline_block: i64,
-        last_used_gas_price: BigDecimal,
+        last_used_gas_price: BigUint,
         raw_tx: Vec<u8>,
     ) -> QueryResult<InsertedOperationResponse> {
         self.0.conn().transaction(|| {
@@ -156,7 +157,7 @@ impl<'a> EthereumSchema<'a> {
                 op_type: op_type.to_string(),
                 nonce,
                 last_deadline_block,
-                last_used_gas_price,
+                last_used_gas_price: last_used_gas_price.into(),
                 raw_tx,
             };
 
@@ -242,13 +243,13 @@ impl<'a> EthereumSchema<'a> {
         &self,
         eth_op_id: i64,
         new_deadline_block: i64,
-        new_gas_value: BigDecimal,
+        new_gas_value: BigUint,
     ) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             // Update the stored tx.
             update(eth_operations::table.filter(eth_operations::id.eq(eth_op_id)))
                 .set((
-                    eth_operations::last_used_gas_price.eq(new_gas_value),
+                    eth_operations::last_used_gas_price.eq(StoredBigUint(new_gas_value)),
                     eth_operations::last_deadline_block.eq(new_deadline_block),
                 ))
                 .execute(self.0.conn())?;

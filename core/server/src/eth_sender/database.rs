@@ -7,7 +7,7 @@
 use std::collections::VecDeque;
 use std::str::FromStr;
 // External uses
-use bigdecimal::BigDecimal;
+use num::BigUint;
 use web3::types::{H256, U256};
 // Workspace uses
 use models::{
@@ -98,7 +98,7 @@ impl DatabaseAccess for Database {
             op_type,
             op.map(|op| op.id.unwrap()),
             deadline_block,
-            BigDecimal::from_str(&used_gas_price.to_string()).unwrap(),
+            BigUint::from_str(&used_gas_price.to_string()).unwrap(),
             raw_tx,
         )?)
     }
@@ -119,7 +119,7 @@ impl DatabaseAccess for Database {
         Ok(storage.ethereum_schema().update_eth_tx(
             eth_op_id,
             new_deadline_block,
-            BigDecimal::from_str(&new_gas_value.to_string()).unwrap(),
+            BigUint::from_str(&new_gas_value.to_string()).unwrap(),
         )?)
     }
 

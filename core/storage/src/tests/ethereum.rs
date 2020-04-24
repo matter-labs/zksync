@@ -1,7 +1,6 @@
 // Built-in deps
 use std::str::FromStr;
 // External imports
-use bigdecimal::BigDecimal;
 use web3::types::{H256, U256};
 // Workspace imports
 use models::{
@@ -12,6 +11,7 @@ use models::{
 // Local imports
 use crate::tests::db_test;
 use crate::{chain::block::BlockSchema, ethereum::EthereumSchema, StorageProcessor};
+use num::BigUint;
 
 /// Creates a sample operation to be stored in `operations` table.
 /// This function is required since `eth_operations` table is linked to
@@ -38,7 +38,7 @@ pub struct EthereumTxParams {
     op: Operation,
     hash: H256,
     deadline_block: u64,
-    gas_price: BigDecimal,
+    gas_price: BigUint,
     raw_tx: Vec<u8>,
 }
 
@@ -50,7 +50,7 @@ impl EthereumTxParams {
             op,
             hash: H256::from_low_u64_ne(op_id),
             deadline_block: 100,
-            gas_price: 1000.into(),
+            gas_price: 1000u32.into(),
             raw_tx: Default::default(),
         }
     }

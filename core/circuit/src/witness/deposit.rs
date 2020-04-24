@@ -302,8 +302,8 @@ pub fn calculate_deposit_operations_from_witness(
 mod test {
     use super::*;
     use crate::witness::test_utils::{check_circuit, test_genesis_plasma_state};
-    use bigdecimal::BigDecimal;
     use models::node::{Account, Deposit};
+    use num::BigUint;
 
     #[test]
     #[ignore]
@@ -319,7 +319,7 @@ mod test {
             priority_op: Deposit {
                 from: empty_account_address,
                 token: 0,
-                amount: BigDecimal::from(1),
+                amount: BigUint::from(1u32),
                 to: empty_account_address,
             },
             account_id: empty_account_id,
@@ -376,7 +376,7 @@ mod test {
             priority_op: Deposit {
                 from: deposit_to_account_address,
                 token: 0,
-                amount: BigDecimal::from(1),
+                amount: BigUint::from(1u32),
                 to: deposit_to_account_address,
             },
             account_id: deposit_to_account_id,
@@ -423,7 +423,7 @@ mod test {
             priority_op: Deposit {
                 from: deposit_to_account_address,
                 token: 0,
-                amount: BigDecimal::from(1),
+                amount: BigUint::from(1u32),
                 to: deposit_to_account_address,
             },
             account_id: deposit_to_account_id,
@@ -503,7 +503,7 @@ mod test {
             priority_op: Deposit {
                 from: deposit_to_account_address,
                 token: 0,
-                amount: BigDecimal::from(1),
+                amount: BigUint::from(1u32),
                 to: deposit_to_account_address,
             },
             account_id: deposit_to_account_id,
