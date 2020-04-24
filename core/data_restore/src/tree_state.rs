@@ -314,7 +314,6 @@ impl TreeState {
                 serial_id: 0,
                 data: priority_op,
                 deadline_block: 0,
-                eth_fee: BigDecimal::from(0),
                 eth_hash: Vec::new(),
             },
             block_index,

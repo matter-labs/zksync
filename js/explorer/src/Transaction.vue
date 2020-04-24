@@ -157,6 +157,15 @@ export default {
                     { name: "New signer key hash",      value: `<code>${this.txData.to}</code>`},
                     { name: "Created at",               value: formatDate(this.txData.created_at) },
                 ]
+                : this.txData.tx_type == "Deposit" || this.txData.tx_type == "FullExit"
+                ? [
+                    { name: 'Tx hash',        value: tx_hash},
+                    { name: "Type",           value: `<b>${this.txData.tx_type}</b>`   },
+                    { name: "Status",         value: `<b>${this.txData.status}</b>` },
+                    { name: "From",           value: `<code><a ${target_from} href="${link_from}">${this.txData.from} ${onchain_from}</a></code>`      },
+                    { name: "To",             value: `<code><a ${target_to} href="${link_to}">${this.txData.to} ${onchain_to}</a></code>`      },
+                    { name: "Amount",         value: `<b>${this.txData.tokenName}</b> ${readableEther(this.txData.amount)}`    },
+                ]
                 : [
                     { name: 'Tx hash',        value: tx_hash},
                     { name: "Type",           value: `<b>${this.txData.tx_type}</b>`   },
