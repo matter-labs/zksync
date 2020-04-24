@@ -1,5 +1,4 @@
 use crate::rollup_ops::RollupOpsBlock;
-use bigdecimal::BigDecimal;
 use chrono;
 use failure::format_err;
 use models::node::account::Account;

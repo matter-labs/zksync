@@ -50,8 +50,8 @@ table! {
     active_provers (id) {
         id -> Int4,
         worker -> Text,
-        created_at -> Timestamp,
-        stopped_at -> Nullable<Timestamp>,
+        created_at -> Timestamptz,
+        stopped_at -> Nullable<Timestamptz>,
         block_size -> Int8,
     }
 }
@@ -158,7 +158,7 @@ table! {
         priority_op_serialid -> Int8,
         deadline_block -> Int8,
         eth_hash -> Bytea,
-        created_at -> Timestamp,
+        created_at -> Timestamptz,
     }
 }
 
@@ -194,7 +194,7 @@ table! {
         id -> Int8,
         block_number -> Int8,
         action_type -> Text,
-        created_at -> Timestamp,
+        created_at -> Timestamptz,
         confirmed -> Bool,
     }
 }
@@ -203,7 +203,7 @@ table! {
     proofs (block_number) {
         block_number -> Int8,
         proof -> Jsonb,
-        created_at -> Timestamp,
+        created_at -> Timestamptz,
     }
 }
 
@@ -212,8 +212,8 @@ table! {
         id -> Int4,
         block_number -> Int8,
         worker -> Nullable<Text>,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 
