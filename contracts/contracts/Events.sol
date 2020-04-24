@@ -25,7 +25,6 @@ contract Events {
         address sender,
         uint16 tokenId,
         uint128 amount,
-        uint256 fee,
         address indexed owner
     );
 
@@ -51,8 +50,7 @@ contract Events {
         uint64 serialId,
         uint8 opType,
         bytes pubData,
-        uint256 expirationBlock,
-        uint256 fee
+        uint256 expirationBlock
     );
 }
 
@@ -61,23 +59,23 @@ contract Events {
 contract UpgradeEvents {
 
     /// @notice Event emitted when new upgradeable contract is added to upgrade gatekeeper's list of managed contracts
-    event UpgradeableAdded(
+    event UpgradeableAdd(
         Upgradeable upgradeable
     );
 
     /// @notice Upgrade mode enter event
-    event NoticePeriodStarted(
+    event NoticePeriodStart(
         address[] newTargets
     );
 
     /// @notice Upgrade mode cancel event
-    event UpgradeCanceled();
+    event UpgradeCancel();
 
     /// @notice Upgrade mode preparation status event
-    event PreparationStarted();
+    event PreparationStart();
 
     /// @notice Upgrade mode complete event
-    event UpgradeCompleted(
+    event UpgradeComplete(
         Upgradeable upgradeable,
         address newTargetAddress
     );

@@ -2,10 +2,16 @@ FROM fedora:30
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN dnf install -y  gettext nodejs nodejs-yarn axel jq postgresql libpq-devel rust make openssl-devel git python gcc-c++ docker which && dnf clean all \
   && curl https://sh.rustup.rs -sSf | bash -s -- -y \
-  && cargo install diesel_cli --no-default-features --features postgres \
-  && cargo install wasm-pack \
-  && rm -rf ~/.cargo/registry \
   && ln -s /usr/bin/nodejs-yarn /usr/bin/yarn
+
+RUN cargo install diesel_cli --no-default-features --features postgres
+RUN cargo install wasm-pack
+
+# sccache support
+RUN cargo install sccache
+ENV RUSTC_WRAPPER=/root/.cargo/bin/sccache
+ENV SCCACHE_DIR=/drone/src/target/rust-ci-cache/sccache
+ENV CARGO_HOME=/drone/src/target/rust-ci-cache/cargo
 
 RUN curl -LO https://storage.googleapis.com/kubernetes-release/release/`curl -s https://storage.googleapis.com/kubernetes-release/release/stable.txt`/bin/linux/amd64/kubectl
 RUN chmod +x ./kubectl

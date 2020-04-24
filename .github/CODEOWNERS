@@ -7,7 +7,7 @@
 # notify about any circuit, prover and server changes
 /core/circuit/ @alexander-movchan @gluk64
 /core/prover/ @furkhat
-/core @dvush
+/core @dvush @popzxc
 
 # dev tools
 /bin @dvush

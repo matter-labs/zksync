@@ -245,6 +245,7 @@ pub struct WithdrawOp {
 impl WithdrawOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x03;
+    pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [1];
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -255,6 +256,15 @@ impl WithdrawOp {
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(self.tx.to.as_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
+        data
+    }
+
+    fn get_withdrawal_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&Self::WITHDRAW_DATA_PREFIX); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
+        data.extend_from_slice(self.tx.to.as_bytes());
+        data.extend_from_slice(&self.tx.token.to_be_bytes());
+        data.extend_from_slice(&self.tx.amount.to_u128().unwrap().to_be_bytes());
         data
     }
 
@@ -429,6 +439,7 @@ pub struct FullExitOp {
 impl FullExitOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x06;
+    pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [0];
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -446,6 +457,22 @@ impl FullExitOp {
                 .to_be_bytes(),
         );
         data.resize(Self::CHUNKS * 8, 0x00);
+        data
+    }
+
+    fn get_withdrawal_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&Self::WITHDRAW_DATA_PREFIX); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
+        data.extend_from_slice(self.priority_op.eth_address.as_bytes());
+        data.extend_from_slice(&self.priority_op.token.to_be_bytes());
+        data.extend_from_slice(
+            &self
+                .withdraw_amount
+                .clone()
+                .map(|a| a.to_u128().unwrap())
+                .unwrap_or(0)
+                .to_be_bytes(),
+        );
         data
     }
 
@@ -525,6 +552,14 @@ impl FranklinOp {
     pub fn eth_witness(&self) -> Option<Vec<u8>> {
         match self {
             FranklinOp::ChangePubKeyOffchain(op) => Some(op.get_eth_witness()),
+            _ => None,
+        }
+    }
+
+    pub fn withdrawal_data(&self) -> Option<Vec<u8>> {
+        match self {
+            FranklinOp::Withdraw(op) => Some(op.get_withdrawal_data()),
+            FranklinOp::FullExit(op) => Some(op.get_withdrawal_data()),
             _ => None,
         }
     }

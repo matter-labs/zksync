@@ -95,7 +95,6 @@ fn executed_priority_operations() {
             to_account: Default::default(),
             priority_op_serialid: 0,
             deadline_block: 100,
-            eth_fee: Default::default(),
             eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
         };
         OperationsSchema(&conn).store_executed_priority_operation(executed_tx.clone())?;
@@ -114,7 +113,6 @@ fn executed_priority_operations() {
             executed_tx.priority_op_serialid
         );
         assert_eq!(stored_operation.deadline_block, executed_tx.deadline_block);
-        assert_eq!(stored_operation.eth_fee, executed_tx.eth_fee);
         assert_eq!(stored_operation.eth_hash, executed_tx.eth_hash);
 
         Ok(())

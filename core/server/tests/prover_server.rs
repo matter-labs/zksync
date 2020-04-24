@@ -7,8 +7,9 @@ use futures::channel::mpsc;
 // Workspace deps
 use circuit::witness::deposit::apply_deposit_tx;
 use circuit::witness::deposit::calculate_deposit_operations_from_witness;
+use models::circuit::CircuitAccountTree;
 use models::node::Address;
-use models::params::block_chunk_sizes;
+use models::params::{account_tree_depth, block_chunk_sizes};
 use num::BigUint;
 use prover::client;
 use prover::ApiClient;
@@ -20,8 +21,17 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
     let conn_pool = storage::ConnectionPool::new();
     let addr = net::SocketAddr::from_str(bind_to).unwrap();
     let (tx, _rx) = mpsc::channel(1);
+    let tree = CircuitAccountTree::new(account_tree_depth());
     thread::spawn(move || {
-        prover_server::start_prover_server(conn_pool, addr, prover_timeout, rounds_interval, tx);
+        prover_server::start_prover_server(
+            conn_pool,
+            addr,
+            prover_timeout,
+            rounds_interval,
+            tx,
+            tree,
+            0,
+        );
     });
     bind_to.to_string()
 }
@@ -157,7 +167,7 @@ pub fn test_operation_and_wanted_prover_data(
     let validator_account_id: u32 = 0;
     accounts.insert(validator_account_id, validator_account.clone());
 
-    let mut state = plasma::state::PlasmaState::new(accounts, 1);
+    let mut state = plasma::state::PlasmaState::from_acc_map(accounts, 1);
     println!(
         "acc_number 0, acc {:?}",
         models::circuit::account::CircuitAccount::from(validator_account.clone()).pub_key_hash,
@@ -167,6 +177,7 @@ pub fn test_operation_and_wanted_prover_data(
         models::circuit::account::CircuitAccount::from(validator_account.clone()),
     );
     let initial_root = circuit_tree.root_hash();
+    let initial_root2 = circuit_tree.root_hash();
     let deposit_priority_op = models::node::FranklinPriorityOp::Deposit(models::node::Deposit {
         from: validator_account.address,
         token: 0,
@@ -211,7 +222,6 @@ pub fn test_operation_and_wanted_prover_data(
                 serial_id: 0,
                 data: deposit_priority_op.clone(),
                 deadline_block: 2,
-                eth_fee: BigUint::from(0u32),
                 eth_hash: vec![0; 8],
             },
             block_index: 0,
@@ -292,7 +302,7 @@ pub fn test_operation_and_wanted_prover_data(
         },
         prover::prover_data::ProverData {
             public_data_commitment,
-            old_root: initial_root,
+            old_root: initial_root2,
             new_root: block.new_root_hash,
             validator_address: models::node::Fr::from_str(&block.fee_account.to_string()).unwrap(),
             operations,

@@ -85,7 +85,6 @@ impl StoredExecutedPriorityOperation {
                     .try_get_priority_op()
                     .expect("FranklinOp should have priority op"),
                 deadline_block: self.deadline_block as u64,
-                eth_fee: self.eth_fee.0,
                 eth_hash: self.eth_hash,
             },
             op: franklin_op,
@@ -99,9 +98,7 @@ impl NewExecutedPriorityOperation {
         exec_prior_op: ExecutedPriorityOp,
         block: BlockNumber,
     ) -> Self {
-        let mut operation = serde_json::to_value(&exec_prior_op.op).unwrap();
-        operation["eth_fee"] =
-            serde_json::to_value(exec_prior_op.priority_op.eth_fee.to_string()).unwrap();
+        let operation = serde_json::to_value(&exec_prior_op.op).unwrap();
 
         let (from_account, to_account) = match exec_prior_op.op {
             FranklinOp::Deposit(deposit) => (deposit.priority_op.from, deposit.priority_op.to),
@@ -123,7 +120,6 @@ impl NewExecutedPriorityOperation {
             to_account: to_account.as_ref().to_vec(),
             priority_op_serialid: exec_prior_op.priority_op.serial_id as i64,
             deadline_block: exec_prior_op.priority_op.deadline_block as i64,
-            eth_fee: exec_prior_op.priority_op.eth_fee.into(),
             eth_hash: exec_prior_op.priority_op.eth_hash,
         }
     }

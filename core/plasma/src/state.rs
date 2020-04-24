@@ -50,13 +50,25 @@ impl PlasmaState {
         }
     }
 
-    pub fn new(accounts: AccountMap, current_block: u32) -> Self {
+    pub fn from_acc_map(accounts: AccountMap, current_block: BlockNumber) -> Self {
         let mut empty = Self::empty();
         empty.block_number = current_block;
         for (id, account) in accounts {
             empty.insert_account(id, account);
         }
         empty
+    }
+
+    pub fn new(
+        balance_tree: AccountTree,
+        account_id_by_address: HashMap<Address, AccountId>,
+        current_block: BlockNumber,
+    ) -> Self {
+        Self {
+            balance_tree,
+            block_number: current_block,
+            account_id_by_address,
+        }
     }
 
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {

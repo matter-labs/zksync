@@ -55,7 +55,7 @@ fn generate_state() -> (HashMap<AccountId, (PrivateKey, H256)>, PlasmaState) {
         keys.insert(account_id, (sk, eth_sk));
     }
 
-    let state = PlasmaState::new(accounts, CURRENT_BLOCK);
+    let state = PlasmaState::from_acc_map(accounts, CURRENT_BLOCK);
 
     (keys, state)
 }
