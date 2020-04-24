@@ -11,6 +11,9 @@ contract Config {
     /// @notice Period after the start of preparation upgrade when contract wouldn't register new priority operations (in seconds)
     uint constant UPGRADE_PREPARATION_LOCK_PERIOD = 1 days;
 
+    /// @notice ERC20 token withdrawal gas limit
+    uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 250000;
+
     /// @notice zkSync address length
     uint8 constant ADDRESS_BYTES = 20;
 

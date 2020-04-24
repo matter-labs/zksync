@@ -90,6 +90,19 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         blocks[0].stateRoot = _genesisRoot;
     }
 
+    /// @notice Sends tokens
+    /// @param _token Token address
+    /// @param _to Address of recipient
+    /// @param _amount Amount of tokens to transfer
+    /// @return bool flag indicating that transfer is successful
+    function sendERC20NoRevert(address _token, address _to, uint128 _amount) internal returns (bool) {
+        (bool callSuccess, bytes memory callReturnValueEncoded) = _token.call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
+            abi.encodeWithSignature("transfer(address,uint256)", _to, uint256(_amount))
+        );
+        bool callReturnValue = abi.decode(callReturnValueEncoded, (bool));
+        return callSuccess && callReturnValue;
+    }
+
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external nonReentrant {
@@ -122,7 +135,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
                 } else {
                     address tokenAddr = governance.tokenAddresses(tokenId);
                     require(tokenAddr != address(0), "cwd11"); // unknown tokenId
-                    sent = IERC20(tokenAddr).transfer(to, amount);
+                    sent = sendERC20NoRevert(tokenAddr, to, amount);
                 }
                 if (!sent) {
                     balancesToWithdraw[packedBalanceKey].balanceToWithdraw += amount;
