@@ -8,7 +8,10 @@ const franklin_abi = require('../../contracts/build/Franklin.json');
 import {ethers, utils, Contract} from "ethers";
 import {bigNumberify, parseEther} from "ethers/utils";
 import {IERC20_INTERFACE} from "zksync/build/utils";
-
+import Axios from "axios";
+import {compareObjectStructure, transactionHistoryItems} from "./api-test";
+import { TokenLike } from "zksync/build/types";
+import * as assert from "assert";
 
 const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
@@ -258,8 +261,100 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Transfer to self no fee ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
+
+    await testTransactionHistory(syncWallet1.address());
+    await testAccountResponse(syncWallet1.address(), token);
+
+    await testSendingWithWrongSignature(syncWallet1, syncWallet2);
+
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, withdrawFee);
     console.log(`Withdraw ok, Token: ${token}`);
+}
+
+async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: Wallet) {
+    const signedTransfer: types.Transfer = syncWallet1.signer.signSyncTransfer({
+        from: syncWallet1.address(),
+        to: syncWallet2.address(),
+        tokenId: 0,
+        amount: utils.parseEther('0.001'),
+        fee: utils.parseEther('0.001'),
+        nonce: await syncWallet1.getNonce(),
+    });
+
+    const ETH_SIGNATURE_LENGTH_PREFIXED = 132;
+    const fakeEthSignature: types.TxEthSignature = {
+        signature: "0x".padEnd(ETH_SIGNATURE_LENGTH_PREFIXED, '0'),
+        type: "EthereumSignature"
+    };
+
+    try {
+        await syncWallet1.provider.submitTx(signedTransfer, fakeEthSignature);
+        assert(false, "sending tx with incorrect eth signature must throw");
+    } catch (e) {
+        assert(
+            e.jrpcError.message == 'Eth signature is incorrect',
+            "sending tx with incorrect eth signature must fail"
+        );
+    }
+
+    const signedWithdraw = syncWallet1.signer.signSyncWithdraw({
+        from: syncWallet1.address(),
+        ethAddress: syncWallet1.address(),
+        tokenId: 0,
+        amount: utils.parseEther('0.001'),
+        fee: utils.parseEther('0.001'),
+        nonce: await syncWallet1.getNonce(),
+    })
+
+    try {
+        await syncWallet1.provider.submitTx(signedWithdraw, fakeEthSignature);
+        assert(false, "sending tx with incorrect eth signature must throw");
+    } catch (e) {
+        assert(
+            e.jrpcError.message == 'Eth signature is incorrect',
+            "sending tx with incorrect eth signature must fail"
+        );
+    }
+}
+
+
+async function testAccountResponse(address: string, token: TokenLike) {
+    const { data } = await Axios.get(process.env.REST_API_ADDR + `/api/v0.1/account/${address}`);
+    const tokenId = syncProvider.tokenSet.resolveTokenId(token);
+    const sampleApiStatus = {
+        "id": 1,
+        "commited": {
+            "pub_key_hash": "sync:0000000000000000000000000000000000000000",
+            "address": "0xeb9591873d2895c4e130f3ea19d1b83e07face08",
+            "balances": {
+                [tokenId]: "0"
+            },
+            "nonce": 5
+        },
+        "verified": {
+            "pub_key_hash": "sync:0000000000000000000000000000000000000000",
+            "address": "0xeb9591873d2895c4e130f3ea19d1b83e07face08",
+            "balances": {},
+            "nonce": 0
+        }
+    }
+
+    assert(
+        compareObjectStructure(sampleApiStatus, data), 
+        "rest method '/api/v0.1/account/' doesn't work as expected. Check if explorer and client work."
+    );
+}
+
+async function testTransactionHistory(address: string) {
+    const { data } = await Axios.get(process.env.REST_API_ADDR + `/api/v0.1/account/${address}/history/0/20`);
+    assert(
+        data.map(received => 
+            transactionHistoryItems.some(expected => 
+                compareObjectStructure(expected, received)
+            )
+        ),
+        "rest method '/account/{address}/history/{offset}/{limit}' doesn't work as expected. Check if explorer and client work."
+    );
 }
 
 (async () => {
