@@ -15,27 +15,20 @@ steps:
   image: drillster/drone-volume-cache
   settings:
     mount:
-    - ./target/rust-ci-cache
+    - ./target/cargo
     - ./keys
     restore: true
   volumes:
   - name: cache
     path: /cache
-  settings:
-    restore: true
-    mount:
-      - ./target/cargo
-      - ./keys
+
 - name: geth
   image: matterlabs/geth:latest
   detach: true
-  depends-on:
-  - restore-cache
+
 - name: postgres
   image: postgres:10.4
   detach: true
-  depends-on:
-  - restore-cache
 
 - name: init
   image: matterlabs/ci
@@ -117,6 +110,7 @@ steps:
   - zksync build-contracts
   depends_on:
   - init
+
 - name: ganache
   image: matterlabs/ganache
   detach: true

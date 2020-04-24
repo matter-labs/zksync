@@ -9,7 +9,7 @@ import {Address, TokenAddress} from "zksync/build/types";
 import {AddressZero} from "ethers/constants";
 import {Contract, ethers} from "ethers";
 
-const abi = require('ethereumjs-abi')
+const {simpleEncode} = require('ethereumjs-abi')
 const {expect} = require("chai")
 const {deployContract} = require("ethereum-waffle");
 const {wallet, exitWallet, deployTestContract, getCallRevertReason, IERC20_INTERFACE} = require("./common");
@@ -264,7 +264,7 @@ describe("ZK Sync withdraw unit tests", function () {
         const sendETH = await wallet.sendTransaction({
             to: zksyncContract.address,
             value: withdrawAmount.mul(2),
-            data: abi.simpleEncode("receiveETH()")
+            data: simpleEncode("receiveETH()")
         });
         await sendETH.wait();
 
@@ -283,7 +283,7 @@ describe("ZK Sync withdraw unit tests", function () {
         const sendETH = await wallet.sendTransaction({
             to: zksyncContract.address,
             value: withdrawAmount,
-            data: abi.simpleEncode("receiveETH()")
+            data: simpleEncode("receiveETH()")
         });
         await sendETH.wait();
 
@@ -338,7 +338,7 @@ describe("ZK Sync withdraw unit tests", function () {
         await wallet.sendTransaction({
             to: zksyncContract.address,
             value: withdrawAmount,
-            data: abi.simpleEncode("receiveETH()")
+            data: simpleEncode("receiveETH()")
         });
         await tokenContract.transfer(zksyncContract.address, withdrawAmount);
 
