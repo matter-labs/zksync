@@ -105,15 +105,15 @@ describe("ZK priority queue ops unit tests", function () {
         operationTestContract = await deployTestContract('../../build/OperationsTest');
     });
 
-    async function performDeposit(to: Address, token: TokenAddress, depositAmount: BigNumber, feeInEth: BigNumberish) {
+    async function performDeposit(to: Address, token: TokenAddress, depositAmount: BigNumber) {
         const openedRequests = await zksyncContract.totalOpenPriorityRequests();
         const depositOwner = wallet.address;
 
         let tx;
         if (token === ethers.constants.AddressZero) {
-            tx = await zksyncContract.depositETH(depositAmount, depositOwner, {value: depositAmount.add(feeInEth)});
+            tx = await zksyncContract.depositETH(depositOwner, {value: depositAmount});
         } else {
-            tx = await zksyncContract.depositERC20(token, depositAmount, depositOwner, {value: feeInEth});
+            tx = await zksyncContract.depositERC20(token, depositAmount, depositOwner);
         }
         const receipt = await tx.wait();
 
@@ -131,7 +131,6 @@ describe("ZK priority queue ops unit tests", function () {
         expect(priorityQueueEvent.values.sender, "sender address").eq(wallet.address);
         expect(priorityQueueEvent.values.serialId, "request id").eq(openedRequests);
         expect(priorityQueueEvent.values.opType, "request type").eq(1);
-        expect(priorityQueueEvent.values.fee.toString(), "request fee").eq(feeInEth.toString());
         expect(priorityQueueEvent.values.expirationBlock, "expiration block").eq(deadlineBlock);
         const parsedDepositPubdata = await operationTestContract.parseDepositFromPubdata(priorityQueueEvent.values.pubData);
 
@@ -140,9 +139,9 @@ describe("ZK priority queue ops unit tests", function () {
         expect(parsedDepositPubdata.owner, "parsed owner").eq(depositOwner);
     }
 
-    async function performFullExitRequest(accountId: number, token: TokenAddress, feeInEth: BigNumberish) {
+    async function performFullExitRequest(accountId: number, token: TokenAddress) {
         const openedRequests = await zksyncContract.totalOpenPriorityRequests();
-        const tx = await zksyncContract.fullExit(accountId, token, {value: feeInEth});
+        const tx = await zksyncContract.fullExit(accountId, token);
         const receipt = await tx.wait();
 
         const deadlineBlock = receipt.blockNumber + TEST_PRIORITY_EXPIRATION;
@@ -159,7 +158,6 @@ describe("ZK priority queue ops unit tests", function () {
         expect(priorityQueueEvent.values.sender, "sender address").eq(wallet.address);
         expect(priorityQueueEvent.values.serialId, "request id").eq(openedRequests);
         expect(priorityQueueEvent.values.opType, "request type").eq(6);
-        expect(priorityQueueEvent.values.fee.toString(), "request fee").eq(feeInEth.toString());
         expect(priorityQueueEvent.values.expirationBlock, "expiration block").eq(deadlineBlock);
 
         const parsedFullExitPubdata = await operationTestContract.parseFullExitFromPubdata(priorityQueueEvent.values.pubData);
@@ -173,32 +171,29 @@ describe("ZK priority queue ops unit tests", function () {
         zksyncContract.connect(wallet);
         const tokenAddress = ethers.constants.AddressZero;
         const depositAmount = parseEther("1.0");
-        const fee = await ethProxy.estimateDepositFeeInETHToken(tokenAddress);
 
-        await performDeposit(wallet.address, tokenAddress, depositAmount, fee);
-        await performDeposit(ethers.Wallet.createRandom().address, tokenAddress, depositAmount, fee);
+        await performDeposit(wallet.address, tokenAddress, depositAmount);
+        await performDeposit(ethers.Wallet.createRandom().address, tokenAddress, depositAmount);
     });
 
     it("success ERC20 deposits", async () => {
         zksyncContract.connect(wallet);
         const tokenAddress = tokenContract.address;
         const depositAmount = parseEther("1.0");
-        const fee = await ethProxy.estimateDepositFeeInETHToken(tokenAddress);
 
         tokenContract.connect(wallet);
         await tokenContract.approve(zksyncContract.address, depositAmount);
-        await performDeposit(wallet.address, tokenAddress, depositAmount, fee);
+        await performDeposit(wallet.address, tokenAddress, depositAmount);
         await tokenContract.approve(zksyncContract.address, depositAmount);
-        await performDeposit(ethers.Wallet.createRandom().address, tokenAddress, depositAmount, fee);
+        await performDeposit(ethers.Wallet.createRandom().address, tokenAddress, depositAmount);
     });
 
     it("success FullExit request", async () => {
         zksyncContract.connect(wallet);
         const accountId = 1;
-        const fee = await ethProxy.estimateEmergencyWithdrawFeeInETHToken();
 
-        await performFullExitRequest(accountId, ethers.constants.AddressZero, fee);
-        await performFullExitRequest(accountId, tokenContract.address, fee);
+        await performFullExitRequest(accountId, ethers.constants.AddressZero);
+        await performFullExitRequest(accountId, tokenContract.address);
     });
 });
 
@@ -244,7 +239,7 @@ describe("ZK Sync withdraw unit tests", function () {
     async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
         let gasFee: BigNumber;
         const balanceBefore = await onchainBalance(ethWallet, token);
-        const contractBalanceBefore = bigNumberify(await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId));
+        const contractBalanceBefore = bigNumberify((await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId)).balanceToWithdraw);
         if (token === ethers.constants.AddressZero) {
             const tx = await zksyncContract.withdrawETH(amount, {gasLimit: 70000});
             const receipt = await tx.wait();
@@ -257,7 +252,7 @@ describe("ZK Sync withdraw unit tests", function () {
         const expectedBalance = token == AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
         expect(balanceAfter.toString(), "withdraw account balance mismatch").eq(expectedBalance.toString());
 
-        const contractBalanceAfter = bigNumberify(await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId));
+        const contractBalanceAfter = bigNumberify((await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId)).balanceToWithdraw);
         const expectedContractBalance = contractBalanceBefore.sub(amount);
         expect(contractBalanceAfter.toString(), "withdraw contract balance mismatch").eq(expectedContractBalance.toString());
     }
@@ -462,56 +457,46 @@ describe("ZK Sync test process next operation", function () {
         zksyncContract.connect(wallet);
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
 
         const pubdata = Buffer.alloc(8, 0);
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
         expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
-        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
     });
 
     it("Process transfer", async () => {
         zksyncContract.connect(wallet);
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
 
         const pubdata = Buffer.alloc(8 * 2, 0xff);
         pubdata[0] = 0x05;
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
         expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
-        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
     });
     it("Process transfer to new", async () => {
         zksyncContract.connect(wallet);
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
 
         const pubdata = Buffer.alloc(8 * 5, 0xff);
         pubdata[0] = 0x02;
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
         expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
-        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
     });
 
     it("Process deposit", async () => {
         zksyncContract.connect(wallet);
-        const depositAmount = parseEther("0.7");
+        const depositAmount = parseEther("0.8");
 
-        await zksyncContract.depositETH(depositAmount, wallet.address, {value: parseEther("0.8")});
+        await zksyncContract.depositETH(wallet.address, {value: depositAmount});
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
 
         // construct deposit pubdata
         const pubdata = Buffer.alloc(8 * 6, 0);
@@ -519,20 +504,16 @@ describe("ZK Sync test process next operation", function () {
         pubdata.writeUIntBE(0xaabbff, 1, 3);
         Buffer.from(depositAmount.toHexString().substr(2).padStart(16 * 2, "0"), "hex").copy(pubdata, 6);
         Buffer.from(wallet.address.substr(2), "hex").copy(pubdata, 22);
-
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
         expect(committedPriorityRequestsAfter - 1, "priority request number").eq(committedPriorityRequestsBefore);
-        expect(totalOnchainOpsAfter - 1, "committed onchain ops number").eq(totalOnchainOpsBefore);
     });
 
     it("Process partial exit", async () => {
         zksyncContract.connect(wallet);
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
 
         // construct deposit pubdata
         const pubdata = Buffer.alloc(8 * 6, 0);
@@ -541,9 +522,7 @@ describe("ZK Sync test process next operation", function () {
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
         expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
-        expect(totalOnchainOpsAfter - 1, "committed onchain ops number").eq(totalOnchainOpsBefore);
     });
 
     it("Process full exit", async () => {
@@ -552,10 +531,9 @@ describe("ZK Sync test process next operation", function () {
         const fullExitAmount = parseEther("0.7");
         const accountId = 0xaabbff;
 
-        await zksyncContract.fullExit(accountId, tokenContract.address, {value: parseEther("0.1")});
+        await zksyncContract.fullExit(accountId, tokenContract.address);
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
 
         // construct deposit pubdata
         const pubdata = Buffer.alloc(8 * 6, 0);
@@ -568,9 +546,7 @@ describe("ZK Sync test process next operation", function () {
         await zksyncContract.testProcessOperation(pubdata, "0x", []);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
         expect(committedPriorityRequestsAfter - 1, "priority request number").eq(committedPriorityRequestsBefore);
-        expect(totalOnchainOpsAfter - 1, "committed onchain ops number").eq(totalOnchainOpsBefore);
     });
 
     it("Change pubkey with auth", async () => {
@@ -583,7 +559,6 @@ describe("ZK Sync test process next operation", function () {
         const accountId = 0xffee12;
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
 
         // construct deposit pubdata
         const pubdata = Buffer.alloc(8 * 6, 0);
@@ -596,9 +571,7 @@ describe("ZK Sync test process next operation", function () {
         await zksyncContract.testProcessOperation(pubdata, "0x", [0]);
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
         expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
-        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
     });
 
     it("Change pubkey with posted signature", async () => {
@@ -611,7 +584,6 @@ describe("ZK Sync test process next operation", function () {
         const accountId = 0xffee12;
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsBefore = await zksyncContract.totalOnchainOps();
 
         // construct deposit pubdata
         const pubdata = Buffer.alloc(8 * 6, 0);
@@ -624,8 +596,6 @@ describe("ZK Sync test process next operation", function () {
         await zksyncContract.testProcessOperation(pubdata, ethWitness, [(ethWitness.length - 2) / 2]); // (ethWitness.length - 2) / 2   ==   len of ethWitness in bytes
 
         const committedPriorityRequestsAfter = await zksyncContract.totalCommittedPriorityRequests();
-        const totalOnchainOpsAfter = await zksyncContract.totalOnchainOps();
         expect(committedPriorityRequestsAfter, "priority request number").eq(committedPriorityRequestsBefore);
-        expect(totalOnchainOpsAfter, "committed onchain ops number").eq(totalOnchainOpsBefore);
     });
 });

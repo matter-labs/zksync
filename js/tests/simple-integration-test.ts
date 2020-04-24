@@ -161,10 +161,10 @@ async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: 
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
     const tokenId = await withdrawTo.provider.tokenSet.resolveTokenId(token);
-    const pendingToBeOnchainBalance = await contract.balancesToWithdraw(
+    const pendingToBeOnchainBalance = (await contract.balancesToWithdraw(
         await withdrawTo.address(),
         tokenId,
-    );
+    )).balanceToWithdraw;
 
     if (!wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee))) {
         throw new Error("Wrong amount on wallet after WITHDRAW");
@@ -212,20 +212,6 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
         ethWallet,
         syncProvider,
     );
-
-    try {
-        const tx = await zksyncDepositorWallet.depositToSyncFromEthereum({
-            depositTo: syncWallet.address(),
-            token: "ETH",
-            amount: utils.parseEther('0.01'),
-            maxFeeInETHToken: utils.parseEther('0'),
-            approveDepositAmountForERC20: true,
-        });
-        await tx.awaitVerifyReceipt();
-        testPassed = false;
-    } catch (e) {
-        console.log(`Error (expected) on priorityop fail:${e}`.slice(0,50));
-    }
     
     try {
         const tx = await syncWallet.syncTransfer({

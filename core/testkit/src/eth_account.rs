@@ -42,10 +42,6 @@ pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
     Ok(BigDecimal::from_str(&string_wei_value)?)
 }
 
-fn priority_op_fee() -> BigDecimal {
-    parse_ether("0.3").unwrap()
-}
-
 /// Used to sign and post ETH transactions for the ZK Sync contracts.
 #[derive(Debug)]
 pub struct EthereumAccount<T: Transport> {
@@ -125,7 +121,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "fullExit",
                 (u64::from(account_id), token_address),
-                Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
+                Options::default(),
             )
             .await
             .map_err(|e| format_err!("Full exit send err: {}", e))?;
@@ -231,7 +227,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "changePubKeyHash",
                 (new_pubkey_hash.data.to_vec(),),
-                Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
+                Options::default(),
             )
             .await
             .map_err(|e| format_err!("ChangePubKeyHash send err: {}", e))?;
@@ -269,9 +265,9 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "depositETH",
-                (big_dec_to_u256(amount.clone()), *to),
+                *to,
                 Options::with(|opt| {
-                    opt.value = Some(big_dec_to_u256(amount.clone() + priority_op_fee()));
+                    opt.value = Some(big_dec_to_u256(amount.clone()));
                     opt.nonce = nonce;
                 }),
             )
@@ -343,7 +339,7 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .compat()
             .await
-            .map(u256_to_big_dec)
+            .map(|(to_withdraw, _): (U256, U256)| u256_to_big_dec(to_withdraw))
             .map_err(|e| format_err!("Contract query fail: {}", e))?)
     }
 
@@ -403,7 +399,7 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "depositERC20",
                 (token_contract, big_dec_to_u256(amount.clone()), *to),
-                Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
+                Options::default(),
             )
             .await
             .map_err(|e| format_err!("Deposit erc20 send err: {}", e))?;
@@ -468,7 +464,11 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "verifyBlock",
-                (u64::from(block.block_number), [U256::default(); 8]),
+                (
+                    u64::from(block.block_number),
+                    [U256::default(); 8],
+                    block.get_withdrawals_data(),
+                ),
                 Options::default(),
             )
             .await

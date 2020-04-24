@@ -10,13 +10,15 @@ contract ZKSyncUnitTest is FranklinTest {
     }
 
     function setBalanceToWithdraw(address _owner, uint16 _token, uint128 _amount) external {
-        balancesToWithdraw[_owner][_token] = _amount;
+        balancesToWithdraw[_owner][_token].balanceToWithdraw = _amount;
     }
 
     function receiveETH() payable external{}
 
     function addPendingWithdrawal(address _to, uint16 _tokenId, uint128 _amount) external {
-        storeWithdrawalAsPending(_to, _tokenId, _amount);
+        pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
+        numberOfPendingWithdrawals++;
+        balancesToWithdraw[_to][_tokenId].balanceToWithdraw += _amount;
     }
 
     function testProcessOperation(

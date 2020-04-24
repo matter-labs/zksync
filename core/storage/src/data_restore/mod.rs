@@ -169,11 +169,11 @@ impl<'a> DataRestoreSchema<'a> {
     ) -> QueryResult<()> {
         // Withdraw ops counter is set equal to the `verify` ops counter
         // since we assume that we've sent a withdraw for every `verify` op.
-        update(eth_stats::table.filter(eth_stats::id.eq(true)))
+        update(eth_parameters::table.filter(eth_parameters::id.eq(true)))
             .set((
-                eth_stats::commit_ops.eq(last_committed_block as i64),
-                eth_stats::verify_ops.eq(last_verified_block as i64),
-                eth_stats::withdraw_ops.eq(last_verified_block as i64),
+                eth_parameters::commit_ops.eq(last_committed_block as i64),
+                eth_parameters::verify_ops.eq(last_verified_block as i64),
+                eth_parameters::withdraw_ops.eq(last_verified_block as i64),
             ))
             .execute(self.0.conn())?;
 

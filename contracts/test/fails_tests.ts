@@ -341,7 +341,7 @@ describe("PLANNED FAILS", function () {
         console.log("Got revert code when there are no requests to cancel");
 
         // Withdraw eth
-        const rollupBalance = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+        const rollupBalance = (await franklinDeployedContract.balancesToWithdraw(wallet.address, 0)).balanceToWithdraw;
         await withdrawEthFromContract(
             provider,
             wallet,
