@@ -1,5 +1,4 @@
 use crate::rollup_ops::RollupOpsBlock;
-use bigdecimal::BigDecimal;
 use failure::format_err;
 use models::node::account::Account;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -313,7 +312,6 @@ impl TreeState {
                 serial_id: 0,
                 data: priority_op,
                 deadline_block: 0,
-                eth_fee: BigDecimal::from(0),
                 eth_hash: Vec::new(),
             },
             block_index,

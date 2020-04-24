@@ -240,7 +240,7 @@ describe("Integration test", async function () {
         expect(await priorityQueueDeployedContract.firstPriorityRequestId()).equal(2);
 
         // Withdraw accumulated fees eth for wallet
-        const balanceToWithdraw = await franklinDeployedContract.getBalanceToWithdraw(wallet.address, 0);
+        const balanceToWithdraw = (await franklinDeployedContract.getBalanceToWithdraw(wallet.address, 0));
 
         await withdrawEthFromContract(
             provider,
@@ -250,7 +250,7 @@ describe("Integration test", async function () {
             null,
         );
 
-        expect(await franklinDeployedContract.getBalanceToWithdraw(wallet.address, 0)).equal(bigNumberify(0));
+        expect((await franklinDeployedContract.getBalanceToWithdraw(wallet.address, 0))).equal(bigNumberify(0));
 
         //console.log("Full exit verified and withdrawed to wallet");
         //console.log(" + ETH Integration passed")

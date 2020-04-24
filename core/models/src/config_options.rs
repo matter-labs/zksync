@@ -22,13 +22,13 @@ impl Drop for ThreadPanicNotify {
 
 /// Obtains the environment variable value.
 /// Panics if there is no environment variable with provided name set.
-fn get_env(name: &str) -> String {
+pub fn get_env(name: &str) -> String {
     env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e))
 }
 
 /// Obtains the environment variable value and parses it using the `FromStr` type implementation.
 /// Panics if there is no environment variable with provided name set, or the value cannot be parsed.
-fn parse_env<F>(name: &str) -> F
+pub fn parse_env<F>(name: &str) -> F
 where
     F: FromStr,
     F::Err: std::fmt::Debug,
@@ -39,7 +39,7 @@ where
 }
 
 /// Similar to `parse_env`, but also takes a function to change the variable value before parsing.
-fn parse_env_with<T, F>(name: &str, f: F) -> T
+pub fn parse_env_with<T, F>(name: &str, f: F) -> T
 where
     T: FromStr,
     T::Err: std::fmt::Debug,
@@ -95,6 +95,7 @@ pub struct ConfigurationOptions {
     pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
     pub confirmations_for_eth_event: u64,
+    pub api_requests_caches_size: usize,
 }
 
 impl ConfigurationOptions {
@@ -119,6 +120,7 @@ impl ConfigurationOptions {
             tx_batch_size: parse_env("TX_BATCH_SIZE"),
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
+            api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
         }
     }
 }

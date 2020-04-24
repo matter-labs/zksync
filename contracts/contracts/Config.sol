@@ -29,21 +29,6 @@ contract Config {
     /// @notice Max amount of tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
     uint16 constant MAX_AMOUNT_OF_REGISTERED_TOKENS = (2 ** 16) - 1;
 
-    /// @notice Fee gas price multiplier for transactions
-    uint256 constant FEE_GAS_PRICE_MULTIPLIER = 2;
-
-    /// @notice Base gas for deposit eth transaction
-    /// NOTE: Gas fee may vary with time when ethereum is updated
-    uint256 constant BASE_DEPOSIT_ETH_GAS = 179000;
-
-    /// @notice Base gas for deposit erc20 transaction
-    /// NOTE: Gas fee may vary for different tokens
-    uint256 constant BASE_DEPOSIT_ERC_GAS = 214000;
-
-    /// @notice Base gas for full exit transaction
-    /// NOTE: Gas fee may vary with time when ethereum is updated
-    uint256 constant BASE_FULL_EXIT_GAS = 170000;
-
     /// @notice Expected average period of block creation
     uint256 constant BLOCK_PERIOD = 15 seconds;
 
@@ -59,6 +44,9 @@ contract Config {
 
     /// @notice Full exit operation length
     uint256 constant FULL_EXIT_BYTES = 6 * 8;
+
+    /// @notice OnchainWithdrawal data length
+    uint256 constant ONCHAIN_WITHDRAWAL_BYTES = 1 + 20 + 2 + 16; // (uint8 addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount)
 
     /// @notice ChangePubKey operation length
     uint256 constant CHANGE_PUBKEY_BYTES = 6 * 8;

@@ -213,20 +213,4 @@ export class ETHProxy {
             return tokenId;
         }
     }
-
-    async estimateDepositFeeInETHToken(
-        token: TokenLike,
-        gasPrice?: utils.BigNumber
-    ): Promise<utils.BigNumber> {
-        gasPrice = gasPrice || (await this.ethersProvider.getGasPrice());
-        const multiplier = isTokenETH(token) ? 179000 : 214000;
-        return gasPrice.mul(2 * multiplier);
-    }
-
-    async estimateEmergencyWithdrawFeeInETHToken(
-        gasPrice?: utils.BigNumber
-    ): Promise<utils.BigNumber> {
-        gasPrice = gasPrice || (await this.ethersProvider.getGasPrice());
-        return gasPrice.mul(2 * 170000);
-    }
 }

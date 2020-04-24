@@ -183,6 +183,7 @@ pub fn start_ws_server(
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     panic_notify: mpsc::Sender<bool>,
+    each_cache_size: usize,
 ) {
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
@@ -193,6 +194,7 @@ pub fn start_ws_server(
         mempool_request_sender,
         state_keeper_request_sender.clone(),
         sign_verify_request_sender,
+        each_cache_size,
     );
     req_rpc_app.extend(&mut io);
 
@@ -207,6 +209,7 @@ pub fn start_ws_server(
         executed_tx_receiver,
         state_keeper_request_sender,
         panic_notify.clone(),
+        each_cache_size,
     );
 
     std::thread::Builder::new()

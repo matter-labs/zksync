@@ -354,7 +354,7 @@ export class WalletDecorator {
             ? tokensInfo[token].id
             : token;
 
-        return await contract.getBalanceToWithdraw(address, tokenId).then(ethers.utils.formatEther);
+        return (await contract.getBalanceToWithdraw(address, tokenId)).then(ethers.utils.formatEther);
     }
 
     async balancesToWithdraw(tokens) {

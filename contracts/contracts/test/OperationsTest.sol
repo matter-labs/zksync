@@ -42,7 +42,7 @@ contract OperationsTest {
 
         bytes memory pubdata = Operations.writeFullExitPubdata(x);
         //require(pubdata.length == Operations.PackedDepositPubdataBytes());
-        Operations.FullExit memory r = Operations.readFullExitPubdata(pubdata);
+        Operations.FullExit memory r = Operations.readFullExitPubdata(pubdata, 0);
 
         require(x.accountId == r.accountId, "accountId mismatch");
         require(x.owner == r.owner,         "owner mismatch");
@@ -70,7 +70,7 @@ contract OperationsTest {
         });
 
         bytes memory pubdata = Operations.writePartialExitPubdata(x);
-        Operations.PartialExit memory r = Operations.readPartialExitPubdata(pubdata);
+        Operations.PartialExit memory r = Operations.readPartialExitPubdata(pubdata, 0);
 
         require(x.owner == r.owner,     "owner mismatch");
         require(x.tokenId == r.tokenId, "tokenId mismatch");
@@ -83,7 +83,7 @@ contract OperationsTest {
     }
 
     function parseFullExitFromPubdata(bytes calldata _pubdata) external pure returns (uint24 accountId, address owner, uint16 tokenId, uint128 amount) {
-        Operations.FullExit memory r = Operations.readFullExitPubdata(_pubdata);
+        Operations.FullExit memory r = Operations.readFullExitPubdata(_pubdata, 0);
         accountId = r.accountId;
         owner = r.owner;
         tokenId = r.tokenId;

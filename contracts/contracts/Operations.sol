@@ -98,11 +98,11 @@ library Operations {
     uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
         ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
 
-    function readFullExitPubdata(bytes memory _data) internal pure
+    function readFullExitPubdata(bytes memory _data, uint _offset) internal pure
         returns (FullExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = 0;
+        uint offset = _offset;
         (offset, parsed.accountId) = Bytes.readUInt24(_data, offset);      // accountId
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);         // owner
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);        // tokenId
@@ -136,11 +136,11 @@ library Operations {
         address owner;
     }
 
-    function readPartialExitPubdata(bytes memory _data) internal pure
+    function readPartialExitPubdata(bytes memory _data, uint _offset) internal pure
         returns (PartialExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = ACCOUNT_ID_BYTES;                             // accountId (ignored)
+        uint offset = _offset + ACCOUNT_ID_BYTES;                   // accountId (ignored)
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
         offset += FEE_BYTES;                                        // fee (ignored)
@@ -176,6 +176,18 @@ library Operations {
         (offset, parsed.pubKeyHash) = Bytes.readBytes20(_data, offset);              // pubKeyHash
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);                   // owner
         (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);                    // nonce
+    }
+
+    // Withdrawal data process
+
+    function readWithdrawalData(bytes memory _data, uint _offset) internal pure
+        returns (bool _addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount)
+    {
+        uint offset = _offset;
+        (offset, _addToPendingWithdrawalsQueue) = Bytes.readBool(_data, offset);
+        (offset, _to) = Bytes.readAddress(_data, offset);
+        (offset, _tokenId) = Bytes.readUInt16(_data, offset);
+        (offset, _amount) = Bytes.readUInt128(_data, offset);
     }
 
 }

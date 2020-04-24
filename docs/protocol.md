@@ -71,11 +71,11 @@ ZK Sync implements a ZK rollup protocol (in short "rollup" below) for ETH and ER
 
 General rollup workflow is as follows:
 
-- Users can become owners in rollup be depositing assets from L1 or receiving a transfer from other owners.
+- Users can become owners in rollup by depositing assets from L1 or receiving a transfer from other owners.
 - Owners can transfer assets to each other.
 - Owners can withdraw assets under their control to an L1 address.
 
-Rollup operation requires the assistance by an operator, who rolls transactions together, computes a zero-knowledge proof of the correct state transition, and effects the state transition by interacting with the rollup contract.
+Rollup operation requires the assistance of an operator, who rolls transactions together, computes a zero-knowledge proof of the correct state transition, and affects the state transition by interacting with the rollup contract.
 
 ### Assumptions
 
@@ -119,24 +119,24 @@ This includes, in particular, the following claims:
 |--|--|--|--|
 |AccountId|3|BE integer|Incremented number of accounts in Rollup. New account will have the next free id. Max value is 16777215|
 |TokenId|2|BE integer|Incremented number of tokens in Rollup, max value is 65535|
-|PackedTxAmount|5|[Parameters](#our-convertation-parameters-for-packing-amounts-and-fees)|Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantisa * 10^exponent where mantisa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368 * 10^31, providing 10 full decimal digit precision.|
+|PackedTxAmount|5|[Parameters](#our-convertation-parameters-for-packing-amounts-and-fees)|Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantissa * 10^exponent where mantissa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368 * 10^31, providing 10 full decimal digit precision.|
 |PackedFee|2|[Parameters](#our-convertation-parameters-for-packing-amounts-and-fees)|Packed fees must be represented with 2 bytes: 5 bit for exponent, 11 bit for mantissa.|
-|StateAmount|16|BE integer|State amount is represented as uint128 with a range from 0 to ~3.4 * 10^38. It allows to represent up to 3.4 * 10^20 "units" if standard Ethereums 18 decimal symbols are used. This thould be a sufficient range.|
+|StateAmount|16|BE integer|State amount is represented as uint128 with a range from 0 to ~3.4 * 10^38. It allows to represent up to 3.4 * 10^20 "units" if standard Ethereum's 18 decimal symbols are used. This should be a sufficient range.|
 |StateFee|16|BE integer|State fee is represented as uint128 with a range from 0 to ~3.4 * 10^38. It allows to represent up to 3.4 * 10^20 "units" if standard Ethereums 18 decimal symbols are used. This thould be a sufficient range.|
 |Nonce|4|BE integer|Nonce reflects the current state of the account in the tree starting from zero. In order to apply the update of this state, it is necessary to indicate the current account nonce in the corresponding transaction, after which it will be automatically incremented. If you specify the wrong nonce, the changes will not occur.|
-|RollupPubkeyHash|20|LE integer|To make public key hash from a Rollup [public key](#generating-rollup-key-pair) apply [Pedersen hash function](#pedersen-hash) to the key and then take the last 20 bytes of the result.|
-|EthAddress|20|LE integer|To make an ethereum address from the etherum public key, all we need to do is to apply Keccak-256 hash function to the key and then take the last 20 bytes of the result.|
-|PackedRollupPubkey|32|LE integer|An Rollup public key is the first 32 bytes of a Rollup [public key](#generating-rollup-key-pair)|
+|RollupPubkeyHash|20|LE integer|To make a public key hash from a Rollup [public key](#generating-rollup-key-pair) apply [Pedersen hash function](#pedersen-hash) to the key and then take the last 20 bytes of the result.|
+|EthAddress|20|LE integer|To make an Ethereum address from the Etherum's public key, all we need to do is to apply Keccak-256 hash function to the key and then take the last 20 bytes of the result.|
+|PackedRollupPubkey|32|LE integer|A Rollup public key is the first 32 bytes of a Rollup [public key](#generating-rollup-key-pair)|
 |TxHash|32|LE integer|To get hash for transaction apply [SHA256 function](#sha256) to concatenated bytes of [transaction fields](#zk-sync-operations)|
 |Signature|64|LE integer|Read [Pedersen signature](#pedersen-signature)|
-|BlockNumber|4|BE integer|Incremented number of Rollup blocks, max number is 4294967296|
+|BlockNumber|4|BE integer|Incremented number of Rollup blocks, max number is 4294967295|
 |RootHash|32|LE integer|[Merkle tree root hash](#state-sparse-merkle-tree-smt)|
 
 ### Amount packing
 
 Amounts and fees are compressed in ZK Sync using simple [fundamentals of floating point arithmetic](https://en.wikipedia.org/wiki/Floating-point_arithmetic).
 
-A floating-point number has four parts: a sign, a mantissa, a radix, and an exponent. The sign is either a 1 or -1. The mantissa, always a positive number, holds the significant digits of the floating-point number. The exponent indicates the positive or negative power of the radix that the mantissa and sign should be multiplied by. The four components are combined as follows to get the floating-point value:
+A floating-point number has the following parts: a mantissa, a radix, and an exponent. The mantissa (always non-negative in our case) holds the significant digits of the floating-point number. The exponent indicates the power of the radix that the mantissa and sign should be multiplied by. The components are combined as follows to get the floating-point value:
 
 ```
 sign * mantissa * (radix ^ exponent)
@@ -144,7 +144,7 @@ sign * mantissa * (radix ^ exponent)
 
 Mantissa and exponent parameters used in ZK Sync:
 
-|Type|Exponent bit width|Mantissa bit width|Exponent base|
+|Type|Exponent bit width|Mantissa bit width|Radix|
 |--|--|--|--|
 |PackedTxAmount|5|35|10|
 |PackedFee|5|11|10|
@@ -212,7 +212,7 @@ Priority operations:
 
 Full list: https://docs.google.com/spreadsheets/d/1ejK1MJfVehcwjgjVDFD3E2k1EZ7auqbG_y0DKidS9nA/edit#gid=0
 
-Legeand:
+Legend:
 
 - User transaction: what users can submit to the operator (body of Http request / input for contract method).
 - Onchain operation: what the operator can put into the rollup block pubdata (operation pubdata).
@@ -328,7 +328,7 @@ signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19
 
 #### Tree updates
 
-1. Account(from_id).balance(token) -= Transfer.amount
+1. Account(from_id).balance(token) -= (Transfer.amount + Transfer.fee)
 3. Account(from_id).nonce += 1
 2. Account(to_id).balance(token) += Transfer.amount
 4. Account(fees_account_id).balance(token) += Transfer.fee
@@ -412,7 +412,7 @@ signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19
 to_id = get_lowest_free_account_id()
 
 1. Account(to_id).address = TransferToNew.to_address
-2. Account(from_id).balance(token) -= TransferToNew.amount
+2. Account(from_id).balance(token) -= (TransferToNew.amount + Transfer.fee)
 3. Account(from_id).nonce += 1
 4. Account(to_id).balance(token) += TransferToNew.amount
 5. Account(fees_account_id).balance(token) += TransferToNew.fee
@@ -484,74 +484,13 @@ signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19
 2. id = get_id(Withdraw.from_address) != nil
 3. verify(signature) == true
 4. Transfer.nonce == Account(id).nonce
-5. Account(id).balance(token) >= Withdraw.amount + Withdraw.fee
+5. Account(id).balance(token) >= (Withdraw.amount + Withdraw.fee)
 
 #### Tree updates
 
-1. Account(id).balance(token) -= Withdraw.amount
+1. Account(id).balance(token) -= (Withdraw.amount + Withdraw.fee)
 2. Account(id).nonce += 1
 3. Account(fees_account_id).balance(token) += Withdraw.fee
-
-### 5. Close
-
-#### Description
-
-Closes account - corresponds to the specified account with a zero address. **WARN: Account balances must be equal to zero for all possible tokens.**
-
-#### Onchain operation
-
-##### Size
-
-|Chunks|Significant bytes|
-|--|--|
-|1|4|
-
-##### Structure
-
-|Field|Byte len|Value/type|Description|
-|--|--|--|--|
-|opcode|1|`0x04`|Operation code|
-|account|3|AccountId|Unique identifier of the rollup account to close|
-
-##### Example
-
-```
-0400000400000000
-```
-
-Reads as: close account #4.
-
-#### User transaction
-
-##### Structure
-
-|Field|Value/type|Description|
-|--|--|--|
-|type|`0x04`|Operation code|
-|account|RollupAddress|Unique address of the rollup account to close|
-|nonce|Nonce|A one-time code that specifies the order of transactions|
-|signature|Signanture|Pedersen signature of previous fields that had been concatenated into a single bytes array|
-
-##### Example
-
-```json
-type: 4,
-account: "0x03e69588c1f4155dec60da3bf5113e029911ce33",
-nonce: 5,
-signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce330124"
-```
-
-#### Invariants
-
-1. for token in 0 ..< TotalToken { Account(id).balance(token) == 0 }
-2. id = get_id(Withdraw.account) != nil
-3. verify(signature) == true
-4. Transfer.nonce == Account(id).nonce
-
-#### Tree updates
-
-1. Account(id).pubkey_hash = 0x0000000000000000000000000000000000000000
-2. Account(id).nonce = 0
 
 ### 6. Deposit
 
@@ -559,7 +498,6 @@ signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19
 
 Deposits funds from ethereum account to the specified Rollup account.
 Deposit starts as priority operation - user calls contract method `depositEth` to deposit ethereum, or `depositErc` to deposit ERC-20 tokens. After that operator includes this operation in a block. In the account tree, the new account will be created if needed.
-A fee for deposit is taken in the smart contract. It depends on a transaction gas price. It is not included in pubdata.
 
 #### Onchain operation
 
@@ -602,16 +540,7 @@ The following must be concatenated into single bytes string and placed into **tr
 |to_address|RollupAddress|The address that will represent the rollup account that will receive the funds (recipient)|
 
 If transaction currency is Ether, provide the proper Ether amount in transaction value field.
-value >= full_amount + tx.gas_price * fee_gas_price_multiplier * base_tx_gas, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 179000 - base gas for deposit Ether transaction.
-
-If transaction currency is not Ether, provide the proper Ether amount in transaction value field.
-value >= tx.gas_price * fee_gas_price_multiplier * base_tx_gas, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 214000 - base gas for deposit ERC20 transaction.
-
-Fee will be accumulated on the validators balance after she commit the block that contains this operation.
+value is full_amount
 
 ##### Example
 
@@ -621,7 +550,6 @@ from_address: "0x03e69588c1f4155dec60da3bf5113e029911ce33",
 token: 2,
 full_amount: "0x000000000000000002c68af0bb140000",
 to_address: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef",
-fee: "0x0012",
 nonce: 5,
 signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce330124"
 ```
@@ -647,7 +575,6 @@ It is possible that the operator for some reason does not include this operation
 The user can request this operation to withdraw funds if he thinks that his transactions are censored by validators.
 
 It starts as a priority operation - user calls contract method `fullExit`. After that operator includes this operation in a block.
-A fee for full exit is taken in the smart contract. It depends on a transaction gas price. It is not included in pubdata.
 
 #### Onchain operation
 
@@ -690,13 +617,6 @@ The following must be concatenated into single bytes string and placed into **tr
 
 User provides `account_id` and token address (zero address for ETH), token id is determined using governance contract and 
 owner is determined using transaction sender.
-
-Provide the proper Ether amount in transaction value field.
-value >= tx.gas_price * fee_gas_price_multiplier * base_tx_gas, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 170000 - base gas for full exit transaction.
-
-Fee will be accumulated on the validators balance after she commit the block that contains this operation.
 
 ##### Example
 
@@ -807,20 +727,11 @@ signature: "0x8b7385c7bb8913b9fd176247efab0ccc72e3197abe8e2d4c6596ba58a32a91675f
 #### Deposit Ether
 Deposit Ether to Rollup - transfer Ether from user L1 address into Rollup address
 ```solidity
-depositETH(uint128 _amount, bytes calldata _rollupAddr) payable
+depositETH(address _franklinAddr)
 ```
-- _amount: Amount to deposit
-- _rollupAddr: The receiver Rollup address
+- _franklinAddr: The receiver Layer 2 address
 
-The user must specify value of Ether to send:
-
-*msg.value >= _amount + fee*
-
-*fee = tx.gas_price * fee_gas_price_multiplier * base_tx_gas*, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 179000 - base gas for deposit Ether transaction.
-
-If sender specified msg.value more than this _amount + fee - she will recieve difference.
+msg.value equals amount to deposit.
 
 #### Deposit ERC-20 token
 Deposit ERC-20 token to Rollup - transfer token from user L1 address into Rollup address
@@ -830,16 +741,6 @@ depositERC20(address _token, uint128 _amount, bytes calldata _rollupAddr) payabl
 - _token: Token address in L1 chain
 - _amount: Amount to deposit 
 - _rollupAddr: The receiver Rollup address
-
-The user must specify msg.value of Ether to send:
-
-*msg.value >= fee*
-
-*fee = tx.gas_price * fee_gas_price_multiplier * base_tx_gas*, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 214000 - base gas for deposit ERC20 transaction.
-
-If sender specified msg.value more than this fee - she will recieve difference.
 
 #### Withdraw Ether
 
@@ -878,16 +779,6 @@ fullExit (
 ```
 - _accountId: Numerical id of the Rollup account
 - _token: Token address in L1 chain
-
-The user must specify msg.value of Ether to send:
-
-*msg.value >= fee*
-
-*fee = tx.gas_price * fee_gas_price_multiplier * base_tx_gas*, where
-- fee_gas_price_multiplier = 2 - comission coeffictient
-- base_tx_gas = 170000 - base gas for full exit transaction.
-
-If sender specified msg.value more than this fee - she will recieve difference.
 
 #### Exodus mode
 
@@ -940,11 +831,12 @@ commitBlock(
 
 Submit verified block proof. Only active validator can make it. This block onchain operations will be fulfilled.
 ```solidity
-verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof)
+verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof, bytes calldata _withdrawalsData)
 ```
 
 - _blockNumber: Block number
 - _proof Block proof
+- _withdrawalsData Withdrawals data
 
 ### Priority Queue contract
 

@@ -130,4 +130,18 @@ impl Block {
             max_block_chunk_size()
         );
     }
+
+    pub fn get_withdrawals_data(&self) -> Vec<u8> {
+        let mut withdrawals_data = Vec::new();
+
+        for block_tx in &self.block_transactions {
+            if let Some(franklin_op) = block_tx.get_executed_op() {
+                if let Some(withdrawal_data) = franklin_op.withdrawal_data() {
+                    withdrawals_data.extend(&withdrawal_data);
+                }
+            }
+        }
+
+        withdrawals_data
+    }
 }

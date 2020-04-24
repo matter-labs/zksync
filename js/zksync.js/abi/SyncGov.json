@@ -1,13 +1,7 @@
 {
   "interface": [
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_networkGovernor",
-          "type": "address"
-        }
-      ],
+      "inputs": [],
       "payable": false,
       "stateMutability": "nonpayable",
       "type": "constructor"
@@ -56,6 +50,21 @@
         }
       ],
       "name": "changeGovernor",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "initializationParameters",
+          "type": "bytes"
+        }
+      ],
+      "name": "initialize",
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",
