@@ -8,8 +8,10 @@ use futures::channel::mpsc;
 use circuit::witness::deposit::apply_deposit_tx;
 use circuit::witness::deposit::calculate_deposit_operations_from_witness;
 use models::circuit::CircuitAccountTree;
+use models::config_options::ConfigurationOptions;
+use models::node::block::Block;
 use models::node::Address;
-use models::params::{account_tree_depth, block_chunk_sizes, total_tokens};
+use models::params::{account_tree_depth, total_tokens};
 use models::prover_utils::EncodedProofPlonk;
 use prover::client;
 use prover::ApiClient;
@@ -56,7 +58,7 @@ fn client_with_empty_worker_name_panics() {
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
-    let block_size_chunks = block_chunk_sizes()[0];
+    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
     let client = client::ApiClient::new(
         &format!("http://{}", &addr).parse().unwrap(),
@@ -87,7 +89,7 @@ fn api_client_simple_simulation() {
 
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let block_size_chunks = block_chunk_sizes()[0];
+    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
     let client = client::ApiClient::new(
         &format!("http://{}", &addr).parse().unwrap(),
         "foo",
@@ -234,13 +236,14 @@ pub fn test_operation_and_wanted_prover_data(
     let fee_updates = state.collect_fee(&fees, validator_account_id);
     accounts_updated.extend(fee_updates.into_iter());
 
-    let block = models::node::block::Block {
-        block_number: state.block_number,
-        new_root_hash: state.root_hash(),
-        fee_account: validator_account_id,
-        block_transactions: ops,
-        processed_priority_ops: (0, 1),
-    };
+    let block = Block::new_from_availabe_block_sizes(
+        state.block_number,
+        state.root_hash(),
+        validator_account_id,
+        ops,
+        (0, 1),
+        &ConfigurationOptions::from_env().available_block_chunk_sizes,
+    );
 
     let mut pub_data = vec![];
     let mut operations = vec![];

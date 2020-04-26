@@ -63,13 +63,7 @@ pub fn get_operation(
     Operation {
         id: None,
         action,
-        block: Block {
-            block_number,
-            new_root_hash: Fr::default(),
-            fee_account: 0,
-            block_transactions: Vec::new(),
-            processed_priority_ops: (0, 0),
-        },
+        block: Block::new(block_number, Fr::default(), 0, Vec::new(), (0, 0), 100),
         accounts_updated,
     }
 }

@@ -125,13 +125,14 @@ fn get_unique_operation(
     Operation {
         id: None,
         action,
-        block: Block {
+        block: Block::new(
             block_number,
-            new_root_hash: root_hash_for_block(block_number),
-            fee_account: 0,
-            block_transactions: Vec::new(),
-            processed_priority_ops: (0, 0),
-        },
+            root_hash_for_block(block_number),
+            0,
+            Vec::new(),
+            (0, 0),
+            100,
+        ),
         accounts_updated,
     }
 }

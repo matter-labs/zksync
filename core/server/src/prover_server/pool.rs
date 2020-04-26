@@ -270,7 +270,7 @@ impl Maintainer {
         commit_operation: &models::Operation,
     ) -> Result<ProverData, String> {
         let block_number = commit_operation.block.block_number;
-        let block_size = commit_operation.block.smallest_block_size();
+        let block_size = commit_operation.block.block_chunks_size;
 
         info!("building prover data for block {}", &block_number);
 
@@ -482,7 +482,7 @@ impl Maintainer {
         }
 
         witness_accum.add_operation_with_pubdata(operations, pub_data);
-        witness_accum.extend_pubdata_with_noops();
+        witness_accum.extend_pubdata_with_noops(block_size);
         assert_eq!(witness_accum.pubdata.len(), 64 * block_size);
         assert_eq!(witness_accum.operations.len(), block_size);
 

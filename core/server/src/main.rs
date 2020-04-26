@@ -127,6 +127,7 @@ fn main() {
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
+        config_opts.available_block_chunk_sizes.clone(),
     );
     start_state_keeper(state_keeper, &main_runtime);
 
@@ -172,6 +173,7 @@ fn main() {
         connection_pool,
         mempool_request_receiver,
         eth_watch_req_sender,
+        &config_opts,
         &main_runtime,
     );
     run_block_proposer_task(

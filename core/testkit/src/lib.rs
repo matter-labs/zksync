@@ -32,6 +32,8 @@ pub mod zksync_account;
 use models::prover_utils::EncodedProofPlonk;
 use web3::types::U64;
 
+pub const TESKIT_BLOCK_CHUNKS_SIZE: usize = 100;
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ETHAccountId(pub usize);
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -219,6 +221,7 @@ pub fn spawn_state_keeper(
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
+        vec![TESKIT_BLOCK_CHUNKS_SIZE],
     );
 
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
@@ -345,8 +348,23 @@ pub fn perform_basic_operations(
     println!("Full exit test success, token_id: {}", token);
 }
 
+pub struct TestkitConfig {
+    pub chain_id: u8,
+    pub gas_price_factor: usize,
+    pub web3_url: String,
+}
+
+pub fn get_testkit_config_from_env() -> TestkitConfig {
+    let env_config = ConfigurationOptions::from_env();
+    TestkitConfig {
+        chain_id: env_config.chain_id,
+        gas_price_factor: env_config.gas_price_factor,
+        web3_url: env_config.web3_url,
+    }
+}
+
 pub fn perform_basic_tests() {
-    let config = ConfigurationOptions::from_env();
+    let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
@@ -361,16 +379,17 @@ pub fn perform_basic_tests() {
         deploy_timer.elapsed().as_secs()
     );
 
-    let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
+    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
-        config.operator_private_key,
-        config.operator_eth_addr,
+        commit_account_info.private_key,
+        commit_account_info.address,
         transport.clone(),
         contracts.contract,
-        &config,
+        testkit_config.chain_id,
+        testkit_config.gas_price_factor,
     );
-
-    let eth_accounts = get_test_accounts()
+    let eth_accounts = test_accounts_info
         .into_iter()
         .map(|test_eth_account| {
             EthereumAccount::new(
@@ -378,7 +397,8 @@ pub fn perform_basic_tests() {
                 test_eth_account.address,
                 transport.clone(),
                 contracts.contract,
-                &config,
+                testkit_config.chain_id,
+                testkit_config.gas_price_factor,
             )
         })
         .collect::<Vec<_>>();

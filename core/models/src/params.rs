@@ -128,7 +128,7 @@ pub const LEAF_DATA_BIT_WIDTH: usize =
 
 static mut BLOCK_CHUNK_SIZES_VALUE: Vec<usize> = Vec::new();
 
-pub fn block_chunk_sizes() -> &'static [usize] {
+pub(crate) fn block_chunk_sizes() -> &'static [usize] {
     // use of mutable static is unsafe as it can be mutated by multiple threads.
     // using `unsafe` block as there's no risk of data race, the worst that can
     // happen is we read and set environment value multuple times, which is ok.
@@ -142,10 +142,6 @@ pub fn block_chunk_sizes() -> &'static [usize] {
         }
         BLOCK_CHUNK_SIZES_VALUE.as_slice()
     }
-}
-
-pub fn max_block_chunk_size() -> usize {
-    *block_chunk_sizes().last().unwrap()
 }
 
 /// Priority op should be executed for this number of eth blocks.

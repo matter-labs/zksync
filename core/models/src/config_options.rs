@@ -8,6 +8,7 @@ use futures::{channel::mpsc, executor::block_on, SinkExt};
 use web3::types::{H160, H256};
 // Local uses
 use crate::node::Address;
+use crate::params::block_chunk_sizes;
 
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
 pub struct ThreadPanicNotify(pub mpsc::Sender<bool>);
@@ -96,12 +97,15 @@ pub struct ConfigurationOptions {
     pub prover_server_address: SocketAddr,
     pub confirmations_for_eth_event: u64,
     pub api_requests_caches_size: usize,
+    pub available_block_chunk_sizes: Vec<usize>,
 }
 
 impl ConfigurationOptions {
     /// Parses the configuration options values from the environment variables.
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
+        let mut available_block_chunk_sizes = block_chunk_sizes().to_vec();
+        available_block_chunk_sizes.sort();
         Self {
             replica_name: parse_env("SERVER_REPLICA_NAME"),
             rest_api_server_address: parse_env("REST_API_BIND"),
@@ -121,6 +125,7 @@ impl ConfigurationOptions {
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
             api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
+            available_block_chunk_sizes,
         }
     }
 }

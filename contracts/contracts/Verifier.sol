@@ -11,6 +11,15 @@ contract Verifier is KeysWithPlonkVerifier {
     function initialize(bytes calldata) external {
     }
 
+
+    function isBlockSizeSupported(uint32 _size) public pure returns (bool) {
+        if (DUMMY_VERIFIER) {
+            return true;
+        } else {
+            return isBlockSizeSupportedInternal(_size);
+        }
+    }
+
     function verifyBlockProof(
         uint256[] calldata _proof,
         bytes32 _commitment,

@@ -9,9 +9,10 @@ use crypto_exports::pairing::ff::PrimeField;
 use circuit::circuit::FranklinCircuit;
 use circuit::witness::deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness};
 use circuit::witness::utils::WitnessBuilder;
+use models::config_options::ConfigurationOptions;
+use models::node::block::smallest_block_size_for_chunks;
 use models::node::operations::DepositOp;
 use models::node::{Deposit, Engine, Fr};
-use models::params::block_chunk_sizes;
 use models::prover_utils::EncodedProofPlonk;
 use prover::plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig};
 use prover::prover_data::ProverData;
@@ -24,7 +25,7 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // - BabyProver sends `working_on` requests (heartbeat) over api client
     // - BabyProver stops running upon receiving data over stop channel
 
-    let block_size_chunks = block_chunk_sizes()[0];
+    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
 
     // Create a channel to notify on provers exit.
     let (done_tx, _done_rx) = mpsc::channel();
@@ -130,7 +131,10 @@ fn new_test_data_for_prover() -> ProverData {
     let pub_data_from_witness = deposit_witness.get_pubdata();
 
     witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
-    witness_accum.extend_pubdata_with_noops();
+    witness_accum.extend_pubdata_with_noops(smallest_block_size_for_chunks(
+        DepositOp::CHUNKS,
+        &ConfigurationOptions::from_env().available_block_chunk_sizes,
+    ));
     witness_accum.collect_fees(&Vec::new());
     witness_accum.calculate_pubdata_commitment();
 

@@ -38,10 +38,19 @@ impl PlonkVerificationKey {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct EncodedProofPlonk {
     pub inputs: Vec<U256>,
     pub proof: Vec<U256>,
+}
+
+impl Default for EncodedProofPlonk {
+    fn default() -> Self {
+        Self {
+            inputs: vec![U256::default(); 1],
+            proof: vec![U256::default(); 33],
+        }
+    }
 }
 
 pub struct SetupForStepByStepProver {

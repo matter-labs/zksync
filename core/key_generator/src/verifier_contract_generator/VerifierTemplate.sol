@@ -5,7 +5,7 @@ import "./PlonkCore.sol";
 // Hardcoded constants to avoid accessing store
 contract KeysWithPlonkVerifier is VerifierWithDeserialize {
 
-    function isBlockSizeSupported(uint32 _size) public pure returns (bool) {
+    function isBlockSizeSupportedInternal(uint32 _size) internal pure returns (bool) {
         {{~#each chunks ~}}
         {{#if @first}}
         if (_size == uint32({{this}})) { return true; }
