@@ -67,7 +67,7 @@ pub fn balance_tree_depth() -> usize {
 }
 /// Number of supported tokens.
 pub fn total_tokens() -> usize {
-    2usize.pow(account_tree_depth() as u32)
+    2usize.pow(balance_tree_depth() as u32)
 }
 pub const ETH_TOKEN_ID: TokenId = 0;
 
