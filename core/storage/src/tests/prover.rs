@@ -96,7 +96,7 @@ fn prover_run() {
 
         // Create a block.
         BlockSchema(&conn)
-            .execute_operation(get_operation(1, Action::Commit, Vec::new()))
+            .execute_operation(get_operation(1, Action::Commit, Vec::new(), block_size))
             .expect("Commit block 1");
 
         // Get a prover run.
@@ -134,7 +134,7 @@ fn prover_run() {
 
         // Create one more block.
         BlockSchema(&conn)
-            .execute_operation(get_operation(2, Action::Commit, Vec::new()))
+            .execute_operation(get_operation(2, Action::Commit, Vec::new(), block_size))
             .expect("Commit block 2");
 
         // Now we should get a prover run for the second block.

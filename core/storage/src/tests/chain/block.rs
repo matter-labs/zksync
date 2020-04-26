@@ -17,6 +17,9 @@ use crate::{
     StorageProcessor,
 };
 
+/// block size used for this tests
+const BLOCK_SIZE_CHUNKS: usize = 100;
+
 /// Creates several random updates for the provided account map,
 /// and returns the resulting account map together with the list
 /// of generated updates.
@@ -56,9 +59,24 @@ fn test_commit_rewind() {
             apply_random_updates(accounts_block_2.clone(), &mut rng);
 
         // Execute and commit these blocks.
-        BlockSchema(&conn).execute_operation(get_operation(1, Action::Commit, updates_block_1))?;
-        BlockSchema(&conn).execute_operation(get_operation(2, Action::Commit, updates_block_2))?;
-        BlockSchema(&conn).execute_operation(get_operation(3, Action::Commit, updates_block_3))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            1,
+            Action::Commit,
+            updates_block_1,
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            2,
+            Action::Commit,
+            updates_block_2,
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            3,
+            Action::Commit,
+            updates_block_3,
+            BLOCK_SIZE_CHUNKS,
+        ))?;
 
         // Check that they are stored in state.
         let (block, state) = StateSchema(&conn).load_committed_state(Some(1)).unwrap();
@@ -78,6 +96,7 @@ fn test_commit_rewind() {
                 proof: Default::default(),
             },
             Vec::new(),
+            BLOCK_SIZE_CHUNKS,
         ))?;
         ProverSchema(&conn).store_proof(2, &Default::default())?;
         BlockSchema(&conn).execute_operation(get_operation(
@@ -86,6 +105,7 @@ fn test_commit_rewind() {
                 proof: Default::default(),
             },
             Vec::new(),
+            BLOCK_SIZE_CHUNKS,
         ))?;
 
         // Check that we still can get the state for these blocks.
@@ -433,6 +453,7 @@ fn load_commits_after_block() {
                 block_id,
                 Action::Commit,
                 updates,
+                BLOCK_SIZE_CHUNKS,
             ))?;
 
             operations.push(operation);
@@ -446,6 +467,7 @@ fn load_commits_after_block() {
                 proof: Default::default(),
             },
             Vec::new(),
+            BLOCK_SIZE_CHUNKS,
         ))?;
         ProverSchema(&conn).store_proof(3, &Default::default())?;
 
