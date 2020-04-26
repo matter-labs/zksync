@@ -1,6 +1,6 @@
 {
 	"name": "zksync-crypto",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"browser": "dist/web.js",
 	"main": "dist/node.js",
 	"files": [
@@ -9,7 +9,7 @@
 		"dist/*.js"
 	],
 	"scripts": {
-		"build": "build.sh",
+		"build": "./build.sh",
 		"test": "f cargo test"
 	}
 }

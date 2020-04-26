@@ -99,7 +99,7 @@ pub fn private_key_to_pubkey_hash(private_key: &[u8]) -> Vec<u8> {
 /// [0..32] - packed public key of signer.
 /// [32..64] - packed r point of the signature.
 /// [64..96] - s poing of the signature.
-pub fn sign_musig_rescue(private_key: &[u8], msg: &[u8]) -> Vec<u8> {
+pub fn sign_musig(private_key: &[u8], msg: &[u8]) -> Vec<u8> {
     let mut packed_full_signature = Vec::with_capacity(PACKED_POINT_SIZE + PACKED_SIGNATURE_SIZE);
     //
     let p_g = FixedGenerators::SpendingKeyGenerator;

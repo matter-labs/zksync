@@ -1,6 +1,6 @@
 //! Compare crypto primitives to those that we use in our `models` crate;
 
-use super::{private_key_to_pubkey_hash, read_signing_key, sign_musig_rescue};
+use super::{private_key_to_pubkey_hash, read_signing_key, sign_musig};
 
 use crypto_exports::ff::{self, PrimeField, PrimeFieldRepr};
 use crypto_exports::franklin_crypto::eddsa::PrivateKey;
@@ -46,12 +46,12 @@ fn test_signature() {
     for msg_len in &[0, 2, 4, 5, 32, 128] {
         let msg = random_msg(*msg_len);
 
-        let wasm_signature = sign_musig_rescue(&serialized_pk, &msg);
+        let wasm_signature = sign_musig(&serialized_pk, &msg);
 
         let wasm_unpacked_signature = TxSignature::deserialize_from_packed_bytes(&wasm_signature)
             .expect("failed to unpack signature");
 
-        let signer_pubkey = wasm_unpacked_signature.verify_musig_rescue(&msg);
+        let signer_pubkey = wasm_unpacked_signature.verify_musig(&msg);
         assert_eq!(
             signer_pubkey.map(|pk| pk.0.into_xy()),
             Some(pubkey.0.into_xy()),
