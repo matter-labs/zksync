@@ -276,8 +276,8 @@ impl<'a> OperationsExtSchema<'a> {
     pub fn get_account_transactions_history(
         &self,
         address: &Address,
-        offset: i64,
-        limit: i64,
+        offset: u64,
+        limit: u64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
         // TODO: txs are not ordered
 
