@@ -14,6 +14,8 @@ use crate::circuit::FranklinCircuit;
 // Public re-exports
 pub use crate::witness::utils::WitnessBuilder;
 
+pub const FEE_ACCOUNT_ID: u32 = 0;
+
 /// Verifies that circuit has no unsatisfied constraints, and panics otherwise.
 pub fn check_circuit(circuit: FranklinCircuit<Engine>) {
     let mut cs = TestConstraintSystem::<Engine>::new();
@@ -26,12 +28,11 @@ pub fn check_circuit(circuit: FranklinCircuit<Engine>) {
     }
 }
 
+/// Helper structure to generate `PlasmaState` and `CircuitAccountTree`.
 #[derive(Debug)]
 pub struct PlasmaStateGenerator;
 
 impl PlasmaStateGenerator {
-    pub const FEE_ACCOUNT_ID: u32 = 0;
-
     fn create_state(accounts: AccountMap) -> (PlasmaState, CircuitAccountTree) {
         let plasma_state = PlasmaState::from_acc_map(accounts, 1);
 
@@ -50,15 +51,12 @@ impl PlasmaStateGenerator {
             .map(|acc| (acc.id, acc.account.clone()))
             .collect();
 
-        if accounts.iter().any(|(id, _)| *id == Self::FEE_ACCOUNT_ID) {
-            panic!(
-                "AccountId {} is an existing fee account",
-                Self::FEE_ACCOUNT_ID
-            );
+        if accounts.iter().any(|(id, _)| *id == FEE_ACCOUNT_ID) {
+            panic!("AccountId {} is an existing fee account", FEE_ACCOUNT_ID);
         }
 
         let validator_accounts = std::iter::once((
-            Self::FEE_ACCOUNT_ID,
+            FEE_ACCOUNT_ID,
             Account::default_with_address(&Address::default()),
         ))
         .chain(accounts)
@@ -68,15 +66,12 @@ impl PlasmaStateGenerator {
     }
 
     pub fn from_single(account: &WitnessTestAccount) -> (PlasmaState, CircuitAccountTree) {
-        if account.id == Self::FEE_ACCOUNT_ID {
-            panic!(
-                "AccountId {} is an existing fee account",
-                Self::FEE_ACCOUNT_ID
-            );
+        if account.id == FEE_ACCOUNT_ID {
+            panic!("AccountId {} is an existing fee account", FEE_ACCOUNT_ID);
         }
 
         let fee_account = (
-            Self::FEE_ACCOUNT_ID,
+            FEE_ACCOUNT_ID,
             Account::default_with_address(&Address::default()),
         );
         let validator_accounts = vec![fee_account, (account.id, account.account.clone())]

@@ -2,22 +2,18 @@
 use models::{node::operations::ChangePubKeyOp, primitives::pack_bits_into_bytes_in_order};
 // Local deps
 use crate::witness::{
-    change_pubkey_offchain::{
-        apply_change_pubkey_offchain_tx, calculate_change_pubkey_offchain_from_witness,
-    },
-    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount},
+    change_pubkey_offchain::ChangePubkeyOffChainWitness,
+    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount, FEE_ACCOUNT_ID},
     utils::WitnessBuilder,
 };
 
+/// Basic check for execution of `ChangePubKeyOp` in circuit.
+/// Here we generate an empty account and change its public key.
 #[test]
 #[ignore]
 fn test_change_pubkey_offchain_success() {
+    // Input data.
     let account = WitnessTestAccount::new_empty(0xc1);
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
-
-    let fee_account_id = 0;
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
-
     let change_pkhash_op = ChangePubKeyOp {
         tx: account
             .zksync_account
@@ -25,16 +21,22 @@ fn test_change_pubkey_offchain_success() {
         account_id: account.id,
     };
 
+    // Initialize Plasma and WitnessBuilder.
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+
+    // Apply op on plasma
     plasma_state
         .apply_change_pubkey_op(&change_pkhash_op)
-        .expect("applying op fail");
+        .expect("Operation failed");
 
+    // Apply op on circuit
     let change_pkhash_witness =
-        apply_change_pubkey_offchain_tx(&mut witness_accum.account_tree, &change_pkhash_op);
-    let change_pkhash_operations =
-        calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
+        ChangePubkeyOffChainWitness::apply_tx(&mut witness_accum.account_tree, &change_pkhash_op);
+    let change_pkhash_operations = change_pkhash_witness.calculate_operations();
     let pub_data_from_witness = change_pkhash_witness.get_pubdata();
 
+    // Check that pubdata observed from witness is correct
     assert_eq!(
         hex::encode(pack_bits_into_bytes_in_order(pub_data_from_witness.clone())),
         hex::encode(change_pkhash_op.get_public_data()),

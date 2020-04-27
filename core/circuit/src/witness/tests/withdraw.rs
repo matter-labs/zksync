@@ -4,20 +4,16 @@ use bigdecimal::BigDecimal;
 use models::node::{operations::WithdrawOp, Address};
 // Local deps
 use crate::witness::{
-    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount},
+    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount, FEE_ACCOUNT_ID},
     utils::{prepare_sig_data, WitnessBuilder},
-    withdraw::{apply_withdraw_tx, calculate_withdraw_operations_from_witness},
+    withdraw::WithdrawWitness,
 };
 
 #[test]
 #[ignore]
 fn test_withdraw() {
+    // Input data.
     let account = WitnessTestAccount::new(1, 10);
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
-
-    let fee_account_id = 0;
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
-
     let withdraw_op = WithdrawOp {
         tx: account
             .zksync_account
@@ -34,12 +30,7 @@ fn test_withdraw() {
         account_id: account.id,
     };
 
-    let (fee, _) = plasma_state
-        .apply_withdraw_op(&withdraw_op)
-        .expect("transfer should be success");
-    plasma_state.collect_fee(&[fee.clone()], witness_accum.fee_account_id);
-
-    let withdraw_witness = apply_withdraw_tx(&mut witness_accum.account_tree, &withdraw_op);
+    // Additional data required for performing the operation.
     let sign_packed = withdraw_op
         .tx
         .signature
@@ -53,8 +44,20 @@ fn test_withdraw() {
             &withdraw_op.tx.signature.pub_key,
         )
         .expect("prepare signature data");
-    let withdraw_operations = calculate_withdraw_operations_from_witness(
-        &withdraw_witness,
+
+    // Initialize Plasma and WitnessBuilder.
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+
+    // Apply op on plasma
+    let (fee, _) = plasma_state
+        .apply_withdraw_op(&withdraw_op)
+        .expect("transfer should be success");
+    plasma_state.collect_fee(&[fee.clone()], witness_accum.fee_account_id);
+
+    // Apply op on circuit
+    let withdraw_witness = WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw_op);
+    let withdraw_operations = withdraw_witness.calculate_operations(
         &first_sig_msg,
         &second_sig_msg,
         &third_sig_msg,

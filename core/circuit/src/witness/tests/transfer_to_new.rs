@@ -4,24 +4,19 @@ use bigdecimal::BigDecimal;
 use models::node::operations::TransferToNewOp;
 // Local deps
 use crate::witness::{
-    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount},
-    transfer_to_new::{
-        apply_transfer_to_new_tx, calculate_transfer_to_new_operations_from_witness,
-    },
+    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount, FEE_ACCOUNT_ID},
+    transfer_to_new::TransferToNewWitness,
     utils::{prepare_sig_data, WitnessBuilder},
 };
 
+/// Basic check for execution of `TransferToNew` operation in circuit.
+/// Here we create one account and perform a transfer to a new account.
 #[test]
 #[ignore]
 fn test_transfer_to_new_success() {
+    // Input data.
     let account_from = WitnessTestAccount::new(1, 10);
     let account_to = WitnessTestAccount::new_empty(2); // Will not be included into state.
-    let (mut plasma_state, mut circuit_account_tree) =
-        PlasmaStateGenerator::from_single(&account_from);
-
-    let fee_account_id = 0;
-    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
-
     let transfer_op = TransferToNewOp {
         tx: account_from
             .zksync_account
@@ -39,12 +34,7 @@ fn test_transfer_to_new_success() {
         to: account_to.id,
     };
 
-    let (fee, _) = plasma_state
-        .apply_transfer_to_new_op(&transfer_op)
-        .expect("transfer should be success");
-    plasma_state.collect_fee(&[fee.clone()], witness_accum.fee_account_id);
-
-    let transfer_witness = apply_transfer_to_new_tx(&mut witness_accum.account_tree, &transfer_op);
+    // Additional data required for performing the operation.
     let sign_packed = transfer_op
         .tx
         .signature
@@ -58,8 +48,22 @@ fn test_transfer_to_new_success() {
             &transfer_op.tx.signature.pub_key,
         )
         .expect("prepare signature data");
-    let transfer_operations = calculate_transfer_to_new_operations_from_witness(
-        &transfer_witness,
+
+    // Initialize Plasma and WitnessBuilder.
+    let (mut plasma_state, mut circuit_account_tree) =
+        PlasmaStateGenerator::from_single(&account_from);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+
+    // Apply op on plasma
+    let (fee, _) = plasma_state
+        .apply_transfer_to_new_op(&transfer_op)
+        .expect("transfer should be success");
+    plasma_state.collect_fee(&[fee.clone()], witness_accum.fee_account_id);
+
+    // Apply op on circuit
+    let transfer_witness =
+        TransferToNewWitness::apply_tx(&mut witness_accum.account_tree, &transfer_op);
+    let transfer_operations = transfer_witness.calculate_operations(
         &first_sig_msg,
         &second_sig_msg,
         &third_sig_msg,
