@@ -1,3 +1,5 @@
+// External deps
+use crypto_exports::franklin_crypto::{bellman::Circuit, circuit::test::TestConstraintSystem};
 // Workspace deps
 use models::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
@@ -5,10 +7,7 @@ use models::{
 };
 use plasma::state::PlasmaState;
 // Local deps
-use crate::{
-    circuit::FranklinCircuit,
-    franklin_crypto::{bellman::Circuit, circuit::test::TestConstraintSystem},
-};
+use crate::circuit::FranklinCircuit;
 
 // Public re-exports
 pub use crate::witness::utils::WitnessBuilder;

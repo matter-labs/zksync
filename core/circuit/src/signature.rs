@@ -1,22 +1,25 @@
-use crate::allocated_structures::*;
-use crate::element::{CircuitElement, CircuitPubkey};
-use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-use crate::franklin_crypto::circuit::baby_eddsa::EddsaSignature;
-use crate::franklin_crypto::circuit::boolean::{le_bits_into_le_bytes, AllocatedBit, Boolean};
-use crate::franklin_crypto::circuit::ecc;
-use crate::operation::SignatureData;
-use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
-
-use crate::franklin_crypto::circuit::expression::Expression;
-use crate::franklin_crypto::circuit::multipack;
-use crate::franklin_crypto::circuit::pedersen_hash;
-use crate::franklin_crypto::circuit::rescue;
-use crate::franklin_crypto::circuit::sha256;
-use crate::franklin_crypto::jubjub::JubjubEngine;
-use crate::franklin_crypto::rescue::RescueEngine;
-use models::params as franklin_constants;
-use models::params::{FR_BIT_WIDTH, FR_BIT_WIDTH_PADDED};
+// External deps
+use crypto_exports::franklin_crypto::{
+    bellman::{pairing::ff::PrimeField, ConstraintSystem, SynthesisError},
+    circuit::{
+        baby_eddsa::EddsaSignature,
+        boolean::{le_bits_into_le_bytes, AllocatedBit, Boolean},
+        ecc,
+        expression::Expression,
+        multipack, pedersen_hash, rescue, sha256,
+    },
+    jubjub::JubjubEngine,
+    rescue::RescueEngine,
+};
+// Workspace deps
+use models::params::{self as franklin_constants, FR_BIT_WIDTH, FR_BIT_WIDTH_PADDED};
+// Local deps
+use crate::{
+    allocated_structures::*,
+    element::{CircuitElement, CircuitPubkey},
+    operation::SignatureData,
+    utils::{multi_and, pack_bits_to_element, reverse_bytes},
+};
 
 /// Max len of message for signature, we use Pedersen hash to compress message to this len before signing.
 const MAX_SIGN_MESSAGE_BIT_WIDTH: usize = 256;

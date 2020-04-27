@@ -1,19 +1,23 @@
-use crate::account;
-use crate::account::AccountContent;
-use crate::element::CircuitElement;
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-use crate::franklin_crypto::circuit::float_point::parse_with_exponent_le;
-use crate::operation::{Operation, OperationBranch};
-use crate::utils;
+// External deps
+use crypto_exports::franklin_crypto::{
+    bellman::{
+        pairing::{ff::PrimeField, Engine},
+        ConstraintSystem, SynthesisError,
+    },
+    circuit::{
+        boolean::Boolean, float_point::parse_with_exponent_le, num::AllocatedNum, Assignment,
+    },
+    rescue::RescueEngine,
+};
+// Workspace deps
 use models::params as franklin_constants;
-
-use crate::franklin_crypto::circuit::boolean::Boolean;
-use crate::franklin_crypto::circuit::num::AllocatedNum;
-
-use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
-use crate::franklin_crypto::bellman::pairing::Engine;
-use crate::franklin_crypto::circuit::Assignment;
-use crate::franklin_crypto::rescue::RescueEngine;
+// Local deps
+use crate::{
+    account::{self, AccountContent},
+    element::CircuitElement,
+    operation::{Operation, OperationBranch},
+    utils,
+};
 
 pub struct AllocatedOperationBranch<E: RescueEngine> {
     pub account: AccountContent<E>,

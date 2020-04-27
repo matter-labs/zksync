@@ -1,6 +1,6 @@
 use crate::playground::get_path_in_file_dump_dir;
 use crate::witness::deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness};
-use crate::witness::test_utils::test_genesis_plasma_state;
+use crate::witness::tests::test_utils::test_genesis_plasma_state;
 use crate::witness::utils::WitnessBuilder;
 use bigdecimal::BigDecimal;
 use models::node::{Account, Deposit, DepositOp, Fr};

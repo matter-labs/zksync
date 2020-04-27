@@ -1,12 +1,12 @@
 // External
-use crate::franklin_crypto::bellman::pairing::ff::Field;
-use crate::franklin_crypto::jubjub::JubjubEngine;
-use crate::franklin_crypto::jubjub::{edwards, Unknown};
+use crypto_exports::franklin_crypto::{
+    bellman::pairing::ff::Field,
+    jubjub::{edwards, JubjubEngine, Unknown},
+    rescue::RescueEngine,
+};
 use serde::{Deserialize, Serialize};
 // Workspace
 use crate::account::AccountWitness;
-
-use crypto_exports::franklin_crypto::rescue::RescueEngine;
 
 #[derive(Clone, Debug)]
 pub struct OperationBranchWitness<E: RescueEngine> {
