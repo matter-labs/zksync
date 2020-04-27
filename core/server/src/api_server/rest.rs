@@ -23,20 +23,37 @@ use web3::types::H160;
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
 impl SharedNetworkStatus {
-    #[allow(dead_code)]
     fn read(&self) -> NetworkStatus {
         (*self.0.as_ref().read().unwrap()).clone()
+    }
+}
+
+/// Caches used by REST API server.
+#[derive(Debug, Clone)]
+struct Caches {
+    pub transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
+    pub priority_op_receipts: SharedLruCache<u32, PriorityOpReceiptResponse>,
+    pub block_executed_ops: SharedLruCache<u32, Vec<ExecutedOperations>>,
+    pub blocks_info: SharedLruCache<u32, BlockDetails>,
+    pub blocks_by_height_or_hash: SharedLruCache<String, BlockDetails>,
+}
+
+impl Caches {
+    pub fn new(caches_size: usize) -> Self {
+        Self {
+            transaction_receipts: SharedLruCache::new(caches_size),
+            priority_op_receipts: SharedLruCache::new(caches_size),
+            block_executed_ops: SharedLruCache::new(caches_size),
+            blocks_info: SharedLruCache::new(caches_size),
+            blocks_by_height_or_hash: SharedLruCache::new(caches_size),
+        }
     }
 }
 
 /// AppState is a collection of records cloned by each thread to shara data between them
 #[derive(Clone)]
 struct AppState {
-    cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
-    cache_of_priority_op_receipts: SharedLruCache<u32, PriorityOpReceiptResponse>,
-    cache_of_block_executed_ops: SharedLruCache<u32, Vec<ExecutedOperations>>,
-    cache_of_blocks_info: SharedLruCache<u32, BlockDetails>,
-    cache_blocks_by_height_or_hash: SharedLruCache<String, BlockDetails>,
+    caches: Caches,
     connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
     contract_address: String,
@@ -66,7 +83,13 @@ impl AppState {
                     loop {
                         timer.tick().await;
 
-                        let storage = state.connection_pool.access_storage().expect("db failed");
+                        let storage = match state.connection_pool.access_storage() {
+                            Ok(storage) => storage,
+                            Err(err) => {
+                                log::warn!("Unable to update the network status. Storage access failed: {}", err);
+                                continue;
+                            }
+                        };
 
                         let last_verified = storage
                             .chain()
@@ -107,129 +130,122 @@ impl AppState {
         &self,
         transaction_hash: Vec<u8>,
     ) -> Result<Option<TxReceiptResponse>, actix_web::error::Error> {
-        let res =
-            if let Some(tx_receipt) = self.cache_of_transaction_receipts.get(&transaction_hash) {
-                Some(tx_receipt)
-            } else {
-                let storage = self.access_storage()?;
-                let tx_receipt = storage
-                    .chain()
-                    .operations_ext_schema()
-                    .tx_receipt(transaction_hash.as_slice())
-                    .unwrap_or(None);
+        if let Some(tx_receipt) = self.caches.transaction_receipts.get(&transaction_hash) {
+            return Ok(Some(tx_receipt));
+        }
 
-                if let Some(tx_receipt) = tx_receipt.clone() {
-                    // Unverified blocks can still change, so we can't cache them.
-                    if tx_receipt.verified {
-                        self.cache_of_transaction_receipts
-                            .insert(transaction_hash, tx_receipt);
-                    }
-                }
+        let storage = self.access_storage()?;
+        let tx_receipt = storage
+            .chain()
+            .operations_ext_schema()
+            .tx_receipt(transaction_hash.as_slice())
+            .unwrap_or(None);
 
-                tx_receipt
-            };
-        Ok(res)
+        if let Some(tx_receipt) = tx_receipt.clone() {
+            // Unverified blocks can still change, so we can't cache them.
+            if tx_receipt.verified {
+                self.caches
+                    .transaction_receipts
+                    .insert(transaction_hash, tx_receipt);
+            }
+        }
+
+        Ok(tx_receipt)
     }
 
     fn get_priority_op_receipt(
         &self,
         id: u32,
     ) -> Result<PriorityOpReceiptResponse, actix_web::error::Error> {
-        let res = if let Some(receipt) = self.cache_of_priority_op_receipts.get(&id) {
-            receipt
-        } else {
-            let storage = self.access_storage()?;
-            let receipt = storage
-                .chain()
-                .operations_ext_schema()
-                .get_priority_op_receipt(id)
-                .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        if let Some(receipt) = self.caches.priority_op_receipts.get(&id) {
+            return Ok(receipt);
+        }
 
-            // Unverified blocks can still change, so we can't cache them.
-            if receipt.verified {
-                self.cache_of_priority_op_receipts
-                    .insert(id, receipt.clone());
-            }
+        let storage = self.access_storage()?;
+        let receipt = storage
+            .chain()
+            .operations_ext_schema()
+            .get_priority_op_receipt(id)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-            receipt
-        };
-        Ok(res)
+        // Unverified blocks can still change, so we can't cache them.
+        if receipt.verified {
+            self.caches.priority_op_receipts.insert(id, receipt.clone());
+        }
+
+        Ok(receipt)
     }
 
     fn get_block_executed_ops(
         &self,
         block_id: u32,
     ) -> Result<Vec<ExecutedOperations>, actix_web::error::Error> {
-        let res = if let Some(executed_ops) = self.cache_of_block_executed_ops.get(&block_id) {
-            executed_ops
-        } else {
-            let storage = self.access_storage()?;
-            let executed_ops = storage
-                .chain()
-                .block_schema()
-                .get_block_executed_ops(block_id)
-                .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        if let Some(executed_ops) = self.caches.block_executed_ops.get(&block_id) {
+            return Ok(executed_ops);
+        }
 
-            if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1)
-            {
-                // Unverified blocks can still change, so we can't cache them.
-                if !block_details.is_empty() && block_details[0].verified_at.is_some() {
-                    self.cache_of_block_executed_ops
-                        .insert(block_id, executed_ops.clone());
-                }
+        let storage = self.access_storage()?;
+        let executed_ops = storage
+            .chain()
+            .block_schema()
+            .get_block_executed_ops(block_id)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+        if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1) {
+            // Unverified blocks can still change, so we can't cache them.
+            if !block_details.is_empty() && block_details[0].verified_at.is_some() {
+                self.caches
+                    .block_executed_ops
+                    .insert(block_id, executed_ops.clone());
             }
+        }
 
-            executed_ops
-        };
-        Ok(res)
+        Ok(executed_ops)
     }
 
     fn get_block_info(
         &self,
         block_id: u32,
     ) -> Result<Option<BlockDetails>, actix_web::error::Error> {
-        let res = if let Some(block) = self.cache_of_blocks_info.get(&block_id) {
-            Some(block)
-        } else {
-            let storage = self.access_storage()?;
-            let mut blocks = storage
-                .chain()
-                .block_schema()
-                .load_block_range(block_id, 1)
-                .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        if let Some(block) = self.caches.blocks_info.get(&block_id) {
+            return Ok(Some(block));
+        }
 
-            if !blocks.is_empty() && blocks[0].verified_at.is_some() {
-                self.cache_of_blocks_info
-                    .insert(block_id, blocks[0].clone());
-            }
+        let storage = self.access_storage()?;
+        let mut blocks = storage
+            .chain()
+            .block_schema()
+            .load_block_range(block_id, 1)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-            blocks.pop()
-        };
-        Ok(res)
+        if !blocks.is_empty() && blocks[0].verified_at.is_some() {
+            self.caches.blocks_info.insert(block_id, blocks[0].clone());
+        }
+
+        Ok(blocks.pop())
     }
 
     fn get_block_by_height_or_hash(
         &self,
         query: String,
     ) -> Result<Option<BlockDetails>, actix_web::error::Error> {
-        let res = if let Some(block) = self.cache_blocks_by_height_or_hash.get(&query) {
-            Some(block)
-        } else {
-            let storage = self.access_storage()?;
-            let block = storage
-                .chain()
-                .block_schema()
-                .find_block_by_height_or_hash(query.clone());
+        if let Some(block) = self.caches.blocks_by_height_or_hash.get(&query) {
+            return Ok(Some(block));
+        }
 
-            if let Some(block) = block.clone() {
-                if block.verified_at.is_some() {
-                    self.cache_blocks_by_height_or_hash.insert(query, block);
-                }
+        let storage = self.access_storage()?;
+        let block = storage
+            .chain()
+            .block_schema()
+            .find_block_by_height_or_hash(query.clone());
+
+        if let Some(block) = block.clone() {
+            if block.verified_at.is_some() {
+                self.caches.blocks_by_height_or_hash.insert(query, block);
             }
+        }
 
-            block
-        };
-        Ok(res)
+        Ok(block)
     }
 }
 
@@ -326,11 +342,11 @@ fn handle_get_account_transactions(
 
 fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
-    request_path: web::Path<(Address, i64, i64)>,
+    request_path: web::Path<(Address, u64, u64)>,
 ) -> ActixResult<HttpResponse> {
     let (address, offset, limit) = request_path.into_inner();
 
-    const MAX_LIMIT: i64 = 100;
+    const MAX_LIMIT: u64 = 100;
     if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
@@ -599,11 +615,7 @@ pub(super) fn start_server_thread_detached(
             let runtime = actix_rt::System::new("api-server");
 
             let state = AppState {
-                cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
-                cache_of_priority_op_receipts: SharedLruCache::new(api_requests_caches_size),
-                cache_of_block_executed_ops: SharedLruCache::new(api_requests_caches_size),
-                cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
-                cache_blocks_by_height_or_hash: SharedLruCache::new(api_requests_caches_size),
+                caches: Caches::new(api_requests_caches_size),
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{:?}", contract_address),
