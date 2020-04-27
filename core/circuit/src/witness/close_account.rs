@@ -1,3 +1,11 @@
+// External deps
+use crypto_exports::franklin_crypto::{
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{Field, PrimeField},
+    },
+    rescue::RescueEngine,
+};
 // Workspace deps
 use models::{
     circuit::{
@@ -8,13 +16,6 @@ use models::{
     params as franklin_constants,
 };
 // Local deps
-use crate::franklin_crypto::{
-    bellman::pairing::{
-        bn256::{Bn256, Fr},
-        ff::{Field, PrimeField},
-    },
-    rescue::RescueEngine,
-};
 use crate::{
     operation::{
         Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
@@ -200,11 +201,11 @@ pub fn calculate_close_account_operations_from_witness(
 //
 //    use crate::circuit::FranklinCircuit;
 //    use bellman::Circuit;
-//    use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-//    use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-//    use crate::franklin_crypto::circuit::test::*;
-//    use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey};
-//    use crate::franklin_crypto::jubjub::FixedGenerators;
+//    use crypto_exports::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
+//    use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+//    use crypto_exports::franklin_crypto::circuit::test::*;
+//    use crypto_exports::franklin_crypto::eddsa::{PrivateKey, PublicKey};
+//    use crypto_exports::franklin_crypto::jubjub::FixedGenerators;
 //    use models::circuit::account::{CircuitAccount, CircuitAccountTree, CircuitBalanceTree};
 //    use models::circuit::utils::*;
 //    use models::node::tx::PackedPublicKey;

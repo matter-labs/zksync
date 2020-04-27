@@ -1,4 +1,11 @@
 // Workspace deps
+use crypto_exports::franklin_crypto::{
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{Field, PrimeField},
+    },
+    rescue::RescueEngine,
+};
 use models::{
     circuit::{
         account::CircuitAccountTree,
@@ -9,13 +16,6 @@ use models::{
     primitives::convert_to_float,
 };
 // Local deps
-use crate::franklin_crypto::{
-    bellman::pairing::{
-        bn256::{Bn256, Fr},
-        ff::{Field, PrimeField},
-    },
-    rescue::RescueEngine,
-};
 use crate::{
     operation::{
         Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,

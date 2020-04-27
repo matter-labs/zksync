@@ -1,15 +1,5 @@
-// Workspace deps
-use models::{
-    circuit::{
-        account::{Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree},
-        utils::pub_key_hash_fe,
-    },
-    merkle_tree::RescueHasher,
-    params,
-};
-
-// Local deps
-use crate::franklin_crypto::{
+// External deps
+use crypto_exports::franklin_crypto::{
     alt_babyjubjub::AltJubjubBn256,
     bellman::pairing::{
         bn256::{Bn256, Fr},
@@ -22,9 +12,20 @@ use crate::franklin_crypto::{
     jubjub::FixedGenerators,
     rescue::bn256::Bn256RescueParams,
 };
+use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
+// Workspace deps
+use models::{
+    circuit::{
+        account::{Balance, CircuitAccount, CircuitAccountTree, CircuitBalanceTree},
+        utils::pub_key_hash_fe,
+    },
+    merkle_tree::RescueHasher,
+    params,
+};
+
+// Local deps
 use crate::{
     circuit::FranklinCircuit,
-    rand::{Rng, SeedableRng, XorShiftRng},
     witness::{
         noop::noop_operation,
         utils::{apply_fee, get_audits, public_data_commitment},

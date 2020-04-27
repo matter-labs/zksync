@@ -12,6 +12,4 @@ mod playground;
 pub mod signature;
 pub mod utils;
 pub mod witness;
-
 use crypto_exports::franklin_crypto;
-use crypto_exports::rand;

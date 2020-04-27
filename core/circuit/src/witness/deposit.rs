@@ -1,3 +1,11 @@
+// External deps
+use crypto_exports::franklin_crypto::{
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{Field, PrimeField},
+    },
+    rescue::RescueEngine,
+};
 // Workspace deps
 use models::{
     circuit::{
@@ -8,13 +16,6 @@ use models::{
     params as franklin_constants,
 };
 // Local deps
-use crate::franklin_crypto::{
-    bellman::pairing::{
-        bn256::{Bn256, Fr},
-        ff::{Field, PrimeField},
-    },
-    rescue::RescueEngine,
-};
 use crate::{
     operation::{
         Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,

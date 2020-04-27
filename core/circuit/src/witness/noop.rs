@@ -1,10 +1,11 @@
-// Workspace deps
-use models::circuit::{account::CircuitAccountTree, utils::le_bit_vector_into_field_element};
-// Local deps
-use crate::franklin_crypto::bellman::pairing::{
+// External deps
+use crypto_exports::franklin_crypto::bellman::pairing::{
     bn256::{Bn256, Fr},
     ff::{Field, PrimeField},
 };
+// Workspace deps
+use models::circuit::{account::CircuitAccountTree, utils::le_bit_vector_into_field_element};
+// Local deps
 use crate::{
     account::AccountWitness,
     operation::{

@@ -1,5 +1,16 @@
 // External deps
 use crypto::{digest::Digest, sha2::Sha256};
+use crypto_exports::franklin_crypto::{
+    alt_babyjubjub::AltJubjubBn256,
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{BitIterator, Field, PrimeField, PrimeFieldRepr},
+    },
+    eddsa::{PrivateKey, PublicKey},
+    jubjub::{FixedGenerators, JubjubEngine},
+    rescue::bn256::Bn256RescueParams,
+};
+use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 // Workspace deps
 use models::{
     circuit::{
@@ -14,21 +25,10 @@ use models::{
 };
 use plasma::state::CollectedFee;
 // Local deps
-use crate::franklin_crypto::{
-    alt_babyjubjub::AltJubjubBn256,
-    bellman::pairing::{
-        bn256::{Bn256, Fr},
-        ff::{BitIterator, Field, PrimeField, PrimeFieldRepr},
-    },
-    eddsa::{PrivateKey, PublicKey},
-    jubjub::{FixedGenerators, JubjubEngine},
-    rescue::bn256::Bn256RescueParams,
-};
 use crate::{
     account::AccountWitness,
     circuit::FranklinCircuit,
     operation::{Operation, SignatureData},
-    rand::{Rng, SeedableRng, XorShiftRng},
     utils::sign_rescue,
 };
 
