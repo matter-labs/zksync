@@ -501,5 +501,6 @@ trigger:
   - promote
   target:
   - testnet
+  - ropsten
 
 ...
