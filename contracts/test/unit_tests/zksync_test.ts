@@ -24,7 +24,7 @@ describe("ZK Sync signature verification unit tests", function () {
     let testContract;
     let randomWallet = ethers.Wallet.createRandom();
     before(async () => {
-        const deployer = new Deployer(wallet, true);
+        const deployer = new Deployer(wallet, true, false);
         await deployer.deployGovernance();
         await deployer.deployVerifier();
         process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
@@ -89,7 +89,7 @@ describe("ZK priority queue ops unit tests", function () {
     let ethProxy;
     let operationTestContract;
     before(async () => {
-        const deployer = new Deployer(wallet, true);
+        const deployer = new Deployer(wallet, true, false);
         const governanceDeployedContract = await deployer.deployGovernance();
         await deployer.deployVerifier();
         process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
@@ -218,7 +218,7 @@ describe("ZK Sync withdraw unit tests", function () {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        const deployer = new Deployer(wallet, true);
+        const deployer = new Deployer(wallet, true, false);
         const governanceDeployedContract = await deployer.deployGovernance();
         await deployer.deployVerifier();
         process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
@@ -368,7 +368,7 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
     let tokenContract;
     let ethProxy;
     before(async () => {
-        const deployer = new Deployer(wallet, true);
+        const deployer = new Deployer(wallet, true, false);
         const governanceDeployedContract = await deployer.deployGovernance();
         await deployer.deployVerifier();
         process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;
@@ -438,7 +438,7 @@ describe("ZK Sync test process next operation", function () {
     let incorrectTokenContract;
     let ethProxy;
     before(async () => {
-        const deployer = new Deployer(wallet, true);
+        const deployer = new Deployer(wallet, true, false);
         const governanceDeployedContract = await deployer.deployGovernance();
         await deployer.deployVerifier();
         process.env.OPERATOR_FRANKLIN_ADDRESS = wallet.address;

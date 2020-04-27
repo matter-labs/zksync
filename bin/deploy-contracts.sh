@@ -1,50 +1,65 @@
 #!/bin/bash
 
+DEPLOY_STEP=${1:-"0"}
+
 # Redeploy current contracts
 # NOTE: this script does not build contracts, to build them use `zksync redeploy`
 
-. .setup_env
-
-# // TODO key generation
-# KEY_FILES=$CONTRACT_KEY_FILES
-# .load_keys
-#
-# mkdir -p contracts/contracts/keys/
-# cp -f $KEY_DIR/*.sol contracts/contracts/keys/
-
 echo "redeploying for the db $DATABASE_URL"
-cd contracts;
-yarn deploy-no-build | tee ../deploy.log;
-cd ..;
 
-UPGRADE_GATEKEEPER_ADDR_NEW_VALUE=`grep "UPGRADE_GATEKEEPER_ADDR" deploy.log`
-GOVERNANCE_TARGET_ADDR_NEW_VALUE=`grep "GOVERNANCE_TARGET_ADDR" deploy.log`
-VERIFIER_TARGET_ADDR_NEW_VALUE=`grep "VERIFIER_TARGET_ADDR" deploy.log`
-CONTRACT_TARGET_ADDR_NEW_VALUE=`grep "CONTRACT_TARGET_ADDR" deploy.log`
-CONTRACT_GENESIS_TX_HASH_NEW_VALUE=`grep "CONTRACT_GENESIS_TX_HASH" deploy.log`
-CONTRACT_ADDR_NEW_VALUE=`grep "CONTRACT_ADDR" deploy.log`
-ERC20_ADDR_NEW_VALUE=`grep "TEST_ERC20" deploy.log`
-GOVERNANCE_GENESIS_TX_HASH_NEW_VALUE=`grep "GOVERNANCE_GENESIS_TX_HASH" deploy.log`
-GOVERNANCE_ADDR_NEW_VALUE=`grep "GOVERNANCE_ADDR" deploy.log`
-VERIFIER_ADDR_NEW_VALUE=`grep "VERIFIER_ADDR" deploy.log`
-if [[ ! -z "$CONTRACT_ADDR_NEW_VALUE" ]]
-then
-    export LABEL=$ZKSYNC_ENV-Contract_deploy-`date +%Y-%m-%d-%H%M%S`
-    mkdir -p logs/$LABEL/
-    cp ./$ENV_FILE logs/$LABEL/$ZKSYNC_ENV.bak
-    cp deploy.log logs/$LABEL/
-    echo $CONTRACT_ADDR_NEW_VALUE
-    python3 bin/replace-env-variable.py ./$ENV_FILE $UPGRADE_GATEKEEPER_ADDR_NEW_VALUE
+update_env_file() {
+  STEP=$1
+  case $STEP in
+  0)
+    GOVERNANCE_TARGET_ADDR_NEW_VALUE=$(grep "GOVERNANCE_TARGET_ADDR" deploy.log)
     python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_TARGET_ADDR_NEW_VALUE
+    ;;
+  1)
+    GOVERNANCE_GENESIS_TX_HASH_NEW_VALUE=$(grep "GOVERNANCE_GENESIS_TX_HASH" deploy.log)
+    python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_GENESIS_TX_HASH_NEW_VALUE
+    GOVERNANCE_ADDR_NEW_VALUE=$(grep "GOVERNANCE_ADDR" deploy.log)
+    python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_ADDR_NEW_VALUE
+    ;;
+  2)
+    VERIFIER_TARGET_ADDR_NEW_VALUE=$(grep "VERIFIER_TARGET_ADDR" deploy.log)
     python3 bin/replace-env-variable.py ./$ENV_FILE $VERIFIER_TARGET_ADDR_NEW_VALUE
+    ;;
+  3)
+    VERIFIER_ADDR_NEW_VALUE=$(grep "VERIFIER_ADDR" deploy.log)
+    python3 bin/replace-env-variable.py ./$ENV_FILE $VERIFIER_ADDR_NEW_VALUE
+    ;;
+  4)
+    CONTRACT_TARGET_ADDR_NEW_VALUE=$(grep "CONTRACT_TARGET_ADDR" deploy.log)
     python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_TARGET_ADDR_NEW_VALUE
+    ;;
+  5)
+    CONTRACT_GENESIS_TX_HASH_NEW_VALUE=$(grep "CONTRACT_GENESIS_TX_HASH" deploy.log)
+    CONTRACT_ADDR_NEW_VALUE=$(grep "CONTRACT_ADDR" deploy.log)
     python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_GENESIS_TX_HASH_NEW_VALUE
     python3 bin/replace-env-variable.py ./$ENV_FILE $CONTRACT_ADDR_NEW_VALUE
-    python3 bin/replace-env-variable.py ./$ENV_FILE $ERC20_ADDR_NEW_VALUE
-    python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_GENESIS_TX_HASH_NEW_VALUE
-    python3 bin/replace-env-variable.py ./$ENV_FILE $GOVERNANCE_ADDR_NEW_VALUE
-    python3 bin/replace-env-variable.py ./$ENV_FILE $VERIFIER_ADDR_NEW_VALUE
-else
-    echo "Contract deployment failed"
-    exit 1
-fi
+    ;;
+  6)
+    UPGRADE_GATEKEEPER_ADDR_NEW_VALUE=$(grep "UPGRADE_GATEKEEPER_ADDR" deploy.log)
+    python3 bin/replace-env-variable.py ./$ENV_FILE $UPGRADE_GATEKEEPER_ADDR_NEW_VALUE
+    ;;
+  *)
+    ;;
+  esac
+}
+
+for CURRENT_STEP in {0..8}; do
+  if [ "$DEPLOY_STEP" -gt "$CURRENT_STEP" ]; then
+    echo "Skipping step $CURRENT_STEP"
+    continue
+  fi
+  echo "Started executing step $CURRENT_STEP"
+  . .setup_env
+
+  cd contracts
+  yarn deploy-no-build --deployStep $CURRENT_STEP | tee ../deploy.log
+  cd ..
+  update_env_file $CURRENT_STEP
+  echo "Finished executing $CURRENT_STEP"
+done
+
+exit 0

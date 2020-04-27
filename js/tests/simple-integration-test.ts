@@ -312,9 +312,9 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
         await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.018");
 
         await syncProvider.disconnect();
     } catch (e) {
