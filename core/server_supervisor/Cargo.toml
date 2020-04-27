@@ -16,4 +16,4 @@ env_logger = "0.6"
 tokio = { version = "0.2", features = ["full"] }
 futures = { version = "0.3", features = ["compat"] }
 anyhow = "1.0.13"
-diesel = { version = "1.4.3", features = ["postgres", "serde_json", "r2d2", "chrono"] }
+diesel = { version = "1.4.4", features = ["postgres", "serde_json", "r2d2", "chrono"] }

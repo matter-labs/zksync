@@ -38,7 +38,6 @@ actix-web = "1.0.8"
 
 bigdecimal = { version = "0.1.0", features = ["serde"]}
 chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
-diesel = { version = "1.4.3", features = ["postgres", "serde_json", "r2d2", "chrono"] }
 ctrlc = "3.1"
 failure = "0.1"
 # TODO: should be removed after json rpc deps are updated is updated, current version (14.0)
