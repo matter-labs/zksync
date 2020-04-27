@@ -62,6 +62,8 @@ pub struct DataRestoreDriver<T: Transport> {
     pub eth_blocks_step: u64,
     /// The distance to the last ethereum block
     pub end_eth_blocks_offset: u64,
+    /// Available block chunk sizes
+    pub available_block_chunk_sizes: Vec<usize>,
 }
 
 impl<T: Transport> DataRestoreDriver<T> {
@@ -83,6 +85,7 @@ impl<T: Transport> DataRestoreDriver<T> {
         franklin_contract_eth_addr: H160,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
+        available_block_chunk_sizes: Vec<usize>,
     ) -> Self {
         let web3 = Web3::new(web3_transport);
 
@@ -104,7 +107,7 @@ impl<T: Transport> DataRestoreDriver<T> {
 
         let events_state = EventsState::default();
 
-        let tree_state = TreeState::new();
+        let tree_state = TreeState::new(available_block_chunk_sizes.clone());
 
         Self {
             connection_pool,
@@ -115,6 +118,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             tree_state,
             eth_blocks_step,
             end_eth_blocks_offset,
+            available_block_chunk_sizes,
         }
     }
 
@@ -173,6 +177,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             account_map,
             current_unprocessed_priority_op,
             fee_acc_num,
+            self.available_block_chunk_sizes.clone(),
         );
 
         info!("Genesis tree root hash: {:?}", tree_state.root_hash());
@@ -197,6 +202,7 @@ impl<T: Transport> DataRestoreDriver<T> {
             tree_state.1, // account map
             tree_state.2, // unprocessed priority op
             tree_state.3, // fee account
+            self.available_block_chunk_sizes.clone(),
         );
         match state {
             StorageUpdateState::Events => {

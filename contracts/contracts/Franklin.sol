@@ -606,7 +606,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _blockNumber Block number
     /// @param _proof Block proof
     /// @param _withdrawalsData Block withdrawals data
-    function verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof, bytes calldata _withdrawalsData)
+    function verifyBlock(uint32 _blockNumber, uint256[] calldata _proof, bytes calldata _withdrawalsData)
         external
     {
         requireActive();
@@ -693,7 +693,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     /// @param _proof Proof
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner
-    function exit(uint16 _tokenId, uint128 _amount, uint256[8] calldata _proof) external {
+    function exit(uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external {
         require(exodusMode, "fet11"); // must be in exodus mode
         require(exited[msg.sender][_tokenId] == false, "fet12"); // already exited
         require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed

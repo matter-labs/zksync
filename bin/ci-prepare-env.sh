@@ -12,4 +12,3 @@ python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE API_SERVER=http://
 python3 $ZKSYNC_HOME/bin/replace-env-variable.py $CI_ENV_FILE PROVER_SERVER_URL=http://start-server-detached:8088
 
 zksync env ci
-zksync gen-keys-if-not-present

@@ -1,19 +1,20 @@
 // Built-in deps
 use std::str::FromStr;
-use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
-use std::time;
+use std::time::{self, Duration};
 // External deps
 use backoff;
 use backoff::Operation;
-use crypto_exports::franklin_crypto::bellman::groth16;
 use failure::bail;
 use failure::format_err;
 use log::*;
+use reqwest::Url;
 use serde::{Deserialize, Serialize};
 // Workspace deps
 use crate::client;
 use crate::prover_data::ProverData;
-use models::prover_utils::encode_proof;
+use circuit::circuit::FranklinCircuit;
+use models::node::Engine;
+use models::prover_utils::EncodedProofPlonk;
 
 #[derive(Serialize, Deserialize)]
 pub struct ProverReq {
@@ -35,70 +36,59 @@ pub struct WorkingOnReq {
 #[derive(Serialize, Deserialize)]
 pub struct PublishReq {
     pub block: u32,
-    pub proof: models::EncodedProof,
+    pub proof: EncodedProofPlonk,
 }
 
 #[derive(Debug, Clone)]
 pub struct ApiClient {
-    register_url: String,
-    block_to_prove_url: String,
-    working_on_url: String,
-    prover_data_url: String,
-    publish_url: String,
-    stopped_url: String,
+    register_url: Url,
+    block_to_prove_url: Url,
+    working_on_url: Url,
+    prover_data_url: Url,
+    publish_url: Url,
+    stopped_url: Url,
     worker: String,
-    req_server_timeout: time::Duration,
-    is_terminating_bool: Option<Arc<AtomicBool>>,
+    // client keeps connection pool inside, so it is recommended to reuse it (see docstring for reqwest::Client)
+    http_client: reqwest::blocking::Client,
 }
 
 impl ApiClient {
-    pub fn new(
-        base_url: &str,
-        worker: &str,
-        is_terminating_bool: Option<Arc<AtomicBool>>,
-        req_server_timeout: time::Duration,
-    ) -> Self {
+    pub fn new(base_url: &Url, worker: &str, req_server_timeout: time::Duration) -> Self {
         if worker == "" {
             panic!("worker name cannot be empty")
         }
+        let http_client = reqwest::blocking::ClientBuilder::new()
+            .timeout(req_server_timeout)
+            .build()
+            .expect("Failed to create request client");
         Self {
-            register_url: format!("{}/register", base_url),
-            block_to_prove_url: format!("{}/block_to_prove", base_url),
-            working_on_url: format!("{}/working_on", base_url),
-            prover_data_url: format!("{}/prover_data", base_url),
-            publish_url: format!("{}/publish", base_url),
-            stopped_url: format!("{}/stopped", base_url),
+            register_url: base_url.join("/register").unwrap(),
+            block_to_prove_url: base_url.join("/block_to_prove").unwrap(),
+            working_on_url: base_url.join("/working_on").unwrap(),
+            prover_data_url: base_url.join("/prover_data").unwrap(),
+            publish_url: base_url.join("/publish").unwrap(),
+            stopped_url: base_url.join("/stopped").unwrap(),
             worker: worker.to_string(),
-            req_server_timeout,
-            is_terminating_bool,
+            http_client,
         }
-    }
-
-    fn is_terminating(&self) -> bool {
-        self.is_terminating_bool
-            .as_ref()
-            .map(|b| b.load(Ordering::SeqCst))
-            .unwrap_or(false)
     }
 
     fn with_retries<T>(
         &self,
         op: &dyn Fn() -> Result<T, failure::Error>,
     ) -> Result<T, failure::Error> {
-        let mut with_checking = || -> Result<T, backoff::Error<failure::Error>> {
-            if self.is_terminating() {
-                op().map_err(backoff::Error::Permanent)
-            } else {
-                op().map_err(backoff::Error::Transient)
-            }
-            .map_err(|e| {
-                warn!("{}", e);
-                e
-            })
+        let mut wrap_to_backoff_operation = || -> Result<T, backoff::Error<failure::Error>> {
+            op().map_err(backoff::Error::Transient)
         };
 
-        with_checking
-            .retry(&mut Self::get_backoff())
+        wrap_to_backoff_operation
+            .retry_notify(&mut Self::get_backoff(), |e, d: Duration| {
+                warn!(
+                    "Failed to reach server err: <{}>, retrying after: {}s",
+                    e,
+                    d.as_secs(),
+                )
+            })
             .map_err(|e| match e {
                 backoff::Error::Permanent(e) | backoff::Error::Transient(e) => e,
             })
@@ -106,25 +96,25 @@ impl ApiClient {
 
     fn get_backoff() -> backoff::ExponentialBackoff {
         let mut backoff = backoff::ExponentialBackoff::default();
-        backoff.initial_interval = time::Duration::from_secs(6);
-        backoff.multiplier = 1.2;
-        // backoff.max_elapsed_time = Some(time::Duration::from_secs(30));
+        backoff.current_interval = Duration::from_secs(5);
+        backoff.initial_interval = Duration::from_secs(5);
+        backoff.max_interval = Duration::from_secs(40);
         backoff
     }
 
     pub fn register_prover(&self, block_size: usize) -> Result<i32, failure::Error> {
         let op = || -> Result<i32, failure::Error> {
             info!("Registering prover...");
-            let client = self.get_client()?;
-            let res = client
-                .post(&self.register_url)
+            let res = self
+                .http_client
+                .post(self.register_url.as_str())
                 .json(&client::ProverReq {
                     name: self.worker.clone(),
                     block_size,
                 })
                 .send();
 
-            let mut res = res.map_err(|e| format_err!("register request failed: {}", e))?;
+            let res = res.map_err(|e| format_err!("register request failed: {}", e))?;
             let text = res
                 .text()
                 .map_err(|e| format_err!("failed to read register response: {}", e))?;
@@ -137,20 +127,12 @@ impl ApiClient {
     }
 
     pub fn prover_stopped(&self, prover_run_id: i32) -> Result<(), failure::Error> {
-        let client = self.get_client()?;
-        client
-            .post(&self.stopped_url)
+        self.http_client
+            .post(self.stopped_url.as_str())
             .json(&prover_run_id)
             .send()
             .map_err(|e| format_err!("prover stopped request failed: {}", e))?;
         Ok(())
-    }
-
-    fn get_client(&self) -> Result<reqwest::Client, failure::Error> {
-        reqwest::ClientBuilder::new()
-            .timeout(self.req_server_timeout)
-            .build()
-            .map_err(|e| format_err!("failed to create reqwest client: {}", e))
     }
 }
 
@@ -158,9 +140,9 @@ impl crate::ApiClient for ApiClient {
     fn block_to_prove(&self, block_size: usize) -> Result<Option<(i64, i32)>, failure::Error> {
         let op = || -> Result<Option<(i64, i32)>, failure::Error> {
             trace!("sending block_to_prove");
-            let client = self.get_client()?;
-            let mut res = client
-                .get(&self.block_to_prove_url)
+            let res = self
+                .http_client
+                .get(self.block_to_prove_url.as_str())
                 .json(&client::ProverReq {
                     name: self.worker.clone(),
                     block_size,
@@ -184,9 +166,9 @@ impl crate::ApiClient for ApiClient {
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
         let op = || -> Result<(), failure::Error> {
             trace!("sending working_on {}", job_id);
-            let client = self.get_client()?;
-            let res = client
-                .post(&self.working_on_url)
+            let res = self
+                .http_client
+                .post(self.working_on_url.as_str())
                 .json(&client::WorkingOnReq {
                     prover_run_id: job_id,
                 })
@@ -202,12 +184,12 @@ impl crate::ApiClient for ApiClient {
         Ok(self.with_retries(&op)?)
     }
 
-    fn prover_data(&self, block: i64) -> Result<ProverData, failure::Error> {
-        let client = self.get_client()?;
+    fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
         let op = || -> Result<ProverData, failure::Error> {
             trace!("sending prover_data");
-            let mut res = client
-                .get(&self.prover_data_url)
+            let res = self
+                .http_client
+                .get(self.prover_data_url.as_str())
                 .json(&block)
                 .send()
                 .map_err(|e| format_err!("failed to request prover data: {}", e))?;
@@ -219,28 +201,25 @@ impl crate::ApiClient for ApiClient {
             Ok(res.ok_or_else(|| format_err!("couldn't get ProverData for block {}", block))?)
         };
 
-        Ok(self.with_retries(&op)?)
+        let prover_data = self.with_retries(&op)?;
+        Ok(prover_data.into_circuit(block))
     }
 
-    fn publish(
-        &self,
-        block: i64,
-        proof: groth16::Proof<models::node::Engine>,
-    ) -> Result<(), failure::Error> {
-        let op = || -> Result<(), failure::Error> {
+    fn publish(&self, block: i64, proof: EncodedProofPlonk) -> Result<(), failure::Error> {
+        let op = move || -> Result<(), failure::Error> {
             trace!("Trying publish proof {}", block);
-            let encoded = encode_proof(&proof);
-
-            let client = self.get_client()?;
-            let mut res = client
-                .post(&self.publish_url)
+            let proof = proof.clone();
+            let res = self
+                .http_client
+                .post(self.publish_url.as_str())
                 .json(&client::PublishReq {
                     block: block as u32,
-                    proof: encoded,
+                    proof,
                 })
                 .send()
                 .map_err(|e| format_err!("failed to send publish request: {}", e))?;
-            if res.status() != reqwest::StatusCode::OK {
+            let status = res.status();
+            if status != reqwest::StatusCode::OK {
                 match res.text() {
                     Ok(message) => {
                         if message == "duplicate key" {
@@ -248,13 +227,13 @@ impl crate::ApiClient for ApiClient {
                         } else {
                             bail!(
                                 "publish request failed with status: {} and message: {}",
-                                res.status(),
+                                status,
                                 message
                             );
                         }
                     }
                     Err(_) => {
-                        bail!("publish request failed with status: {}", res.status());
+                        bail!("publish request failed with status: {}", status);
                     }
                 };
             }

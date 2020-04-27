@@ -6,12 +6,12 @@ use futures::SinkExt;
 use tokio::runtime::Runtime;
 // Workspace uses
 use crate::mempool::ProposedBlock;
+use crypto_exports::ff;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
 use models::node::tx::{FranklinTx, TxHash};
 use models::node::{
     Account, AccountId, AccountTree, AccountUpdate, AccountUpdates, BlockNumber, PriorityOp,
 };
-use models::params::max_block_chunk_size;
 use models::ActionType;
 use models::CommitRequest;
 use plasma::state::{OpSuccess, PlasmaState};
@@ -50,12 +50,12 @@ struct PendingBlock {
 }
 
 impl PendingBlock {
-    fn new(unprocessed_priority_op_before: u64) -> Self {
+    fn new(unprocessed_priority_op_before: u64, chunks_left: usize) -> Self {
         Self {
             success_operations: Vec::new(),
             failed_txs: Vec::new(),
             account_updates: Vec::new(),
-            chunks_left: max_block_chunk_size(),
+            chunks_left,
             pending_op_block_index: 0,
             unprocessed_priority_op_before,
             pending_block_iteration: 0,
@@ -76,6 +76,8 @@ pub struct PlasmaStateKeeper {
     rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
     tx_for_commitments: mpsc::Sender<CommitRequest>,
     executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
+
+    available_block_chunk_sizes: Vec<usize>,
 }
 
 pub struct PlasmaStateInitParams {
@@ -194,7 +196,17 @@ impl PlasmaStateKeeper {
         rx_for_blocks: mpsc::Receiver<StateKeeperRequest>,
         tx_for_commitments: mpsc::Sender<CommitRequest>,
         executed_tx_notify_sender: mpsc::Sender<ExecutedOpsNotify>,
+        available_block_chunk_sizes: Vec<usize>,
     ) -> Self {
+        assert!(!available_block_chunk_sizes.is_empty());
+
+        let is_sorted = {
+            let mut sorted = available_block_chunk_sizes.clone();
+            sorted.sort();
+            sorted == available_block_chunk_sizes
+        };
+        assert!(is_sorted);
+
         let state = PlasmaState::new(
             initial_state.tree,
             initial_state.acc_id_by_addr,
@@ -205,14 +217,16 @@ impl PlasmaStateKeeper {
             .get_account_by_address(&fee_account_address)
             .expect("Fee account should be present in the account tree");
         // Keeper starts with the NEXT block
+        let max_block_size = *available_block_chunk_sizes.iter().max().unwrap();
         let keeper = PlasmaStateKeeper {
             state,
             fee_account_id,
             current_unprocessed_priority_op: initial_state.unprocessed_priority_op,
             rx_for_blocks,
             tx_for_commitments,
-            pending_block: PendingBlock::new(initial_state.unprocessed_priority_op),
+            pending_block: PendingBlock::new(initial_state.unprocessed_priority_op, max_block_size),
             executed_tx_notify_sender,
+            available_block_chunk_sizes,
         };
 
         let root = keeper.state.root_hash();
@@ -256,7 +270,7 @@ impl PlasmaStateKeeper {
         let state = PlasmaState::from_acc_map(accounts, last_committed + 1);
         let root_hash = state.root_hash();
         info!("Genesis block created, state: {}", state.root_hash());
-        println!("GENESIS_ROOT=0x{}", root_hash.to_hex());
+        println!("GENESIS_ROOT=0x{}", ff::to_hex(&root_hash));
     }
 
     async fn run(mut self) {
@@ -442,7 +456,13 @@ impl PlasmaStateKeeper {
     async fn seal_pending_block(&mut self) {
         let pending_block = std::mem::replace(
             &mut self.pending_block,
-            PendingBlock::new(self.current_unprocessed_priority_op),
+            PendingBlock::new(
+                self.current_unprocessed_priority_op,
+                *self
+                    .available_block_chunk_sizes
+                    .last()
+                    .expect("failed to get max block size"),
+            ),
         );
 
         let mut block_transactions = pending_block.success_operations;
@@ -454,16 +474,17 @@ impl PlasmaStateKeeper {
         );
 
         let commit_request = CommitRequest {
-            block: Block {
-                block_number: self.state.block_number,
-                new_root_hash: self.state.root_hash(),
-                fee_account: self.fee_account_id,
+            block: Block::new_from_availabe_block_sizes(
+                self.state.block_number,
+                self.state.root_hash(),
+                self.fee_account_id,
                 block_transactions,
-                processed_priority_ops: (
+                (
                     pending_block.unprocessed_priority_op_before,
                     self.current_unprocessed_priority_op,
                 ),
-            },
+                &self.available_block_chunk_sizes,
+            ),
             accounts_updated: pending_block.account_updates,
         };
         self.state.block_number += 1;

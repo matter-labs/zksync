@@ -8,12 +8,10 @@ use diesel::r2d2::{ConnectionManager, Pool, PoolError};
 // Local imports
 use self::recoverable_connection::RecoverableConnection;
 use crate::StorageProcessor;
+use models::config_options::parse_env;
 
 pub mod holder;
 pub mod recoverable_connection;
-
-/// Size of the pool to use in case of `DB_POOL_SIZE` variable not being set.
-const DEFAULT_POOL_SIZE: u32 = 10;
 
 /// `ConnectionPool` is a wrapper over a `diesel`s `Pool`, encapsulating
 /// the fixed size pool of connection to the database.
@@ -34,9 +32,10 @@ impl fmt::Debug for ConnectionPool {
 impl ConnectionPool {
     /// Establishes a pool of the connections to the database and
     /// creates a new `ConnectionPool` object.
-    pub fn new() -> Self {
+    /// pool_max_size - number of connections in pool, if not set env variable "DB_POOL_SIZE" is going to be used.
+    pub fn new(pool_max_size: Option<u32>) -> Self {
         let database_url = Self::get_database_url();
-        let max_size = Self::get_pool_max_size();
+        let max_size = pool_max_size.unwrap_or_else(|| parse_env("DB_POOL_SIZE"));
         let manager = ConnectionManager::<RecoverableConnection<PgConnection>>::new(database_url);
         let pool = Pool::builder()
             .max_size(max_size)
@@ -74,19 +73,5 @@ impl ConnectionPool {
     /// Obtains the database URL from the environment variable.
     fn get_database_url() -> String {
         env::var("DATABASE_URL").expect("DATABASE_URL must be set")
-    }
-
-    /// Obtains the pool max size from the environment variable (or uses
-    /// a default value, if the variable was not set).
-    fn get_pool_max_size() -> u32 {
-        env::var("DB_POOL_SIZE")
-            .map(|size| size.parse().expect("DB_POOL_SIZE must be integer"))
-            .unwrap_or(DEFAULT_POOL_SIZE)
-    }
-}
-
-impl Default for ConnectionPool {
-    fn default() -> Self {
-        Self::new()
     }
 }

@@ -1,8 +1,8 @@
 use super::{Nonce, TokenId};
 
 use crate::node::{
-    is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount, CloseOp,
-    TransferOp, WithdrawOp,
+    is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
+    public_key_from_private, CloseOp, TransferOp, WithdrawOp,
 };
 use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
@@ -15,10 +15,13 @@ use crate::franklin_crypto::alt_babyjubjub::{edwards, AltJubjubBn256};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed, Signature};
 use crate::franklin_crypto::jubjub::FixedGenerators;
+use crate::franklin_crypto::rescue::RescueEngine;
 use crate::misc::utils::format_ether;
 use crate::node::operations::ChangePubKeyOp;
-use crate::params::JUBJUB_PARAMS;
-use crate::primitives::{big_decimal_to_u128, pedersen_hash_tx_msg, u128_to_bigdecimal};
+use crate::params::{JUBJUB_PARAMS, RESCUE_PARAMS};
+use crate::primitives::{
+    big_decimal_to_u128, pedersen_hash_tx_msg, rescue_hash_tx_msg, u128_to_bigdecimal,
+};
 use failure::{bail, ensure, format_err};
 use parity_crypto::publickey::{
     public_to_address, recover, sign, KeyPair, Signature as ETHSignature,
@@ -190,7 +193,7 @@ impl Transfer {
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             cached_signer.clone()
-        } else if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
+        } else if let Some(pub_key) = self.signature.verify_musig(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -304,7 +307,7 @@ impl Withdraw {
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
         if let VerifiedSignatureCache::Cached(cached_signer) = &self.cached_signer {
             cached_signer.clone()
-        } else if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
+        } else if let Some(pub_key) = self.signature.verify_musig(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -347,7 +350,7 @@ impl Close {
     }
 
     pub fn verify_signature(&self) -> Option<PubKeyHash> {
-        if let Some(pub_key) = self.signature.verify_musig_sha256(&self.get_bytes()) {
+        if let Some(pub_key) = self.signature.verify_musig_rescue(&self.get_bytes()) {
             Some(PubKeyHash::from_pubkey(&pub_key))
         } else {
             None
@@ -514,11 +517,11 @@ pub struct TxSignature {
 
 impl TxSignature {
     pub fn sign_musig(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
-        Self::sign_musig_sha256(pk, msg)
+        Self::sign_musig_rescue(pk, msg)
     }
 
     pub fn verify_musig(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
-        self.verify_musig_sha256(msg)
+        self.verify_musig_rescue(msg)
     }
 
     #[allow(dead_code)]
@@ -537,12 +540,29 @@ impl TxSignature {
         }
     }
 
+    #[allow(dead_code)]
     fn verify_musig_sha256(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let valid = self.pub_key.0.verify_musig_sha256(
             &hashed_msg,
             &self.signature.0,
             FixedGenerators::SpendingKeyGenerator,
+            &JUBJUB_PARAMS,
+        );
+        if valid {
+            Some(self.pub_key.0.clone())
+        } else {
+            None
+        }
+    }
+
+    fn verify_musig_rescue(&self, msg: &[u8]) -> Option<PublicKey<Engine>> {
+        let hashed_msg = rescue_hash_tx_msg(msg);
+        let valid = self.pub_key.0.verify_musig_rescue(
+            &hashed_msg,
+            &self.signature.0,
+            FixedGenerators::SpendingKeyGenerator,
+            &RESCUE_PARAMS,
             &JUBJUB_PARAMS,
         );
         if valid {
@@ -564,15 +584,12 @@ impl TxSignature {
         );
 
         Self {
-            pub_key: PackedPublicKey(PublicKey::from_private(
-                pk,
-                FixedGenerators::SpendingKeyGenerator,
-                &JUBJUB_PARAMS,
-            )),
+            pub_key: PackedPublicKey(public_key_from_private(pk)),
             signature: PackedSignature(signature),
         }
     }
 
+    #[allow(dead_code)]
     fn sign_musig_sha256(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self {
         let hashed_msg = pedersen_hash_tx_msg(msg);
         let seed = Seed::deterministic_seed(&pk, &hashed_msg);
@@ -584,13 +601,40 @@ impl TxSignature {
         );
 
         Self {
-            pub_key: PackedPublicKey(PublicKey::from_private(
-                pk,
-                FixedGenerators::SpendingKeyGenerator,
-                &JUBJUB_PARAMS,
-            )),
+            pub_key: PackedPublicKey(public_key_from_private(pk)),
             signature: PackedSignature(signature),
         }
+    }
+
+    fn sign_musig_rescue(pk: &PrivateKey<Engine>, msg: &[u8]) -> Self
+    where
+        Engine: RescueEngine,
+    {
+        let hashed_msg = rescue_hash_tx_msg(msg);
+        let seed = Seed::deterministic_seed(&pk, &hashed_msg);
+        let signature = pk.musig_rescue_sign(
+            &hashed_msg,
+            &seed,
+            FixedGenerators::SpendingKeyGenerator,
+            &RESCUE_PARAMS,
+            &JUBJUB_PARAMS,
+        );
+
+        Self {
+            pub_key: PackedPublicKey(public_key_from_private(pk)),
+            signature: PackedSignature(signature),
+        }
+    }
+
+    /// Deserialize signature from packed bytes representation.
+    /// [0..32] - packed pubkey of the signer.
+    /// [32..96] - packed r,s of the signature
+    pub fn deserialize_from_packed_bytes(bytes: &[u8]) -> Result<Self, failure::Error> {
+        ensure!(bytes.len() == 32 + 64, "packed signature length mismatch");
+        Ok(Self {
+            pub_key: PackedPublicKey::deserialize_packed(&bytes[0..32])?,
+            signature: PackedSignature::deserialize_packed(&bytes[32..])?,
+        })
     }
 }
 
@@ -864,6 +908,30 @@ mod test {
         messages.push(b"hello world".to_vec());
 
         (pk, messages)
+    }
+
+    #[test]
+    fn test_musig_rescue_signing_verification() {
+        let (pk, messages) = gen_pk_and_msg();
+
+        for msg in &messages {
+            let signature = TxSignature::sign_musig_rescue(&pk, msg);
+
+            if let Some(sign_pub_key) = signature.verify_musig_rescue(msg) {
+                let pub_key = PublicKey::from_private(
+                    &pk,
+                    FixedGenerators::SpendingKeyGenerator,
+                    &JUBJUB_PARAMS,
+                );
+                assert!(
+                    sign_pub_key.0.eq(&pub_key.0),
+                    "Signature pub key is wrong, msg: {}",
+                    hex::encode(&msg)
+                );
+            } else {
+                panic!("Signature is incorrect, msg: {}", hex::encode(&msg));
+            }
+        }
     }
 
     #[test]

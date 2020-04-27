@@ -11,13 +11,12 @@
 use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts, run_upgrade_franklin};
 use crate::zksync_account::ZksyncAccount;
-use models::config_options::ConfigurationOptions;
 use std::time::Instant;
 use testkit::*;
 use web3::transports::Http;
 
 fn migration_test() {
-    let config = ConfigurationOptions::from_env();
+    let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
@@ -32,16 +31,17 @@ fn migration_test() {
         deploy_timer.elapsed().as_secs()
     );
 
-    let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
+    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
-        config.operator_private_key,
-        config.operator_eth_addr,
+        commit_account_info.private_key,
+        commit_account_info.address,
         transport.clone(),
         contracts.contract,
-        &config,
+        testkit_config.chain_id,
+        testkit_config.gas_price_factor,
     );
-
-    let eth_accounts = get_test_accounts()
+    let eth_accounts = test_accounts_info
         .into_iter()
         .map(|test_eth_account| {
             EthereumAccount::new(
@@ -49,7 +49,8 @@ fn migration_test() {
                 test_eth_account.address,
                 transport.clone(),
                 contracts.contract,
-                &config,
+                testkit_config.chain_id,
+                testkit_config.gas_price_factor,
             )
         })
         .collect::<Vec<_>>();

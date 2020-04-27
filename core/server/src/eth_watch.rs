@@ -8,7 +8,6 @@
 // Built-in deps
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::time::Duration;
 // External uses
 use failure::format_err;
 use futures::{
@@ -30,8 +29,6 @@ use models::TokenAddedEvent;
 use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 use web3::transports::EventLoopHandle;
-
-const ETH_POLL_INTERVAL: Duration = Duration::from_secs(3);
 
 pub enum EthWatchRequest {
     PollETHNode,
@@ -437,7 +434,7 @@ pub fn start_eth_watch(
     runtime.spawn(eth_watch.run());
 
     runtime.spawn(async move {
-        let mut timer = time::interval(ETH_POLL_INTERVAL);
+        let mut timer = time::interval(config_options.eth_watch_poll_interval);
 
         loop {
             timer.tick().await;

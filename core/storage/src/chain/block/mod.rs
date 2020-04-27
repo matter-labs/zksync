@@ -120,16 +120,17 @@ impl<'a> BlockSchema<'a> {
         let new_root_hash = fe_from_bytes(&stored_block.root_hash).expect("Unparsable root hash");
 
         // Return the obtained block in the expected format.
-        Ok(Some(Block {
-            block_number: block,
+        Ok(Some(Block::new(
+            block,
             new_root_hash,
-            fee_account: stored_block.fee_account_id as AccountId,
+            stored_block.fee_account_id as AccountId,
             block_transactions,
-            processed_priority_ops: (
+            (
                 stored_block.unprocessed_prior_op_before as u64,
                 stored_block.unprocessed_prior_op_after as u64,
             ),
-        }))
+            stored_block.block_size as usize,
+        )))
     }
 
     /// Same as `get_block_executed_ops`, but returns a vector of `FranklinOp` instead
@@ -462,7 +463,7 @@ impl<'a> BlockSchema<'a> {
             let fee_account_id = i64::from(block.fee_account);
             let unprocessed_prior_op_before = block.processed_priority_ops.0 as i64;
             let unprocessed_prior_op_after = block.processed_priority_ops.1 as i64;
-            let block_size = block.smallest_block_size() as i64;
+            let block_size = block.block_chunks_size as i64;
 
             self.save_block_transactions(block)?;
 

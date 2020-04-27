@@ -28,6 +28,9 @@ Setup:
 zksync init
 ```
 
+During the first initialization you have to download around 8 GB of setup files, this should be done once.
+If you have a problem on this step of the initialization, see help for the `zksync plonk-setup` command.
+
 To completely reset the dev environment:
 
 - Stop services:
@@ -66,14 +69,14 @@ Run server:
 zksync server
 ```
 
-By default block chunk size set to `50`. For testing & development purposes you
-can change it to the smaller value.
+Server is configured using env files in `./etc/env` directory. 
+After the first initialization, file `./etc/env/dev.env` will be created. By default, this file is copied from the `./etc/env/dev.env.example` template.
 
-**Note:** Currently it's not recommended though. Lowering the block chunk size may
-break several tests, since some of them create big blocks.
+Server can produce block of different sizes, the list of available sizes is determined by the `SUPPORTED_BLOCK_CHUNKS_SIZES` environment variable.
+Block sizes which will actually be produced by the server can be configured using the `BLOCK_CHUNK_SIZES` environment variable.
 
-If you have to change the block chunk size anyway, you should change the environment
-variable `BLOCK_SIZE_CHUNKS` value in `./etc/env/dev.env`.
+Note: for proof generation for large blocks requires a lot of resources and an average user machine 
+is only capable of creating proofs for the smallest block sizes.
 
 After that you may need to invalidate `cargo` cache by touching the files of `models`:
 
@@ -85,13 +88,6 @@ This is required, because `models` take the environment variable value at the co
 we have to recompile this module to set correct values.
 
 If you use additional caching systems (like `sccache`), you may have to remove their cache as well.
-
-After that you must generate keys. This only needs to be done once:
-
-```sh
-./bin/gen-keys
-zksync redeploy
-```
 
 Run prover:
 
@@ -196,7 +192,6 @@ Currently the following criteria are checked:
   zksync loadtest # Has to be run in the 3rd terminal
   ```
 
-
 ## Using Dummy Prover
 
 Using the real prover for the development can be not really handy, since it's pretty slow and resource consuming.
@@ -234,36 +229,26 @@ $ zksync dummy-prover status
 Dummy Verifier status: disabled
 ```
 
-## Generating keys
 
-To generate a proving key, from `server` dir run:
+## Developing circuit
 
-```sh
-cargo run --release --bin read_write_keys
-```
+* To generate proofs one must have the universal setup files (which are downloaded during the first initialization).
+* To verify generated proofs one must have verification keys. Verification keys are generated for specific circuit & Verifier.sol contract; without these keys it is impossible to verify proofs on the Ethereum network.
 
-It will generate a `*VerificationKey.sol` and `*_pk.key` files for 'deposit', 'exit' and 'transfer' circuits in the root folder.
+Steps to do after updating circuit:
+1. Update circuit version by updating `KEY_DIR` in your env file (don't forget to place it to `dev.env.example`)
+(last parts of this variable usually means last commit where you updated circuit).
+2. Regenerate verification keys and Verifier contract using `zksync verify-keys gen` command.
+3. Pack generated verification keys using `zksync verify-keys pack` command and commit resulting file to repo.
 
-Move files to proper locations:
-
-```sh
-mv -f n*VerificationKey.sol ./contracts/contracts/
-mv -f *_pk.key ./prover/keys/
-```
-
-If the pregenerated leaf format changes, replace the `EMPTY_TREE_ROOT` constant in `contracts/contracts/PlasmaStorage.sol`.
 
 ## Contracts
 
 ### Re-build contracts:
 
 ```sh
-cd contracts; yarn build
+zksync build-contracts
 ```
-
-IMPORTANT! Generated `.abi` and `.bin` files are fed to cargo to build module `plasma::eth`. 
-
-So you need to rebuild the code on every change (to be automated).
 
 ### Publish source code on etherscan
 

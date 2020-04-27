@@ -1,10 +1,10 @@
-use super::merkle_tree::{PedersenHasher, SparseMerkleTree};
+use super::merkle_tree::{RescueHasher, SparseMerkleTree};
 use super::params;
 use super::primitives::{pack_as_float, u128_to_bigdecimal, unpack_float};
 use crate::franklin_crypto::bellman::pairing::bn256;
 use crate::franklin_crypto::{
     eddsa::{PrivateKey as PrivateKeyImport, PublicKey as PublicKeyImport},
-    jubjub::JubjubEngine,
+    jubjub::{FixedGenerators, JubjubEngine},
 };
 use bigdecimal::BigDecimal;
 
@@ -31,7 +31,7 @@ pub type Fs = <Engine as JubjubEngine>::Fs;
 
 pub type AccountMap = fnv::FnvHashMap<u32, Account>;
 pub type AccountUpdates = Vec<(u32, AccountUpdate)>;
-pub type AccountTree = SparseMerkleTree<Account, Fr, PedersenHasher<Engine>>;
+pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
 
 pub type PrivateKey = PrivateKeyImport<Engine>;
 pub type PublicKey = PublicKeyImport<Engine>;
@@ -151,6 +151,15 @@ pub fn closest_packable_fee_amount(amount: &BigDecimal) -> BigDecimal {
 pub fn closest_packable_token_amount(amount: &BigDecimal) -> BigDecimal {
     let fee_packed = pack_token_amount(&amount);
     unpack_token_amount(&fee_packed).expect("token amount repacking")
+}
+
+/// Derives public key prom private
+pub fn public_key_from_private(pk: &PrivateKey) -> PublicKey {
+    PublicKey::from_private(
+        pk,
+        FixedGenerators::SpendingKeyGenerator,
+        &params::JUBJUB_PARAMS,
+    )
 }
 
 #[cfg(test)]
