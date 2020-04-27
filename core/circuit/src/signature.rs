@@ -441,7 +441,7 @@ pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: Constrai
 
     let mut sponge = rescue::StatefulRescueGadget::new(rescue_params);
     sponge.specialize(
-        cs.namespace(|| "specialize rescue on input length"), 
+        cs.namespace(|| "specialize rescue on input length"),
         hash_input.len() as u8,
     );
 
