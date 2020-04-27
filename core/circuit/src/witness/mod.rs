@@ -1,3 +1,15 @@
+// Public re-exports
+pub use self::{
+    change_pubkey_offchain::ChangePubkeyOffChainWitness,
+    close_account::CloseAccountWitness,
+    deposit::DepositWitness,
+    full_exit::FullExitWitness,
+    transfer::TransferWitness,
+    transfer_to_new::TransferToNewWitness,
+    utils::{prepare_sig_data, WitnessBuilder},
+    withdraw::WithdrawWitness,
+};
+
 pub mod change_pubkey_offchain;
 pub mod close_account;
 pub mod deposit;

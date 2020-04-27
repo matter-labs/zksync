@@ -72,164 +72,166 @@ impl<E: RescueEngine> FullExitWitness<E> {
     }
 }
 
-pub fn apply_full_exit_tx(
-    tree: &mut CircuitAccountTree,
-    full_exit: &FullExitOp,
-    is_success: bool,
-) -> FullExitWitness<Bn256> {
-    let full_exit = FullExitData {
-        token: u32::from(full_exit.priority_op.token),
-        account_address: full_exit.priority_op.account_id,
-        eth_address: eth_address_to_fr(&full_exit.priority_op.eth_address),
-    };
+impl FullExitWitness<Bn256> {
+    pub fn apply_tx(
+        tree: &mut CircuitAccountTree,
+        full_exit: &FullExitOp,
+        is_success: bool,
+    ) -> Self {
+        let full_exit = FullExitData {
+            token: u32::from(full_exit.priority_op.token),
+            account_address: full_exit.priority_op.account_id,
+            eth_address: eth_address_to_fr(&full_exit.priority_op.eth_address),
+        };
 
-    // le_bit_vector_into_field_element()
-    apply_full_exit(tree, &full_exit, is_success)
-}
-pub fn apply_full_exit(
-    tree: &mut CircuitAccountTree,
-    full_exit: &FullExitData,
-    is_success: bool,
-) -> FullExitWitness<Bn256> {
-    //preparing data and base witness
-    let before_root = tree.root_hash();
-    debug!("Initial root = {}", before_root);
-    let (audit_path_before, audit_balance_path_before) =
-        get_audits(tree, full_exit.account_address, full_exit.token);
-
-    let capacity = tree.capacity();
-    assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
-    let account_address_fe = Fr::from_str(&full_exit.account_address.to_string()).unwrap();
-    let token_fe = Fr::from_str(&full_exit.token.to_string()).unwrap();
-
-    //applying full_exit
-    let amount_to_exit = {
-        let (_, _, balance, _) = apply_leaf_operation(
-            tree,
-            full_exit.account_address,
-            full_exit.token,
-            |_| {},
-            |_| {},
-        );
-        if is_success {
-            balance
-        } else {
-            Fr::zero()
-        }
-    };
-
-    let (account_witness_before, account_witness_after, balance_before, balance_after) = {
-        if is_success {
-            apply_leaf_operation(
-                tree,
-                full_exit.account_address,
-                full_exit.token,
-                |_| {},
-                |bal| {
-                    bal.value = Fr::zero();
-                },
-            )
-        } else {
-            apply_leaf_operation(
-                tree,
-                full_exit.account_address,
-                full_exit.token,
-                |_| {},
-                |_| {},
-            )
-        }
-    };
-
-    let after_root = tree.root_hash();
-    debug!("After root = {}", after_root);
-    let (audit_path_after, audit_balance_path_after) =
-        get_audits(tree, full_exit.account_address, full_exit.token);
-
-    let a = balance_before;
-    let b = Fr::zero();
-
-    FullExitWitness {
-        before: OperationBranch {
-            address: Some(account_address_fe),
-            token: Some(token_fe),
-            witness: OperationBranchWitness {
-                account_witness: account_witness_before,
-                account_path: audit_path_before,
-                balance_value: Some(balance_before),
-                balance_subtree_path: audit_balance_path_before,
-            },
-        },
-        after: OperationBranch {
-            address: Some(account_address_fe),
-            token: Some(token_fe),
-            witness: OperationBranchWitness {
-                account_witness: account_witness_after,
-                account_path: audit_path_after,
-                balance_value: Some(balance_after),
-                balance_subtree_path: audit_balance_path_after,
-            },
-        },
-        args: OperationArguments {
-            eth_address: Some(full_exit.eth_address),
-            amount_packed: Some(Fr::zero()),
-            full_amount: Some(amount_to_exit),
-            fee: Some(Fr::zero()),
-            pub_nonce: Some(Fr::zero()),
-            a: Some(a),
-            b: Some(b),
-            new_pub_key_hash: Some(Fr::zero()),
-        },
-        before_root: Some(before_root),
-        after_root: Some(after_root),
-        tx_type: Some(Fr::from_str("6").unwrap()),
+        // le_bit_vector_into_field_element()
+        Self::apply_data(tree, &full_exit, is_success)
     }
-}
-pub fn calculate_full_exit_operations_from_witness(
-    full_exit_witness: &FullExitWitness<Bn256>,
-) -> Vec<Operation<Bn256>> {
-    let pubdata_chunks = full_exit_witness
-        .get_pubdata()
-        .chunks(64)
-        .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-        .collect::<Vec<_>>();
 
-    let empty_sig_data = SignatureData {
-        r_packed: vec![Some(false); 256],
-        s: vec![Some(false); 256],
-    };
+    fn apply_data(
+        tree: &mut CircuitAccountTree,
+        full_exit: &FullExitData,
+        is_success: bool,
+    ) -> Self {
+        //preparing data and base witness
+        let before_root = tree.root_hash();
+        debug!("Initial root = {}", before_root);
+        let (audit_path_before, audit_balance_path_before) =
+            get_audits(tree, full_exit.account_address, full_exit.token);
 
-    let mut operations = vec![];
-    operations.push(Operation {
-        new_root: full_exit_witness.after_root,
-        tx_type: full_exit_witness.tx_type,
-        chunk: Some(Fr::from_str("0").unwrap()),
-        pubdata_chunk: Some(pubdata_chunks[0]),
-        first_sig_msg: Some(Fr::zero()),
-        second_sig_msg: Some(Fr::zero()),
-        third_sig_msg: Some(Fr::zero()),
-        signer_pub_key_packed: vec![Some(false); 256],
-        args: full_exit_witness.args.clone(),
-        lhs: full_exit_witness.before.clone(),
-        rhs: full_exit_witness.before.clone(),
-        signature_data: empty_sig_data.clone(),
-    });
+        let capacity = tree.capacity();
+        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
+        let account_address_fe = Fr::from_str(&full_exit.account_address.to_string()).unwrap();
+        let token_fe = Fr::from_str(&full_exit.token.to_string()).unwrap();
 
-    for (i, pubdata_chunk) in pubdata_chunks.iter().cloned().enumerate().take(6).skip(1) {
+        //applying full_exit
+        let amount_to_exit = {
+            let (_, _, balance, _) = apply_leaf_operation(
+                tree,
+                full_exit.account_address,
+                full_exit.token,
+                |_| {},
+                |_| {},
+            );
+            if is_success {
+                balance
+            } else {
+                Fr::zero()
+            }
+        };
+
+        let (account_witness_before, account_witness_after, balance_before, balance_after) = {
+            if is_success {
+                apply_leaf_operation(
+                    tree,
+                    full_exit.account_address,
+                    full_exit.token,
+                    |_| {},
+                    |bal| {
+                        bal.value = Fr::zero();
+                    },
+                )
+            } else {
+                apply_leaf_operation(
+                    tree,
+                    full_exit.account_address,
+                    full_exit.token,
+                    |_| {},
+                    |_| {},
+                )
+            }
+        };
+
+        let after_root = tree.root_hash();
+        debug!("After root = {}", after_root);
+        let (audit_path_after, audit_balance_path_after) =
+            get_audits(tree, full_exit.account_address, full_exit.token);
+
+        let a = balance_before;
+        let b = Fr::zero();
+
+        FullExitWitness {
+            before: OperationBranch {
+                address: Some(account_address_fe),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: account_witness_before,
+                    account_path: audit_path_before,
+                    balance_value: Some(balance_before),
+                    balance_subtree_path: audit_balance_path_before,
+                },
+            },
+            after: OperationBranch {
+                address: Some(account_address_fe),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: account_witness_after,
+                    account_path: audit_path_after,
+                    balance_value: Some(balance_after),
+                    balance_subtree_path: audit_balance_path_after,
+                },
+            },
+            args: OperationArguments {
+                eth_address: Some(full_exit.eth_address),
+                amount_packed: Some(Fr::zero()),
+                full_amount: Some(amount_to_exit),
+                fee: Some(Fr::zero()),
+                pub_nonce: Some(Fr::zero()),
+                a: Some(a),
+                b: Some(b),
+                new_pub_key_hash: Some(Fr::zero()),
+            },
+            before_root: Some(before_root),
+            after_root: Some(after_root),
+            tx_type: Some(Fr::from_str("6").unwrap()),
+        }
+    }
+
+    pub fn calculate_operations(&self) -> Vec<Operation<Bn256>> {
+        let pubdata_chunks = self
+            .get_pubdata()
+            .chunks(64)
+            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
+            .collect::<Vec<_>>();
+
+        let empty_sig_data = SignatureData {
+            r_packed: vec![Some(false); 256],
+            s: vec![Some(false); 256],
+        };
+
+        let mut operations = vec![];
         operations.push(Operation {
-            new_root: full_exit_witness.after_root,
-            tx_type: full_exit_witness.tx_type,
-            chunk: Some(Fr::from_str(&i.to_string()).unwrap()),
-            pubdata_chunk: Some(pubdata_chunk),
+            new_root: self.after_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str("0").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[0]),
             first_sig_msg: Some(Fr::zero()),
             second_sig_msg: Some(Fr::zero()),
             third_sig_msg: Some(Fr::zero()),
             signer_pub_key_packed: vec![Some(false); 256],
-            args: full_exit_witness.args.clone(),
-            lhs: full_exit_witness.after.clone(),
-            rhs: full_exit_witness.after.clone(),
+            args: self.args.clone(),
+            lhs: self.before.clone(),
+            rhs: self.before.clone(),
             signature_data: empty_sig_data.clone(),
         });
-    }
 
-    operations
+        for (i, pubdata_chunk) in pubdata_chunks.iter().cloned().enumerate().take(6).skip(1) {
+            operations.push(Operation {
+                new_root: self.after_root,
+                tx_type: self.tx_type,
+                chunk: Some(Fr::from_str(&i.to_string()).unwrap()),
+                pubdata_chunk: Some(pubdata_chunk),
+                first_sig_msg: Some(Fr::zero()),
+                second_sig_msg: Some(Fr::zero()),
+                third_sig_msg: Some(Fr::zero()),
+                signer_pub_key_packed: vec![Some(false); 256],
+                args: self.args.clone(),
+                lhs: self.after.clone(),
+                rhs: self.after.clone(),
+                signature_data: empty_sig_data.clone(),
+            });
+        }
+
+        operations
+    }
 }
