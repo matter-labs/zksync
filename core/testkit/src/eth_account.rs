@@ -17,6 +17,7 @@ use web3::types::{
 };
 use web3::{Transport, Web3};
 
+const N_CONFIRMATIONS: usize = 1;
 const WEB3_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
@@ -127,7 +128,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("Full exit wait confirm err: {}", e))?;
@@ -167,7 +172,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("Exit wait confirm err: {}", e))?;
@@ -192,7 +201,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| {
@@ -221,7 +234,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("ChangePubKeyHash wait confirm err: {}", e))?;
@@ -259,7 +276,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("Deposit eth wait confirm err: {}", e))?;
@@ -351,7 +372,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("Approve wait confirm err: {}", e))?;
@@ -381,7 +406,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("Deposit erc20 wait confirm err: {}", e))?;
@@ -417,7 +446,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("Commit block confirm err: {}", e))?;
@@ -443,7 +476,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("Verify block confirm err: {}", e))?;
@@ -465,7 +502,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("Complete withdrawals confirm err: {}", e))?;
@@ -482,7 +523,11 @@ impl<T: Transport> EthereumAccount<T> {
         let receipt = self
             .main_contract_eth_client
             .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
+            .send_raw_transaction_with_confirmation(
+                signed_tx.raw_tx.into(),
+                WEB3_POLL_INTERVAL,
+                N_CONFIRMATIONS,
+            )
             .compat()
             .await
             .map_err(|e| format_err!("Trigger exodus if needed confirm err: {}", e))?;

@@ -74,7 +74,6 @@ steps:
   depends_on:
   - rust-build
 
-
 - name: circuit-rust-tests
   image: matterlabs/ci
   commands:
@@ -104,6 +103,13 @@ steps:
   depends_on:
   - init
 
+- name: ganache
+  image: matterlabs/ganache
+  detach: true
+  depends_on:
+  - build-contracts
+  - run-genesis
+
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
@@ -114,6 +120,7 @@ steps:
   depends_on:
   - run-genesis
   - build-contracts
+  - ganache
 
 - name: contract-test
   image: matterlabs/ci
