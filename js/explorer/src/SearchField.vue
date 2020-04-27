@@ -42,24 +42,30 @@ export default {
             this.searching = true;
 
             let query = this.query.trim();
+            for (const prefix of ['0x', 'sync-tx:', 'sync-bl:', 'sync:'])
+                if (query.startsWith(prefix)) 
+                    query = query.slice(prefix.length);
 
-            let block = await client.searchBlock(query);
+            let block = await client.searchBlock(query).catch(() => null);
             if (block && block.block_number) {
                 this.$router.push('/blocks/' + block.block_number);
                 this.searching = false;
                 return;
             }
 
-            let tx = await client.searchTx(query);
+            let tx = await client.searchTx(query).catch(() => null);
             if (tx && tx.tx_type) {
-                this.$router.push('/transactions/' + query);
+                const prefix = tx && tx.tx && tx.tx.priority_op
+                    ? '0x'
+                    : 'sync-tx:';
+                this.$router.push('/transactions/' + prefix + query);
                 this.searching = false;
                 return;
             }
 
-            let account = await client.searchAccount(query);
+            let account = await client.searchAccount(query).catch(() => null);
             if (account && account.id) {
-                this.$router.push('/accounts/' + query);
+                this.$router.push('/accounts/0x' + query);
                 this.searching = false;
                 return;
             }

@@ -10,3 +10,5 @@ cd core/storage
 echo DATABASE_URL=$DATABASE_URL
 diesel database setup
 diesel migration run
+
+mv -f src/schema.rs.generated src/schema.rs

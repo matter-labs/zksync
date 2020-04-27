@@ -54,7 +54,7 @@ impl From<TokenId> for TokenLike {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-/// Token supported in ZK Sync protocol
+/// Token supported in zkSync protocol
 pub struct Token {
     /// id is used for tx signature and serialization
     pub id: TokenId,

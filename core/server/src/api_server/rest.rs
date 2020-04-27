@@ -8,7 +8,8 @@ use actix_web::{
 };
 use futures::channel::mpsc;
 use models::config_options::ThreadPanicNotify;
-use models::node::{Account, AccountId, Address, ExecutedOperations, PubKeyHash};
+use models::node::block::ExecutedOperations;
+use models::node::{Account, AccountId, Address};
 use models::NetworkStatus;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
@@ -25,6 +26,42 @@ struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 impl SharedNetworkStatus {
     fn read(&self) -> NetworkStatus {
         (*self.0.as_ref().read().unwrap()).clone()
+    }
+}
+
+fn remove_prefix(query: &str) -> &str {
+    if query.starts_with("0x") {
+        &query[2..]
+    } else if query.starts_with("sync-bl:") || query.starts_with("sync-tx:") {
+        &query[8..]
+    } else {
+        &query
+    }
+}
+
+fn try_parse_address(query: &str) -> Option<Address> {
+    const ADDRESS_SIZE: usize = 20; // 20 bytes
+
+    let query = remove_prefix(query);
+    let b = hex::decode(query).ok()?;
+
+    if b.len() == ADDRESS_SIZE {
+        Some(Address::from_slice(&b))
+    } else {
+        None
+    }
+}
+
+fn try_parse_hash(query: &str) -> Option<Vec<u8>> {
+    const HASH_SIZE: usize = 32; // 32 bytes
+
+    let query = remove_prefix(query);
+    let b = hex::decode(query).ok()?;
+
+    if b.len() == HASH_SIZE {
+        Some(b)
+    } else {
+        None
     }
 }
 
@@ -275,8 +312,11 @@ struct AccountStateResponse {
 
 fn handle_get_account_state(
     data: web::Data<AppState>,
-    account_address: web::Path<Address>,
+    account_address: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
+    let account_address =
+        try_parse_address(&account_address).ok_or_else(|| HttpResponse::BadRequest().finish())?;
+
     let storage = data.access_storage()?;
 
     let (id, verified, commited) = {
@@ -327,19 +367,6 @@ fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(vec_tokens))
 }
 
-fn handle_get_account_transactions(
-    data: web::Data<AppState>,
-    address: web::Path<PubKeyHash>,
-) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
-    let txs = storage
-        .chain()
-        .operations_ext_schema()
-        .get_account_transactions(&address)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
-    Ok(HttpResponse::Ok().json(txs))
-}
-
 fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
     request_path: web::Path<(Address, u64, u64)>,
@@ -385,22 +412,8 @@ fn handle_get_tx_by_hash(
     data: web::Data<AppState>,
     hash_hex_with_prefix: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
-    if hash_hex_with_prefix.len() < 2 {
-        return Err(HttpResponse::BadRequest().finish().into());
-    }
-
-    let hash = {
-        let hash = if hash_hex_with_prefix.starts_with("0x") {
-            hex::decode(&hash_hex_with_prefix.into_inner()[2..])
-        } else if hash_hex_with_prefix.starts_with("sync-tx:") {
-            hex::decode(&hash_hex_with_prefix.into_inner()[8..])
-        } else {
-            return Err(HttpResponse::BadRequest().finish().into());
-        };
-
-        hash.map_err(|_| HttpResponse::BadRequest().finish())?
-    };
-
+    let hash =
+        try_parse_hash(&hash_hex_with_prefix).ok_or_else(|| HttpResponse::BadRequest().finish())?;
     let storage = data.access_storage()?;
 
     let res = storage
@@ -482,38 +495,17 @@ fn handle_get_block_transactions(
     data: web::Data<AppState>,
     path: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
-    let block_id = path.into_inner();
+    let block_number = path.into_inner();
 
-    let executed_ops = data
-        .get_block_executed_ops(block_id)?
-        .into_iter()
-        .filter(|op| match op {
-            ExecutedOperations::Tx(tx) => tx.op.is_some(),
-            _ => true,
-        })
-        .collect::<Vec<_>>();
+    let storage = data.access_storage()?;
 
-    #[derive(Serialize)]
-    struct ExecutedOperationWithHash {
-        op: ExecutedOperations,
-        tx_hash: String,
-    };
+    let txs = storage
+        .chain()
+        .block_schema()
+        .get_block_transactions(block_number)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    let executed_ops_with_hashes = executed_ops
-        .into_iter()
-        .map(|op| {
-            let tx_hash = match &op {
-                ExecutedOperations::Tx(tx) => tx.tx.hash().to_string(),
-                ExecutedOperations::PriorityOp(tx) => {
-                    format!("0x{}", hex::encode(&tx.priority_op.eth_hash))
-                }
-            };
-
-            ExecutedOperationWithHash { op, tx_hash }
-        })
-        .collect::<Vec<_>>();
-
-    Ok(HttpResponse::Ok().json(executed_ops_with_hashes))
+    Ok(HttpResponse::Ok().json(txs))
 }
 
 #[derive(Deserialize)]
@@ -554,10 +546,6 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                         web::get().to(handle_get_account_state),
                     )
                     .route("/tokens", web::get().to(handle_get_tokens))
-                    .route(
-                        "/account/{id}/transactions",
-                        web::get().to(handle_get_account_transactions),
-                    )
                     .route(
                         "/account/{address}/history/{offset}/{limit}",
                         web::get().to(handle_get_account_transactions_history),

@@ -109,7 +109,7 @@ export class Signer {
 
     static async fromETHSignature(ethSigner: ethers.Signer): Promise<Signer> {
         const sign = await ethSigner.signMessage(
-            "Access ZK Sync account.\n" +
+            "Access zkSync account.\n" +
                 "\n" +
                 "Only sign this message for a trusted client!"
         );
