@@ -8,7 +8,6 @@ use bigdecimal::BigDecimal;
 use ethabi::{decode, ParamType};
 use failure::{bail, ensure, format_err};
 use std::convert::{TryFrom, TryInto};
-use std::str::FromStr;
 use web3::types::{Address, Log, U256};
 
 use super::operations::{DepositOp, FullExitOp};
@@ -130,7 +129,6 @@ pub struct PriorityOp {
     pub serial_id: u64,
     pub data: FranklinPriorityOp,
     pub deadline_block: u64,
-    pub eth_fee: BigDecimal,
     pub eth_hash: Vec<u8>,
 }
 
@@ -145,7 +143,6 @@ impl TryFrom<Log> for PriorityOp {
                 ParamType::Uint(8),   // OpType
                 ParamType::Bytes,     // Pubdata
                 ParamType::Uint(256), // expir. block
-                ParamType::Uint(256), // fee
             ],
             &event.data.0,
         )
@@ -176,10 +173,6 @@ impl TryFrom<Log> for PriorityOp {
                 .as_ref()
                 .map(U256::as_u64)
                 .unwrap(),
-            eth_fee: {
-                let amount_uint = dec_ev.remove(0).to_uint().unwrap();
-                BigDecimal::from_str(&format!("{}", amount_uint)).unwrap()
-            },
             eth_hash: event
                 .transaction_hash
                 .expect("Event transaction hash is missing")

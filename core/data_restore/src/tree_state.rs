@@ -1,5 +1,4 @@
 use crate::rollup_ops::RollupOpsBlock;
-use bigdecimal::BigDecimal;
 use failure::format_err;
 use models::node::account::Account;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -19,21 +18,18 @@ pub struct TreeState {
     pub current_unprocessed_priority_op: u64,
     /// The last fee account address
     pub last_fee_account_address: Address,
-}
-
-impl Default for TreeState {
-    fn default() -> Self {
-        Self::new()
-    }
+    /// Available block chunk sizes
+    pub available_block_chunk_sizes: Vec<usize>,
 }
 
 impl TreeState {
     /// Returns empty self state
-    pub fn new() -> Self {
+    pub fn new(available_block_chunk_sizes: Vec<usize>) -> Self {
         Self {
             state: PlasmaState::empty(),
             current_unprocessed_priority_op: 0,
             last_fee_account_address: Address::default(),
+            available_block_chunk_sizes,
         }
     }
 
@@ -51,6 +47,7 @@ impl TreeState {
         accounts: AccountMap,
         current_unprocessed_priority_op: u64,
         fee_account: AccountId,
+        available_block_chunk_sizes: Vec<usize>,
     ) -> Self {
         let state = PlasmaState::from_acc_map(accounts, current_block);
         let last_fee_account_address = state
@@ -61,6 +58,7 @@ impl TreeState {
             state,
             current_unprocessed_priority_op,
             last_fee_account_address,
+            available_block_chunk_sizes,
         }
     }
 
@@ -265,16 +263,17 @@ impl TreeState {
 
         self.last_fee_account_address = fee_account_address;
 
-        let block = Block {
-            block_number: ops_block.block_num,
-            new_root_hash: self.state.root_hash(),
-            fee_account: ops_block.fee_account,
-            block_transactions: ops,
-            processed_priority_ops: (
+        let block = Block::new_from_availabe_block_sizes(
+            ops_block.block_num,
+            self.state.root_hash(),
+            ops_block.fee_account,
+            ops,
+            (
                 last_unprocessed_prior_op,
                 self.current_unprocessed_priority_op,
             ),
-        };
+            &self.available_block_chunk_sizes,
+        );
 
         self.state.block_number += 1;
 
@@ -313,7 +312,6 @@ impl TreeState {
                 serial_id: 0,
                 data: priority_op,
                 deadline_block: 0,
-                eth_fee: BigDecimal::from(0),
                 eth_hash: Vec::new(),
             },
             block_index,
@@ -504,7 +502,7 @@ mod test {
         //     fee_account: 0,
         // };
 
-        let mut tree = TreeState::new();
+        let mut tree = TreeState::new(vec![50]);
         tree.update_tree_states_from_ops_block(&block1)
             .expect("Cant update state from block 1");
         tree.update_tree_states_from_ops_block(&block2)
@@ -602,7 +600,7 @@ mod test {
             fee_account: 0,
         };
 
-        let mut tree = TreeState::new();
+        let mut tree = TreeState::new(vec![50]);
         tree.update_tree_states_from_ops_block(&block)
             .expect("Cant update state from block");
 

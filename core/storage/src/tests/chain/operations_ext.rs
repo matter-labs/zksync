@@ -55,7 +55,6 @@ fn get_account_transactions_history() {
                 serial_id: 0,
                 data: deposit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_fee: 0.into(),
                 eth_hash: b"1234567890".to_vec(),
             },
             op: deposit_op,
@@ -80,7 +79,6 @@ fn get_account_transactions_history() {
                 serial_id: 0,
                 data: full_exit_op.try_get_priority_op().unwrap(),
                 deadline_block: 0,
-                eth_fee: 0.into(),
                 eth_hash: b"1234567890".to_vec(),
             },
             op: full_exit_op,
@@ -207,11 +205,11 @@ fn get_account_transactions_history() {
         ExecutedOperations::Tx(Box::new(executed_change_pubkey_op))
     };
 
-    let block = Block {
-        block_number: 1,
-        new_root_hash: Fr::zero(),
-        fee_account: 0,
-        block_transactions: vec![
+    let block = Block::new(
+        1,
+        Fr::zero(),
+        0,
+        vec![
             executed_deposit_op,
             executed_full_exit_op,
             executed_transfer_to_new_op,
@@ -220,8 +218,9 @@ fn get_account_transactions_history() {
             executed_close_op,
             executed_change_pubkey_op,
         ],
-        processed_priority_ops: (0, 0), // Not important
-    };
+        (0, 0), // Not important
+        100,
+    );
 
     let expected_behavior = {
         let mut expected_behavior = HashMap::new();

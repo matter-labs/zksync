@@ -24,11 +24,12 @@ const CHANNEL_CAPACITY: usize = 16;
 
 /// Mock database is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug, Default)]
-pub(super) struct MockDatabase {
+pub(in crate::eth_sender) struct MockDatabase {
     restore_state: VecDeque<ETHOperation>,
     unconfirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
     confirmed_operations: RefCell<HashMap<i64, ETHOperation>>,
     nonce: Cell<i64>,
+    gas_price_limit: Cell<U256>,
     pending_op_id: Cell<EthOpId>,
     stats: RefCell<ETHStats>,
 }
@@ -48,9 +49,12 @@ impl MockDatabase {
         let unconfirmed_operations: HashMap<i64, ETHOperation> =
             restore_state.iter().map(|op| (op.id, op.clone())).collect();
 
+        let gas_price_limit: u64 = models::config_options::parse_env("ETH_GAS_PRICE_DEFAULT_LIMIT");
+
         Self {
             restore_state,
             nonce: Cell::new(nonce as i64),
+            gas_price_limit: Cell::new(gas_price_limit.into()),
             pending_op_id: Cell::new(pending_op_id as EthOpId),
             stats: RefCell::new(stats),
             unconfirmed_operations: RefCell::new(unconfirmed_operations),
@@ -189,6 +193,16 @@ impl DatabaseAccess for MockDatabase {
         Ok(())
     }
 
+    fn load_gas_price_limit(&self) -> Result<U256, failure::Error> {
+        Ok(self.gas_price_limit.get())
+    }
+
+    fn update_gas_price_limit(&self, value: U256) -> Result<(), failure::Error> {
+        self.gas_price_limit.set(value);
+
+        Ok(())
+    }
+
     fn load_stats(&self) -> Result<ETHStats, failure::Error> {
         Ok(self.stats.borrow().clone())
     }
@@ -203,7 +217,7 @@ impl DatabaseAccess for MockDatabase {
 
 /// Mock Ethereum client is capable of recording all the incoming requests for the further analysis.
 #[derive(Debug)]
-pub(super) struct MockEthereum {
+pub(in crate::eth_sender) struct MockEthereum {
     pub block_number: u64,
     pub gas_price: U256,
     pub tx_statuses: RefCell<HashMap<H256, ExecutedTxStatus>>,
@@ -326,7 +340,7 @@ impl EthereumInterface for MockEthereum {
 
 /// Creates a default `ETHSender` with mock Ethereum connection/database and no operations in DB.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(super) fn default_eth_sender() -> (
+pub(in crate::eth_sender) fn default_eth_sender() -> (
     ETHSender<MockEthereum, MockDatabase>,
     mpsc::Sender<Operation>,
     mpsc::Receiver<Operation>,
@@ -337,7 +351,7 @@ pub(super) fn default_eth_sender() -> (
 /// Creates an `ETHSender` with mock Ethereum connection/database and no operations in DB
 /// which supports multiple transactions in flight.
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(super) fn concurrent_eth_sender(
+pub(in crate::eth_sender) fn concurrent_eth_sender(
     max_txs_in_flight: u64,
 ) -> (
     ETHSender<MockEthereum, MockDatabase>,
@@ -349,7 +363,7 @@ pub(super) fn concurrent_eth_sender(
 
 /// Creates an `ETHSender` with mock Ethereum connection/database and restores its state "from DB".
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
-pub(super) fn restored_eth_sender(
+pub(in crate::eth_sender) fn restored_eth_sender(
     restore_state: impl IntoIterator<Item = ETHOperation>,
     stats: ETHStats,
 ) -> (
@@ -393,7 +407,7 @@ fn build_eth_sender(
 /// Behaves the same as `ETHSender::sign_new_tx`, but does not affect nonce.
 /// This method should be used to create expected tx copies which won't affect
 /// the internal `ETHSender` state.
-pub(super) fn create_signed_tx(
+pub(in crate::eth_sender) fn create_signed_tx(
     id: i64,
     eth_sender: &ETHSender<MockEthereum, MockDatabase>,
     operation: &Operation,
@@ -429,7 +443,7 @@ pub(super) fn create_signed_tx(
 }
 
 /// Creates an `ETHOperation` object for a withdraw operation.
-pub(super) fn create_signed_withdraw_tx(
+pub(in crate::eth_sender) fn create_signed_withdraw_tx(
     id: i64,
     eth_sender: &ETHSender<MockEthereum, MockDatabase>,
     deadline_block: u64,

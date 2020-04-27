@@ -3,7 +3,6 @@ use super::FranklinTx;
 use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use crate::params::{block_chunk_sizes, max_block_chunk_size};
 use crate::serialization::*;
 use web3::types::H256;
 
@@ -59,9 +58,51 @@ pub struct Block {
     pub block_transactions: Vec<ExecutedOperations>,
     /// (unprocessed prior op id before block, unprocessed prior op id after block)
     pub processed_priority_ops: (u64, u64),
+    // actual block chunks sizes that will be used on contract, `block_chunks_sizes >= block.chunks_used()`
+    pub block_chunks_size: usize,
 }
 
 impl Block {
+    // Constructor
+    pub fn new(
+        block_number: BlockNumber,
+        new_root_hash: Fr,
+        fee_account: AccountId,
+        block_transactions: Vec<ExecutedOperations>,
+        processed_priority_ops: (u64, u64),
+        block_chunks_size: usize,
+    ) -> Self {
+        Self {
+            block_number,
+            new_root_hash,
+            fee_account,
+            block_transactions,
+            processed_priority_ops,
+            block_chunks_size,
+        }
+    }
+
+    /// Constructor that determines smallest block size for the given block
+    pub fn new_from_availabe_block_sizes(
+        block_number: BlockNumber,
+        new_root_hash: Fr,
+        fee_account: AccountId,
+        block_transactions: Vec<ExecutedOperations>,
+        processed_priority_ops: (u64, u64),
+        available_block_chunks_sizes: &[usize],
+    ) -> Self {
+        let mut block = Self {
+            block_number,
+            new_root_hash,
+            fee_account,
+            block_transactions,
+            processed_priority_ops,
+            block_chunks_size: 0,
+        };
+        block.block_chunks_size = block.smallest_block_size(available_block_chunks_sizes);
+        block
+    }
+
     pub fn get_eth_encoded_root(&self) -> H256 {
         let mut be_bytes = [0u8; 32];
         self.new_root_hash
@@ -79,7 +120,7 @@ impl Block {
             .collect::<Vec<_>>();
 
         // Pad block with noops.
-        executed_tx_pub_data.resize(self.smallest_block_size() * 8, 0x00);
+        executed_tx_pub_data.resize(self.block_chunks_size * 8, 0x00);
 
         executed_tx_pub_data
     }
@@ -105,7 +146,7 @@ impl Block {
         self.processed_priority_ops.1 - self.processed_priority_ops.0
     }
 
-    pub fn chunks_used(&self) -> usize {
+    fn chunks_used(&self) -> usize {
         self.block_transactions
             .iter()
             .filter_map(ExecutedOperations::get_executed_op)
@@ -113,21 +154,39 @@ impl Block {
             .sum()
     }
 
-    pub fn smallest_block_size(&self) -> usize {
+    fn smallest_block_size(&self, available_block_sizes: &[usize]) -> usize {
         let chunks_used = self.chunks_used();
-        Self::smallest_block_size_for_chunks(chunks_used)
+        smallest_block_size_for_chunks(chunks_used, available_block_sizes)
     }
 
-    pub fn smallest_block_size_for_chunks(chunks_used: usize) -> usize {
-        for &block_size in block_chunk_sizes() {
-            if block_size >= chunks_used {
-                return block_size;
+    pub fn get_withdrawals_data(&self) -> Vec<u8> {
+        let mut withdrawals_data = Vec::new();
+
+        for block_tx in &self.block_transactions {
+            if let Some(franklin_op) = block_tx.get_executed_op() {
+                if let Some(withdrawal_data) = franklin_op.withdrawal_data() {
+                    withdrawals_data.extend(&withdrawal_data);
+                }
             }
         }
-        panic!(
-            "Provided chunks amount ({}) cannot fit in one block, maximum available size is {}",
-            chunks_used,
-            max_block_chunk_size()
-        );
+
+        withdrawals_data
     }
+}
+
+// Get smallest block size given
+pub fn smallest_block_size_for_chunks(
+    chunks_used: usize,
+    available_block_sizes: &[usize],
+) -> usize {
+    for &block_size in available_block_sizes {
+        if block_size >= chunks_used {
+            return block_size;
+        }
+    }
+    panic!(
+        "Provided chunks amount ({}) cannot fit in one block, maximum available size is {}",
+        chunks_used,
+        available_block_sizes.last().unwrap()
+    );
 }

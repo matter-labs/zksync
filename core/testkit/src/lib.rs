@@ -29,8 +29,10 @@ use web3::Transport;
 pub mod eth_account;
 pub mod external_commands;
 pub mod zksync_account;
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use web3::types::U64;
+
+pub const TESKIT_BLOCK_CHUNKS_SIZE: usize = 100;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ETHAccountId(pub usize);
@@ -219,6 +221,7 @@ pub fn spawn_state_keeper(
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
+        vec![TESKIT_BLOCK_CHUNKS_SIZE],
     );
 
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
@@ -345,8 +348,23 @@ pub fn perform_basic_operations(
     println!("Full exit test success, token_id: {}", token);
 }
 
+pub struct TestkitConfig {
+    pub chain_id: u8,
+    pub gas_price_factor: usize,
+    pub web3_url: String,
+}
+
+pub fn get_testkit_config_from_env() -> TestkitConfig {
+    let env_config = ConfigurationOptions::from_env();
+    TestkitConfig {
+        chain_id: env_config.chain_id,
+        gas_price_factor: env_config.gas_price_factor,
+        web3_url: env_config.web3_url,
+    }
+}
+
 pub fn perform_basic_tests() {
-    let config = ConfigurationOptions::from_env();
+    let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
@@ -361,16 +379,17 @@ pub fn perform_basic_tests() {
         deploy_timer.elapsed().as_secs()
     );
 
-    let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
+    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
-        config.operator_private_key,
-        config.operator_eth_addr,
+        commit_account_info.private_key,
+        commit_account_info.address,
         transport.clone(),
         contracts.contract,
-        &config,
+        testkit_config.chain_id,
+        testkit_config.gas_price_factor,
     );
-
-    let eth_accounts = get_test_accounts()
+    let eth_accounts = test_accounts_info
         .into_iter()
         .map(|test_eth_account| {
             EthereumAccount::new(
@@ -378,7 +397,8 @@ pub fn perform_basic_tests() {
                 test_eth_account.address,
                 transport.clone(),
                 contracts.contract,
-                &config,
+                testkit_config.chain_id,
+                testkit_config.gas_price_factor,
             )
         })
         .collect::<Vec<_>>();
@@ -577,7 +597,7 @@ impl TestSetup {
         sending_account: ETHAccountId,
         token_id: Token,
         amount: &BigDecimal,
-        proof: EncodedProof,
+        proof: EncodedProofPlonk,
     ) -> ETHExecResult {
         block_on(self.accounts.eth_accounts[sending_account.0].exit(token_id.0, amount, proof))
             .expect("Failed to post exit tx")
@@ -812,12 +832,13 @@ impl TestSetup {
 
     fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigDecimal {
         let account = &self.accounts.eth_accounts[eth_account_id.0];
-        if token == 0 {
+        let result = if token == 0 {
             block_on(account.eth_balance()).expect("Failed to get eth balance")
         } else {
             block_on(account.erc20_balance(&self.tokens[&token]))
                 .expect("Failed to get erc20 balance")
-        }
+        };
+        result + self.get_balance_to_withdraw(eth_account_id, Token(token))
     }
 
     pub fn get_balance_to_withdraw(
@@ -876,7 +897,7 @@ impl TestSetup {
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
         token: Token,
-    ) -> (EncodedProof, BigDecimal) {
+    ) -> (EncodedProofPlonk, BigDecimal) {
         let owner_address = self.accounts.zksync_accounts[fund_owner.0].address;
         // restore account state
         prover::exit_proof::create_exit_proof(accounts, owner_address, token.0)

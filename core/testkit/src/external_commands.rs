@@ -55,7 +55,7 @@ fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
 
 pub fn deploy_test_contracts() -> Contracts {
     let result = Command::new("sh")
-        .arg("execute-deploy-test.sh")
+        .arg("execute-deploy-testkit.sh")
         .output()
         .expect("failed to execute contract deploy script");
 
@@ -99,7 +99,10 @@ pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_addres
         panic!("test upgrade franklin script failed")
     }
     if !result.stderr.is_empty() {
-        panic!("test upgrade franklin script failed with error")
+        panic!(
+            "test upgrade franklin script failed with error: {}",
+            String::from_utf8_lossy(&result.stderr).to_string()
+        )
     }
 }
 
@@ -109,7 +112,9 @@ pub struct ETHAccountInfo {
     pub address: Address,
     pub private_key: H256,
 }
-pub fn get_test_accounts() -> Vec<ETHAccountInfo> {
+
+/// First is vec of test acccounts, second is commit account
+pub fn get_test_accounts() -> (Vec<ETHAccountInfo>, ETHAccountInfo) {
     let result = Command::new("sh")
         .arg("print-test-accounts.sh")
         .output()
@@ -120,8 +125,13 @@ pub fn get_test_accounts() -> Vec<ETHAccountInfo> {
     let stdout = String::from_utf8(result.stdout).expect("stdout is not valid utf8");
 
     for std_out_line in stdout.split_whitespace().collect::<Vec<_>>() {
-        if let Ok(parsed) = serde_json::from_str(std_out_line) {
-            return parsed;
+        if let Ok(mut parsed) = serde_json::from_str::<Vec<ETHAccountInfo>>(std_out_line) {
+            let commit_account = parsed.remove(0);
+            assert!(
+                !parsed.is_empty(),
+                "can't use testkit without test accounts"
+            );
+            return (parsed, commit_account);
         }
     }
 
