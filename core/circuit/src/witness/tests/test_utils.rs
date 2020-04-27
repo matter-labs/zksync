@@ -1,11 +1,16 @@
-use crate::circuit::FranklinCircuit;
-use crate::franklin_crypto::bellman::Circuit;
-use crate::franklin_crypto::circuit::test::TestConstraintSystem;
-use models::circuit::account::CircuitAccount;
-use models::circuit::CircuitAccountTree;
-use models::node::{Account, AccountId, Address, Engine};
+// Workspace deps
+use models::{
+    circuit::{account::CircuitAccount, CircuitAccountTree},
+    node::{Account, AccountId, Address, Engine},
+};
 use plasma::state::PlasmaState;
+// Local deps
+use crate::{
+    circuit::FranklinCircuit,
+    franklin_crypto::{bellman::Circuit, circuit::test::TestConstraintSystem},
+};
 
+// Public re-exports
 pub use crate::witness::utils::WitnessBuilder;
 
 pub fn check_circuit(circuit: FranklinCircuit<Engine>) {

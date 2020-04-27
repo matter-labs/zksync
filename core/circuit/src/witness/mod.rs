@@ -7,6 +7,7 @@ pub mod transfer;
 pub mod transfer_to_new;
 pub mod withdraw;
 
-// TODO: jazzandrock maybe extract test_utils in a new crate and use it as dev dependency?
-pub mod test_utils;
 pub mod utils;
+
+#[cfg(test)]
+mod tests;
