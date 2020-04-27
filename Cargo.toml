@@ -16,15 +16,3 @@ members = [
     "core/crypto_exports",
     "core/server_supervisor",
 ]
-
-[profile.dev.package."*"]
-opt-level = 3
-
-[profile.release]
-debug = true
-
-[profile.test]
-debug = true
-
-[profile.bench]
-debug = true

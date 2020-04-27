@@ -74,7 +74,6 @@ steps:
   depends_on:
   - rust-build
 
-
 - name: circuit-rust-tests
   image: matterlabs/ci
   commands:
