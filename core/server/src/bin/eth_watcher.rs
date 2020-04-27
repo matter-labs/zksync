@@ -31,7 +31,7 @@ fn main() {
     let watcher = EthWatch::new(
         web3,
         web3_event_loop_handle,
-        ConnectionPool::new(),
+        ConnectionPool::new(Some(1)),
         governance_addr,
         //priority_queue_address,
         contract_address,

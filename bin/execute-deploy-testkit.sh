@@ -5,7 +5,5 @@ then
   cd $ZKSYNC_HOME
 fi
 
-. .setup_env
-
 cd contracts;
-yarn deploy-test-no-build | tee ../deploy.log;
+yarn deploy-testkit | tee ../deploy.log;

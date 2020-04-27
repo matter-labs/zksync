@@ -1,0 +1,74 @@
+#!/bin/bash
+
+USAGE='Usage: zksync verify-keys [unpack | gen [all|contract] | pack]
+
+Used to generate and distribute verification keys.
+
+Options:
+
+unpack (default)               unpacks verification keys from keys/packed dir for your current circuit parameters in env file ($ACCOUNT_TREE_DEPTH,$BALANCE_TREE_DEPTH,$KEY_DIR)
+
+gen [all (default) | contract]  generates verification keys to $KEY_DIR, [contract] option is going to only regenerate Verifier.contract 
+pack                           reverse of unpack
+'
+
+set -e
+
+COMMAND=${1:-unpack}
+VERIFY_KEYS_TARBAL="verify-keys-`basename $KEY_DIR`-account-"$ACCOUNT_TREE_DEPTH"_-balance-$BALANCE_TREE_DEPTH.tar.gz"
+cd $ZKSYNC_HOME
+
+
+unpack() {
+    [ -f keys/packed/$VERIFY_KEYS_TARBAL ] || (echo Keys file $VERIFY_KEYS_TARBAL not found && exit 1)
+    tar xf keys/packed/$VERIFY_KEYS_TARBAL
+    echo "Keys unpacked"
+}
+
+pack() {
+    tar cvzf $VERIFY_KEYS_TARBAL $KEY_DIR
+    mkdir -p keys/packed
+    mv $VERIFY_KEYS_TARBAL keys/packed
+    echo "Keys packed"
+}
+
+gen() {
+    SUBCOMMAND=${1:-all}
+    OUTPUT_DIR=$KEY_DIR/account-"$ACCOUNT_TREE_DEPTH"_balance-"$BALANCE_TREE_DEPTH"/
+    case $SUBCOMMAND in 
+        contract)
+            cargo run --bin key_generator --release -- contract
+            cp $OUTPUT_DIR/KeysWithPlonkVerifier.sol $ZKSYNC_HOME/contracts/contracts
+            echo "Contract regenerated"
+            ;;
+        all)
+            # HACK: We need to rebuild sources in case hardcoded values changed that might affect the keys
+            touch core/models/src/lib.rs
+            mkdir -p $OUTPUT_DIR
+            cargo run --bin key_generator --release -- keys
+            cargo run --bin key_generator --release -- contract
+            cp $OUTPUT_DIR/KeysWithPlonkVerifier.sol $ZKSYNC_HOME/contracts/contracts
+            echo "Keys and contract generated"
+            ;;
+        *)
+            echo "$USAGE" && exit 1
+    esac
+}
+
+case $COMMAND in 
+    unpack)
+        unpack
+        ;;
+    gen)
+        gen $2
+        ;;
+    pack)
+        pack
+        ;;
+    -h|--h)
+        echo "$USAGE" && exit 0
+        ;;
+    *)
+        echo "$USAGE" && exit 1
+        ;;
+esac

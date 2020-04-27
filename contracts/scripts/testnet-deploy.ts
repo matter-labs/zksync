@@ -11,6 +11,7 @@ async function main() {
     parser.addArgument('--deploy', {action: 'storeTrue'});
     parser.addArgument('--publish', {action: 'storeTrue'});
     parser.addArgument('--test', {action: 'storeTrue'});
+    parser.addArgument('--testkit', {action: 'storeTrue'});
     const args = parser.parseArgs(process.argv.slice(2));
     if (args.deploy == false && args.publish == false && args.test == false) {
         parser.printHelp();
@@ -26,8 +27,12 @@ async function main() {
         // small polling interval for localhost network
         provider.pollingInterval = 200;
     }
-    const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-    const testWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
+    let wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+    let testWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
+    if (args.testkit) {
+        wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
+        testWallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+    }
 
     const deployer = new Deployer(wallet, args.test);
 

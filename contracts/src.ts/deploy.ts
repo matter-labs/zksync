@@ -187,7 +187,7 @@ export class Deployer {
             this.wallet,
             this.bytecodes.VerifierTarget,
             this.constructorArgs('VerifierTarget'),
-            { gasLimit: 3000000, },
+            { gasLimit: 5000000 },
         );
         this.addresses.VerifierTarget = target.address;
 
@@ -234,26 +234,26 @@ export class Deployer {
             await this.getDeployedContract('Governance').transferMastership(contract.address),
             await this.getDeployedContract('Verifier').transferMastership(contract.address),
             await this.getDeployedContract('Franklin').transferMastership(contract.address),
-    
+
             await contract.addUpgradeable(this.addresses['Governance']),
             await contract.addUpgradeable(this.addresses['Verifier']),
             await contract.addUpgradeable(this.addresses['Franklin']),
         ];
 
         await Promise.all(promises.map(tx => tx.wait()));
-    
+
         return contract;
     }
 
     async addTestERC20Token(approve: "GovernanceApprove" | "GovernanceNotApprove") {
         assert(["GovernanceApprove", "GovernanceNotApprove"].includes(approve));
         let erc20 = await deployContract(
-            this.wallet, 
+            this.wallet,
             this.bytecodes.ERC20,
-            [], 
+            [],
             {
                 gasLimit: 3000000,
-                
+
             }
         );
         this.addresses.ERC20 = erc20.address;

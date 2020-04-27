@@ -593,7 +593,11 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
                 let withdrawals_data = op.block.get_withdrawals_data();
                 self.ethereum.encode_tx_data(
                     "verifyBlock",
-                    (u64::from(block_number), *proof.clone(), withdrawals_data),
+                    (
+                        u64::from(block_number),
+                        proof.proof.clone(),
+                        withdrawals_data,
+                    ),
                 )
             }
         }

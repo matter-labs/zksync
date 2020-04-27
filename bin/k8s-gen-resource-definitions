@@ -4,13 +4,7 @@ rm -rf etc/kube/gen/$ZKSYNC_ENV
 mkdir -p etc/kube/gen/$ZKSYNC_ENV
 envsubst < etc/kube/server.yaml > etc/kube/gen/$ZKSYNC_ENV/server.yaml
 envsubst < etc/kube/nginx.yaml > etc/kube/gen/$ZKSYNC_ENV/nginx.yaml
+envsubst < etc/kube/prover.yaml > etc/kube/gen/$ZKSYNC_ENV/prover.yaml
 
 # Generate and apply secret for env config
 . bin/k8s-secret > etc/kube/gen/$ZKSYNC_ENV/secret.yaml
-
-for BLOCK_SIZE_CHUNKS in $(echo $BLOCK_CHUNK_SIZES | sed "s/,/ /g"); do
-    export BLOCK_SIZE_CHUNKS=$BLOCK_SIZE_CHUNKS
-    # If BLOCK_SIZE_CHUNKS = 10, then PROVER_CONTAINER_RESOURCES equals to the value of $PROVER_CONTAINER_RESOURCES_10
-    export PROVER_CONTAINER_RESOURCES=$(eval echo \$PROVER_$(echo -n $BLOCK_SIZE_CHUNKS)_CONTAINER_RESOURCES)
-    envsubst < etc/kube/prover.yaml > etc/kube/gen/$ZKSYNC_ENV/prover-$BLOCK_SIZE_CHUNKS.yaml
-done

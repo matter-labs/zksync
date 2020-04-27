@@ -1,12 +1,12 @@
-use crate::JUBJUB_PARAMS;
+use crate::RESCUE_PARAMS;
 use crate::{Engine, Fr};
 use crypto_exports::franklin_crypto::{
     bellman::{pairing::ff::PrimeField, BitIterator},
+    circuit::multipack,
     eddsa::PublicKey,
-    pedersen_hash::{baby_pedersen_hash, Personalization},
+    rescue::rescue_hash,
 };
 
-const FR_BIT_WIDTH_PADDED: usize = 256;
 const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
 const NEW_PUBKEY_HASH_WIDTH: usize = 160;
 
@@ -76,10 +76,7 @@ pub fn le_bit_vector_into_bytes(bits: &[bool]) -> Vec<u8> {
 
 pub fn pub_key_hash(pub_key: &PublicKey<Engine>) -> Vec<u8> {
     let (pub_x, pub_y) = pub_key.0.into_xy();
-    let mut pub_key_bits = Vec::with_capacity(FR_BIT_WIDTH_PADDED * 2);
-    append_le_fixed_width(&mut pub_key_bits, &pub_x, FR_BIT_WIDTH_PADDED);
-    append_le_fixed_width(&mut pub_key_bits, &pub_y, FR_BIT_WIDTH_PADDED);
-    let pub_key_hash = pedersen_hash_fr(pub_key_bits);
+    let pub_key_hash = rescue_hash_elements(&[pub_x, pub_y]);
     let mut pub_key_hash_bits = Vec::with_capacity(NEW_PUBKEY_HASH_WIDTH);
     append_le_fixed_width(&mut pub_key_hash_bits, &pub_key_hash, NEW_PUBKEY_HASH_WIDTH);
     let mut bytes = le_bit_vector_into_bytes(&pub_key_hash_bits);
@@ -87,25 +84,28 @@ pub fn pub_key_hash(pub_key: &PublicKey<Engine>) -> Vec<u8> {
     bytes
 }
 
-fn pedersen_hash_fr(input: Vec<bool>) -> Fr {
-    JUBJUB_PARAMS.with(|params| {
-        baby_pedersen_hash::<Engine, _>(Personalization::NoteCommitment, input, params)
-            .into_xy()
-            .0
+fn rescue_hash_fr(input: Vec<bool>) -> Fr {
+    RESCUE_PARAMS.with(|params| {
+        let packed = multipack::compute_multipacking::<Engine>(&input);
+        let sponge_output = rescue_hash::<Engine>(params, &packed);
+        assert_eq!(sponge_output.len(), 1, "rescue hash problem");
+        sponge_output[0]
     })
 }
 
-fn pedersen_hash_bits(input: Vec<bool>) -> Vec<bool> {
-    let hash_fr = pedersen_hash_fr(input);
-    let mut hash_bits: Vec<bool> = BitIterator::new(hash_fr.into_repr()).collect();
-    hash_bits.reverse();
-    hash_bits.resize(256, false);
-    hash_bits
+fn rescue_hash_elements(input: &[Fr]) -> Fr {
+    RESCUE_PARAMS.with(|params| {
+        let sponge_output = rescue_hash::<Engine>(params, &input);
+        assert_eq!(sponge_output.len(), 1, "rescue hash problem");
+        sponge_output[0]
+    })
 }
 
-pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
+pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     let mut msg_bits = bytes_into_be_bits(msg);
     msg_bits.resize(PAD_MSG_BEFORE_HASH_BITS_LEN, false);
-    let hash_bits = pedersen_hash_bits(msg_bits);
+    let hash_fr = rescue_hash_fr(msg_bits);
+    let mut hash_bits = Vec::new();
+    append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
     pack_bits_into_bytes(hash_bits)
 }

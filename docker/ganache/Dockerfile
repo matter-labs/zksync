@@ -2,7 +2,7 @@ FROM node:10.19.0-alpine3.10
 
 COPY . /
 
-ENV MNEMONIC="${MNEMONIC}"
+ENV TEST_MNEMONIC="${TEST_MNEMONIC}"
 
 RUN yarn && yarn cache clean
 

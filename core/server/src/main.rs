@@ -1,10 +1,12 @@
-//use tokio::runtime::Runtime;
-#[macro_use]
-extern crate log;
+// Built-in deps
+use std::cell::RefCell;
+use std::time::Duration;
 // External uses
 use clap::{App, Arg};
-// Workspace uses
 use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
+use tokio::runtime::Runtime;
+use web3::types::H160;
+// Workspace uses
 use models::config_options::ConfigurationOptions;
 use models::node::config::{
     OBSERVER_MODE_PULL_INTERVAL, PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL,
@@ -17,11 +19,7 @@ use server::mempool::run_mempool_task;
 use server::prover_server::start_prover_server;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
 use server::{eth_sender, leader_election, observer_mode};
-use std::cell::RefCell;
-use std::time::Duration;
 use storage::ConnectionPool;
-use tokio::runtime::Runtime;
-use web3::types::H160;
 
 fn main() {
     env_logger::init();
@@ -37,18 +35,18 @@ fn main() {
         )
         .get_matches();
 
-    let connection_pool = ConnectionPool::new();
-
     if cli.is_present("genesis") {
-        info!("Generating genesis block.");
+        log::info!("Generating genesis block.");
         PlasmaStateKeeper::create_genesis_block(
-            connection_pool,
+            ConnectionPool::new(Some(1)),
             &config_opts.operator_franklin_addr,
         );
         return;
     }
 
-    debug!("starting server");
+    let connection_pool = ConnectionPool::new(None);
+
+    log::debug!("starting server");
 
     let storage = connection_pool
         .access_storage()
@@ -95,7 +93,7 @@ fn main() {
     // spawn threads for different processes
     // see https://docs.google.com/drawings/d/16UeYq7cuZnpkyMWGrgDAbmlaGviN2baY1w1y745Me70/edit?usp=sharing
 
-    info!("starting actors");
+    log::info!("starting actors");
 
     let mut main_runtime = Runtime::new().expect("main runtime start");
 
@@ -129,6 +127,7 @@ fn main() {
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
+        config_opts.available_block_chunk_sizes.clone(),
     );
     start_state_keeper(state_keeper, &main_runtime);
 
@@ -163,8 +162,8 @@ fn main() {
     start_prover_server(
         connection_pool.clone(),
         config_opts.prover_server_address,
-        Duration::from_secs(PROVER_GONE_TIMEOUT as u64),
-        Duration::from_secs(PROVER_PREPARE_DATA_INTERVAL),
+        PROVER_GONE_TIMEOUT,
+        PROVER_PREPARE_DATA_INTERVAL,
         stop_signal_sender,
         observer_mode_final_state.circuit_acc_tree,
         observer_mode_final_state.circuit_tree_block,
@@ -174,6 +173,7 @@ fn main() {
         connection_pool,
         mempool_request_receiver,
         eth_watch_req_sender,
+        &config_opts,
         &main_runtime,
     );
     run_block_proposer_task(
@@ -183,4 +183,5 @@ fn main() {
     );
 
     main_runtime.block_on(async move { stop_signal_receiver.next().await });
+    main_runtime.shutdown_timeout(Duration::from_secs(0));
 }

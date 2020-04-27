@@ -26,7 +26,7 @@ cargo run --bin exodus_test --release
 if [[ $ZKSYNC_ENV == ci ]]; then
     export WEB3_URL=http://ganache:7545
 elif [[ $ZKSYNC_ENV == dev ]]; then
-    CONTAINER_ID=$(docker run -d -p 7545:7545 matterlabs/ganache)
+    CONTAINER_ID=$(docker run --rm -d -p 7545:7545 matterlabs/ganache)
     export WEB3_URL=http://localhost:7545
 fi
 

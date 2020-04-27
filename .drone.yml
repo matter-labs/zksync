@@ -15,20 +15,12 @@ steps:
   image: drillster/drone-volume-cache
   settings:
     mount:
-    - ./target/cargo
-    - ./keys
+    - ./target/rust-ci-cache
+    - ./keys/setup
     restore: true
   volumes:
   - name: cache
     path: /cache
-
-- name: geth
-  image: matterlabs/geth:latest
-  detach: true
-
-- name: postgres
-  image: postgres:10.4
-  detach: true
 
 - name: init
   image: matterlabs/ci
@@ -36,16 +28,16 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - ci-prepare-env.sh
+  - zksync dummy-prover ensure-disabled
   - zksync env ci
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
-  - f cargo build --release
+  - zksync plonk-setup check || zksync plonk-setup download
+  - zksync verify-keys unpack
   - zksync dummy-prover ensure-disabled
   depends_on:
   - restore-cache
-  - postgres
-  - geth
 
 - name: rust-checks
   image: matterlabs/ci
@@ -81,6 +73,7 @@ steps:
   - zksync genesis
   depends_on:
   - rust-build
+
 
 - name: circuit-rust-tests
   image: matterlabs/ci
@@ -144,7 +137,7 @@ steps:
   settings:
     mount:
     - ./target/rust-ci-cache
-    - ./keys
+    - ./keys/setup
     rebuild: true
   volumes:
   - name: cache
@@ -153,6 +146,13 @@ steps:
   - redeploy-and-integration-testkit
   - circuit-rust-tests
   - non-circuit-rust-tests
+
+services:
+- name: geth
+  image: matterlabs/geth:latest
+
+- name: postgres
+  image: postgres:10.4
 
 volumes:
 - name: cache
@@ -181,7 +181,7 @@ steps:
   settings:
     mount:
     - ./target/rust-ci-cache
-    - ./keys
+    - ./keys/setup
     restore: true
   volumes:
   - name: cache
@@ -197,6 +197,7 @@ steps:
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
+  - zksync verify-keys unpack
   - zksync genesis
   - zksync dummy-prover enable
   - f cargo build --release --bin server
@@ -270,7 +271,7 @@ steps:
   settings:
     mount:
     - ./target/rust-ci-cache
-    - ./keys
+    - ./keys/setup
     restore: true
   volumes:
   - name: cache
@@ -285,7 +286,8 @@ steps:
   - echo -n $STAGE_ENV_BASE64| base64 --decode > $ZKSYNC_HOME/etc/env/stage.env
   - zksync env stage
   - zksync yarn
-  - zksync gen-keys-if-not-present
+  - zksync plonk-setup check || zksync plonk-setup download
+  - zksync verify-keys unpack
   - zksync build-contracts
   environment:
     STAGE_ENV_BASE64:

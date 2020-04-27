@@ -14,7 +14,7 @@ members = [
     "core/testkit",
     "core/loadtest",
     "core/crypto_exports",
-    "core/server_supervisor"
+    "core/server_supervisor",
 ]
 
 [profile.dev.package."*"]
