@@ -1,15 +1,26 @@
-use super::utils::*;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
-use crate::franklin_crypto::rescue::RescueEngine;
-use crate::operation::SignatureData;
-use crate::operation::*;
-use crypto_exports::ff::{Field, PrimeField};
-use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{
-    append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
+// Workspace deps
+use models::{
+    circuit::{
+        account::CircuitAccountTree,
+        utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
+    },
+    node::operations::ChangePubKeyOp,
+    params as franklin_constants,
 };
-use models::node::operations::ChangePubKeyOp;
-use models::params as franklin_constants;
+// Local deps
+use crate::franklin_crypto::{
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{Field, PrimeField},
+    },
+    rescue::RescueEngine,
+};
+use crate::{
+    operation::{
+        Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
+    },
+    witness::utils::{apply_leaf_operation, get_audits},
+};
 
 pub struct ChangePubkeyOffChainData {
     pub account_id: u32,

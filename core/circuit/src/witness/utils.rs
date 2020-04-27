@@ -1,31 +1,36 @@
-use crate::account::*;
-
-use crate::circuit::FranklinCircuit;
-use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
-use crate::franklin_crypto::bellman::pairing::ff::Field;
-use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField, PrimeFieldRepr};
-use crate::franklin_crypto::eddsa::PrivateKey;
-use crate::franklin_crypto::eddsa::PublicKey;
-use crate::franklin_crypto::jubjub::FixedGenerators;
-use crate::franklin_crypto::jubjub::JubjubEngine;
-use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
-use crate::operation::Operation;
-use crate::operation::SignatureData;
-use crate::rand::{Rng, SeedableRng, XorShiftRng};
-use crate::utils::*;
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
-use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
-use models::circuit::utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element};
-use models::merkle_tree::hasher::Hasher;
-use models::merkle_tree::{PedersenHasher, RescueHasher};
-use models::node::tx::PackedPublicKey;
-use models::node::{AccountId, BlockNumber, Engine, Fr};
-use models::params as franklin_constants;
-use models::params::total_tokens;
-use models::primitives::big_decimal_to_u128;
+// External deps
+use crypto::{digest::Digest, sha2::Sha256};
+// Workspace deps
+use models::{
+    circuit::{
+        account::{Balance, CircuitAccount, CircuitAccountTree},
+        utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element},
+    },
+    merkle_tree::{hasher::Hasher, PedersenHasher, RescueHasher},
+    node::{tx::PackedPublicKey, AccountId, BlockNumber, Engine},
+    params as franklin_constants,
+    params::total_tokens,
+    primitives::big_decimal_to_u128,
+};
 use plasma::state::CollectedFee;
+// Local deps
+use crate::franklin_crypto::{
+    alt_babyjubjub::AltJubjubBn256,
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{BitIterator, Field, PrimeField, PrimeFieldRepr},
+    },
+    eddsa::{PrivateKey, PublicKey},
+    jubjub::{FixedGenerators, JubjubEngine},
+    rescue::bn256::Bn256RescueParams,
+};
+use crate::{
+    account::AccountWitness,
+    circuit::FranklinCircuit,
+    operation::{Operation, SignatureData},
+    rand::{Rng, SeedableRng, XorShiftRng},
+    utils::sign_rescue,
+};
 
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
@@ -97,7 +102,7 @@ impl<'a> WitnessBuilder<'a> {
             .account_tree
             .get(self.fee_account_id)
             .expect("fee account is not in the tree");
-        let mut fee_circuit_account_balances = Vec::with_capacity(models::params::total_tokens());
+        let mut fee_circuit_account_balances = Vec::with_capacity(total_tokens());
         for i in 0u32..(total_tokens() as u32) {
             let balance_value = fee_circuit_account
                 .subtree

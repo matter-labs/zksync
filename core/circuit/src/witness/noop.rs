@@ -1,15 +1,17 @@
-use super::utils::*;
-
-use crate::operation::*;
-
-use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-
-use crate::account::AccountWitness;
-use crate::operation::SignatureData;
-use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::le_bit_vector_into_field_element;
-
-use crate::franklin_crypto::bellman::pairing::bn256::*;
+// Workspace deps
+use models::circuit::{account::CircuitAccountTree, utils::le_bit_vector_into_field_element};
+// Local deps
+use crate::franklin_crypto::bellman::pairing::{
+    bn256::{Bn256, Fr},
+    ff::{Field, PrimeField},
+};
+use crate::{
+    account::AccountWitness,
+    operation::{
+        Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
+    },
+    witness::utils::get_audits,
+};
 
 pub fn noop_operation(tree: &CircuitAccountTree, acc_id: u32) -> Operation<Bn256> {
     let signature_data = SignatureData::init_empty();

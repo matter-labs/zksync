@@ -1,21 +1,27 @@
-use super::utils::*;
-
-use crate::operation::*;
-
-use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-
-use crate::franklin_crypto::circuit::float_point::convert_to_float;
-use crate::franklin_crypto::rescue::RescueEngine;
-use crate::operation::SignatureData;
-use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{
-    append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element,
+// Workspace deps
+use models::{
+    circuit::{
+        account::CircuitAccountTree,
+        utils::{append_be_fixed_width, eth_address_to_fr, le_bit_vector_into_field_element},
+    },
+    node::operations::WithdrawOp,
+    params as franklin_constants,
+    primitives::{big_decimal_to_u128, convert_to_float},
 };
-
-use crate::franklin_crypto::bellman::pairing::bn256::*;
-use models::node::WithdrawOp;
-use models::params as franklin_constants;
-use models::primitives::big_decimal_to_u128;
+// Local deps
+use crate::franklin_crypto::{
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{Field, PrimeField},
+    },
+    rescue::RescueEngine,
+};
+use crate::{
+    operation::{
+        Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
+    },
+    witness::utils::{apply_leaf_operation, get_audits},
+};
 
 pub struct WithdrawData {
     pub amount: u128,

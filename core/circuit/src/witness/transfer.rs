@@ -1,16 +1,27 @@
-use super::utils::*;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
-use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-use crate::franklin_crypto::circuit::float_point::convert_to_float;
-use crate::franklin_crypto::rescue::RescueEngine;
-use crate::operation::SignatureData;
-use crate::operation::*;
-use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
-use models::params as franklin_constants;
-
-use models::node::TransferOp;
-use models::primitives::big_decimal_to_u128;
+// Workspace deps
+use models::{
+    circuit::{
+        account::CircuitAccountTree,
+        utils::{append_be_fixed_width, le_bit_vector_into_field_element},
+    },
+    node::operations::TransferOp,
+    params as franklin_constants,
+    primitives::{big_decimal_to_u128, convert_to_float},
+};
+// Local deps
+use crate::franklin_crypto::{
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{Field, PrimeField},
+    },
+    rescue::RescueEngine,
+};
+use crate::{
+    operation::{
+        Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
+    },
+    witness::utils::{apply_leaf_operation, get_audits},
+};
 
 #[derive(Debug)]
 pub struct TransferData {

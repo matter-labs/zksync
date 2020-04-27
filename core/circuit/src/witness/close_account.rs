@@ -1,15 +1,26 @@
-use super::utils::*;
-
-use crate::operation::*;
-
-use crate::franklin_crypto::bellman::pairing::bn256::*;
-use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-use crate::franklin_crypto::rescue::RescueEngine;
-use crate::operation::SignatureData;
-use models::circuit::account::CircuitAccountTree;
-use models::circuit::utils::{append_be_fixed_width, le_bit_vector_into_field_element};
-use models::node::operations::CloseOp;
-use models::params as franklin_constants;
+// Workspace deps
+use models::{
+    circuit::{
+        account::CircuitAccountTree,
+        utils::{append_be_fixed_width, le_bit_vector_into_field_element},
+    },
+    node::operations::CloseOp,
+    params as franklin_constants,
+};
+// Local deps
+use crate::franklin_crypto::{
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{Field, PrimeField},
+    },
+    rescue::RescueEngine,
+};
+use crate::{
+    operation::{
+        Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
+    },
+    witness::utils::{apply_leaf_operation, get_audits},
+};
 
 pub struct CloseAccountData {
     pub account_address: u32,
