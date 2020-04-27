@@ -41,7 +41,7 @@ pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
     Ok(BigDecimal::from_str(&string_wei_value)?)
 }
 
-/// Used to sign and post ETH transactions for the ZK Sync contracts.
+/// Used to sign and post ETH transactions for the zkSync contracts.
 #[derive(Debug)]
 pub struct EthereumAccount<T: Transport> {
     pub private_key: H256,

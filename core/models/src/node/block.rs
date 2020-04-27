@@ -4,6 +4,8 @@ use super::PriorityOp;
 use super::{AccountId, BlockNumber, Fr};
 use crate::franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use crate::serialization::*;
+use chrono::DateTime;
+use chrono::Utc;
 use web3::types::H256;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -13,6 +15,7 @@ pub struct ExecutedTx {
     pub op: Option<FranklinOp>,
     pub fail_reason: Option<String>,
     pub block_index: Option<u32>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

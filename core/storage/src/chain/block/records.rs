@@ -1,7 +1,8 @@
 // External imports
 use chrono::prelude::*;
-use diesel::sql_types::{BigInt, Binary, Nullable, Timestamp};
+use diesel::sql_types::{BigInt, Binary, Jsonb, Nullable, Text, Timestamp};
 use serde_derive::{Deserialize, Serialize};
+use serde_json::value::Value;
 // Workspace imports
 // Local imports
 use crate::schema::*;
@@ -43,4 +44,19 @@ pub struct BlockDetails {
 
     #[sql_type = "Nullable<Timestamp>"]
     pub verified_at: Option<NaiveDateTime>,
+}
+
+#[derive(Debug, Serialize, Deserialize, QueryableByName)]
+pub struct BlockTransactionItem {
+    #[sql_type = "Text"]
+    pub tx_hash: String,
+
+    #[sql_type = "BigInt"]
+    pub block_number: i64,
+
+    #[sql_type = "Jsonb"]
+    pub op: Value,
+
+    #[sql_type = "Timestamp"]
+    pub created_at: NaiveDateTime,
 }
