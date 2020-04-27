@@ -31,7 +31,7 @@ function perform_redeployment {
 }
 
 function run_dummy_prover {
-    cargo run --bin dummy_prover
+    cargo run --release --bin dummy_prover "dummy-prover-instance"
     exit 0
 }
 

@@ -15,7 +15,7 @@ default = ["console_error_panic_hook"]
 [dependencies]
 wasm-bindgen = "0.2.59"
 crypto_exports = { path = "../../core/crypto_exports", version = "0.1.0" }
-hex = "0.3"
+hex = "0.4"
 sha2 = "0.8"
 
 # The `console_error_panic_hook` crate provides better debugging of panics by
@@ -33,6 +33,7 @@ wee_alloc = { version = "0.4.2", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.2"
+models = { path = "../../core/models" }
 
 [profile.release]
 # Tell `rustc` to optimize for small code size.

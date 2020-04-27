@@ -18,13 +18,20 @@ fn stored_accounts() {
     let _ = env_logger::try_init();
     let mut rng = create_rng();
 
+    let block_size = 100;
+
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
         // Create several accounts.
         let (accounts_block, updates_block) = apply_random_updates(AccountMap::default(), &mut rng);
 
         // Execute and commit block with them.
-        BlockSchema(&conn).execute_operation(get_operation(1, Action::Commit, updates_block))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            1,
+            Action::Commit,
+            updates_block,
+            block_size,
+        ))?;
 
         // Get the accounts by their addresses.
         for (account_id, account) in accounts_block.iter() {
@@ -65,6 +72,7 @@ fn stored_accounts() {
                 proof: Default::default(),
             },
             Vec::new(),
+            block_size,
         ))?;
 
         // After that all the accounts should have a verified state.

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+USAGE='Usage: zksync playground <name_of_the_test> 
+
+Runs tests from playground.
+'
+
+if [ -z $1 ]; then
+    echo "$USAGE"
+    exit 1;
+fi
+
+cd core/circuit 
+cargo test --release -p circuit --features "playground" $1 -- --nocapture

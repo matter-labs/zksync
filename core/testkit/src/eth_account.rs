@@ -4,11 +4,10 @@ use ethabi::ParamType;
 use failure::{ensure, format_err};
 use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
-use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
 use models::node::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 use models::primitives::big_decimal_to_u128;
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
@@ -63,7 +62,8 @@ impl<T: Transport> EthereumAccount<T> {
         address: Address,
         transport: T,
         contract_address: Address,
-        config: &ConfigurationOptions,
+        chain_id: u8,
+        gas_price_factor: usize,
     ) -> Self {
         let main_contract_eth_client = ETHClient::new(
             transport,
@@ -71,8 +71,8 @@ impl<T: Transport> EthereumAccount<T> {
             address,
             private_key,
             contract_address,
-            config.chain_id,
-            config.gas_price_factor,
+            chain_id,
+            gas_price_factor,
         );
 
         Self {
@@ -148,7 +148,7 @@ impl<T: Transport> EthereumAccount<T> {
         &self,
         token_id: TokenId,
         amount: &BigDecimal,
-        proof: EncodedProof,
+        proof: EncodedProofPlonk,
     ) -> Result<ETHExecResult, failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
@@ -157,7 +157,7 @@ impl<T: Transport> EthereumAccount<T> {
                 (
                     u64::from(token_id),
                     U128::from(big_decimal_to_u128(amount)),
-                    proof,
+                    proof.proof,
                 ),
                 Options::default(),
             )
@@ -433,7 +433,7 @@ impl<T: Transport> EthereumAccount<T> {
                 "verifyBlock",
                 (
                     u64::from(block.block_number),
-                    [U256::default(); 8],
+                    vec![U256::default(); 10],
                     block.get_withdrawals_data(),
                 ),
                 Options::default(),
@@ -604,6 +604,11 @@ async fn get_revert_reason<T: Transport>(
             )
             .compat()
             .await?;
+
+        // For some strange, reason this could happen
+        if encoded_revert_reason.0.len() < 4 {
+            return Ok("".to_string());
+        }
         // This function returns ABI encoded retrun value for function with signature "Error(string)"
         // we strip first 4 bytes because they encode function name "Error", the rest is encoded string.
         let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];

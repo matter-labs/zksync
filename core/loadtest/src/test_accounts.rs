@@ -37,7 +37,8 @@ impl TestAccount {
                     addr,
                     transport.clone(),
                     config.contract_eth_addr,
-                    &config,
+                    config.chain_id,
+                    config.gas_price_factor,
                 );
                 Self {
                     zk_acc: ZksyncAccount::new(
