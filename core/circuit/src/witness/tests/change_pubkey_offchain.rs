@@ -25,23 +25,15 @@ fn test_change_pubkey_offchain_success() {
         account_id: account.id,
     };
 
-    println!("node root hash before op: {:?}", plasma_state.root_hash());
     plasma_state
         .apply_change_pubkey_op(&change_pkhash_op)
         .expect("applying op fail");
-    println!("node root hash after op: {:?}", plasma_state.root_hash());
-    println!(
-        "node pubdata: {}",
-        hex::encode(&change_pkhash_op.get_public_data())
-    );
 
     let change_pkhash_witness =
         apply_change_pubkey_offchain_tx(&mut witness_accum.account_tree, &change_pkhash_op);
     let change_pkhash_operations =
         calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
     let pub_data_from_witness = change_pkhash_witness.get_pubdata();
-
-    //        println!("Change pk onchain witness: {:#?}", change_pkhash_witness);
 
     assert_eq!(
         hex::encode(pack_bits_into_bytes_in_order(pub_data_from_witness.clone())),

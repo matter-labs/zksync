@@ -29,19 +29,7 @@ fn test_deposit_in_empty_leaf() {
         account_id: empty_account_id,
     };
 
-    println!(
-        "node root hash before deposit: {:?}",
-        plasma_state.root_hash()
-    );
     plasma_state.apply_deposit_op(&deposit_op);
-    println!(
-        "node root hash after deposit: {:?}",
-        plasma_state.root_hash()
-    );
-    println!(
-        "node pub data: {}",
-        hex::encode(&deposit_op.get_public_data())
-    );
 
     let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
     let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
@@ -81,9 +69,7 @@ fn test_deposit_existing_account() {
         account_id: account.id,
     };
 
-    println!("node root hash before op: {:?}", plasma_state.root_hash());
     plasma_state.apply_deposit_op(&deposit_op);
-    println!("node root hash after op: {:?}", plasma_state.root_hash());
 
     let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
     let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);

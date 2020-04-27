@@ -28,9 +28,7 @@ fn test_full_exit_success() {
         withdraw_amount: Some(BigDecimal::from(10)),
     };
 
-    println!("node root hash before op: {:?}", plasma_state.root_hash());
     plasma_state.apply_full_exit_op(&full_exit_op);
-    println!("node root hash after op: {:?}", plasma_state.root_hash());
 
     let full_exit_witness =
         apply_full_exit_tx(&mut witness_accum.account_tree, &full_exit_op, true);
@@ -72,9 +70,7 @@ fn test_full_exit_failure_no_account_in_tree() {
         withdraw_amount: None,
     };
 
-    println!("node root hash before op: {:?}", plasma_state.root_hash());
     plasma_state.apply_full_exit_op(&full_exit_op);
-    println!("node root hash after op: {:?}", plasma_state.root_hash());
 
     let full_exit_witness =
         apply_full_exit_tx(&mut witness_accum.account_tree, &full_exit_op, false);
