@@ -58,10 +58,10 @@ describe("UpgradeGatekeeper unit tests", function () {
 
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startUpgrade([]) )).revertReason).equal("spu12")
         await expect(UpgradeGatekeeperContract.startUpgrade([DummySecond.address]))
-            .to.emit(UpgradeGatekeeperContract, 'NoticePeriodStarted')
+            .to.emit(UpgradeGatekeeperContract, 'NoticePeriodStart')
         expect((await getCallRevertReason( () => UpgradeGatekeeperContract.startUpgrade([]) )).revertReason).equal("spu11")
         await expect(UpgradeGatekeeperContract.cancelUpgrade())
-            .to.emit(UpgradeGatekeeperContract, 'UpgradeCanceled')
+            .to.emit(UpgradeGatekeeperContract, 'UpgradeCancel')
     });
 
     it("checking that the upgrade works correctly", async () => {
@@ -69,7 +69,7 @@ describe("UpgradeGatekeeper unit tests", function () {
 
         // activate
         await expect(UpgradeGatekeeperContract.startUpgrade([DummySecond.address]))
-            .to.emit(UpgradeGatekeeperContract, 'NoticePeriodStarted')
+            .to.emit(UpgradeGatekeeperContract, 'NoticePeriodStart')
 
         let activated_time = performance.now();
 
@@ -90,7 +90,7 @@ describe("UpgradeGatekeeper unit tests", function () {
                 await UpgradeGatekeeperContract.startPreparation();
             } else {
                 await expect(UpgradeGatekeeperContract.startPreparation())
-                    .to.emit(UpgradeGatekeeperContract, 'PreparationStarted')
+                    .to.emit(UpgradeGatekeeperContract, 'PreparationStart')
             }
         }
 
@@ -100,7 +100,7 @@ describe("UpgradeGatekeeper unit tests", function () {
         // finish upgrade
         await proxyDummyInterface.verifyPriorityOperation();
         await expect(UpgradeGatekeeperContract.finishUpgrade([[bytes[2], bytes[3]]]))
-            .to.emit(UpgradeGatekeeperContract, 'UpgradeCompleted')
+            .to.emit(UpgradeGatekeeperContract, 'UpgradeComplete')
             .withArgs(proxyTestContract.address, DummySecond.address)
 
         await expect(await proxyTestContract.getTarget())

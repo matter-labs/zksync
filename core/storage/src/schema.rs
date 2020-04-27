@@ -108,13 +108,6 @@ table! {
 }
 
 table! {
-    eth_nonce (id) {
-        id -> Bool,
-        nonce -> Int8,
-    }
-}
-
-table! {
     eth_operations (id) {
         id -> Int8,
         nonce -> Int8,
@@ -136,8 +129,10 @@ table! {
 }
 
 table! {
-    eth_stats (id) {
+    eth_parameters (id) {
         id -> Bool,
+        nonce -> Int8,
+        gas_price_limit -> Int8,
         commit_ops -> Int8,
         verify_ops -> Int8,
         withdraw_ops -> Int8,
@@ -162,7 +157,6 @@ table! {
         to_account -> Bytea,
         priority_op_serialid -> Int8,
         deadline_block -> Int8,
-        eth_fee -> Numeric,
         eth_hash -> Bytea,
     }
 }
@@ -228,6 +222,15 @@ table! {
     }
 }
 
+table! {
+    leader_election (id) {
+        id -> Int4,
+        name -> Text,
+        created_at -> Timestamp,
+        bail_at -> Nullable<Timestamp>,
+    }
+}
+
 joinable!(account_balance_updates -> tokens (coin_id));
 joinable!(balances -> accounts (account_id));
 joinable!(balances -> tokens (coin_id));
@@ -247,10 +250,9 @@ allow_tables_to_appear_in_same_query!(
     data_restore_last_watched_eth_block,
     data_restore_rollup_ops,
     data_restore_storage_state_update,
-    eth_nonce,
     eth_operations,
     eth_ops_binding,
-    eth_stats,
+    eth_parameters,
     eth_tx_hashes,
     executed_priority_operations,
     executed_transactions,
@@ -259,4 +261,5 @@ allow_tables_to_appear_in_same_query!(
     prover_runs,
     server_config,
     tokens,
+    leader_election,
 );

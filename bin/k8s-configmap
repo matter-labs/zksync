@@ -4,11 +4,11 @@
 
 #. .setup_env prod
 
-kubectl create secret generic $ZKSYNC_ENV-secret --namespace $ZKSYNC_ENV --dry-run -o yaml
+kubectl create configmap $ZKSYNC_ENV-configmap --namespace $ZKSYNC_ENV --dry-run -o yaml
 echo data:
 grep -v '^#' $ENV_FILE | grep -v '^$' | while read -r line; do
     VAR=`sed 's/=.*//' <<< $line`
     echo -n "  $VAR: "
-    echo -n ${!VAR} | base64 --wrap=0
+    uname -a | grep Darwin > /dev/null && echo -n ${!VAR} | base64 || echo -n ${!VAR} | base64 --wrap=0
     echo
 done

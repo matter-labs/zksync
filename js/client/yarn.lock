@@ -3547,10 +3547,10 @@ etag@~1.8.1:
   resolved "https://registry.yarnpkg.com/etag/-/etag-1.8.1.tgz#41ae2eeb65efa62268aebfea83ac7d79299b0887"
   integrity sha1-Qa4u62XvpiJorr/qg6x9eSmbCIc=
 
-ethers@^4.0.37:
-  version "4.0.46"
-  resolved "https://registry.yarnpkg.com/ethers/-/ethers-4.0.46.tgz#13cd3ed099487f43ece00194b89a8a8781f71507"
-  integrity sha512-/dPMzzpInhtiip4hKFvsDiJKeRk64IhyA+Po7CtNXneQFSOCYXg8eBFt+jXbxUQyApgWnWOtYxWdfn9+CvvxDA==
+ethers@^4.0.46:
+  version "4.0.47"
+  resolved "https://registry.yarnpkg.com/ethers/-/ethers-4.0.47.tgz#91b9cd80473b1136dd547095ff9171bd1fc68c85"
+  integrity sha512-hssRYhngV4hiDNeZmVU/k5/E8xmLG8UpcNUzg6mb7lqhgpFPH/t7nuv20RjRrEf0gblzvi2XwR5Te+V3ZFc9pQ==
   dependencies:
     aes-js "3.0.0"
     bn.js "^4.4.0"
@@ -9529,10 +9529,10 @@ yorkie@^2.0.0:
     normalize-path "^1.0.0"
     strip-indent "^2.0.0"
 
-zksync-crypto@^0.0.2:
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.0.2.tgz#a39925395b8a433e13b2742b8acea874d5e44656"
-  integrity sha512-dT6KnrNj8MtbhBRk41Xsr8S2DwSOgfWD0Ym8YmWi+gTHKF3l8/4dzCxRj4iTI8AClnhUv//FHnb6g2/ZeaaVGQ==
+zksync-crypto@^0.2.0:
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.2.0.tgz#49893c093bda66b3a76106656f53717109e97f8a"
+  integrity sha512-KMd79bf3dn6GJtrfd2dLCYpR4M4kgeQdYBJuK1Dc+cbENxIn5h0DaUYBucLGi2JvyQG8MpprgA1sZ/KdhIPpTQ==
 
 "zksync@link:../zksync.js":
   version "0.0.0"

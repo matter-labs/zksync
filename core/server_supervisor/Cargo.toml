@@ -1,0 +1,19 @@
+[package]
+name = "server_supervisor"
+version = "0.1.0"
+authors = ["furkhat <vailodf@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kube = "0.31.0"
+kube-derive = "0.31.0"
+k8s-openapi = { version = "0.7.1", default-features = false, features = ["v1_15"] }
+storage = { path = "../storage", version = "0.0.1" }
+log = "0.4"
+env_logger = "0.6"
+tokio = { version = "0.2", features = ["full"] }
+futures = { version = "0.3", features = ["compat"] }
+anyhow = "1.0.13"
+diesel = { version = "1.4.3", features = ["postgres", "serde_json", "r2d2", "chrono"] }

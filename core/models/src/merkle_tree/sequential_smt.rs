@@ -9,16 +9,16 @@ use std::fmt::Debug;
 // Tree of depth 20 should contain 2^20 elements
 
 // [0, (2^TREE_DEPTH - 1)]
-type ItemIndex = u32;
+type ItemIndex = usize;
 
 // [0, TREE_DEPTH]
-type Depth = u32;
+type Depth = usize;
 
 // Hash index determines on what level of the tree the hash is
 // and kept as level (where zero is a root) and item in a level indexed from 0
-type HashIndex = (u32, u32);
+type HashIndex = (usize, usize);
 
-type ItemIndexPacked = u64;
+type ItemIndexPacked = usize;
 
 trait PackToIndex {
     fn pack(&self) -> ItemIndexPacked;
@@ -26,10 +26,10 @@ trait PackToIndex {
 
 impl PackToIndex for HashIndex {
     fn pack(&self) -> ItemIndexPacked {
-        let mut packed = 0u64;
-        packed += u64::from(self.0);
-        packed <<= 32u64;
-        packed += u64::from(self.1);
+        let mut packed = 0usize;
+        packed += self.0;
+        packed <<= 32usize;
+        packed += self.1;
 
         packed
     }
@@ -65,7 +65,7 @@ where
     H: Hasher<Hash>,
 {
     /// Returns the capacity of the tree (how many items can the tree hold).
-    pub fn capacity(&self) -> u32 {
+    pub fn capacity(&self) -> usize {
         1 << self.tree_depth
     }
 
@@ -316,6 +316,10 @@ mod tests {
                 };
             }
             acc
+        }
+
+        fn hash_elements<I: IntoIterator<Item = u64>>(&self, _elements: I) -> u64 {
+            unimplemented!()
         }
 
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {

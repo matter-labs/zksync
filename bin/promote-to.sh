@@ -2,4 +2,4 @@
 
 set -e
 
-drone build promote $(git config --get remote.origin.url|sed -e 's/git@github.com:\(.*\).git/\1/') $2 $1
+drone build promote $(git config --get remote.origin.url|sed -e 's/git@github.com:\(.*\).git/\1/') $2 $1 --param=ZKSYNC_ENV=$1

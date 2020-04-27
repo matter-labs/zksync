@@ -50,13 +50,25 @@ impl PlasmaState {
         }
     }
 
-    pub fn new(accounts: AccountMap, current_block: u32) -> Self {
+    pub fn from_acc_map(accounts: AccountMap, current_block: BlockNumber) -> Self {
         let mut empty = Self::empty();
         empty.block_number = current_block;
         for (id, account) in accounts {
             empty.insert_account(id, account);
         }
         empty
+    }
+
+    pub fn new(
+        balance_tree: AccountTree,
+        account_id_by_address: HashMap<Address, AccountId>,
+        current_block: BlockNumber,
+    ) -> Self {
+        Self {
+            balance_tree,
+            block_number: current_block,
+            account_id_by_address,
+        }
     }
 
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {
@@ -133,7 +145,7 @@ impl PlasmaState {
     fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
         // NOTE: Authroization of the FullExit is verified on the contract.
         assert!(
-            priority_op.token < params::TOTAL_TOKENS as TokenId,
+            priority_op.token < params::total_tokens() as TokenId,
             "Full exit token is out of range, this should be enforced by contract"
         );
         trace!("Processing {:?}", priority_op);
@@ -198,7 +210,7 @@ impl PlasmaState {
 
     fn apply_transfer(&mut self, tx: Transfer) -> Result<OpSuccess, Error> {
         ensure!(
-            tx.token < (params::TOTAL_TOKENS as TokenId),
+            tx.token < (params::total_tokens() as TokenId),
             "Token id is not supported"
         );
         let (from, from_account) = self
@@ -237,7 +249,7 @@ impl PlasmaState {
 
     fn apply_withdraw(&mut self, tx: Withdraw) -> Result<OpSuccess, Error> {
         ensure!(
-            tx.token < (params::TOTAL_TOKENS as TokenId),
+            tx.token < (params::total_tokens() as TokenId),
             "Token id is not supported"
         );
         let (account_id, account) = self
@@ -496,7 +508,7 @@ impl PlasmaState {
         let mut updates = Vec::new();
         let account = self.get_account(op.account_id).unwrap();
 
-        for token in 0..params::TOTAL_TOKENS {
+        for token in 0..params::total_tokens() {
             if account.get_balance(token as TokenId) != BigDecimal::from(0) {
                 bail!("Account is not empty, token id: {}", token);
             }

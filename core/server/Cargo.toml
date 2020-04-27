@@ -13,7 +13,7 @@ circuit = { path = "../circuit", version = "0.1.1"}
 
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
-hex = "0.3.2"
+hex = "0.4"
 ethabi = "9.0.0"
 web3 = "0.10.0"
 serde = "1.0.90"
@@ -44,6 +44,8 @@ failure = "0.1"
 # TODO: should be removed after json rpc deps are updated is updated, current version (14.0)
 futures01 = { package = "futures", version = "0.1" }
 reqwest = "0.9.22"
+
+lru-cache = "0.1.2"
 
 [dev-dependencies]
 lazy_static = "1.4"

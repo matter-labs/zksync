@@ -21,16 +21,11 @@ eval NONCE=$NONCE
 # Convert the number from the hexadecimal form to the decimal. The result will be like `291`.
 NONCE=`printf "%d\n" $NONCE`
 
-
-psql "$DATABASE_URL" -c "INSERT INTO eth_nonce (nonce) \
-                         VALUES ('$NONCE') \
-                         ON CONFLICT (id) DO UPDATE  \
-                         SET nonce = '$NONCE'" || exit 1
-echo "successfully inserted the Ethereum nonce ($NONCE) into the database"
-
-psql "$DATABASE_URL" -c "INSERT INTO eth_stats (commit_ops, verify_ops, withdraw_ops) \
-                         VALUES (0, 0, 0) \
+# Insert data: nonce (obtained above), gas price limit (obtained from env), stats data (defaults to zero)
+psql "$DATABASE_URL" -c "INSERT INTO eth_parameters (nonce, gas_price_limit, commit_ops, verify_ops, withdraw_ops) \
+                         VALUES ('$NONCE', '$ETH_GAS_PRICE_DEFAULT_LIMIT', 0, 0, 0) \
                          ON CONFLICT (id) DO UPDATE  \
                          SET (commit_ops, verify_ops, withdraw_ops) = (0, 0, 0)" || exit 1
 
-echo "successfully initialized the Ethereum stats"
+echo "inserted Ethereum nonce ($NONCE)"
+echo "successfully initialized the Ethereum parameters table"

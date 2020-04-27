@@ -13,9 +13,8 @@ use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
 use bigdecimal::BigDecimal;
 use log::*;
-use models::config_options::ConfigurationOptions;
 use models::node::AccountMap;
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use std::time::{Duration, Instant};
 use testkit::*;
 use web3::transports::Http;
@@ -33,13 +32,13 @@ fn create_verified_initial_state(
 ) {
     info!("Creating initial state");
     for token in tokens {
-        test_setup.start_block();
         for account in zksync_accounts {
+            test_setup.start_block();
             test_setup.deposit(deposit_account, *account, *token, deposit_amount.clone());
+            test_setup
+                .execute_commit_and_verify_block()
+                .expect("Commit and verify initial block");
         }
-        test_setup
-            .execute_commit_and_verify_block()
-            .expect("Commit and verify initial block");
     }
     info!("Done creating initial state");
 }
@@ -116,10 +115,10 @@ fn check_exit_garbage_proof(
         "Checking exit with garbage proof token: {}, amount: {}",
         token.0, amount
     );
-    let proof = EncodedProof::default();
+    let proof = EncodedProofPlonk::default();
     test_setup
         .exit(send_account, token, amount, proof)
-        .expect_revert("vvy14");
+        .expect_revert("fet13");
     info!("Done cheching exit with garbage proof");
 }
 
@@ -273,8 +272,7 @@ fn check_exit_correct_proof_incorrect_sender(
 
 fn exit_test() {
     env_logger::init();
-
-    let config = ConfigurationOptions::from_env();
+    let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
@@ -289,16 +287,18 @@ fn exit_test() {
         deploy_timer.elapsed().as_secs()
     );
 
-    let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
+    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+
+    let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
-        config.operator_private_key,
-        config.operator_eth_addr,
+        commit_account_info.private_key,
+        commit_account_info.address,
         transport.clone(),
         contracts.contract,
-        &config,
+        testkit_config.chain_id,
+        testkit_config.gas_price_factor,
     );
-
-    let eth_accounts = get_test_accounts()
+    let eth_accounts = test_accounts_info
         .into_iter()
         .map(|test_eth_account| {
             EthereumAccount::new(
@@ -306,7 +306,8 @@ fn exit_test() {
                 test_eth_account.address,
                 transport.clone(),
                 contracts.contract,
-                &config,
+                testkit_config.chain_id,
+                testkit_config.gas_price_factor,
             )
         })
         .collect::<Vec<_>>();
