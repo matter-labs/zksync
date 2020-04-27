@@ -30,7 +30,7 @@ async function main() {
             provider.pollingInterval = 200;
         }
 
-        const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
+        const wallet = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0").connect(provider);
 
         const proxyContract = new ethers.Contract(
             args.contractAddress,

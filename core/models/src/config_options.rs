@@ -93,11 +93,11 @@ pub struct ConfigurationOptions {
     pub operator_private_key: H256,
     pub chain_id: u8,
     pub gas_price_factor: usize,
-    pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
     pub confirmations_for_eth_event: u64,
     pub api_requests_caches_size: usize,
     pub available_block_chunk_sizes: Vec<usize>,
+    pub eth_watch_poll_interval: Duration,
 }
 
 impl ConfigurationOptions {
@@ -121,11 +121,13 @@ impl ConfigurationOptions {
             operator_private_key: parse_env("OPERATOR_PRIVATE_KEY"),
             chain_id: parse_env("CHAIN_ID"),
             gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
-            tx_batch_size: parse_env("TX_BATCH_SIZE"),
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
             api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
             available_block_chunk_sizes,
+            eth_watch_poll_interval: Duration::from_millis(parse_env::<u64>(
+                "ETH_WATCH_POLL_INTERVAL",
+            )),
         }
     }
 }

@@ -9,7 +9,11 @@ export CI_DOCKER_IMAGE ?= matterlabs/ci
 # Getting started
 
 # Check and change environment (listed here for autocomplete and documentation only)
+# next two target are hack that allows to pass arguments to makefile
 env:	
+	@bin/zkenv $(filter-out $@,$(MAKECMDGOALS))
+%:
+	@:
 
 # Get everything up and running for the first time
 init:

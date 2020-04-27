@@ -40,7 +40,6 @@
     "deploy-no-build": "ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-testkit": "ts-node scripts/testnet-deploy.ts --deploy --test --testkit",
     "publish_source": "ts-node scripts/testnet-deploy.ts --publish",
-    "print-operator-wallet": "ts-node scripts/init-operator-acc.ts",
     "submit-proof": "ts-node scripts/submit-proof.ts",
     "submit-test-proof": "yarn build && ts-node scripts/submit-test-proof.ts",
     "lint:solidity": "solhint contracts/**/*.sol",

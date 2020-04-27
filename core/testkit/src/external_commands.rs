@@ -99,7 +99,10 @@ pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_addres
         panic!("test upgrade franklin script failed")
     }
     if !result.stderr.is_empty() {
-        panic!("test upgrade franklin script failed with error")
+        panic!(
+            "test upgrade franklin script failed with error: {}",
+            String::from_utf8_lossy(&result.stderr).to_string()
+        )
     }
 }
 
