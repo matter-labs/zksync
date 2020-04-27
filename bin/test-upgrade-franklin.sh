@@ -9,4 +9,4 @@ then
 fi
 
 cd contracts;
-f yarn ts-node scripts/test-upgrade-franklin.ts $1 $2
+yarn ts-node scripts/test-upgrade-franklin.ts $1 $2
