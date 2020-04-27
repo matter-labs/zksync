@@ -1,35 +1,28 @@
 // Workspace deps
-use models::{
-    node::{operations::ChangePubKeyOp, Account},
-    primitives::pack_bits_into_bytes_in_order,
-};
-use testkit::zksync_account::ZksyncAccount;
+use models::{node::operations::ChangePubKeyOp, primitives::pack_bits_into_bytes_in_order};
 // Local deps
 use crate::witness::{
     change_pubkey_offchain::{
         apply_change_pubkey_offchain_tx, calculate_change_pubkey_offchain_from_witness,
     },
-    tests::test_utils::{check_circuit, test_genesis_plasma_state},
+    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount},
     utils::WitnessBuilder,
 };
 
 #[test]
 #[ignore]
 fn test_change_pubkey_offchain_success() {
-    let zksync_account = ZksyncAccount::rand();
-    let change_pkhash_to_account_id = 0xc1;
-    let change_pkhash_to_account_address = zksync_account.address;
-    let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![(
-        change_pkhash_to_account_id,
-        Account::default_with_address(&change_pkhash_to_account_address),
-    )]);
+    let account = WitnessTestAccount::new_empty(0xc1);
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
 
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let change_pkhash_op = ChangePubKeyOp {
-        tx: zksync_account.create_change_pubkey_tx(None, true, false),
-        account_id: change_pkhash_to_account_id,
+        tx: account
+            .zksync_account
+            .create_change_pubkey_tx(None, true, false),
+        account_id: account.id,
     };
 
     println!("node root hash before op: {:?}", plasma_state.root_hash());

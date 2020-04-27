@@ -1,18 +1,18 @@
 // External deps
 use bigdecimal::BigDecimal;
 // Workspace deps
-use models::node::{operations::DepositOp, Account, Deposit};
+use models::node::{operations::DepositOp, Deposit};
 // Local deps
 use crate::witness::{
     deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness},
-    tests::test_utils::{check_circuit, test_genesis_plasma_state},
+    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount},
     utils::WitnessBuilder,
 };
 
 #[test]
 #[ignore]
 fn test_deposit_in_empty_leaf() {
-    let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(Vec::new());
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate_empty();
 
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
@@ -65,24 +65,20 @@ fn test_deposit_in_empty_leaf() {
 #[test]
 #[ignore]
 fn test_deposit_existing_account() {
-    let deposit_to_account_id = 1;
-    let deposit_to_account_address = "1111111111111111111111111111111111111111".parse().unwrap();
-    let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![(
-        deposit_to_account_id,
-        Account::default_with_address(&deposit_to_account_address),
-    )]);
+    let account = WitnessTestAccount::new_empty(1);
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
 
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let deposit_op = DepositOp {
         priority_op: Deposit {
-            from: deposit_to_account_address,
+            from: account.account.address,
             token: 0,
             amount: BigDecimal::from(1),
-            to: deposit_to_account_address,
+            to: account.account.address,
         },
-        account_id: deposit_to_account_id,
+        account_id: account.id,
     };
 
     println!("node root hash before op: {:?}", plasma_state.root_hash());

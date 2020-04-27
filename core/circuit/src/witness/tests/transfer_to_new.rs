@@ -1,11 +1,10 @@
 // External deps
 use bigdecimal::BigDecimal;
 // Workspace deps
-use models::node::{operations::TransferToNewOp, Account};
-use testkit::zksync_account::ZksyncAccount;
+use models::node::operations::TransferToNewOp;
 // Local deps
 use crate::witness::{
-    tests::test_utils::{check_circuit, test_genesis_plasma_state},
+    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount},
     transfer_to_new::{
         apply_transfer_to_new_tx, calculate_transfer_to_new_operations_from_witness,
     },
@@ -15,38 +14,29 @@ use crate::witness::{
 #[test]
 #[ignore]
 fn test_transfer_to_new_success() {
-    let from_zksync_account = ZksyncAccount::rand();
-    let from_account_id = 1;
-    let from_account_address = from_zksync_account.address;
-    let from_account = {
-        let mut account = Account::default_with_address(&from_account_address);
-        account.add_balance(0, &BigDecimal::from(10));
-        account.pub_key_hash = from_zksync_account.pubkey_hash.clone();
-        account
-    };
-
-    let to_account_id = 2;
-    let to_account_address = "2222222222222222222222222222222222222222".parse().unwrap();
-
+    let account_from = WitnessTestAccount::new(1, 10);
+    let account_to = WitnessTestAccount::new_empty(2); // Will not be included into state.
     let (mut plasma_state, mut circuit_account_tree) =
-        test_genesis_plasma_state(vec![(from_account_id, from_account)]);
+        PlasmaStateGenerator::from_single(&account_from);
+
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let transfer_op = TransferToNewOp {
-        tx: from_zksync_account
+        tx: account_from
+            .zksync_account
             .sign_transfer(
                 0,
                 "",
                 BigDecimal::from(7),
                 BigDecimal::from(3),
-                &to_account_address,
+                &account_to.account.address,
                 None,
                 true,
             )
             .0,
-        from: from_account_id,
-        to: to_account_id,
+        from: account_from.id,
+        to: account_to.id,
     };
 
     let (fee, _) = plasma_state

@@ -1,11 +1,10 @@
 // External deps
 use bigdecimal::BigDecimal;
 // Workspace deps
-use models::node::{operations::WithdrawOp, Account, Address};
-use testkit::zksync_account::ZksyncAccount;
+use models::node::{operations::WithdrawOp, Address};
 // Local deps
 use crate::witness::{
-    tests::test_utils::{check_circuit, test_genesis_plasma_state},
+    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount},
     utils::{prepare_sig_data, WitnessBuilder},
     withdraw::{apply_withdraw_tx, calculate_withdraw_operations_from_witness},
 };
@@ -13,23 +12,15 @@ use crate::witness::{
 #[test]
 #[ignore]
 fn test_withdraw() {
-    let zksync_account = ZksyncAccount::rand();
-    let account_id = 1;
-    let account_address = zksync_account.address;
-    let account = {
-        let mut account = Account::default_with_address(&account_address);
-        account.add_balance(0, &BigDecimal::from(10));
-        account.pub_key_hash = zksync_account.pubkey_hash.clone();
-        account
-    };
+    let account = WitnessTestAccount::new(1, 10);
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
 
-    let (mut plasma_state, mut circuit_account_tree) =
-        test_genesis_plasma_state(vec![(account_id, account)]);
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let withdraw_op = WithdrawOp {
-        tx: zksync_account
+        tx: account
+            .zksync_account
             .sign_withdraw(
                 0,
                 "",
@@ -40,7 +31,7 @@ fn test_withdraw() {
                 true,
             )
             .0,
-        account_id,
+        account_id: account.id,
     };
 
     println!("node root hash before op: {:?}", plasma_state.root_hash());
