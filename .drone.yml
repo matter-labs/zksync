@@ -16,7 +16,7 @@ steps:
   settings:
     mount:
     - ./target/rust-ci-cache
-    - ./keys
+    - ./keys/setup
     restore: true
   volumes:
   - name: cache
@@ -28,10 +28,13 @@ steps:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
   - ci-prepare-env.sh
+  - zksync dummy-prover ensure-disabled
   - zksync env ci
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
+  - zksync plonk-setup check || zksync plonk-setup download
+  - zksync verify-keys unpack
   - zksync dummy-prover ensure-disabled
   depends_on:
   - restore-cache
@@ -100,6 +103,13 @@ steps:
   depends_on:
   - init
 
+- name: ganache
+  image: matterlabs/ganache
+  detach: true
+  depends_on:
+  - build-contracts
+  - run-genesis
+
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
@@ -110,6 +120,7 @@ steps:
   depends_on:
   - run-genesis
   - build-contracts
+  - ganache
 
 - name: contract-test
   image: matterlabs/ci
@@ -125,7 +136,7 @@ steps:
   settings:
     mount:
     - ./target/rust-ci-cache
-    - ./keys
+    - ./keys/setup
     rebuild: true
   volumes:
   - name: cache
@@ -169,7 +180,7 @@ steps:
   settings:
     mount:
     - ./target/rust-ci-cache
-    - ./keys
+    - ./keys/setup
     restore: true
   volumes:
   - name: cache
@@ -185,6 +196,7 @@ steps:
   - zksync yarn
   - zksync db-wait
   - zksync db-setup
+  - zksync verify-keys unpack
   - zksync genesis
   - zksync dummy-prover enable
   - f cargo build --release --bin server
@@ -258,7 +270,7 @@ steps:
   settings:
     mount:
     - ./target/rust-ci-cache
-    - ./keys
+    - ./keys/setup
     restore: true
   volumes:
   - name: cache
@@ -273,7 +285,8 @@ steps:
   - echo -n $STAGE_ENV_BASE64| base64 --decode > $ZKSYNC_HOME/etc/env/stage.env
   - zksync env stage
   - zksync yarn
-  - zksync gen-keys-if-not-present
+  - zksync plonk-setup check || zksync plonk-setup download
+  - zksync verify-keys unpack
   - zksync build-contracts
   environment:
     STAGE_ENV_BASE64:
@@ -451,7 +464,7 @@ steps:
   - docker pull matterlabs/nginx:${DRONE_COMMIT_SHA:0:8}
   environment:
     ENV_BASE64:
-      from_secret: testnet_env_base64
+      from_secret: ${ZKSYNC_ENV}_env_base64
     PASSWORD:
       from_secret: docker_password
     USERNAME:
@@ -465,18 +478,18 @@ steps:
   commands:
   - export ZKSYNC_HOME=`pwd`
   - export PATH=$ZKSYNC_HOME/bin:$PATH
-  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/testnet.env
-  - zksync env testnet
+  - echo -n $ENV_BASE64 | base64 --decode > $ZKSYNC_HOME/etc/env/${ZKSYNC_ENV}.env
+  - zksync env ${ZKSYNC_ENV}
   - echo -n $KUBECONFIG_BASE64 | base64 --decode > `pwd`/kubeconfig.yaml
-  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/testnet.env KUBECONFIG=`pwd`/kubeconfig.yaml
+  - python3 $ZKSYNC_HOME/bin/replace-env-variable.py $ZKSYNC_HOME/etc/env/${ZKSYNC_ENV}.env KUBECONFIG=`pwd`/kubeconfig.yaml
   - zksync db-migrate
   - zksync apply-kubeconfig
   - zksync restart
   environment:
     ENV_BASE64:
-      from_secret: testnet_env_base64
+      from_secret: ${ZKSYNC_ENV}_env_base64
     KUBECONFIG_BASE64:
-      from_secret: testnet_kubeconfig_base64
+      from_secret: ${ZKSYNC_ENV}_kubeconfig_base64
 
 volumes:
 - name: docker-sock
@@ -488,5 +501,6 @@ trigger:
   - promote
   target:
   - testnet
+  - ropsten
 
 ...

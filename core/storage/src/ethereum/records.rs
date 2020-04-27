@@ -58,17 +58,30 @@ pub struct ETHBinding {
 }
 
 #[derive(Debug, Queryable, QueryableByName, PartialEq)]
-#[table_name = "eth_nonce"]
-pub struct ETHNonce {
+#[table_name = "eth_parameters"]
+pub struct ETHParams {
     pub id: bool,
     pub nonce: i64,
-}
-
-#[derive(Debug, Queryable, QueryableByName, PartialEq)]
-#[table_name = "eth_stats"]
-pub struct ETHStats {
-    pub id: bool,
+    pub gas_price_limit: i64,
     pub commit_ops: i64,
     pub verify_ops: i64,
     pub withdraw_ops: i64,
+}
+
+/// A slice of `ETHParams` structure with only stats part in it.
+#[derive(Debug)]
+pub struct ETHStats {
+    pub commit_ops: i64,
+    pub verify_ops: i64,
+    pub withdraw_ops: i64,
+}
+
+impl From<ETHParams> for ETHStats {
+    fn from(params: ETHParams) -> Self {
+        Self {
+            commit_ops: params.commit_ops,
+            verify_ops: params.verify_ops,
+            withdraw_ops: params.withdraw_ops,
+        }
+    }
 }

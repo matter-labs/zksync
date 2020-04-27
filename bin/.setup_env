@@ -1,10 +1,10 @@
 #!/bin/bash
 
+pushd `dirname $0`/.. > /dev/null
+
 # Setup env itself
 if [ -z "$ZKSYNC_ENV" ]
 then
-
-    pushd `dirname $0`/.. > /dev/null
 
     if [ -f etc/env/current ]; then
         export ZKSYNC_ENV=`cat etc/env/current`
@@ -28,9 +28,15 @@ then
     set -o allexport
     eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
     set +o allexport
-
-    popd > /dev/null
+else
+    ENV_FILE=./etc/env/$ZKSYNC_ENV.env
+    # Reload env vars, maybe they changed
+    set -o allexport
+    eval $(grep -v '^#' $ENV_FILE | sed 's/^/export /')
+    set +o allexport
 fi
+
+popd > /dev/null
 
 # Setup the git hooks folder.
 if ! git config --local core.hooksPath > /dev/null; then

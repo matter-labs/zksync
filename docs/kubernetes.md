@@ -22,8 +22,7 @@ kubectl config view
 Activate env with `zksync <TARGET_ENV>`
 
 Only if verifier or circuit changes:
-1. gen keys
-2. upload keys to KEYS_SPACE_URL
+1. See README.md about developing circuit and updating verifying keys
 
 Only if deploying new contract or fresh depoyment:
 1. `zksync build-contracts`

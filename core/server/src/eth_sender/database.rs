@@ -52,6 +52,12 @@ pub(super) trait DatabaseAccess {
     /// Loads the stored Ethereum operations stats.
     fn load_stats(&self) -> Result<ETHStats, failure::Error>;
 
+    /// Loads the stored gas price limit.
+    fn load_gas_price_limit(&self) -> Result<U256, failure::Error>;
+
+    /// Updates the stored gas price limit.
+    fn update_gas_price_limit(&self, value: U256) -> Result<(), failure::Error>;
+
     /// Performs several database operations within one database transaction.
     fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
     where
@@ -132,6 +138,18 @@ impl DatabaseAccess for Database {
         let storage = self.db_pool.access_storage()?;
         let stats = storage.ethereum_schema().load_stats()?;
         Ok(stats.into())
+    }
+
+    fn load_gas_price_limit(&self) -> Result<U256, failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+        let limit = storage.ethereum_schema().load_gas_price_limit()?;
+        Ok(limit)
+    }
+
+    fn update_gas_price_limit(&self, value: U256) -> Result<(), failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+        storage.ethereum_schema().update_gas_price_limit(value)?;
+        Ok(())
     }
 
     fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>

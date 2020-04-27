@@ -8,6 +8,7 @@ use futures::{channel::mpsc, executor::block_on, SinkExt};
 use web3::types::{H160, H256};
 // Local uses
 use crate::node::Address;
+use crate::params::block_chunk_sizes;
 
 /// If its placed inside thread::spawn closure it will notify channel when this thread panics.
 pub struct ThreadPanicNotify(pub mpsc::Sender<bool>);
@@ -22,13 +23,13 @@ impl Drop for ThreadPanicNotify {
 
 /// Obtains the environment variable value.
 /// Panics if there is no environment variable with provided name set.
-fn get_env(name: &str) -> String {
+pub fn get_env(name: &str) -> String {
     env::var(name).unwrap_or_else(|e| panic!("Env var {} missing, {}", name, e))
 }
 
 /// Obtains the environment variable value and parses it using the `FromStr` type implementation.
 /// Panics if there is no environment variable with provided name set, or the value cannot be parsed.
-fn parse_env<F>(name: &str) -> F
+pub fn parse_env<F>(name: &str) -> F
 where
     F: FromStr,
     F::Err: std::fmt::Debug,
@@ -39,7 +40,7 @@ where
 }
 
 /// Similar to `parse_env`, but also takes a function to change the variable value before parsing.
-fn parse_env_with<T, F>(name: &str, f: F) -> T
+pub fn parse_env_with<T, F>(name: &str, f: F) -> T
 where
     T: FromStr,
     T::Err: std::fmt::Debug,
@@ -92,16 +93,19 @@ pub struct ConfigurationOptions {
     pub operator_private_key: H256,
     pub chain_id: u8,
     pub gas_price_factor: usize,
-    pub tx_batch_size: usize,
     pub prover_server_address: SocketAddr,
     pub confirmations_for_eth_event: u64,
     pub api_requests_caches_size: usize,
+    pub available_block_chunk_sizes: Vec<usize>,
+    pub eth_watch_poll_interval: Duration,
 }
 
 impl ConfigurationOptions {
     /// Parses the configuration options values from the environment variables.
     /// Panics if any of options is missing or has inappropriate value.
     pub fn from_env() -> Self {
+        let mut available_block_chunk_sizes = block_chunk_sizes().to_vec();
+        available_block_chunk_sizes.sort();
         Self {
             replica_name: parse_env("SERVER_REPLICA_NAME"),
             rest_api_server_address: parse_env("REST_API_BIND"),
@@ -117,10 +121,42 @@ impl ConfigurationOptions {
             operator_private_key: parse_env("OPERATOR_PRIVATE_KEY"),
             chain_id: parse_env("CHAIN_ID"),
             gas_price_factor: parse_env("GAS_PRICE_FACTOR"),
-            tx_batch_size: parse_env("TX_BATCH_SIZE"),
             prover_server_address: parse_env("PROVER_SERVER_BIND"),
             confirmations_for_eth_event: parse_env("CONFIRMATIONS_FOR_ETH_EVENT"),
             api_requests_caches_size: parse_env("API_REQUESTS_CACHES_SIZE"),
+            available_block_chunk_sizes,
+            eth_watch_poll_interval: Duration::from_millis(parse_env::<u64>(
+                "ETH_WATCH_POLL_INTERVAL",
+            )),
         }
+    }
+}
+
+/// Possible block chunks sizes and corresponding setup powers of two,
+/// this is only parameters needed to create verifying contract.
+#[derive(Debug)]
+pub struct AvailableBlockSizesConfig {
+    pub blocks_chunks: Vec<usize>,
+    pub blocks_setup_power2: Vec<u32>,
+}
+
+impl AvailableBlockSizesConfig {
+    pub fn from_env() -> Self {
+        let result = Self {
+            blocks_chunks: get_env("SUPPORTED_BLOCK_CHUNKS_SIZES")
+                .split(',')
+                .map(|p| p.parse().unwrap())
+                .collect(),
+            blocks_setup_power2: get_env("SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS")
+                .split(',')
+                .map(|p| p.parse().unwrap())
+                .collect(),
+        };
+        assert_eq!(
+            result.blocks_chunks.len(),
+            result.blocks_setup_power2.len(),
+            "block sized and setup powers should have same length, check config file"
+        );
+        result
     }
 }

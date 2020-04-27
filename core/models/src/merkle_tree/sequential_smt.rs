@@ -318,6 +318,10 @@ mod tests {
             acc
         }
 
+        fn hash_elements<I: IntoIterator<Item = u64>>(&self, _elements: I) -> u64 {
+            unimplemented!()
+        }
+
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
             11 * lhs + 17 * rhs + 1 + i as u64
             //log::debug!("compress {} {}, {} => {}", lhs, rhs, i, r);

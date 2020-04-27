@@ -696,6 +696,10 @@ mod tests {
             acc
         }
 
+        fn hash_elements<I: IntoIterator<Item = u64>>(&self, _elements: I) -> u64 {
+            unreachable!("Hash elements is specific for rescue hash and used only for pubkey hash derivation")
+        }
+
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
             (11 * lhs + 17 * rhs + 1 + i as u64) % 1_234_567_891
             //debug!("compress {} {}, {} => {}", lhs, rhs, i, r);

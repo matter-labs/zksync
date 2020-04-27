@@ -1,6 +1,5 @@
 // Built-in deps
-use std::collections::VecDeque;
-use std::str::FromStr;
+use std::{collections::VecDeque, convert::TryFrom, str::FromStr};
 // External imports
 use bigdecimal::BigDecimal;
 use diesel::dsl::{insert_into, update};
@@ -13,7 +12,7 @@ use models::{
 };
 // Local imports
 use self::records::{
-    ETHBinding, ETHNonce, ETHStats, ETHTxHash, NewETHBinding, NewETHOperation, NewETHTxHash,
+    ETHBinding, ETHParams, ETHStats, ETHTxHash, NewETHBinding, NewETHOperation, NewETHTxHash,
     StorageETHOperation,
 };
 use crate::chain::operations::records::StoredOperation;
@@ -263,11 +262,11 @@ impl<'a> EthereumSchema<'a> {
     /// **should not** be invoked.
     ///
     /// This method expects the database to be initially prepared with inserting the actual
-    /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
+    /// stats values. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
     fn report_created_operation(&self, operation_type: OperationType) -> QueryResult<()> {
         self.0.conn().transaction(|| {
-            let mut current_stats: ETHStats = eth_stats::table.first(self.0.conn())?;
+            let mut current_stats: ETHParams = eth_parameters::table.first(self.0.conn())?;
 
             // Increase the only one type of operations.
             match operation_type {
@@ -283,11 +282,11 @@ impl<'a> EthereumSchema<'a> {
             };
 
             // Update the stored stats.
-            update(eth_stats::table.filter(eth_stats::id.eq(true)))
+            update(eth_parameters::table.filter(eth_parameters::id.eq(true)))
                 .set((
-                    eth_stats::commit_ops.eq(current_stats.commit_ops),
-                    eth_stats::verify_ops.eq(current_stats.verify_ops),
-                    eth_stats::withdraw_ops.eq(current_stats.withdraw_ops),
+                    eth_parameters::commit_ops.eq(current_stats.commit_ops),
+                    eth_parameters::verify_ops.eq(current_stats.verify_ops),
+                    eth_parameters::withdraw_ops.eq(current_stats.withdraw_ops),
                 ))
                 .execute(self.0.conn())?;
 
@@ -295,9 +294,39 @@ impl<'a> EthereumSchema<'a> {
         })
     }
 
+    /// Updates the stored gas price limit used by GasAdjuster.
+    ///
+    /// This method expects the database to be initially prepared with inserting the actual
+    /// gas limit value. Currently the script `db-insert-eth-data.sh` is responsible for that
+    /// and it's invoked within `db-reset` subcommand.
+    pub fn update_gas_price_limit(&self, gas_price_limit: U256) -> QueryResult<()> {
+        self.0.conn().transaction(|| {
+            let gas_price_limit: i64 =
+                i64::try_from(gas_price_limit).expect("Can't convert U256 to i64");
+
+            // Update the stored gas price limit.
+            update(eth_parameters::table.filter(eth_parameters::id.eq(true)))
+                .set(eth_parameters::gas_price_limit.eq(gas_price_limit))
+                .execute(self.0.conn())?;
+
+            Ok(())
+        })
+    }
+
+    pub fn load_gas_price_limit(&self) -> QueryResult<U256> {
+        let params: ETHParams = eth_parameters::table.first::<ETHParams>(self.0.conn())?;
+
+        let gas_price_limit =
+            U256::try_from(params.gas_price_limit).expect("Negative gas limit value stored in DB");
+
+        Ok(gas_price_limit)
+    }
+
     /// Loads the stored Ethereum operations stats.
     pub fn load_stats(&self) -> QueryResult<ETHStats> {
-        eth_stats::table.first(self.0.conn())
+        eth_parameters::table
+            .first::<ETHParams>(self.0.conn())
+            .map(ETHStats::from)
     }
 
     /// Marks the stored Ethereum transaction as confirmed (and thus the associated `Operation`
@@ -352,12 +381,12 @@ impl<'a> EthereumSchema<'a> {
     /// nonce value. Currently the script `db-insert-eth-data.sh` is responsible for that
     /// and it's invoked within `db-reset` subcommand.
     pub(crate) fn get_next_nonce(&self) -> QueryResult<i64> {
-        let old_nonce: ETHNonce = eth_nonce::table.first(self.0.conn())?;
+        let old_nonce: ETHParams = eth_parameters::table.first(self.0.conn())?;
 
         let new_nonce_value = old_nonce.nonce + 1;
 
-        update(eth_nonce::table.filter(eth_nonce::id.eq(true)))
-            .set(eth_nonce::nonce.eq(new_nonce_value))
+        update(eth_parameters::table.filter(eth_parameters::id.eq(true)))
+            .set(eth_parameters::nonce.eq(new_nonce_value))
             .execute(self.0.conn())?;
 
         let old_nonce_value = old_nonce.nonce;
@@ -365,47 +394,35 @@ impl<'a> EthereumSchema<'a> {
         Ok(old_nonce_value)
     }
 
-    /// Method that internally initializes the `eth_nonce` and `eth_stats` tables.
+    /// Method that internally initializes the `eth_parameters` table.
     /// Since in db tests the database is empty, we must provide a possibility
     /// to initialize required db fields.
     #[cfg(test)]
     pub fn initialize_eth_data(&self) -> QueryResult<()> {
         #[derive(Debug, Insertable)]
-        #[table_name = "eth_nonce"]
-        pub struct NewETHNonce {
+        #[table_name = "eth_parameters"]
+        pub struct NewETHParams {
             pub nonce: i64,
-        }
-
-        #[derive(Debug, Insertable)]
-        #[table_name = "eth_stats"]
-        pub struct NewETHStats {
+            pub gas_price_limit: i64,
             pub commit_ops: i64,
             pub verify_ops: i64,
             pub withdraw_ops: i64,
         }
 
-        let old_nonce: Option<ETHNonce> = eth_nonce::table.first(self.0.conn()).optional()?;
+        let old_params: Option<ETHParams> =
+            eth_parameters::table.first(self.0.conn()).optional()?;
 
-        if old_nonce.is_none() {
-            // There is no nonce, we have to insert it manually.
-            let nonce = NewETHNonce { nonce: 0 };
-
-            insert_into(eth_nonce::table)
-                .values(&nonce)
-                .execute(self.0.conn())?;
-        }
-
-        let old_stats: Option<ETHStats> = eth_stats::table.first(self.0.conn()).optional()?;
-
-        if old_stats.is_none() {
-            let stats = NewETHStats {
+        if old_params.is_none() {
+            let params = NewETHParams {
+                nonce: 0,
+                gas_price_limit: 400 * 10e9 as i64,
                 commit_ops: 0,
                 verify_ops: 0,
                 withdraw_ops: 0,
             };
 
-            insert_into(eth_stats::table)
-                .values(&stats)
+            insert_into(eth_parameters::table)
+                .values(&params)
                 .execute(self.0.conn())?;
         }
 

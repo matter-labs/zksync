@@ -21,7 +21,7 @@ cp $IN_DIR/Franklin.sol $OUT_DIR/FranklinTestNoInit.sol
 ssed 's/import "\.\./import "\.\.\/\.\./' -i $OUT_DIR/*.sol
 # Rename contracts
 ssed 's/Governance/GovernanceTest/' -i $OUT_DIR/*.sol
-ssed 's/Verifier/VerifierTest/' -i $OUT_DIR/*.sol
+ssed 's/\bVerifier\b/VerifierTest/' -i $OUT_DIR/*.sol
 ssed 's/Franklin/FranklinTest/' -i $OUT_DIR/*.sol
 ssed 's/Storage/StorageTest/' -i $OUT_DIR/*.sol
 ssed 's/Config/ConfigTest/' -i $OUT_DIR/*.sol

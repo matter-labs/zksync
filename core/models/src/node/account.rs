@@ -4,8 +4,9 @@ use crate::primitives::GetBits;
 use std::collections::HashMap;
 use std::convert::TryInto;
 
-use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
 use bigdecimal::BigDecimal;
+use crypto_exports::franklin_crypto::bellman::pairing::ff::{self, PrimeField};
+use crypto_exports::franklin_crypto::eddsa::PublicKey;
 use failure::ensure;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -14,11 +15,8 @@ use super::Fr;
 use super::{AccountId, AccountUpdates, Nonce, TokenId};
 use crate::circuit::account::{Balance, CircuitAccount};
 use crate::circuit::utils::{eth_address_to_fr, pub_key_hash_bytes};
-use crate::franklin_crypto::eddsa::PublicKey;
-use crate::franklin_crypto::jubjub::FixedGenerators;
-use crate::merkle_tree::pedersen_hasher::BabyPedersenHasher;
-use crate::node::PrivateKey;
-use crate::params::JUBJUB_PARAMS;
+use crate::merkle_tree::rescue_hasher::BabyRescueHasher;
+use crate::node::{public_key_from_private, PrivateKey};
 use web3::types::Address;
 
 #[derive(Clone, PartialEq, Default, Eq, Hash, PartialOrd, Ord)]
@@ -58,21 +56,17 @@ impl PubKeyHash {
 
     pub fn from_pubkey(public_key: &PublicKey<Engine>) -> Self {
         let mut pk_hash =
-            pub_key_hash_bytes(public_key, &params::PEDERSEN_HASHER as &BabyPedersenHasher);
+            pub_key_hash_bytes(public_key, &params::RESCUE_HASHER as &BabyRescueHasher);
         pk_hash.reverse();
         Self::from_bytes(&pk_hash).expect("pk convert error")
     }
 
     pub fn to_fr(&self) -> Fr {
-        Fr::from_hex(&format!("0x{}", hex::encode(&self.data))).unwrap()
+        ff::from_hex(&format!("0x{}", hex::encode(&self.data))).unwrap()
     }
 
     pub fn from_privkey(private_key: &PrivateKey) -> Self {
-        let pub_key = PublicKey::from_private(
-            private_key,
-            FixedGenerators::SpendingKeyGenerator,
-            &JUBJUB_PARAMS,
-        );
+        let pub_key = public_key_from_private(&private_key);
         Self::from_pubkey(&pub_key)
     }
 }
