@@ -2,7 +2,7 @@
 
 This is an image of the dependencies structure.
 Use it for a better understanding.
-![](https://i.imgur.com/nXRKt8a.png)
+![](https://docs.google.com/drawings/d/e/2PACX-1vQWlvxseJXa-X8PhrkpshBiE_rlJJak4noE2wl__0uH957MHK2jLlzxWMfOMsr7AnzpfMqga52bn-Oc/pub?w=960&h=720)
 
 ## Contracts and interfaces
 
