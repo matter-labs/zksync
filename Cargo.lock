@@ -1056,6 +1056,7 @@ name = "data_restore"
 version = "0.1.0"
 dependencies = [
  "bigdecimal",
+ "chrono",
  "clap",
  "crypto_exports",
  "env_logger",
@@ -1403,7 +1404,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#bb300939be633c7645b5265bfcfda1dadc5a4a90"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#8361d0768ea0f252e387b87c707cdc3e46a92974"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -2429,6 +2430,7 @@ name = "models"
 version = "0.0.1"
 dependencies = [
  "bigdecimal",
+ "chrono",
  "criterion",
  "crypto_exports",
  "ethabi",
