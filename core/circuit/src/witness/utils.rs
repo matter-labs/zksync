@@ -18,7 +18,11 @@ use models::{
         utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element},
     },
     merkle_tree::{hasher::Hasher, PedersenHasher, RescueHasher},
-    node::{tx::PackedPublicKey, AccountId, BlockNumber, Engine},
+    node::{
+        operations::{TransferOp, TransferToNewOp, WithdrawOp},
+        tx::PackedPublicKey,
+        AccountId, BlockNumber, Engine,
+    },
     params as franklin_constants,
     params::total_tokens,
     primitives::big_decimal_to_u128,
@@ -520,5 +524,56 @@ impl SigDataInput {
             signature,
             signer_pub_key_packed,
         })
+    }
+
+    pub fn from_transfer_op(transfer_op: &TransferOp) -> Self {
+        let sign_packed = transfer_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let input = SigDataInput::new(
+            &sign_packed,
+            &transfer_op.tx.get_bytes(),
+            &transfer_op.tx.signature.pub_key,
+        )
+        .expect("prepare signature data");
+
+        input
+    }
+
+    pub fn from_transfer_to_new_op(transfer_op: &TransferToNewOp) -> Self {
+        let sign_packed = transfer_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let input = SigDataInput::new(
+            &sign_packed,
+            &transfer_op.tx.get_bytes(),
+            &transfer_op.tx.signature.pub_key,
+        )
+        .expect("prepare signature data");
+
+        input
+    }
+
+    pub fn from_withdraw_op(withdraw_op: &WithdrawOp) -> Self {
+        let sign_packed = withdraw_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let input = SigDataInput::new(
+            &sign_packed,
+            &withdraw_op.tx.get_bytes(),
+            &withdraw_op.tx.signature.pub_key,
+        )
+        .expect("prepare signature data");
+
+        input
     }
 }

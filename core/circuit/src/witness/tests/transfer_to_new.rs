@@ -37,18 +37,7 @@ fn test_transfer_to_new_success() {
     };
 
     // Additional data required for performing the operation.
-    let sign_packed = transfer_op
-        .tx
-        .signature
-        .signature
-        .serialize_packed()
-        .expect("signature serialize");
-    let input = SigDataInput::new(
-        &sign_packed,
-        &transfer_op.tx.get_bytes(),
-        &transfer_op.tx.signature.pub_key,
-    )
-    .expect("prepare signature data");
+    let input = SigDataInput::from_transfer_to_new_op(&transfer_op);
 
     generic_test_scenario::<TransferToNewWitness<Bn256>, _>(
         &accounts,

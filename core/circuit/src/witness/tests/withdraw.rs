@@ -33,18 +33,7 @@ fn test_withdraw() {
     };
 
     // Additional data required for performing the operation.
-    let sign_packed = withdraw_op
-        .tx
-        .signature
-        .signature
-        .serialize_packed()
-        .expect("signature serialize");
-    let input = SigDataInput::new(
-        &sign_packed,
-        &withdraw_op.tx.get_bytes(),
-        &withdraw_op.tx.signature.pub_key,
-    )
-    .expect("prepare signature data");
+    let input = SigDataInput::from_withdraw_op(&withdraw_op);
 
     generic_test_scenario::<WithdrawWitness<Bn256>, _>(
         &accounts,
