@@ -19,7 +19,10 @@ use models::{
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
-    witness::utils::{apply_leaf_operation, get_audits, SigDataInput},
+    witness::{
+        utils::{apply_leaf_operation, get_audits, SigDataInput},
+        Witness,
+    },
 };
 
 #[derive(Debug)]
@@ -45,8 +48,23 @@ pub struct TransferWitness<E: RescueEngine> {
     pub tx_type: Option<E::Fr>,
 }
 
-impl<E: RescueEngine> TransferWitness<E> {
-    pub fn get_pubdata(&self) -> Vec<bool> {
+impl Witness for TransferWitness<Bn256> {
+    type OperationType = TransferOp;
+    type CalculateOpsInput = SigDataInput;
+
+    fn apply_tx(tree: &mut CircuitAccountTree, transfer: &TransferOp) -> Self {
+        let transfer_data = TransferData {
+            amount: big_decimal_to_u128(&transfer.tx.amount),
+            fee: big_decimal_to_u128(&transfer.tx.fee),
+            token: u32::from(transfer.tx.token),
+            from_account_address: transfer.from,
+            to_account_address: transfer.to,
+        };
+        // le_bit_vector_into_field_element()
+        Self::apply_data(tree, &transfer_data)
+    }
+
+    fn get_pubdata(&self) -> Vec<bool> {
         // construct pubdata
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
@@ -85,6 +103,48 @@ impl<E: RescueEngine> TransferWitness<E> {
         pubdata_bits.resize(2 * franklin_constants::CHUNK_BIT_WIDTH, false); //TODO verify if right padding is okay
         pubdata_bits
     }
+
+    fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
+        let pubdata_chunks: Vec<_> = self
+            .get_pubdata()
+            .chunks(64)
+            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
+            .collect();
+
+        let operation_zero = Operation {
+            new_root: self.intermediate_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str("0").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[0]),
+            first_sig_msg: Some(input.first_sig_msg),
+            second_sig_msg: Some(input.second_sig_msg),
+            third_sig_msg: Some(input.third_sig_msg),
+            signature_data: input.signature.clone(),
+            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
+            args: self.args.clone(),
+            lhs: self.from_before.clone(),
+            rhs: self.to_before.clone(),
+        };
+
+        let operation_one = Operation {
+            new_root: self.after_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str("1").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[1]),
+            first_sig_msg: Some(input.first_sig_msg),
+            second_sig_msg: Some(input.second_sig_msg),
+            third_sig_msg: Some(input.third_sig_msg),
+            signature_data: input.signature.clone(),
+            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
+            args: self.args.clone(),
+            lhs: self.from_intermediate.clone(),
+            rhs: self.to_intermediate.clone(),
+        };
+        vec![operation_zero, operation_one]
+    }
+}
+
+impl<E: RescueEngine> TransferWitness<E> {
     pub fn get_sig_bits(&self) -> Vec<bool> {
         let mut sig_bits = vec![];
         append_be_fixed_width(
@@ -134,18 +194,6 @@ impl<E: RescueEngine> TransferWitness<E> {
 }
 
 impl TransferWitness<Bn256> {
-    pub fn apply_tx(tree: &mut CircuitAccountTree, transfer: &TransferOp) -> Self {
-        let transfer_data = TransferData {
-            amount: big_decimal_to_u128(&transfer.tx.amount),
-            fee: big_decimal_to_u128(&transfer.tx.fee),
-            token: u32::from(transfer.tx.token),
-            from_account_address: transfer.from,
-            to_account_address: transfer.to,
-        };
-        // le_bit_vector_into_field_element()
-        Self::apply_data(tree, &transfer_data)
-    }
-
     fn apply_data(tree: &mut CircuitAccountTree, transfer: &TransferData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
@@ -314,44 +362,5 @@ impl TransferWitness<Bn256> {
             after_root: Some(after_root),
             tx_type: Some(Fr::from_str("5").unwrap()),
         }
-    }
-
-    pub fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
-        let pubdata_chunks: Vec<_> = self
-            .get_pubdata()
-            .chunks(64)
-            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-            .collect();
-
-        let operation_zero = Operation {
-            new_root: self.intermediate_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("0").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[0]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.from_before.clone(),
-            rhs: self.to_before.clone(),
-        };
-
-        let operation_one = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("1").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[1]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.from_intermediate.clone(),
-            rhs: self.to_intermediate.clone(),
-        };
-        vec![operation_zero, operation_one]
     }
 }

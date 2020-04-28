@@ -20,7 +20,10 @@ use crate::{
     operation::{
         Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
     },
-    witness::utils::{apply_leaf_operation, get_audits},
+    witness::{
+        utils::{apply_leaf_operation, get_audits},
+        Witness,
+    },
 };
 
 pub struct FullExitData {
@@ -38,8 +41,25 @@ pub struct FullExitWitness<E: RescueEngine> {
     pub tx_type: Option<E::Fr>,
 }
 
-impl<E: RescueEngine> FullExitWitness<E> {
-    pub fn get_pubdata(&self) -> Vec<bool> {
+impl Witness for FullExitWitness<Bn256> {
+    type OperationType = (FullExitOp, bool);
+    type CalculateOpsInput = ();
+
+    fn apply_tx(
+        tree: &mut CircuitAccountTree,
+        (full_exit, is_success): &(FullExitOp, bool),
+    ) -> Self {
+        let full_exit = FullExitData {
+            token: u32::from(full_exit.priority_op.token),
+            account_address: full_exit.priority_op.account_id,
+            eth_address: eth_address_to_fr(&full_exit.priority_op.eth_address),
+        };
+
+        // le_bit_vector_into_field_element()
+        Self::apply_data(tree, &full_exit, *is_success)
+    }
+
+    fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -70,24 +90,57 @@ impl<E: RescueEngine> FullExitWitness<E> {
         pubdata_bits.resize(6 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
+
+    fn calculate_operations(&self, _input: ()) -> Vec<Operation<Bn256>> {
+        let pubdata_chunks = self
+            .get_pubdata()
+            .chunks(64)
+            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
+            .collect::<Vec<_>>();
+
+        let empty_sig_data = SignatureData {
+            r_packed: vec![Some(false); 256],
+            s: vec![Some(false); 256],
+        };
+
+        let mut operations = vec![];
+        operations.push(Operation {
+            new_root: self.after_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str("0").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[0]),
+            first_sig_msg: Some(Fr::zero()),
+            second_sig_msg: Some(Fr::zero()),
+            third_sig_msg: Some(Fr::zero()),
+            signer_pub_key_packed: vec![Some(false); 256],
+            args: self.args.clone(),
+            lhs: self.before.clone(),
+            rhs: self.before.clone(),
+            signature_data: empty_sig_data.clone(),
+        });
+
+        for (i, pubdata_chunk) in pubdata_chunks.iter().cloned().enumerate().take(6).skip(1) {
+            operations.push(Operation {
+                new_root: self.after_root,
+                tx_type: self.tx_type,
+                chunk: Some(Fr::from_str(&i.to_string()).unwrap()),
+                pubdata_chunk: Some(pubdata_chunk),
+                first_sig_msg: Some(Fr::zero()),
+                second_sig_msg: Some(Fr::zero()),
+                third_sig_msg: Some(Fr::zero()),
+                signer_pub_key_packed: vec![Some(false); 256],
+                args: self.args.clone(),
+                lhs: self.after.clone(),
+                rhs: self.after.clone(),
+                signature_data: empty_sig_data.clone(),
+            });
+        }
+
+        operations
+    }
 }
 
 impl FullExitWitness<Bn256> {
-    pub fn apply_tx(
-        tree: &mut CircuitAccountTree,
-        full_exit: &FullExitOp,
-        is_success: bool,
-    ) -> Self {
-        let full_exit = FullExitData {
-            token: u32::from(full_exit.priority_op.token),
-            account_address: full_exit.priority_op.account_id,
-            eth_address: eth_address_to_fr(&full_exit.priority_op.eth_address),
-        };
-
-        // le_bit_vector_into_field_element()
-        Self::apply_data(tree, &full_exit, is_success)
-    }
-
     fn apply_data(
         tree: &mut CircuitAccountTree,
         full_exit: &FullExitData,
@@ -185,53 +238,5 @@ impl FullExitWitness<Bn256> {
             after_root: Some(after_root),
             tx_type: Some(Fr::from_str("6").unwrap()),
         }
-    }
-
-    pub fn calculate_operations(&self) -> Vec<Operation<Bn256>> {
-        let pubdata_chunks = self
-            .get_pubdata()
-            .chunks(64)
-            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-            .collect::<Vec<_>>();
-
-        let empty_sig_data = SignatureData {
-            r_packed: vec![Some(false); 256],
-            s: vec![Some(false); 256],
-        };
-
-        let mut operations = vec![];
-        operations.push(Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("0").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[0]),
-            first_sig_msg: Some(Fr::zero()),
-            second_sig_msg: Some(Fr::zero()),
-            third_sig_msg: Some(Fr::zero()),
-            signer_pub_key_packed: vec![Some(false); 256],
-            args: self.args.clone(),
-            lhs: self.before.clone(),
-            rhs: self.before.clone(),
-            signature_data: empty_sig_data.clone(),
-        });
-
-        for (i, pubdata_chunk) in pubdata_chunks.iter().cloned().enumerate().take(6).skip(1) {
-            operations.push(Operation {
-                new_root: self.after_root,
-                tx_type: self.tx_type,
-                chunk: Some(Fr::from_str(&i.to_string()).unwrap()),
-                pubdata_chunk: Some(pubdata_chunk),
-                first_sig_msg: Some(Fr::zero()),
-                second_sig_msg: Some(Fr::zero()),
-                third_sig_msg: Some(Fr::zero()),
-                signer_pub_key_packed: vec![Some(false); 256],
-                args: self.args.clone(),
-                lhs: self.after.clone(),
-                rhs: self.after.clone(),
-                signature_data: empty_sig_data.clone(),
-            });
-        }
-
-        operations
     }
 }

@@ -1,3 +1,9 @@
+use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
+
+use models::circuit::account::CircuitAccountTree;
+
+use crate::operation::Operation;
+
 // Public re-exports
 pub use self::{
     change_pubkey_offchain::ChangePubkeyOffChainWitness,
@@ -23,3 +29,21 @@ pub mod utils;
 
 #[cfg(test)]
 pub(crate) mod tests;
+
+/// Generic trait representing the witness data interface.
+pub trait Witness {
+    /// Type of the operation generating the witness.
+    type OperationType;
+    /// Additional data required for calculating the Circuit operations.
+    /// Should be `()` if no additional data required.
+    type CalculateOpsInput;
+
+    /// Applies the operation to the Circuit account tree, generating the witness data.
+    fn apply_tx(tree: &mut CircuitAccountTree, op: &Self::OperationType) -> Self;
+
+    /// Obtains the pubdata from the witness.
+    fn get_pubdata(&self) -> Vec<bool>;
+
+    /// Calculates the list of Circuit operations from the witness data.
+    fn calculate_operations(&self, input: Self::CalculateOpsInput) -> Vec<Operation<Bn256>>;
+}

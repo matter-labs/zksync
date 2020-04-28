@@ -4,7 +4,7 @@
 use crate::state_keeper::PlasmaStateInitParams;
 use circuit::witness::{
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
-    TransferToNewWitness, TransferWitness, WithdrawWitness,
+    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use log::info;
 use models::circuit::account::CircuitAccount;
@@ -122,7 +122,10 @@ impl ObservedState {
                 }
                 FranklinOp::FullExit(full_exit_op) => {
                     let success = full_exit_op.withdraw_amount.is_some();
-                    FullExitWitness::apply_tx(&mut self.circuit_acc_tree, &full_exit_op, success);
+                    FullExitWitness::apply_tx(
+                        &mut self.circuit_acc_tree,
+                        &(*full_exit_op, success),
+                    );
                 }
                 FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
                     ChangePubkeyOffChainWitness::apply_tx(

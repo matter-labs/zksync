@@ -10,7 +10,7 @@ use log::info;
 use circuit::witness::{
     utils::{SigDataInput, WitnessBuilder},
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
-    TransferToNewWitness, TransferWitness, WithdrawWitness,
+    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use models::{
     circuit::CircuitAccountTree,
@@ -286,7 +286,7 @@ impl Maintainer {
                     let deposit_witness =
                         DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit);
 
-                    let deposit_operations = deposit_witness.calculate_operations();
+                    let deposit_operations = deposit_witness.calculate_operations(());
                     operations.extend(deposit_operations);
                     pub_data.extend(deposit_witness.get_pubdata());
                 }
@@ -399,11 +399,10 @@ impl Maintainer {
 
                     let full_exit_witness = FullExitWitness::apply_tx(
                         &mut witness_accum.account_tree,
-                        &full_exit_op,
-                        success,
+                        &(*full_exit_op, success),
                     );
 
-                    let full_exit_operations = full_exit_witness.calculate_operations();
+                    let full_exit_operations = full_exit_witness.calculate_operations(());
 
                     operations.extend(full_exit_operations);
                     pub_data.extend(full_exit_witness.get_pubdata());
@@ -414,7 +413,7 @@ impl Maintainer {
                         &change_pkhash_op,
                     );
 
-                    let change_pkhash_operations = change_pkhash_witness.calculate_operations();
+                    let change_pkhash_operations = change_pkhash_witness.calculate_operations(());
 
                     operations.extend(change_pkhash_operations);
                     pub_data.extend(change_pkhash_witness.get_pubdata());

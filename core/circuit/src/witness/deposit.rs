@@ -20,7 +20,10 @@ use crate::{
     operation::{
         Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
     },
-    witness::utils::{apply_leaf_operation, get_audits},
+    witness::{
+        utils::{apply_leaf_operation, get_audits},
+        Witness,
+    },
 };
 
 pub struct DepositData {
@@ -39,8 +42,21 @@ pub struct DepositWitness<E: RescueEngine> {
     pub tx_type: Option<E::Fr>,
 }
 
-impl<E: RescueEngine> DepositWitness<E> {
-    pub fn get_pubdata(&self) -> Vec<bool> {
+impl Witness for DepositWitness<Bn256> {
+    type OperationType = DepositOp;
+    type CalculateOpsInput = ();
+
+    fn apply_tx(tree: &mut CircuitAccountTree, deposit: &DepositOp) -> Self {
+        let deposit_data = DepositData {
+            amount: deposit.priority_op.amount.to_string().parse().unwrap(),
+            token: u32::from(deposit.priority_op.token),
+            account_address: deposit.account_id,
+            address: eth_address_to_fr(&deposit.priority_op.to),
+        };
+        Self::apply_data(tree, &deposit_data)
+    }
+
+    fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -74,122 +90,7 @@ impl<E: RescueEngine> DepositWitness<E> {
         pubdata_bits
     }
 
-    // CLARIFY: What? Why?
-    pub fn get_sig_bits(&self) -> Vec<bool> {
-        let mut sig_bits = vec![];
-        append_be_fixed_width(
-            &mut sig_bits,
-            &Fr::from_str("1").unwrap(), //Corresponding tx_type
-            franklin_constants::TX_TYPE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.args.new_pub_key_hash.unwrap(),
-            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.token.unwrap(),
-            franklin_constants::TOKEN_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.args.full_amount.unwrap(),
-            franklin_constants::BALANCE_BIT_WIDTH,
-        );
-        append_be_fixed_width(
-            &mut sig_bits,
-            &self.before.witness.account_witness.nonce.unwrap(),
-            franklin_constants::NONCE_BIT_WIDTH,
-        );
-        sig_bits
-    }
-}
-
-impl DepositWitness<Bn256> {
-    pub fn apply_tx(tree: &mut CircuitAccountTree, deposit: &DepositOp) -> Self {
-        let deposit_data = DepositData {
-            amount: deposit.priority_op.amount.to_string().parse().unwrap(),
-            token: u32::from(deposit.priority_op.token),
-            account_address: deposit.account_id,
-            address: eth_address_to_fr(&deposit.priority_op.to),
-        };
-        Self::apply_data(tree, &deposit_data)
-    }
-
-    fn apply_data(tree: &mut CircuitAccountTree, deposit: &DepositData) -> Self {
-        //preparing data and base witness
-        let before_root = tree.root_hash();
-        debug!("deposit Initial root = {}", before_root);
-        let (audit_path_before, audit_balance_path_before) =
-            get_audits(tree, deposit.account_address, deposit.token);
-
-        let capacity = tree.capacity();
-        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
-        let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
-        let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
-        let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
-        debug!("amount_as_field_element is: {}", amount_as_field_element);
-        //calculate a and b
-        let a = amount_as_field_element;
-        let b = Fr::zero();
-
-        //applying deposit
-        let (account_witness_before, account_witness_after, balance_before, balance_after) =
-            apply_leaf_operation(
-                tree,
-                deposit.account_address,
-                deposit.token,
-                |acc| {
-                    assert!((acc.address == deposit.address) || (acc.address == Fr::zero()));
-                    acc.address = deposit.address;
-                },
-                |bal| bal.value.add_assign(&amount_as_field_element),
-            );
-
-        let after_root = tree.root_hash();
-        debug!("deposit After root = {}", after_root);
-        let (audit_path_after, audit_balance_path_after) =
-            get_audits(tree, deposit.account_address, deposit.token);
-
-        DepositWitness {
-            before: OperationBranch {
-                address: Some(account_address_fe),
-                token: Some(token_fe),
-                witness: OperationBranchWitness {
-                    account_witness: account_witness_before,
-                    account_path: audit_path_before,
-                    balance_value: Some(balance_before),
-                    balance_subtree_path: audit_balance_path_before,
-                },
-            },
-            after: OperationBranch {
-                address: Some(account_address_fe),
-                token: Some(token_fe),
-                witness: OperationBranchWitness {
-                    account_witness: account_witness_after,
-                    account_path: audit_path_after,
-                    balance_value: Some(balance_after),
-                    balance_subtree_path: audit_balance_path_after,
-                },
-            },
-            args: OperationArguments {
-                eth_address: Some(deposit.address),
-                amount_packed: Some(Fr::zero()),
-                full_amount: Some(amount_as_field_element),
-                fee: Some(Fr::zero()),
-                a: Some(a),
-                b: Some(b),
-                pub_nonce: Some(Fr::zero()),
-                new_pub_key_hash: Some(Fr::zero()),
-            },
-            before_root: Some(before_root),
-            after_root: Some(after_root),
-            tx_type: Some(Fr::from_str("1").unwrap()),
-        }
-    }
-
-    pub fn calculate_operations(&self) -> Vec<Operation<Bn256>> {
+    fn calculate_operations(&self, _input: ()) -> Vec<Operation<Bn256>> {
         let first_sig_msg = &Fr::zero();
         let second_sig_msg = &Fr::zero();
         let third_sig_msg = &Fr::zero();
@@ -304,5 +205,112 @@ impl DepositWitness<Bn256> {
             operation_five,
         ];
         operations
+    }
+}
+
+impl<E: RescueEngine> DepositWitness<E> {
+    // CLARIFY: What? Why?
+    pub fn get_sig_bits(&self) -> Vec<bool> {
+        let mut sig_bits = vec![];
+        append_be_fixed_width(
+            &mut sig_bits,
+            &Fr::from_str("1").unwrap(), //Corresponding tx_type
+            franklin_constants::TX_TYPE_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.new_pub_key_hash.unwrap(),
+            franklin_constants::NEW_PUBKEY_HASH_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.token.unwrap(),
+            franklin_constants::TOKEN_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.args.full_amount.unwrap(),
+            franklin_constants::BALANCE_BIT_WIDTH,
+        );
+        append_be_fixed_width(
+            &mut sig_bits,
+            &self.before.witness.account_witness.nonce.unwrap(),
+            franklin_constants::NONCE_BIT_WIDTH,
+        );
+        sig_bits
+    }
+}
+
+impl DepositWitness<Bn256> {
+    fn apply_data(tree: &mut CircuitAccountTree, deposit: &DepositData) -> Self {
+        //preparing data and base witness
+        let before_root = tree.root_hash();
+        debug!("deposit Initial root = {}", before_root);
+        let (audit_path_before, audit_balance_path_before) =
+            get_audits(tree, deposit.account_address, deposit.token);
+
+        let capacity = tree.capacity();
+        assert_eq!(capacity, 1 << franklin_constants::account_tree_depth());
+        let account_address_fe = Fr::from_str(&deposit.account_address.to_string()).unwrap();
+        let token_fe = Fr::from_str(&deposit.token.to_string()).unwrap();
+        let amount_as_field_element = Fr::from_str(&deposit.amount.to_string()).unwrap();
+        debug!("amount_as_field_element is: {}", amount_as_field_element);
+        //calculate a and b
+        let a = amount_as_field_element;
+        let b = Fr::zero();
+
+        //applying deposit
+        let (account_witness_before, account_witness_after, balance_before, balance_after) =
+            apply_leaf_operation(
+                tree,
+                deposit.account_address,
+                deposit.token,
+                |acc| {
+                    assert!((acc.address == deposit.address) || (acc.address == Fr::zero()));
+                    acc.address = deposit.address;
+                },
+                |bal| bal.value.add_assign(&amount_as_field_element),
+            );
+
+        let after_root = tree.root_hash();
+        debug!("deposit After root = {}", after_root);
+        let (audit_path_after, audit_balance_path_after) =
+            get_audits(tree, deposit.account_address, deposit.token);
+
+        DepositWitness {
+            before: OperationBranch {
+                address: Some(account_address_fe),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: account_witness_before,
+                    account_path: audit_path_before,
+                    balance_value: Some(balance_before),
+                    balance_subtree_path: audit_balance_path_before,
+                },
+            },
+            after: OperationBranch {
+                address: Some(account_address_fe),
+                token: Some(token_fe),
+                witness: OperationBranchWitness {
+                    account_witness: account_witness_after,
+                    account_path: audit_path_after,
+                    balance_value: Some(balance_after),
+                    balance_subtree_path: audit_balance_path_after,
+                },
+            },
+            args: OperationArguments {
+                eth_address: Some(deposit.address),
+                amount_packed: Some(Fr::zero()),
+                full_amount: Some(amount_as_field_element),
+                fee: Some(Fr::zero()),
+                a: Some(a),
+                b: Some(b),
+                pub_nonce: Some(Fr::zero()),
+                new_pub_key_hash: Some(Fr::zero()),
+            },
+            before_root: Some(before_root),
+            after_root: Some(after_root),
+            tx_type: Some(Fr::from_str("1").unwrap()),
+        }
     }
 }

@@ -20,7 +20,10 @@ use crate::{
     operation::{
         Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
     },
-    witness::utils::{apply_leaf_operation, get_audits},
+    witness::{
+        utils::{apply_leaf_operation, get_audits},
+        Witness,
+    },
 };
 
 pub struct ChangePubkeyOffChainData {
@@ -39,8 +42,22 @@ pub struct ChangePubkeyOffChainWitness<E: RescueEngine> {
     pub tx_type: Option<E::Fr>,
 }
 
-impl<E: RescueEngine> ChangePubkeyOffChainWitness<E> {
-    pub fn get_pubdata(&self) -> Vec<bool> {
+impl Witness for ChangePubkeyOffChainWitness<Bn256> {
+    type OperationType = ChangePubKeyOp;
+    type CalculateOpsInput = ();
+
+    fn apply_tx(tree: &mut CircuitAccountTree, change_pubkey_offchain: &ChangePubKeyOp) -> Self {
+        let change_pubkey_data = ChangePubkeyOffChainData {
+            account_id: change_pubkey_offchain.account_id,
+            address: eth_address_to_fr(&change_pubkey_offchain.tx.account),
+            new_pubkey_hash: change_pubkey_offchain.tx.new_pk_hash.to_fr(),
+            nonce: Fr::from_str(&change_pubkey_offchain.tx.nonce.to_string()).unwrap(),
+        };
+
+        Self::apply_data(tree, change_pubkey_data)
+    }
+
+    fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -75,23 +92,31 @@ impl<E: RescueEngine> ChangePubkeyOffChainWitness<E> {
         );
         pubdata_bits
     }
+
+    fn calculate_operations(&self, _input: ()) -> Vec<Operation<Bn256>> {
+        self.get_pubdata()
+            .chunks(64)
+            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
+            .enumerate()
+            .map(|(chunk_n, pubdata_chunk)| Operation {
+                new_root: self.after_root,
+                tx_type: self.tx_type,
+                chunk: Some(Fr::from_str(&chunk_n.to_string()).unwrap()),
+                pubdata_chunk: Some(pubdata_chunk),
+                first_sig_msg: Some(Fr::zero()),
+                second_sig_msg: Some(Fr::zero()),
+                third_sig_msg: Some(Fr::zero()),
+                signature_data: SignatureData::init_empty(),
+                signer_pub_key_packed: vec![Some(false); 256],
+                args: self.args.clone(),
+                lhs: self.before.clone(),
+                rhs: self.after.clone(),
+            })
+            .collect()
+    }
 }
 
 impl ChangePubkeyOffChainWitness<Bn256> {
-    pub fn apply_tx(
-        tree: &mut CircuitAccountTree,
-        change_pubkey_offchain: &ChangePubKeyOp,
-    ) -> Self {
-        let change_pubkey_data = ChangePubkeyOffChainData {
-            account_id: change_pubkey_offchain.account_id,
-            address: eth_address_to_fr(&change_pubkey_offchain.tx.account),
-            new_pubkey_hash: change_pubkey_offchain.tx.new_pk_hash.to_fr(),
-            nonce: Fr::from_str(&change_pubkey_offchain.tx.nonce.to_string()).unwrap(),
-        };
-
-        Self::apply_data(tree, change_pubkey_data)
-    }
-
     fn apply_data(
         tree: &mut CircuitAccountTree,
         change_pubkey_offcahin: ChangePubkeyOffChainData,
@@ -166,27 +191,5 @@ impl ChangePubkeyOffChainWitness<Bn256> {
             after_root: Some(after_root),
             tx_type: Some(Fr::from_str("7").unwrap()),
         }
-    }
-
-    pub fn calculate_operations(&self) -> Vec<Operation<Bn256>> {
-        self.get_pubdata()
-            .chunks(64)
-            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-            .enumerate()
-            .map(|(chunk_n, pubdata_chunk)| Operation {
-                new_root: self.after_root,
-                tx_type: self.tx_type,
-                chunk: Some(Fr::from_str(&chunk_n.to_string()).unwrap()),
-                pubdata_chunk: Some(pubdata_chunk),
-                first_sig_msg: Some(Fr::zero()),
-                second_sig_msg: Some(Fr::zero()),
-                third_sig_msg: Some(Fr::zero()),
-                signature_data: SignatureData::init_empty(),
-                signer_pub_key_packed: vec![Some(false); 256],
-                args: self.args.clone(),
-                lhs: self.before.clone(),
-                rhs: self.after.clone(),
-            })
-            .collect()
     }
 }

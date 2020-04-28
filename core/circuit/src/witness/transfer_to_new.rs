@@ -18,7 +18,10 @@ use models::{
 // Local deps
 use crate::{
     operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
-    witness::utils::{apply_leaf_operation, get_audits, SigDataInput},
+    witness::{
+        utils::{apply_leaf_operation, get_audits, SigDataInput},
+        Witness,
+    },
 };
 
 pub struct TransferToNewData {
@@ -44,8 +47,24 @@ pub struct TransferToNewWitness<E: RescueEngine> {
     pub tx_type: Option<E::Fr>,
 }
 
-impl<E: RescueEngine> TransferToNewWitness<E> {
-    pub fn get_pubdata(&self) -> Vec<bool> {
+impl Witness for TransferToNewWitness<Bn256> {
+    type OperationType = TransferToNewOp;
+    type CalculateOpsInput = SigDataInput;
+
+    fn apply_tx(tree: &mut CircuitAccountTree, transfer_to_new: &TransferToNewOp) -> Self {
+        let transfer_data = TransferToNewData {
+            amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),
+            fee: transfer_to_new.tx.fee.to_string().parse().unwrap(),
+            token: u32::from(transfer_to_new.tx.token),
+            from_account_address: transfer_to_new.from,
+            to_account_address: transfer_to_new.to,
+            new_address: eth_address_to_fr(&transfer_to_new.tx.to),
+        };
+        // le_bit_vector_into_field_element()
+        Self::apply_data(tree, &transfer_data)
+    }
+
+    fn get_pubdata(&self) -> Vec<bool> {
         let mut pubdata_bits = vec![];
         append_be_fixed_width(
             &mut pubdata_bits,
@@ -90,6 +109,99 @@ impl<E: RescueEngine> TransferToNewWitness<E> {
         pubdata_bits.resize(5 * franklin_constants::CHUNK_BIT_WIDTH, false);
         pubdata_bits
     }
+
+    fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
+        let pubdata_chunks: Vec<_> = self
+            .get_pubdata()
+            .chunks(64)
+            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
+            .collect();
+
+        let operation_zero = Operation {
+            new_root: self.intermediate_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str("0").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[0]),
+            first_sig_msg: Some(input.first_sig_msg),
+            second_sig_msg: Some(input.second_sig_msg),
+            third_sig_msg: Some(input.third_sig_msg),
+            signature_data: input.signature.clone(),
+            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
+            args: self.args.clone(),
+            lhs: self.from_before.clone(),
+            rhs: self.to_before.clone(),
+        };
+
+        let operation_one = Operation {
+            new_root: self.after_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str("1").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[1]),
+            first_sig_msg: Some(input.first_sig_msg),
+            second_sig_msg: Some(input.second_sig_msg),
+            third_sig_msg: Some(input.third_sig_msg),
+            signature_data: input.signature.clone(),
+            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
+            args: self.args.clone(),
+            lhs: self.from_intermediate.clone(),
+            rhs: self.to_intermediate.clone(),
+        };
+
+        let operation_two = Operation {
+            new_root: self.after_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str("2").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[2]),
+            first_sig_msg: Some(input.first_sig_msg),
+            second_sig_msg: Some(input.second_sig_msg),
+            third_sig_msg: Some(input.third_sig_msg),
+            signature_data: input.signature.clone(),
+            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
+            args: self.args.clone(),
+            lhs: self.from_after.clone(),
+            rhs: self.to_after.clone(),
+        };
+
+        let operation_three = Operation {
+            new_root: self.after_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str("3").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[3]),
+            first_sig_msg: Some(input.first_sig_msg),
+            second_sig_msg: Some(input.second_sig_msg),
+            third_sig_msg: Some(input.third_sig_msg),
+            signature_data: input.signature.clone(),
+            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
+            args: self.args.clone(),
+            lhs: self.from_after.clone(),
+            rhs: self.to_after.clone(),
+        };
+
+        let operation_four = Operation {
+            new_root: self.after_root,
+            tx_type: self.tx_type,
+            chunk: Some(Fr::from_str("4").unwrap()),
+            pubdata_chunk: Some(pubdata_chunks[4]),
+            first_sig_msg: Some(input.first_sig_msg),
+            second_sig_msg: Some(input.second_sig_msg),
+            third_sig_msg: Some(input.third_sig_msg),
+            signature_data: input.signature.clone(),
+            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
+            args: self.args.clone(),
+            lhs: self.from_after.clone(),
+            rhs: self.to_after.clone(),
+        };
+        vec![
+            operation_zero,
+            operation_one,
+            operation_two,
+            operation_three,
+            operation_four,
+        ]
+    }
+}
+
+impl<E: RescueEngine> TransferToNewWitness<E> {
     pub fn get_sig_bits(&self) -> Vec<bool> {
         let mut sig_bits = vec![];
         append_be_fixed_width(
@@ -139,19 +251,6 @@ impl<E: RescueEngine> TransferToNewWitness<E> {
 }
 
 impl TransferToNewWitness<Bn256> {
-    pub fn apply_tx(tree: &mut CircuitAccountTree, transfer_to_new: &TransferToNewOp) -> Self {
-        let transfer_data = TransferToNewData {
-            amount: transfer_to_new.tx.amount.to_string().parse().unwrap(),
-            fee: transfer_to_new.tx.fee.to_string().parse().unwrap(),
-            token: u32::from(transfer_to_new.tx.token),
-            from_account_address: transfer_to_new.from,
-            to_account_address: transfer_to_new.to,
-            new_address: eth_address_to_fr(&transfer_to_new.tx.to),
-        };
-        // le_bit_vector_into_field_element()
-        Self::apply_data(tree, &transfer_data)
-    }
-
     fn apply_data(tree: &mut CircuitAccountTree, transfer_to_new: &TransferToNewData) -> Self {
         //preparing data and base witness
         let before_root = tree.root_hash();
@@ -345,95 +444,5 @@ impl TransferToNewWitness<Bn256> {
             after_root: Some(after_root),
             tx_type: Some(Fr::from_str("2").unwrap()),
         }
-    }
-
-    pub fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
-        let pubdata_chunks: Vec<_> = self
-            .get_pubdata()
-            .chunks(64)
-            .map(|x| le_bit_vector_into_field_element(&x.to_vec()))
-            .collect();
-
-        let operation_zero = Operation {
-            new_root: self.intermediate_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("0").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[0]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.from_before.clone(),
-            rhs: self.to_before.clone(),
-        };
-
-        let operation_one = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("1").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[1]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.from_intermediate.clone(),
-            rhs: self.to_intermediate.clone(),
-        };
-
-        let operation_two = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("2").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[2]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.from_after.clone(),
-            rhs: self.to_after.clone(),
-        };
-
-        let operation_three = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("3").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[3]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.from_after.clone(),
-            rhs: self.to_after.clone(),
-        };
-
-        let operation_four = Operation {
-            new_root: self.after_root,
-            tx_type: self.tx_type,
-            chunk: Some(Fr::from_str("4").unwrap()),
-            pubdata_chunk: Some(pubdata_chunks[4]),
-            first_sig_msg: Some(input.first_sig_msg),
-            second_sig_msg: Some(input.second_sig_msg),
-            third_sig_msg: Some(input.third_sig_msg),
-            signature_data: input.signature.clone(),
-            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
-            args: self.args.clone(),
-            lhs: self.from_after.clone(),
-            rhs: self.to_after.clone(),
-        };
-        vec![
-            operation_zero,
-            operation_one,
-            operation_two,
-            operation_three,
-            operation_four,
-        ]
     }
 }
