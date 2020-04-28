@@ -9,6 +9,7 @@ use crate::franklin_crypto::eddsa::PrivateKey;
 use crate::franklin_crypto::eddsa::PublicKey;
 use crate::franklin_crypto::jubjub::FixedGenerators;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use crate::operation::Operation;
 use crate::operation::SignatureData;
 use crate::rand::{Rng, SeedableRng, XorShiftRng};
@@ -18,11 +19,11 @@ use crypto::sha2::Sha256;
 use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
 use models::circuit::utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element};
 use models::merkle_tree::hasher::Hasher;
-use models::merkle_tree::PedersenHasher;
-use models::node::block::Block;
+use models::merkle_tree::{PedersenHasher, RescueHasher};
 use models::node::tx::PackedPublicKey;
 use models::node::{AccountId, BlockNumber, Engine, Fr};
 use models::params as franklin_constants;
+use models::params::total_tokens;
 use num::ToPrimitive;
 use plasma::state::CollectedFee;
 
@@ -74,9 +75,11 @@ impl<'a> WitnessBuilder<'a> {
     }
 
     /// Add noops if pubdata isn't of right size
-    pub fn extend_pubdata_with_noops(&mut self) {
+    pub fn extend_pubdata_with_noops(&mut self, block_size_chunks: usize) {
         let chunks_used = self.operations.len();
-        let chunks_remaining = Block::smallest_block_size_for_chunks(chunks_used) - chunks_used;
+        let chunks_remaining = block_size_chunks
+            .checked_sub(chunks_used)
+            .expect("failed to get number of noops");
         for _ in 0..chunks_remaining {
             self.operations.push(crate::witness::noop::noop_operation(
                 &self.account_tree,
@@ -94,9 +97,8 @@ impl<'a> WitnessBuilder<'a> {
             .account_tree
             .get(self.fee_account_id)
             .expect("fee account is not in the tree");
-        let mut fee_circuit_account_balances =
-            Vec::with_capacity(1 << models::params::BALANCE_TREE_DEPTH);
-        for i in 0u32..1u32 << (models::params::BALANCE_TREE_DEPTH as u32) {
+        let mut fee_circuit_account_balances = Vec::with_capacity(models::params::total_tokens());
+        for i in 0u32..(total_tokens() as u32) {
             let balance_value = fee_circuit_account
                 .subtree
                 .get(i)
@@ -146,7 +148,8 @@ impl<'a> WitnessBuilder<'a> {
     pub fn into_circuit_instance(self) -> FranklinCircuit<'static, Engine> {
         let operation_batch_size = self.operations.len();
         FranklinCircuit {
-            params: &models::params::JUBJUB_PARAMS,
+            rescue_params: &models::params::RESCUE_PARAMS,
+            jubjub_params: &models::params::JUBJUB_PARAMS,
             operation_batch_size,
             old_root: Some(self.initial_root_hash),
             new_root: Some(self.root_after_fees.expect("root after fee not present")),
@@ -172,31 +175,31 @@ impl<'a> WitnessBuilder<'a> {
 
 pub fn generate_dummy_sig_data(
     bits: &[bool],
-    phasher: &PedersenHasher<Bn256>,
-    params: &AltJubjubBn256,
+    rescue_hasher: &RescueHasher<Bn256>,
+    rescue_params: &Bn256RescueParams,
+    jubjub_params: &AltJubjubBn256,
 ) -> (SignatureData, Fr, Fr, Fr, Fr, Fr) {
     let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let private_key = PrivateKey::<Bn256>(rng.gen());
-    let sender_pk = PublicKey::from_private(&private_key, p_g, &params);
+    let sender_pk = PublicKey::from_private(&private_key, p_g, &jubjub_params);
     let (sender_x, sender_y) = sender_pk.0.into_xy();
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
     let first_sig_part: Fr = le_bit_vector_into_field_element(&first_sig_part_bits);
     let second_sig_part: Fr = le_bit_vector_into_field_element(&second_sig_part_bits);
     let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
-    let sig_msg = phasher.hash_bits(sig_bits_to_hash.clone());
+    let sig_msg = rescue_hasher.hash_bits(sig_bits_to_hash.clone());
     let mut sig_bits: Vec<bool> = BitIterator::new(sig_msg.into_repr()).collect();
     sig_bits.reverse();
     sig_bits.resize(256, false);
 
-    let signature_data = sign_sha256(&sig_bits, &private_key, p_g, params);
-    // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
+    let signature_data = sign_rescue(&sig_bits, &private_key, p_g, rescue_params, jubjub_params);
     (
         signature_data,
         first_sig_part,
@@ -213,9 +216,9 @@ pub fn generate_sig_witness(
     _params: &AltJubjubBn256,
 ) -> (Fr, Fr, Fr) {
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(sig_bits_to_hash.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
     let (first_sig_part_bits, remaining) = sig_bits_to_hash.split_at(Fr::CAPACITY as usize);
     let remaining = remaining.to_vec();
     let (second_sig_part_bits, third_sig_part_bits) = remaining.split_at(Fr::CAPACITY as usize);
@@ -224,17 +227,19 @@ pub fn generate_sig_witness(
     let third_sig_part: Fr = le_bit_vector_into_field_element(&third_sig_part_bits);
     (first_sig_part, second_sig_part, third_sig_part)
 }
+
 pub fn generate_sig_data(
     bits: &[bool],
     phasher: &PedersenHasher<Bn256>,
     private_key: &PrivateKey<Bn256>,
-    params: &AltJubjubBn256,
+    rescue_params: &Bn256RescueParams,
+    jubjub_params: &AltJubjubBn256,
 ) -> (SignatureData, Fr, Fr, Fr) {
     let p_g = FixedGenerators::SpendingKeyGenerator;
     let mut sig_bits_to_hash = bits.to_vec();
-    assert!(sig_bits_to_hash.len() <= franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(sig_bits_to_hash.len() <= franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
 
-    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS, false);
+    sig_bits_to_hash.resize(franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS, false);
     debug!(
         "inside generation after resize: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits_to_hash))
@@ -256,8 +261,7 @@ pub fn generate_sig_data(
         "inside generation: {}",
         hex::encode(be_bit_vector_into_bytes(&sig_bits))
     );
-    let signature_data = sign_sha256(&sig_bits, &private_key, p_g, params);
-    // let signature = sign_sha(&sig_bits, &private_key, p_g, params, rng);
+    let signature_data = sign_rescue(&sig_bits, &private_key, p_g, rescue_params, jubjub_params);
 
     (
         signature_data,

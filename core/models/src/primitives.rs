@@ -13,7 +13,9 @@ use num::{BigUint, FromPrimitive, ToPrimitive};
 use web3::types::U256;
 // Workspace deps
 use crate::circuit::utils::append_le_fixed_width;
-use crate::merkle_tree::{hasher::Hasher, pedersen_hasher::BabyPedersenHasher};
+use crate::merkle_tree::{
+    hasher::Hasher, pedersen_hasher::BabyPedersenHasher, rescue_hasher::BabyRescueHasher,
+};
 use crate::params;
 
 // TODO: replace Vec with Iterator?
@@ -104,7 +106,10 @@ pub fn field_element_to_u128<P: PrimeField>(fr: P) -> u128 {
     res
 }
 
-pub fn serialize_g1_for_ethereum(point: <Bn256 as Engine>::G1Affine) -> (U256, U256) {
+pub fn serialize_g1_for_ethereum(point: &<Bn256 as Engine>::G1Affine) -> (U256, U256) {
+    if point.is_zero() {
+        return (U256::zero(), U256::zero());
+    }
     let uncompressed = point.into_uncompressed();
 
     let uncompressed_slice = uncompressed.as_ref();
@@ -118,7 +123,7 @@ pub fn serialize_g1_for_ethereum(point: <Bn256 as Engine>::G1Affine) -> (U256, U
 }
 
 pub fn serialize_g2_for_ethereum(
-    point: <Bn256 as Engine>::G2Affine,
+    point: &<Bn256 as Engine>::G2Affine,
 ) -> ((U256, U256), (U256, U256)) {
     let uncompressed = point.into_uncompressed();
 
@@ -134,7 +139,7 @@ pub fn serialize_g2_for_ethereum(
     ((x_1, x_0), (y_1, y_0))
 }
 
-pub fn serialize_fe_for_ethereum(field_element: <Bn256 as ScalarEngine>::Fr) -> U256 {
+pub fn serialize_fe_for_ethereum(field_element: &<Bn256 as ScalarEngine>::Fr) -> U256 {
     let mut be_bytes = [0u8; 32];
     field_element
         .into_repr()
@@ -401,6 +406,16 @@ pub fn pedersen_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
     let mut msg_bits = bytes_into_be_bits(msg);
     msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
     let hasher = &params::PEDERSEN_HASHER as &BabyPedersenHasher;
+    let hash_fr = hasher.hash_bits(msg_bits.into_iter());
+    let mut hash_bits = Vec::new();
+    append_le_fixed_width(&mut hash_bits, &hash_fr, 256);
+    pack_bits_into_bytes(hash_bits)
+}
+
+pub fn rescue_hash_tx_msg(msg: &[u8]) -> Vec<u8> {
+    let mut msg_bits = bytes_into_be_bits(msg);
+    msg_bits.resize(params::PAD_MSG_BEFORE_HASH_BITS_LEN, false);
+    let hasher = &params::RESCUE_HASHER as &BabyRescueHasher;
     let hash_fr = hasher.hash_bits(msg_bits.into_iter());
     let mut hash_bits = Vec::new();
     append_le_fixed_width(&mut hash_bits, &hash_fr, 256);

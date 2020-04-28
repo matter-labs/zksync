@@ -6,11 +6,16 @@ export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export DEV_TICKER_DOCKER_IMAGE ?= matterlabs/dev-ticker:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
+export GANACHE_DOCKER_IMAGE ?= matterlabs/ganache
 
 # Getting started
 
 # Check and change environment (listed here for autocomplete and documentation only)
+# next two target are hack that allows to pass arguments to makefile
 env:	
+	@bin/zkenv $(filter-out $@,$(MAKECMDGOALS))
+%:
+	@:
 
 # Get everything up and running for the first time
 init:
@@ -99,15 +104,18 @@ image-ci:
 push-image-ci: image-ci
 	docker push "${CI_DOCKER_IMAGE}"
 
+image-ganache:
+	@cd docker/ganache && envsubst < Dockerfile | docker build -t "${GANACHE_DOCKER_IMAGE}" . -f -
+
+push-image-ganache: image-ganache
+	docker push "${GANACHE_DOCKER_IMAGE}"
+
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
 rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 
 # Rust: main stuff
-
-prover:
-	@bin/provers-launch-dev
 
 server:
 	@cargo run --bin server --release
@@ -159,11 +167,8 @@ build-contracts: confirm_action prepare-contracts
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
-gen-keys-if-not-present:
-	test -f ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol || gen-keys
-
 prepare-contracts:
-	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
 # testing
 
@@ -171,9 +176,7 @@ ci-check:
 	@ci-check.sh
 	
 integration-testkit: build-contracts
-	cargo run --bin testkit --release
-	cargo run --bin exodus_test --release
-	cargo run --bin migration_test --release
+	@bin/integration-testkit
 
 migration-test: build-contracts
 	cargo run --bin migration_test --release
@@ -194,9 +197,6 @@ integration-full-exit:
 
 price:
 	@node contracts/scripts/check-price.js
-
-circuit-tests:
-	cargo test --no-fail-fast --release -p circuit -- --ignored --test-threads 1
 
 prover-tests:
 	f cargo test -p prover --release -- --ignored
@@ -267,7 +267,7 @@ endif
 restart: stop start
 
 start-provers:
-	@bin/provers-scale 1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=1
@@ -280,7 +280,7 @@ start-server-supervisor:
 
 
 stop-provers:
-	@bin/provers-scale 0
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=0

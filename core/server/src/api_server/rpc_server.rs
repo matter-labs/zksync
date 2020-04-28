@@ -149,21 +149,27 @@ pub trait Rpc {
         &self,
         addr: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send>;
+
     #[rpc(name = "ethop_info")]
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp>;
+
     #[rpc(name = "tx_info")]
     fn tx_info(&self, hash: TxHash) -> Result<TransactionInfoResp>;
+
     #[rpc(name = "tx_submit", returns = "TxHash")]
     fn tx_submit(
         &self,
         tx: Box<FranklinTx>,
         signature: Box<Option<TxEthSignature>>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
+
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
+
     /// "ETH" | #ERC20_ADDRESS => {Token}
     #[rpc(name = "tokens")]
     fn tokens(&self) -> Result<HashMap<String, Token>>;
+
     #[rpc(name = "get_tx_fee")]
     fn get_tx_fee(
         &self,
@@ -361,7 +367,7 @@ impl Rpc for RpcApp {
                     state_keeper_response.0,
                 ))
                 .await
-                .expect("state keeper receiver dropped");
+                .map_err(|_| Error::internal_error())?;
             let committed_account_state = state_keeper_response
                 .1
                 .await
@@ -466,7 +472,7 @@ impl Rpc for RpcApp {
             mempool_sender
                 .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
                 .await
-                .expect("mempool receiver dropped");
+                .map_err(|_| Error::internal_error())?;
             let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
 
             tx_add_result.map(|_| hash).map_err(|e| Error {
@@ -486,9 +492,17 @@ impl Rpc for RpcApp {
             .load_config()
             .map_err(|_| Error::internal_error())?;
 
+        // `expect` calls below are safe, since not having the addresses in the server config
+        // means a misconfiguration, server cannot operate in this condition.
+        let main_contract = config
+            .contract_addr
+            .expect("Server config doesn't contain the main contract address");
+        let gov_contract = config
+            .gov_contract_addr
+            .expect("Server config doesn't contain the gov contract address");
         Ok(ContractAddressResp {
-            main_contract: config.contract_addr.expect("server config"),
-            gov_contract: config.gov_contract_addr.expect("server config"),
+            main_contract,
+            gov_contract,
         })
     }
 
@@ -587,7 +601,7 @@ async fn verify_tx_info_message_signature(
     req_channel
         .send(request)
         .await
-        .expect("verifier pool receiver dropped");
+        .map_err(|_| Error::internal_error())?;
 
     // Wait for the check result.
     resp.1

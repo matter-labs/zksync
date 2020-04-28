@@ -10,14 +10,12 @@ storage = { path = "../storage", version = "0.0.1" }
 circuit = { path = "../circuit", version = "0.1.1"}
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
-hex = "0.3"
+hex = "0.4"
 rust-crypto = "0.2"
-rustc-hex = "2.0.1"
 
 web3 = "0.10.0"
 signal-hook = "0.1.8"
 tokio = "0.1.18"
-futures = "0.1.28"
 
 fnv = "1.0.6"
 serde = "1.0.90"
@@ -30,7 +28,8 @@ log = "0.4"
 env_logger = "0.6"
 num-traits = "0.2"
 actix-web = "1.0"
-reqwest = "0.9.22"
+reqwest = { version = "0.10", features = ["blocking", "json"] }
 failure = "0.1"
 backoff = "0.1.6"
 clap = "2.33.0"
+ctrlc = "3.1"

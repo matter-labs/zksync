@@ -4,7 +4,7 @@
 use clap::{App, Arg};
 use log::info;
 use models::node::{Address, TokenId, TokenLike};
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use num::BigUint;
 use serde::Serialize;
 use std::time::Instant;
@@ -15,7 +15,7 @@ struct ExitProofData {
     token_id: TokenId,
     owner: Address,
     amount: BigUint,
-    proof: EncodedProof,
+    proof: EncodedProofPlonk,
 }
 
 fn main() {
@@ -58,7 +58,7 @@ fn main() {
 
     let timer = Instant::now();
     info!("Restoring state from db");
-    let connection_pool = ConnectionPool::new();
+    let connection_pool = ConnectionPool::new(Some(1));
     let storage = connection_pool
         .access_storage()
         .expect("Storage access failed");

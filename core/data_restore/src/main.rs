@@ -20,9 +20,9 @@ const ETH_BLOCKS_STEP: u64 = 1;
 const END_ETH_BLOCKS_OFFSET: u64 = 40;
 
 fn main() {
-    info!("Restoring ZK Sync state from the contract");
+    info!("Restoring zkSync state from the contract");
     env_logger::init();
-    let connection_pool = ConnectionPool::new();
+    let connection_pool = ConnectionPool::new(Some(1));
     let config_opts = ConfigurationOptions::from_env();
 
     let cli = App::new("Data restore driver")
@@ -45,6 +45,7 @@ fn main() {
     let governance_genesis_tx_hash = config_opts.governance_genesis_tx_hash;
     let contract_addr = config_opts.contract_eth_addr;
     let contract_genesis_tx_hash = config_opts.contract_genesis_tx_hash;
+    let available_block_chunk_sizes = config_opts.available_block_chunk_sizes;
 
     let mut driver = DataRestoreDriver::new(
         connection_pool,
@@ -53,6 +54,7 @@ fn main() {
         contract_addr,
         ETH_BLOCKS_STEP,
         END_ETH_BLOCKS_OFFSET,
+        available_block_chunk_sizes,
     );
 
     // If genesis is argument is present - there will be fetching contracts creation transactions to get first eth block and genesis acc address

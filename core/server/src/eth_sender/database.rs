@@ -22,7 +22,7 @@ use super::transactions::ETHStats;
 pub(super) trait DatabaseAccess {
     /// Loads the unconfirmed and unprocessed operations from the database.
     /// Unconfirmed operations are Ethereum operations that were started, but not confirmed yet.
-    /// Unprocessed operations are ZK Sync operations that were not started at all.
+    /// Unprocessed operations are zkSync operations that were not started at all.
     fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error>;
 
     /// Saves a new unconfirmed operation to the database.

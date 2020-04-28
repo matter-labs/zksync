@@ -59,17 +59,19 @@ pub fn get_operation(
     block_number: BlockNumber,
     action: Action,
     accounts_updated: Vec<(u32, AccountUpdate)>,
+    block_size: usize,
 ) -> Operation {
     Operation {
         id: None,
         action,
-        block: Block {
+        block: Block::new(
             block_number,
-            new_root_hash: Fr::default(),
-            fee_account: 0,
-            block_transactions: Vec::new(),
-            processed_priority_ops: (0, 0),
-        },
+            Fr::default(),
+            0,
+            Vec::new(),
+            (0, 0),
+            block_size,
+        ),
         accounts_updated,
     }
 }

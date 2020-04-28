@@ -1,7 +1,7 @@
 // External imports
 use web3::types::H256;
 // Workspace imports
-use crypto_exports::rand::XorShiftRng;
+use crypto_exports::{ff::PrimeField, rand::XorShiftRng};
 use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, Fr};
 use models::{ethereum::OperationType, fe_to_bytes, Action, Operation};
 // Local imports
@@ -16,6 +16,9 @@ use crate::{
     prover::ProverSchema,
     StorageProcessor,
 };
+
+/// block size used for this tests
+const BLOCK_SIZE_CHUNKS: usize = 100;
 
 /// Creates several random updates for the provided account map,
 /// and returns the resulting account map together with the list
@@ -56,9 +59,24 @@ fn test_commit_rewind() {
             apply_random_updates(accounts_block_2.clone(), &mut rng);
 
         // Execute and commit these blocks.
-        BlockSchema(&conn).execute_operation(get_operation(1, Action::Commit, updates_block_1))?;
-        BlockSchema(&conn).execute_operation(get_operation(2, Action::Commit, updates_block_2))?;
-        BlockSchema(&conn).execute_operation(get_operation(3, Action::Commit, updates_block_3))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            1,
+            Action::Commit,
+            updates_block_1,
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            2,
+            Action::Commit,
+            updates_block_2,
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            3,
+            Action::Commit,
+            updates_block_3,
+            BLOCK_SIZE_CHUNKS,
+        ))?;
 
         // Check that they are stored in state.
         let (block, state) = StateSchema(&conn).load_committed_state(Some(1)).unwrap();
@@ -78,6 +96,7 @@ fn test_commit_rewind() {
                 proof: Default::default(),
             },
             Vec::new(),
+            BLOCK_SIZE_CHUNKS,
         ))?;
         ProverSchema(&conn).store_proof(2, &Default::default())?;
         BlockSchema(&conn).execute_operation(get_operation(
@@ -86,6 +105,7 @@ fn test_commit_rewind() {
                 proof: Default::default(),
             },
             Vec::new(),
+            BLOCK_SIZE_CHUNKS,
         ))?;
 
         // Check that we still can get the state for these blocks.
@@ -108,7 +128,7 @@ fn test_commit_rewind() {
 
 /// Creates an unique new root hash for the block based on its number.
 fn root_hash_for_block(block_number: BlockNumber) -> Fr {
-    Fr::from_hex(format!("{:064x}", block_number).as_ref()).unwrap()
+    Fr::from_str(&block_number.to_string()).unwrap()
 }
 
 /// Creates an unique ethereum operation hash based on its number.
@@ -125,13 +145,14 @@ fn get_unique_operation(
     Operation {
         id: None,
         action,
-        block: Block {
+        block: Block::new(
             block_number,
-            new_root_hash: root_hash_for_block(block_number),
-            fee_account: 0,
-            block_transactions: Vec::new(),
-            processed_priority_ops: (0, 0),
-        },
+            root_hash_for_block(block_number),
+            0,
+            Vec::new(),
+            (0, 0),
+            100,
+        ),
         accounts_updated,
     }
 }
@@ -432,6 +453,7 @@ fn load_commits_after_block() {
                 block_id,
                 Action::Commit,
                 updates,
+                BLOCK_SIZE_CHUNKS,
             ))?;
 
             operations.push(operation);
@@ -445,6 +467,7 @@ fn load_commits_after_block() {
                 proof: Default::default(),
             },
             Vec::new(),
+            BLOCK_SIZE_CHUNKS,
         ))?;
         ProverSchema(&conn).store_proof(3, &Default::default())?;
 

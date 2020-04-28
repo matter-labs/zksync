@@ -48,6 +48,7 @@ pub struct StoredExecutedPriorityOperation {
     pub priority_op_serialid: i64,
     pub deadline_block: i64,
     pub eth_hash: Vec<u8>,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Insertable)]
@@ -64,6 +65,7 @@ pub struct NewExecutedTransaction {
     pub fail_reason: Option<String>,
     pub primary_account_address: Vec<u8>,
     pub nonce: i64,
+    pub created_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Queryable, QueryableByName)]
@@ -81,4 +83,5 @@ pub struct StoredExecutedTransaction {
     pub fail_reason: Option<String>,
     pub primary_account_address: Vec<u8>,
     pub nonce: i64,
+    pub created_at: NaiveDateTime,
 }

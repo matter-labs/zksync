@@ -1,4 +1,4 @@
-# ZK Sync Rollup Protocol
+# zkSync Rollup Protocol
 
 ## Table of contents
 
@@ -12,8 +12,8 @@
     + [Data types](#data-types)
     + [Amount packing](#amount-packing)
     + [State Merkle Tree (SMT)](#state-merkle-tree)
-    + [ZK Sync block pub data format](#zk-sync-block-pub-data-format)
-  * [ZK Sync operations](#zk-sync-operations)
+    + [zkSync block pub data format](#zk-sync-block-pub-data-format)
+  * [zkSync operations](#zk-sync-operations)
     + [1. Noop operation](#1-noop-operation)
     + [2. Transfer](#2-transfer)
     + [3. Transfer to new](#3-transfer-to-new)
@@ -55,7 +55,7 @@
 ## Glossary
 
 - **L1**: layer-1 blockchain (Ethereum)
-- **Rollup**: layer-2 blockchain (ZK Sync)
+- **Rollup**: layer-2 blockchain (zkSync)
 - **Owner**: a user who controls some assets in L2.
 - **Operator**: entity operating the Rollup.
 - **Eventually**: happening within finite time.
@@ -67,7 +67,7 @@
 
 ### Overview
 
-ZK Sync implements a ZK rollup protocol (in short "rollup" below) for ETH and ERC20 fungible token transfers. 
+zkSync implements a ZK rollup protocol (in short "rollup" below) for ETH and ERC20 fungible token transfers. 
 
 General rollup workflow is as follows:
 
@@ -134,7 +134,7 @@ This includes, in particular, the following claims:
 
 ### Amount packing
 
-Amounts and fees are compressed in ZK Sync using simple [fundamentals of floating point arithmetic](https://en.wikipedia.org/wiki/Floating-point_arithmetic).
+Amounts and fees are compressed in zkSync using simple [fundamentals of floating point arithmetic](https://en.wikipedia.org/wiki/Floating-point_arithmetic).
 
 A floating-point number has the following parts: a mantissa, a radix, and an exponent. The mantissa (always non-negative in our case) holds the significant digits of the floating-point number. The exponent indicates the power of the radix that the mantissa and sign should be multiplied by. The components are combined as follows to get the floating-point value:
 
@@ -142,7 +142,7 @@ A floating-point number has the following parts: a mantissa, a radix, and an exp
 sign * mantissa * (radix ^ exponent)
 ```
 
-Mantissa and exponent parameters used in ZK Sync:
+Mantissa and exponent parameters used in zkSync:
 
 |Type|Exponent bit width|Mantissa bit width|Radix|
 |--|--|--|--|
@@ -188,13 +188,13 @@ An empty leaf contains: `state_tree_root` computed using empty balances subtree,
 
 And empty leaf contains `value` equal to zero.
 
-### ZK Sync block pub data format
+### zkSync block pub data format
 
 Rollup block pub data consists of [Rollup operations](#zk-sync-operations) pub data sequence. The maximum block size is a constant value. If the size of the operations included in the block is not enough to fill it completely, the remainder will be filled with empty [Noop](#1-noop-operation) operations.
 
-## ZK Sync operations
+## zkSync operations
 
-ZK Sync operations are divided into Rollup transactions (initiated inside Rollup by a Rollup account) and Priority operations (initiated on the mainchain by an Ethereum account).
+zkSync operations are divided into Rollup transactions (initiated inside Rollup by a Rollup account) and Priority operations (initiated on the mainchain by an Ethereum account).
 
 Rollup transactions:
 
@@ -976,66 +976,115 @@ If the proof is valid (the circuit is satisfied), it means that there exists a s
 
 ## Appendix I: Cryptographic primitives
 
-### Pedersen signature
+### Rescue hash
 
-Pedersen signature is made according to derandomized Simple Schnorr Multi-Signature(i.e., a protocol which allows a group of signers to produce a short, joint signature on a common message) called MuSig. You can find its complete description in the relevant article [MPSW18](https://eprint.iacr.org/2018/068.pdf). Also if you only need an algorithm for implementation read [DF08](https://www.politesi.polimi.it/bitstream/10589/144372/1/main.pdf) page 53. Note: you need some background in mathematics, elliptic curve cryptography and knowledge of Schnorr signature algorithm to completely understand how to implement MuSig. [DF08](https://www.politesi.polimi.it/bitstream/10589/144372/1/main.pdf) contains all the necessary basics for this purpose.
+For Merkle trees and hash invocations that require collision resistance we use Rescue hash described in [AABDS19](https://eprint.iacr.org/2019/426.pdf). Reference implementation examples can be found in [SW19](https://starkware.co/hash-challenge-implementation-reference-code/#marvellous). 
 
-As the hashing algorithm, we use Pedersen hash function that is a secure hash function that maps a sequence of bits to a compressed point on an elliptic curve. Find its description and definition at [BB18](https://iden3-docs.readthedocs.io/en/latest/_downloads/4b929e0f96aef77b75bb5cfc0f832151/Pedersen-Hash.pdf) pages 2-5.
+For our application we've chosen the following parametrization:
+- rate = 2
+- capacity = 1
+- non-linearity of 5th degree for BN254 curve
+
+MDS matrix and round constants are generated from the seed phrase using the following [code](https://github.com/matter-labs/franklin-crypto/blob/186e1241373616ac99f6f84d688905cf9bb6aa0c/src/rescue/bn256/mod.rs#L48). Seen phrases for round constants and MDS matrix consist of two parts: short human-readable and long abstract that was taken from ZCash's original "sapling-crypto" library and over which we could not have any influence. For MDS matrix seed phrase is chosen to be the first one from the series that generates matrix without eigenvalues.
+
+If number of hashed elements it not divisible by rate then extra field element equal to `1` is appended to the hash input.
+
+Number of input elements if internally forbidded to be equal to zero.
+
+Outputs of Rescue hash are expected to be uniformly distributed in the field (but their bits are not uniformly distributed).
+
+Rate of 2 allows us to get up to two field elements from the sponge per hash round.
+
+#### Test vectors
+
+In test vectors we output only first element of the squeezed sponge. Such operation mode
+
+|**Example 1**| |
+|-|-|
+|Msg length|1 field element|
+|Msg|[0x27014c0bd27dddc8514b53831287e0ba02b26875bdcb34f0d4699681f487cf7b]|
+|Hash|0x1c54bc6adef0a488caa8ef6723ae30c784ddb0659effe5c4d0ea19b5e038300a|
+
+|**Example 2**| |
+|-|-|
+|Msg length|2 field elements|
+|Msg|[0x27014c0bd27dddc8514b53831287e0ba02b26875bdcb34f0d4699681f487cf7b, 0x238ba289e8783d31585aa75bba8ddc2269c0c2d8c45d0769943b16f009ff5510]|
+|Hash|0x1a751dc151d807fcb5269089c4d120ef318e26f2eaea983d74096f577cb45d93|
+
+|**Example 3**| |
+|-|-|
+|Msg length|3 field elements|
+|Msg|[0x27014c0bd27dddc8514b53831287e0ba02b26875bdcb34f0d4699681f487cf7b, 0x238ba289e8783d31585aa75bba8ddc2269c0c2d8c45d0769943b16f009ff5510, 0x069fd7f225dd46f03e4e0059d187419eb51b5ab5a33368e4ac05e62353dda0c3]|
+|Hash|0x2c3045ae4008cab38d00491870f9cb3aecb63d56c7199fd922af7b92e00722b6|
+
+### Bitpacking
+
+Rescue is an algebraic hash that operates over field elements, so any binary data (packed transaction) has first to be encode into the series of field elements. For this bit string `x` is encoded as seried of field elements placing `253` bits into each element starting from the LSB.
+
+### Transaction signature
+
+Signature is made according to derandomized Simple Schnorr Multi-Signature(i.e., a protocol which allows a group of signers to produce a short, joint signature on a common message) called MuSig. You can find its complete description in the relevant article [MPSW18](https://eprint.iacr.org/2018/068.pdf). Also if you only need an algorithm for implementation read [DF08](https://www.politesi.polimi.it/bitstream/10589/144372/1/main.pdf) page 53. Note: you need some background in mathematics, elliptic curve cryptography and knowledge of Schnorr signature algorithm to completely understand how to implement MuSig. [DF08](https://www.politesi.polimi.it/bitstream/10589/144372/1/main.pdf) contains all the necessary basics for this purpose.
+
+Signature is formed over the BabyJubjub curve in a normalized form (`-x^2 + y^2 = 1 + dx^2y^2`, so `a = -1`):
+
+- Base field = Scalar field of BN254 (group order)
+- `d = 12181644023421730124874158521699555681764249180949974110617291017600649128846`
+- main subgroup order = `2736030358979909402780800718157159386076813972158567259200215660948447373041`
+  
+
+#### Derandomization
 
 Derandomization is made via [RFC6979](https://tools.ietf.org/html/rfc6979) using SHA-256 hash function according to [RFC4634](https://tools.ietf.org/html/rfc4634) pages 4-7. Derandomization comes down to the fact that we are not generating randomness using a hash function based on some entropy and the message. Actually we generate some number k, using HMAC mechanism (read [RFC2104](https://tools.ietf.org/html/rfc2104) page 3) and [SHA-256](https://tools.ietf.org/html/rfc4634) as hash function for message in algorithm of k generation (find in [RFC6979](https://tools.ietf.org/html/rfc6979) pages 10-13) and replace randomness with this number.
 
+#### Challenge
+
+For Schnorr signature (that MuSig is) we need to generate Fiat-Shamir transformation challenge that should be a random bit string of some length (120 bits or more). We label such a challenge `c`. For this we use the following procedure. Later for `message` we assume a signed message (transaction hash).
+
+- Define `pad32(X)` pads byte string `X` to 32 bytes with zero bytes and panics on longer strings. Inside of the circuit all inputs are of the fixed length.
+- `EncodeLE(F)` encodes a field element `F` of as a byte string in little-endian order
+- `XCoord(P)` takes `X` coordinate of the point `P` on BabyJubjub curve
+- `EncodeIntoFr(X)` encodes byte string `X` as a series of field elements of the circuit base field `Fr`. Each byte is represented as a series of 8 bits (MSB first) and such full series of bits (from all the bytes) is packed into field elements using bitpacking as described above.
+- For shortness `enc(X)` = `EncodeIntoFr(pad32(EncodeLE(X)))`
+- we absorb the series of field elements into the Rescue sponge as `sponge = Rescue( enc(XCoord(PubKey)), enc(XCoord(R)), enc(message))`
+- we draw two field elements `F0, F1` from the sponge (that has `rate = 2`)
+- Bottom 125 bits of `F0` are placed into bottom 125 bits of `c` (LSB of `F0` is placed into LSB of `c`)
+- Bottom 125 bits of `F1` are placed into next 125 bits of `c` (LSB of `F1` is placed into 126th bit of `c`)
+
+Such procedure allows us to get `c` uniformly in `[0, 2^250)`.
+
+#### Dealing with subgroup
+
+BabyJubjub curve is a Twisted Edwards curve that always have a subgroup of even order. In the signature we require that public key and signature's random point `R` belong to the main subgroup (of prime order).
+
 #### Test vectors
 
-Private key:
-0xe722a760057093d02ece4b7c85d23e360843ca89487b55ad62d019891a9dcf04
+- Secret key = `0x05368b800322fad50e74d9b1eab3364570d67a56ef133de0c8dbf1deaf2a474e`
+- Public key X = `0x2d3801d48de21c009f4329af753cc554793c98c0c9594f4a20f7e7d23608d69d`
+- Public key Y = `0x2e55266f6fb271ccd351cbb10cf953adafcafe7c6785375f583611063ddf93cb`
 
 |**Example 1**| |
 |-|-|
 |Msg length|0 bytes|
 |Msg||
-|Pseudorandom k|0xefaf976f4380cbf9f75d5aa803f6e30ab128c28efdaf98afd5d499d8d4af1505|
-|r|0xcf817838f48b0361ab4eabae531cb07e702da8609dc0d86bba864d2c01350e27|
-|s|0xd5a585581df0c9bf1c3c9e7bc41793b384c988d25bc59d845d978eb8d9130d04|
+|Signature R.X|0x27b3b852c85cedfdcba33a6efe4f54207f91bd84c0b5849c4ffc9682f3c9e25f|
+|Signature R.Y|0x125575f528c6df6e70f903f70b50a81bc1442a88178134c7d04b2d2f6372aec9|
+|Signature S|0x04ce6d6e21f874bd89293ea53050dbf742338d0b1513e450538fed7e56c8cdc9|
 
 |**Example 2**| |
 |-|-|
-|Msg length|2 bytes|
-|Msg|0x3732|
-|Pseudorandom k|0xb16e1ac42e49a7091f7e403740940530b30fa950b780e3dc8b540389cccd5403|
-|r|0x16702f67279bd5e7d0eceb6575edbe9bac4bba6eede88fa2a23c05af21af4416|
-|s|0x64c8f17711ac38bcde764a52fd02a6ec323a43f8a55ce327b118550c10a41f03|
+|Msg length|1 byte|
+|Msg|0x72|
+|Signature R.X|0x024341a6854db6897eb0fc51b9612db1d1ff5c50dfcac99bf1c2396e77f047e1|
+|Signature R.Y|0x1ca7b1c1d7f54becbf3dbb96808139e6572aac85377a2bcda46b125db31d07b2|
+|Signature S|0x005694d986c7c13cb428c713b4e5f7d590d4a1561e6df64112619955c98958cb|
 
 |**Example 3**| |
 |-|-|
-|Msg length|7 bytes|
-|Msg|0x666f6f20626f6f|
-|Pseudorandom k|0xad9b4423449095252b7ac07e983e32c3fa4a671ac65eead591f7e22d1bff6e04|
-|r|0xf0cfcfef2762231575b45415f10036a6809ca0ca2199473f8aa444d760a9d626|
-|s|0xff3b129ad4dd7e70a65493e81f5d3c7da384ccb7e30f0c800999a43f98a9d000|
-
-### Pedersen hash
-
-*TODO: link to scheme, formally describe parametrization -- TODO by AV*
-
-#### Test vectors
-
-|**Example 1**| |
-|-|-|
-|Msg length|0 bytes|
-|Msg||
-|Hash|0x00ae2848283cc78335f892cc540e99a6c232456a464f83346f64fb0df4124c15|
-
-|**Example 2**| |
-|-|-|
 |Msg length|2 bytes|
-|Msg|0x3732|
-|Hash|0xd1f4ca5b2578caa7b9f9c8ce84be3156bb0d69b1b85e6995a60b108cdd71dd09|
-
-|**Example 3**| |
-|-|-|
-|Msg length|7 bytes|
-|Msg|0x666f6f20626f6f|
-|Hash|0x4a22ba227585cc1ebf892511498df72db48e62b04dceb14f070a03a63e216c05|
+|Msg|0xaf82|
+|Signature R.X|0x0dd227c7e193e87ef488783db85100a7f8ac2f020d72e154532eea3f72b58cc5|
+|Signature R.Y|0x2abb436ba00308869e27badba36387a0981a91b4359a6bf323ae4bdf10771867|
+|Signature S|0x01dd611aaadce6fcea01094556585f9dac6b025831a0b07ed70edb9efcb2c7df|
 
 ### SHA256
 
@@ -1061,43 +1110,10 @@ Algorithm: SHA-256 according to [RFC4634](https://tools.ietf.org/html/rfc4634).
 |Msg|0xaf82|
 |Hash|0x2a0305714ebec7cc0cc0949aa208aa04dc7a4b43ff0d9f4f76546ae8056e2713|
 
-### EDDSA signature scheme
-
-Scheme: Ed25519.
-
-*TODO: link to scheme, formally describe parametrization -- TODO by AV*
-
-#### Test vectors
-
-|**Example 1**| |
-|-|-|
-|Secret key|0x9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60|
-|Public key|0xd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a|
-|Msg length|0 bytes|
-|Msg||
-|Signature|0xe5564300c360ac729086e2cc806e828a84877f1eb8e5d974d873e065224901555fb8821590a33bacc61e39701cf9b46bd25bf5f0595bbe24655141438e7a100b|
-
-|**Example 2**| |
-|-|-|
-|Secret key|0x4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb|
-|Public key|0x3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c|
-|Msg length|1 byte|
-|Msg|72|
-|Signature|0x92a009a9f0d4cab8720e820b5f642540a2b27b5416503f8fb3762223ebdb69da085ac1e43e15996e458f3613d0f11d8c387b2eaeb4302aeeb00d291612bb0c00|
-
-|**Example 3**| |
-|-|-|
-|Secret key|0xc5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7|
-|Public key|0xfc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025|
-|Msg length|2 bytes|
-|Msg|0xaf82|
-|Signature|0x6291d657deec24024827e69c3abe01a30ce548a284743a445e3680d7db5ac3ac18ff9b538d16f290ae67f760984dc6594a7c15e9716ed28dc027beceea1ec40a|
-
 ### Sparse Merkle Tree
 
 1. Generic SMT description [Ostersjo/Dahlberg, R.: Sparse Merkle Trees: Definitions and Space-Time Trade-Offs with Applications for Balloon. Bachelor’s thesis, Karlstad University (2016)](http://www.diva-portal.org/smash/get/diva2:936353/FULLTEXT02.pdf)
 2. Basics of SMT [Fichter K.: What’s a Sparse Merkle Tree? (2018)](https://medium.com/@kelvinfichter/whats-a-sparse-merkle-tree-acda70aeb837)
 
-In ZK Sync we use a sparse Merkle tree with a flexible hashing strategy. We can change its depth depending on how many accounts we want to have.
+In zkSync we use a sparse Merkle tree with a flexible hashing strategy. We can change its depth depending on how many accounts we want to have.
 
-To get hashes, use the [Pedersen hasher](#pedersen-hash).

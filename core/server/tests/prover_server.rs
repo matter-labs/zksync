@@ -8,17 +8,21 @@ use futures::channel::mpsc;
 use circuit::witness::deposit::apply_deposit_tx;
 use circuit::witness::deposit::calculate_deposit_operations_from_witness;
 use models::circuit::CircuitAccountTree;
+use models::config_options::ConfigurationOptions;
+use models::node::block::Block;
 use models::node::Address;
-use models::params::{account_tree_depth, block_chunk_sizes};
+use models::params::{account_tree_depth, total_tokens};
+use models::prover_utils::EncodedProofPlonk;
 use num::BigUint;
 use prover::client;
 use prover::ApiClient;
 use server::prover_server;
+use std::time::Duration;
 
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
     // TODO: make single server spawn for all tests
     let bind_to = "127.0.0.1:8088";
-    let conn_pool = storage::ConnectionPool::new();
+    let conn_pool = storage::ConnectionPool::new(Some(1));
     let addr = net::SocketAddr::from_str(bind_to).unwrap();
     let (tx, _rx) = mpsc::channel(1);
     let tree = CircuitAccountTree::new(account_tree_depth());
@@ -37,7 +41,7 @@ fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration)
 }
 
 fn access_storage() -> storage::StorageProcessor {
-    storage::ConnectionPool::new()
+    storage::ConnectionPool::new(Some(1))
         .access_storage()
         .expect("failed to connect to db")
 }
@@ -45,19 +49,22 @@ fn access_storage() -> storage::StorageProcessor {
 #[test]
 #[should_panic]
 fn client_with_empty_worker_name_panics() {
-    client::ApiClient::new("", "", None, time::Duration::from_secs(1));
+    client::ApiClient::new(
+        &"http:://example.com".parse().unwrap(),
+        "",
+        Duration::from_secs(1),
+    );
 }
 
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
 fn api_client_register_start_and_stop_of_prover() {
-    let block_size_chunks = block_chunk_sizes()[0];
+    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
     let addr = spawn_server(time::Duration::from_secs(1), time::Duration::from_secs(1));
     let client = client::ApiClient::new(
-        &format!("http://{}", &addr),
+        &format!("http://{}", &addr).parse().unwrap(),
         "foo",
-        None,
-        time::Duration::from_secs(1),
+        Duration::from_secs(1),
     );
     let id = client
         .register_prover(block_size_chunks)
@@ -83,11 +90,10 @@ fn api_client_simple_simulation() {
 
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let block_size_chunks = block_chunk_sizes()[0];
+    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
     let client = client::ApiClient::new(
-        &format!("http://{}", &addr),
+        &format!("http://{}", &addr).parse().unwrap(),
         "foo",
-        None,
         time::Duration::from_secs(1),
     );
 
@@ -145,11 +151,11 @@ fn api_client_simple_simulation() {
     let prover_data = client
         .prover_data(block)
         .expect("failed to get prover data");
-    assert_eq!(prover_data.old_root, wanted_prover_data.old_root);
-    assert_eq!(prover_data.new_root, wanted_prover_data.new_root);
+    assert_eq!(prover_data.old_root, Some(wanted_prover_data.old_root));
+    assert_eq!(prover_data.new_root, Some(wanted_prover_data.new_root));
     assert_eq!(
-        prover_data.public_data_commitment,
-        wanted_prover_data.public_data_commitment,
+        prover_data.pub_data_commitment,
+        Some(wanted_prover_data.public_data_commitment),
     );
 }
 
@@ -231,13 +237,14 @@ pub fn test_operation_and_wanted_prover_data(
     let fee_updates = state.collect_fee(&fees, validator_account_id);
     accounts_updated.extend(fee_updates.into_iter());
 
-    let block = models::node::block::Block {
-        block_number: state.block_number,
-        new_root_hash: state.root_hash(),
-        fee_account: validator_account_id,
-        block_transactions: ops,
-        processed_priority_ops: (0, 1),
-    };
+    let block = Block::new_from_availabe_block_sizes(
+        state.block_number,
+        state.root_hash(),
+        validator_account_id,
+        ops,
+        (0, 1),
+        &ConfigurationOptions::from_env().available_block_chunk_sizes,
+    );
 
     let mut pub_data = vec![];
     let mut operations = vec![];
@@ -270,7 +277,7 @@ pub fn test_operation_and_wanted_prover_data(
         .get(block.fee_account as u32)
         .expect("fee_account is not empty");
     let mut validator_balances = vec![];
-    for i in 0..1 << models::params::BALANCE_TREE_DEPTH {
+    for i in 0..total_tokens() {
         let balance_value = match validator_acc.subtree.get(i as u32) {
             None => models::node::Fr::zero(),
             Some(bal) => bal.value,
@@ -325,7 +332,7 @@ fn api_server_publish_dummy() {
         .post(&format!("http://{}/publish", &addr))
         .json(&client::PublishReq {
             block: 1,
-            proof: models::EncodedProof::default(),
+            proof: EncodedProofPlonk::default(),
         })
         .send()
         .expect("failed to send publish request");
