@@ -9,7 +9,7 @@ async function main() {
     const franklinDeployedContract = deployer.getDeployedProxyContract('Franklin');
     let value = await franklinDeployedContract.onchainOps(2);
     console.log(value);
-    value = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+    value = await franklinDeployedContract.getBalanceToWithdraw(wallet.address, 0);
     console.log(value);
 }
 

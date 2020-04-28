@@ -683,7 +683,7 @@ Reads as: change pubkey, account #4, new pubkey hash sync:11036945fcc11c349c3a30
 
 1. Transaction can be authorized by providing signature of the message `concat[nonce, new_pubkey_hash]` (e.g. `0000000311036945fcc11c349c3a300f19cd87cb03c4f2ef` for example above) with transaction.
 Transaction will be verified on the contract.
-2. For users that can't sign messages it is possible to authorize this operation by calling `authPubkeyHash` method of the smart contract. User should provide new pubkey hash and nonce for this transaction.
+2. For users that can't sign messages it is possible to authorize this operation by calling `setAuthPubkeyHash` method of the smart contract. User should provide new pubkey hash and nonce for this transaction.
 After this transaction succeeded transaction without signature can be sent to operator.
 
 #### User transaction
@@ -763,7 +763,7 @@ withdrawERC20(address _token, uint128 _amount)
 
 Authenticates pubkey hash change for new rollup public key.
 ```solidity
-function authPubkeyHash(bytes calldata _fact, uint32 _nonce) external {
+function setAuthPubkeyHash(bytes calldata _fact, uint32 _nonce) external {
 ```
 - _fact: Rollup public key hash
 - _nonce: Account nonce for which this pubkey change is authorized.
