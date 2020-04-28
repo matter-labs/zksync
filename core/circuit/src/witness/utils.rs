@@ -464,8 +464,6 @@ pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
     Fr::from_repr(fr_repr).unwrap()
 }
 
-pub type SigData = (Fr, Fr, Fr, SignatureData, Vec<Option<bool>>);
-
 /// Gathered signature data for calculating the operations in several
 /// witness structured (e.g. `TransferWitness` or `WithdrawWitness`).
 #[derive(Debug)]
