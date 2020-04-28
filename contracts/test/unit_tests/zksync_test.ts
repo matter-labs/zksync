@@ -32,15 +32,6 @@ describe("zkSync signature verification unit tests", function () {
         testContract = await deployer.deployFranklin();
     });
 
-    it("pubkey hash signature verification success", async () => {
-        const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
-        const nonce = 0x11223344;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce);
-        let {revertReason, result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address));
-        expect(result).eq(true);
-    });
-
     it("pubkey hash signature verification incorrect nonce", async () => {
         const incorrectNonce = 0x11223345;
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
@@ -75,7 +66,7 @@ describe("zkSync signature verification unit tests", function () {
         for (const message of [Buffer.from("msg", "ascii"), Buffer.alloc(0), Buffer.alloc(10, 1)]) {
             const signature = await wallet.signMessage(message);
             const sinedMessage = Buffer.concat([Buffer.from(`\x19Ethereum Signed Message:\n${message.length}`, "ascii"), message]);
-            const address = await testContract.testVerifyEthereumSignature(signature, sinedMessage);
+            const address = await testContract.testRecoverAddressFromEthSignature(signature, sinedMessage);
             expect(address, `address mismatch, message ${message.toString("hex")}`).eq(wallet.address);
         }
     });
@@ -239,20 +230,20 @@ describe("zkSync withdraw unit tests", function () {
     async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
         let gasFee: BigNumber;
         const balanceBefore = await onchainBalance(ethWallet, token);
-        const contractBalanceBefore = bigNumberify((await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId)).balanceToWithdraw);
+        const contractBalanceBefore = bigNumberify((await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)));
         if (token === ethers.constants.AddressZero) {
-            const tx = await zksyncContract.withdrawETH(amount, {gasLimit: 70000});
+            const tx = await zksyncContract.withdrawETH(amount);
             const receipt = await tx.wait();
             gasFee = receipt.gasUsed.mul(await ethWallet.provider.getGasPrice());
         } else {
-            await zksyncContract.withdrawERC20(token, amount, {gasLimit: 70000});
+            await zksyncContract.withdrawERC20(token, amount);
         }
         const balanceAfter = await onchainBalance(ethWallet, token);
 
         const expectedBalance = token == AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
         expect(balanceAfter.toString(), "withdraw account balance mismatch").eq(expectedBalance.toString());
 
-        const contractBalanceAfter = bigNumberify((await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId)).balanceToWithdraw);
+        const contractBalanceAfter = bigNumberify((await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)));
         const expectedContractBalance = contractBalanceBefore.sub(amount);
         expect(contractBalanceAfter.toString(), "withdraw contract balance mismatch").eq(expectedContractBalance.toString());
     }
@@ -389,7 +380,7 @@ describe("zkSync auth pubkey onchain unit tests", function () {
         const nonce = 0x1234;
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
 
-        const receipt = await (await zksyncContract.authPubkeyHash(pubkeyHash, nonce)).wait();
+        const receipt = await (await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce)).wait();
         let authEvent;
         for (const event of receipt.logs) {
             const parsedLog = zksyncContract.interface.parseLog(event);
@@ -410,10 +401,10 @@ describe("zkSync auth pubkey onchain unit tests", function () {
         const nonce = 0xdead;
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
 
-        await zksyncContract.authPubkeyHash(pubkeyHash, nonce);
+        await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce);
         //
         const otherPubkeyHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        const {revertReason} = await getCallRevertReason(async () => await zksyncContract.authPubkeyHash(otherPubkeyHash, nonce));
+        const {revertReason} = await getCallRevertReason(async () => await zksyncContract.setAuthPubkeyHash(otherPubkeyHash, nonce));
         expect(revertReason, "revert reason incorrect").eq("ahf11");
     });
 
@@ -424,7 +415,7 @@ describe("zkSync auth pubkey onchain unit tests", function () {
         const longPubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefefe";
 
         for (const pkHash of [shortPubkeyHash, longPubkeyHash]) {
-            const {revertReason} = await getCallRevertReason(async () => await zksyncContract.authPubkeyHash(shortPubkeyHash, nonce));
+            const {revertReason} = await getCallRevertReason(async () => await zksyncContract.setAuthPubkeyHash(shortPubkeyHash, nonce));
             expect(revertReason, "revert reason incorrect").eq("ahf10");
         }
     });
@@ -554,7 +545,7 @@ describe("zkSync test process next operation", function () {
 
         const nonce = 0x1234;
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
-        await zksyncContract.authPubkeyHash(pubkeyHash, nonce);
+        await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce);
 
         const accountId = 0xffee12;
 

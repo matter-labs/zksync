@@ -167,10 +167,10 @@ async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: 
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
     const tokenId = await withdrawTo.provider.tokenSet.resolveTokenId(token);
-    const pendingToBeOnchainBalance = (await contract.balancesToWithdraw(
+    const pendingToBeOnchainBalance = (await contract.getBalanceToWithdraw(
         await withdrawTo.address(),
         tokenId,
-    )).balanceToWithdraw;
+    ));
 
     if (!wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee))) {
         throw new Error("Wrong amount on wallet after WITHDRAW");

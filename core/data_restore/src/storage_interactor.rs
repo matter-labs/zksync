@@ -6,7 +6,7 @@ use web3::types::H256;
 use models::{
     node::{block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
     prover_utils::EncodedProofPlonk,
-    Action, Operation, TokenAddedEvent,
+    Action, NewTokenEvent, Operation,
 };
 use storage::{
     data_restore::records::{
@@ -105,7 +105,7 @@ pub fn update_tree_state(
 pub fn save_events_state(
     connection_pool: &ConnectionPool,
     block_events: &[BlockEvent],
-    tokens: &[TokenAddedEvent],
+    tokens: &[NewTokenEvent],
     last_watched_eth_block_number: u64,
 ) {
     let storage = connection_pool.access_storage().expect("db failed");
