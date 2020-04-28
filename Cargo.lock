@@ -3717,7 +3717,6 @@ dependencies = [
  "clap",
  "crypto_exports",
  "ctrlc",
- "diesel",
  "env_logger",
  "eth_client",
  "ethabi",
