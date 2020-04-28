@@ -17,10 +17,8 @@ use models::{
 };
 // Local deps
 use crate::{
-    operation::{
-        Operation, OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
-    },
-    witness::utils::{apply_leaf_operation, get_audits},
+    operation::{Operation, OperationArguments, OperationBranch, OperationBranchWitness},
+    witness::utils::{apply_leaf_operation, get_audits, SigDataInput},
 };
 
 pub struct CloseAccountData {
@@ -153,14 +151,7 @@ impl CloseAccountWitness<Bn256> {
         }
     }
 
-    pub fn calculate_operations(
-        &self,
-        first_sig_msg: &Fr,
-        second_sig_msg: &Fr,
-        third_sig_msg: &Fr,
-        signature_data: &SignatureData,
-        signer_pub_key_packed: &[Option<bool>],
-    ) -> Vec<Operation<Bn256>> {
+    pub fn calculate_operations(&self, input: SigDataInput) -> Vec<Operation<Bn256>> {
         let pubdata_chunks: Vec<_> = self
             .get_pubdata()
             .chunks(64)
@@ -171,11 +162,11 @@ impl CloseAccountWitness<Bn256> {
             tx_type: self.tx_type,
             chunk: Some(Fr::from_str("0").unwrap()),
             pubdata_chunk: Some(pubdata_chunks[0]),
-            first_sig_msg: Some(*first_sig_msg),
-            second_sig_msg: Some(*second_sig_msg),
-            third_sig_msg: Some(*third_sig_msg),
-            signature_data: signature_data.clone(),
-            signer_pub_key_packed: signer_pub_key_packed.to_vec(),
+            first_sig_msg: Some(input.first_sig_msg),
+            second_sig_msg: Some(input.second_sig_msg),
+            third_sig_msg: Some(input.third_sig_msg),
+            signature_data: input.signature.clone(),
+            signer_pub_key_packed: input.signer_pub_key_packed.to_vec(),
             args: self.args.clone(),
             lhs: self.before.clone(),
             rhs: self.before.clone(),
@@ -269,7 +260,7 @@ impl CloseAccountWitness<Bn256> {
 //        let packed_public_key_bytes = packed_public_key.serialize_packed().unwrap();
 //        let signer_packed_key_bits: Vec<_> = bytes_into_be_bits(&packed_public_key_bytes)
 //            .iter()
-//            .map(|x| Some(*x))
+//            .map(|x| Some(input.x))
 //            .collect();
 //
 //        let operations = calculate_close_account_operations_from_witness(

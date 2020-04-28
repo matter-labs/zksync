@@ -6,7 +6,7 @@ use models::node::operations::TransferOp;
 use crate::witness::{
     tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount, FEE_ACCOUNT_ID},
     transfer::TransferWitness,
-    utils::{prepare_sig_data, WitnessBuilder},
+    utils::{SigDataInput, WitnessBuilder},
 };
 
 /// Basic check for execution of `Transfer` operation in circuit.
@@ -44,13 +44,12 @@ fn test_transfer_success() {
         .signature
         .serialize_packed()
         .expect("signature serialize");
-    let (first_sig_msg, second_sig_msg, third_sig_msg, signature_data, signer_packed_key_bits) =
-        prepare_sig_data(
-            &sign_packed,
-            &transfer_op.tx.get_bytes(),
-            &transfer_op.tx.signature.pub_key,
-        )
-        .expect("prepare signature data");
+    let input = SigDataInput::new(
+        &sign_packed,
+        &transfer_op.tx.get_bytes(),
+        &transfer_op.tx.signature.pub_key,
+    )
+    .expect("prepare signature data");
 
     // Initialize Plasma and WitnessBuilder.
     let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
@@ -64,13 +63,7 @@ fn test_transfer_success() {
 
     // Apply op on circuit
     let transfer_witness = TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer_op);
-    let transfer_operations = transfer_witness.calculate_operations(
-        &first_sig_msg,
-        &second_sig_msg,
-        &third_sig_msg,
-        &signature_data,
-        &signer_packed_key_bits,
-    );
+    let transfer_operations = transfer_witness.calculate_operations(input);
     let pub_data_from_witness = transfer_witness.get_pubdata();
 
     witness_accum.add_operation_with_pubdata(transfer_operations, pub_data_from_witness);
@@ -94,7 +87,8 @@ fn test_transfer_success() {
 #[ignore]
 fn test_transfer_to_self() {
     // Input data.
-    let account = WitnessTestAccount::new(1, 10);
+    let accounts = vec![WitnessTestAccount::new(1, 10)];
+    let account = &accounts[0];
     let transfer_op = TransferOp {
         tx: account
             .zksync_account
@@ -119,16 +113,15 @@ fn test_transfer_to_self() {
         .signature
         .serialize_packed()
         .expect("signature serialize");
-    let (first_sig_msg, second_sig_msg, third_sig_msg, signature_data, signer_packed_key_bits) =
-        prepare_sig_data(
-            &sign_packed,
-            &transfer_op.tx.get_bytes(),
-            &transfer_op.tx.signature.pub_key,
-        )
-        .expect("prepare signature data");
+    let input = SigDataInput::new(
+        &sign_packed,
+        &transfer_op.tx.get_bytes(),
+        &transfer_op.tx.signature.pub_key,
+    )
+    .expect("prepare signature data");
 
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Apply op on plasma
@@ -139,13 +132,7 @@ fn test_transfer_to_self() {
 
     // Apply op on circuit
     let transfer_witness = TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer_op);
-    let transfer_operations = transfer_witness.calculate_operations(
-        &first_sig_msg,
-        &second_sig_msg,
-        &third_sig_msg,
-        &signature_data,
-        &signer_packed_key_bits,
-    );
+    let transfer_operations = transfer_witness.calculate_operations(input);
     let pub_data_from_witness = transfer_witness.get_pubdata();
 
     witness_accum.add_operation_with_pubdata(transfer_operations, pub_data_from_witness);

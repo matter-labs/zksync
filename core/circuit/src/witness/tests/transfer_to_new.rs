@@ -6,7 +6,7 @@ use models::node::operations::TransferToNewOp;
 use crate::witness::{
     tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount, FEE_ACCOUNT_ID},
     transfer_to_new::TransferToNewWitness,
-    utils::{prepare_sig_data, WitnessBuilder},
+    utils::{SigDataInput, WitnessBuilder},
 };
 
 /// Basic check for execution of `TransferToNew` operation in circuit.
@@ -15,7 +15,8 @@ use crate::witness::{
 #[ignore]
 fn test_transfer_to_new_success() {
     // Input data.
-    let account_from = WitnessTestAccount::new(1, 10);
+    let accounts = vec![WitnessTestAccount::new(1, 10)];
+    let account_from = &accounts[0];
     let account_to = WitnessTestAccount::new_empty(2); // Will not be included into state.
     let transfer_op = TransferToNewOp {
         tx: account_from
@@ -41,17 +42,15 @@ fn test_transfer_to_new_success() {
         .signature
         .serialize_packed()
         .expect("signature serialize");
-    let (first_sig_msg, second_sig_msg, third_sig_msg, signature_data, signer_packed_key_bits) =
-        prepare_sig_data(
-            &sign_packed,
-            &transfer_op.tx.get_bytes(),
-            &transfer_op.tx.signature.pub_key,
-        )
-        .expect("prepare signature data");
+    let input = SigDataInput::new(
+        &sign_packed,
+        &transfer_op.tx.get_bytes(),
+        &transfer_op.tx.signature.pub_key,
+    )
+    .expect("prepare signature data");
 
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) =
-        PlasmaStateGenerator::from_single(&account_from);
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Apply op on plasma
@@ -63,13 +62,7 @@ fn test_transfer_to_new_success() {
     // Apply op on circuit
     let transfer_witness =
         TransferToNewWitness::apply_tx(&mut witness_accum.account_tree, &transfer_op);
-    let transfer_operations = transfer_witness.calculate_operations(
-        &first_sig_msg,
-        &second_sig_msg,
-        &third_sig_msg,
-        &signature_data,
-        &signer_packed_key_bits,
-    );
+    let transfer_operations = transfer_witness.calculate_operations(input);
     let pub_data_from_witness = transfer_witness.get_pubdata();
 
     witness_accum.add_operation_with_pubdata(transfer_operations, pub_data_from_witness);

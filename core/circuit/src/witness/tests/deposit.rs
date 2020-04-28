@@ -15,6 +15,7 @@ use crate::witness::{
 #[ignore]
 fn test_deposit_in_empty_leaf() {
     // Input data.
+    let accounts = &[];
     let account = WitnessTestAccount::new_empty(1); // Will not be included into PlasmaState
     let deposit_op = DepositOp {
         priority_op: Deposit {
@@ -27,7 +28,7 @@ fn test_deposit_in_empty_leaf() {
     };
 
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate_empty();
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Apply op on plasma
@@ -59,7 +60,8 @@ fn test_deposit_in_empty_leaf() {
 #[ignore]
 fn test_deposit_existing_account() {
     // Input data.
-    let account = WitnessTestAccount::new_empty(1);
+    let accounts = vec![WitnessTestAccount::new_empty(1)];
+    let account = &accounts[0];
     let deposit_op = DepositOp {
         priority_op: Deposit {
             from: account.account.address,
@@ -71,7 +73,7 @@ fn test_deposit_existing_account() {
     };
 
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Apply op on plasma

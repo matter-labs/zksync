@@ -6,7 +6,7 @@ pub use self::{
     full_exit::FullExitWitness,
     transfer::TransferWitness,
     transfer_to_new::TransferToNewWitness,
-    utils::{prepare_sig_data, WitnessBuilder},
+    utils::{SigDataInput, WitnessBuilder},
     withdraw::WithdrawWitness,
 };
 

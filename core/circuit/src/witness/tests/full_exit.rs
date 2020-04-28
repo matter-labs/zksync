@@ -16,7 +16,8 @@ use crate::witness::{
 #[ignore]
 fn test_full_exit_success() {
     // Input data.
-    let account = WitnessTestAccount::new(1, 10);
+    let accounts = vec![WitnessTestAccount::new(1, 10)];
+    let account = &accounts[0];
     let full_exit_op = FullExitOp {
         priority_op: FullExit {
             account_id: account.id,
@@ -27,7 +28,7 @@ fn test_full_exit_success() {
     };
 
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Apply op on plasma
@@ -58,6 +59,7 @@ fn test_full_exit_success() {
 #[ignore]
 fn test_full_exit_failure_no_account_in_tree() {
     // Input data.
+    let accounts = &[];
     let account = WitnessTestAccount::new_empty(1); // Will not be included into PlasmaState
     let full_exit_op = FullExitOp {
         priority_op: FullExit {
@@ -69,7 +71,7 @@ fn test_full_exit_failure_no_account_in_tree() {
     };
 
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate_empty();
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Apply op on plasma

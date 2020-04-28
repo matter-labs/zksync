@@ -64,26 +64,6 @@ impl PlasmaStateGenerator {
 
         Self::create_state(validator_accounts)
     }
-
-    pub fn from_single(account: &WitnessTestAccount) -> (PlasmaState, CircuitAccountTree) {
-        if account.id == FEE_ACCOUNT_ID {
-            panic!("AccountId {} is an existing fee account", FEE_ACCOUNT_ID);
-        }
-
-        let fee_account = (
-            FEE_ACCOUNT_ID,
-            Account::default_with_address(&Address::default()),
-        );
-        let validator_accounts = vec![fee_account, (account.id, account.account.clone())]
-            .into_iter()
-            .collect();
-
-        Self::create_state(validator_accounts)
-    }
-
-    pub fn generate_empty() -> (PlasmaState, CircuitAccountTree) {
-        Self::generate(&[])
-    }
 }
 
 /// A helper structure for witness tests which contains both testkit

@@ -8,7 +8,7 @@ use futures::channel::mpsc;
 use log::info;
 // Workspace deps
 use circuit::witness::{
-    utils::{prepare_sig_data, WitnessBuilder},
+    utils::{SigDataInput, WitnessBuilder},
     ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
     TransferToNewWitness, TransferWitness, WithdrawWitness,
 };
@@ -301,25 +301,13 @@ impl Maintainer {
                         .serialize_packed()
                         .map_err(|e| format!("failed to pack transaction signature {}", e))?;
 
-                    let (
-                        first_sig_msg,
-                        second_sig_msg,
-                        third_sig_msg,
-                        signature_data,
-                        signer_packed_key_bits,
-                    ) = prepare_sig_data(
+                    let input = SigDataInput::new(
                         &sig_packed,
                         &transfer.tx.get_bytes(),
                         &transfer.tx.signature.pub_key,
                     )?;
 
-                    let transfer_operations = transfer_witness.calculate_operations(
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature_data,
-                        &signer_packed_key_bits,
-                    );
+                    let transfer_operations = transfer_witness.calculate_operations(input);
 
                     operations.extend(transfer_operations);
                     fees.push(CollectedFee {
@@ -341,25 +329,14 @@ impl Maintainer {
                         .serialize_packed()
                         .map_err(|e| format!("failed to pack transaction signature {}", e))?;
 
-                    let (
-                        first_sig_msg,
-                        second_sig_msg,
-                        third_sig_msg,
-                        signature_data,
-                        signer_packed_key_bits,
-                    ) = prepare_sig_data(
+                    let input = SigDataInput::new(
                         &sig_packed,
                         &transfer_to_new.tx.get_bytes(),
                         &transfer_to_new.tx.signature.pub_key,
                     )?;
 
-                    let transfer_to_new_operations = transfer_to_new_witness.calculate_operations(
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature_data,
-                        &signer_packed_key_bits,
-                    );
+                    let transfer_to_new_operations =
+                        transfer_to_new_witness.calculate_operations(input);
 
                     operations.extend(transfer_to_new_operations);
                     fees.push(CollectedFee {
@@ -379,25 +356,13 @@ impl Maintainer {
                         .serialize_packed()
                         .map_err(|e| format!("failed to pack transaction signature {}", e))?;
 
-                    let (
-                        first_sig_msg,
-                        second_sig_msg,
-                        third_sig_msg,
-                        signature_data,
-                        signer_packed_key_bits,
-                    ) = prepare_sig_data(
+                    let input = SigDataInput::new(
                         &sig_packed,
                         &withdraw.tx.get_bytes(),
                         &withdraw.tx.signature.pub_key,
                     )?;
 
-                    let withdraw_operations = withdraw_witness.calculate_operations(
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature_data,
-                        &signer_packed_key_bits,
-                    );
+                    let withdraw_operations = withdraw_witness.calculate_operations(input);
 
                     operations.extend(withdraw_operations);
                     fees.push(CollectedFee {
@@ -417,25 +382,14 @@ impl Maintainer {
                         .serialize_packed()
                         .map_err(|e| format!("failed to pack signature: {}", e))?;
 
-                    let (
-                        first_sig_msg,
-                        second_sig_msg,
-                        third_sig_msg,
-                        signature_data,
-                        signer_packed_key_bits,
-                    ) = prepare_sig_data(
+                    let input = SigDataInput::new(
                         &sig_packed,
                         &close.tx.get_bytes(),
                         &close.tx.signature.pub_key,
                     )?;
 
-                    let close_account_operations = close_account_witness.calculate_operations(
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature_data,
-                        &signer_packed_key_bits,
-                    );
+                    let close_account_operations =
+                        close_account_witness.calculate_operations(input);
 
                     operations.extend(close_account_operations);
                     pub_data.extend(close_account_witness.get_pubdata());

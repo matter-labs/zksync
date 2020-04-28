@@ -462,48 +462,63 @@ pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
 
 pub type SigData = (Fr, Fr, Fr, SignatureData, Vec<Option<bool>>);
 
-pub fn prepare_sig_data(
-    sig_bytes: &[u8],
-    tx_bytes: &[u8],
-    pub_key: &PackedPublicKey,
-) -> Result<SigData, String> {
-    let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-    let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(&r_bytes)
-        .iter()
-        .map(|x| Some(*x))
-        .collect();
-    let s_bits: Vec<_> = models::primitives::bytes_into_be_bits(&s_bytes)
-        .iter()
-        .map(|x| Some(*x))
-        .collect();
-    let signature = SignatureData {
-        r_packed: r_bits,
-        s: s_bits,
-    };
-    let sig_bits: Vec<bool> = models::primitives::bytes_into_be_bits(&tx_bytes);
+/// Gathered signature data for calculating the operations in several
+/// witness structured (e.g. `TransferWitness` or `WithdrawWitness`).
+#[derive(Debug)]
+pub struct SigDataInput {
+    pub first_sig_msg: Fr,
+    pub second_sig_msg: Fr,
+    pub third_sig_msg: Fr,
+    pub signature: SignatureData,
+    pub signer_pub_key_packed: Vec<Option<bool>>,
+}
 
-    let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(
-        &sig_bits,
-        &models::params::PEDERSEN_HASHER,
-        &models::params::JUBJUB_PARAMS,
-    );
-
-    let signer_packed_key_bytes = match pub_key.serialize_packed() {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(format!("failed to prepare signature data: {}", e));
-        }
-    };
-    let signer_packed_key_bits: Vec<_> =
-        models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
+impl SigDataInput {
+    /// Creates a new `SigDataInput` from the raw tx contents, signature and public key
+    /// of the author.
+    pub fn new(
+        sig_bytes: &[u8],
+        tx_bytes: &[u8],
+        pub_key: &PackedPublicKey,
+    ) -> Result<SigDataInput, String> {
+        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+        let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(&r_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
-    Ok((
-        first_sig_msg,
-        second_sig_msg,
-        third_sig_msg,
-        signature,
-        signer_packed_key_bits,
-    ))
+        let s_bits: Vec<_> = models::primitives::bytes_into_be_bits(&s_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
+        let signature = SignatureData {
+            r_packed: r_bits,
+            s: s_bits,
+        };
+        let sig_bits: Vec<bool> = models::primitives::bytes_into_be_bits(&tx_bytes);
+
+        let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(
+            &sig_bits,
+            &models::params::PEDERSEN_HASHER,
+            &models::params::JUBJUB_PARAMS,
+        );
+
+        let signer_packed_key_bytes = match pub_key.serialize_packed() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("failed to prepare signature data: {}", e));
+            }
+        };
+        let signer_pub_key_packed: Vec<_> =
+            models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
+                .iter()
+                .map(|x| Some(*x))
+                .collect();
+        Ok(SigDataInput {
+            first_sig_msg,
+            second_sig_msg,
+            third_sig_msg,
+            signature,
+            signer_pub_key_packed,
+        })
+    }
 }

@@ -13,7 +13,8 @@ use crate::witness::{
 #[ignore]
 fn test_change_pubkey_offchain_success() {
     // Input data.
-    let account = WitnessTestAccount::new_empty(0xc1);
+    let accounts = vec![WitnessTestAccount::new_empty(0xc1)];
+    let account = &accounts[0];
     let change_pkhash_op = ChangePubKeyOp {
         tx: account
             .zksync_account
@@ -22,7 +23,7 @@ fn test_change_pubkey_offchain_success() {
     };
 
     // Initialize Plasma and WitnessBuilder.
-    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::from_single(&account);
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
 
     // Apply op on plasma
