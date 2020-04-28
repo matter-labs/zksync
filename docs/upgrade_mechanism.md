@@ -55,9 +55,19 @@ There is three **phases of upgrade** which described in UpgradeGatekeeper:
 |Phase|Description|
 |-|-|
 |**Idle**|This is a phase when there are no upgrades to process.|
-|**NoticePeriod**|This phase starts when master of gatekeeper calls `startUpgrade` function. Sense of this phase --- give all users of the rollup contract an opportunity to withdraw funds to the ethereum network before updating the target. The transition to the next phase can be done after at least upgradeNoticePeriod seconds from the start of this phase. `upgradeNoticePeriod` is a value which defines by the "`mainContract`".|
+|**NoticePeriod**|This phase starts when master of gatekeeper calls `startUpgrade` function. Sense of this phase --- give all users of the rollup contract an opportunity to withdraw funds to the ethereum network before upgrading the target. The transition to the next phase can be done after at least upgradeNoticePeriod seconds from the start of this phase. `upgradeNoticePeriod` is a value which defines by the "`mainContract`".|
 |**Preparation**|This is a finish phase. During this phase, master can call `finishUpgrade` function, which upgrades targets in proxies. One of the most important checks inside this function is enforcing that the mainContract is ready for the upgrade.|
 
+So, the upgrade process:
+
+1. Deploy new targets for proxies that would be upgraded.
+2. Call `startUpgrade` with addresses of these targets (and zeroes for proxies that shouldn't be upgraded).
+3. Wait for the end of the `notice period`.
+4. Call `startPreparation`.
+5. Wait until all open priority operations will be processed.
+6. Call `finishUpgrade` with needed targets initialization parameters.
+
+**NOTE:** In case of some error or bug in code, there is an option to cancel the upgrade before finishing.
 
 ## Current Franklin contract upgrade specification or "How notice period works"
 
