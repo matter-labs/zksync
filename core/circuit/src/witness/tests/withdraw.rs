@@ -33,7 +33,7 @@ fn test_withdraw() {
     };
 
     // Additional data required for performing the operation.
-    let input = SigDataInput::from_withdraw_op(&withdraw_op);
+    let input = SigDataInput::from_withdraw_op(&withdraw_op).expect("SigDataInput creation failed");
 
     generic_test_scenario::<WithdrawWitness<Bn256>, _>(
         &accounts,

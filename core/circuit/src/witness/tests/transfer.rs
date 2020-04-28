@@ -39,7 +39,7 @@ fn test_transfer_success() {
     };
 
     // Additional data required for performing the operation.
-    let input = SigDataInput::from_transfer_op(&transfer_op);
+    let input = SigDataInput::from_transfer_op(&transfer_op).expect("SigDataInput creation failed");
 
     generic_test_scenario::<TransferWitness<Bn256>, _>(
         &accounts,
@@ -80,7 +80,7 @@ fn test_transfer_to_self() {
     };
 
     // Additional data required for performing the operation.
-    let input = SigDataInput::from_transfer_op(&transfer_op);
+    let input = SigDataInput::from_transfer_op(&transfer_op).expect("SigDataInput creation failed");
 
     generic_test_scenario::<TransferWitness<Bn256>, _>(
         &accounts,

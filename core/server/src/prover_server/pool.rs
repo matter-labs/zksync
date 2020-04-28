@@ -294,19 +294,7 @@ impl Maintainer {
                     let transfer_witness =
                         TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer);
 
-                    let sig_packed = transfer
-                        .tx
-                        .signature
-                        .signature
-                        .serialize_packed()
-                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
-
-                    let input = SigDataInput::new(
-                        &sig_packed,
-                        &transfer.tx.get_bytes(),
-                        &transfer.tx.signature.pub_key,
-                    )?;
-
+                    let input = SigDataInput::from_transfer_op(&transfer)?;
                     let transfer_operations = transfer_witness.calculate_operations(input);
 
                     operations.extend(transfer_operations);
@@ -322,19 +310,7 @@ impl Maintainer {
                         &transfer_to_new,
                     );
 
-                    let sig_packed = transfer_to_new
-                        .tx
-                        .signature
-                        .signature
-                        .serialize_packed()
-                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
-
-                    let input = SigDataInput::new(
-                        &sig_packed,
-                        &transfer_to_new.tx.get_bytes(),
-                        &transfer_to_new.tx.signature.pub_key,
-                    )?;
-
+                    let input = SigDataInput::from_transfer_to_new_op(&transfer_to_new)?;
                     let transfer_to_new_operations =
                         transfer_to_new_witness.calculate_operations(input);
 
@@ -349,19 +325,7 @@ impl Maintainer {
                     let withdraw_witness =
                         WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw);
 
-                    let sig_packed = withdraw
-                        .tx
-                        .signature
-                        .signature
-                        .serialize_packed()
-                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
-
-                    let input = SigDataInput::new(
-                        &sig_packed,
-                        &withdraw.tx.get_bytes(),
-                        &withdraw.tx.signature.pub_key,
-                    )?;
-
+                    let input = SigDataInput::from_withdraw_op(&withdraw)?;
                     let withdraw_operations = withdraw_witness.calculate_operations(input);
 
                     operations.extend(withdraw_operations);
@@ -375,19 +339,7 @@ impl Maintainer {
                     let close_account_witness =
                         CloseAccountWitness::apply_tx(&mut witness_accum.account_tree, &close);
 
-                    let sig_packed = close
-                        .tx
-                        .signature
-                        .signature
-                        .serialize_packed()
-                        .map_err(|e| format!("failed to pack signature: {}", e))?;
-
-                    let input = SigDataInput::new(
-                        &sig_packed,
-                        &close.tx.get_bytes(),
-                        &close.tx.signature.pub_key,
-                    )?;
-
+                    let input = SigDataInput::from_close_op(&close)?;
                     let close_account_operations =
                         close_account_witness.calculate_operations(input);
 

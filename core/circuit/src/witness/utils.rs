@@ -19,7 +19,7 @@ use models::{
     },
     merkle_tree::{hasher::Hasher, PedersenHasher, RescueHasher},
     node::{
-        operations::{TransferOp, TransferToNewOp, WithdrawOp},
+        operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
         tx::PackedPublicKey,
         AccountId, BlockNumber, Engine,
     },
@@ -526,7 +526,23 @@ impl SigDataInput {
         })
     }
 
-    pub fn from_transfer_op(transfer_op: &TransferOp) -> Self {
+    pub fn from_close_op(close_op: &CloseOp) -> Result<Self, String> {
+        let sign_packed = close_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        let input = SigDataInput::new(
+            &sign_packed,
+            &close_op.tx.get_bytes(),
+            &close_op.tx.signature.pub_key,
+        );
+
+        input
+    }
+
+    pub fn from_transfer_op(transfer_op: &TransferOp) -> Result<Self, String> {
         let sign_packed = transfer_op
             .tx
             .signature
@@ -537,13 +553,12 @@ impl SigDataInput {
             &sign_packed,
             &transfer_op.tx.get_bytes(),
             &transfer_op.tx.signature.pub_key,
-        )
-        .expect("prepare signature data");
+        );
 
         input
     }
 
-    pub fn from_transfer_to_new_op(transfer_op: &TransferToNewOp) -> Self {
+    pub fn from_transfer_to_new_op(transfer_op: &TransferToNewOp) -> Result<Self, String> {
         let sign_packed = transfer_op
             .tx
             .signature
@@ -554,13 +569,12 @@ impl SigDataInput {
             &sign_packed,
             &transfer_op.tx.get_bytes(),
             &transfer_op.tx.signature.pub_key,
-        )
-        .expect("prepare signature data");
+        );
 
         input
     }
 
-    pub fn from_withdraw_op(withdraw_op: &WithdrawOp) -> Self {
+    pub fn from_withdraw_op(withdraw_op: &WithdrawOp) -> Result<Self, String> {
         let sign_packed = withdraw_op
             .tx
             .signature
@@ -571,8 +585,7 @@ impl SigDataInput {
             &sign_packed,
             &withdraw_op.tx.get_bytes(),
             &withdraw_op.tx.signature.pub_key,
-        )
-        .expect("prepare signature data");
+        );
 
         input
     }
