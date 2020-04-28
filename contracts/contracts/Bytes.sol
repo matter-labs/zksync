@@ -88,10 +88,10 @@ library Bytes {
         }
     }
 
-    function bytesToBytes32(bytes memory  _input) internal pure returns (bytes32 _output) {
-        require (_input.length == 0x20);
+    function bytesToBytes32(bytes memory  _bytes, uint256 _start) internal pure returns (bytes32 r) {
+        require(_bytes.length >= 0x20, "btb32");
         assembly {
-            _output := mload(add(_input, 0x20))
+            r := mload(add(add(_bytes, 0x20), _start))
         }
     }
 
@@ -184,6 +184,11 @@ library Bytes {
     function readBytes20(bytes memory _data, uint _offset) internal pure returns (uint new_offset, bytes20 r) {
         new_offset = _offset + 20;
         r = bytesToBytes20(_data, _offset);
+    }
+
+    function readBytes32(bytes memory _data, uint _offset) internal pure returns (uint new_offset, bytes32 r) {
+        new_offset = _offset + 32;
+        r = bytesToBytes32(_data, _offset);
     }
 
     // Helper function for hex conversion.

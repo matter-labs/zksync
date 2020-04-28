@@ -174,32 +174,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         totalOpenPriorityRequests -= toProcess;
     }
 
-    // function scheduleMigration(address _migrateTo, uint32 _migrateByBlock) external {
-    //     requireGovernor();
-    //     require(migrateByBlock == 0, "migration in progress");
-    //     migrateTo = _migrateTo;
-    //     migrateByBlock = _migrateByBlock;
-    // }
-
-    // // Anybody MUST be able to call this function
-    // function sealMigration() external {
-    //     require(migrateByBlock > 0, "no migration scheduled");
-    //     migrationSealed = true;
-    //     exodusMode = true;
-    // }
-
-    // // Anybody MUST be able to call this function
-    // function migrateToken(uint32 _tokenId, uint128 /*_amount*/, bytes calldata /*_proof*/) external {
-    //     require(migrationSealed, "migration not sealed");
-    //     requireValidToken(_tokenId);
-    //     require(tokenMigrated[_tokenId]==false, "token already migrated");
-    //     // TODO: check the proof for the amount
-    //     // TODO: transfer ERC20 or ETH to the `migrateTo` address
-    //     tokenMigrated[_tokenId] = true;
-
-    //     require(false, "unimplemented");
-    // }
-
     /// @notice Deposit ETH to Layer 2 - transfer ether from user into contract, validate it, register deposit
     /// @param _franklinAddr The receiver Layer 2 address
     function depositETH(address _franklinAddr) external payable nonReentrant {
@@ -501,12 +475,14 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @return address of the signer
     function recoverAddressFromEthSignature(bytes memory _signature, bytes memory _message) internal pure returns (address) {
         require(_signature.length == 2*ETH_SIGN_RS_BYTES + 1, "ves10"); // incorrect signature length
+        require(ETH_SIGN_RS_BYTES == 32, "ves11");  // expected ETH_SIGN_RS_BYTES to be 32 bytes
 
+        bytes32 signR;
+        bytes32 signS;
         uint offset = 0;
-        bytes32 signR = Bytes.bytesToBytes32(Bytes.slice(_signature, offset, ETH_SIGN_RS_BYTES));
-        offset += ETH_SIGN_RS_BYTES;
-        bytes32 signS = Bytes.bytesToBytes32(Bytes.slice(_signature, offset, ETH_SIGN_RS_BYTES));
-        offset += ETH_SIGN_RS_BYTES;
+
+        (offset, signR) = Bytes.readBytes32(_signature, offset);
+        (offset, signS) = Bytes.readBytes32(_signature, offset);
         uint8 signV = uint8(_signature[offset]);
 
         return ecrecover(keccak256(_message), signV, signR, signS);
@@ -516,7 +492,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         require(_newPkHash.length == 20, "vpk11"); // unexpected hash length
 
         bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n130",
+            "\x19Ethereum Signed Message:\n130",  // 130 is message length, update if changing the message
             "Register ZK Sync pubkey:\n\n",
             Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)),
             " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
