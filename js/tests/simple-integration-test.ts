@@ -11,6 +11,7 @@ import {IERC20_INTERFACE} from "zksync/build/utils";
 import Axios from "axios";
 import {compareObjectStructure, transactionHistoryItems} from "./api-test";
 import { TokenLike } from "zksync/build/types";
+import * as apitype from "./api-type-validate";
 import * as assert from "assert";
 
 const WEB3_URL = process.env.WEB3_URL;
@@ -265,8 +266,9 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
 
-    await testTransactionHistory(syncWallet1.address());
-    await testAccountResponse(syncWallet1.address(), token);
+    const tokenId = syncProvider.tokenSet.resolveTokenId(token);
+    await apitype.checkAccount(syncWallet1.address());
+    await apitype.checkTxHistory(syncWallet1.address());
 
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
 
@@ -320,46 +322,6 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
     }
 }
 
-
-async function testAccountResponse(address: string, token: TokenLike) {
-    const { data } = await Axios.get(process.env.REST_API_ADDR + `/api/v0.1/account/${address}`);
-    const tokenId = syncProvider.tokenSet.resolveTokenId(token);
-    const sampleApiStatus = {
-        "id": 1,
-        "commited": {
-            "pub_key_hash": "sync:0000000000000000000000000000000000000000",
-            "address": "0xeb9591873d2895c4e130f3ea19d1b83e07face08",
-            "balances": {
-                [tokenId]: "0"
-            },
-            "nonce": 5
-        },
-        "verified": {
-            "pub_key_hash": "sync:0000000000000000000000000000000000000000",
-            "address": "0xeb9591873d2895c4e130f3ea19d1b83e07face08",
-            "balances": {},
-            "nonce": 0
-        }
-    }
-
-    assert(
-        compareObjectStructure(sampleApiStatus, data), 
-        "rest method '/api/v0.1/account/' doesn't work as expected. Check if explorer and client work."
-    );
-}
-
-async function testTransactionHistory(address: string) {
-    const { data } = await Axios.get(process.env.REST_API_ADDR + `/api/v0.1/account/${address}/history/0/20`);
-    assert(
-        data.map(received => 
-            transactionHistoryItems.some(expected => 
-                compareObjectStructure(expected, received)
-            )
-        ),
-        "rest method '/account/{address}/history/{offset}/{limit}' doesn't work as expected. Check if explorer and client work."
-    );
-}
-
 (async () => {
     try {
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
@@ -406,6 +368,9 @@ async function testTransactionHistory(address: string) {
         );
 
         await testThrowingErrorOnTxFail(zksyncDepositorWallet);
+
+        apitype.deleteUnusedGenFiles();
+        await apitype.checkStatus();
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");
