@@ -1,5 +1,7 @@
 # Upgrade mechanism
 
+>Use [structure image](https://drive.google.com/file/d/1tsgcS3m5poEL1A3B27dKpjUgw1V8XY2R/view?usp=sharing) for better understanding
+
 ## Contracts and interfaces
 
 ### Ownable
