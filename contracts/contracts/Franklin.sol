@@ -516,9 +516,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         require(_newPkHash.length == 20, "vpk11"); // unexpected hash length
 
         bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n135",
+            "\x19Ethereum Signed Message:\n130",
             "Register ZK Sync pubkey:\n\n",
-            "sync:", Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)),
+            Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)),
             " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
             "\n\n",
             "Only sign this message for a trusted client!"
