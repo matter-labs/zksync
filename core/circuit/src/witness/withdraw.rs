@@ -352,8 +352,9 @@ mod test {
     fn test_withdraw() {
         use testkit::zksync_account::ZksyncAccount;
 
-        let zksync_account = ZksyncAccount::rand();
         let account_id = 1;
+        let mut zksync_account = ZksyncAccount::rand();
+        zksync_account.account_id = Some(account_id);
         let account_address = zksync_account.address;
         let account = {
             let mut account = Account::default_with_address(&account_address);
@@ -435,12 +436,14 @@ mod test {
 
     #[test]
     #[ignore]
+    #[should_panic(expected = "chunk number 0/execute_op/op_valid")]
     fn test_withdraw_replay() {
         use testkit::zksync_account::ZksyncAccount;
 
         let account_id = 1;
         let account_duplicate_id = 11;
-        let zksync_account = ZksyncAccount::rand();
+        let mut zksync_account = ZksyncAccount::rand();
+        zksync_account.account_id = Some(account_id);
         let account_address = zksync_account.address;
         let account = {
             let mut account = Account::default_with_address(&account_address);

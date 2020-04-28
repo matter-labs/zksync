@@ -1,4 +1,7 @@
 #!/bin/bash
+
+FAST_ONLY=`[ "$1" == "--fast-only" ]`
+
 . .setup_env
 
 set -e
@@ -19,8 +22,10 @@ function clean_up() {
     exit $exitcode
 }
 
-# run with usual geth
-cargo run --bin exodus_test --release
+if [ ! FAST_ONLY ]; then
+  # run with usual geth
+  cargo run --bin exodus_test --release
+fi
 
 # set up ganache
 if [[ $ZKSYNC_ENV == ci ]]; then

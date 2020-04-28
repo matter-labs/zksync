@@ -158,7 +158,7 @@ library Operations {
     // ChangePubKey
 
     struct ChangePubKey {
-        // uint24 accountId;
+        uint24 accountId;
         bytes pubKeyHash;
         address owner;
         uint32 nonce;
@@ -167,10 +167,10 @@ library Operations {
     function readChangePubKeyPubdata(bytes memory _data, uint _offset) internal pure
         returns (ChangePubKey memory parsed)
     {
-        uint offset = _offset + ACCOUNT_ID_BYTES;                                    // accountId (ignored)
-        (offset, parsed.pubKeyHash) = Bytes.read(_data, offset, PUBKEY_HASH_BYTES);  // pubKeyHash
-        (offset, parsed.owner) = Bytes.readAddress(_data, offset);                   // owner
-        (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);                    // nonce
+        (_offset, parsed.accountId) = Bytes.readUInt24(_data, _offset);                // accountId
+        (_offset, parsed.pubKeyHash) = Bytes.read(_data, _offset, PUBKEY_HASH_BYTES);  // pubKeyHash
+        (_offset, parsed.owner) = Bytes.readAddress(_data, _offset);                   // owner
+        (_offset, parsed.nonce) = Bytes.readUInt32(_data, _offset);                    // nonce
     }
 
     // Withdrawal data process

@@ -452,7 +452,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                     if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
                         bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsRequiringEthWitness]);
 
-                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
+                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
                         require(valid, "fpp15"); // failed to verify change pubkey hash signature
                     } else {
                         bool valid = keccak256(authFacts[op.owner][op.nonce]) == keccak256(op.pubKeyHash);
@@ -490,14 +490,15 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         return ecrecover(keccak256(_message), signV, signR, signS);
     }
 
-    function verifyChangePubkeySignature(bytes memory _signature, bytes memory _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
+    function verifyChangePubkeySignature(bytes memory _signature, bytes memory _newPkHash, uint32 _nonce, address _ethAddress, uint24 _accountId) internal pure returns (bool) {
         require(_newPkHash.length == 20, "vpk11"); // unexpected hash length
 
         bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n134",
+            "\x19Ethereum Signed Message:\n155",
             "Register zkSync pubkey:\n\n",
             "sync:", Bytes.bytesToHexASCIIBytes(_newPkHash),
-            " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
+            "\nnonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
+            "\naccount id: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt24(_accountId)),
             "\n\n",
             "Only sign this message for a trusted client!"
         );

@@ -177,6 +177,9 @@ ci-check:
 integration-testkit: build-contracts
 	@bin/integration-testkit
 
+integration-testkit-fast-only: build-contracts
+	@bin/integration-testkit --fast-only
+
 migration-test: build-contracts
 	cargo run --bin migration_test --release
 

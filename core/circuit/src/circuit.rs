@@ -775,6 +775,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut serialized_tx_bits = vec![];
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(cur.account_address.get_bits_be());
         serialized_tx_bits.extend(cur.account.address.get_bits_be());
         serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
@@ -1397,6 +1398,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             8,
         )?; //we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
         serialized_tx_bits.extend(tx_code.get_bits_be());
+        serialized_tx_bits.extend(lhs.account_address.get_bits_be());
         serialized_tx_bits.extend(lhs.account.address.get_bits_be());
         serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
@@ -1601,6 +1603,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut serialized_tx_bits = vec![];
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(lhs.account_address.get_bits_be());
         serialized_tx_bits.extend(lhs.account.address.get_bits_be());
         serialized_tx_bits.extend(rhs.account.address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());

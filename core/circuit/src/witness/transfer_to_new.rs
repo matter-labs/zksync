@@ -449,8 +449,9 @@ mod test {
     #[test]
     #[ignore]
     fn test_transfer_to_new_success() {
-        let from_zksync_account = ZksyncAccount::rand();
         let from_account_id = 1;
+        let mut from_zksync_account = ZksyncAccount::rand();
+        from_zksync_account.account_id = Some(from_account_id);
         let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
@@ -530,10 +531,12 @@ mod test {
 
     #[test]
     #[ignore]
+    #[should_panic(expected = "chunk number 0/execute_op/op_valid")]
     fn test_transfer_to_new_replay() {
         let from_account_id = 1;
         let from_account_duplicate_id = 11;
-        let from_zksync_account = ZksyncAccount::rand();
+        let mut from_zksync_account = ZksyncAccount::rand();
+        from_zksync_account.account_id = Some(from_account_id);
         let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);

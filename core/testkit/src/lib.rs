@@ -641,6 +641,12 @@ impl TestSetup {
     }
 
     pub fn change_pubkey_with_tx(&mut self, zksync_signer: ZKSyncAccountId) {
+        let account_id = self
+            .get_zksync_account_committed_state(zksync_signer)
+            .expect("can't change pubkey, account does not exist")
+            .0;
+        self.accounts.zksync_accounts[zksync_signer.0].account_id = Some(account_id);
+
         let tx = self
             .accounts
             .change_pubkey_with_tx(zksync_signer, None, true);
@@ -653,6 +659,12 @@ impl TestSetup {
         eth_account: ETHAccountId,
         zksync_signer: ZKSyncAccountId,
     ) {
+        let account_id = self
+            .get_zksync_account_committed_state(zksync_signer)
+            .expect("can't change pubkey, account does not exist")
+            .0;
+        self.accounts.zksync_accounts[zksync_signer.0].account_id = Some(account_id);
+
         let tx =
             self.accounts
                 .change_pubkey_with_onchain_auth(eth_account, zksync_signer, None, true);
