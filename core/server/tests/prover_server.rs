@@ -1,22 +1,20 @@
 // Built-in deps
-use std::str::FromStr;
-use std::{net, thread, time};
+use std::{net, str::FromStr, thread, time, time::Duration};
 // External deps
 use crypto_exports::pairing::ff::{Field, PrimeField};
 use futures::channel::mpsc;
 // Workspace deps
-use circuit::witness::deposit::apply_deposit_tx;
-use circuit::witness::deposit::calculate_deposit_operations_from_witness;
-use models::circuit::CircuitAccountTree;
-use models::config_options::ConfigurationOptions;
-use models::node::block::Block;
-use models::node::Address;
-use models::params::{account_tree_depth, total_tokens};
-use models::prover_utils::EncodedProofPlonk;
-use prover::client;
-use prover::ApiClient;
+use circuit::witness::{deposit::DepositWitness, Witness};
+use models::{
+    circuit::CircuitAccountTree,
+    config_options::ConfigurationOptions,
+    node::{block::Block, Address},
+    params::{account_tree_depth, total_tokens},
+    prover_utils::EncodedProofPlonk,
+};
+use prover::{client, ApiClient};
+// Local deps
 use server::prover_server;
-use std::time::Duration;
 
 fn spawn_server(prover_timeout: time::Duration, rounds_interval: time::Duration) -> String {
     // TODO: make single server spawn for all tests
@@ -249,7 +247,7 @@ pub fn test_operation_and_wanted_prover_data(
     let mut operations = vec![];
 
     if let models::node::FranklinPriorityOp::Deposit(deposit_op) = deposit_priority_op {
-        let deposit_witness = apply_deposit_tx(
+        let deposit_witness = DepositWitness::apply_tx(
             &mut circuit_tree,
             &models::node::operations::DepositOp {
                 priority_op: deposit_op,
@@ -257,7 +255,7 @@ pub fn test_operation_and_wanted_prover_data(
             },
         );
 
-        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+        let deposit_operations = deposit_witness.calculate_operations(());
         operations.extend(deposit_operations);
         pub_data.extend(deposit_witness.get_pubdata());
     }
