@@ -155,7 +155,6 @@ fn test_noop() {
 
     // Parametrize the circuit instance.
     let circuit_instance = FranklinCircuit {
-        operation_batch_size: 1,
         rescue_params,
         jubjub_params,
         old_root: Some(tree.root_hash()),
@@ -264,7 +263,6 @@ fn incorrect_circuit_pubdata() {
         );
 
         let circuit_instance = FranklinCircuit {
-            operation_batch_size: 1,
             rescue_params,
             jubjub_params,
             old_root: Some(circuit_old_hash),
@@ -278,7 +276,7 @@ fn incorrect_circuit_pubdata() {
         };
 
         let error = check_circuit_non_panicking(circuit_instance)
-            .expect_err("Hash check: Incorrect hash values should lead to error");
+            .expect_err("Hash check: Incorrect pubdata values should lead to an error");
 
         assert!(
             error.contains(expected_msg),
@@ -301,7 +299,6 @@ fn incorrect_circuit_pubdata() {
     );
 
     let circuit_instance = FranklinCircuit {
-        operation_batch_size: 1,
         rescue_params,
         jubjub_params,
         old_root: Some(tree.root_hash()),
@@ -320,7 +317,7 @@ fn incorrect_circuit_pubdata() {
     let expected_msg = "enforce external data hash equality";
 
     let error = check_circuit_non_panicking(circuit_instance)
-        .expect_err("Validator address: Incorrect hash values should lead to error");
+        .expect_err("Validator address: Incorrect pubdata values should lead to an error");
 
     assert!(
         error.contains(expected_msg),
@@ -343,7 +340,6 @@ fn incorrect_circuit_pubdata() {
     );
 
     let circuit_instance = FranklinCircuit {
-        operation_batch_size: 1,
         rescue_params,
         jubjub_params,
         old_root: Some(tree.root_hash()),
@@ -362,7 +358,7 @@ fn incorrect_circuit_pubdata() {
     let expected_msg = "enforce external data hash equality";
 
     let error = check_circuit_non_panicking(circuit_instance)
-        .expect_err("Validator address: Incorrect hash values should lead to error");
+        .expect_err("Validator address: Incorrect pubdata values should lead to an error");
 
     assert!(
         error.contains(expected_msg),

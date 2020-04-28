@@ -41,7 +41,6 @@ const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
 pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub rescue_params: &'a <E as RescueEngine>::Params,
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
-    pub operation_batch_size: usize,
     /// The old root of the tree
     pub old_root: Option<E::Fr>,
 
@@ -61,7 +60,6 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'
         Self {
             rescue_params: self.rescue_params,
             jubjub_params: self.jubjub_params,
-            operation_batch_size: self.operation_batch_size,
             old_root: self.old_root,
             block_number: self.block_number,
             validator_address: self.validator_address,

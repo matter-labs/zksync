@@ -40,7 +40,6 @@ impl ProverData {
         FranklinCircuit {
             rescue_params: &models::params::RESCUE_PARAMS as &Bn256RescueParams,
             jubjub_params: &models::params::JUBJUB_PARAMS as &AltJubjubBn256,
-            operation_batch_size: self.operations.len(),
             old_root: Some(self.old_root),
             block_number: Fr::from_str(&block.to_string()),
             validator_address: Some(self.validator_address),

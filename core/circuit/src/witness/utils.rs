@@ -155,11 +155,9 @@ impl<'a> WitnessBuilder<'a> {
 
     /// Finaly, creates circuit instance for given operations.
     pub fn into_circuit_instance(self) -> FranklinCircuit<'static, Engine> {
-        let operation_batch_size = self.operations.len();
         FranklinCircuit {
             rescue_params: &models::params::RESCUE_PARAMS,
             jubjub_params: &models::params::JUBJUB_PARAMS,
-            operation_batch_size,
             old_root: Some(self.initial_root_hash),
             operations: self.operations,
             pub_data_commitment: Some(

@@ -8,17 +8,24 @@
 
 // External deps
 use bigdecimal::BigDecimal;
+use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
 use models::node::{
     operations::{DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp},
     Address, Deposit, FullExit,
 };
 // Local deps
-use crate::witness::{
-    tests::test_utils::{check_circuit, PlasmaStateGenerator, WitnessTestAccount, FEE_ACCOUNT_ID},
-    utils::{SigDataInput, WitnessBuilder},
-    DepositWitness, FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness,
-    Witness,
+use crate::{
+    circuit::FranklinCircuit,
+    witness::{
+        tests::test_utils::{
+            check_circuit, check_circuit_non_panicking, PlasmaStateGenerator, WitnessTestAccount,
+            FEE_ACCOUNT_ID,
+        },
+        utils::{SigDataInput, WitnessBuilder},
+        DepositWitness, FullExitWitness, TransferToNewWitness, TransferWitness, WithdrawWitness,
+        Witness,
+    },
 };
 
 mod change_pubkey_offchain;
@@ -30,18 +37,16 @@ mod transfer;
 mod transfer_to_new;
 mod withdraw;
 
-/// Composite test combines all the witness types applied together within one block:
+/// Executes the following operations:
+///
 /// - Deposit several types of token on the account.
 /// - Transfer some funds to different accounts, both existing and new.
 /// - Change the public key of account.
 /// - Withdraw some funds.
-/// - Perform full exit for an account.
-/// - Check the root hash and circuit constraints.
 ///
-/// All the actions are performed within one block.
-#[test]
-#[ignore]
-fn composite_test() {
+/// Returns the resulting `WitnessBuilder` and the hash obtained
+/// from `PlasmaState` for further correctness checks.
+fn apply_many_ops() -> FranklinCircuit<'static, Bn256> {
     const ETH_TOKEN: u16 = 0;
     const NNM_TOKEN: u16 = 2;
 
@@ -215,8 +220,6 @@ fn composite_test() {
     witness_accum.collect_fees(&fees);
     witness_accum.calculate_pubdata_commitment();
 
-    // Check the circuit state.
-
     // Check that root hashes match
     assert_eq!(
         plasma_state.root_hash(),
@@ -226,6 +229,24 @@ fn composite_test() {
         "root hash in state keeper and witness generation code mismatch"
     );
 
+    witness_accum.into_circuit_instance()
+}
+
+/// Composite test combines all the witness types applied together within one block:
+/// - Deposit several types of token on the account.
+/// - Transfer some funds to different accounts, both existing and new.
+/// - Change the public key of account.
+/// - Withdraw some funds.
+/// - Perform full exit for an account.
+/// - Check the root hash and circuit constraints.
+///
+/// All the actions are performed within one block.
+#[test]
+#[ignore]
+fn composite_test() {
+    // Perform some operations
+    let circuit = apply_many_ops();
+
     // Verify that there are no unsatisfied constraints
-    check_circuit(witness_accum.into_circuit_instance());
+    check_circuit(circuit);
 }

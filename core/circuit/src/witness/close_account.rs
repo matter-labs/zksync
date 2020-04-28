@@ -300,10 +300,8 @@ impl CloseAccountWitness<Bn256> {
 //            let mut cs = TestConstraintSystem::<Bn256>::new();
 //
 //            let instance = FranklinCircuit {
-//                operation_batch_size: 10,
 //                params,
 //                old_root: close_account_witness.before_root,
-//                new_root: Some(root_after_fee),
 //                operations,
 //                pub_data_commitment: Some(public_data_commitment),
 //                block_number: Some(block_number),
