@@ -48,6 +48,14 @@ The last part of deploying --- is to transfer mastership of all proxy contracts 
 
 The last should be done by calling several times `addUpgradeable` function.
 
+So, step-by-step deploy process:
+
+1. Deploy targets for all proxies.
+2. Deploy proxies with needed target addresses and initialization parameters.
+3. Deploy UpgradeGatekeeper with Franklin's proxy's address as a parameter.
+4. Transfer mastership of all proxies to the `UpgradeGatekeeper`.
+5. Add all proxies to the list of managing by the gatekeeper by calling `addUpgradeable` several times.
+
 ### Upgrade process
 
 There is three **phases of upgrade** which described in UpgradeGatekeeper:
@@ -58,7 +66,7 @@ There is three **phases of upgrade** which described in UpgradeGatekeeper:
 |**NoticePeriod**|This phase starts when master of gatekeeper calls `startUpgrade` function. Sense of this phase --- give all users of the rollup contract an opportunity to withdraw funds to the ethereum network before upgrading the target. The transition to the next phase can be done after at least upgradeNoticePeriod seconds from the start of this phase. `upgradeNoticePeriod` is a value which defines by the "`mainContract`".|
 |**Preparation**|This is a finish phase. During this phase, master can call `finishUpgrade` function, which upgrades targets in proxies. One of the most important checks inside this function is enforcing that the mainContract is ready for the upgrade.|
 
-So, the upgrade process:
+So, step-by-step upgrade process:
 
 1. Deploy new targets for proxies that would be upgraded.
 2. Call `startUpgrade` with addresses of these targets (and zeroes for proxies that shouldn't be upgraded).
