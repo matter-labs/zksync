@@ -250,3 +250,49 @@ fn composite_test() {
     // Verify that there are no unsatisfied constraints
     check_circuit(circuit);
 }
+
+/// Checks that corrupted list of operations leads to predictable errors.
+#[test]
+#[ignore]
+fn corrupted_operations() {
+    // Perform some operations
+    let circuit = apply_many_ops();
+
+    // Try to cut off an operation at end.
+    let mut first_circuit = circuit.clone();
+    first_circuit.operations.pop();
+
+    // As we removed the last operation, the last chunk of the block is no longer the last chunk of
+    // the corresponding transaction.
+    // See `circuit.rs` for details.
+    let expected_msg =
+        "ensure last chunk of the block is a last chunk of corresponding transaction";
+
+    let error = check_circuit_non_panicking(first_circuit)
+        .expect_err("Corrupted operations list should lead to an error");
+
+    assert!(
+        error.contains(expected_msg),
+        "corrupted_operations: Got error message '{}', but expected '{}'",
+        error,
+        expected_msg
+    );
+
+    // Now try to cut off an operation at the beginning.
+    let mut second_circuit = circuit.clone();
+    second_circuit.operations.remove(0);
+
+    // We corrupted the very first chunk, so it should be reported.
+    // See `circuit.rs` for details.
+    let expected_msg = "chunk number 0/verify_correct_chunking/correct_sequence";
+
+    let error = check_circuit_non_panicking(second_circuit)
+        .expect_err("Corrupted operations list should lead to an error");
+
+    assert!(
+        error.contains(expected_msg),
+        "corrupted_operations: Got error message '{}', but expected '{}'",
+        error,
+        expected_msg
+    );
+}
