@@ -5,7 +5,7 @@ use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
 use models::node::operations::TransferOp;
 // Local deps
 use crate::witness::{
-    tests::test_utils::{generic_test_scenario, WitnessTestAccount},
+    tests::test_utils::{corrupted_input_test_scenario, generic_test_scenario, WitnessTestAccount},
     transfer::TransferWitness,
     utils::SigDataInput,
 };
@@ -105,4 +105,54 @@ fn test_transfer_to_self() {
             vec![fee]
         },
     );
+}
+
+/// Checks that corrupted signature data leads to unsatisfied constraints in circuit.
+#[test]
+#[ignore]
+fn corrupted_ops_input() {
+    // Incorrect signature data will lead to `op_valid` constraint failure.
+    // See `circuit.rs` for details.
+    const EXPECTED_PANIC_MSG: &str = "op_valid is true";
+
+    // Legit input data.
+    let accounts = vec![WitnessTestAccount::new(1, 10)];
+    let account = &accounts[0];
+    let transfer_op = TransferOp {
+        tx: account
+            .zksync_account
+            .sign_transfer(
+                0,
+                "",
+                BigDecimal::from(7),
+                BigDecimal::from(3),
+                &account.account.address,
+                None,
+                true,
+            )
+            .0,
+        from: account.id,
+        to: account.id,
+    };
+
+    // Additional data required for performing the operation.
+    let input = SigDataInput::from_transfer_op(&transfer_op).expect("SigDataInput creation failed");
+
+    // Test vector with values corrupted one by one.
+    let test_vector = input.corrupted_variations();
+
+    for input in test_vector {
+        corrupted_input_test_scenario::<TransferWitness<Bn256>, _>(
+            &accounts,
+            transfer_op.clone(),
+            input,
+            EXPECTED_PANIC_MSG,
+            |plasma_state, op| {
+                let (fee, _) = plasma_state
+                    .apply_transfer_op(&op)
+                    .expect("transfer should be success");
+                vec![fee]
+            },
+        );
+    }
 }

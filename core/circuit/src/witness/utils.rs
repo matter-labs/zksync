@@ -466,7 +466,7 @@ pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
 
 /// Gathered signature data for calculating the operations in several
 /// witness structured (e.g. `TransferWitness` or `WithdrawWitness`).
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SigDataInput {
     pub first_sig_msg: Fr,
     pub second_sig_msg: Fr,
@@ -586,5 +586,35 @@ impl SigDataInput {
         );
 
         input
+    }
+
+    /// Provides a vector of copies of this `SigDataInput` object, all with one field
+    /// set to incorrect value.
+    /// Used for circuit tests.
+    #[cfg(test)]
+    pub fn corrupted_variations(&self) -> Vec<Self> {
+        let incorrect_fr = crate::witness::tests::test_utils::incorrect_fr();
+        vec![
+            SigDataInput {
+                first_sig_msg: incorrect_fr,
+                ..self.clone()
+            },
+            SigDataInput {
+                second_sig_msg: incorrect_fr,
+                ..self.clone()
+            },
+            SigDataInput {
+                third_sig_msg: incorrect_fr,
+                ..self.clone()
+            },
+            SigDataInput {
+                signature: SignatureData::init_empty(),
+                ..self.clone()
+            },
+            SigDataInput {
+                signer_pub_key_packed: vec![Some(false); self.signer_pub_key_packed.len()],
+                ..self.clone()
+            },
+        ]
     }
 }

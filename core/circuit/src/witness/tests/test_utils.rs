@@ -1,10 +1,13 @@
 // External deps
 use bigdecimal::BigDecimal;
-use crypto_exports::franklin_crypto::{bellman::Circuit, circuit::test::TestConstraintSystem};
+use crypto_exports::franklin_crypto::{
+    bellman::{pairing::ff::PrimeField, Circuit},
+    circuit::test::TestConstraintSystem,
+};
 // Workspace deps
 use models::{
     circuit::{account::CircuitAccount, CircuitAccountTree},
-    node::{Account, AccountId, AccountMap, Address, Engine},
+    node::{Account, AccountId, AccountMap, Address, Engine, Fr},
 };
 use plasma::state::{CollectedFee, PlasmaState};
 use testkit::zksync_account::ZksyncAccount;
@@ -16,16 +19,28 @@ pub use crate::witness::utils::WitnessBuilder;
 
 pub const FEE_ACCOUNT_ID: u32 = 0;
 
-/// Verifies that circuit has no unsatisfied constraints, and panics otherwise.
-pub fn check_circuit(circuit: FranklinCircuit<Engine>) {
+/// Verifies that circuit has no unsatisfied constraints, and returns an error otherwise.
+pub fn check_circuit_non_panicking(circuit: FranklinCircuit<Engine>) -> Result<(), String> {
     let mut cs = TestConstraintSystem::<Engine>::new();
     circuit.synthesize(&mut cs).unwrap();
 
     println!("unconstrained: {}", cs.find_unconstrained());
     println!("number of constraints {}", cs.num_constraints());
     if let Some(err) = cs.which_is_unsatisfied() {
-        panic!("ERROR satisfying in {}", err);
+        Err(err.into())
+    } else {
+        Ok(())
     }
+}
+
+/// Verifies that circuit has no unsatisfied constraints, and panics otherwise.
+pub fn check_circuit(circuit: FranklinCircuit<Engine>) {
+    check_circuit_non_panicking(circuit).expect("ERROR satisfying the constraints:")
+}
+
+// Provides a quasi-random non-zero `Fr` to substitute an incorrect `Fr` value.
+pub fn incorrect_fr() -> Fr {
+    Fr::from_str("12345").unwrap()
 }
 
 /// Helper structure to generate `PlasmaState` and `CircuitAccountTree`.
@@ -141,4 +156,58 @@ pub fn generic_test_scenario<W, F>(
 
     // Verify that there are no unsatisfied constraints
     check_circuit(witness_accum.into_circuit_instance());
+}
+
+/// Does the same operations as the `generic_test_scenario`, but assumes
+/// that input for `calculate_operations` is corrupted and will lead to the panic.
+/// The panic is caught and checked to match the provided message.
+pub fn corrupted_input_test_scenario<W, F>(
+    accounts: &[WitnessTestAccount],
+    op: W::OperationType,
+    input: W::CalculateOpsInput,
+    expected_msg: &str,
+    apply_op_on_plasma: F,
+) where
+    W: Witness,
+    W::CalculateOpsInput: Clone + std::fmt::Debug,
+    F: FnOnce(&mut PlasmaState, &W::OperationType) -> Vec<CollectedFee>,
+{
+    // Initialize Plasma and WitnessBuilder.
+    let (mut plasma_state, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+
+    // Apply op on plasma
+    let fees = apply_op_on_plasma(&mut plasma_state, &op);
+    plasma_state.collect_fee(&fees, FEE_ACCOUNT_ID);
+
+    // Apply op on circuit
+    let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
+    let circuit_operations = witness.calculate_operations(input.clone());
+    let pub_data_from_witness = witness.get_pubdata();
+
+    // Prepare circuit
+    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.collect_fees(&fees);
+    witness_accum.calculate_pubdata_commitment();
+
+    let result = check_circuit_non_panicking(witness_accum.into_circuit_instance());
+
+    match result {
+        Ok(_) => panic!(
+            "Operation did not err, but was expected to err with message '{}' \
+             Provided input: {:?}",
+            expected_msg, input
+        ),
+        Err(error_msg) => {
+            assert!(
+                error_msg.contains(expected_msg),
+                "Code erred with unexpected message. \
+                 Provided message: '{}', but expected '{}'. \
+                 Provided input: {:?}",
+                error_msg,
+                expected_msg,
+                input,
+            );
+        }
+    }
 }
