@@ -52,16 +52,12 @@ The last should be done by calling several times `addUpgradeable` function.
 
 There is three **phases of upgrade** which described in UpgradeGatekeeper:
 
-* **Idle**
-This is a phase when there are no upgrades to process.
+|Phase|Description|
+|-|-|
+|**Idle**|This is a phase when there are no upgrades to process.|
+|**NoticePeriod**|This phase starts when master of gatekeeper calls `startUpgrade` function. Sense of this phase --- give all users of the rollup contract an opportunity to withdraw funds to the ethereum network before updating the target. The transition to the next phase can be done after at least upgradeNoticePeriod seconds from the start of this phase. `upgradeNoticePeriod` is a value which defines by the "`mainContract`".|
+|**Preparation**|This is a finish phase. During this phase, master can call `finishUpgrade` function, which upgrades targets in proxies. One of the most important checks inside this function is enforcing that the mainContract is ready for the upgrade.|
 
-* **NoticePeriod**
-This phase starts when master of gatekeeper calls `startUpgrade` function.
-Sense of this phase --- give all users of the rollup contract an opportunity to withdraw funds to the ethereum network before updating the target. The transition to the next phase can be done after at least upgradeNoticePeriod seconds from the start of this phase. `upgradeNoticePeriod` is a value which defines by the "`mainContract`".
-
-* **Preparation**
-This is a finish phase. During this phase master can call `finishUpgrade` function.
-One of the most important checks inside this function is enforcing that the mainContract is ready for the upgrade.
 
 ## Current Franklin contract upgrade specification or "How notice period works"
 
