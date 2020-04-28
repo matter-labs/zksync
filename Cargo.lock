@@ -523,20 +523,9 @@ dependencies = [
 
 [[package]]
 name = "bigdecimal"
-version = "0.0.15"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f73d2953c59932d4a0ac941bb5ccca17e324ddae9aa487353dc22f0aade2c4b4"
-dependencies = [
- "num-bigint",
- "num-integer",
- "num-traits",
-]
-
-[[package]]
-name = "bigdecimal"
-version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1374191e2dd25f9ae02e3aa95041ed5d747fc77b3c102b49fe2dd9a8117a6244"
+checksum = "460825c9e21708024d67c07057cd5560e5acdccac85de0de624a81d3de51bacb"
 dependencies = [
  "num-bigint",
  "num-integer",
@@ -766,7 +755,7 @@ dependencies = [
 name = "circuit"
 version = "0.1.1"
 dependencies = [
- "bigdecimal 0.1.2",
+ "bigdecimal",
  "crypto_exports",
  "hex",
  "log 0.4.8",
@@ -1129,7 +1118,7 @@ version = "1.4.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "33d7ca63eb2efea87a7f56a283acc49e2ce4b2bd54adf7465dc1d81fef13d8fc"
 dependencies = [
- "bigdecimal 0.0.15",
+ "bigdecimal",
  "bitflags 1.2.1",
  "byteorder",
  "chrono",
@@ -3711,7 +3700,7 @@ dependencies = [
  "actix-cors",
  "actix-rt",
  "actix-web",
- "bigdecimal 0.1.2",
+ "bigdecimal",
  "chrono",
  "circuit",
  "clap",
@@ -3935,7 +3924,7 @@ checksum = "213701ba3370744dcd1a12960caa4843b3d68b4d1c0a5d575e0d65b2ee9d16c0"
 name = "storage"
 version = "0.0.1"
 dependencies = [
- "bigdecimal 0.1.2",
+ "bigdecimal",
  "chrono",
  "crypto_exports",
  "diesel",

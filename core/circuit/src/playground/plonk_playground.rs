@@ -7,6 +7,7 @@ use models::node::{Account, Deposit, DepositOp, Fr};
 use models::prover_utils::fs_utils::{
     get_universal_setup_lagrange_form, get_universal_setup_monomial_form,
 };
+use num::BigUint;
 use std::time::Instant;
 
 #[test]
@@ -25,7 +26,7 @@ fn test_transpile_deposit_franklin_existing_account() {
         priority_op: Deposit {
             from: deposit_to_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: deposit_to_account_address,
         },
         account_id: deposit_to_account_id,
@@ -110,7 +111,7 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
         priority_op: Deposit {
             from: deposit_to_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: deposit_to_account_address,
         },
         account_id: deposit_to_account_id,
@@ -219,7 +220,7 @@ fn test_new_transpile_deposit_franklin_existing_account() {
         priority_op: Deposit {
             from: deposit_to_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: deposit_to_account_address,
         },
         account_id: deposit_to_account_id,
@@ -394,7 +395,7 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
         priority_op: Deposit {
             from: deposit_to_account_address,
             token: 0,
-            amount: BigDecimal::from(1),
+            amount: BigUint::from(1u32),
             to: deposit_to_account_address,
         },
         account_id: deposit_to_account_id,

@@ -5,7 +5,7 @@ use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
 use models::node::block::Block;
 use models::node::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use num::{BigUint, ToPrimitive};
 use std::convert::TryFrom;
 use std::str::FromStr;
