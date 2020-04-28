@@ -24,7 +24,7 @@ use crate::node::block::Block;
 use crate::node::BlockNumber;
 use crate::node::{AccountUpdates, TokenId};
 use crate::prover_utils::EncodedProofPlonk;
-use ethabi::{decode, ParamType};
+
 use failure::format_err;
 use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
 use serde_bytes;
