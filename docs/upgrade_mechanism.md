@@ -4,15 +4,15 @@
 
 ### Ownable
 
-`Ownable` is a contract which stores address of its **master** at the storage slot with index `keccak256("master")`.
+`Ownable` is a contract that stores the address of its **master** at the storage slot with index `keccak256("master")`.
 
 ### UpgradeableMaster
 
-`UpgradeableMaster` is a interface of contract, which will makes a decision about transition between **phases of upgrade** (this will be explained below)
+`UpgradeableMaster` is an interface of contract, which will decide transition between **phases of upgrade** (this will be explained below)
 
 ### Upgradeable
 
-`Upgradeable` is a interface of contract, which know its **target** (address of implementation). Target can be changed by calling `upgradeTarget` method.
+`Upgradeable` is an interface of contract, which knows its **target** (address of implementation). The target can be changed by calling `upgradeTarget` method.
 
 ```sol
 /// @title Interface of the upgradeable contract
@@ -28,16 +28,16 @@ interface Upgradeable {
 
 ### Proxy
 
-`Proxy` is an interim contract between caller and real implementation of contract.
+`Proxy` is an interim contract between the caller and the real implementation of the contract.
 
 ```sol
 /// @title Proxy Contract
 contract Proxy is Upgradeable, UpgradeableMaster, Ownable
 ```
 
-**Note: storage of this contract will be a context in which all processes of target will work.** Proxy will store address of its **target** at the storage slot with index `keccak256("target")`.
+**Note: storage of this contract will be a context in which all processes of the target will work.** Proxy will store address of its **target** at the storage slot with index `keccak256("target")`.
 
-As Proxy implements Upgradeable it can change its target, but only `master` can do it.
+As Proxy implements Upgradeable, it can change its target, but only `master` can do it.
 
 Proxy have a fallback function:
 
@@ -81,21 +81,21 @@ function() external payable {
 }
 ```
 
-There is some type of calls that Proxy must intercept without uncheck submitting to processing to a fallback function: calling the `initialize` function (in correct way this function will be called from proxy contract directly) and functions of `UpgradeableMaster` interface (that is a reason why Proxy implements it).
+There is some type of calls that Proxy must intercept without uncheck submitting to processing to a fallback function: calling the `initialize` function (in the right way this function will be called from proxy contract directly) and functions of `UpgradeableMaster` interface (that is a reason why Proxy implements it).
 
 ### UpgradeGatekeeper
 
-`UpgradeGatekeeper` is a contract which will manage upgrade process. It is needed to prevent upgrading rollup contracts by master in one function call.
+`UpgradeGatekeeper` is a contract that will manage the upgrade process. It is needed to prevent upgrading rollup contracts by the master in one function call.
 
 ## Deploying and upgrade process
 
 ### Deploying
 
-When a target contract is deployed on the network operator will deploy Proxy contract. Parameters of constructor - address of deployed target contract in network and its initialization parameters.
+When a target contract is deployed on the network operator will deploy the Proxy contract. Parameters of the constructor: address of deployed target contract in the network and its initialization parameters.
 
 When all needed Proxy contracts are deployed, one of them (which must implements `UpgradeableMaster` interface) will act as a parameter of constructor of `UpgradeGatekeeper` (it will names "`mainContract`").
 
-The last part of deploying --- transfer mastership of proxy contracts to the gatekeeper and add them to the gatekeeper's list of managing contracts.
+The last part of deploying --- is to transfer mastership of all proxy contracts to the gatekeeper and add them to the gatekeeper's list of managing contracts.
 
 The last will be done by calling several times the next function:
 
@@ -119,7 +119,7 @@ enum UpgradeStatus {
 ```
 
 * **Idle**
-This a phase when there is no upgrades to process.
+This is a phase when there are no upgrades to process.
 
 * **NoticePeriod**
 This phase starts when master of gatekeeper calls next function:
@@ -128,7 +128,7 @@ This phase starts when master of gatekeeper calls next function:
 /// @param newTargets New managed contracts targets (if element of this array is equal to zero address it means that appropriate upgradeable contract wouldn't be upgraded this time)
 function startUpgrade(address[] calldata newTargets) external
 ```
-Sense of this phase - is to give all users of the rollup contract a chanse to make a decision about stop using gatekeeper's contracts. The transition to the next phase can be done after at least upgradeNoticePeriod seconds from start of this phase. upgradeNoticePeriod is a value which defines from some "`mainContract`":
+Sense of this phase - give all users of the rollup contract an opportunity to withdraw funds to the ethereum network before updating the target. The transition to the next phase can be done after at least upgradeNoticePeriod seconds from the start of this phase. upgradeNoticePeriod is a value which defines from some "`mainContract`":
 ```sol
 /// @notice Contract which defines notice period duration and allows finish upgrade during preparation of it
 UpgradeableMaster public mainContract;
@@ -165,8 +165,8 @@ function readyForUpgrade() external returns (bool) {
 }
 ```
 
-To prevent rollup from spamming of priority requests contract during `preparation lock period` can not add priority requests.
-This period starts from the notification from gatekeeper about start of preparation status of upgrade and ends when the upgrade finishes, or after `UPGRADE_PREPARATION_LOCK_PERIOD` seconds from its start.
+To prevent rollup from spamming of priority requests, during `preparation lock period` contract will not add new priority requests.
+This period starts from the notification from the gatekeeper about the start of preparation status of upgrade and ends when the upgrade finishes, or after `UPGRADE_PREPARATION_LOCK_PERIOD` seconds from its start.
 
 The last is defined in Config.sol:
 ```sol
