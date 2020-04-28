@@ -172,16 +172,26 @@ fn test_noop() {
     check_circuit(circuit_instance);
 }
 
-/// Test for the root hash being set to the incorrect value.
+/// Test for the incorrect values being fed to the circuit via the provided
+/// pubdata.
 ///
 /// The following checks are performed:
 /// - Incorrect old root hash in `pub_data_commitment`,
 /// - Incorrect new root hash in `pub_data_commitment`,
 /// - Incorrect old root hash in `FranklinCircuit`,
 /// - Incorrect old root hash in both `pub_data_commitment` and `FranklinCircuit` (same value),
+/// - Incorrect validator address in pubdata,
+/// - Incorrect block number in pubdata.
+///
+/// All these checks are implemented within one test to reduce the overhead of the
+/// circuit initialization.
 #[test]
 #[ignore]
-fn incorrect_root() {
+fn incorrect_circuit_pubdata() {
+    // ----------
+    // Test setup
+    // ----------
+
     // Cryptographic utilities initialization.
     let jubjub_params = &AltJubjubBn256::new();
     let rescue_params = &Bn256RescueParams::new_2_into_1::<BlakeHasher>();
@@ -209,6 +219,10 @@ fn incorrect_root() {
 
     let correct_hash = tree.root_hash();
     let incorrect_hash = Default::default();
+
+    // ---------------------
+    // Incorrect hash values
+    // ---------------------
 
     // Test vector of the following values:
     // (pub data old root hash), (pub data new root hash),
@@ -249,7 +263,6 @@ fn incorrect_root() {
             Some(block_number),
         );
 
-        // Parametrize the circuit instance.
         let circuit_instance = FranklinCircuit {
             operation_batch_size: 1,
             rescue_params,
@@ -265,13 +278,96 @@ fn incorrect_root() {
         };
 
         let error = check_circuit_non_panicking(circuit_instance)
-            .expect_err("Incorrect hash values should lead to error");
+            .expect_err("Hash check: Incorrect hash values should lead to error");
 
         assert!(
             error.contains(expected_msg),
-            "Got error message '{}', but expected '{}'",
+            "Hash check: Got error message '{}', but expected '{}'",
             error,
             expected_msg
         );
     }
+
+    // ---------------------------
+    // Incorrect validator address
+    // ---------------------------
+
+    let pub_data_commitment = public_data_commitment::<Bn256>(
+        &[false; 64],
+        Some(tree.root_hash()),
+        Some(tree.root_hash()),
+        Some(Default::default()),
+        Some(block_number),
+    );
+
+    let circuit_instance = FranklinCircuit {
+        operation_batch_size: 1,
+        rescue_params,
+        jubjub_params,
+        old_root: Some(tree.root_hash()),
+        operations: vec![operation.clone()],
+        pub_data_commitment: Some(pub_data_commitment),
+        block_number: Some(block_number),
+        validator_account: validator_account_witness.clone(),
+        validator_address: Some(validator_address),
+        validator_balances: validator_balances.clone(),
+        validator_audit_path: validator_audit_path.clone(),
+    };
+
+    // Validator address is a part of pubdata, which is used to calculate the new root hash,
+    // so the hash value will not match expected one.
+    // For details see `circuit.rs`.
+    let expected_msg = "enforce external data hash equality";
+
+    let error = check_circuit_non_panicking(circuit_instance)
+        .expect_err("Validator address: Incorrect hash values should lead to error");
+
+    assert!(
+        error.contains(expected_msg),
+        "Validator address: Got error message '{}', but expected '{}'",
+        error,
+        expected_msg
+    );
+
+    // ----------------------
+    // Incorrect block number
+    // ----------------------
+
+    let incorrect_block_number = Fr::from_str("2").unwrap();
+    let pub_data_commitment = public_data_commitment::<Bn256>(
+        &[false; 64],
+        Some(tree.root_hash()),
+        Some(tree.root_hash()),
+        Some(validator_address),
+        Some(incorrect_block_number),
+    );
+
+    let circuit_instance = FranklinCircuit {
+        operation_batch_size: 1,
+        rescue_params,
+        jubjub_params,
+        old_root: Some(tree.root_hash()),
+        operations: vec![operation.clone()],
+        pub_data_commitment: Some(pub_data_commitment),
+        block_number: Some(block_number),
+        validator_account: validator_account_witness.clone(),
+        validator_address: Some(validator_address),
+        validator_balances: validator_balances.clone(),
+        validator_audit_path: validator_audit_path.clone(),
+    };
+
+    // Block number is a part of pubdata, which is used to calculate the new root hash,
+    // so the hash value will not match expected one.
+    // For details see `circuit.rs`.
+    let expected_msg = "enforce external data hash equality";
+
+    let error = check_circuit_non_panicking(circuit_instance)
+        .expect_err("Validator address: Incorrect hash values should lead to error");
+
+    assert!(
+        error.contains(expected_msg),
+        "Validator address: Got error message '{}', but expected '{}'",
+        error,
+        expected_msg
+    );
 }
