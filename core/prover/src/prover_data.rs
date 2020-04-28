@@ -42,7 +42,6 @@ impl ProverData {
             jubjub_params: &models::params::JUBJUB_PARAMS as &AltJubjubBn256,
             operation_batch_size: self.operations.len(),
             old_root: Some(self.old_root),
-            new_root: Some(self.new_root),
             block_number: Fr::from_str(&block.to_string()),
             validator_address: Some(self.validator_address),
             pub_data_commitment: Some(self.public_data_commitment),

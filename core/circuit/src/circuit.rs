@@ -45,8 +45,6 @@ pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     /// The old root of the tree
     pub old_root: Option<E::Fr>,
 
-    /// The new root of the tree
-    pub new_root: Option<E::Fr>,
     pub block_number: Option<E::Fr>,
     pub validator_address: Option<E::Fr>,
 
@@ -65,7 +63,6 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'
             jubjub_params: self.jubjub_params,
             operation_batch_size: self.operation_batch_size,
             old_root: self.old_root,
-            new_root: self.new_root,
             block_number: self.block_number,
             validator_address: self.validator_address,
             pub_data_commitment: self.pub_data_commitment,

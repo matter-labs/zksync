@@ -26,7 +26,7 @@ use crate::{
     circuit::FranklinCircuit,
     witness::{
         noop::noop_operation,
-        tests::test_utils::check_circuit,
+        tests::test_utils::{check_circuit, check_circuit_non_panicking},
         utils::{apply_fee, get_audits, public_data_commitment},
     },
 };
@@ -159,7 +159,6 @@ fn test_noop() {
         rescue_params,
         jubjub_params,
         old_root: Some(tree.root_hash()),
-        new_root: Some(tree.root_hash()),
         operations: vec![operation],
         pub_data_commitment: Some(public_data_commitment),
         block_number: Some(block_number),
@@ -171,4 +170,108 @@ fn test_noop() {
 
     // Check that there are no unsatisfied constraints.
     check_circuit(circuit_instance);
+}
+
+/// Test for the root hash being set to the incorrect value.
+///
+/// The following checks are performed:
+/// - Incorrect old root hash in `pub_data_commitment`,
+/// - Incorrect new root hash in `pub_data_commitment`,
+/// - Incorrect old root hash in `FranklinCircuit`,
+/// - Incorrect old root hash in both `pub_data_commitment` and `FranklinCircuit` (same value),
+#[test]
+#[ignore]
+fn incorrect_root() {
+    // Cryptographic utilities initialization.
+    let jubjub_params = &AltJubjubBn256::new();
+    let rescue_params = &Bn256RescueParams::new_2_into_1::<BlakeHasher>();
+    let p_g = FixedGenerators::SpendingKeyGenerator;
+    let rng = &mut XorShiftRng::from_seed([0x3dbe_6258, 0x8d31_3d76, 0x3237_db17, 0xe5bc_0654]);
+    let phasher = RescueHasher::<Bn256>::default();
+
+    // Account tree, which we'll manually fill
+    let mut tree: CircuitAccountTree = CircuitAccountTree::new(params::account_tree_depth());
+
+    // We'll create one block with number 1
+    let block_number = Fr::from_str("1").unwrap();
+
+    // Validator account credentials
+    let (validator_address_number, validator_address, validator_balances) =
+        insert_validator(&mut tree, rng, p_g, &jubjub_params, &phasher);
+
+    // Insert sender into a tree.
+    insert_sender(&mut tree, rng, p_g, &jubjub_params, &phasher);
+
+    // Perform the `noop` operation and collect the data required for circuit instance creation.
+    let operation = noop_operation(&tree, validator_address_number);
+    let (_, validator_account_witness) = apply_fee(&mut tree, validator_address_number, 0, 0);
+    let (validator_audit_path, _) = get_audits(&tree, validator_address_number, 0);
+
+    let correct_hash = tree.root_hash();
+    let incorrect_hash = Default::default();
+
+    // Test vector of the following values:
+    // (pub data old root hash), (pub data new root hash),
+    // (circuit old root hash), (expected error message)
+    let test_vector = vec![
+        (
+            incorrect_hash,
+            correct_hash,
+            correct_hash,
+            "external data hash equality",
+        ),
+        (
+            correct_hash,
+            incorrect_hash,
+            correct_hash,
+            "external data hash equality",
+        ),
+        (
+            correct_hash,
+            correct_hash,
+            incorrect_hash,
+            "root state before applying operation is valid",
+        ),
+        (
+            incorrect_hash,
+            correct_hash,
+            incorrect_hash,
+            "root state before applying operation is valid",
+        ),
+    ];
+
+    for (pubdata_old_hash, pubdata_new_hash, circuit_old_hash, expected_msg) in test_vector {
+        let public_data_commitment = public_data_commitment::<Bn256>(
+            &[false; 64],
+            Some(pubdata_old_hash),
+            Some(pubdata_new_hash),
+            Some(validator_address),
+            Some(block_number),
+        );
+
+        // Parametrize the circuit instance.
+        let circuit_instance = FranklinCircuit {
+            operation_batch_size: 1,
+            rescue_params,
+            jubjub_params,
+            old_root: Some(circuit_old_hash),
+            operations: vec![operation.clone()],
+            pub_data_commitment: Some(public_data_commitment),
+            block_number: Some(block_number),
+            validator_account: validator_account_witness.clone(),
+            validator_address: Some(validator_address),
+            validator_balances: validator_balances.clone(),
+            validator_audit_path: validator_audit_path.clone(),
+        };
+
+        let error = check_circuit_non_panicking(circuit_instance)
+            .expect_err("Incorrect hash values should lead to error");
+
+        assert!(
+            error.contains(expected_msg),
+            "Got error message '{}', but expected '{}'",
+            error,
+            expected_msg
+        );
+    }
 }

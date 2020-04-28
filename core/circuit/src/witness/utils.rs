@@ -161,7 +161,6 @@ impl<'a> WitnessBuilder<'a> {
             jubjub_params: &models::params::JUBJUB_PARAMS,
             operation_batch_size,
             old_root: Some(self.initial_root_hash),
-            new_root: Some(self.root_after_fees.expect("root after fee not present")),
             operations: self.operations,
             pub_data_commitment: Some(
                 self.pubdata_commitment
