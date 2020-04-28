@@ -44,7 +44,7 @@ export async function cancelOustandingDepositsForExodus(
     const oldFirstPriorityRequestId = await franklinDeployedContract.firstPriorityRequestId();
 
     const receipt = await executeTransaction(async () => {
-        return await franklinDeployedContract.cancelOutstandingDepositsForExodusMode(expectedToCancel);
+        return await franklinDeployedContract.cancelOutstandingDepositsForExodusMode(expectedToCancel, { gasLimit: 1000000 });
     }, revertCode);
 
     if (receipt) {
@@ -66,6 +66,7 @@ async function executeTransaction(txClosure, revertCode) {
     try {
         const tx = await txClosure();
         receipt = await tx.wait();
+        console.log('revert code:', revertCode, revertCode && revertCode.length)
         if (revertCode) {
             expect(receipt.status, `expected transaction fail with code: ${revertCode}`).not.eq(1);
         }
@@ -149,7 +150,7 @@ export async function postBlockCommit(
     onchainOperationsNumber,
     priorityOperationsNumber,
     commitment,
-    revertCode,
+    revertCode: string,
     triggerExodus = false,
 ) {
     const root = Buffer.from(commitArgs.newRoot, "hex");

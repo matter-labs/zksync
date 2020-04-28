@@ -3,20 +3,22 @@ use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
 use crate::franklin_crypto::circuit::boolean::Boolean;
 use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
 
+use crate::franklin_crypto::bellman::pairing::Engine;
 use crate::franklin_crypto::circuit::expression::Expression;
 use crate::franklin_crypto::circuit::num::AllocatedNum;
-use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::circuit::rescue;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::RescueEngine;
 use models::params as franklin_constants;
 
 #[derive(Clone)]
-pub struct CircuitElement<E: JubjubEngine> {
+pub struct CircuitElement<E: Engine> {
     number: AllocatedNum<E>,
     bits_le: Vec<Boolean>,
     length: usize,
 }
 
-impl<E: JubjubEngine> CircuitElement<E> {
+impl<E: Engine> CircuitElement<E> {
     pub fn unsafe_empty_of_some_length(zero_num: AllocatedNum<E>, length: usize) -> Self {
         let bits = vec![Boolean::constant(false); length];
         CircuitElement {
@@ -271,6 +273,10 @@ impl<E: JubjubEngine> CircuitElement<E> {
         self.number.clone()
     }
 
+    pub fn into_number(self) -> AllocatedNum<E> {
+        self.number
+    }
+
     pub fn get_bits_le(&self) -> Vec<Boolean> {
         self.bits_le.clone()
     }
@@ -290,13 +296,13 @@ impl<E: JubjubEngine> CircuitElement<E> {
 }
 
 #[derive(Clone)]
-pub struct CircuitPubkey<E: JubjubEngine> {
+pub struct CircuitPubkey<E: RescueEngine + JubjubEngine> {
     x: CircuitElement<E>,
     y: CircuitElement<E>,
     hash: CircuitElement<E>,
 }
 
-impl<E: JubjubEngine> CircuitPubkey<E> {
+impl<E: RescueEngine + JubjubEngine> CircuitPubkey<E> {
     pub fn from_xy_fe<
         CS: ConstraintSystem<E>,
         Fx: FnOnce() -> Result<E::Fr, SynthesisError>,
@@ -305,7 +311,7 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
         mut cs: CS,
         x: Fx,
         y: Fy,
-        params: &E::Params,
+        params: &<E as RescueEngine>::Params,
     ) -> Result<Self, SynthesisError> {
         let x_num = AllocatedNum::alloc(cs.namespace(|| "x_num"), x)?;
         let y_num = AllocatedNum::alloc(cs.namespace(|| "y_num"), y)?;
@@ -317,23 +323,20 @@ impl<E: JubjubEngine> CircuitPubkey<E> {
         mut cs: CS,
         x: AllocatedNum<E>,
         y: AllocatedNum<E>,
-        params: &E::Params,
+        params: &<E as RescueEngine>::Params,
     ) -> Result<Self, SynthesisError> {
-        let x_ce = CircuitElement::from_number(cs.namespace(|| "x"), x)?;
-        let y_ce = CircuitElement::from_number(cs.namespace(|| "y"), y)?;
-        let mut to_hash = vec![];
-        to_hash.extend(x_ce.clone().into_padded_le_bits(256));
-        to_hash.extend(y_ce.clone().into_padded_le_bits(256));
-        let hash = pedersen_hash::pedersen_hash(
-            cs.namespace(|| "hash"),
-            pedersen_hash::Personalization::NoteCommitment,
-            &to_hash,
-            params,
-        )?;
-        debug!("hash when fromxy: {:?}", hash.get_x().get_value());
-        let mut hash_bits = hash
-            .get_x()
-            .into_bits_le(cs.namespace(|| "hash into_bits"))?;
+        let x_ce = CircuitElement::from_number(cs.namespace(|| "x"), x.clone())?;
+        let y_ce = CircuitElement::from_number(cs.namespace(|| "y"), y.clone())?;
+
+        let mut sponge_output =
+            rescue::rescue_hash(cs.namespace(|| "hash public key"), &[x, y], params)?;
+
+        assert_eq!(sponge_output.len(), 1);
+
+        let hash = sponge_output.pop().expect("must get an element");
+
+        debug!("hash when fromxy: {:?}", hash.get_value());
+        let mut hash_bits = hash.into_bits_le(cs.namespace(|| "hash into_bits"))?;
         hash_bits.truncate(franklin_constants::NEW_PUBKEY_HASH_WIDTH);
         let element = CircuitElement::from_le_bits(cs.namespace(|| "repack_hash"), hash_bits)?;
 

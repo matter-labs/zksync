@@ -5,7 +5,8 @@ use web3::types::H256;
 // Workspace deps
 use models::{
     node::{block::Block, AccountMap, AccountUpdate, AccountUpdates, FranklinOp},
-    Action, EncodedProof, NewTokenEvent, Operation,
+    prover_utils::EncodedProofPlonk,
+    Action, NewTokenEvent, Operation,
 };
 use storage::{
     data_restore::records::{
@@ -78,7 +79,7 @@ pub fn update_tree_state(
 
         let verify_op = Operation {
             action: Action::Verify {
-                proof: Box::new(EncodedProof::default()),
+                proof: Box::new(EncodedProofPlonk::default()),
             },
             block,
             accounts_updated: Vec::new(),

@@ -9,9 +9,12 @@ use crate::operation::SignatureData;
 use crate::utils::{multi_and, pack_bits_to_element, reverse_bytes};
 
 use crate::franklin_crypto::circuit::expression::Expression;
+use crate::franklin_crypto::circuit::multipack;
 use crate::franklin_crypto::circuit::pedersen_hash;
+use crate::franklin_crypto::circuit::rescue;
 use crate::franklin_crypto::circuit::sha256;
 use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::RescueEngine;
 use models::params as franklin_constants;
 use models::params::{FR_BIT_WIDTH, FR_BIT_WIDTH_PADDED};
 
@@ -35,17 +38,19 @@ impl<E: JubjubEngine> AllocatedSignatureData<E> {
     }
 }
 
-pub struct AllocatedSignerPubkey<E: JubjubEngine> {
+pub struct AllocatedSignerPubkey<E: RescueEngine + JubjubEngine> {
     pub pubkey: CircuitPubkey<E>,
     pub point: ecc::EdwardsPoint<E>,
     pub is_correctly_unpacked: Boolean,
     pub r_y_bits: Vec<Boolean>,
     pub r_x_bit: Boolean,
 }
-pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
+
+pub fn unpack_point_if_possible<E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     packed_key: &[Option<bool>],
-    params: &E::Params,
+    rescue_params: &<E as RescueEngine>::Params,
+    jubjub_params: &<E as JubjubEngine>::Params,
 ) -> Result<AllocatedSignerPubkey<E>, SynthesisError> {
     assert_eq!(packed_key.len(), franklin_constants::FR_BIT_WIDTH_PADDED);
     let packed_key_bits_correct_order = reverse_bytes(packed_key);
@@ -63,7 +68,7 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
         cs.namespace(|| "recover_from_y_unchecked"),
         &Boolean::from(r_x_bit.clone()),
         &r_y.get_number(),
-        &params,
+        &jubjub_params,
     )?;
     debug!(
         "r_recovered.x={:?} \n r_recovered.y={:?}",
@@ -75,7 +80,7 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
         cs.namespace(|| "pubkey from xy"),
         r_recovered.get_x().clone(),
         r_recovered.get_y().clone(),
-        &params,
+        &rescue_params,
     )?;
 
     Ok(AllocatedSignerPubkey {
@@ -86,12 +91,14 @@ pub fn unpack_point_if_possible<E: JubjubEngine, CS: ConstraintSystem<E>>(
         r_y_bits: r_y.get_bits_be(),
     })
 }
-pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
+
+pub fn verify_circuit_signature<E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     op_data: &AllocatedOperationData<E>,
     signer_key: &AllocatedSignerPubkey<E>,
     signature_data: SignatureData,
-    params: &E::Params,
+    rescue_params: &<E as RescueEngine>::Params,
+    jubjub_params: &<E as JubjubEngine>::Params,
     generator: ecc::EdwardsPoint<E>,
 ) -> Result<AllocatedSignatureData<E>, SynthesisError> {
     let signature_data_r_packed = reverse_bytes(&signature_data.r_packed);
@@ -128,7 +135,7 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         cs.namespace(|| "recover_from_y_unchecked"),
         &Boolean::from(r_x_bit.clone()),
         &r_y.get_number(),
-        &params,
+        &jubjub_params,
     )?;
 
     let signature = EddsaSignature {
@@ -153,37 +160,31 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
     assert_eq!(
         serialized_tx_bits.len(),
-        franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS
+        franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS
     );
 
-    // signature msg is the hash of serialized transaction
-    let sig_msg = pedersen_hash::pedersen_hash(
-        cs.namespace(|| "sig_msg"),
-        pedersen_hash::Personalization::NoteCommitment,
+    let input = multipack::pack_into_witness(
+        cs.namespace(|| "pack transaction bits into field elements for rescue"),
         &serialized_tx_bits,
-        params,
-    )?
-    .get_x()
-    .clone();
+    )?;
 
+    // signature msg is the hash of serialized transaction
+    let mut sponge_output = rescue::rescue_hash(cs.namespace(|| "sig_msg"), &input, rescue_params)?;
+
+    assert_eq!(sponge_output.len(), 1);
+
+    let sig_msg = sponge_output.pop().expect("must get an element");
     let mut sig_msg_bits = sig_msg.into_bits_le(cs.namespace(|| "sig_msg_bits"))?;
     sig_msg_bits.resize(256, Boolean::constant(false));
 
-    let is_sig_verified = is_sha256_signature_verified(
+    let is_sig_verified = is_rescue_signature_verified(
         cs.namespace(|| "musig sha256"),
         &sig_msg_bits,
         &signature,
-        params,
+        rescue_params,
+        jubjub_params,
         generator,
     )?;
-
-    //    let is_sig_verified = is_pedersen_signature_verified(
-    //        cs.namespace(|| "musig pedersen"),
-    //        &sig_msg_bits,
-    //        &signature,
-    //        params,
-    //        generator,
-    //    )?;
 
     debug!("is_sig_verified={:?}", is_sig_verified.get_value());
     debug!("is_sig_r_correct={:?}", is_sig_r_correct.get_value());
@@ -207,8 +208,6 @@ pub fn verify_circuit_signature<E: JubjubEngine, CS: ConstraintSystem<E>>(
         sig_r_x_bit: Boolean::from(r_x_bit),
         sig_r_y_bits: r_y.into_padded_be_bits(franklin_constants::FR_BIT_WIDTH_PADDED - 1),
         sig_s_bits: signature_s.into_padded_be_bits(franklin_constants::FR_BIT_WIDTH_PADDED),
-        // sig_r_y_bits: r_y.get_bits_be(),
-        // sig_s_bits: signature_s.get_bits_be(),
     })
 }
 pub fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSystem<E>>(
@@ -216,10 +215,10 @@ pub fn verify_signature_message_construction<E: JubjubEngine, CS: ConstraintSyst
     mut serialized_tx_bits: Vec<Boolean>,
     op_data: &AllocatedOperationData<E>,
 ) -> Result<Boolean, SynthesisError> {
-    assert!(serialized_tx_bits.len() < franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS);
+    assert!(serialized_tx_bits.len() < franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS);
 
     serialized_tx_bits.resize(
-        franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS,
+        franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS,
         Boolean::constant(false),
     );
     let (first_sig_part_bits, remaining) = serialized_tx_bits.split_at(E::Fr::CAPACITY as usize);
@@ -323,7 +322,7 @@ pub fn is_pedersen_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
 
     let max_message_len = 32 as usize; //since it is the result of pedersen hash
 
-    let is_sig_verified = is_verified_raw_message_signature(
+    let is_sig_verified = verify_schnorr_relationship(
         signature,
         cs.namespace(|| "verify transaction signature"),
         params,
@@ -342,7 +341,7 @@ pub fn is_sha256_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
     generator: ecc::EdwardsPoint<E>,
 ) -> Result<Boolean, SynthesisError> {
     // this contant is also used inside franklin_crypto verify sha256(enforce version of this check)
-    const IPUT_PAD_LEN_FOR_SHA256: usize = 768;
+    const INPUT_PAD_LEN_FOR_SHA256: usize = 768;
 
     let mut sig_data_bits = sig_data_bits.to_vec();
     assert!(
@@ -373,12 +372,12 @@ pub fn is_sha256_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
     }
     hash_input.extend(sig_data_bits);
 
-    hash_input.resize(IPUT_PAD_LEN_FOR_SHA256, Boolean::constant(false));
+    hash_input.resize(INPUT_PAD_LEN_FOR_SHA256, Boolean::constant(false));
     let h_bits = sha256::sha256(cs.namespace(|| "sha256"), &hash_input)?;
 
     let max_message_len = 32 as usize; //since it is the result of sha256 hash
 
-    let is_sig_verified = is_verified_raw_message_signature(
+    let is_sig_verified = verify_schnorr_relationship(
         signature,
         cs.namespace(|| "verify transaction signature"),
         params,
@@ -389,11 +388,109 @@ pub fn is_sha256_signature_verified<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(is_sig_verified)
 }
 
-pub fn is_verified_raw_message_signature<CS, E>(
+pub fn is_rescue_signature_verified<E: RescueEngine + JubjubEngine, CS: ConstraintSystem<E>>(
+    mut cs: CS,
+    sig_data_bits: &[Boolean],
+    signature: &EddsaSignature<E>,
+    rescue_params: &<E as RescueEngine>::Params,
+    jubjub_params: &<E as JubjubEngine>::Params,
+    generator: ecc::EdwardsPoint<E>,
+) -> Result<Boolean, SynthesisError> {
+    // This constant is also used inside `franklin_crypto` verify rescue(enforce version of this check)
+    const INPUT_PAD_LEN_FOR_RESCUE: usize = 768;
+    let mut sig_data_bits = sig_data_bits.to_vec();
+    assert!(
+        sig_data_bits.len() <= MAX_SIGN_MESSAGE_BIT_WIDTH,
+        "Signature message len is too big {}/{}",
+        sig_data_bits.len(),
+        MAX_SIGN_MESSAGE_BIT_WIDTH
+    );
+    sig_data_bits.resize(MAX_SIGN_MESSAGE_BIT_WIDTH, Boolean::constant(false));
+    sig_data_bits = le_bits_into_le_bytes(sig_data_bits);
+
+    let mut hash_input: Vec<Boolean> = vec![];
+    {
+        let mut pk_x_serialized = signature
+            .pk
+            .get_x()
+            .into_bits_le_fixed(cs.namespace(|| "pk_x_bits"), FR_BIT_WIDTH)?;
+        pk_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
+        hash_input.extend(le_bits_into_le_bytes(pk_x_serialized));
+    }
+    {
+        let mut r_x_serialized = signature
+            .r
+            .get_x()
+            .into_bits_le_fixed(cs.namespace(|| "r_x_bits"), FR_BIT_WIDTH)?;
+        r_x_serialized.resize(FR_BIT_WIDTH_PADDED, Boolean::constant(false));
+        hash_input.extend(le_bits_into_le_bytes(r_x_serialized));
+    }
+    hash_input.extend(sig_data_bits);
+    hash_input.resize(INPUT_PAD_LEN_FOR_RESCUE, Boolean::constant(false));
+
+    let hash_input = multipack::pack_into_witness(
+        cs.namespace(|| "pack FS parameter bits into fiedl elements"),
+        &hash_input,
+    )?;
+
+    assert_eq!(
+        hash_input.len(),
+        4,
+        "multipacking of FS hash is expected to have length 4"
+    );
+
+    let mut sponge = rescue::StatefulRescueGadget::new(rescue_params);
+    sponge.specialize(
+        cs.namespace(|| "specialize rescue on input length"),
+        hash_input.len() as u8,
+    );
+
+    sponge.absorb(
+        cs.namespace(|| "apply rescue hash on FS parameters"),
+        &hash_input,
+        &rescue_params,
+    )?;
+
+    let s0 = sponge.squeeze_out_single(
+        cs.namespace(|| "squeeze first word form sponge"),
+        &rescue_params,
+    )?;
+
+    let s1 = sponge.squeeze_out_single(
+        cs.namespace(|| "squeeze second word form sponge"),
+        &rescue_params,
+    )?;
+
+    let s0_bits = s0.into_bits_le(cs.namespace(|| "make bits of first word for FS challenge"))?;
+
+    let s1_bits = s1.into_bits_le(cs.namespace(|| "make bits of second word for FS challenge"))?;
+
+    let take_bits = (<E as JubjubEngine>::Fs::CAPACITY / 2) as usize;
+
+    let mut bits = Vec::with_capacity(<E as JubjubEngine>::Fs::CAPACITY as usize);
+    bits.extend_from_slice(&s0_bits[0..take_bits]);
+    bits.extend_from_slice(&s1_bits[0..take_bits]);
+    assert!(bits.len() == E::Fs::CAPACITY as usize);
+
+    let max_message_len = 32 as usize; //since it is the result of sha256 hash
+
+    // we can use lowest bits of the challenge
+    let is_sig_verified = verify_schnorr_relationship(
+        signature,
+        cs.namespace(|| "verify transaction signature"),
+        jubjub_params,
+        &bits,
+        generator,
+        max_message_len,
+    )?;
+    Ok(is_sig_verified)
+}
+
+pub fn verify_schnorr_relationship<CS, E>(
     signature: &EddsaSignature<E>,
     mut cs: CS,
     params: &E::Params,
-    message: &[Boolean],
+    fs_challenge: &[Boolean],
     generator: ecc::EdwardsPoint<E>,
     max_message_len: usize,
 ) -> Result<Boolean, SynthesisError>
@@ -401,10 +498,8 @@ where
     CS: ConstraintSystem<E>,
     E: JubjubEngine,
 {
-    // TODO check that s < Fs::Char
-
     // message is always padded to 256 bits in this gadget, but still checked on synthesis
-    assert!(message.len() <= max_message_len * 8);
+    assert!(fs_challenge.len() <= max_message_len * 8);
 
     let scalar_bits = signature
         .s
@@ -420,15 +515,11 @@ where
         &params,
     )?;
 
-    let mut h: Vec<Boolean> = vec![];
-    h.extend(message.iter().cloned());
-    h.resize(256, Boolean::Constant(false));
-
-    assert_eq!(h.len(), 256);
+    let challenge = fs_challenge;
 
     let pk_mul_hash = signature
         .pk
-        .mul(cs.namespace(|| "Calculate h*PK"), &h, params)?;
+        .mul(cs.namespace(|| "Calculate h*PK"), &challenge, params)?;
 
     let rhs = pk_mul_hash.add(cs.namespace(|| "Make signature RHS"), &signature.r, params)?;
 

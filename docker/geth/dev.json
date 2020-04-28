@@ -8,6 +8,8 @@
     "eip158Block": 3,
     "byzantiumBlock": 4,
     "constantinopleBlock": 5,
+    "petersburgBlock": 6,
+    "istanbulBlock": 7,
     "clique": {
       "period": 1,
       "epoch": 30000

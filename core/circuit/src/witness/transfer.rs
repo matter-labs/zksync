@@ -2,7 +2,7 @@ use super::utils::*;
 use crate::franklin_crypto::bellman::pairing::bn256::*;
 use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
 use crate::franklin_crypto::circuit::float_point::convert_to_float;
-use crate::franklin_crypto::jubjub::JubjubEngine;
+use crate::franklin_crypto::rescue::RescueEngine;
 use crate::operation::SignatureData;
 use crate::operation::*;
 use models::circuit::account::CircuitAccountTree;
@@ -20,7 +20,8 @@ pub struct TransferData {
     pub from_account_address: u32,
     pub to_account_address: u32,
 }
-pub struct TransferWitness<E: JubjubEngine> {
+
+pub struct TransferWitness<E: RescueEngine> {
     pub from_before: OperationBranch<E>,
     pub from_intermediate: OperationBranch<E>,
     pub from_after: OperationBranch<E>,
@@ -33,7 +34,7 @@ pub struct TransferWitness<E: JubjubEngine> {
     pub after_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
 }
-impl<E: JubjubEngine> TransferWitness<E> {
+impl<E: RescueEngine> TransferWitness<E> {
     pub fn get_pubdata(&self) -> Vec<bool> {
         // construct pubdata
         let mut pubdata_bits = vec![];
@@ -351,6 +352,7 @@ pub fn calculate_transfer_operations_from_witness(
     };
     vec![operation_zero, operation_one]
 }
+
 #[cfg(test)]
 mod test {
     use super::*;

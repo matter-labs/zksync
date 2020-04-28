@@ -50,8 +50,8 @@ table! {
     active_provers (id) {
         id -> Int4,
         worker -> Text,
-        created_at -> Timestamp,
-        stopped_at -> Nullable<Timestamp>,
+        created_at -> Timestamptz,
+        stopped_at -> Nullable<Timestamptz>,
         block_size -> Int8,
     }
 }
@@ -158,6 +158,7 @@ table! {
         priority_op_serialid -> Int8,
         deadline_block -> Int8,
         eth_hash -> Bytea,
+        created_at -> Timestamptz,
     }
 }
 
@@ -175,6 +176,16 @@ table! {
         fail_reason -> Nullable<Text>,
         primary_account_address -> Bytea,
         nonce -> Int8,
+        created_at -> Timestamptz,
+    }
+}
+
+table! {
+    leader_election (id) {
+        id -> Int4,
+        name -> Text,
+        created_at -> Timestamp,
+        bail_at -> Nullable<Timestamp>,
     }
 }
 
@@ -183,7 +194,7 @@ table! {
         id -> Int8,
         block_number -> Int8,
         action_type -> Text,
-        created_at -> Timestamp,
+        created_at -> Timestamptz,
         confirmed -> Bool,
     }
 }
@@ -192,7 +203,7 @@ table! {
     proofs (block_number) {
         block_number -> Int8,
         proof -> Jsonb,
-        created_at -> Timestamp,
+        created_at -> Timestamptz,
     }
 }
 
@@ -201,8 +212,8 @@ table! {
         id -> Int4,
         block_number -> Int8,
         worker -> Nullable<Text>,
-        created_at -> Timestamp,
-        updated_at -> Timestamp,
+        created_at -> Timestamptz,
+        updated_at -> Timestamptz,
     }
 }
 
@@ -219,15 +230,6 @@ table! {
         id -> Int4,
         address -> Text,
         symbol -> Text,
-    }
-}
-
-table! {
-    leader_election (id) {
-        id -> Int4,
-        name -> Text,
-        created_at -> Timestamp,
-        bail_at -> Nullable<Timestamp>,
     }
 }
 
@@ -256,10 +258,10 @@ allow_tables_to_appear_in_same_query!(
     eth_tx_hashes,
     executed_priority_operations,
     executed_transactions,
+    leader_election,
     operations,
     proofs,
     prover_runs,
     server_config,
     tokens,
-    leader_election,
 );

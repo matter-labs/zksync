@@ -28,8 +28,13 @@ export function readableEther(wei) {
 
 export function shortenHash(str, fallback) {
     try {
-        return `${str.slice(0, 12)}..${str.slice(-10)}`;
+        return `${str.slice(0, 8)}..${str.slice(-6)}`;
     } catch (e) {
         return fallback || 'unknown';
     }
+}
+
+export function formatDate(timeStr) {
+    if (timeStr == null) return '';
+    return timeStr.toString().split('T')[0] + " " + timeStr.toString().split('T')[1].split('.')[0];
 }
