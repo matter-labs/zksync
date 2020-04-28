@@ -13,7 +13,7 @@ circuit = { path = "../circuit", version = "0.1.1"}
 
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
-hex = "0.3.2"
+hex = "0.4"
 ethabi = "9.0.0"
 web3 = "0.10.0"
 serde = "1.0.90"

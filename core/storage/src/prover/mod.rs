@@ -5,7 +5,7 @@ use diesel::dsl::{insert_into, now, sql_query};
 use diesel::prelude::*;
 // Workspace imports
 use models::node::BlockNumber;
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 // Local imports
 use self::records::{ActiveProver, IntegerNumber, NewProof, ProverRun, StoredProof};
 use crate::StorageProcessor;
@@ -130,7 +130,7 @@ impl<'a> ProverSchema<'a> {
     pub fn store_proof(
         &self,
         block_number: BlockNumber,
-        proof: &EncodedProof,
+        proof: &EncodedProofPlonk,
     ) -> QueryResult<usize> {
         let to_store = NewProof {
             block_number: i64::from(block_number),
@@ -141,7 +141,7 @@ impl<'a> ProverSchema<'a> {
     }
 
     /// Gets the stored proof for a block.
-    pub fn load_proof(&self, block_number: BlockNumber) -> QueryResult<EncodedProof> {
+    pub fn load_proof(&self, block_number: BlockNumber) -> QueryResult<EncodedProofPlonk> {
         use crate::schema::proofs::dsl;
         let stored: StoredProof = dsl::proofs
             .filter(dsl::block_number.eq(i64::from(block_number)))

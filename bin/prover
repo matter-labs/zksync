@@ -1,0 +1,25 @@
+#!/bin/bash
+
+NUM_OF_PROVERS=${1:-1}
+
+. .setup_env
+
+pids=( ) # initialize an empty array to store PIDs
+
+for n in `eval echo {1..$NUM_OF_PROVERS}`; do
+    PROVER_BASE_NAME="$POD_NAME"_"$n"_blocks_
+    cargo run --release --bin plonk_step_by_step_prover $PROVER_BASE_NAME > /dev/null & pid="$!"
+    pids+=( "$pid" )
+    echo "prover $PROVER_BASE_NAME with pid $pid"
+    PIDS="$pid $PIDS"
+done
+
+trap ctrl_c INT
+
+function ctrl_c() {
+    echo "Killing $PIDS"
+    kill "${pids[@]}" # kill all instances started above
+    exit 0
+}
+
+while true;do sleep 1000000; done

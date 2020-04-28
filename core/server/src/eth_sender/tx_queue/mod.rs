@@ -17,7 +17,7 @@ pub struct TxData {
     pub op_type: OperationType,
     /// Not signed raw tx payload.
     pub raw: RawTxData,
-    /// Optional ZK Sync operation.
+    /// Optional zkSync operation.
     pub operation: Option<Operation>,
 }
 
@@ -28,7 +28,7 @@ impl PartialEq for TxData {
 }
 
 impl TxData {
-    /// Creates a new `TxData` object with the associated ZK Sync operation.
+    /// Creates a new `TxData` object with the associated zkSync operation.
     pub fn from_operation(op_type: OperationType, operation: Operation, raw: RawTxData) -> Self {
         Self {
             op_type,
@@ -37,7 +37,7 @@ impl TxData {
         }
     }
 
-    /// Creates a new `TxData` object without associated ZK Sync operation.
+    /// Creates a new `TxData` object without associated zkSync operation.
     pub fn from_raw(op_type: OperationType, raw: RawTxData) -> Self {
         Self {
             op_type,

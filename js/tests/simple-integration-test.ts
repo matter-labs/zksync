@@ -20,6 +20,9 @@ const MNEMONIC = process.env.TEST_MNEMONIC;
 const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
 console.log("Running integration test on the ", network, " network");
 const ethersProvider = new ethers.providers.JsonRpcProvider(WEB3_URL);
+if (network == "localhost") {
+    ethersProvider.pollingInterval = 100;
+}
 
 let syncProvider: Provider;
 

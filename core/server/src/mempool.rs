@@ -24,16 +24,14 @@ use futures::{
 };
 use tokio::runtime::Runtime;
 // Workspace uses
-use models::{
-    node::{
-        AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
-        TransferOp, TransferToNewOp,
-    },
-    params::max_block_chunk_size,
+use models::node::{
+    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp, TransferOp,
+    TransferToNewOp,
 };
 use storage::ConnectionPool;
 // Local uses
 use crate::{eth_watch::EthWatchRequest, signature_checker::VerifiedTx};
+use models::config_options::ConfigurationOptions;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Fail)]
 pub enum TxAddError {
@@ -152,6 +150,7 @@ struct Mempool {
     mempool_state: MempoolState,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
+    max_block_size_chunks: usize,
 }
 
 impl Mempool {
@@ -228,7 +227,7 @@ impl Mempool {
             .clone()
             .send(EthWatchRequest::GetPriorityQueueOps {
                 op_start_id: current_unprocessed_priority_op,
-                max_chunks: max_block_chunk_size(),
+                max_chunks: self.max_block_size_chunks,
                 resp: eth_watch_resp.0,
             })
             .await
@@ -237,7 +236,7 @@ impl Mempool {
         let priority_ops = eth_watch_resp.1.await.expect("Err response from eth watch");
 
         (
-            max_block_chunk_size()
+            self.max_block_size_chunks
                 - priority_ops
                     .iter()
                     .map(|op| op.data.chunks())
@@ -273,6 +272,7 @@ pub fn run_mempool_task(
     db_pool: ConnectionPool,
     requests: mpsc::Receiver<MempoolRequest>,
     eth_watch_req: mpsc::Sender<EthWatchRequest>,
+    config: &ConfigurationOptions,
     runtime: &Runtime,
 ) {
     let mempool_state = MempoolState::restore_from_db(&db_pool);
@@ -281,6 +281,11 @@ pub fn run_mempool_task(
         mempool_state,
         requests,
         eth_watch_req,
+        max_block_size_chunks: *config
+            .available_block_chunk_sizes
+            .iter()
+            .max()
+            .expect("failed to find max block chunks size"),
     };
     runtime.spawn(mempool.run());
 }

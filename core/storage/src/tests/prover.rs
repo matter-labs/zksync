@@ -2,10 +2,12 @@
 use std::time::Duration;
 // External imports
 // Workspace imports
-use models::{Action, EncodedProof};
+use models::Action;
 // Local imports
 use crate::tests::{chain::utils::get_operation, db_test};
 use crate::{chain::block::BlockSchema, prover::ProverSchema, StorageProcessor};
+use models::config_options::ConfigurationOptions;
+use models::prover_utils::EncodedProofPlonk;
 
 /// Checks that the proof can be stored and loaded.
 #[test]
@@ -17,7 +19,7 @@ fn test_store_proof() {
         assert!(ProverSchema(&conn).load_proof(1).is_err());
 
         // Store the proof.
-        let proof = EncodedProof::default();
+        let proof = EncodedProofPlonk::default();
         assert!(ProverSchema(&conn).store_proof(1, &proof).is_ok());
 
         // Now load it.
@@ -87,14 +89,14 @@ fn prover_run() {
     db_test(conn.conn(), || {
         // Add the prover.
         let prover_name = "prover_10";
-        let block_size = 10;
+        let block_size = ConfigurationOptions::from_env().available_block_chunk_sizes[0]; //smallest block size
         let _prover_id = ProverSchema(&conn)
             .register_prover(prover_name, block_size)
             .expect("Can't add a prover");
 
         // Create a block.
         BlockSchema(&conn)
-            .execute_operation(get_operation(1, Action::Commit, Vec::new()))
+            .execute_operation(get_operation(1, Action::Commit, Vec::new(), block_size))
             .expect("Commit block 1");
 
         // Get a prover run.
@@ -118,7 +120,7 @@ fn prover_run() {
         );
 
         // Create & store proof for the first block.
-        let proof = EncodedProof::default();
+        let proof = EncodedProofPlonk::default();
         assert!(ProverSchema(&conn).store_proof(1, &proof).is_ok());
 
         // Try to get another run. There should be none, since there are no blocks to prover.
@@ -132,7 +134,7 @@ fn prover_run() {
 
         // Create one more block.
         BlockSchema(&conn)
-            .execute_operation(get_operation(2, Action::Commit, Vec::new()))
+            .execute_operation(get_operation(2, Action::Commit, Vec::new(), block_size))
             .expect("Commit block 2");
 
         // Now we should get a prover run for the second block.

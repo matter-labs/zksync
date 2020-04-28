@@ -93,7 +93,7 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
 }
 
 /// Bench for `PlasmaState::apply_transfer_op`.
-fn apply_transfer_op(b: &mut Bencher<'_>) {
+fn apply_transfer_tx(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
     let (private_key, _) = keys.get(&0).expect("Can't key the private key");
 
@@ -127,7 +127,7 @@ fn apply_transfer_op(b: &mut Bencher<'_>) {
 }
 
 /// Bench for `PlasmaState::apply_full_exit_op`.
-fn apply_full_exit_op(b: &mut Bencher<'_>) {
+fn apply_full_exit_tx(b: &mut Bencher<'_>) {
     let (_, state) = generate_state();
 
     let from_account = state.get_account(0).expect("Can't get the account");
@@ -152,7 +152,7 @@ fn apply_full_exit_op(b: &mut Bencher<'_>) {
 }
 
 /// Bench for `PlasmaState::apply_deposit_op`.
-fn apply_deposit_op(b: &mut Bencher<'_>) {
+fn apply_deposit_tx(b: &mut Bencher<'_>) {
     let (_, state) = generate_state();
 
     let to_account = state.get_account(0).expect("Can't get the account");
@@ -178,7 +178,7 @@ fn apply_deposit_op(b: &mut Bencher<'_>) {
 }
 
 /// Bench for `PlasmaState::apply_withdraw_op`.
-fn apply_withdraw_op(b: &mut Bencher<'_>) {
+fn apply_withdraw_tx(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
 
     let from_account = state.get_account(0).expect("Can't get the account");
@@ -281,14 +281,14 @@ pub fn bench_ops(c: &mut Criterion) {
         "PlasmaState::apply_transfer_to_new_op bench",
         apply_transfer_to_new_op,
     );
-    group.bench_function("PlasmaState::apply_transfer_op bench", apply_transfer_op);
-    group.bench_function("PlasmaState::apply_withdraw_op bench", apply_withdraw_op);
+    group.bench_function("PlasmaState::apply_transfer_tx bench", apply_transfer_tx);
+    group.bench_function("PlasmaState::apply_withdraw_tx bench", apply_withdraw_tx);
     group.bench_function(
         "PlasmaState::apply_change_pubkey_op bench",
         apply_change_pubkey_op,
     );
-    group.bench_function("PlasmaState::apply_deposit_op bench", apply_deposit_op);
-    group.bench_function("PlasmaState::apply_full_exit_op bench", apply_full_exit_op);
+    group.bench_function("PlasmaState::apply_deposit_tx bench", apply_deposit_tx);
+    group.bench_function("PlasmaState::apply_full_exit_tx bench", apply_full_exit_tx);
     group.bench_function("PlasmaState::insert_account bench", insert_account);
 
     group.finish();
