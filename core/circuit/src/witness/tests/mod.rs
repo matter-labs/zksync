@@ -251,16 +251,16 @@ fn composite_test() {
     check_circuit(circuit);
 }
 
-/// Checks that corrupted list of operations leads to predictable errors.
+/// Checks that corrupted list of operations in block leads to predictable errors.
+/// Check for chunk in the end of the operations list.
 #[test]
 #[ignore]
-fn corrupted_operations() {
+fn corrupted_last_operation() {
     // Perform some operations
-    let circuit = apply_many_ops();
+    let mut circuit = apply_many_ops();
 
     // Try to cut off an operation at end.
-    let mut first_circuit = circuit.clone();
-    first_circuit.operations.pop();
+    circuit.operations.pop();
 
     // As we removed the last operation, the last chunk of the block is no longer the last chunk of
     // the corresponding transaction.
@@ -268,7 +268,7 @@ fn corrupted_operations() {
     let expected_msg =
         "ensure last chunk of the block is a last chunk of corresponding transaction";
 
-    let error = check_circuit_non_panicking(first_circuit)
+    let error = check_circuit_non_panicking(circuit)
         .expect_err("Corrupted operations list should lead to an error");
 
     assert!(
@@ -277,20 +277,58 @@ fn corrupted_operations() {
         error,
         expected_msg
     );
+}
+
+/// Checks that corrupted list of operations in block leads to predictable errors.
+/// Check for chunk in the beginning of the operations list.
+#[test]
+#[ignore]
+fn corrupted_first_operation() {
+    // Perform some operations
+    let mut circuit = apply_many_ops();
 
     // Now try to cut off an operation at the beginning.
-    let mut second_circuit = circuit.clone();
-    second_circuit.operations.remove(0);
+    circuit.operations.remove(0);
 
     // We corrupted the very first chunk, so it should be reported.
     // See `circuit.rs` for details.
     let expected_msg = "chunk number 0/verify_correct_chunking/correct_sequence";
 
-    let error = check_circuit_non_panicking(second_circuit)
+    let error = check_circuit_non_panicking(circuit)
         .expect_err("Corrupted operations list should lead to an error");
 
     assert!(
         error.contains(expected_msg),
+        "corrupted_operations: Got error message '{}', but expected '{}'",
+        error,
+        expected_msg
+    );
+}
+
+/// Checks that corrupted list of operations in block leads to predictable errors.
+/// Check for chunk in the middle of the operations list.
+#[test]
+#[ignore]
+fn corrupted_intermediate_operation() {
+    // Perform some operations
+    let mut circuit = apply_many_ops();
+
+    // Now replace the operation in the middle with incorrect operation.
+    let corrupted_op_chunk = circuit.operations.len() / 2;
+    circuit.operations[corrupted_op_chunk] = circuit.operations[0].clone();
+
+    // Create an error message with the exact chunk number.
+    // See `circuit.rs` for details.
+    let expected_msg = format!(
+        "chunk number {}/verify_correct_chunking/correct_sequence",
+        corrupted_op_chunk
+    );
+
+    let error = check_circuit_non_panicking(circuit)
+        .expect_err("Corrupted operations list should lead to an error");
+
+    assert!(
+        error.contains(&expected_msg),
         "corrupted_operations: Got error message '{}', but expected '{}'",
         error,
         expected_msg
