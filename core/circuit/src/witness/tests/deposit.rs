@@ -43,26 +43,36 @@ fn test_deposit_in_empty_leaf() {
 #[test]
 #[ignore]
 fn test_deposit_existing_account() {
-    // Input data.
-    let accounts = vec![WitnessTestAccount::new_empty(1)];
-    let account = &accounts[0];
-    let deposit_op = DepositOp {
-        priority_op: Deposit {
-            from: account.account.address,
-            token: 0,
-            amount: BigDecimal::from(1),
-            to: account.account.address,
-        },
-        account_id: account.id,
-    };
+    // Data for building a test vector: tuples of (token_id, amount).
+    let test_vector = vec![
+        (0, 1),             // Small deposit in ETH.
+        (0, 0),             // 0 deposit in ETH.
+        (0, std::u64::MAX), // Big amount in ETH.
+        (2, 1),             // Non-ETH token.
+    ];
 
-    generic_test_scenario::<DepositWitness<Bn256>, _>(
-        &accounts,
-        deposit_op,
-        (),
-        |plasma_state, op| {
-            plasma_state.apply_deposit_op(op);
-            vec![]
-        },
-    );
+    for (token_id, token_amount) in test_vector {
+        // Input data.
+        let accounts = vec![WitnessTestAccount::new_empty(1)];
+        let account = &accounts[0];
+        let deposit_op = DepositOp {
+            priority_op: Deposit {
+                from: account.account.address,
+                token: token_id,
+                amount: BigDecimal::from(token_amount),
+                to: account.account.address,
+            },
+            account_id: account.id,
+        };
+
+        generic_test_scenario::<DepositWitness<Bn256>, _>(
+            &accounts,
+            deposit_op,
+            (),
+            |plasma_state, op| {
+                plasma_state.apply_deposit_op(op);
+                vec![]
+            },
+        );
+    }
 }
