@@ -66,6 +66,7 @@ impl<'a, E: RescueEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
             let root_hash_ce =
                 CircuitElement::from_number(cs.namespace(|| "root_hash_ce"), root_hash)?;
             initial_hash_data.extend(root_hash_ce.into_padded_be_bits(FR_BIT_WIDTH_PADDED));
+            initial_hash_data.extend(branch.account_address.get_bits_be());
             initial_hash_data.extend(branch.account.address.get_bits_be());
             initial_hash_data.extend(branch.token.get_bits_be());
             initial_hash_data.extend(branch.balance.get_bits_be());

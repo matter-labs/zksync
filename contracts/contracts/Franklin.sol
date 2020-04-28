@@ -691,16 +691,17 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
     }
 
     /// @notice Withdraws token from Franklin to root chain in case of exodus mode. User must provide proof that he owns funds
+    /// @param _accountId Id of the account in the tree
     /// @param _proof Proof
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner
-    function exit(uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external {
+    function exit(uint24 _accountId, uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external {
         require(exodusMode, "fet11"); // must be in exodus mode
-        require(exited[msg.sender][_tokenId] == false, "fet12"); // already exited
-        require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
+        require(!exited[_accountId][_tokenId], "fet12"); // already exited
+        require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, _accountId, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
 
         balancesToWithdraw[msg.sender][_tokenId].balanceToWithdraw += _amount;
-        exited[msg.sender][_tokenId] = true;
+        exited[_accountId][_tokenId] = true;
     }
 
     function authPubkeyHash(bytes calldata _fact, uint32 _nonce) external {
