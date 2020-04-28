@@ -26,10 +26,11 @@ fn test_full_exit_success() {
         },
         withdraw_amount: Some(BigDecimal::from(10)),
     };
+    let success = true;
 
     generic_test_scenario::<FullExitWitness<Bn256>, _>(
         &accounts,
-        (full_exit_op, true),
+        (full_exit_op, success),
         (),
         |plasma_state, op| {
             plasma_state.apply_full_exit_op(&op.0);
@@ -52,10 +53,11 @@ fn test_full_exit_failure_no_account_in_tree() {
         },
         withdraw_amount: None,
     };
+    let success = false;
 
     generic_test_scenario::<FullExitWitness<Bn256>, _>(
         accounts,
-        (full_exit_op, false),
+        (full_exit_op, success),
         (),
         |plasma_state, op| {
             plasma_state.apply_full_exit_op(&op.0);
