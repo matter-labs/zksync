@@ -46,13 +46,17 @@ When all needed Proxy contracts are deployed, one of them (which must implements
 
 The last part of the deploy process is to transfer all proxy contracts under control of the gatekeeper. This should be done by calling several times `addUpgradeable` function.
 
-So, step-by-step deploy process:
+---
+
+**So, step-by-step deploy process:**
 
 1. Deploy targets for all proxies.
 2. Deploy proxies with needed target addresses and initialization parameters.
 3. Deploy UpgradeGatekeeper passing the address of the main proxy as a parameter.
 4. Transfer mastership of all proxies to the `UpgradeGatekeeper`.
 5. Add all proxies to the gatekeeper's list by calling `UpgradeGatekeeper.addUpgradeable()` function for each of them.
+
+---
 
 ### Upgrade process
 
@@ -64,7 +68,9 @@ There is three **phases of upgrade** which described in UpgradeGatekeeper:
 |**NoticePeriod**|This phase starts when master of gatekeeper calls `startUpgrade` function. The purpose of this phase is to give all users of the rollup contract an opportunity to withdraw funds to the ethereum network before upgrading the target. The transition to the next phase can be done after at least upgradeNoticePeriod seconds from the start of this phase. `upgradeNoticePeriod` is a value which defines by the "`mainContract`".|
 |**Preparation**|This is the final phase. During this phase, master can call `finishUpgrade` function, which upgrades targets in proxies. One of the most important checks inside this function is enforcing that the mainContract is ready for the upgrade.|
 
-So, step-by-step upgrade process:
+---
+
+**So, step-by-step upgrade process:**
 
 1. Deploy new targets for proxies that would be upgraded.
 2. Call `startUpgrade` with addresses of these targets (and zeroes for proxies that shouldn't be upgraded).
@@ -74,6 +80,8 @@ So, step-by-step upgrade process:
 6. Call `finishUpgrade` with needed targets initialization parameters.
 
 **NOTE:** In case of some error or bug in code, there is an option to cancel the upgrade before finishing by calling `cancelUpgrade` function.
+
+---
 
 ## Current Franklin contract upgrade specification or "How notice period works"
 
