@@ -73,7 +73,7 @@ So, step-by-step upgrade process:
 5. Wait until all open priority operations will be processed.
 6. Call `finishUpgrade` with needed targets initialization parameters.
 
-**NOTE:** In case of some error or bug in code, there is an option to cancel the upgrade before finishing.
+**NOTE:** In case of some error or bug in code, there is an option to cancel the upgrade before finishing by calling `cancelUpgrade` function.
 
 ## Current Franklin contract upgrade specification or "How notice period works"
 
