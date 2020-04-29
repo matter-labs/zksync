@@ -164,7 +164,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         for (uint64 i = 0; i < toProcess; i++) {
             uint64 id = firstPriorityRequestId + i;
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
-                Operations.Deposit memory op = Operations.readDepositPubdata(priorityRequests[id].pubData, 0);
+                Operations.Deposit memory op = Operations.readDepositPubdata(priorityRequests[id].pubData);
                 bytes22 packedBalanceKey = packAddressAndTokenId(op.owner, op.tokenId);
                 balancesToWithdraw[packedBalanceKey].balanceToWithdraw += op.amount;
             }
@@ -258,6 +258,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
 
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
+            accountId:  0, // unknown at this point
             owner:      _owner,
             tokenId:    _token,
             amount:     _amount
@@ -316,7 +317,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             // Get priority operations number for this block.
             uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
-            bytes32 withdrawalsDataHash = collectOnchainOps(publicData, _ethWitness, _ethWitnessSizes);
+            bytes32 withdrawalsDataHash = collectOnchainOps(_blockNumber, publicData, _ethWitness, _ethWitnessSizes);
 
             uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
 
@@ -362,12 +363,15 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     }
 
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
+    /// @param _blockNumber Franklin block number
     /// @param _publicData Operations packed in bytes array
     /// @param _ethWitness Eth witness that was posted with commit
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
-    function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
+    function collectOnchainOps(uint32 _blockNumber, bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
         internal returns (bytes32 withdrawalsDataHash) {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
+
+        uint64 currentPriorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
 
         uint256 pubDataPtr = 0;
         uint256 pubDataStartPtr = 0;
@@ -412,33 +416,39 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
                 } else if (opType == uint8(Operations.OpType.Deposit)) {
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
 
+                    Operations.Deposit memory depositData = Operations.readDepositPubdata(pubData);
+                    emit DepositCommit(_blockNumber, depositData.accountId, depositData.owner, depositData.tokenId, depositData.amount);
+
                     OnchainOperation memory onchainOp = OnchainOperation(
                         Operations.OpType.Deposit,
                         pubData
                     );
-                    commitNextPriorityOperation(onchainOp);
+                    commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
+                    currentPriorityRequestId++;
 
                     pubDataPtr += DEPOSIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.PartialExit)) {
-                    bool addToPendingWithdrawalsQueue = true;
-
                     Operations.PartialExit memory data = Operations.readPartialExitPubdata(_publicData, pubdataOffset + 1);
+
+                    bool addToPendingWithdrawalsQueue = true;
                     withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
 
                     pubDataPtr += PARTIAL_EXIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.FullExit)) {
-                    bool addToPendingWithdrawalsQueue = false;
-
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
 
-                    Operations.FullExit memory data = Operations.readFullExitPubdata(pubData, 0);
-                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
+                    Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
+                    emit FullExitCommit(_blockNumber, fullExitData.accountId, fullExitData.owner, fullExitData.tokenId, fullExitData.amount);
+
+                    bool addToPendingWithdrawalsQueue = false;
+                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, fullExitData.owner, fullExitData.tokenId, fullExitData.amount));
 
                     OnchainOperation memory onchainOp = OnchainOperation(
                         Operations.OpType.FullExit,
                         pubData
                     );
-                    commitNextPriorityOperation(onchainOp);
+                    commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
+                    currentPriorityRequestId++;
 
                     pubDataPtr += FULL_EXIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
@@ -467,6 +477,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         require(pubDataPtr == pubDataEndPtr, "fcs12"); // last chunk exceeds pubdata
         require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
         require(processedOperationsRequiringEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
+
+        require(currentPriorityRequestId <= firstPriorityRequestId + totalOpenPriorityRequests, "fcs16"); // fcs16 - excess priority requests in pubdata
+        totalCommittedPriorityRequests = currentPriorityRequestId - firstPriorityRequestId;
     }
 
     /// @notice Recovers signer's address from ethereum signature for given message
@@ -554,11 +567,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         }
     }
 
-    function commitNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
-        uint64 cachedTotalCommitedPriorityRequests = totalCommittedPriorityRequests;
-        require(totalOpenPriorityRequests > cachedTotalCommitedPriorityRequests, "vnp11"); // no more priority requests in queue
-
-        uint64 _priorityRequestId = firstPriorityRequestId + cachedTotalCommitedPriorityRequests;
+    function commitNextPriorityOperation(OnchainOperation memory _onchainOp, uint64 _priorityRequestId) internal {
         Operations.OpType priorReqType = priorityRequests[_priorityRequestId].opType;
         bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
 
@@ -571,8 +580,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         } else {
             revert("vnp15"); // invalid or non-priority operation
         }
-
-        totalCommittedPriorityRequests++;
     }
 
     /// @notice Processes onchain withdrawals. Full exit withdrawals will not be added to pending withdrawals queue
