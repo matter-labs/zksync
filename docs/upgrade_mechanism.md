@@ -3,6 +3,7 @@
 This is an image of the dependencies structure.
 Use it for a better understanding.
 ![](https://docs.google.com/drawings/d/e/2PACX-1vQWlvxseJXa-X8PhrkpshBiE_rlJJak4noE2wl__0uH957MHK2jLlzxWMfOMsr7AnzpfMqga52bn-Oc/pub?w=960&h=720)
+Source: [link](https://docs.google.com/drawings/d/13SlGac7BHqFeL0J0J3BHdn_nx2tZcbN_u4kWn8Q7t7c/edit)
 
 ## Contracts and interfaces
 
