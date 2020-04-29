@@ -336,8 +336,9 @@ export async function signChangePubkeyMessage(
     const msgAccId = serializeAccountId(accountId)
         .toString("hex")
         .toLowerCase();
+    const pubKeyHashHex = pubKeyHash.replace('sync:', '').toLowerCase();
     const message = `Register zkSync pubkey:\n\n` +
-                     `${pubKeyHash.toLowerCase()}\n` +
+                     `${pubKeyHashHex}\n` +
                      `nonce: 0x${msgNonce}\n` +
                      `account id: 0x${msgAccId}\n\n` +
                      `Only sign this message for a trusted client!`;

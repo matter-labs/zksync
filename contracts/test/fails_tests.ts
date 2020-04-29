@@ -341,7 +341,7 @@ describe("PLANNED FAILS", function () {
         console.log("Got revert code when there are no requests to cancel");
 
         // Withdraw eth
-        const rollupBalance = (await franklinDeployedContract.balancesToWithdraw(wallet.address, 0)).balanceToWithdraw;
+        const rollupBalance = (await franklinDeployedContract.getBalancesToWithdraw(wallet.address, 0));
         await withdrawEthFromContract(
             provider,
             wallet,
@@ -586,7 +586,7 @@ describe("PLANNED FAILS", function () {
     //     const receipt = await tx.wait();
     //
     //     const event = receipt.events.pop();
-    //     if (event.event == "BlocksReverted") {
+    //     if (event.event == "BlocksRevert") {
     //         expect(await franklinDeployedContract.totalBlocksCommitted()).equal(0);
     //         reverted = true;
     //     }
