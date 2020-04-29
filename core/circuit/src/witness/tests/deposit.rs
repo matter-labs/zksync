@@ -76,3 +76,38 @@ fn test_deposit_existing_account() {
         );
     }
 }
+
+/// Checks that executing a deposit operation with incorrect
+/// data results in an error.
+#[test]
+#[ignore]
+#[should_panic(expected = "assertion failed: (acc.address == deposit.address)")]
+fn test_incorrect_deposit_address() {
+    const TOKEN_ID: u16 = 0;
+    const TOKEN_AMOUNT: u32 = 100;
+
+    let accounts = vec![WitnessTestAccount::new_empty(1)];
+    let account = &accounts[0];
+
+    // Create a deposit operation with an incorrect recipient address.
+    let deposit_op = DepositOp {
+        priority_op: Deposit {
+            from: account.account.address,
+            token: TOKEN_ID,
+            amount: BigDecimal::from(TOKEN_AMOUNT),
+            to: Default::default(),
+        },
+        account_id: account.id,
+    };
+
+    // Attempt to apply incorrect operation should result in an assertion failure.
+    generic_test_scenario::<DepositWitness<Bn256>, _>(
+        &accounts,
+        deposit_op,
+        (),
+        |plasma_state, op| {
+            plasma_state.apply_deposit_op(op);
+            vec![]
+        },
+    );
+}
