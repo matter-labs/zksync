@@ -19,17 +19,14 @@ function clean_up() {
     exit $exitcode
 }
 
-# run with usual geth
-cargo run --bin exodus_test --release
-
-# set up ganache
+# set up fast geth
 if [[ $ZKSYNC_ENV == ci ]]; then
-    export WEB3_URL=http://ganache:7545
+    export WEB3_URL=http://geth-fast:8545
 elif [[ $ZKSYNC_ENV == dev ]]; then
-    CONTAINER_ID=$(docker run --rm -d -p 7545:7545 matterlabs/ganache)
+    CONTAINER_ID=$(docker run --rm -d -p 7545:8545 matterlabs/geth:latest fast)
     export WEB3_URL=http://localhost:7545
 fi
 
-# run with ganache
+cargo run --bin exodus_test --release
 cargo run --bin testkit --release
 cargo run --bin migration_test --release

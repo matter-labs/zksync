@@ -191,8 +191,9 @@ mod test {
     #[test]
     #[ignore]
     fn test_change_pubkey_offchain_success() {
-        let zksync_account = ZksyncAccount::rand();
         let change_pkhash_to_account_id = 0xc1;
+        let mut zksync_account = ZksyncAccount::rand();
+        zksync_account.account_id = Some(change_pkhash_to_account_id);
         let change_pkhash_to_account_address = zksync_account.address;
         let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![(
             change_pkhash_to_account_id,

@@ -448,7 +448,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
                     if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
                         bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsRequiringEthWitness]);
 
-                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
+                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
                         require(valid, "fpp15"); // failed to verify change pubkey hash signature
                     } else {
                         bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
@@ -488,14 +488,15 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         return ecrecover(keccak256(_message), signV, signR, signS);
     }
 
-    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
+    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint24 _accountId) internal pure returns (bool) {
         require(_newPkHash.length == 20, "vpk11"); // unexpected hash length
 
         bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n129",  // 129 is message length, update if changing the message
+            "\x19Ethereum Signed Message:\n150",
             "Register zkSync pubkey:\n\n",
-            Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)),
-            " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
+            Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)), "\n",
+            "nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n",
+            "account id: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt24(_accountId)),
             "\n\n",
             "Only sign this message for a trusted client!"
         );
@@ -692,17 +693,18 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     }
 
     /// @notice Withdraws token from Franklin to root chain in case of exodus mode. User must provide proof that he owns funds
+    /// @param _accountId Id of the account in the tree
     /// @param _proof Proof
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner (must be total amount, not part of it)
-    function exit(uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external nonReentrant {
+    function exit(uint24 _accountId, uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external nonReentrant {
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
         require(exodusMode, "fet11"); // must be in exodus mode
-        require(!exited[packedBalanceKey], "fet12"); // already exited
-        require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
+        require(!exited[_accountId][_tokenId], "fet12"); // already exited
+        require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, _accountId, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
 
         balancesToWithdraw[packedBalanceKey].balanceToWithdraw += _amount;
-        exited[packedBalanceKey] = true;
+        exited[_accountId][_tokenId] = true;
     }
 
     function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external nonReentrant {
