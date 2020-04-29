@@ -31,7 +31,7 @@ Source: [link](https://docs.google.com/drawings/d/13SlGac7BHqFeL0J0J3BHdn_nx2tZc
 
 Proxy has a fallback function that performs a delegatecall to the contract implementation and returns whatever the implementation call returns.
 
-There is some type of calls that Proxy must intercept without unchecked submitting to processing to a fallback function. These are calls to `initialize` function (in the right way this function should be called only from`upgradeTarget` method and proxy's constructor) and calls to functions from `UpgradeableMaster` interface (that is why Proxy implements it).
+There is some type of calls that Proxy must intercept without unchecked submitting to processing to a fallback function. These are calls to `initialize` function (in the right way this function should be called only from `upgradeTarget` method and proxy's constructor) and calls to functions from `UpgradeableMaster` interface (that is why Proxy implements it).
 
 ### UpgradeGatekeeper
 
