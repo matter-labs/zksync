@@ -334,3 +334,29 @@ fn corrupted_intermediate_operation() {
         expected_msg
     );
 }
+
+/// Checks that corrupted validator merkle proof in block leads to predictable errors.
+/// Check for chunk in the end of the operations list.
+#[test]
+#[ignore]
+fn corrupted_validator_audit_path() {
+    // Perform some operations
+    let mut circuit = apply_many_ops();
+
+    // Corrupt merkle proof.
+    circuit.validator_audit_path[0] = Some(Default::default());
+
+    // Corrupted proof will lead to incorrect root hash.
+    // See `circuit.rs` for details.
+    let expected_msg = "root before applying fees is correct";
+
+    let error = check_circuit_non_panicking(circuit)
+        .expect_err("Corrupted operations list should lead to an error");
+
+    assert!(
+        error.contains(expected_msg),
+        "corrupted_operations: Got error message '{}', but expected '{}'",
+        error,
+        expected_msg
+    );
+}
