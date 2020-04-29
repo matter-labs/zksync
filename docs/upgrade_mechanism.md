@@ -87,7 +87,7 @@ There is three **phases of upgrade** which described in UpgradeGatekeeper:
 
 `UPGRADE_NOTICE_PERIOD` defined in Config.sol as 1 week.
 
-`Franklin` makes a decision that upgrade can be finished when both of these conditions is true:
+`Franklin` decides that the upgrade can be completed if both of these conditions are met:
 1. exodus mode is not activated
 2. number of open priority requests equals to zero.
 
