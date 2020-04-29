@@ -149,7 +149,6 @@ fn api_client_simple_simulation() {
         .prover_data(block)
         .expect("failed to get prover data");
     assert_eq!(prover_data.old_root, Some(wanted_prover_data.old_root));
-    assert_eq!(prover_data.new_root, Some(wanted_prover_data.new_root));
     assert_eq!(
         prover_data.pub_data_commitment,
         Some(wanted_prover_data.public_data_commitment),
