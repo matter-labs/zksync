@@ -373,6 +373,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         internal returns (bytes32 withdrawalsDataHash) {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
 
+        uint64 currentCommittedPriorityRequests = 0;
+
         uint256 pubDataPtr = 0;
         uint256 pubDataStartPtr = 0;
         uint256 pubDataEndPtr = 0;
@@ -420,7 +422,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                         Operations.OpType.Deposit,
                         pubData
                     );
-                    commitNextPriorityOperation(onchainOp);
+                    commitNextPriorityOperation(onchainOp, currentCommittedPriorityRequests);
+                    currentCommittedPriorityRequests++;
 
                     pubDataPtr += DEPOSIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.PartialExit)) {
@@ -442,7 +445,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
                         Operations.OpType.FullExit,
                         pubData
                     );
-                    commitNextPriorityOperation(onchainOp);
+                    commitNextPriorityOperation(onchainOp, currentCommittedPriorityRequests);
+                    currentCommittedPriorityRequests++;
 
                     pubDataPtr += FULL_EXIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
@@ -471,6 +475,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         require(pubDataPtr == pubDataEndPtr, "fcs12"); // last chunk exceeds pubdata
         require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
         require(processedOperationsRequiringEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
+
+        totalCommittedPriorityRequests += currentCommittedPriorityRequests;
     }
 
     /// @notice Verifies ethereum signature for given message and recovers address of the signer
@@ -555,10 +561,12 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         }
     }
 
-    function commitNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
+    /// @param _currentCommittedPriorityRequests number of currently committed priority operation, which are not yet calculated in totalCommittedPriorityRequests variable
+    /// @dev _currentCommittedPriorityRequests is needed to reduce gas outlay: we can update totalCommittedPriorityRequests variable only once during committing priority requests
+    function commitNextPriorityOperation(OnchainOperation memory _onchainOp, uint64 _currentCommittedPriorityRequests) internal {
         require(totalOpenPriorityRequests > totalCommittedPriorityRequests, "vnp11"); // no more priority requests in queue
 
-        uint64 _priorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
+        uint64 _priorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests + _currentCommittedPriorityRequests;
         Operations.OpType priorReqType = priorityRequests[_priorityRequestId].opType;
         bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
 
@@ -571,8 +579,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events {
         } else {
             revert("vnp15"); // invalid or non-priority operation
         }
-
-        totalCommittedPriorityRequests++;
     }
 
     /// @notice Processes onchain withdrawals. Full exit withdrawals will not be added to pending withdrawals queue
