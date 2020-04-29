@@ -134,9 +134,7 @@ steps:
   - name: cache
     path: /cache
   depends_on:
-  - redeploy-and-integration-testkit
-  - circuit-rust-tests
-  - non-circuit-rust-tests
+  - rust-build
 
 services:
 - name: geth
