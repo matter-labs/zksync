@@ -331,7 +331,7 @@ impl<T: Transport> EthereumAccount<T> {
 
         Ok(contract
             .query(
-                "balancesToWithdraw",
+                "getBalanceToWithdraw",
                 (self.address, u64::from(token)),
                 None,
                 Options::default(),
@@ -339,7 +339,7 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .compat()
             .await
-            .map(|(to_withdraw, _): (U256, U256)| u256_to_big_dec(to_withdraw))
+            .map(u256_to_big_dec)
             .map_err(|e| format_err!("Contract query fail: {}", e))?)
     }
 
@@ -547,7 +547,7 @@ impl<T: Transport> EthereumAccount<T> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "authPubkeyHash",
+                "setAuthPubkeyHash",
                 (fact.to_vec(), u64::from(nonce)),
                 Options::default(),
             )

@@ -391,13 +391,13 @@ impl ChangePubKey {
         nonce: Nonce,
         new_pubkey_hash: &PubKeyHash,
     ) -> Result<Vec<u8>, failure::Error> {
-        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 134;
+        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 129;
         let mut eth_signed_msg = Vec::with_capacity(CHANGE_PUBKEY_SIGNATURE_LEN);
         eth_signed_msg.extend_from_slice(b"Register zkSync pubkey:\n\n");
         eth_signed_msg.extend_from_slice(
             format!(
                 "{} nonce: 0x{}\n\n",
-                new_pubkey_hash.to_hex().to_ascii_lowercase(),
+                hex::encode(&new_pubkey_hash.data).to_ascii_lowercase(),
                 hex::encode(&nonce.to_be_bytes()).to_ascii_lowercase()
             )
             .as_bytes(),
