@@ -12,7 +12,7 @@ Use it for a better understanding.
 
 ### UpgradeableMaster
 
-`UpgradeableMaster` is an interface of contract, which will decide transition between **phases of upgrade** (this will be explained below)
+`UpgradeableMaster` is an interface that controls the upgrade flow through the **phases of upgrade** (this will be explained below)
 
 ### Upgradeable
 
