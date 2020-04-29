@@ -28,7 +28,7 @@ Use it for a better understanding.
 
 `Proxy` implements `Upgradeable` interface: `master` of Proxy can change its target.
 
-Proxy have a fallback function that performs a delegatecall to the contract implementation and return whatever the implementation call returns
+Proxy has a fallback function that performs a delegatecall to the contract implementation and returns whatever the implementation call returns.
 
 There is some type of calls that Proxy must intercept without uncheck submitting to processing to a fallback function: calling the `initialize` function (in the right way this function will be called from proxy contract directly) and functions of `UpgradeableMaster` interface (that is a reason why Proxy implements it).
 
