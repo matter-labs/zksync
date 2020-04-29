@@ -44,9 +44,7 @@ When a target contract is deployed on the network operator will deploy the Proxy
 
 When all needed Proxy contracts are deployed, one of them (which must implements `UpgradeableMaster` interface) will act as a parameter of constructor of `UpgradeGatekeeper` (it will names "`mainContract`").
 
-The last part of deploying --- is to transfer mastership of all proxy contracts to the gatekeeper and add them to the gatekeeper's list of managing contracts.
-
-The last should be done by calling several times `addUpgradeable` function.
+The last part of the deploy process is to transfer all proxy contracts under control of the gatekeeper. This should be done by calling several times `addUpgradeable` function.
 
 So, step-by-step deploy process:
 
