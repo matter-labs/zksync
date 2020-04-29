@@ -106,7 +106,7 @@ pub fn run_upgrade_franklin(franklin_address: Address, upgrade_gatekeeper_addres
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ETHAccountInfo {
     pub address: Address,

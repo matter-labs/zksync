@@ -595,12 +595,16 @@ impl TestSetup {
     pub fn exit(
         &mut self,
         sending_account: ETHAccountId,
+        account_id: AccountId,
         token_id: Token,
         amount: &BigDecimal,
         proof: EncodedProofPlonk,
     ) -> ETHExecResult {
-        block_on(self.accounts.eth_accounts[sending_account.0].exit(token_id.0, amount, proof))
-            .expect("Failed to post exit tx")
+        block_on(
+            self.accounts.eth_accounts[sending_account.0]
+                .exit(account_id, token_id.0, amount, proof),
+        )
+        .expect("Failed to post exit tx")
     }
 
     pub fn full_exit(&mut self, post_by: ETHAccountId, from: ZKSyncAccountId, token: Token) {
@@ -822,10 +826,15 @@ impl TestSetup {
             bail!("Block checks failed")
         }
 
+        for zk_id in 0..self.accounts.zksync_accounts.len() {
+            self.accounts.zksync_accounts[zk_id].account_id =
+                self.get_zksync_account_id(ZKSyncAccountId(zk_id));
+        }
+
         Ok(())
     }
 
-    fn get_zksync_account_committed_state(
+    pub fn get_zksync_account_committed_state(
         &self,
         zksync_id: ZKSyncAccountId,
     ) -> Option<(AccountId, Account)> {
@@ -834,6 +843,11 @@ impl TestSetup {
             self.state_keeper_request_sender.clone(),
             address,
         ))
+    }
+
+    pub fn get_zksync_account_id(&self, zksync_id: ZKSyncAccountId) -> Option<AccountId> {
+        self.get_zksync_account_committed_state(zksync_id)
+            .map(|a| a.0)
     }
 
     fn get_zksync_balance(&self, zksync_id: ZKSyncAccountId, token: TokenId) -> BigDecimal {
@@ -910,9 +924,10 @@ impl TestSetup {
         fund_owner: ZKSyncAccountId,
         token: Token,
     ) -> (EncodedProofPlonk, BigDecimal) {
-        let owner_address = self.accounts.zksync_accounts[fund_owner.0].address;
+        let owner = &self.accounts.zksync_accounts[fund_owner.0];
+        let owner_id = owner.account_id.expect("Account should have id to exit");
         // restore account state
-        prover::exit_proof::create_exit_proof(accounts, owner_address, token.0)
+        prover::exit_proof::create_exit_proof(accounts, owner_id, owner.address, token.0)
             .expect("Failed to generate exit proof")
     }
 }
