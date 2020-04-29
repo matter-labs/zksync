@@ -81,7 +81,7 @@ So, step-by-step upgrade process:
 
 `Franklin` makes a decision that upgrade can be finished when both of these conditions is true:
 1. exodus mode is not activated
-2. count of open priority requests equals to zero.
+2. number of open priority requests equals to zero.
 
 To prevent rollup from spamming of priority requests, during `preparation lock period` contract will not add new priority requests.
 This period starts from the notification from the gatekeeper about the start of preparation status of upgrade and ends when the upgrade finishes, or after `UPGRADE_PREPARATION_LOCK_PERIOD` seconds from its start.
