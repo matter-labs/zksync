@@ -141,9 +141,10 @@ steps:
 services:
 - name: geth
   image: matterlabs/geth:latest
+  settings:
     config: standard
 
-- name: geth_fast
+- name: geth-fast
   image: matterlabs/geth:latest
   settings:
     config: fast
@@ -237,6 +238,7 @@ steps:
 services:
 - name: geth
   image: matterlabs/geth:latest
+  settings:
     config: standard
 
 - name: postgres
