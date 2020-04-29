@@ -1,7 +1,6 @@
 pragma solidity 0.5.16;
 
 import "./Upgradeable.sol";
-import "./Operations.sol";
 
 
 /// @title zkSync events
