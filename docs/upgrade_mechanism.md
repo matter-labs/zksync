@@ -40,7 +40,7 @@ There is some type of calls that Proxy must intercept without uncheck submitting
 
 ### Deploying
 
-When a target contract is deployed on the network operator will deploy the Proxy contract. Parameters of the constructor: address of deployed target contract in the network and its initialization parameters.
+After the target contract is deployed, operator will deploy the Proxy contract. This will initialize the storage.
 
 When all needed Proxy contracts are deployed, one of them (which must implements `UpgradeableMaster` interface) will act as a parameter of constructor of `UpgradeGatekeeper` (it will names "`mainContract`").
 
