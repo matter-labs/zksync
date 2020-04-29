@@ -215,6 +215,7 @@ fn test_incorrect_transfer_account_from() {
         },
     );
 }
+
 /// Checks that executing a transfer operation with incorrect
 /// data (account `to` ID) results in an error.
 #[test]

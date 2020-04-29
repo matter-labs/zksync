@@ -3,9 +3,13 @@ use bigdecimal::BigDecimal;
 use crypto_exports::franklin_crypto::bellman::pairing::bn256::Bn256;
 // Workspace deps
 use models::node::{operations::WithdrawOp, Address};
+use plasma::state::CollectedFee;
 // Local deps
 use crate::witness::{
-    tests::test_utils::{corrupted_input_test_scenario, generic_test_scenario, WitnessTestAccount},
+    tests::test_utils::{
+        corrupted_input_test_scenario, generic_test_scenario, incorrect_op_test_scenario,
+        WitnessTestAccount,
+    },
     utils::SigDataInput,
     withdraw::WithdrawWitness,
 };
@@ -104,6 +108,113 @@ fn corrupted_ops_input() {
                     .apply_withdraw_op(&op)
                     .expect("transfer should be success");
                 vec![fee]
+            },
+        );
+    }
+}
+
+/// Checks that executing a withdraw operation with incorrect
+/// data (account `from` ID) results in an error.
+#[test]
+#[ignore]
+fn test_incorrect_withdraw_account_from() {
+    const TOKEN_ID: u16 = 0;
+    const INITIAL_BALANCE: u64 = 10;
+    const TOKEN_AMOUNT: u64 = 7;
+    const FEE_AMOUNT: u64 = 3;
+
+    // Operation is not valid, since `from` ID is different from the tx body.
+    const ERR_MSG: &str = "op_valid is true/enforce equal to one";
+
+    let incorrect_from_account = WitnessTestAccount::new(3, INITIAL_BALANCE);
+
+    // Input data: transaction is signed by an incorrect account (address of account
+    // and ID of the `from` accounts differ).
+    let accounts = vec![WitnessTestAccount::new(1, INITIAL_BALANCE)];
+    let account_from = &accounts[0];
+    let withdraw_op = WithdrawOp {
+        tx: incorrect_from_account
+            .zksync_account
+            .sign_withdraw(
+                TOKEN_ID,
+                "",
+                BigDecimal::from(TOKEN_AMOUNT),
+                BigDecimal::from(FEE_AMOUNT),
+                &Address::zero(),
+                None,
+                true,
+            )
+            .0,
+        account_id: account_from.id,
+    };
+
+    let input = SigDataInput::from_withdraw_op(&withdraw_op).expect("SigDataInput creation failed");
+
+    incorrect_op_test_scenario::<WithdrawWitness<Bn256>, _>(
+        &accounts,
+        withdraw_op,
+        input,
+        ERR_MSG,
+        || {
+            vec![CollectedFee {
+                token: TOKEN_ID,
+                amount: FEE_AMOUNT.into(),
+            }]
+        },
+    );
+}
+
+/// Checks that executing a withdraw operation with incorrect
+/// data (insufficient funds) results in an error.
+#[test]
+#[ignore]
+fn test_incorrect_withdraw_amount() {
+    const TOKEN_ID: u16 = 0;
+    // Balance check should fail.
+    // "balance-fee bits" is message for subtraction check in circuit.
+    // For details see `circuit.rs`.
+    const ERR_MSG: &str = "balance-fee bits";
+
+    // Test vector of (initial_balance, transfer_amount, fee_amount).
+    let test_vector = vec![
+        (10, 15, 0), // Withdraw too big
+        (10, 7, 4),  // Fee too big
+        (0, 1, 1),   // Withdraw from 0 balance
+    ];
+
+    for (initial_balance, transfer_amount, fee_amount) in test_vector {
+        // Input data: account does not have enough funds.
+        let accounts = vec![WitnessTestAccount::new(1, initial_balance)];
+        let account_from = &accounts[0];
+        let withdraw_op = WithdrawOp {
+            tx: account_from
+                .zksync_account
+                .sign_withdraw(
+                    TOKEN_ID,
+                    "",
+                    BigDecimal::from(transfer_amount),
+                    BigDecimal::from(fee_amount),
+                    &Address::zero(),
+                    None,
+                    true,
+                )
+                .0,
+            account_id: account_from.id,
+        };
+
+        let input =
+            SigDataInput::from_withdraw_op(&withdraw_op).expect("SigDataInput creation failed");
+
+        incorrect_op_test_scenario::<WithdrawWitness<Bn256>, _>(
+            &accounts,
+            withdraw_op,
+            input,
+            ERR_MSG,
+            || {
+                vec![CollectedFee {
+                    token: TOKEN_ID,
+                    amount: fee_amount.into(),
+                }]
             },
         );
     }
