@@ -3,7 +3,7 @@ type Balances = {
     '1'?: string,
 };
 
-type Interface = {
+export type Interface = {
     "id": number,
     "commited": {
         "pub_key_hash": string,

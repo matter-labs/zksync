@@ -232,6 +232,7 @@ steps:
   - sleep 15
   - zksync integration-simple
   - zksync integration-full-exit
+  - zksync api-type-validate
   depends_on:
   - start-server-detached
   - start-prover-detached

@@ -8,8 +8,6 @@ const franklin_abi = require('../../contracts/build/Franklin.json');
 import {ethers, utils, Contract} from "ethers";
 import {bigNumberify, parseEther} from "ethers/utils";
 import {IERC20_INTERFACE} from "zksync/build/utils";
-import Axios from "axios";
-import {compareObjectStructure, transactionHistoryItems} from "./api-test";
 import { TokenLike } from "zksync/build/types";
 import * as apitype from "./api-type-validate";
 import * as assert from "assert";
@@ -266,10 +264,13 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
 
-    const tokenId = syncProvider.tokenSet.resolveTokenId(token);
+    await apitype.checkBlock(1);
+    const blocks = await apitype.checkBlocks();
+    for (const { block_number } of blocks.slice(-10)) {
+        await apitype.checkBlockTransactions(block_number);
+    }
     await apitype.checkAccount(syncWallet1.address());
     await apitype.checkTxHistory(syncWallet1.address());
-
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
 
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, withdrawFee);
@@ -371,6 +372,7 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
 
         apitype.deleteUnusedGenFiles();
         await apitype.checkStatus();
+        await apitype.checkTestnetConfig();
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");

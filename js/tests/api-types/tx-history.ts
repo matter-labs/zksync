@@ -18,6 +18,25 @@ type Deposit = {
     "created_at": string,
 };
 
+type FullExit = {
+    "hash": string,
+    "pq_id": number,
+    "tx": {
+        "priority_op": {
+            "token": string,
+            "account_id": number,
+            "eth_address": string,
+        },
+        "withdraw_amount": string,
+        "type": "FullExit"
+    },
+    "success": null,
+    "fail_reason": null,
+    "commited": boolean,
+    "verified": boolean,
+    "created_at": string,
+};
+
 type Transfer = {
     "hash": string,
     "pq_id": null,
@@ -46,7 +65,7 @@ type ChangePubKey = {
     "pq_id": null,
     "tx": {
         "account": string,
-        "ethSignature": null,
+        "ethSignature"?: string,
         "newPkHash": string,
         "nonce": number,
         "type": string,
@@ -54,7 +73,31 @@ type ChangePubKey = {
     "success": boolean,
     "fail_reason"?: string,
     "commited": boolean,
-    "verified": boolean
+    "verified": boolean,
+    "created_at": string,
 }
 
-export type Interface = (Deposit | Transfer | ChangePubKey)[];
+type Withdraw =   {
+    "hash": string,
+    "pq_id": null,
+    "tx": {
+      "amount": string,
+      "fee": string,
+      "from": string,
+      "nonce": number,
+      "signature": {
+        "pubKey": string,
+        "signature": string
+      },
+      "to": string,
+      "token": string,
+      "type": "Withdraw"
+    },
+    "success": boolean,
+    "fail_reason"?: string,
+    "commited": boolean,
+    "verified": boolean,
+    "created_at": string,
+};
+
+export type Interface = (Deposit | Transfer | Withdraw | ChangePubKey | FullExit)[];
