@@ -52,7 +52,7 @@ So, step-by-step deploy process:
 
 1. Deploy targets for all proxies.
 2. Deploy proxies with needed target addresses and initialization parameters.
-3. Deploy UpgradeGatekeeper with Franklin's proxy's address as a parameter.
+3. Deploy UpgradeGatekeeper passing the address of the main proxy as a parameter.
 4. Transfer mastership of all proxies to the `UpgradeGatekeeper`.
 5. Add all proxies to the list of managing by the gatekeeper by calling `addUpgradeable` several times.
 
