@@ -34,7 +34,7 @@ There is some type of calls that Proxy must intercept without uncheck submitting
 
 ### UpgradeGatekeeper
 
-`UpgradeGatekeeper` is a contract that will manage the upgrade process. It is needed to prevent upgrading rollup contracts by the master in one function call.
+`UpgradeGatekeeper` is a contract that will manage the upgrade process. It is needed to prevent upgrading rollup contracts by the master in one function call and do upgrades of all contracts atomically: contracts that are declared to be upgraded at the start of this process should all be upgraded, or all these upgrades will be rejected.
 
 ## Deploying and upgrade process
 
