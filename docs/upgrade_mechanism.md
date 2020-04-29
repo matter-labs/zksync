@@ -79,7 +79,7 @@ So, step-by-step upgrade process:
 
 ## Current Franklin contract upgrade specification or "How notice period works"
 
-`UPGRADE_NOTICE_PERIOD` defined in Config.sol as 2 weeks.
+`UPGRADE_NOTICE_PERIOD` defined in Config.sol as 1 week.
 
 `Franklin` makes a decision that upgrade can be finished when both of these conditions is true:
 1. exodus mode is not activated
