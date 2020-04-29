@@ -26,7 +26,7 @@ contract ZKSyncUnitTest is FranklinTest {
         bytes calldata _ethWitness,
         uint32[] calldata _ethWitnessSizes
     ) external {
-        collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
+        collectOnchainOps(0, _publicData, _ethWitness, _ethWitnessSizes);
     }
 
     function testVerifyEthereumSignature(bytes calldata _signature, bytes calldata _message) external pure returns (address) {

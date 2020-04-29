@@ -1,6 +1,7 @@
 pragma solidity 0.5.16;
 
 import "./Upgradeable.sol";
+import "./Operations.sol";
 
 
 /// @title zkSync events
@@ -51,6 +52,22 @@ contract Events {
         uint8 opType,
         bytes pubData,
         uint256 expirationBlock
+    );
+
+    event DepositCommit(
+        uint32 franklinBlockId,
+        uint24 accountId,
+        address owner,
+        uint16 tokenId,
+        uint128 amount
+    );
+
+    event FullExitCommit(
+        uint32 franklinBlockId,
+        uint24 accountId,
+        address owner,
+        uint16 tokenId,
+        uint128 amount
     );
 }
 

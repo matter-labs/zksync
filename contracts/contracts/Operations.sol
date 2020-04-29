@@ -46,7 +46,7 @@ library Operations {
     // Deposit pubdata
 
     struct Deposit {
-        // uint24 accountId -- ignored at serialization
+        uint24 accountId;
         uint16 tokenId;
         uint128 amount; 
         address owner;
@@ -56,16 +56,14 @@ library Operations {
         ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + ADDRESS_BYTES;
 
     /// Deserialize deposit pubdata
-    function readDepositPubdata(bytes memory _data, uint _offset) internal pure
-        returns (uint new_offset, Deposit memory parsed)
+    function readDepositPubdata(bytes memory _data) internal pure
+        returns (Deposit memory parsed)
     {
-        uint offset = _offset + ACCOUNT_ID_BYTES;                   // accountId (ignored)
-        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
-        (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
-        (offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
-
-        require(offset == _offset + PACKED_DEPOSIT_PUBDATA_BYTES, "rdp10"); // reading invalid deposit pubdata size
-        new_offset = offset;
+        uint offset = 0;
+        (offset, parsed.accountId) = Bytes.readUInt24(_data, offset); // accountId
+        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);   // tokenId
+        (offset, parsed.amount) = Bytes.readUInt128(_data, offset);   // amount
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset);    // owner
     }
 
     /// Serialize deposit pubdata
@@ -98,10 +96,10 @@ library Operations {
     uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
         ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
 
-    function readFullExitPubdata(bytes memory _data, uint _offset) internal pure
+    function readFullExitPubdata(bytes memory _data) internal pure
         returns (FullExit memory parsed)
     {
-        uint offset = _offset;
+        uint offset = 0;
         (offset, parsed.accountId) = Bytes.readUInt24(_data, offset);      // accountId
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);         // owner
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);        // tokenId
