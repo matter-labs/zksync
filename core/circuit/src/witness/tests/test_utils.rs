@@ -159,8 +159,8 @@ pub fn generic_test_scenario<W, F>(
 }
 
 /// Does the same operations as the `generic_test_scenario`, but assumes
-/// that input for `calculate_operations` is corrupted and will lead to the panic.
-/// The panic is caught and checked to match the provided message.
+/// that input for `calculate_operations` is corrupted and will lead to an error.
+/// The error is caught and checked to match the provided message.
 pub fn corrupted_input_test_scenario<W, F>(
     accounts: &[WitnessTestAccount],
     op: W::OperationType,
@@ -179,6 +179,59 @@ pub fn corrupted_input_test_scenario<W, F>(
     // Apply op on plasma
     let fees = apply_op_on_plasma(&mut plasma_state, &op);
     plasma_state.collect_fee(&fees, FEE_ACCOUNT_ID);
+
+    // Apply op on circuit
+    let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
+    let circuit_operations = witness.calculate_operations(input.clone());
+    let pub_data_from_witness = witness.get_pubdata();
+
+    // Prepare circuit
+    witness_accum.add_operation_with_pubdata(circuit_operations, pub_data_from_witness);
+    witness_accum.collect_fees(&fees);
+    witness_accum.calculate_pubdata_commitment();
+
+    let result = check_circuit_non_panicking(witness_accum.into_circuit_instance());
+
+    match result {
+        Ok(_) => panic!(
+            "Operation did not err, but was expected to err with message '{}' \
+             Provided input: {:?}",
+            expected_msg, input
+        ),
+        Err(error_msg) => {
+            assert!(
+                error_msg.contains(expected_msg),
+                "Code erred with unexpected message. \
+                 Provided message: '{}', but expected '{}'. \
+                 Provided input: {:?}",
+                error_msg,
+                expected_msg,
+                input,
+            );
+        }
+    }
+}
+
+/// Performs the operation on the circuit, but not on the plasma,
+/// since the operation is meant to be incorrect and should result in an error.
+/// The error is caught and checked to match the provided message.
+pub fn incorrect_op_test_scenario<W, F>(
+    accounts: &[WitnessTestAccount],
+    op: W::OperationType,
+    input: W::CalculateOpsInput,
+    expected_msg: &str,
+    collect_fees: F,
+) where
+    W: Witness,
+    W::CalculateOpsInput: Clone + std::fmt::Debug,
+    F: FnOnce() -> Vec<CollectedFee>,
+{
+    // Initialize WitnessBuilder.
+    let (_, mut circuit_account_tree) = PlasmaStateGenerator::generate(&accounts);
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, FEE_ACCOUNT_ID, 1);
+
+    // Collect fees without actually applying the tx on plasma
+    let fees = collect_fees();
 
     // Apply op on circuit
     let witness = W::apply_tx(&mut witness_accum.account_tree, &op);
