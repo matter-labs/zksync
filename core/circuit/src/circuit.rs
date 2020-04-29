@@ -21,7 +21,7 @@ use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams
 use crate::franklin_crypto::rescue::RescueEngine;
 use models::node::operations::{ChangePubKeyOp, NoopOp};
 use models::node::{CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp};
-use models::params::{self, FR_BIT_WIDTH_PADDED};
+use models::params::{self, FR_BIT_WIDTH_PADDED, SIGNED_TRANSFER_BIT_WIDTH};
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
 pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
@@ -782,6 +782,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(serialized_tx_bits.len(), params::SIGNED_WITHDRAW_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -1421,6 +1422,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -1626,6 +1628,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
