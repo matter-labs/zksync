@@ -37,6 +37,7 @@ class ZKSyncTxError extends Error {
 export class Wallet {
     public provider: Provider;
 
+    private ethSignatureType?: "EthereumSignature" | "EIP1271Signature";
     private constructor(
         public ethSigner: ethers.Signer,
         public cachedAddress: Address,
@@ -76,13 +77,16 @@ export class Wallet {
 
     async getEthMessageSignature(message: string): Promise<TxEthSignature> {
         const signature = await this.ethSigner.signMessage(message);
-        const recovered = ethers.utils.verifyMessage(message, signature);
-        const address = await this.ethSigner.getAddress();
-        const type = recovered == address
-            ? "EthereumSignature"
-            : "EIP1271Signature";
 
-        return { type, signature };
+        if (this.ethSignatureType == undefined) {
+            const recovered = ethers.utils.verifyMessage(message, signature).toLowerCase();
+            const address = await this.ethSigner.getAddress().then(s => s.toLowerCase());
+            this.ethSignatureType = recovered === address
+                ? "EthereumSignature"
+                : "EIP1271Signature";
+        }
+
+        return { type: this.ethSignatureType, signature };
     }
 
     async syncTransfer(transfer: {
