@@ -972,12 +972,27 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         };
 
         // SHOULD be true for successful exit
-        // otherwise it is impossible to decide from pub data if nonce should be updated
         let is_address_correct = CircuitElement::equals(
             cs.namespace(|| "is_address_correct"),
             &cur.account.address,
             &op_data.eth_address,
         )?;
+
+        // MUST be true for the validity of the first chunk
+        let is_pubdata_amount_valid = {
+            let circuit_pubdata_amount = CircuitElement::conditionally_select_with_number_strict(
+                cs.namespace(|| "pubdata_amount"),
+                Expression::constant::<CS>(E::Fr::zero()),
+                &cur.balance,
+                &is_address_correct.not(),
+            )?;
+
+            CircuitElement::equals(
+                cs.namespace(|| "is_pubdata_amount_correct"),
+                &circuit_pubdata_amount,
+                &op_data.full_amount,
+            )?
+        };
 
         // MUST be true for correct op. First chunk is correct and tree update can be executed.
         let first_chunk_valid = {
@@ -988,6 +1003,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 cs.namespace(|| "no nonce overflow"),
                 &cur.account.nonce.get_number(),
             )?);
+            flags.push(is_pubdata_amount_valid);
             multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
         };
 
