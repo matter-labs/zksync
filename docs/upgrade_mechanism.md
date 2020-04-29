@@ -26,7 +26,7 @@ Use it for a better understanding.
 
 **Note: storage of this contract will be a context in which all processes of the target will work.** Proxy will store address of its **target** at the storage slot with index `keccak256("target")`.
 
-As Proxy implements Upgradeable, it can change its target, but only `master` can do it.
+`Proxy` implements `Upgradeable` interface: `master` of Proxy can change its target.
 
 Proxy have a fallback function that performs a delegatecall to the contract implementation and return whatever the implementation call returns
 
