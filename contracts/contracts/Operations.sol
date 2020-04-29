@@ -163,7 +163,7 @@ library Operations {
     // ChangePubKey
 
     struct ChangePubKey {
-        // uint24 accountId; -- present in pubdata, ignored at serialization
+        uint24 accountId;
         bytes20 pubKeyHash;
         address owner;
         uint32 nonce;
@@ -174,8 +174,8 @@ library Operations {
     {
         require(PUBKEY_HASH_BYTES == 20, "rcp11"); // expected PUBKEY_HASH_BYTES to be 20
 
-        // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = _offset + ACCOUNT_ID_BYTES;                                    // accountId (ignored)
+        uint offset = _offset;
+        (offset, parsed.accountId) = Bytes.readUInt24(_data, offset);                // accountId
         (offset, parsed.pubKeyHash) = Bytes.readBytes20(_data, offset);              // pubKeyHash
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);                   // owner
         (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);                    // nonce

@@ -80,8 +80,8 @@ contract Storage {
         bytes pubData;
     }
 
-    /// @notice Flag indicates that a user has exited certain token balance (per owner and tokenId, see packAddressAndTokenId)
-    mapping(bytes22 => bool) public exited;
+    /// @notice Flag indicates that a user has exited certain token balance (per account id and tokenId)
+    mapping(uint24 => mapping(uint16 => bool)) public exited;
 
     /// @notice Flag indicates that exodus (mass exit) mode is triggered
     /// @notice Once it was raised, it can not be cleared again, and all users must exit

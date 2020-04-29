@@ -14,6 +14,7 @@ use web3::{Error, Transport, Web3};
 
 pub mod signer;
 
+#[derive(Clone)]
 pub struct ETHClient<T: Transport> {
     private_key: H256,
     pub sender_account: Address,
