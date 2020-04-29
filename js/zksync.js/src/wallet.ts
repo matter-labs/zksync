@@ -74,13 +74,23 @@ export class Wallet {
         return wallet;
     }
 
+    async getEthMessageSignature(message: string): Promise<TxEthSignature> {
+        const signature = await this.ethSigner.signMessage(message);
+        const recovered = ethers.utils.verifyMessage(message, signature);
+        const address = await this.ethSigner.getAddress();
+        const type = recovered == address
+            ? "EthereumSignature"
+            : "EIP1271Signature";
+
+        return { type, signature };
+    }
+
     async syncTransfer(transfer: {
         to: Address;
         token: TokenLike;
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce?: Nonce;
-        ethSignatureType?: "EthereumSignature" | "EIP1271Signature";
     }): Promise<Transaction> {
         if (!this.signer) {
             throw new Error(
@@ -115,10 +125,7 @@ export class Wallet {
             `Nonce: ${nonce}\n` +
             `Fee: ${stringFee} ${stringToken}`;
 
-        const txMessageEthSignature: TxEthSignature = {
-            type: transfer.ethSignatureType || "EthereumSignature",
-            signature: await this.ethSigner.signMessage(humanReadableTxInfo)
-        };
+        const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
 
         const signedTransferTransaction = this.signer.signSyncTransfer(
             transactionData
@@ -141,7 +148,6 @@ export class Wallet {
         amount: utils.BigNumberish;
         fee: utils.BigNumberish;
         nonce?: Nonce;
-        ethSignatureType?: "EthereumSignature" | "EIP1271Signature";
     }): Promise<Transaction> {
         if (!this.signer) {
             throw new Error(
@@ -176,10 +182,7 @@ export class Wallet {
             `Nonce: ${nonce}\n` +
             `Fee: ${stringFee} ${stringToken}`;
 
-        const txMessageEthSignature: TxEthSignature = {
-            type: withdraw.ethSignatureType || "EthereumSignature",
-            signature: await this.ethSigner.signMessage(humanReadableTxInfo)
-        };
+        const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
 
         const signedWithdrawTransaction = this.signer.signSyncWithdraw(
             transactionData
