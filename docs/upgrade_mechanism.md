@@ -16,7 +16,7 @@ Use it for a better understanding.
 
 ### Upgradeable
 
-`Upgradeable` is an interface of contract, which knows its **target** (address of implementation). The target can be changed by calling `upgradeTarget` method.
+`Upgradeable` is an interface of a proxy with a variable **target** (address of implementation). The target can be changed by calling `upgradeTarget` method on the proxy.
 
 ### Proxy
 
