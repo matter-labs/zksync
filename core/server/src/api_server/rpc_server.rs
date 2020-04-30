@@ -89,7 +89,10 @@ impl DepositingAccountBalances {
                 .or_insert(DepositingFunds::default());
 
             balance.amount += BigDecimal::from(op.amount);
-            if balance.expected_accept_block < expected_accept_block {
+
+            // `balance.expected_accept_block` should be the greatest block number among
+            // all the deposits for a certain token.
+            if expected_accept_block > balance.expected_accept_block {
                 balance.expected_accept_block = expected_accept_block;
             }
         }

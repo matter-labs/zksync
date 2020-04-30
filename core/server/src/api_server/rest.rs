@@ -21,7 +21,6 @@ use web3::types::H160;
 use super::rpc_server::get_ongoing_priority_ops;
 use crate::eth_watch::EthWatchRequest;
 use storage::chain::operations_ext::records::TransactionsHistoryItem;
-use tokio::runtime::Builder as RuntimeBuilder;
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
@@ -198,79 +197,73 @@ fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
     request_path: web::Path<(Address, i64, i64)>,
 ) -> ActixResult<HttpResponse> {
-    let (address, offset, limit) = request_path.into_inner();
+    let (address, mut offset, mut limit) = request_path.into_inner();
 
     const MAX_LIMIT: i64 = 100;
     if limit > MAX_LIMIT || limit < 0 || offset < 0 {
         return Err(HttpResponse::BadRequest().finish().into());
     }
 
+    let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
+
+    // Fetch ongoing deposits, since they must be reported within the transactions history.
+    let mut ongoing_ops = futures::executor::block_on(async move {
+        get_ongoing_priority_ops(&eth_watcher_request_sender).await
+    })
+    .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    ongoing_ops.sort_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
+
+    // Filter only deposits for the requested address.
+    // `map` is used after filter to find the max block number without an
+    // additional list pass.
+    // `take` is used last to limit the amount of entries.
+    let mut transactions_history: Vec<_> = ongoing_ops
+        .iter()
+        .filter(|(_block, op)| {
+            if let FranklinPriorityOp::Deposit(deposit) = &op.data {
+                // Address may be set to either sender or recipient.
+                deposit.from == address || deposit.to == address
+            } else {
+                false
+            }
+        })
+        .map(|(_block, op)| {
+            let hash_str = format!("0x{}", hex::encode(&op.eth_hash));
+            let pq_id = Some(op.serial_id as i64);
+            let tx = serde_json::to_value(&op.data).unwrap();
+            TransactionsHistoryItem {
+                hash: Some(hash_str),
+                pq_id,
+                tx,
+                success: None,
+                fail_reason: None,
+                commited: false,
+                verified: false,
+            }
+        })
+        .skip(offset as usize)
+        .take(limit as usize)
+        .collect();
+
+    if !transactions_history.is_empty() {
+        // We've taken at least one transaction, this means
+        // offset is consumed completely, and limit is reduced.
+        offset = 0;
+        limit -= transactions_history.len() as i64;
+    } else {
+        // We didn't take any items, so we just decrement offset.
+        offset -= ongoing_ops.len() as i64;
+    };
+
     let storage = data.access_storage()?;
-    let mut transactions_history = storage
+    let mut storage_transactions = storage
         .chain()
         .operations_ext_schema()
         .get_account_transactions_history(&address, offset, limit)
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    if transactions_history.len() < limit as usize {
-        // There is a capacity for more transactions, so we can append
-        // the unconfirmed deposit operations.
-        let left_capacity = limit as usize - transactions_history.len();
-
-        let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
-
-        // Fetch ongoing deposits, since they must be reported within the transactions history.
-        let mut ongoing_deposits: Vec<TransactionsHistoryItem> = {
-            // Create lightweight single-threaded runtime to execute async in non-async function.
-            let mut runtime = RuntimeBuilder::new()
-                .basic_scheduler()
-                .build()
-                .expect("Can't create a Tokio runtime");
-
-            let mut ongoing_ops = runtime
-                .block_on(
-                    async move { get_ongoing_priority_ops(&eth_watcher_request_sender).await },
-                )
-                .map_err(|_| HttpResponse::InternalServerError().finish())?;
-
-            ongoing_ops.sort_unstable_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
-
-            // Filter only deposits for the requested address.
-            // `map` is used after filter to find the max block number without an
-            // additional list pass.
-            // `take` is used last to limit the amount of entries.
-            let deposits: Vec<_> = ongoing_ops
-                .into_iter()
-                .filter(|(_block, op)| {
-                    if let FranklinPriorityOp::Deposit(deposit) = &op.data {
-                        // Address may be set to either sender or recipient.
-                        deposit.from == address || deposit.to == address
-                    } else {
-                        false
-                    }
-                })
-                .map(|(_block, op)| {
-                    let hash_str = format!("0x{}", hex::encode(&op.eth_hash));
-                    let pq_id = Some(op.serial_id as i64);
-                    let tx = serde_json::to_value(&op.data).unwrap();
-                    TransactionsHistoryItem {
-                        hash: Some(hash_str),
-                        pq_id,
-                        tx,
-                        success: None,
-                        fail_reason: None,
-                        commited: false,
-                        verified: false,
-                    }
-                })
-                .take(left_capacity as usize)
-                .collect();
-
-            deposits
-        };
-
-        transactions_history.append(&mut ongoing_deposits);
-    }
+    transactions_history.append(&mut storage_transactions);
 
     Ok(HttpResponse::Ok().json(transactions_history))
 }
