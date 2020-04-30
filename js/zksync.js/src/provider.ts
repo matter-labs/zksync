@@ -13,7 +13,9 @@ import {
     ContractAddress,
     Tokens,
     TokenAddress,
-    TxEthSignature
+    TxEthSignature,
+    OngoingDeposit,
+    OngoingDeposits
 } from "./types";
 import {
     isTokenETH,
@@ -84,6 +86,10 @@ export class Provider {
 
     async getState(address: Address): Promise<AccountState> {
         return await this.transport.request("account_info", [address]);
+    }
+
+    async getOngoingDeposits(address: Address): Promise<OngoingDeposits> {
+        return await this.transport.request("get_ongoing_deposits", [address]);
     }
 
     // get transaction status by its hash (e.g. 0xdead..beef)

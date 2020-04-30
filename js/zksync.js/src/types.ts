@@ -34,6 +34,21 @@ export interface AccountState {
         pubKeyHash: PubKeyHash;
     };
 }
+
+export interface OngoingDeposit {
+    received_on_block: utils.BigNumberish,
+    token: number,
+    amount: utils.BigNumberish,
+    eth_tx_hash: string,
+}
+
+export interface OngoingDeposits {
+    address: Address;
+    [deposits: number]: OngoingDeposit,
+    confirmations_for_eth_event: utils.BigNumberish,
+    estimated_deposits_approval_block: utils.BigNumberish | null,
+}
+
 export interface TxEthSignature {
     type: "EthereumSignature" | "EIP1271Signature";
     signature: string;

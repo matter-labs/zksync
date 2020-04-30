@@ -9,7 +9,8 @@ import {
     PriorityOperationReceipt,
     TransactionReceipt,
     PubKeyHash,
-    TxEthSignature
+    TxEthSignature,
+    OngoingDeposits
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -315,6 +316,10 @@ export class Wallet {
         return this.provider.getState(this.address());
     }
 
+    async getOngoingDeposits(): Promise<OngoingDeposits> {
+        return this.provider.getOngoingDeposits(this.address());
+    }
+
     async getBalance(
         token: TokenLike,
         type: "committed" | "verified" = "committed"
@@ -381,6 +386,10 @@ export class Wallet {
             this.provider.contractAddress.mainContract,
             MAX_ERC20_APPROVE_AMOUNT
         );
+    }
+
+    async currentEthBlock(): Promise<number> {
+        return await this.ethSigner.provider.getBlockNumber();
     }
 
     async depositToSyncFromEthereum(deposit: {
