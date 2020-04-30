@@ -1,6 +1,10 @@
 pragma solidity ^0.5.0;
 
-import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import "./IERC20.sol";
+import "./ReentrancyGuard.sol";
+import "./SafeMath.sol";
+import "./SafeMathUint128.sol";
+import "./SafeCast.sol";
 
 import "./Storage.sol";
 import "./Config.sol";
@@ -8,12 +12,12 @@ import "./Events.sol";
 
 import "./Bytes.sol";
 import "./Operations.sol";
-import "./ReentrancyGuard.sol";
-
 
 /// @title zkSync main contract
 /// @author Matter Labs
 contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
+    using SafeMath for uint256;
+    using SafeMathUint128 for uint128;
 
     // Upgrade functional
 
@@ -75,8 +79,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// _ // FIXME: remove _genesisAccAddress
     /// _genesisRoot Genesis blocks (first block) root
     function initialize(bytes calldata initializationParameters) external {
-        initializeReentrancyGuard();
-
         (
         address _governanceAddress,
         address _verifierAddress,
@@ -88,6 +90,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         governance = Governance(_governanceAddress);
 
         blocks[0].stateRoot = _genesisRoot;
+        initializeReentrancyGuard();
     }
 
     /// @notice Sends tokens
@@ -126,7 +129,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             uint128 amount = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
             // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
             if (amount != 0) {
-                // avoid reentrancy attack by using subtract and not "= 0" and changing local state before external call
                 balancesToWithdraw[packedBalanceKey].balanceToWithdraw -= amount;
                 bool sent = false;
                 if (tokenId == 0) {
@@ -178,7 +180,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _franklinAddr The receiver Layer 2 address
     function depositETH(address _franklinAddr) external payable nonReentrant {
         requireActive();
-        registerDeposit(0, uint128(msg.value), _franklinAddr);
+        registerDeposit(0, SafeCast.toUint128(msg.value), _franklinAddr);
     }
 
     /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
@@ -201,10 +203,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         uint256 balance_before = _token.balanceOf(address(this));
         require(_token.transferFrom(msg.sender, address(this), _amount), "fd012"); // token transfer failed deposit
         uint256 balance_after = _token.balanceOf(address(this));
-        require(balance_after == balance_before + uint256(_amount), "det11"); // det11 - incorrect token balance diff
-        require(balance_after >= balance_before, "det12"); // det12 - token balance overflow
+        uint128 deposit_amount = SafeCast.toUint128(balance_after.sub(balance_before));
 
-        registerDeposit(tokenId, _amount, _franklinAddr);
+        registerDeposit(tokenId, deposit_amount, _franklinAddr);
     }
 
     /// @notice Withdraw ERC20 token to Layer 1 - register withdrawal and transfer ERC20 to sender
@@ -281,7 +282,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _token);
         uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
         require(balance >= _amount, "frw11"); // insufficient balance withdraw
-        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance - _amount;
+        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
         emit OnchainWithdrawal(
             msg.sender,
             _token,
@@ -367,6 +368,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _publicData Operations packed in bytes array
     /// @param _ethWitness Eth witness that was posted with commit
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
+    /// Priority operations must be committed in the same order as they are in the priority queue.
     function collectOnchainOps(uint32 _blockNumber, bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
         internal returns (bytes32 withdrawalsDataHash) {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
@@ -597,7 +599,10 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         while (offset < withdrawalsData.length) {
             (bool addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
             bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
-            balancesToWithdraw[packedBalanceKey].balanceToWithdraw += _amount;
+
+            uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
+            balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
+
             if (addToPendingWithdrawalsQueue) {
                 pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
                 numberOfPendingWithdrawals++;
@@ -647,8 +652,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @notice Reverts unverified blocks
     /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
     function revertBlocks(uint32 _maxBlocksToRevert) external nonReentrant {
-        // TODO: limit who can call this method
-
         require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
 
         uint32 blocksCommited = totalBlocksCommitted;
@@ -664,7 +667,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             delete blocks[i];
         }
 
-        blocksCommited = blocksToRevert;
+        blocksCommited -= blocksToRevert;
         totalBlocksCommitted -= blocksToRevert;
         totalCommittedPriorityRequests -= revertedPriorityRequests;
 
