@@ -86,7 +86,7 @@ impl DepositingAccountBalances {
 
             let balance = balances
                 .entry(token_symbol)
-                .or_insert(DepositingFunds::default());
+                .or_insert_with(DepositingFunds::default);
 
             balance.amount += BigDecimal::from(op.amount);
 
