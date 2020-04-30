@@ -18,7 +18,7 @@ import * as zksync from "zksync";
 const TEST_PRIORITY_EXPIRATION = 16;
 
 
-describe("ZK Sync signature verification unit tests", function () {
+describe("zkSync signature verification unit tests", function () {
     this.timeout(50000);
 
     let testContract;
@@ -35,9 +35,10 @@ describe("ZK Sync signature verification unit tests", function () {
     it("pubkey hash signature verification success", async () => {
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce);
+        const accountId = 0xdeadba;
+        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
         let {revertReason, result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address));
+            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, accountId));
         expect(result).eq(true);
     });
 
@@ -45,9 +46,10 @@ describe("ZK Sync signature verification unit tests", function () {
         const incorrectNonce = 0x11223345;
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce);
+        const accountId = 0xdeadba;
+        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
         let {result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), incorrectNonce, randomWallet.address));
+            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), incorrectNonce, randomWallet.address, accountId));
         expect(result).eq(false);
     });
 
@@ -55,9 +57,10 @@ describe("ZK Sync signature verification unit tests", function () {
         const incorrectPubkeyHash = "sync:aaaafefefefefefefefefefefefefefefefefefe";
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce);
+        const accountId = 0xdeadba;
+        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
         let {result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, incorrectPubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address));
+            testContract.changePubkeySignatureCheck(signature, incorrectPubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, accountId));
         expect(result).eq(false);
     });
 
@@ -65,9 +68,21 @@ describe("ZK Sync signature verification unit tests", function () {
         const incorrectSignerAddress = wallet.address;
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
         const nonce = 0x11223344;
-        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce);
+        const accountId = 0xdeadba;
+        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
         let {result} = await getCallRevertReason(() =>
-            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, incorrectSignerAddress));
+            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, incorrectSignerAddress, accountId));
+        expect(result).eq(false);
+    });
+
+    it("pubkey hash signature verification incorrect account id", async () => {
+        const incorrectAccountId = 0xbabeba;
+        const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
+        const nonce = 0x11223344;
+        const accountId = 0xdeadba;
+        const signature = await zksync.utils.signChangePubkeyMessage(randomWallet, pubkeyHash, nonce, accountId);
+        let {result} = await getCallRevertReason(() =>
+            testContract.changePubkeySignatureCheck(signature, pubkeyHash.replace("sync:", "0x"), nonce, randomWallet.address, incorrectAccountId));
         expect(result).eq(false);
     });
 
@@ -75,7 +90,7 @@ describe("ZK Sync signature verification unit tests", function () {
         for (const message of [Buffer.from("msg", "ascii"), Buffer.alloc(0), Buffer.alloc(10, 1)]) {
             const signature = await wallet.signMessage(message);
             const sinedMessage = Buffer.concat([Buffer.from(`\x19Ethereum Signed Message:\n${message.length}`, "ascii"), message]);
-            const address = await testContract.testVerifyEthereumSignature(signature, sinedMessage);
+            const address = await testContract.testRecoverAddressFromEthSignature(signature, sinedMessage);
             expect(address, `address mismatch, message ${message.toString("hex")}`).eq(wallet.address);
         }
     });
@@ -210,7 +225,7 @@ async function onchainBalance(ethWallet: ethers.Wallet, token: Address): Promise
     }
 }
 
-describe("ZK Sync withdraw unit tests", function () {
+describe("zkSync withdraw unit tests", function () {
     this.timeout(50000);
 
     let zksyncContract;
@@ -239,20 +254,20 @@ describe("ZK Sync withdraw unit tests", function () {
     async function performWithdraw(ethWallet: ethers.Wallet, token: TokenAddress, tokenId: number, amount: BigNumber) {
         let gasFee: BigNumber;
         const balanceBefore = await onchainBalance(ethWallet, token);
-        const contractBalanceBefore = bigNumberify((await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId)).balanceToWithdraw);
+        const contractBalanceBefore = bigNumberify((await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)));
         if (token === ethers.constants.AddressZero) {
-            const tx = await zksyncContract.withdrawETH(amount, {gasLimit: 70000});
+            const tx = await zksyncContract.withdrawETH(amount);
             const receipt = await tx.wait();
             gasFee = receipt.gasUsed.mul(await ethWallet.provider.getGasPrice());
         } else {
-            await zksyncContract.withdrawERC20(token, amount, {gasLimit: 70000});
+            await zksyncContract.withdrawERC20(token, amount);
         }
         const balanceAfter = await onchainBalance(ethWallet, token);
 
         const expectedBalance = token == AddressZero ? balanceBefore.add(amount).sub(gasFee) : balanceBefore.add(amount);
         expect(balanceAfter.toString(), "withdraw account balance mismatch").eq(expectedBalance.toString());
 
-        const contractBalanceAfter = bigNumberify((await zksyncContract.balancesToWithdraw(ethWallet.address, tokenId)).balanceToWithdraw);
+        const contractBalanceAfter = bigNumberify((await zksyncContract.getBalanceToWithdraw(ethWallet.address, tokenId)));
         const expectedContractBalance = contractBalanceBefore.sub(amount);
         expect(contractBalanceAfter.toString(), "withdraw contract balance mismatch").eq(expectedContractBalance.toString());
     }
@@ -361,7 +376,7 @@ describe("ZK Sync withdraw unit tests", function () {
     });
 });
 
-describe("ZK Sync auth pubkey onchain unit tests", function () {
+describe("zkSync auth pubkey onchain unit tests", function () {
     this.timeout(50000);
 
     let zksyncContract;
@@ -389,7 +404,7 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
         const nonce = 0x1234;
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
 
-        const receipt = await (await zksyncContract.authPubkeyHash(pubkeyHash, nonce)).wait();
+        const receipt = await (await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce)).wait();
         let authEvent;
         for (const event of receipt.logs) {
             const parsedLog = zksyncContract.interface.parseLog(event);
@@ -410,10 +425,10 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
         const nonce = 0xdead;
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
 
-        await zksyncContract.authPubkeyHash(pubkeyHash, nonce);
+        await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce);
         //
         const otherPubkeyHash = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-        const {revertReason} = await getCallRevertReason(async () => await zksyncContract.authPubkeyHash(otherPubkeyHash, nonce));
+        const {revertReason} = await getCallRevertReason(async () => await zksyncContract.setAuthPubkeyHash(otherPubkeyHash, nonce));
         expect(revertReason, "revert reason incorrect").eq("ahf11");
     });
 
@@ -424,13 +439,13 @@ describe("ZK Sync auth pubkey onchain unit tests", function () {
         const longPubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefefe";
 
         for (const pkHash of [shortPubkeyHash, longPubkeyHash]) {
-            const {revertReason} = await getCallRevertReason(async () => await zksyncContract.authPubkeyHash(shortPubkeyHash, nonce));
+            const {revertReason} = await getCallRevertReason(async () => await zksyncContract.setAuthPubkeyHash(shortPubkeyHash, nonce));
             expect(revertReason, "revert reason incorrect").eq("ahf10");
         }
     });
 });
 
-describe("ZK Sync test process next operation", function () {
+describe("zkSync test process next operation", function () {
     this.timeout(50000);
 
     let zksyncContract;
@@ -554,7 +569,7 @@ describe("ZK Sync test process next operation", function () {
 
         const nonce = 0x1234;
         const pubkeyHash = "0xfefefefefefefefefefefefefefefefefefefefe";
-        await zksyncContract.authPubkeyHash(pubkeyHash, nonce);
+        await zksyncContract.setAuthPubkeyHash(pubkeyHash, nonce);
 
         const accountId = 0xffee12;
 
@@ -579,9 +594,8 @@ describe("ZK Sync test process next operation", function () {
 
         const nonce = 0x1234;
         const pubkeyHash = "sync:fefefefefefefefefefefefefefefefefefefefe";
-        const ethWitness = await zksync.utils.signChangePubkeyMessage(wallet, pubkeyHash, nonce);
-
         const accountId = 0xffee12;
+        const ethWitness = await zksync.utils.signChangePubkeyMessage(wallet, pubkeyHash, nonce, accountId);
 
         const committedPriorityRequestsBefore = await zksyncContract.totalCommittedPriorityRequests();
 

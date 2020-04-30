@@ -1,4 +1,4 @@
-# ZK Sync Rollup Protocol
+# zkSync Rollup Protocol
 
 ## Table of contents
 
@@ -12,8 +12,8 @@
     + [Data types](#data-types)
     + [Amount packing](#amount-packing)
     + [State Merkle Tree (SMT)](#state-merkle-tree)
-    + [ZK Sync block pub data format](#zk-sync-block-pub-data-format)
-  * [ZK Sync operations](#zk-sync-operations)
+    + [zkSync block pub data format](#zk-sync-block-pub-data-format)
+  * [zkSync operations](#zk-sync-operations)
     + [1. Noop operation](#1-noop-operation)
     + [2. Transfer](#2-transfer)
     + [3. Transfer to new](#3-transfer-to-new)
@@ -55,7 +55,7 @@
 ## Glossary
 
 - **L1**: layer-1 blockchain (Ethereum)
-- **Rollup**: layer-2 blockchain (ZK Sync)
+- **Rollup**: layer-2 blockchain (zkSync)
 - **Owner**: a user who controls some assets in L2.
 - **Operator**: entity operating the Rollup.
 - **Eventually**: happening within finite time.
@@ -67,7 +67,7 @@
 
 ### Overview
 
-ZK Sync implements a ZK rollup protocol (in short "rollup" below) for ETH and ERC20 fungible token transfers. 
+zkSync implements a ZK rollup protocol (in short "rollup" below) for ETH and ERC20 fungible token transfers. 
 
 General rollup workflow is as follows:
 
@@ -134,7 +134,7 @@ This includes, in particular, the following claims:
 
 ### Amount packing
 
-Amounts and fees are compressed in ZK Sync using simple [fundamentals of floating point arithmetic](https://en.wikipedia.org/wiki/Floating-point_arithmetic).
+Amounts and fees are compressed in zkSync using simple [fundamentals of floating point arithmetic](https://en.wikipedia.org/wiki/Floating-point_arithmetic).
 
 A floating-point number has the following parts: a mantissa, a radix, and an exponent. The mantissa (always non-negative in our case) holds the significant digits of the floating-point number. The exponent indicates the power of the radix that the mantissa and sign should be multiplied by. The components are combined as follows to get the floating-point value:
 
@@ -142,7 +142,7 @@ A floating-point number has the following parts: a mantissa, a radix, and an exp
 sign * mantissa * (radix ^ exponent)
 ```
 
-Mantissa and exponent parameters used in ZK Sync:
+Mantissa and exponent parameters used in zkSync:
 
 |Type|Exponent bit width|Mantissa bit width|Radix|
 |--|--|--|--|
@@ -188,13 +188,13 @@ An empty leaf contains: `state_tree_root` computed using empty balances subtree,
 
 And empty leaf contains `value` equal to zero.
 
-### ZK Sync block pub data format
+### zkSync block pub data format
 
 Rollup block pub data consists of [Rollup operations](#zk-sync-operations) pub data sequence. The maximum block size is a constant value. If the size of the operations included in the block is not enough to fill it completely, the remainder will be filled with empty [Noop](#1-noop-operation) operations.
 
-## ZK Sync operations
+## zkSync operations
 
-ZK Sync operations are divided into Rollup transactions (initiated inside Rollup by a Rollup account) and Priority operations (initiated on the mainchain by an Ethereum account).
+zkSync operations are divided into Rollup transactions (initiated inside Rollup by a Rollup account) and Priority operations (initiated on the mainchain by an Ethereum account).
 
 Rollup transactions:
 
@@ -683,7 +683,7 @@ Reads as: change pubkey, account #4, new pubkey hash sync:11036945fcc11c349c3a30
 
 1. Transaction can be authorized by providing signature of the message `concat[nonce, new_pubkey_hash]` (e.g. `0000000311036945fcc11c349c3a300f19cd87cb03c4f2ef` for example above) with transaction.
 Transaction will be verified on the contract.
-2. For users that can't sign messages it is possible to authorize this operation by calling `authPubkeyHash` method of the smart contract. User should provide new pubkey hash and nonce for this transaction.
+2. For users that can't sign messages it is possible to authorize this operation by calling `setAuthPubkeyHash` method of the smart contract. User should provide new pubkey hash and nonce for this transaction.
 After this transaction succeeded transaction without signature can be sent to operator.
 
 #### User transaction
@@ -763,7 +763,7 @@ withdrawERC20(address _token, uint128 _amount)
 
 Authenticates pubkey hash change for new rollup public key.
 ```solidity
-function authPubkeyHash(bytes calldata _fact, uint32 _nonce) external {
+function setAuthPubkeyHash(bytes calldata _fact, uint32 _nonce) external {
 ```
 - _fact: Rollup public key hash
 - _nonce: Account nonce for which this pubkey change is authorized.
@@ -1115,5 +1115,5 @@ Algorithm: SHA-256 according to [RFC4634](https://tools.ietf.org/html/rfc4634).
 1. Generic SMT description [Ostersjo/Dahlberg, R.: Sparse Merkle Trees: Definitions and Space-Time Trade-Offs with Applications for Balloon. Bachelor’s thesis, Karlstad University (2016)](http://www.diva-portal.org/smash/get/diva2:936353/FULLTEXT02.pdf)
 2. Basics of SMT [Fichter K.: What’s a Sparse Merkle Tree? (2018)](https://medium.com/@kelvinfichter/whats-a-sparse-merkle-tree-acda70aeb837)
 
-In ZK Sync we use a sparse Merkle tree with a flexible hashing strategy. We can change its depth depending on how many accounts we want to have.
+In zkSync we use a sparse Merkle tree with a flexible hashing strategy. We can change its depth depending on how many accounts we want to have.
 

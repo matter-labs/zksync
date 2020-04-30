@@ -1,6 +1,6 @@
 //! Ethereum watcher polls the Ethereum node for new events
 //! such as PriorityQueue events or NewToken events.
-//! New events are accepted to the ZK Sync network once they have the sufficient amount of confirmations.
+//! New events are accepted to the zkSync network once they have the sufficient amount of confirmations.
 //!
 //! Poll interval is configured using the `ETH_POLL_INTERVAL` constant.
 //! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.
@@ -25,7 +25,7 @@ use models::misc::constants::EIP1271_SUCCESS_RETURN_VALUE;
 use models::node::tx::EIP1271Signature;
 use models::node::{Nonce, PriorityOp, PubKeyHash, Token, TokenId};
 use models::params::PRIORITY_EXPIRATION;
-use models::TokenAddedEvent;
+use models::NewTokenEvent;
 use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 use web3::transports::EventLoopHandle;
@@ -126,7 +126,7 @@ impl<T: Transport> EthWatch<T> {
         let new_token_event_topic = self
             .gov_contract
             .0
-            .event("TokenAdded")
+            .event("NewToken")
             .expect("gov contract abi error")
             .signature();
         FilterBuilder::default()
@@ -141,7 +141,7 @@ impl<T: Transport> EthWatch<T> {
         &self,
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<TokenAddedEvent>, failure::Error> {
+    ) -> Result<Vec<NewTokenEvent>, failure::Error> {
         let filter = self.get_new_token_event_filter(from, to);
 
         self.web3
@@ -151,9 +151,8 @@ impl<T: Transport> EthWatch<T> {
             .await?
             .into_iter()
             .map(|event| {
-                TokenAddedEvent::try_from(event).map_err(|e| {
-                    format_err!("Failed to parse TokenAdded event log from ETH: {}", e)
-                })
+                NewTokenEvent::try_from(event)
+                    .map_err(|e| format_err!("Failed to parse NewToken event log from ETH: {}", e))
             })
             .collect()
     }
@@ -340,7 +339,7 @@ impl<T: Transport> EthWatch<T> {
             .compat()
             .await
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))?;
-        Ok(auth_fact.as_slice() == &pub_key_hash.data[..])
+        Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
     pub async fn run(mut self) {

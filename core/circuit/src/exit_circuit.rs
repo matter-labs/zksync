@@ -17,8 +17,8 @@ use models::circuit::utils::{append_be_fixed_width, be_bit_vector_into_bytes};
 use models::circuit::CircuitAccountTree;
 use models::node::{AccountId, Engine, Fr, TokenId};
 use models::params::{
-    ADDRESS_WIDTH, BALANCE_BIT_WIDTH, FR_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED,
-    TOKEN_BIT_WIDTH,
+    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, FR_BIT_WIDTH_PADDED,
+    SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
 };
 
 #[derive(Clone)]
@@ -66,6 +66,7 @@ impl<'a, E: RescueEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
             let root_hash_ce =
                 CircuitElement::from_number(cs.namespace(|| "root_hash_ce"), root_hash)?;
             initial_hash_data.extend(root_hash_ce.into_padded_be_bits(FR_BIT_WIDTH_PADDED));
+            initial_hash_data.extend(branch.account_id.get_bits_be());
             initial_hash_data.extend(branch.account.address.get_bits_be());
             initial_hash_data.extend(branch.token.get_bits_be());
             initial_hash_data.extend(branch.balance.get_bits_be());
@@ -113,6 +114,11 @@ pub fn create_exit_circuit_with_public_input(
         &mut pubdata_commitment,
         &root_hash,
         SUBTREE_HASH_WIDTH_PADDED,
+    );
+    append_be_fixed_width(
+        &mut pubdata_commitment,
+        &account_address_fe,
+        ACCOUNT_ID_BIT_WIDTH,
     );
     let account_address = account_tree
         .get(account_id)

@@ -16,7 +16,7 @@
           "type": "uint32"
         }
       ],
-      "name": "BlockCommitted",
+      "name": "BlockCommit",
       "type": "event"
     },
     {
@@ -29,7 +29,7 @@
           "type": "uint32"
         }
       ],
-      "name": "BlockVerified",
+      "name": "BlockVerification",
       "type": "event"
     },
     {
@@ -48,7 +48,7 @@
           "type": "uint32"
         }
       ],
-      "name": "BlocksReverted",
+      "name": "BlocksRevert",
       "type": "event"
     },
     {
@@ -215,7 +215,7 @@
           "type": "uint32"
         }
       ],
-      "name": "authPubkeyHash",
+      "name": "setAuthPubkeyHash",
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",

@@ -10,7 +10,7 @@ use models::node::{
 };
 use models::{fe_from_bytes, fe_to_bytes, Action, ActionType, Operation};
 // Local imports
-use self::records::{BlockDetails, StorageBlock};
+use self::records::{BlockDetails, BlockTransactionItem, StorageBlock};
 use crate::prover::records::StoredProof;
 use crate::prover::ProverSchema;
 use crate::schema::*;
@@ -144,6 +144,42 @@ impl<'a> BlockSchema<'a> {
                 ExecutedOperations::PriorityOp(priorop) => Some(priorop.op),
             })
             .collect())
+    }
+
+    pub fn get_block_transactions(
+        &self,
+        block: BlockNumber,
+    ) -> QueryResult<Vec<BlockTransactionItem>> {
+        let query = format!(
+            "\
+            with transactions as ( \
+                select \
+                    '0x' || encode(tx_hash, 'hex') as tx_hash, \
+                    tx as op, \
+                    block_number, \
+                    created_at \
+                from executed_transactions \
+                where block_number = {block} \
+            ), priority_ops as ( \
+                select \
+                    '0x' || encode(eth_hash, 'hex') as tx_hash, \
+                    operation as op, \
+                    block_number, \
+                    created_at \
+                from executed_priority_operations \
+                where block_number = {block} \
+            ), everything as ( \
+                select * from transactions \
+                union all \
+                select * from priority_ops \
+            ) \
+            select * from everything \
+            order by created_at \
+        ",
+            block = block
+        );
+
+        diesel::sql_query(query).load(self.0.conn())
     }
 
     /// Given the block number, loads all the operations that were executed in that block.

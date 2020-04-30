@@ -56,7 +56,7 @@ export async function cancelOustandingDepositsForExodus(
         expect(oldCommittedPriorityRequests - newCommittedPriorityRequests).equal(0);
         expect(newFirstPriorityRequestId - oldFirstPriorityRequestId).equal(actualToCancel);
 
-        const balanceToWithdraw = (await franklinDeployedContract.balancesToWithdraw(wallet.address, 0)).balanceToWithdraw;
+        const balanceToWithdraw = (await franklinDeployedContract.getBalanceToWithdraw(wallet.address, 0));
         expect(balanceToWithdraw, "Exodus mode deposit cancel balance mismatch").equal(expectedBalanceToWithdraw);
     }
 }
@@ -246,7 +246,7 @@ export async function withdrawErcFromContract(
     balanceToWithdraw,
     revertCode,
 ) {
-    const rollupBalance = (await franklinDeployedContract.balancesToWithdraw(wallet.address, tokenId)).balanceToWithdraw;
+    const rollupBalance = (await franklinDeployedContract.getBalanceToWithdraw(wallet.address, tokenId));
     const oldBalance = await token.balanceOf(wallet.address);
 
 
@@ -259,7 +259,7 @@ export async function withdrawErcFromContract(
     }, revertCode);
     if (receipt) {
         const newBalance = await token.balanceOf(wallet.address);
-        const newRollupBalance = (await franklinDeployedContract.balancesToWithdraw(wallet.address, tokenId)).balanceToWithdraw;
+        const newRollupBalance = (await franklinDeployedContract.getBalanceToWithdraw(wallet.address, tokenId));
         expect(rollupBalance - newRollupBalance).equal(bigNumberify(balanceToWithdraw));
         expect(newBalance.sub(oldBalance)).eq(balanceToWithdraw);
     }

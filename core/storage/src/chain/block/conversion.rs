@@ -70,6 +70,7 @@ impl StoredExecutedTransaction {
             block_index: self
                 .block_index
                 .map(|val| u32::try_from(val).expect("Invalid block index")),
+            created_at: chrono::Utc::now(),
         })
     }
 }
@@ -171,6 +172,7 @@ impl NewExecutedTransaction {
             block_index: exec_tx.block_index.map(|idx| idx as i32),
             primary_account_address: exec_tx.tx.account().as_bytes().to_vec(),
             nonce: exec_tx.tx.nonce() as i64,
+            created_at: exec_tx.created_at,
         }
     }
 }

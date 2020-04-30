@@ -1,4 +1,4 @@
-pragma solidity 0.5.16;
+pragma solidity ^0.5.0;
 
 
 /// @title zkSync configuration constants
@@ -6,10 +6,13 @@ pragma solidity 0.5.16;
 contract Config {
 
     /// @notice Notice period before activation preparation status of upgrade mode (in seconds)
-    uint constant UPGRADE_NOTICE_PERIOD = 2 weeks;
+    uint constant UPGRADE_NOTICE_PERIOD = 1 weeks;
 
     /// @notice Period after the start of preparation upgrade when contract wouldn't register new priority operations (in seconds)
     uint constant UPGRADE_PREPARATION_LOCK_PERIOD = 1 days;
+
+    /// @notice ERC20 token withdrawal gas limit
+    uint256 constant ERC20_WITHDRAWAL_GAS_LIMIT = 250000;
 
     /// @notice zkSync address length
     uint8 constant ADDRESS_BYTES = 20;

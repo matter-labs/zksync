@@ -46,6 +46,7 @@ export interface Signature {
 
 export interface Transfer {
     type: "Transfer";
+    accountId: number,
     from: Address;
     to: Address;
     token: number;
@@ -57,6 +58,7 @@ export interface Transfer {
 
 export interface Withdraw {
     type: "Withdraw";
+    accountId: number,
     from: Address;
     to: Address;
     token: number;
@@ -64,6 +66,15 @@ export interface Withdraw {
     fee: utils.BigNumberish;
     nonce: number;
     signature: Signature;
+}
+
+export interface ChangePubKey {
+    type: "ChangePubKey";
+    accountId: number,
+    account: Address;
+    newPkHash: PubKeyHash;
+    nonce: number;
+    ethSignature: string;
 }
 
 export interface CloseAccount {
