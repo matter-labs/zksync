@@ -3,7 +3,7 @@ pragma solidity ^0.5.0;
 import "./IERC20.sol";
 import "./ReentrancyGuard.sol";
 import "./SafeMath.sol";
-import "./SafeMathUint128.sol";
+import "./SafeMathUInt128.sol";
 import "./SafeCast.sol";
 
 import "./Storage.sol";
@@ -17,7 +17,7 @@ import "./Operations.sol";
 /// @author Matter Labs
 contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
     using SafeMath for uint256;
-    using SafeMathUint128 for uint128;
+    using SafeMathUInt128 for uint128;
 
     // Upgrade functional
 
@@ -79,6 +79,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// _ // FIXME: remove _genesisAccAddress
     /// _genesisRoot Genesis blocks (first block) root
     function initialize(bytes calldata initializationParameters) external {
+        initializeReentrancyGuard();
+
         (
         address _governanceAddress,
         address _verifierAddress,
@@ -90,7 +92,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         governance = Governance(_governanceAddress);
 
         blocks[0].stateRoot = _genesisRoot;
-        initializeReentrancyGuard();
     }
 
     /// @notice Sends tokens
