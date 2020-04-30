@@ -106,6 +106,15 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         return callSuccess && callReturnValue;
     }
 
+    /// @notice Sends ETH
+    /// @param _to Address of recipient
+    /// @param _amount Amount of tokens to transfer
+    /// @return bool flag indicating that transfer is successful
+    function sendETHNoRevert(address payable _to, uint256 _amount) internal returns (bool) {
+        (bool callSuccess,) = _to.call.gas(ETH_WITHDRAWAL_GAS_LIMIT).value(_amount)("");
+        return callSuccess;
+    }
+
     /// @notice executes pending withdrawals
     /// @param _n The number of withdrawals to complete starting from oldest
     function completeWithdrawals(uint32 _n) external nonReentrant {
@@ -133,7 +142,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
                 bool sent = false;
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
-                    sent = toPayable.send(amount);
+                    sent = sendETHNoRevert(toPayable, amount);
                 } else {
                     address tokenAddr = governance.tokenAddresses(tokenId);
                     require(tokenAddr != address(0), "cwd11"); // unknown tokenId
@@ -187,7 +196,8 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _amount Ether amount to withdraw
     function withdrawETH(uint256 _amount) external nonReentrant {
         registerSingleWithdrawal(0, _amount);
-        msg.sender.transfer(_amount);
+        (bool success,) = msg.sender.call.value(_amount)("");
+        require(success, "fwe11"); // ETH withdraw failed
     }
 
     /// @notice Deposit ERC20 token to Layer 2 - transfer ERC20 tokens from user into contract, validate it, register deposit
