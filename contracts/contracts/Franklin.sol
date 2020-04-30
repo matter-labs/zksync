@@ -98,9 +98,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
     /// @return bool flag indicating that transfer is successful
-    function sendERC20NoRevert(address _token, address _to, uint128 _amount) internal returns (bool) {
+    function sendERC20NoRevert(address _token, address _to, uint256 _amount) internal returns (bool) {
         (bool callSuccess, bytes memory callReturnValueEncoded) = _token.call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
-            abi.encodeWithSignature("transfer(address,uint256)", _to, uint256(_amount))
+            abi.encodeWithSignature("transfer(address,uint256)", _to, _amount)
         );
         bool callReturnValue = abi.decode(callReturnValueEncoded, (bool));
         return callSuccess && callReturnValue;
@@ -126,7 +126,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             delete pendingWithdrawals[i];
 
             bytes22 packedBalanceKey = packAddressAndTokenId(to, tokenId);
-            uint128 amount = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
+            uint256 amount = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
             // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
             if (amount != 0) {
                 balancesToWithdraw[packedBalanceKey].balanceToWithdraw -= amount;
@@ -185,7 +185,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
 
     /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
     /// @param _amount Ether amount to withdraw
-    function withdrawETH(uint128 _amount) external nonReentrant {
+    function withdrawETH(uint256 _amount) external nonReentrant {
         registerSingleWithdrawal(0, _amount);
         msg.sender.transfer(_amount);
     }
@@ -211,7 +211,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @notice Withdraw ERC20 token to Layer 1 - register withdrawal and transfer ERC20 to sender
     /// @param _token Token address
     /// @param _amount amount to withdraw
-    function withdrawERC20(IERC20 _token, uint128 _amount) external nonReentrant {
+    function withdrawERC20(IERC20 _token, uint256 _amount) external nonReentrant {
         uint16 tokenId = governance.validateTokenAddress(address(_token));
         registerSingleWithdrawal(tokenId, _amount);
         require(_token.transfer(msg.sender, _amount), "fw011"); // token transfer failed withdraw
@@ -278,10 +278,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @notice Register withdrawal - update user balances and emit OnchainWithdrawal event
     /// @param _token - token by id
     /// @param _amount - token amount
-    function registerSingleWithdrawal(uint16 _token, uint128 _amount) internal {
+    function registerSingleWithdrawal(uint16 _token, uint256 _amount) internal {
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _token);
-        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-        require(balance >= _amount, "frw11"); // insufficient balance withdraw
+        uint256 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
         balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
         emit OnchainWithdrawal(
             msg.sender,
@@ -600,7 +599,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             (bool addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
             bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
 
-            uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
+            uint256 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
             balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
 
             if (addToPendingWithdrawalsQueue) {

@@ -18,7 +18,7 @@ contract Events {
     event OnchainWithdrawal(
         address indexed owner,
         uint16 tokenId,
-        uint128 amount
+        uint256 amount
     );
 
     /// @notice Event emitted when user send a transaction to deposit her funds
