@@ -1,6 +1,6 @@
-import { Contract, ContractTransaction, ethers, utils } from "ethers";
-import { ETHProxy, Provider } from "./provider";
-import { Signer } from "./signer";
+import {Contract, ContractTransaction, ethers, utils} from "ethers";
+import {ETHProxy, Provider} from "./provider";
+import {Signer} from "./signer";
 import {
     AccountState,
     Address,
@@ -9,7 +9,7 @@ import {
     PriorityOperationReceipt,
     TransactionReceipt,
     PubKeyHash,
-    TxEthSignature
+    TxEthSignature, ChangePubKey
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -41,8 +41,10 @@ export class Wallet {
     private constructor(
         public ethSigner: ethers.Signer,
         public cachedAddress: Address,
-        public signer?: Signer
-    ) {}
+        public signer?: Signer,
+        public accountId?: number,
+    ) {
+    }
 
     connect(provider: Provider) {
         this.provider = provider;
@@ -52,7 +54,8 @@ export class Wallet {
     static async fromEthSigner(
         ethWallet: ethers.Signer,
         provider: Provider,
-        signer?: Signer
+        signer?: Signer,
+        accountId?: number,
     ): Promise<Wallet> {
         const walletSigner = signer
             ? signer
@@ -60,7 +63,8 @@ export class Wallet {
         const wallet = new Wallet(
             ethWallet,
             await ethWallet.getAddress(),
-            walletSigner
+            walletSigner,
+            accountId,
         );
         wallet.connect(provider);
         return wallet;
@@ -68,9 +72,10 @@ export class Wallet {
 
     static async fromEthSignerNoKeys(
         ethWallet: ethers.Signer,
-        provider: Provider
+        provider: Provider,
+        accountId?: number,
     ): Promise<Wallet> {
-        const wallet = new Wallet(ethWallet, await ethWallet.getAddress());
+        const wallet = new Wallet(ethWallet, await ethWallet.getAddress(), undefined, accountId);
         wallet.connect(provider);
         return wallet;
     }
@@ -102,6 +107,8 @@ export class Wallet {
             );
         }
 
+        await this.setRequiredAccountIdFromServer("Transfer funds");
+
         const tokenId = await this.provider.tokenSet.resolveTokenId(
             transfer.token
         );
@@ -110,6 +117,7 @@ export class Wallet {
                 ? await this.getNonce(transfer.nonce)
                 : await this.getNonce();
         const transactionData = {
+            accountId: this.accountId,
             from: this.address(),
             to: transfer.to,
             tokenId,
@@ -127,7 +135,8 @@ export class Wallet {
             `Transfer ${stringAmount} ${stringToken}\n` +
             `To: ${transfer.to.toLowerCase()}\n` +
             `Nonce: ${nonce}\n` +
-            `Fee: ${stringFee} ${stringToken}`;
+            `Fee: ${stringFee} ${stringToken}\n` +
+            `Account Id: ${this.accountId}`;
 
         const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
 
@@ -158,6 +167,7 @@ export class Wallet {
                 "ZKSync signer is required for sending zksync transactions."
             );
         }
+        await this.setRequiredAccountIdFromServer("Withdraw funds");
 
         const tokenId = await this.provider.tokenSet.resolveTokenId(
             withdraw.token
@@ -167,6 +177,7 @@ export class Wallet {
                 ? await this.getNonce(withdraw.nonce)
                 : await this.getNonce();
         const transactionData = {
+            accountId: this.accountId,
             from: this.address(),
             ethAddress: withdraw.ethAddress,
             tokenId,
@@ -184,7 +195,8 @@ export class Wallet {
             `Withdraw ${stringAmount} ${stringToken}\n` +
             `To: ${withdraw.ethAddress.toLowerCase()}\n` +
             `Nonce: ${nonce}\n` +
-            `Fee: ${stringFee} ${stringToken}`;
+            `Fee: ${stringFee} ${stringToken}\n` +
+            `Account Id: ${this.accountId}`;
 
         const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
 
@@ -227,28 +239,25 @@ export class Wallet {
         const currentPubKeyHash = await this.getCurrentPubKeyHash();
         const newPubKeyHash = this.signer.pubKeyHash();
 
-        if (currentPubKeyHash == newPubKeyHash) {
-            throw new Error("Current signing key is set already");
+        if (currentPubKeyHash === newPubKeyHash) {
+            throw new Error("Current signing key is already set");
         }
 
-        const isAccountInTheTree = await this.getAccountId();
-        if (isAccountInTheTree === undefined) {
-            throw new Error(
-                "Account should exist in the zkSync network before setting signing key"
-            );
-        }
+        await this.setRequiredAccountIdFromServer("Set Signing Key");
 
         const numNonce = await this.getNonce(nonce);
         const ethSignature = onchainAuth
             ? null
             : await signChangePubkeyMessage(
-                  this.ethSigner,
-                  newPubKeyHash,
-                  numNonce
-              );
+                this.ethSigner,
+                newPubKeyHash,
+                numNonce,
+                this.accountId,
+            );
 
-        const txData = {
+        const txData: ChangePubKey = {
             type: "ChangePubKey",
+            accountId: this.accountId,
             account: this.address(),
             newPkHash: this.signer.pubKeyHash(),
             nonce: numNonce,
@@ -483,6 +492,8 @@ export class Wallet {
         let accountId;
         if (withdraw.accountId != null) {
             accountId = withdraw.accountId;
+        } else if (this.accountId !== undefined) {
+            accountId = this.accountId;
         } else {
             const accountState = await this.getAccountState();
             if (!accountState.id) {
@@ -513,6 +524,17 @@ export class Wallet {
         );
 
         return new ETHOperation(ethTransaction, this.provider);
+    }
+
+    private async setRequiredAccountIdFromServer(actionName: string) {
+        if (this.accountId === undefined) {
+            const accountIdFromServer = await this.getAccountId();
+            if (accountIdFromServer == null) {
+                throw new Error(`Failed to ${actionName}: Account does not exist in the zkSync network`);
+            } else {
+                this.accountId = accountIdFromServer;
+            }
+        }
     }
 }
 

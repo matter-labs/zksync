@@ -103,13 +103,6 @@ steps:
   depends_on:
   - init
 
-- name: ganache
-  image: matterlabs/ganache
-  detach: true
-  depends_on:
-  - build-contracts
-  - run-genesis
-
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
@@ -120,7 +113,6 @@ steps:
   depends_on:
   - run-genesis
   - build-contracts
-  - ganache
 
 - name: contract-test
   image: matterlabs/ci
@@ -142,13 +134,18 @@ steps:
   - name: cache
     path: /cache
   depends_on:
-  - redeploy-and-integration-testkit
-  - circuit-rust-tests
-  - non-circuit-rust-tests
+  - rust-build
 
 services:
 - name: geth
   image: matterlabs/geth:latest
+  settings:
+    config: standard
+
+- name: geth-fast
+  image: matterlabs/geth:latest
+  settings:
+    config: fast
 
 - name: postgres
   image: postgres:10.4
@@ -239,6 +236,8 @@ steps:
 services:
 - name: geth
   image: matterlabs/geth:latest
+  settings:
+    config: standard
 
 - name: postgres
   image: postgres:10.4
