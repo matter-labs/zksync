@@ -50,11 +50,60 @@ impl ResponseAccountState {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositingFunds {
+    amount: BigDecimal,
+    expected_accept_block: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositingAccountBalances {
+    balances: HashMap<String, DepositingFunds>,
+}
+
+impl DepositingAccountBalances {
+    pub fn from_pending_ops(
+        pending_ops: OngoingDepositsResp,
+        tokens: &HashMap<TokenId, Token>,
+    ) -> Result<Self> {
+        let mut balances = HashMap::new();
+
+        for op in pending_ops.deposits {
+            let token_symbol = if op.token_id == 0 {
+                "ETH".to_string()
+            } else {
+                tokens
+                    .get(&op.token_id)
+                    .ok_or_else(Error::internal_error)?
+                    .symbol
+                    .clone()
+            };
+
+            let expected_accept_block =
+                op.received_on_block + pending_ops.confirmations_for_eth_event;
+
+            let balance = balances
+                .entry(token_symbol)
+                .or_insert(DepositingFunds::default());
+
+            balance.amount += BigDecimal::from(op.amount);
+            if balance.expected_accept_block < expected_accept_block {
+                balance.expected_accept_block = expected_accept_block;
+            }
+        }
+
+        Ok(Self { balances })
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfoResp {
     address: Address,
     id: Option<AccountId>,
+    depositing: DepositingAccountBalances,
     committed: ResponseAccountState,
     verified: ResponseAccountState,
 }
@@ -96,14 +145,14 @@ pub struct ContractAddressResp {
 #[serde(rename_all = "camelCase")]
 pub struct OngoingDeposit {
     received_on_block: u64,
-    token: u16,
+    token_id: u16,
     amount: u64,
     eth_tx_hash: String,
 }
 
 impl OngoingDeposit {
     pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
-        let (token, amount) = match priority_op.data {
+        let (token_id, amount) = match priority_op.data {
             FranklinPriorityOp::Deposit(deposit) => (
                 deposit.token,
                 big_decimal_to_u128(&deposit.amount)
@@ -119,7 +168,7 @@ impl OngoingDeposit {
 
         Self {
             received_on_block,
-            token,
+            token_id,
             amount,
             eth_tx_hash,
         }
@@ -228,6 +277,7 @@ pub trait Rpc {
     ) -> Box<dyn futures01::Future<Item = OngoingDepositsResp, Error = Error> + Send>;
 }
 
+#[derive(Clone)]
 pub struct RpcApp {
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
@@ -248,6 +298,67 @@ impl RpcApp {
         self.connection_pool
             .access_storage_fragile()
             .map_err(|_| Error::internal_error())
+    }
+
+    /// Async version of `get_ongoing_deposits` which does not use old futures as a return type.
+    async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
+        let mut eth_watcher_request_sender = self.eth_watcher_request_sender.clone();
+        let confirmations_for_eth_event = self.confirmations_for_eth_event;
+
+        let eth_watcher_response = oneshot::channel();
+
+        // Get all the ongoing priority ops from the `EthWatcher`.
+        eth_watcher_request_sender
+            .send(EthWatchRequest::GetUnconfirmedQueueOps {
+                resp: eth_watcher_response.0,
+            })
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        let ongoing_ops = eth_watcher_response
+            .1
+            .await
+            .map_err(|_| Error::internal_error())?;
+
+        let mut max_block_number = 0;
+
+        // Filter only deposits for the requested address.
+        // `map` is used after filter to find the max block number without an
+        // additional list pass.
+        let deposits: Vec<_> = ongoing_ops
+            .into_iter()
+            .filter(|(_block, op)| {
+                if let FranklinPriorityOp::Deposit(deposit) = &op.data {
+                    // Address may be set to either sender or recipient.
+                    deposit.from == address || deposit.to == address
+                } else {
+                    false
+                }
+            })
+            .map(|(block, op)| {
+                if block > max_block_number {
+                    max_block_number = block;
+                }
+
+                OngoingDeposit::new(block, op)
+            })
+            .collect();
+
+        let estimated_deposits_approval_block = if !deposits.is_empty() {
+            // We have to wait `confirmations_for_eth_event` blocks after the most
+            // recent deposit operation.
+            Some(max_block_number + confirmations_for_eth_event)
+        } else {
+            // No ongoing deposits => no estimated block.
+            None
+        };
+
+        Ok(OngoingDepositsResp {
+            address,
+            deposits,
+            confirmations_for_eth_event,
+            estimated_deposits_approval_block,
+        })
     }
 }
 
@@ -275,6 +386,7 @@ impl Rpc for RpcApp {
         };
 
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
+        let self_ = self.clone();
         let account_state_resp = async move {
             let state_keeper_response = oneshot::channel();
             state_keeper_request_sender
@@ -304,11 +416,15 @@ impl Rpc for RpcApp {
                 ResponseAccountState::default()
             };
 
+            let depositing_ops = self_.get_ongoing_deposits_impl(address).await?;
+            let depositing = DepositingAccountBalances::from_pending_ops(depositing_ops, &tokens)?;
+
             Ok(AccountInfoResp {
                 address,
                 id,
                 committed,
                 verified,
+                depositing,
             })
         };
 
@@ -319,65 +435,8 @@ impl Rpc for RpcApp {
         &self,
         address: Address,
     ) -> Box<dyn futures01::Future<Item = OngoingDepositsResp, Error = Error> + Send> {
-        let mut eth_watcher_request_sender = self.eth_watcher_request_sender.clone();
-        let confirmations_for_eth_event = self.confirmations_for_eth_event;
-
-        let ongoing_deposits_resp = async move {
-            let eth_watcher_response = oneshot::channel();
-
-            // Get all the ongoing priority ops from the `EthWatcher`.
-            eth_watcher_request_sender
-                .send(EthWatchRequest::GetUnconfirmedQueueOps {
-                    resp: eth_watcher_response.0,
-                })
-                .await
-                .map_err(|_| Error::internal_error())?;
-
-            let ongoing_ops = eth_watcher_response
-                .1
-                .await
-                .map_err(|_| Error::internal_error())?;
-
-            let mut max_block_number = 0;
-
-            // Filter only deposits for the requested address.
-            // `map` is used after filter to find the max block number without an
-            // additional list pass.
-            let deposits: Vec<_> = ongoing_ops
-                .into_iter()
-                .filter(|(_block, op)| {
-                    if let FranklinPriorityOp::Deposit(deposit) = &op.data {
-                        // Address may be set to either sender or recipient.
-                        deposit.from == address || deposit.to == address
-                    } else {
-                        false
-                    }
-                })
-                .map(|(block, op)| {
-                    if block > max_block_number {
-                        max_block_number = block;
-                    }
-
-                    OngoingDeposit::new(block, op)
-                })
-                .collect();
-
-            let estimated_deposits_approval_block = if !deposits.is_empty() {
-                // We have to wait `confirmations_for_eth_event` blocks after the most
-                // recent deposit operation.
-                Some(max_block_number + confirmations_for_eth_event)
-            } else {
-                // No ongoing deposits => no estimated block.
-                None
-            };
-
-            Ok(OngoingDepositsResp {
-                address,
-                deposits,
-                confirmations_for_eth_event,
-                estimated_deposits_approval_block,
-            })
-        };
+        let self_ = self.clone();
+        let ongoing_deposits_resp = async move { self_.get_ongoing_deposits_impl(address).await };
 
         Box::new(ongoing_deposits_resp.boxed().compat())
     }

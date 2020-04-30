@@ -7,7 +7,7 @@ import {
 const franklin_abi = require('../../contracts/build/Franklin.json');
 import {ethers, utils, Contract} from "ethers";
 import {bigNumberify, parseEther} from "ethers/utils";
-import {IERC20_INTERFACE} from "zksync/build/utils";
+import {IERC20_INTERFACE, sleep} from "zksync/build/utils";
 
 
 const WEB3_URL = process.env.WEB3_URL;
@@ -45,6 +45,11 @@ async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet
             approveDepositAmountForERC20: true,
         });
     console.log(`Deposit posted: ${(new Date().getTime()) - startTime} ms`);
+
+    await sleep(3000);
+    const balances = await depositWallet.getAccountState();
+    console.log(`Ongoing deposits: ${JSON.stringify(balances, null, 4)}`);
+
     await depositHandle.awaitReceipt();
     console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
     const balanceAfterDep = await syncWallet.getBalance(token);

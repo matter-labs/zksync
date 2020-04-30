@@ -31,7 +31,7 @@ use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 use web3::transports::EventLoopHandle;
 
-const ETH_POLL_INTERVAL: Duration = Duration::from_secs(3);
+const ETH_POLL_INTERVAL: Duration = Duration::from_millis(200);
 
 type EthBlockId = u64;
 
