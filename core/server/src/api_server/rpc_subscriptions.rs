@@ -3,6 +3,7 @@
 use super::event_notify::{start_sub_notifier, EventSubscribeRequest};
 use crate::api_server::event_notify::EventNotifierRequest;
 use crate::api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp};
+use crate::eth_watch::EthWatchRequest;
 use crate::mempool::MempoolRequest;
 use crate::state_keeper::{ExecutedOpsNotify, StateKeeperRequest};
 use futures::channel::mpsc;
@@ -11,10 +12,9 @@ use jsonrpc_core::Result;
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
-use models::config_options::ThreadPanicNotify;
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::tx::TxHash;
 use models::{ActionType, Operation};
-use std::net::SocketAddr;
 use std::sync::Arc;
 use storage::ConnectionPool;
 use web3::types::Address;
@@ -174,14 +174,18 @@ struct RpcSubApp {
 }
 
 pub fn start_ws_server(
+    config_options: &ConfigurationOptions,
     op_recv: mpsc::Receiver<Operation>,
     db_pool: ConnectionPool,
-    addr: SocketAddr,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     executed_tx_receiver: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
+    let addr = config_options.json_rpc_ws_server_address.clone();
+    let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
+
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
     let mut io = PubSubHandler::new(MetaIoHandler::default());
@@ -189,7 +193,10 @@ pub fn start_ws_server(
     let req_rpc_app = super::rpc_server::RpcApp {
         mempool_request_sender,
         state_keeper_request_sender: state_keeper_request_sender.clone(),
+        eth_watcher_request_sender,
         connection_pool: db_pool.clone(),
+
+        confirmations_for_eth_event,
     };
     req_rpc_app.extend(&mut io);
 

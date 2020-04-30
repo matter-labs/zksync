@@ -1,3 +1,4 @@
+use crate::eth_watch::EthWatchRequest;
 use crate::mempool::MempoolRequest;
 use crate::mempool::TxAddError;
 use crate::state_keeper::StateKeeperRequest;
@@ -8,16 +9,15 @@ use jsonrpc_core::{Error, ErrorCode, Result};
 use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
-use models::config_options::ThreadPanicNotify;
+use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
 use models::node::tx::TxEthSignature;
 use models::node::tx::TxHash;
 use models::node::{
-    closest_packable_fee_amount, Account, AccountId, FranklinTx, Nonce, PubKeyHash, Token, TokenId,
-    TokenLike,
+    closest_packable_fee_amount, Account, AccountId, FranklinPriorityOp, FranklinTx, Nonce,
+    PriorityOp, PubKeyHash, Token, TokenId, TokenLike,
 };
 use models::primitives::floor_big_decimal;
 use std::collections::HashMap;
-use std::net::SocketAddr;
 use storage::{ConnectionPool, StorageProcessor};
 use web3::types::Address;
 
@@ -89,6 +89,30 @@ pub struct ContractAddressResp {
     pub gov_contract: String,
 }
 
+/// Information about ongoing deposits for certain recipient address.
+///
+/// Please note that since this response is based on the events that are
+/// currently awaiting confirmations, this information is approximate:
+/// blocks on Ethereum can be reverted, and final list of executed deposits
+/// can differ from the this estimation.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OngoingDepositsResp {
+    /// Address for which response is served.
+    address: Address,
+    /// List of tuples (Eth block number, Deposit operation) of ongoing
+    /// deposit operations.
+    deposits: Vec<(u64, PriorityOp)>,
+
+    /// Amount of confirmations required for every deposit to be processed.
+    confirmations_for_eth_event: u64,
+
+    /// Estimated block number for deposits completions:
+    /// all the deposit operations for provided address are expected to be
+    /// accepted in the zkSync network upon reaching this blocks.
+    estimated_deposits_approval_block: u64,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub enum TxFeeTypes {
     Withdraw,
@@ -157,12 +181,21 @@ pub trait Rpc {
         amount: BigDecimal,
         token_like: TokenLike,
     ) -> Result<BigDecimal>;
+
+    #[rpc(name = "get_ongoing_deposits", returns = "OngoingDepositsResp")]
+    fn get_ongoing_deposits(
+        &self,
+        addr: Address,
+    ) -> Box<dyn futures01::Future<Item = OngoingDepositsResp, Error = Error> + Send>;
 }
 
 pub struct RpcApp {
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    pub eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     pub connection_pool: ConnectionPool,
+
+    pub confirmations_for_eth_event: u64,
 }
 
 impl RpcApp {
@@ -241,6 +274,69 @@ impl Rpc for RpcApp {
         };
 
         Box::new(account_state_resp.boxed().compat())
+    }
+
+    fn get_ongoing_deposits(
+        &self,
+        address: Address,
+    ) -> Box<dyn futures01::Future<Item = OngoingDepositsResp, Error = Error> + Send> {
+        let mut eth_watcher_request_sender = self.eth_watcher_request_sender.clone();
+        let confirmations_for_eth_event = self.confirmations_for_eth_event;
+
+        let ongoing_deposits_resp = async move {
+            let eth_watcher_response = oneshot::channel();
+
+            // Get all the ongoing priority ops from the `EthWatcher`.
+            eth_watcher_request_sender
+                .send(EthWatchRequest::GetUnconfirmedQueueOps {
+                    resp: eth_watcher_response.0,
+                })
+                .await
+                .map_err(|_| Error::internal_error())?;
+
+            let ongoing_ops = eth_watcher_response
+                .1
+                .await
+                .map_err(|_| Error::internal_error())?;
+
+            let mut max_block_number = 0;
+
+            // Filter only deposits for the requested address.
+            // `map` is used after filter to find the max block number without an
+            // additional list pass.
+            let deposits = ongoing_ops
+                .into_iter()
+                .filter(|(_block, op)| {
+                    if let FranklinPriorityOp::Deposit(deposit) = &op.data {
+                        deposit.to == address
+                    } else {
+                        false
+                    }
+                })
+                .map(|(block, op)| {
+                    if block > max_block_number {
+                        max_block_number = block;
+                    }
+
+                    (block, op)
+                })
+                .collect();
+
+            // We have to wait `confirmations_for_eth_event` blocks after the most
+            // recent deposit operation, and it should be processed in the next block
+            // once it has enough confirmations.
+            let estimated_deposits_approval_block =
+                max_block_number + confirmations_for_eth_event + 1;
+
+            Ok(OngoingDepositsResp {
+                address,
+                deposits,
+                confirmations_for_eth_event,
+                estimated_deposits_approval_block,
+            })
+        };
+
+        Box::new(ongoing_deposits_resp.boxed().compat())
     }
 
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
@@ -377,12 +473,15 @@ impl Rpc for RpcApp {
 }
 
 pub fn start_rpc_server(
-    addr: SocketAddr,
+    config_options: &ConfigurationOptions,
     connection_pool: ConnectionPool,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
+    let addr = config_options.json_rpc_http_server_address.clone();
+    let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
     std::thread::Builder::new()
         .name("json_rpc_http".to_string())
         .spawn(move || {
@@ -393,6 +492,9 @@ pub fn start_rpc_server(
                 connection_pool,
                 mempool_request_sender,
                 state_keeper_request_sender,
+                eth_watcher_request_sender,
+
+                confirmations_for_eth_event,
             };
             rpc_app.extend(&mut io);
 
