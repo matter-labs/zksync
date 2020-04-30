@@ -422,8 +422,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
                     pubDataPtr += NOOP_BYTES;
                 } else if (opType == uint8(Operations.OpType.TransferToNew)) {
                     pubDataPtr += TRANSFER_TO_NEW_BYTES;
-                } else if (opType == uint8(Operations.OpType.CloseAccount)) {
-                    pubDataPtr += CLOSE_ACCOUNT_BYTES;
                 } else if (opType == uint8(Operations.OpType.Deposit)) {
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
 

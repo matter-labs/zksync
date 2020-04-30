@@ -45,7 +45,6 @@ contract Config {
     uint256 constant DEPOSIT_BYTES = 6 * 8;
     uint256 constant TRANSFER_TO_NEW_BYTES = 5 * 8;
     uint256 constant PARTIAL_EXIT_BYTES = 6 * 8;
-    uint256 constant CLOSE_ACCOUNT_BYTES = 1 * 8;
     uint256 constant TRANSFER_BYTES = 2 * 8;
 
     /// @notice Full exit operation length
