@@ -7,11 +7,13 @@ use web3::types::H256;
 use crypto_exports::rand::{thread_rng, Rng};
 use models::node::tx::{ChangePubKey, PackedEthSignature, TxSignature};
 use models::node::{
-    priv_key_from_fs, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer, Withdraw,
+    priv_key_from_fs, AccountId, Address, Close, Nonce, PrivateKey, PubKeyHash, TokenId, Transfer,
+    Withdraw,
 };
 
 /// Structure used to sign ZKSync transactions, keeps tracks of its nonce internally
 pub struct ZksyncAccount {
+    pub account_id: Option<AccountId>,
     pub private_key: PrivateKey,
     pub pubkey_hash: PubKeyHash,
     pub address: Address,
@@ -70,6 +72,7 @@ impl ZksyncAccount {
             "address should correspond to private key"
         );
         Self {
+            account_id: None,
             address,
             private_key,
             pubkey_hash,
@@ -100,6 +103,7 @@ impl ZksyncAccount {
     ) -> (Transfer, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let transfer = Transfer::new_signed(
+            self.account_id.expect("can't sign tx withoud account id"),
             self.address,
             *to,
             token_id,
@@ -135,6 +139,7 @@ impl ZksyncAccount {
     ) -> (Withdraw, PackedEthSignature) {
         let mut stored_nonce = self.nonce.lock().unwrap();
         let withdraw = Withdraw::new_signed(
+            self.account_id.expect("can't sign tx withoud account id"),
             self.address,
             *eth_address,
             token_id,
@@ -178,18 +183,21 @@ impl ZksyncAccount {
         increment_nonce: bool,
         auth_onchain: bool,
     ) -> ChangePubKey {
+        let account_id = self.account_id.expect("can't sign tx withoud account id");
         let mut stored_nonce = self.nonce.lock().unwrap();
         let nonce = nonce.unwrap_or_else(|| *stored_nonce);
         let eth_signature = if auth_onchain {
             None
         } else {
-            let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &self.pubkey_hash)
-                .expect("Failed to construct change pubkey signed message.");
+            let sign_bytes =
+                ChangePubKey::get_eth_signed_data(account_id, nonce, &self.pubkey_hash)
+                    .expect("Failed to construct change pubkey signed message.");
             let eth_signature = PackedEthSignature::sign(&self.eth_private_key, &sign_bytes)
                 .expect("Signature should succeed");
             Some(eth_signature)
         };
         let change_pubkey = ChangePubKey {
+            account_id,
             account: self.address,
             new_pk_hash: self.pubkey_hash.clone(),
             nonce,

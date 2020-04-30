@@ -5,8 +5,8 @@ import "../generated/FranklinTest.sol";
 
 contract ZKSyncUnitTest is FranklinTest {
 
-    function changePubkeySignatureCheck(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) external pure returns (bool) {
-        return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress);
+    function changePubkeySignatureCheck(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint24 _accountId) external pure returns (bool) {
+        return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress, _accountId);
     }
 
     function setBalanceToWithdraw(address _owner, uint16 _token, uint128 _amount) external {
@@ -27,7 +27,7 @@ contract ZKSyncUnitTest is FranklinTest {
         bytes calldata _ethWitness,
         uint32[] calldata _ethWitnessSizes
     ) external {
-        collectOnchainOps(_publicData, _ethWitness, _ethWitnessSizes);
+        collectOnchainOps(0, _publicData, _ethWitness, _ethWitnessSizes);
     }
 
     function testRecoverAddressFromEthSignature(bytes calldata _signature, bytes calldata _message) external pure returns (address) {

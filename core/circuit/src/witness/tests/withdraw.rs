@@ -219,3 +219,43 @@ fn test_incorrect_withdraw_amount() {
         );
     }
 }
+
+//     #[test]
+//     #[ignore]
+//     #[should_panic(expected = "chunk number 0/execute_op/op_valid")]
+//     fn test_withdraw_replay() {
+//         use testkit::zksync_account::ZksyncAccount;
+
+//         let account_id = 1;
+//         let account_duplicate_id = 11;
+//         let mut zksync_account = ZksyncAccount::rand();
+//         zksync_account.account_id = Some(account_id);
+//         let account_address = zksync_account.address;
+//         let account = {
+//             let mut account = Account::default_with_address(&account_address);
+//             account.add_balance(0, &BigDecimal::from(10));
+//             account.pub_key_hash = zksync_account.pubkey_hash.clone();
+//             account
+//         };
+
+//         let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![
+//             (account_id, account.clone()),
+//             (account_duplicate_id, account),
+//         ]);
+//         let fee_account_id = 0;
+//         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
+
+//         let withdraw_op = WithdrawOp {
+//             tx: zksync_account
+//                 .sign_withdraw(
+//                     0,
+//                     "",
+//                     BigDecimal::from(7),
+//                     BigDecimal::from(3),
+//                     &Address::zero(),
+//                     None,
+//                     true,
+//                 )
+//                 .0,
+//             account_id: account_duplicate_id,
+// }

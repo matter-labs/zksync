@@ -22,7 +22,7 @@ use crate::{
 pub struct AllocatedOperationBranch<E: RescueEngine> {
     pub account: AccountContent<E>,
     pub account_audit_path: Vec<AllocatedNum<E>>, //we do not need their bit representations
-    pub account_address: CircuitElement<E>,
+    pub account_id: CircuitElement<E>,
     pub balance: CircuitElement<E>,
     pub balance_audit_path: Vec<AllocatedNum<E>>,
     pub token: CircuitElement<E>,
@@ -78,7 +78,7 @@ impl<E: RescueEngine> AllocatedOperationBranch<E> {
         Ok(AllocatedOperationBranch {
             account,
             account_audit_path,
-            account_address,
+            account_id: account_address,
             balance,
             token,
             balance_audit_path,

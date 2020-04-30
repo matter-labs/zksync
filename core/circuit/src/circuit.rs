@@ -22,7 +22,7 @@ use models::{
         operations::{ChangePubKeyOp, NoopOp},
         CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
     },
-    params::{self, FR_BIT_WIDTH_PADDED},
+    params::{self, FR_BIT_WIDTH_PADDED, SIGNED_TRANSFER_BIT_WIDTH},
 };
 // Local deps
 use crate::{
@@ -495,10 +495,10 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 &first.account_audit_path,
                 &second.account_audit_path,
             )?,
-            account_address: CircuitElement::conditionally_select(
+            account_id: CircuitElement::conditionally_select(
                 cs.namespace(|| "chosen account_address"),
-                &first.account_address,
-                &second.account_address,
+                &first.account_id,
+                &second.account_id,
                 &is_left,
             )?,
             balance: CircuitElement::conditionally_select(
@@ -768,7 +768,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut pubdata_bits = vec![];
 
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
-        pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+        pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //FEE_PACKED=8
@@ -784,12 +784,14 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut serialized_tx_bits = vec![];
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(cur.account_id.get_bits_be());
         serialized_tx_bits.extend(cur.account.address.get_bits_be());
         serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.full_amount.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(serialized_tx_bits.len(), params::SIGNED_WITHDRAW_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -935,7 +937,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             let pubdata_bits = {
                 let mut pub_data = Vec::new();
                 pub_data.extend(chunk_data.tx_type.get_bits_be()); //1
-                pub_data.extend(cur.account_address.get_bits_be()); //3
+                pub_data.extend(cur.account_id.get_bits_be()); //3
                 pub_data.extend(op_data.eth_address.get_bits_be()); //20
                 pub_data.extend(cur.token.get_bits_be()); // 2
                 pub_data.extend(op_data.full_amount.get_bits_be());
@@ -980,12 +982,27 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         };
 
         // SHOULD be true for successful exit
-        // otherwise it is impossible to decide from pub data if nonce should be updated
         let is_address_correct = CircuitElement::equals(
             cs.namespace(|| "is_address_correct"),
             &cur.account.address,
             &op_data.eth_address,
         )?;
+
+        // MUST be true for the validity of the first chunk
+        let is_pubdata_amount_valid = {
+            let circuit_pubdata_amount = CircuitElement::conditionally_select_with_number_strict(
+                cs.namespace(|| "pubdata_amount"),
+                Expression::constant::<CS>(E::Fr::zero()),
+                &cur.balance,
+                &is_address_correct.not(),
+            )?;
+
+            CircuitElement::equals(
+                cs.namespace(|| "is_pubdata_amount_correct"),
+                &circuit_pubdata_amount,
+                &op_data.full_amount,
+            )?
+        };
 
         // MUST be true for correct op. First chunk is correct and tree update can be executed.
         let first_chunk_valid = {
@@ -996,6 +1013,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
                 cs.namespace(|| "no nonce overflow"),
                 &cur.account.nonce.get_number(),
             )?);
+            flags.push(is_pubdata_amount_valid);
             multi_and(cs.namespace(|| "first_chunk_valid"), &flags)?
         };
 
@@ -1041,7 +1059,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         //construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
-        pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+        pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(cur.token.get_bits_be()); //TOKEN_BIT_WIDTH=16
         pubdata_bits.extend(op_data.full_amount.get_bits_be()); //AMOUNT_PACKED=24
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
@@ -1145,7 +1163,7 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         //construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //TX_TYPE_BIT_WIDTH=8
-        pubdata_bits.extend(cur.account_address.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
+        pubdata_bits.extend(cur.account_id.get_bits_be()); //ACCOUNT_TREE_DEPTH=24
         pubdata_bits.extend(op_data.new_pubkey_hash.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //ETH_KEY_BIT_WIDTH=160
                                                                 // NOTE: nonce if verified implicitly here. Current account nonce goes to pubdata and to contract.
@@ -1387,11 +1405,11 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
     ) -> Result<Boolean, SynthesisError> {
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be()); //8
-        pubdata_bits.extend(lhs.account_address.get_bits_be()); //24
+        pubdata_bits.extend(lhs.account_id.get_bits_be()); //24
         pubdata_bits.extend(cur.token.get_bits_be()); //16
         pubdata_bits.extend(op_data.amount_packed.get_bits_be()); //24
         pubdata_bits.extend(op_data.eth_address.get_bits_be()); //160
-        pubdata_bits.extend(rhs.account_address.get_bits_be()); //24
+        pubdata_bits.extend(rhs.account_id.get_bits_be()); //24
         pubdata_bits.extend(op_data.fee_packed.get_bits_be()); //8
         pubdata_bits.resize(
             TransferToNewOp::CHUNKS * params::CHUNK_BIT_WIDTH,
@@ -1406,12 +1424,14 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
             8,
         )?; //we use here transfer tx_code to allow user sign message without knowing whether it is transfer_to_new or transfer
         serialized_tx_bits.extend(tx_code.get_bits_be());
+        serialized_tx_bits.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits.extend(lhs.account.address.get_bits_be());
         serialized_tx_bits.extend(op_data.eth_address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -1594,9 +1614,9 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         // construct pubdata
         let mut pubdata_bits = vec![];
         pubdata_bits.extend(chunk_data.tx_type.get_bits_be());
-        pubdata_bits.extend(lhs.account_address.get_bits_be());
+        pubdata_bits.extend(lhs.account_id.get_bits_be());
         pubdata_bits.extend(cur.token.get_bits_be());
-        pubdata_bits.extend(rhs.account_address.get_bits_be());
+        pubdata_bits.extend(rhs.account_id.get_bits_be());
         pubdata_bits.extend(op_data.amount_packed.get_bits_be());
         pubdata_bits.extend(op_data.fee_packed.get_bits_be());
 
@@ -1610,12 +1630,14 @@ impl<'a, E: RescueEngine + JubjubEngine> FranklinCircuit<'a, E> {
         let mut serialized_tx_bits = vec![];
 
         serialized_tx_bits.extend(chunk_data.tx_type.get_bits_be());
+        serialized_tx_bits.extend(lhs.account_id.get_bits_be());
         serialized_tx_bits.extend(lhs.account.address.get_bits_be());
         serialized_tx_bits.extend(rhs.account.address.get_bits_be());
         serialized_tx_bits.extend(cur.token.get_bits_be());
         serialized_tx_bits.extend(op_data.amount_packed.get_bits_be());
         serialized_tx_bits.extend(op_data.fee_packed.get_bits_be());
         serialized_tx_bits.extend(cur.account.nonce.get_bits_be());
+        assert_eq!(serialized_tx_bits.len(), SIGNED_TRANSFER_BIT_WIDTH);
 
         let pubdata_chunk = select_pubdata_chunk(
             cs.namespace(|| "select_pubdata_chunk"),
@@ -1764,7 +1786,7 @@ pub fn check_account_data<E: RescueEngine, CS: ConstraintSystem<E>>(
         allocate_merkle_root(
             cs.namespace(|| "account_merkle_root"),
             &cur_account_leaf_bits,
-            &cur.account_address.get_bits_le(),
+            &cur.account_id.get_bits_le(),
             &cur.account_audit_path,
             params,
         )?,

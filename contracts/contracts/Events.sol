@@ -53,6 +53,22 @@ contract Events {
         bytes pubData,
         uint256 expirationBlock
     );
+
+    event DepositCommit(
+        uint32 franklinBlockId,
+        uint24 accountId,
+        address owner,
+        uint16 tokenId,
+        uint128 amount
+    );
+
+    event FullExitCommit(
+        uint32 franklinBlockId,
+        uint24 accountId,
+        address owner,
+        uint16 tokenId,
+        uint128 amount
+    );
 }
 
 /// @title Upgrade events

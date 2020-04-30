@@ -287,3 +287,44 @@ fn test_incorrect_transfer_amount() {
         );
     }
 }
+
+//     #[test]
+//     #[ignore]
+//     #[should_panic(expected = "chunk number 0/execute_op/op_valid")]
+//     fn test_transfer_to_new_replay() {
+//         let from_account_id = 1;
+//         let from_account_duplicate_id = 11;
+//         let mut from_zksync_account = ZksyncAccount::rand();
+//         from_zksync_account.account_id = Some(from_account_id);
+//         let from_account_address = from_zksync_account.address;
+//         let from_account = {
+//             let mut account = Account::default_with_address(&from_account_address);
+//             account.add_balance(0, &BigDecimal::from(10));
+//             account.pub_key_hash = from_zksync_account.pubkey_hash.clone();
+//             account
+//         };
+
+//         let to_account_id = 2;
+//         let to_account_address = "2222222222222222222222222222222222222222".parse().unwrap();
+
+//         let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![
+//             (from_account_id, from_account.clone()),
+//             (from_account_duplicate_id, from_account),
+//         ]);
+//         let fee_account_id = 0;
+//         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
+
+//         let transfer_op = TransferToNewOp {
+//             tx: from_zksync_account
+//                 .sign_transfer(
+//                     0,
+//                     "",
+//                     BigDecimal::from(7),
+//                     BigDecimal::from(3),
+//                     &to_account_address,
+//                     None,
+//                     true,
+//                 )
+//                 .0,
+//             from: from_account_duplicate_id,
+// }
