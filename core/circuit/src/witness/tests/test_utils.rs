@@ -92,7 +92,9 @@ pub struct WitnessTestAccount {
 
 impl WitnessTestAccount {
     pub fn new(id: AccountId, balance: u64) -> Self {
-        let zksync_account = ZksyncAccount::rand();
+        let mut zksync_account = ZksyncAccount::rand();
+        zksync_account.account_id = Some(id);
+
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
             account.add_balance(0, &BigDecimal::from(balance));

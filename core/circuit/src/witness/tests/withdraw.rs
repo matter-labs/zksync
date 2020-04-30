@@ -220,42 +220,63 @@ fn test_incorrect_withdraw_amount() {
     }
 }
 
-//     #[test]
-//     #[ignore]
-//     #[should_panic(expected = "chunk number 0/execute_op/op_valid")]
-//     fn test_withdraw_replay() {
-//         use testkit::zksync_account::ZksyncAccount;
+/// Checks that even if there are two accounts with the same keys in the state,
+/// one account cannot authorize the withdraw from its duplicate.
+#[test]
+#[ignore]
+fn test_withdraw_replay() {
+    const TOKEN_ID: u16 = 0;
+    const INITIAL_BALANCE: u64 = 10;
+    const TOKEN_AMOUNT: u64 = 7;
+    const FEE_AMOUNT: u64 = 3;
 
-//         let account_id = 1;
-//         let account_duplicate_id = 11;
-//         let mut zksync_account = ZksyncAccount::rand();
-//         zksync_account.account_id = Some(account_id);
-//         let account_address = zksync_account.address;
-//         let account = {
-//             let mut account = Account::default_with_address(&account_address);
-//             account.add_balance(0, &BigDecimal::from(10));
-//             account.pub_key_hash = zksync_account.pubkey_hash.clone();
-//             account
-//         };
+    // Operation is not valid, since the balance is already transferred from account
+    // with the same private key.
+    const ERR_MSG: &str = "op_valid is true/enforce equal to one";
 
-//         let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![
-//             (account_id, account.clone()),
-//             (account_duplicate_id, account),
-//         ]);
-//         let fee_account_id = 0;
-//         let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
+    let account_base = WitnessTestAccount::new(1, INITIAL_BALANCE);
+    // Create a copy of the base account with the same keys.
+    let mut account_copy = WitnessTestAccount::new_empty(2);
+    account_copy.account = account_base.account.clone();
 
-//         let withdraw_op = WithdrawOp {
-//             tx: zksync_account
-//                 .sign_withdraw(
-//                     0,
-//                     "",
-//                     BigDecimal::from(7),
-//                     BigDecimal::from(3),
-//                     &Address::zero(),
-//                     None,
-//                     true,
-//                 )
-//                 .0,
-//             account_id: account_duplicate_id,
-// }
+    let account_to = WitnessTestAccount::new_empty(3); // Will not be included into state.
+
+    // Input data
+    let accounts = vec![account_base, account_copy];
+
+    let (account_from, account_copy) = (&accounts[0], &accounts[1]);
+
+    // Create the transfer_op, and set the `from` ID to the duplicate account ID.
+    // Despite that both account and duplicate account have the same keys, withdraw
+    // operation contains the account ID, and transaction should fail.
+    let withdraw_op = WithdrawOp {
+        tx: account_from
+            .zksync_account
+            .sign_withdraw(
+                TOKEN_ID,
+                "",
+                BigDecimal::from(TOKEN_AMOUNT),
+                BigDecimal::from(FEE_AMOUNT),
+                &account_to.account.address,
+                None,
+                true,
+            )
+            .0,
+        account_id: account_copy.id,
+    };
+
+    let input = SigDataInput::from_withdraw_op(&withdraw_op).expect("SigDataInput creation failed");
+
+    incorrect_op_test_scenario::<WithdrawWitness<Bn256>, _>(
+        &accounts,
+        withdraw_op,
+        input,
+        ERR_MSG,
+        || {
+            vec![CollectedFee {
+                token: TOKEN_ID,
+                amount: FEE_AMOUNT.into(),
+            }]
+        },
+    );
+}
