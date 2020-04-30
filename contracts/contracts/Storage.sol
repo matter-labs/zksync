@@ -26,7 +26,7 @@ contract Storage {
     Governance internal governance;
 
     struct BalanceToWithdraw {
-        uint256 balanceToWithdraw;
+        uint128 balanceToWithdraw;
         uint8 gasReserveValue; // gives user opportunity to fill storage slot with nonzero value
     }
 
@@ -121,7 +121,7 @@ contract Storage {
     }
 
     /// @notice Gets value from balancesToWithdraw
-    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint256) {
+    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
         return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
     }
 }
