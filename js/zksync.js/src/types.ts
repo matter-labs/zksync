@@ -25,7 +25,7 @@ export interface AccountState {
                 amount: utils.BigNumberish,
                 // Value denoting the block number when the funds are expected
                 // to be received by zkSync network.
-                expected_accept_block: number,
+                expectedAcceptBlock: number,
             };
         };
     };
@@ -45,20 +45,6 @@ export interface AccountState {
         nonce: number;
         pubKeyHash: PubKeyHash;
     };
-}
-
-export interface OngoingDeposit {
-    received_on_block: utils.BigNumberish,
-    token_id: number,
-    amount: utils.BigNumberish,
-    eth_tx_hash: string,
-}
-
-export interface OngoingDeposits {
-    address: Address;
-    [deposits: number]: OngoingDeposit,
-    confirmations_for_eth_event: utils.BigNumberish,
-    estimated_deposits_approval_block: utils.BigNumberish | null,
 }
 
 export interface TxEthSignature {

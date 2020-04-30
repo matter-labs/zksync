@@ -270,11 +270,8 @@ pub trait Rpc {
         token_like: TokenLike,
     ) -> Result<BigDecimal>;
 
-    #[rpc(name = "get_ongoing_deposits", returns = "OngoingDepositsResp")]
-    fn get_ongoing_deposits(
-        &self,
-        addr: Address,
-    ) -> Box<dyn futures01::Future<Item = OngoingDepositsResp, Error = Error> + Send>;
+    #[rpc(name = "get_confirmations_for_eth_op_amount", returns = "u64")]
+    fn get_confirmations_for_eth_op_amount(&self) -> Result<u64>;
 }
 
 #[derive(Clone)]
@@ -438,16 +435,6 @@ impl Rpc for RpcApp {
         Box::new(account_state_resp.boxed().compat())
     }
 
-    fn get_ongoing_deposits(
-        &self,
-        address: Address,
-    ) -> Box<dyn futures01::Future<Item = OngoingDepositsResp, Error = Error> + Send> {
-        let self_ = self.clone();
-        let ongoing_deposits_resp = async move { self_.get_ongoing_deposits_impl(address).await };
-
-        Box::new(ongoing_deposits_resp.boxed().compat())
-    }
-
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
         let storage = self.access_storage()?;
         let executed_op = storage
@@ -474,6 +461,10 @@ impl Rpc for RpcApp {
                 block: None,
             }
         })
+    }
+
+    fn get_confirmations_for_eth_op_amount(&self) -> Result<u64> {
+        Ok(self.confirmations_for_eth_event)
     }
 
     fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {

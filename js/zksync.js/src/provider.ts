@@ -14,8 +14,6 @@ import {
     Tokens,
     TokenAddress,
     TxEthSignature,
-    OngoingDeposit,
-    OngoingDeposits
 } from "./types";
 import {
     isTokenETH,
@@ -88,16 +86,18 @@ export class Provider {
         return await this.transport.request("account_info", [address]);
     }
 
-    async getOngoingDeposits(address: Address): Promise<OngoingDeposits> {
-        return await this.transport.request("get_ongoing_deposits", [address]);
-    }
-
     // get transaction status by its hash (e.g. 0xdead..beef)
     async getTxReceipt(txHash: string): Promise<TransactionReceipt> {
         return await this.transport.request("tx_info", [txHash]);
     }
 
     async getPriorityOpStatus(
+        serialId: number
+    ): Promise<PriorityOperationReceipt> {
+        return await this.transport.request("ethop_info", [serialId]);
+    }
+
+    async getConfirmationsForEthOpAmount(
         serialId: number
     ): Promise<PriorityOperationReceipt> {
         return await this.transport.request("ethop_info", [serialId]);
