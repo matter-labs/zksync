@@ -16,8 +16,9 @@ use models::node::{
     closest_packable_fee_amount, Account, AccountId, FranklinPriorityOp, FranklinTx, Nonce,
     PriorityOp, PubKeyHash, Token, TokenId, TokenLike,
 };
-use models::primitives::floor_big_decimal;
+use models::primitives::{big_decimal_to_u128, floor_big_decimal};
 use std::collections::HashMap;
+use std::convert::TryInto;
 use storage::{ConnectionPool, StorageProcessor};
 use web3::types::Address;
 
@@ -89,6 +90,42 @@ pub struct ContractAddressResp {
     pub gov_contract: String,
 }
 
+/// Flattened `PriorityOp` object representing a deposit operation.
+/// Used in the `OngoingDepositsResp`.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OngoingDeposit {
+    received_on_block: u64,
+    token: u16,
+    amount: u64,
+    eth_tx_hash: String,
+}
+
+impl OngoingDeposit {
+    pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
+        let (token, amount) = match priority_op.data {
+            FranklinPriorityOp::Deposit(deposit) => (
+                deposit.token,
+                big_decimal_to_u128(&deposit.amount)
+                    .try_into()
+                    .expect("Too big deposit amount"),
+            ),
+            other => {
+                panic!("Incorrect input for OngoingDeposit: {:?}", other);
+            }
+        };
+
+        let eth_tx_hash = hex::encode(&priority_op.eth_hash);
+
+        Self {
+            received_on_block,
+            token,
+            amount,
+            eth_tx_hash,
+        }
+    }
+}
+
 /// Information about ongoing deposits for certain recipient address.
 ///
 /// Please note that since this response is based on the events that are
@@ -102,7 +139,7 @@ pub struct OngoingDepositsResp {
     address: Address,
     /// List of tuples (Eth block number, Deposit operation) of ongoing
     /// deposit operations.
-    deposits: Vec<(u64, PriorityOp)>,
+    deposits: Vec<OngoingDeposit>,
 
     /// Amount of confirmations required for every deposit to be processed.
     confirmations_for_eth_event: u64,
@@ -110,7 +147,9 @@ pub struct OngoingDepositsResp {
     /// Estimated block number for deposits completions:
     /// all the deposit operations for provided address are expected to be
     /// accepted in the zkSync network upon reaching this blocks.
-    estimated_deposits_approval_block: u64,
+    ///
+    /// Can be `None` if there are no ongoing deposits.
+    estimated_deposits_approval_block: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -304,11 +343,12 @@ impl Rpc for RpcApp {
             // Filter only deposits for the requested address.
             // `map` is used after filter to find the max block number without an
             // additional list pass.
-            let deposits = ongoing_ops
+            let deposits: Vec<_> = ongoing_ops
                 .into_iter()
                 .filter(|(_block, op)| {
                     if let FranklinPriorityOp::Deposit(deposit) = &op.data {
-                        deposit.to == address
+                        // Address may be set to either sender or recipient.
+                        deposit.from == address || deposit.to == address
                     } else {
                         false
                     }
@@ -318,15 +358,18 @@ impl Rpc for RpcApp {
                         max_block_number = block;
                     }
 
-                    (block, op)
+                    OngoingDeposit::new(block, op)
                 })
                 .collect();
 
-            // We have to wait `confirmations_for_eth_event` blocks after the most
-            // recent deposit operation, and it should be processed in the next block
-            // once it has enough confirmations.
-            let estimated_deposits_approval_block =
-                max_block_number + confirmations_for_eth_event + 1;
+            let estimated_deposits_approval_block = if !deposits.is_empty() {
+                // We have to wait `confirmations_for_eth_event` blocks after the most
+                // recent deposit operation.
+                Some(max_block_number + confirmations_for_eth_event)
+            } else {
+                // No ongoing deposits => no estimated block.
+                None
+            };
 
             Ok(OngoingDepositsResp {
                 address,
