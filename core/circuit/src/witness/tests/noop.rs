@@ -31,7 +31,8 @@ use crate::{
     },
 };
 
-fn generate_keys(
+/// Creates a random private key and returns a public key hash for it.
+fn generate_pubkey_hash(
     rng: &mut XorShiftRng,
     p_g: FixedGenerators,
     jubjub_params: &AltJubjubBn256,
@@ -39,9 +40,7 @@ fn generate_keys(
 ) -> Fr {
     let sk = PrivateKey::<Bn256>(rng.gen());
     let pk = PublicKey::from_private(&sk, p_g, jubjub_params);
-    let pub_key_hash = pub_key_hash_fe(&pk, phasher);
-
-    pub_key_hash
+    pub_key_hash_fe(&pk, phasher)
 }
 
 fn insert_validator(
@@ -54,7 +53,7 @@ fn insert_validator(
     // Validator account credentials
     let validator_address_number = 7;
     let validator_address = Fr::from_str(&validator_address_number.to_string()).unwrap();
-    let validator_pub_key_hash = generate_keys(rng, p_g, &jubjub_params, &phasher);
+    let validator_pub_key_hash = generate_pubkey_hash(rng, p_g, &jubjub_params, &phasher);
 
     // Create a validator account as an account tree leaf.
     let validator_leaf = CircuitAccount::<Bn256> {
@@ -89,7 +88,7 @@ fn insert_sender(
     let sender_balance_token_id: u32 = 2;
     let sender_balance_value: u128 = 2000;
     let sender_balance = Fr::from_str(&sender_balance_value.to_string()).unwrap();
-    let sender_pub_key_hash = generate_keys(rng, p_g, &jubjub_params, &phasher);
+    let sender_pub_key_hash = generate_pubkey_hash(rng, p_g, &jubjub_params, &phasher);
 
     // Create a sender account as an account tree leaf.
     // Balance tree of this account will only contain one token with non-zero amount of funds.
@@ -343,13 +342,13 @@ fn incorrect_circuit_pubdata() {
         rescue_params,
         jubjub_params,
         old_root: Some(tree.root_hash()),
-        operations: vec![operation.clone()],
+        operations: vec![operation],
         pub_data_commitment: Some(pub_data_commitment),
         block_number: Some(block_number),
-        validator_account: validator_account_witness.clone(),
+        validator_account: validator_account_witness,
         validator_address: Some(validator_address),
-        validator_balances: validator_balances.clone(),
-        validator_audit_path: validator_audit_path.clone(),
+        validator_balances,
+        validator_audit_path,
     };
 
     // Block number is a part of pubdata, which is used to calculate the new root hash,

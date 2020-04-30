@@ -528,13 +528,11 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        let input = SigDataInput::new(
+        SigDataInput::new(
             &sign_packed,
             &close_op.tx.get_bytes(),
             &close_op.tx.signature.pub_key,
-        );
-
-        input
+        )
     }
 
     pub fn from_transfer_op(transfer_op: &TransferOp) -> Result<Self, String> {
@@ -544,13 +542,11 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        let input = SigDataInput::new(
+        SigDataInput::new(
             &sign_packed,
             &transfer_op.tx.get_bytes(),
             &transfer_op.tx.signature.pub_key,
-        );
-
-        input
+        )
     }
 
     pub fn from_transfer_to_new_op(transfer_op: &TransferToNewOp) -> Result<Self, String> {
@@ -560,13 +556,11 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        let input = SigDataInput::new(
+        SigDataInput::new(
             &sign_packed,
             &transfer_op.tx.get_bytes(),
             &transfer_op.tx.signature.pub_key,
-        );
-
-        input
+        )
     }
 
     pub fn from_withdraw_op(withdraw_op: &WithdrawOp) -> Result<Self, String> {
@@ -576,13 +570,11 @@ impl SigDataInput {
             .signature
             .serialize_packed()
             .expect("signature serialize");
-        let input = SigDataInput::new(
+        SigDataInput::new(
             &sign_packed,
             &withdraw_op.tx.get_bytes(),
             &withdraw_op.tx.signature.pub_key,
-        );
-
-        input
+        )
     }
 
     /// Provides a vector of copies of this `SigDataInput` object, all with one field
