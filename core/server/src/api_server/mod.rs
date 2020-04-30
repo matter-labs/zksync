@@ -17,6 +17,7 @@ use models::config_options::ConfigurationOptions;
 use models::Operation;
 use storage::ConnectionPool;
 
+#[allow(clippy::too_many_arguments)]
 pub fn start_api_server(
     op_notify_receiver: mpsc::Receiver<Operation>,
     connection_pool: ConnectionPool,

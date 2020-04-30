@@ -255,7 +255,7 @@ impl<T: Transport> EthWatch<T> {
         // have unconfirmed priority ops.
         let block_from_number =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
-        let block_from = BlockNumber::Number(block_from_number.into());
+        let block_from = BlockNumber::Number(block_from_number);
         let block_to = BlockNumber::Latest;
 
         let pending_events = self

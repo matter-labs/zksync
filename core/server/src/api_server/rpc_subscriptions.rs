@@ -173,6 +173,7 @@ struct RpcSubApp {
     event_sub_sender: mpsc::Sender<EventNotifierRequest>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn start_ws_server(
     config_options: &ConfigurationOptions,
     op_recv: mpsc::Receiver<Operation>,
@@ -183,7 +184,7 @@ pub fn start_ws_server(
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    let addr = config_options.json_rpc_ws_server_address.clone();
+    let addr = config_options.json_rpc_ws_server_address;
     let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
 
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);

@@ -515,6 +515,7 @@ impl Rpc for RpcApp {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server(
     config_options: &ConfigurationOptions,
     connection_pool: ConnectionPool,
@@ -523,7 +524,7 @@ pub fn start_rpc_server(
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
-    let addr = config_options.json_rpc_http_server_address.clone();
+    let addr = config_options.json_rpc_http_server_address;
     let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
     std::thread::Builder::new()
         .name("json_rpc_http".to_string())
