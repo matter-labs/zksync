@@ -33,6 +33,7 @@ pub fn start_api_server(
         config_options.rest_api_server_address,
         config_options.contract_eth_addr,
         mempool_request_sender.clone(),
+        eth_watcher_request_sender.clone(),
         panic_notify.clone(),
     );
     rpc_subscriptions::start_ws_server(

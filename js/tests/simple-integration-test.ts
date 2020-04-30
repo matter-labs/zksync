@@ -46,10 +46,6 @@ async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet
         });
     console.log(`Deposit posted: ${(new Date().getTime()) - startTime} ms`);
 
-    await sleep(3000);
-    const balances = await depositWallet.getAccountState();
-    console.log(`Ongoing deposits: ${JSON.stringify(balances, null, 4)}`);
-
     await depositHandle.awaitReceipt();
     console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
     const balanceAfterDep = await syncWallet.getBalance(token);

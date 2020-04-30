@@ -293,6 +293,27 @@ impl RpcApp {
     }
 }
 
+pub(crate) async fn get_ongoing_priority_ops(
+    eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
+) -> Result<Vec<(u64, PriorityOp)>> {
+    let mut eth_watcher_request_sender = eth_watcher_request_sender.clone();
+
+    let eth_watcher_response = oneshot::channel();
+
+    // Get all the ongoing priority ops from the `EthWatcher`.
+    eth_watcher_request_sender
+        .send(EthWatchRequest::GetUnconfirmedQueueOps {
+            resp: eth_watcher_response.0,
+        })
+        .await
+        .map_err(|_| Error::internal_error())?;
+
+    eth_watcher_response
+        .1
+        .await
+        .map_err(|_| Error::internal_error())
+}
+
 impl RpcApp {
     fn access_storage(&self) -> Result<StorageProcessor> {
         self.connection_pool
@@ -302,23 +323,9 @@ impl RpcApp {
 
     /// Async version of `get_ongoing_deposits` which does not use old futures as a return type.
     async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
-        let mut eth_watcher_request_sender = self.eth_watcher_request_sender.clone();
         let confirmations_for_eth_event = self.confirmations_for_eth_event;
 
-        let eth_watcher_response = oneshot::channel();
-
-        // Get all the ongoing priority ops from the `EthWatcher`.
-        eth_watcher_request_sender
-            .send(EthWatchRequest::GetUnconfirmedQueueOps {
-                resp: eth_watcher_response.0,
-            })
-            .await
-            .map_err(|_| Error::internal_error())?;
-
-        let ongoing_ops = eth_watcher_response
-            .1
-            .await
-            .map_err(|_| Error::internal_error())?;
+        let ongoing_ops = get_ongoing_priority_ops(&self.eth_watcher_request_sender).await?;
 
         let mut max_block_number = 0;
 
