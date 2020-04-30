@@ -71,18 +71,19 @@ fn test_full_exit_failure_no_account_in_tree() {
 #[test]
 #[ignore]
 fn test_incorrect_full_exit_withdraw_amount() {
-    // Test vector of (initial_balance, withdraw_amount).
+    // Test vector of (initial_balance, withdraw_amount, success).
+    // Transactions are expected to fail with any value of provided `success` flag.
     let test_vector = vec![
-        (10, 10000), // Withdraw too big
-        (0, 1),      // Withdraw from 0 balance
+        (10, 10000, true),  // Withdraw too big and `success` set to true
+        (0, 1, true),       // Withdraw from 0 balance and `success` set to true
+        (10, 10000, false), // Withdraw too big and `success` set to false
+        (0, 1, false),      // Withdraw from 0 balance and `success` set to false
     ];
 
-    // Balance check should fail.
-    // "balance-fee bits" is message for subtraction check in circuit.
-    // For details see `circuit.rs`.
-    const ERR_MSG: &str = "balance-fee bits";
+    // Operation is incorrect, since we try to withdraw more funds than account has.
+    const ERR_MSG: &str = "op_valid is true/enforce equal to one";
 
-    for (initial_balance, withdraw_amount) in test_vector {
+    for (initial_balance, withdraw_amount, success) in test_vector {
         // Input data.
         let accounts = vec![WitnessTestAccount::new(1, initial_balance)];
         let account = &accounts[0];
@@ -94,8 +95,6 @@ fn test_incorrect_full_exit_withdraw_amount() {
             },
             withdraw_amount: Some(withdraw_amount.into()),
         };
-        // `success` is set to `true` on purpose to see the circuit behavior.
-        let success = true;
 
         incorrect_op_test_scenario::<FullExitWitness<Bn256>, _>(
             &accounts,
