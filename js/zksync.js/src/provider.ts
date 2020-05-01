@@ -97,10 +97,8 @@ export class Provider {
         return await this.transport.request("ethop_info", [serialId]);
     }
 
-    async getConfirmationsForEthOpAmount(
-        serialId: number
-    ): Promise<PriorityOperationReceipt> {
-        return await this.transport.request("ethop_info", [serialId]);
+    async getConfirmationsForEthOpAmount(): Promise<number> {
+        return await this.transport.request("get_confirmations_for_eth_op_amount", []);
     }
 
     async notifyPriorityOp(
