@@ -11,9 +11,12 @@ use circuit::{
     witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
 };
 use models::{
-    circuit::CircuitAccountTree,
+    circuit::{account::CircuitAccount, CircuitAccountTree},
     config_options::ConfigurationOptions,
-    node::{block::smallest_block_size_for_chunks, operations::DepositOp, Deposit, Engine, Fr},
+    node::{
+        block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
+        Engine, Fr,
+    },
     prover_utils::EncodedProofPlonk,
 };
 // Local deps
@@ -115,8 +118,12 @@ fn prover_proves_a_block_and_publishes_result() {
 
 fn new_test_data_for_prover() -> ProverData {
     let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
-
     let fee_account_id = 0;
+
+    // Init the fee account.
+    let fee_account = Account::default_with_address(&Address::default());
+    circuit_account_tree.insert(fee_account_id, CircuitAccount::from(fee_account));
+
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let empty_account_id = 1;
