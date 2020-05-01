@@ -7,7 +7,9 @@ use actix_web::{
 };
 use futures::channel::mpsc;
 use models::config_options::ThreadPanicNotify;
-use models::node::{Account, AccountId, Address, ExecutedOperations, PubKeyHash};
+use models::node::{
+    Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PubKeyHash,
+};
 use models::NetworkStatus;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
@@ -15,6 +17,10 @@ use std::time::Duration;
 use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
+
+use super::rpc_server::get_ongoing_priority_ops;
+use crate::eth_watch::EthWatchRequest;
+use storage::chain::operations_ext::records::TransactionsHistoryItem;
 
 #[derive(Default, Clone)]
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
@@ -33,6 +39,7 @@ struct AppState {
     network_status: SharedNetworkStatus,
     contract_address: String,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
+    eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
 }
 
 impl AppState {
@@ -190,22 +197,103 @@ fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
     request_path: web::Path<(Address, i64, i64)>,
 ) -> ActixResult<HttpResponse> {
-    let (address, offset, limit) = request_path.into_inner();
+    let (address, mut offset, mut limit) = request_path.into_inner();
 
     const MAX_LIMIT: i64 = 100;
-    if limit > MAX_LIMIT {
+    if limit > MAX_LIMIT || limit < 0 || offset < 0 {
         return Err(HttpResponse::BadRequest().finish().into());
     }
 
-    let storage = data.access_storage()?;
+    let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
 
-    let res = storage
+    let storage = data.access_storage()?;
+    let tokens = storage
+        .tokens_schema()
+        .load_tokens()
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    // Fetch ongoing deposits, since they must be reported within the transactions history.
+    let mut ongoing_ops = futures::executor::block_on(async move {
+        get_ongoing_priority_ops(&eth_watcher_request_sender).await
+    })
+    .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+    ongoing_ops.sort_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
+
+    // Filter only deposits for the requested address.
+    // `map` is used after filter to find the max block number without an
+    // additional list pass.
+    // `take` is used last to limit the amount of entries.
+    let mut transactions_history: Vec<_> = ongoing_ops
+        .iter()
+        .filter(|(_block, op)| {
+            if let FranklinPriorityOp::Deposit(deposit) = &op.data {
+                // Address may be set to either sender or recipient.
+                deposit.from == address || deposit.to == address
+            } else {
+                false
+            }
+        })
+        .map(|(_block, op)| {
+            let deposit = op.data.try_get_deposit().unwrap();
+            let token_symbol = tokens
+                .get(&deposit.token)
+                .map(|t| t.symbol.clone())
+                .unwrap_or_else(|| "unknown".into());
+
+            let hash_str = format!("0x{}", hex::encode(&op.eth_hash));
+            let pq_id = Some(op.serial_id as i64);
+
+            // Account ID may not exist for depositing ops, so it'll be `null`.
+            let account_id: Option<u32> = None;
+
+            // Copy the JSON representation of the executed tx so the appearance
+            // will be the same as for txs from storage.
+            let tx_json = serde_json::json!({
+                "account_id": account_id,
+                "eth_fee": op.eth_fee.to_string(),
+                "priority_op": {
+                    "amount": deposit.amount,
+                    "from": deposit.from,
+                    "to": deposit.to,
+                    "token": token_symbol
+                },
+                "type": "Deposit"
+            });
+
+            TransactionsHistoryItem {
+                hash: Some(hash_str),
+                pq_id,
+                tx: tx_json,
+                success: None,
+                fail_reason: None,
+                commited: false,
+                verified: false,
+            }
+        })
+        .skip(offset as usize)
+        .take(limit as usize)
+        .collect();
+
+    if !transactions_history.is_empty() {
+        // We've taken at least one transaction, this means
+        // offset is consumed completely, and limit is reduced.
+        offset = 0;
+        limit -= transactions_history.len() as i64;
+    } else {
+        // We didn't take any items, so we just decrement offset.
+        offset -= ongoing_ops.len() as i64;
+    };
+
+    let mut storage_transactions = storage
         .chain()
         .operations_ext_schema()
         .get_account_transactions_history(&address, offset, limit)
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    Ok(HttpResponse::Ok().json(res))
+    transactions_history.append(&mut storage_transactions);
+
+    Ok(HttpResponse::Ok().json(transactions_history))
 }
 
 fn handle_get_executed_transaction_by_hash(
@@ -475,6 +563,7 @@ pub(super) fn start_server_thread_detached(
     listen_addr: SocketAddr,
     contract_address: H160,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
+    eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     std::thread::Builder::new()
@@ -489,6 +578,7 @@ pub(super) fn start_server_thread_detached(
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{:?}", contract_address),
                 mempool_request_sender,
+                eth_watcher_request_sender,
             };
             state.spawn_network_status_updater(panic_notify);
 

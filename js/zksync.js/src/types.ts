@@ -17,6 +17,18 @@ export type Nonce = number | "committed";
 export interface AccountState {
     address: Address;
     id?: number;
+    depositing: {
+        balances: {
+            // Token are indexed by their symbol (e.g. "ETH")
+            [token: string]: {
+                // Sum of pending deposits for the token.
+                amount: utils.BigNumberish,
+                // Value denoting the block number when the funds are expected
+                // to be received by zkSync network.
+                expectedAcceptBlock: number,
+            };
+        };
+    };
     committed: {
         balances: {
             // Token are indexed by their symbol (e.g. "ETH")
@@ -34,6 +46,7 @@ export interface AccountState {
         pubKeyHash: PubKeyHash;
     };
 }
+
 export interface TxEthSignature {
     type: "EthereumSignature" | "EIP1271Signature";
     signature: string;

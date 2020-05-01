@@ -31,7 +31,9 @@ use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 use web3::transports::EventLoopHandle;
 
-const ETH_POLL_INTERVAL: Duration = Duration::from_secs(3);
+const ETH_POLL_INTERVAL: Duration = Duration::from_millis(200);
+
+type EthBlockId = u64;
 
 pub enum EthWatchRequest {
     PollETHNode,
@@ -45,6 +47,9 @@ pub enum EthWatchRequest {
         op_start_id: u64,
         max_chunks: usize,
         resp: oneshot::Sender<Vec<PriorityOp>>,
+    },
+    GetUnconfirmedQueueOps {
+        resp: oneshot::Sender<Vec<(EthBlockId, PriorityOp)>>,
     },
     CheckEIP1271Signature {
         address: Address,
@@ -69,9 +74,23 @@ pub struct EthWatch<T: Transport> {
     eth_watch_req: mpsc::Receiver<EthWatchRequest>,
 }
 
+/// Gathered state of the Ethereum network.
+/// Contains information about the known token types and incoming
+/// priority operations (such as `Deposit` and `FullExit`).
 #[derive(Debug)]
 pub struct ETHState {
+    /// Tokens known to zkSync.
     pub tokens: HashMap<TokenId, Address>,
+    /// Queue of priority operations that are accepted by Ethereum network,
+    /// but not yet have enough confirmations to be processed by zkSync.
+    ///
+    /// Note that since these operations do not have enough confirmations,
+    /// they may be not executed in the future, so this list is approximate.
+    ///
+    /// Keys in this HashMap are numbers of blocks with `PriorityOp`.
+    pub unconfirmed_queue: Vec<(EthBlockId, PriorityOp)>,
+    /// Queue of priority operations that passed the confirmation
+    /// threshold and are waiting to be executed.
     pub priority_queue: HashMap<u64, PriorityOp>,
 }
 
@@ -111,6 +130,7 @@ impl<T: Transport> EthWatch<T> {
             last_ethereum_block: 0,
             eth_state: ETHState {
                 tokens: HashMap::new(),
+                unconfirmed_queue: Vec::new(),
                 priority_queue: HashMap::new(),
             },
             web3,
@@ -176,6 +196,37 @@ impl<T: Transport> EthWatch<T> {
             .build()
     }
 
+    /// Filters and parses the priority operation events from the Ethereum
+    /// within the provided range of blocks.
+    /// Returns the list of priority operations together with the block
+    /// numbers.
+    async fn get_priority_op_events_with_blocks(
+        &self,
+        from: BlockNumber,
+        to: BlockNumber,
+    ) -> Result<Vec<(EthBlockId, PriorityOp)>, failure::Error> {
+        let filter = self.get_priority_op_event_filter(from, to);
+        self.web3
+            .eth()
+            .logs(filter)
+            .compat()
+            .await?
+            .into_iter()
+            .map(|event| {
+                let block_number: u64 = event
+                    .block_number
+                    .ok_or_else(|| failure::err_msg("No block number set in the queue event log"))?
+                    .as_u64();
+
+                let priority_op = PriorityOp::try_from(event).map_err(|e| {
+                    format_err!("Failed to parse priority queue event log from ETH: {:?}", e)
+                })?;
+
+                Ok((block_number, priority_op))
+            })
+            .collect()
+    }
+
     async fn get_priority_op_events(
         &self,
         from: BlockNumber,
@@ -196,11 +247,44 @@ impl<T: Transport> EthWatch<T> {
             .collect()
     }
 
+    async fn update_unconfirmed_queue(
+        &mut self,
+        current_ethereum_block: u64,
+    ) -> Result<(), failure::Error> {
+        // We want to scan the interval of blocks from the latest one up to the oldest one which may
+        // have unconfirmed priority ops.
+        let block_from_number =
+            current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
+        let block_from = BlockNumber::Number(block_from_number);
+        let block_to = BlockNumber::Latest;
+
+        let pending_events = self
+            .get_priority_op_events_with_blocks(block_from, block_to)
+            .await
+            .expect("Failed to restore priority queue events from ETH");
+
+        // Replace the old queue state with the new one.
+        self.eth_state.unconfirmed_queue.clear();
+
+        for (block_number, priority_op) in pending_events.into_iter() {
+            self.eth_state
+                .unconfirmed_queue
+                .push((block_number, priority_op));
+        }
+
+        Ok(())
+    }
+
     async fn restore_state_from_eth(&mut self, current_ethereum_block: u64) {
         let new_block_with_accepted_events =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
         let previous_block_with_accepted_events =
             new_block_with_accepted_events.saturating_sub(PRIORITY_EXPIRATION);
+
+        // restore pending queue
+        self.update_unconfirmed_queue(current_ethereum_block)
+            .await
+            .expect("Failed to restore pending queue events from ETH");
 
         // restore priority queue
         let prior_queue_events = self
@@ -240,12 +324,21 @@ impl<T: Transport> EthWatch<T> {
         let new_block_with_accepted_events =
             current_eth_block.saturating_sub(self.number_of_confirmations_for_event);
 
+        // Get new tokens
         let new_tokens = self
             .get_new_token_events(
                 BlockNumber::Number(previous_block_with_accepted_events),
                 BlockNumber::Number(new_block_with_accepted_events),
             )
             .await?;
+
+        for token in new_tokens.into_iter() {
+            debug!("New token added: {:?}", token);
+            self.eth_state
+                .add_new_token(token.id as TokenId, token.address);
+        }
+
+        // Get new priority ops
         let priority_op_events = self
             .get_priority_op_events(
                 BlockNumber::Number(previous_block_with_accepted_events),
@@ -259,11 +352,11 @@ impl<T: Transport> EthWatch<T> {
                 .priority_queue
                 .insert(priority_op.serial_id, priority_op);
         }
-        for token in new_tokens.into_iter() {
-            debug!("New token added: {:?}", token);
-            self.eth_state
-                .add_new_token(token.id as TokenId, token.address);
-        }
+
+        // Get new pending ops
+        self.update_unconfirmed_queue(current_eth_block).await?;
+
+        // Update the last seen block
         self.last_ethereum_block = current_eth_block;
 
         Ok(())
@@ -383,6 +476,10 @@ impl<T: Transport> EthWatch<T> {
                     resp,
                 } => {
                     resp.send(self.get_priority_requests(op_start_id, max_chunks))
+                        .unwrap_or_default();
+                }
+                EthWatchRequest::GetUnconfirmedQueueOps { resp } => {
+                    resp.send(self.eth_state.unconfirmed_queue.clone())
                         .unwrap_or_default();
                 }
                 EthWatchRequest::IsPubkeyChangeAuthorized {
