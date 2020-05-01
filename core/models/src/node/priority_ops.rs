@@ -35,6 +35,14 @@ pub enum FranklinPriorityOp {
 }
 
 impl FranklinPriorityOp {
+    pub fn try_get_deposit(&self) -> Option<Deposit> {
+        if let Self::Deposit(deposit) = self {
+            Some(deposit.clone())
+        } else {
+            None
+        }
+    }
+
     pub fn parse_from_priority_queue_logs(
         pub_data: &[u8],
         op_type_id: u8,

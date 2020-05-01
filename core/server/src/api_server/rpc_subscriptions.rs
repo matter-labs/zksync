@@ -1,8 +1,9 @@
 #![allow(clippy::needless_return)]
 
 // Built-in deps
-use std::{net::SocketAddr, sync::Arc};
+use std::sync::Arc;
 // External uses
+use crate::eth_watch::EthWatchRequest;
 use futures::channel::mpsc;
 use jsonrpc_core::{MetaIoHandler, Result};
 use jsonrpc_derive::rpc;
@@ -10,7 +11,11 @@ use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
 use web3::types::Address;
 // Workspace uses
-use models::{config_options::ThreadPanicNotify, node::tx::TxHash, ActionType, Operation};
+use models::{
+    config_options::{ConfigurationOptions, ThreadPanicNotify},
+    node::tx::TxHash,
+    ActionType, Operation,
+};
 use storage::ConnectionPool;
 // Local uses
 use crate::{
@@ -175,26 +180,30 @@ struct RpcSubApp {
 
 #[allow(clippy::too_many_arguments)]
 pub fn start_ws_server(
+    config_options: &ConfigurationOptions,
     op_recv: mpsc::Receiver<Operation>,
     db_pool: ConnectionPool,
-    addr: SocketAddr,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     executed_tx_receiver: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
     each_cache_size: usize,
 ) {
+    let addr = config_options.json_rpc_ws_server_address;
+
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
     let mut io = PubSubHandler::new(MetaIoHandler::default());
 
     let req_rpc_app = super::rpc_server::RpcApp::new(
+        config_options,
         db_pool.clone(),
         mempool_request_sender,
         state_keeper_request_sender.clone(),
         sign_verify_request_sender,
-        each_cache_size,
+        eth_watcher_request_sender,
     );
     req_rpc_app.extend(&mut io);
 
