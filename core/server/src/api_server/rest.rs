@@ -206,6 +206,12 @@ fn handle_get_account_transactions_history(
 
     let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
 
+    let storage = data.access_storage()?;
+    let tokens = storage
+        .tokens_schema()
+        .load_tokens()
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
     // Fetch ongoing deposits, since they must be reported within the transactions history.
     let mut ongoing_ops = futures::executor::block_on(async move {
         get_ongoing_priority_ops(&eth_watcher_request_sender).await
@@ -229,13 +235,36 @@ fn handle_get_account_transactions_history(
             }
         })
         .map(|(_block, op)| {
+            let deposit = op.data.try_get_deposit().unwrap();
+            let token_symbol = tokens
+                .get(&deposit.token)
+                .map(|t| t.symbol.clone())
+                .unwrap_or("unknown".into());
+
             let hash_str = format!("0x{}", hex::encode(&op.eth_hash));
             let pq_id = Some(op.serial_id as i64);
-            let tx = serde_json::to_value(&op.data).unwrap();
+
+            // Account ID may not exist for depositing ops, so it'll be `null`.
+            let account_id: Option<u32> = None;
+
+            // Copy the JSON representation of the executed tx so the appearance
+            // will be the same as for txs from storage.
+            let tx_json = serde_json::json!({
+                "account_id": account_id,
+                "eth_fee": op.eth_fee.to_string(),
+                "priority_op": {
+                    "amount": deposit.amount,
+                    "from": deposit.from,
+                    "to": deposit.to,
+                    "token": token_symbol
+                },
+                "type": "Deposit"
+            });
+
             TransactionsHistoryItem {
                 hash: Some(hash_str),
                 pq_id,
-                tx,
+                tx: tx_json,
                 success: None,
                 fail_reason: None,
                 commited: false,
@@ -256,7 +285,6 @@ fn handle_get_account_transactions_history(
         offset -= ongoing_ops.len() as i64;
     };
 
-    let storage = data.access_storage()?;
     let mut storage_transactions = storage
         .chain()
         .operations_ext_schema()
