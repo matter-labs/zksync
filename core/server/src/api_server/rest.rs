@@ -239,7 +239,7 @@ fn handle_get_account_transactions_history(
             let token_symbol = tokens
                 .get(&deposit.token)
                 .map(|t| t.symbol.clone())
-                .unwrap_or("unknown".into());
+                .unwrap_or_else(|| "unknown".into());
 
             let hash_str = format!("0x{}", hex::encode(&op.eth_hash));
             let pq_id = Some(op.serial_id as i64);
