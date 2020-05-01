@@ -7,7 +7,7 @@ import {
 const franklin_abi = require('../../contracts/build/Franklin.json');
 import {ethers, utils, Contract} from "ethers";
 import {bigNumberify, parseEther} from "ethers/utils";
-import {IERC20_INTERFACE, sleep} from "zksync/build/utils";
+import {IERC20_INTERFACE} from "zksync/build/utils";
 
 
 const WEB3_URL = process.env.WEB3_URL;
