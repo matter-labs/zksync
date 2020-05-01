@@ -82,7 +82,7 @@ impl ETHOperation {
         current_block >= self.last_deadline_block
     }
 
-    /// Checks whether this object relates to the `Verify` ZK Sync operation.
+    /// Checks whether this object relates to the `Verify` zkSync operation.
     pub fn is_verify(&self) -> bool {
         if let Some(op) = &self.op {
             matches!(op.action, Action::Verify { .. })

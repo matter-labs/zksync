@@ -1,4 +1,4 @@
-pragma solidity 0.5.16;
+pragma solidity ^0.5.0;
 
 
 /// @title Interface of the upgradeable master contract (defines notice period duration and allows finish upgrade during preparation of it)

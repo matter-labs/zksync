@@ -290,7 +290,7 @@ export class WalletDecorator {
         const balances = await Promise.all(
             window.tokensList
                 .map(async token => {
-                    const amount = (await contract.balancesToWithdraw(
+                    const amount = (await contract.getBalanceToWithdraw(
                         await window.ethSigner.getAddress(),
                         token.id
                     )).balanceToWithdraw;

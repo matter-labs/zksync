@@ -54,6 +54,7 @@ fn executed_operations() {
             block_index: None,
             primary_account_address: Default::default(),
             nonce: Default::default(),
+            created_at: chrono::Utc::now(),
         };
 
         OperationsSchema(&conn).store_executed_operation(executed_tx.clone())?;

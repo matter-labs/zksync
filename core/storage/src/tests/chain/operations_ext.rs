@@ -27,13 +27,15 @@ fn get_account_transactions_history() {
         Token::new(2, Address::random(), "FAU"), // used for withdraws
     ];
 
-    let from_zksync_account = ZksyncAccount::rand();
     let from_account_id = 0xbabe;
+    let mut from_zksync_account = ZksyncAccount::rand();
+    from_zksync_account.account_id = Some(from_account_id);
     let from_account_address = from_zksync_account.address;
     let from_account_address_string = format!("{:?}", &from_account_address);
 
-    let to_zksync_account = ZksyncAccount::rand();
     let to_account_id = 0xdcba;
+    let mut to_zksync_account = ZksyncAccount::rand();
+    to_zksync_account.account_id = Some(to_account_id);
     let to_account_address = to_zksync_account.address;
     let to_account_address_string = format!("{:?}", &to_account_address);
 
@@ -111,6 +113,7 @@ fn get_account_transactions_history() {
             op: Some(transfer_to_new_op),
             fail_reason: None,
             block_index: None,
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_transfer_to_new_op))
@@ -139,6 +142,7 @@ fn get_account_transactions_history() {
             op: Some(transfer_op),
             fail_reason: None,
             block_index: None,
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_transfer_op))
@@ -166,6 +170,7 @@ fn get_account_transactions_history() {
             op: Some(withdraw_op),
             fail_reason: None,
             block_index: None,
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_withdraw_op))
@@ -183,6 +188,7 @@ fn get_account_transactions_history() {
             op: Some(close_op),
             fail_reason: None,
             block_index: None,
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_close_op))
@@ -200,6 +206,7 @@ fn get_account_transactions_history() {
             op: Some(change_pubkey_op),
             fail_reason: None,
             block_index: None,
+            created_at: chrono::Utc::now(),
         };
 
         ExecutedOperations::Tx(Box::new(executed_change_pubkey_op))

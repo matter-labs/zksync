@@ -83,11 +83,7 @@ export class Client {
             url:        `${baseUrl()}/blocks/${blockNumber}/transactions`,
         });
         
-        return txs.map(tx => {
-            let res = tx.op;
-            res.tx_hash = tx.tx_hash;
-            return res;
-        });
+        return txs;
     }
 
     searchBlock(query) {

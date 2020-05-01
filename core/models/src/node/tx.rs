@@ -2,7 +2,7 @@ use super::{Nonce, TokenId};
 
 use crate::node::{
     is_fee_amount_packable, is_token_amount_packable, pack_fee_amount, pack_token_amount,
-    public_key_from_private, CloseOp, TransferOp, WithdrawOp,
+    public_key_from_private, AccountId, CloseOp, TransferOp, WithdrawOp,
 };
 use bigdecimal::BigDecimal;
 use crypto::{digest::Digest, sha2::Sha256};
@@ -106,6 +106,7 @@ impl Default for VerifiedSignatureCache {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transfer {
+    pub account_id: AccountId,
     pub from: Address,
     pub to: Address,
     pub token: TokenId,
@@ -120,9 +121,11 @@ pub struct Transfer {
 impl Transfer {
     const TX_TYPE: u8 = 5;
 
+    #[allow(clippy::too_many_arguments)]
     /// Creates transaction from parts
     /// signature is optional, because sometimes we don't know it (i.e. data_restore)
     pub fn new(
+        account_id: AccountId,
         from: Address,
         to: Address,
         token: TokenId,
@@ -132,6 +135,7 @@ impl Transfer {
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
+            account_id,
             from,
             to,
             token,
@@ -147,8 +151,10 @@ impl Transfer {
         tx
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// Creates signed transaction using private key, checks for correcteness
     pub fn new_signed(
+        account_id: AccountId,
         from: Address,
         to: Address,
         token: TokenId,
@@ -157,7 +163,7 @@ impl Transfer {
         nonce: Nonce,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, failure::Error> {
-        let mut tx = Self::new(from, to, token, amount, fee, nonce, None);
+        let mut tx = Self::new(account_id, from, to, token, amount, fee, nonce, None);
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
             bail!("Transfer is incorrect, check amounts");
@@ -168,6 +174,7 @@ impl Transfer {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(&self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
@@ -206,12 +213,14 @@ impl Transfer {
             "Transfer {amount} {token}\n\
             To: {to:?}\n\
             Nonce: {nonce}\n\
-            Fee: {fee} {token}",
+            Fee: {fee} {token}\n\
+            Account Id: {account_id}",
             amount = format_ether(&self.amount),
             token = token_symbol,
             to = self.to,
             nonce = self.nonce,
             fee = format_ether(&self.fee),
+            account_id = self.account_id,
         )
     }
 }
@@ -219,6 +228,7 @@ impl Transfer {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Withdraw {
+    pub account_id: AccountId,
     pub from: Address,
     pub to: Address,
     pub token: TokenId,
@@ -233,9 +243,11 @@ pub struct Withdraw {
 impl Withdraw {
     const TX_TYPE: u8 = 3;
 
+    #[allow(clippy::too_many_arguments)]
     /// Creates transaction from parts
     /// signature is optional, because sometimes we don't know it (i.e. data_restore)
     pub fn new(
+        account_id: AccountId,
         from: Address,
         to: Address,
         token: TokenId,
@@ -245,6 +257,7 @@ impl Withdraw {
         signature: Option<TxSignature>,
     ) -> Self {
         let mut tx = Self {
+            account_id,
             from,
             to,
             token,
@@ -260,8 +273,10 @@ impl Withdraw {
         tx
     }
 
+    #[allow(clippy::too_many_arguments)]
     /// Creates signed transaction using private key, checks for correcteness
     pub fn new_signed(
+        account_id: AccountId,
         from: Address,
         to: Address,
         token: TokenId,
@@ -270,7 +285,7 @@ impl Withdraw {
         nonce: Nonce,
         private_key: &PrivateKey<Engine>,
     ) -> Result<Self, failure::Error> {
-        let mut tx = Self::new(from, to, token, amount, fee, nonce, None);
+        let mut tx = Self::new(account_id, from, to, token, amount, fee, nonce, None);
         tx.signature = TxSignature::sign_musig(private_key, &tx.get_bytes());
         if !tx.check_correctness() {
             bail!("Transfer is incorrect, check amounts");
@@ -281,6 +296,7 @@ impl Withdraw {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         out.extend_from_slice(&self.from.as_bytes());
         out.extend_from_slice(self.to.as_bytes());
         out.extend_from_slice(&self.token.to_be_bytes());
@@ -320,12 +336,14 @@ impl Withdraw {
             "Withdraw {amount} {token}\n\
             To: {to:?}\n\
             Nonce: {nonce}\n\
-            Fee: {fee} {token}",
+            Fee: {fee} {token}\n\
+            Account Id: {account_id}",
             amount = format_ether(&self.amount),
             token = token_symbol,
             to = self.to,
             nonce = self.nonce,
             fee = format_ether(&self.fee),
+            account_id = self.account_id,
         )
     }
 }
@@ -365,6 +383,7 @@ impl Close {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChangePubKey {
+    pub account_id: AccountId,
     pub account: Address,
     pub new_pk_hash: PubKeyHash,
     pub nonce: Nonce,
@@ -378,6 +397,7 @@ impl ChangePubKey {
     pub fn get_bytes(&self) -> Vec<u8> {
         let mut out = Vec::new();
         out.extend_from_slice(&[Self::TX_TYPE]);
+        out.extend_from_slice(&self.account_id.to_be_bytes()[1..]);
         out.extend_from_slice(&self.account.as_bytes());
         out.extend_from_slice(&self.new_pk_hash.data);
         out.extend_from_slice(&self.nonce.to_be_bytes());
@@ -388,31 +408,38 @@ impl ChangePubKey {
     }
 
     pub fn get_eth_signed_data(
+        account_id: AccountId,
         nonce: Nonce,
         new_pubkey_hash: &PubKeyHash,
     ) -> Result<Vec<u8>, failure::Error> {
-        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 135;
+        const CHANGE_PUBKEY_SIGNATURE_LEN: usize = 150;
         let mut eth_signed_msg = Vec::with_capacity(CHANGE_PUBKEY_SIGNATURE_LEN);
-        eth_signed_msg.extend_from_slice(b"Register ZK Sync pubkey:\n\n");
+        eth_signed_msg.extend_from_slice(b"Register zkSync pubkey:\n\n");
         eth_signed_msg.extend_from_slice(
             format!(
-                "{} nonce: 0x{}\n\n",
-                new_pubkey_hash.to_hex().to_ascii_lowercase(),
-                hex::encode(&nonce.to_be_bytes()).to_ascii_lowercase()
+                "{}\n\
+                 nonce: 0x{}\n\
+                 account id: 0x{}\
+                 \n\n",
+                hex::encode(&new_pubkey_hash.data).to_ascii_lowercase(),
+                hex::encode(&nonce.to_be_bytes()).to_ascii_lowercase(),
+                hex::encode(&account_id.to_be_bytes()[1..]).to_ascii_lowercase()
             )
             .as_bytes(),
         );
         eth_signed_msg.extend_from_slice(b"Only sign this message for a trusted client!");
         ensure!(
             eth_signed_msg.len() == CHANGE_PUBKEY_SIGNATURE_LEN,
-            "Change pubkey signed message len is too big"
+            "Change pubkey signed message len is too big: {}, expected: {}",
+            eth_signed_msg.len(),
+            CHANGE_PUBKEY_SIGNATURE_LEN
         );
         Ok(eth_signed_msg)
     }
 
     pub fn verify_eth_signature(&self) -> Option<Address> {
         self.eth_signature.as_ref().and_then(|sign| {
-            Self::get_eth_signed_data(self.nonce, &self.new_pk_hash)
+            Self::get_eth_signed_data(self.account_id, self.nonce, &self.new_pk_hash)
                 .ok()
                 .and_then(|msg| sign.signature_recover_signer(&msg).ok())
         })

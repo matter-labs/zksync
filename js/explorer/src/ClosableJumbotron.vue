@@ -1,6 +1,6 @@
 <template>
     <b-jumbotron v-if="show" style="position:relative">
-        <template v-slot:header>Welcome to ZK Sync Devnet
+        <template v-slot:header>Welcome to zkSync Devnet
             <div class="jumbotronCloseButton" @click="dontshow"><img src="./assets/cross.png" width="20" height="20"></div>
         </template>
         <template v-slot:lead>

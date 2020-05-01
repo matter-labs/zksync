@@ -1,4 +1,5 @@
 use crate::rollup_ops::RollupOpsBlock;
+use chrono;
 use failure::format_err;
 use models::node::account::Account;
 use models::node::block::{Block, ExecutedOperations, ExecutedPriorityOp, ExecutedTx};
@@ -359,6 +360,7 @@ impl TreeState {
             op: Some(executed_op),
             fail_reason: None,
             block_index: Some(block_index),
+            created_at: chrono::Utc::now(),
         };
         ops.push(ExecutedOperations::Tx(Box::new(exec_result)));
         current_op_block_index + 1
@@ -416,6 +418,7 @@ mod test {
         };
 
         let tx2 = Withdraw::new(
+            0,
             [7u8; 20].into(),
             [7u8; 20].into(),
             1,
@@ -438,6 +441,7 @@ mod test {
         };
 
         let tx3 = Transfer::new(
+            0,
             [7u8; 20].into(),
             [8u8; 20].into(),
             1,
@@ -461,6 +465,7 @@ mod test {
         };
 
         let tx4 = Transfer::new(
+            1,
             [8u8; 20].into(),
             [7u8; 20].into(),
             1,
@@ -540,6 +545,7 @@ mod test {
         let pub_data1 = op1.public_data();
 
         let tx2 = Withdraw::new(
+            0,
             [7u8; 20].into(),
             [9u8; 20].into(),
             1,
@@ -555,6 +561,7 @@ mod test {
         let pub_data2 = op2.public_data();
 
         let tx3 = Transfer::new(
+            0,
             [7u8; 20].into(),
             [8u8; 20].into(),
             1,
@@ -571,6 +578,7 @@ mod test {
         let pub_data3 = op3.public_data();
 
         let tx4 = Transfer::new(
+            1,
             [8u8; 20].into(),
             [7u8; 20].into(),
             1,

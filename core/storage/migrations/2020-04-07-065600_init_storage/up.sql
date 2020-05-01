@@ -27,7 +27,7 @@ CREATE TABLE operations (
     id bigserial PRIMARY KEY,
     block_number BIGINT NOT NULL,
     action_type TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    created_at TIMESTAMP with time zone NOT NULL DEFAULT now(),
     confirmed bool NOT NULL DEFAULT false
 );
 
@@ -54,7 +54,8 @@ CREATE TABLE executed_priority_operations (
     to_account bytea NOT NULL,
     priority_op_serialid BIGINT NOT NULL,
     deadline_block BIGINT NOT NULL,
-    eth_hash bytea NOT NULL
+    eth_hash bytea NOT NULL,
+    created_at timestamp with time zone not null default now()
 );
 
 -- Table for the executed common operations (e.g. transfer).
@@ -73,7 +74,8 @@ CREATE TABLE executed_transactions (
     success bool NOT NULL,
     fail_reason TEXT,
     primary_account_address bytea NOT NULL,
-    nonce BIGINT NOT NULL
+    nonce BIGINT NOT NULL,
+    created_at TIMESTAMP with time zone NOT NULL
 );
 
 -- -------------- --
@@ -191,7 +193,7 @@ CREATE TABLE data_restore_rollup_ops
 CREATE TABLE proofs (
     block_number bigserial PRIMARY KEY,
     proof jsonb NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now()
+    created_at TIMESTAMP with time zone NOT NULL DEFAULT now()
 );
 
 -- Ongoing block proving jobs.
@@ -199,16 +201,16 @@ CREATE TABLE prover_runs (
     id serial PRIMARY KEY,
     block_number BIGINT NOT NULL,
     worker TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at TIMESTAMP NOT NULL DEFAULT now()
+    created_at TIMESTAMP with time zone NOT NULL DEFAULT now(),
+    updated_at TIMESTAMP with time zone NOT NULL DEFAULT now()
 );
 
 -- List of currently available provers.
 CREATE TABLE active_provers (
     id serial PRIMARY KEY,
     worker TEXT NOT NULL,
-    created_at TIMESTAMP NOT NULL DEFAULT now(),
-    stopped_at TIMESTAMP,
+    created_at TIMESTAMP with time zone NOT NULL DEFAULT now(),
+    stopped_at TIMESTAMP with time zone,
     block_size BIGINT NOT NULL
 );
 
