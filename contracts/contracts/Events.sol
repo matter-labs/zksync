@@ -31,7 +31,7 @@ contract Events {
 
     /// @notice Event emitted when user sends a authentication fact (e.g. pub-key hash)
     event FactAuth(
-        address sender,
+        address indexed sender,
         uint32 nonce,
         bytes fact
     );
