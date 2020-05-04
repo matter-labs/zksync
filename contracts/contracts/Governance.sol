@@ -20,7 +20,7 @@ contract Governance is Config {
 
     /// @notice Validator's status changed
     event ValidatorStatusUpdate(
-        address validatorAddress,
+        address indexed validatorAddress,
         bool isActive
     );
 
@@ -80,6 +80,7 @@ contract Governance is Config {
     function setValidator(address _validator, bool _active) external {
         requireGovernor(msg.sender);
         validators[_validator] = _active;
+        emit ValidatorStatusUpdate(_validator, _active);
     }
 
     /// @notice Check if specified address is is governor
@@ -94,9 +95,9 @@ contract Governance is Config {
         require(validators[_address], "grr21"); // validator is not active
     }
 
-    /// @notice Validate token id (must be less than  or equal total tokens amount)
+    /// @notice Validate token id (must be less than or equal to total tokens amount)
     /// @param _tokenId Token id
-    /// @return bool flag that indicates if token id is less than or equal total tokens amount
+    /// @return bool flag that indicates if token id is less than or equal to total tokens amount
     function isValidTokenId(uint16 _tokenId) external view returns (bool) {
         return _tokenId <= totalTokens;
     }
