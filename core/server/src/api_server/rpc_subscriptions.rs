@@ -219,10 +219,16 @@ pub fn start_ws_server(
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
 
+            let task_executor = tokio_old::runtime::Builder::new()
+                .name_prefix("ws-executor")
+                .build()
+                .expect("failed to build ws executor");
+
             let server = jsonrpc_ws_server::ServerBuilder::with_meta_extractor(
                 io,
                 |context: &RequestContext| Arc::new(Session::new(context.sender())),
             )
+            .event_loop_executor(task_executor.executor())
             .start(&addr)
             .expect("Unable to start RPC ws server");
 
