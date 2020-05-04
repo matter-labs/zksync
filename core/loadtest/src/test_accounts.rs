@@ -55,7 +55,10 @@ impl TestAccount {
     }
 
     // Updates the current Ethereum and ZKSync account nonce values.
-    pub async fn update_nonce_values(&self, rpc_client: &RpcClient) -> Result<(), failure::Error> {
+    pub async fn update_nonce_values_and_account_id(
+        &self,
+        rpc_client: &RpcClient,
+    ) -> Result<(), failure::Error> {
         // Update ETH nonce.
         let mut nonce = self.eth_nonce.lock().await;
         let v = self
@@ -67,14 +70,12 @@ impl TestAccount {
         *nonce = v.as_u32();
 
         // Update ZKSync nonce.
-        let zknonce = rpc_client
+        let resp = rpc_client
             .account_state_info(self.zk_acc.address)
             .await
-            .expect("rpc error")
-            .committed
-            .nonce;
-        self.zk_acc.set_nonce(zknonce);
-
+            .expect("rpc error");
+        self.zk_acc.set_nonce(resp.committed.nonce);
+        self.zk_acc.set_account_id(resp.id);
         Ok(())
     }
 
