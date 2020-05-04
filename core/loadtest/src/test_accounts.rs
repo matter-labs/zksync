@@ -3,6 +3,7 @@
 use bigdecimal::BigDecimal;
 use rand::Rng;
 use tokio::sync::Mutex;
+use tokio::time;
 use web3::transports::Http;
 // Workspace uses
 use models::{
@@ -55,10 +56,7 @@ impl TestAccount {
     }
 
     // Updates the current Ethereum and ZKSync account nonce values.
-    pub async fn update_nonce_values_and_account_id(
-        &self,
-        rpc_client: &RpcClient,
-    ) -> Result<(), failure::Error> {
+    pub async fn update_nonce_values(&self, rpc_client: &RpcClient) -> Result<(), failure::Error> {
         // Update ETH nonce.
         let mut nonce = self.eth_nonce.lock().await;
         let v = self
@@ -75,8 +73,24 @@ impl TestAccount {
             .await
             .expect("rpc error");
         self.zk_acc.set_nonce(resp.committed.nonce);
-        self.zk_acc.set_account_id(resp.id);
         Ok(())
+    }
+
+    // Updates ZKSync account id.
+    pub async fn update_account_id(&self, rpc_client: &RpcClient) -> Result<(), failure::Error> {
+        let mut ticker = time::interval(std::time::Duration::from_millis(500));
+        for _i in 1..100 {
+            let resp = rpc_client
+                .account_state_info(self.zk_acc.address)
+                .await
+                .expect("rpc error");
+            if resp.id.is_some() {
+                self.zk_acc.set_account_id(resp.id);
+                return Ok(());
+            }
+            ticker.tick().await;
+        }
+        failure::bail!("failed to update account_id: timeout")
     }
 
     pub fn sign_change_pubkey(&self) -> FranklinTx {

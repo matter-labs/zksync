@@ -110,9 +110,7 @@ async fn send_transactions_from_acc(
     let wei_in_gwei = BigDecimal::from(1_000_000_000);
 
     // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
-    test_acc
-        .update_nonce_values_and_account_id(&rpc_client)
-        .await?;
+    test_acc.update_nonce_values(&rpc_client).await?;
 
     // Perform the deposit operation.
     let deposit_amount = BigDecimal::from(ctx.deposit_initial_gwei).mul(&wei_in_gwei);
@@ -137,6 +135,9 @@ async fn send_transactions_from_acc(
         let op_id = deposit_single(&test_acc, amount.mul(&wei_in_gwei), &rpc_client).await?;
         sent_txs.add_op_id(op_id);
     }
+
+    // Now when deposits are done it is time to update account id.
+    test_acc.update_account_id(&rpc_client).await?;
 
     // Create a queue for all the transactions to send.
     // First, we will create and sign all the transactions, and then we will send all the
