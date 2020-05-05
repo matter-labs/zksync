@@ -26,3 +26,62 @@
 //!                    ┗━┳━━━>Acc4━━┓┗━━━>Acc4━━━┳┛
 //!                      ┗━━━>Acc5━┓┗━━━━>Acc5━━━┛
 //! ```
+
+// Temporary, for development
+
+#![allow(dead_code)]
+
+// Built-in deps
+// Local deps
+use crate::{rpc_client::RpcClient, scenarios::ScenarioContext};
+
+#[derive(Debug)]
+enum TestPhase {
+    Init,
+    Deposit,
+    InitialTransfer,
+    FundsRotation,
+    CollectingFunds,
+    Withdraw,
+}
+
+#[derive(Debug)]
+struct ScenarioExecutor {
+    phase: TestPhase,
+    rpc_client: RpcClient,
+}
+
+impl ScenarioExecutor {
+    pub fn new(rpc_client: RpcClient) -> Self {
+        Self {
+            phase: TestPhase::Init,
+            rpc_client,
+        }
+    }
+
+    pub async fn run(&mut self) -> Result<(), failure::Error> {
+        Ok(())
+    }
+}
+
+/// Runs the outgoing TPS scenario:
+/// sends the different types of transactions, and measures the TPS for the sending
+/// process (in other words, speed of the ZKSync node mempool).
+pub fn run_scenario(mut ctx: ScenarioContext) {
+    // let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec);
+    let rpc_addr = ctx.rpc_addr.clone();
+
+    let rpc_client = RpcClient::new(&rpc_addr);
+
+    let mut scenario = ScenarioExecutor::new(rpc_client);
+
+    // Obtain the Ethereum node JSON RPC address.
+    log::info!("Starting the loadtest");
+
+    // Run the scenario.
+    log::info!("Waiting for all transactions to be verified");
+    ctx.rt
+        .block_on(scenario.run())
+        .expect("Failed the scenario");
+    log::info!("Loadtest completed.");
+}

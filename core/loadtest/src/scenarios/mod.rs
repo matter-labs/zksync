@@ -26,6 +26,8 @@ pub enum ScenarioType {
     OutgoingTps,
     /// Measure the TPS for transactions execution (not including verifying).
     ExecutionTps,
+    /// Run the real-life scenario.
+    RealLife,
 }
 
 impl ScenarioType {
@@ -34,6 +36,7 @@ impl ScenarioType {
         match self {
             Self::OutgoingTps => Box::new(outgoing_tps::run_scenario),
             Self::ExecutionTps => Box::new(execution_tps::run_scenario),
+            Self::RealLife => Box::new(real_life::run_scenario),
         }
     }
 }
@@ -45,11 +48,12 @@ impl FromStr for ScenarioType {
         let scenario = match s {
             "outgoing" | "outgoing_tps" => Self::OutgoingTps,
             "execution" | "execution_tps" => Self::ExecutionTps,
+            "reallife" | "real-life" | "real_life" => Self::RealLife,
             other => {
                 failure::bail!(
                     "Unknown scenario type '{}'. \
                      Available options are: \
-                     'outgoing_tps', 'execution_tps'",
+                     'outgoing_tps', 'execution_tps', 'real_life'",
                     other
                 );
             }
