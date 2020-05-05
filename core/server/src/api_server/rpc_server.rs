@@ -749,6 +749,19 @@ impl Rpc for RpcApp {
     }
 }
 
+mod logs {
+    use jsonrpc_http_server::hyper;
+    use jsonrpc_http_server::RequestMiddlewareAction;
+
+    pub(super) fn request_middleware(
+        request: hyper::Request<hyper::Body>,
+    ) -> RequestMiddlewareAction {
+        info!("HTTP RPC call headers: {:?}", request.headers(),);
+
+        request.into()
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server(
     config_options: ConfigurationOptions,
@@ -776,7 +789,11 @@ pub fn start_rpc_server(
             );
             rpc_app.extend(&mut io);
 
-            let server = ServerBuilder::new(io).threads(8).start_http(&addr).unwrap();
+            let server = ServerBuilder::new(io)
+                .request_middleware(logs::request_middleware)
+                .threads(8)
+                .start_http(&addr)
+                .unwrap();
 
             server.wait();
         })
