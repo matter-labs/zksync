@@ -277,6 +277,25 @@ impl ScenarioExecutor {
     }
 
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
+        log::info!("Withdrawing funds back to the Ethereum");
+
+        let mut sent_txs = SentTransactions::new();
+
+        let amount_to_withdraw = self.transfer_size * self.n_accounts as u64;
+
+        let (tx, eth_sign) = self
+            .main_account
+            .sign_withdraw_single(amount_to_withdraw.into());
+        let tx_hash = self
+            .rpc_client
+            .send_tx(tx.clone(), eth_sign.clone())
+            .await?;
+        sent_txs.add_tx_hash(tx_hash);
+
+        wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+
+        log::info!("Withdrawing funds completed");
+
         Ok(())
     }
 
