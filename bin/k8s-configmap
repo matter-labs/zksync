@@ -6,8 +6,8 @@
 
 kubectl create configmap $ZKSYNC_ENV-configmap --namespace $ZKSYNC_ENV --dry-run -o yaml
 echo data:
-grep -v '^#' $ENV_FILE | grep -v '^$' | while read -r line; do
+while read -r line; do
     VAR=`sed 's/=.*//' <<< $line`
     echo -n "  $VAR: "
     echo "'${!VAR}'"
-done
+done < <(grep -v '^#' $ENV_FILE | grep -v '^$')
