@@ -132,27 +132,34 @@ impl ScenarioExecutor {
         Ok(())
     }
 
-    /// Creates a signed transfer to new transaction.
-    /// Sender is the main account, receiver is one of the generated
-    /// accounts, determined by its index.
-    fn sign_transfer_to_new(
+    /// Creates a signed transfer transaction.
+    /// Sender and receiver are chosen from the generated
+    /// accounts, determined by its indices.
+    fn sign_transfer(
         &self,
-        to_idx: usize,
+        from: &ZksyncAccount,
+        to: &ZksyncAccount,
         amount: u64,
     ) -> (FranklinTx, Option<PackedEthSignature>) {
-        let to = &self.accounts[to_idx].address;
-
-        let (tx, eth_signature) = self.main_account.zk_acc.sign_transfer(
+        let (tx, eth_signature) = from.sign_transfer(
             0, // ETH
             "ETH",
             BigDecimal::from(amount),
             BigDecimal::from(0),
-            &to,
+            &to.address,
             None,
             true,
         );
 
         (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
+    }
+
+    /// Generates an ID for funds transfer. The ID is the ID of the next
+    /// account, treating the accounts array like a circle buffer:
+    /// given 3 accounts, IDs returned for queries (0, 1, 2) will be
+    /// (1, 2, 0) correspondingly.
+    fn acc_for_transfer(&self, from_idx: usize) -> usize {
+        (from_idx + 1) % self.accounts.len()
     }
 
     async fn initial_transfer(&mut self) -> Result<(), failure::Error> {
@@ -163,7 +170,11 @@ impl ScenarioExecutor {
         );
 
         let signed_transfers: Vec<_> = (0..self.n_accounts)
-            .map(|acc_id| self.sign_transfer_to_new(acc_id, self.transfer_size))
+            .map(|to_idx| {
+                let from_acc = &self.main_account.zk_acc;
+                let to_acc = &self.accounts[to_idx];
+                self.sign_transfer(from_acc, to_acc, self.transfer_size)
+            })
             .collect();
 
         log::info!("Signed all the initial transfer transactions, sending");
@@ -184,16 +195,84 @@ impl ScenarioExecutor {
             wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
         }
 
-        log::info!("Sent all the initial transfer transactions");
+        log::info!("Initial transfers are sent and verified");
 
         Ok(())
     }
 
     async fn funds_rotation(&mut self) -> Result<(), failure::Error> {
+        for step_number in 1..=self.cycles_amount {
+            log::info!("Starting funds rotation cycle {}", step_number);
+
+            self.funds_rotation_step().await?;
+        }
+
+        Ok(())
+    }
+
+    async fn funds_rotation_step(&mut self) -> Result<(), failure::Error> {
+        let signed_transfers: Vec<_> = (0..self.n_accounts)
+            .map(|from_id| {
+                let from_acc = &self.accounts[from_id];
+                let to_id = self.acc_for_transfer(from_id);
+                let to_acc = &self.accounts[to_id];
+                self.sign_transfer(from_acc, to_acc, self.transfer_size)
+            })
+            .collect();
+
+        log::info!("Signed transfers, sending");
+
+        // Send txs by batches that can fit in one block.
+        for tx_batch in signed_transfers.chunks(self.max_block_size) {
+            let mut sent_txs = SentTransactions::new();
+            // Send each tx.
+            for (tx, eth_sign) in tx_batch {
+                let tx_hash = self
+                    .rpc_client
+                    .send_tx(tx.clone(), eth_sign.clone())
+                    .await?;
+                sent_txs.add_tx_hash(tx_hash);
+            }
+
+            // Wait until all the transactions are verified.
+            wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+        }
+
+        log::info!("Transfers are sent and verified");
+
         Ok(())
     }
 
     async fn collect_funds(&mut self) -> Result<(), failure::Error> {
+        log::info!("Starting collecting funds back to the main account",);
+
+        let signed_transfers: Vec<_> = (0..self.n_accounts)
+            .map(|from_id| {
+                let from_acc = &self.accounts[from_id];
+                let to_acc = &self.main_account.zk_acc;
+                self.sign_transfer(from_acc, to_acc, self.transfer_size)
+            })
+            .collect();
+
+        log::info!("Signed transfers, sending");
+
+        // Send txs by batches that can fit in one block.
+        for tx_batch in signed_transfers.chunks(self.max_block_size) {
+            let mut sent_txs = SentTransactions::new();
+            // Send each tx.
+            for (tx, eth_sign) in tx_batch {
+                let tx_hash = self
+                    .rpc_client
+                    .send_tx(tx.clone(), eth_sign.clone())
+                    .await?;
+                sent_txs.add_tx_hash(tx_hash);
+            }
+
+            // Wait until all the transactions are verified.
+            wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+        }
+
+        log::info!("Collecting funds completed");
         Ok(())
     }
 
