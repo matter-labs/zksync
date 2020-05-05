@@ -450,8 +450,8 @@ mod test {
     #[ignore]
     fn test_transfer_to_new_success() {
         let from_account_id = 1;
-        let mut from_zksync_account = ZksyncAccount::rand();
-        from_zksync_account.account_id = Some(from_account_id);
+        let from_zksync_account = ZksyncAccount::rand();
+        from_zksync_account.set_account_id(Some(from_account_id));
         let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);
@@ -535,8 +535,8 @@ mod test {
     fn test_transfer_to_new_replay() {
         let from_account_id = 1;
         let from_account_duplicate_id = 11;
-        let mut from_zksync_account = ZksyncAccount::rand();
-        from_zksync_account.account_id = Some(from_account_id);
+        let from_zksync_account = ZksyncAccount::rand();
+        from_zksync_account.set_account_id(Some(from_account_id));
         let from_account_address = from_zksync_account.address;
         let from_account = {
             let mut account = Account::default_with_address(&from_account_address);

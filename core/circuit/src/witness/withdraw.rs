@@ -353,8 +353,8 @@ mod test {
         use testkit::zksync_account::ZksyncAccount;
 
         let account_id = 1;
-        let mut zksync_account = ZksyncAccount::rand();
-        zksync_account.account_id = Some(account_id);
+        let zksync_account = ZksyncAccount::rand();
+        zksync_account.set_account_id(Some(account_id));
         let account_address = zksync_account.address;
         let account = {
             let mut account = Account::default_with_address(&account_address);
@@ -442,8 +442,8 @@ mod test {
 
         let account_id = 1;
         let account_duplicate_id = 11;
-        let mut zksync_account = ZksyncAccount::rand();
-        zksync_account.account_id = Some(account_id);
+        let zksync_account = ZksyncAccount::rand();
+        zksync_account.set_account_id(Some(account_id));
         let account_address = zksync_account.address;
         let account = {
             let mut account = Account::default_with_address(&account_address);
