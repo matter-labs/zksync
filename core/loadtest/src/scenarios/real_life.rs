@@ -43,23 +43,83 @@ enum TestPhase {
     FundsRotation,
     CollectingFunds,
     Withdraw,
+    Finish,
 }
 
 #[derive(Debug)]
 struct ScenarioExecutor {
     phase: TestPhase,
     rpc_client: RpcClient,
+
+    // Amount of intermediate accounts.
+    n_accounts: usize,
+    // Transfer amount per accounts (in wei).
+    transfer_size: u64,
+    // Amount of cycles for funds rotation.
+    cycles_amount: usize,
 }
 
 impl ScenarioExecutor {
     pub fn new(rpc_client: RpcClient) -> Self {
+        // Temporary constants to be replaced with configurable values.
+        const N_ACCOUNTS: usize = 100;
+        const TRANSFER_SIZE: u64 = 100;
+        const CYCLES_AMOUNT: usize = 10;
+
         Self {
             phase: TestPhase::Init,
             rpc_client,
+
+            n_accounts: N_ACCOUNTS,
+            transfer_size: TRANSFER_SIZE,
+            cycles_amount: CYCLES_AMOUNT,
         }
     }
 
     pub async fn run(&mut self) -> Result<(), failure::Error> {
+        self.deposit().await?;
+        self.initial_transfer().await?;
+        self.funds_rotation().await?;
+        self.collect_funds().await?;
+        self.withdraw().await?;
+        self.finish().await?;
+
+        Ok(())
+    }
+
+    async fn deposit(&mut self) -> Result<(), failure::Error> {
+        self.phase = TestPhase::Deposit;
+
+        Ok(())
+    }
+
+    async fn initial_transfer(&mut self) -> Result<(), failure::Error> {
+        self.phase = TestPhase::InitialTransfer;
+
+        Ok(())
+    }
+
+    async fn funds_rotation(&mut self) -> Result<(), failure::Error> {
+        self.phase = TestPhase::FundsRotation;
+
+        Ok(())
+    }
+
+    async fn collect_funds(&mut self) -> Result<(), failure::Error> {
+        self.phase = TestPhase::CollectingFunds;
+
+        Ok(())
+    }
+
+    async fn withdraw(&mut self) -> Result<(), failure::Error> {
+        self.phase = TestPhase::Withdraw;
+
+        Ok(())
+    }
+
+    async fn finish(&mut self) -> Result<(), failure::Error> {
+        self.phase = TestPhase::Finish;
+
         Ok(())
     }
 }
