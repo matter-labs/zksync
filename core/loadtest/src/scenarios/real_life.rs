@@ -33,7 +33,11 @@
 
 // Built-in deps
 // Local deps
-use crate::{rpc_client::RpcClient, scenarios::ScenarioContext};
+use crate::{
+    rpc_client::RpcClient,
+    scenarios::{utils::deposit_single, ScenarioContext},
+    test_accounts::TestAccount,
+};
 
 #[derive(Debug)]
 enum TestPhase {
@@ -51,6 +55,9 @@ struct ScenarioExecutor {
     phase: TestPhase,
     rpc_client: RpcClient,
 
+    // Main account to deposit ETH from / return ETH back to.
+    main_account: TestAccount,
+
     // Amount of intermediate accounts.
     n_accounts: usize,
     // Transfer amount per accounts (in wei).
@@ -60,7 +67,7 @@ struct ScenarioExecutor {
 }
 
 impl ScenarioExecutor {
-    pub fn new(rpc_client: RpcClient) -> Self {
+    pub fn new(main_account: TestAccount, rpc_client: RpcClient) -> Self {
         // Temporary constants to be replaced with configurable values.
         const N_ACCOUNTS: usize = 100;
         const TRANSFER_SIZE: u64 = 100;
@@ -69,6 +76,8 @@ impl ScenarioExecutor {
         Self {
             phase: TestPhase::Init,
             rpc_client,
+
+            main_account,
 
             n_accounts: N_ACCOUNTS,
             transfer_size: TRANSFER_SIZE,
@@ -89,6 +98,28 @@ impl ScenarioExecutor {
 
     async fn deposit(&mut self) -> Result<(), failure::Error> {
         self.phase = TestPhase::Deposit;
+
+        // Amount of money we need to deposit.
+        // Initialize it with the raw amount: only sum of transfers per account.
+        let mut amount_to_deposit = self.transfer_size * self.n_accounts as u64;
+
+        // Assume that 10% of funds is added for the covering fees.
+        amount_to_deposit += amount_to_deposit / 10;
+
+        log::info!(
+            "Starting depositing phase. Depositing {} wei to the main account",
+            amount_to_deposit
+        );
+
+        // Deposit funds and wait for operation to be executed.
+        deposit_single(
+            &self.main_account,
+            amount_to_deposit.into(),
+            &self.rpc_client,
+        )
+        .await?;
+
+        log::info!("Deposit phase completed");
 
         Ok(())
     }
@@ -133,7 +164,9 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
 
     let rpc_client = RpcClient::new(&rpc_addr);
 
-    let mut scenario = ScenarioExecutor::new(rpc_client);
+    let mut test_accounts = ctx.test_accounts;
+
+    let mut scenario = ScenarioExecutor::new(test_accounts.pop().unwrap(), rpc_client);
 
     // Obtain the Ethereum node JSON RPC address.
     log::info!("Starting the loadtest");

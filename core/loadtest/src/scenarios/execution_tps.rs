@@ -15,22 +15,22 @@ use std::{
 };
 // External uses
 use bigdecimal::BigDecimal;
-use rand::Rng;
 use tokio::{runtime::Handle, time};
-use web3::types::U256;
 // Workspace uses
 use models::node::tx::TxHash;
 // Local uses
 use crate::{
     rpc_client::RpcClient,
-    scenarios::ScenarioContext,
+    scenarios::{
+        utils::{deposit_single, rand_amount},
+        ScenarioContext,
+    },
     sent_transactions::SentTransactions,
     test_accounts::TestAccount,
     test_spec::TestSpec,
     tps_counter::{run_tps_counter_printer, TPSCounter},
 };
 
-const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
 const TX_EXECUTION_TIMEOUT_SEC: u64 = 5 * 60;
 
 /// Runs the execution TPS scenario:
@@ -200,57 +200,6 @@ async fn send_transactions_from_acc(
     log::info!("Account: {}: all the transactions are sent", addr_hex);
 
     Ok(sent_txs)
-}
-
-// generates random amount for transaction within given range [from, to).
-fn rand_amount(from: u64, to: u64) -> BigDecimal {
-    let amount = rand::thread_rng().gen_range(from, to);
-    BigDecimal::from(amount)
-}
-
-/// Deposits to contract and waits for node to execute it.
-async fn deposit_single(
-    test_acc: &TestAccount,
-    deposit_amount: BigDecimal,
-    rpc_client: &RpcClient,
-) -> Result<u64, failure::Error> {
-    let nonce = {
-        let mut n = test_acc.eth_nonce.lock().await;
-        *n += 1;
-        Some(U256::from(*n - 1))
-    };
-    let priority_op = test_acc
-        .eth_acc
-        .deposit_eth(deposit_amount, &test_acc.zk_acc.address, nonce)
-        .await?;
-    wait_for_deposit_executed(priority_op.serial_id, &rpc_client).await
-}
-
-/// Waits until the deposit priority operation is executed.
-async fn wait_for_deposit_executed(
-    serial_id: u64,
-    rpc_client: &RpcClient,
-) -> Result<u64, failure::Error> {
-    let mut executed = false;
-    // We poll the operation status twice a second until timeout is reached.
-    let start = Instant::now();
-    let timeout = Duration::from_secs(DEPOSIT_TIMEOUT_SEC);
-    let polling_interval = Duration::from_millis(500);
-    let mut timer = time::interval(polling_interval);
-
-    // Polling cycle.
-    while !executed && start.elapsed() < timeout {
-        timer.tick().await;
-        let state = rpc_client.ethop_info(serial_id).await?;
-        executed = state.executed;
-    }
-
-    // Check for the successful execution.
-    if !executed {
-        failure::bail!("Deposit operation timeout");
-    }
-
-    Ok(serial_id)
 }
 
 /// Waits for the transactions to be executed and measures the execution TPS.

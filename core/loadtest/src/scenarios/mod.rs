@@ -16,6 +16,7 @@ use super::{test_accounts::TestAccount, test_spec::TestSpec, tps_counter::TPSCou
 mod execution_tps;
 mod outgoing_tps;
 mod real_life;
+mod utils;
 
 pub type Scenario = Box<dyn Fn(ScenarioContext)>;
 
