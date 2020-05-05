@@ -32,12 +32,30 @@
 #![allow(dead_code)]
 
 // Built-in deps
+use std::time::Duration;
+// External deps
+use bigdecimal::BigDecimal;
+// Workspace deps
+use models::{
+    config_options::ConfigurationOptions,
+    node::{tx::PackedEthSignature, FranklinTx},
+};
+use testkit::zksync_account::ZksyncAccount;
 // Local deps
 use crate::{
     rpc_client::RpcClient,
-    scenarios::{utils::deposit_single, ScenarioContext},
+    scenarios::{
+        utils::{deposit_single, wait_for_verify},
+        ScenarioContext,
+    },
+    sent_transactions::SentTransactions,
     test_accounts::TestAccount,
 };
+
+/// Transactions in this test are aligned so that we aren't sending more transactions
+/// than could fit in the block at the time.
+/// So the timeout is set to the value reasonable for one block.
+const TIMEOUT_FOR_BLOCK: Duration = Duration::from_secs(2 * 60);
 
 #[derive(Debug)]
 enum TestPhase {
@@ -55,15 +73,22 @@ struct ScenarioExecutor {
     phase: TestPhase,
     rpc_client: RpcClient,
 
-    // Main account to deposit ETH from / return ETH back to.
+    /// Main account to deposit ETH from / return ETH back to.
     main_account: TestAccount,
 
-    // Amount of intermediate accounts.
+    /// Intermediate account to rotate funds within.
+    accounts: Vec<ZksyncAccount>,
+
+    /// Amount of intermediate accounts.
     n_accounts: usize,
-    // Transfer amount per accounts (in wei).
+    /// Transfer amount per accounts (in wei).
     transfer_size: u64,
-    // Amount of cycles for funds rotation.
+    /// Amount of cycles for funds rotation.
     cycles_amount: usize,
+
+    /// Biggest supported block size (to not overload the node
+    /// with too many txs at the moment)
+    max_block_size: usize,
 }
 
 impl ScenarioExecutor {
@@ -73,15 +98,19 @@ impl ScenarioExecutor {
         const TRANSFER_SIZE: u64 = 100;
         const CYCLES_AMOUNT: usize = 10;
 
+        let accounts = (0..N_ACCOUNTS).map(|_| ZksyncAccount::rand()).collect();
+
         Self {
             phase: TestPhase::Init,
             rpc_client,
 
             main_account,
+            accounts,
 
             n_accounts: N_ACCOUNTS,
             transfer_size: TRANSFER_SIZE,
             cycles_amount: CYCLES_AMOUNT,
+            max_block_size: Self::get_max_supported_block_size(),
         }
     }
 
@@ -101,10 +130,8 @@ impl ScenarioExecutor {
 
         // Amount of money we need to deposit.
         // Initialize it with the raw amount: only sum of transfers per account.
-        let mut amount_to_deposit = self.transfer_size * self.n_accounts as u64;
-
-        // Assume that 10% of funds is added for the covering fees.
-        amount_to_deposit += amount_to_deposit / 10;
+        // Fees will be set to zero, so there is no need in any additional funds.
+        let amount_to_deposit = self.transfer_size * self.n_accounts as u64;
 
         log::info!(
             "Starting depositing phase. Depositing {} wei to the main account",
@@ -124,8 +151,61 @@ impl ScenarioExecutor {
         Ok(())
     }
 
+    /// Creates a signed transfer to new transaction.
+    /// Sender is the main account, receiver is one of the generated
+    /// accounts, determined by its index.
+    fn sign_transfer_to_new(
+        &self,
+        to_idx: usize,
+        amount: u64,
+    ) -> (FranklinTx, Option<PackedEthSignature>) {
+        let to = &self.accounts[to_idx].address;
+
+        let (tx, eth_signature) = self.main_account.zk_acc.sign_transfer(
+            0, // ETH
+            "ETH",
+            BigDecimal::from(amount),
+            BigDecimal::from(0),
+            &to,
+            None,
+            true,
+        );
+
+        (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
+    }
+
     async fn initial_transfer(&mut self) -> Result<(), failure::Error> {
         self.phase = TestPhase::InitialTransfer;
+
+        log::info!(
+            "Starting initial transfer. {} wei will be send to each of {} new accounts",
+            self.transfer_size,
+            self.n_accounts
+        );
+
+        let signed_transfers: Vec<_> = (0..self.n_accounts)
+            .map(|acc_id| self.sign_transfer_to_new(acc_id, self.transfer_size))
+            .collect();
+
+        log::info!("Signed all the initial transfer transactions, sending");
+
+        // Send txs by batches that can fit in one block.
+        for tx_batch in signed_transfers.chunks(self.max_block_size) {
+            let mut sent_txs = SentTransactions::new();
+            // Send each tx.
+            for (tx, eth_sign) in tx_batch {
+                let tx_hash = self
+                    .rpc_client
+                    .send_tx(tx.clone(), eth_sign.clone())
+                    .await?;
+                sent_txs.add_tx_hash(tx_hash);
+            }
+
+            // Wait until all the transactions are verified.
+            wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+        }
+
+        log::info!("Sent all the initial transfer transactions");
 
         Ok(())
     }
@@ -152,6 +232,15 @@ impl ScenarioExecutor {
         self.phase = TestPhase::Finish;
 
         Ok(())
+    }
+
+    /// Loads the biggest supported block size.
+    /// This method assumes that loadtest and server share the same env config,
+    /// since the value is loaded from the env.
+    fn get_max_supported_block_size() -> usize {
+        let options = ConfigurationOptions::from_env();
+
+        *options.available_block_chunk_sizes.iter().max().unwrap()
     }
 }
 

@@ -22,7 +22,7 @@ use models::node::tx::TxHash;
 use crate::{
     rpc_client::RpcClient,
     scenarios::{
-        utils::{deposit_single, rand_amount},
+        utils::{deposit_single, rand_amount, wait_for_verify},
         ScenarioContext,
     },
     sent_transactions::SentTransactions,
@@ -235,50 +235,5 @@ async fn await_txs_execution(
 
     for hash in tx_hashes {
         await_tx(hash, rpc_client.clone(), tps_counter.clone()).await;
-    }
-}
-
-/// Waits for all the priority operations and transactions to become a part of some block and get verified.
-async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_client: &RpcClient) {
-    let serial_ids = sent_txs.op_serial_ids;
-
-    let start = Instant::now();
-    let polling_interval = Duration::from_millis(500);
-    let mut timer = time::interval(polling_interval);
-
-    // Wait until all the transactions are verified.
-    for &id in serial_ids.iter() {
-        loop {
-            let state = rpc_client
-                .ethop_info(id as u64)
-                .await
-                .expect("[wait_for_verify] call ethop_info");
-            if state.executed && state.verified {
-                log::debug!("deposit (serial_id={}) is verified", id);
-                break;
-            }
-            if start.elapsed() > timeout {
-                panic!("[wait_for_verify] Timeout")
-            }
-            timer.tick().await;
-        }
-    }
-
-    let tx_hashes = sent_txs.tx_hashes;
-    for hash in tx_hashes.iter() {
-        loop {
-            let state = rpc_client
-                .tx_info(hash.clone())
-                .await
-                .expect("[wait_for_verify] call tx_info");
-            if state.verified {
-                log::debug!("{} is verified", hash.to_string());
-                break;
-            }
-            if start.elapsed() > timeout {
-                panic!("[wait_for_verify] Timeout")
-            }
-            timer.tick().await;
-        }
     }
 }
