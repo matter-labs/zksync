@@ -27,10 +27,6 @@
 //!                      ┗━━━>Acc5━┓┗━━━━>Acc5━━━┛
 //! ```
 
-// Temporary, for development
-
-#![allow(dead_code)]
-
 // Built-in deps
 use std::time::Duration;
 // External deps
@@ -58,19 +54,7 @@ use crate::{
 const TIMEOUT_FOR_BLOCK: Duration = Duration::from_secs(2 * 60);
 
 #[derive(Debug)]
-enum TestPhase {
-    Init,
-    Deposit,
-    InitialTransfer,
-    FundsRotation,
-    CollectingFunds,
-    Withdraw,
-    Finish,
-}
-
-#[derive(Debug)]
 struct ScenarioExecutor {
-    phase: TestPhase,
     rpc_client: RpcClient,
 
     /// Main account to deposit ETH from / return ETH back to.
@@ -101,7 +85,6 @@ impl ScenarioExecutor {
         let accounts = (0..N_ACCOUNTS).map(|_| ZksyncAccount::rand()).collect();
 
         Self {
-            phase: TestPhase::Init,
             rpc_client,
 
             main_account,
@@ -126,8 +109,6 @@ impl ScenarioExecutor {
     }
 
     async fn deposit(&mut self) -> Result<(), failure::Error> {
-        self.phase = TestPhase::Deposit;
-
         // Amount of money we need to deposit.
         // Initialize it with the raw amount: only sum of transfers per account.
         // Fees will be set to zero, so there is no need in any additional funds.
@@ -175,8 +156,6 @@ impl ScenarioExecutor {
     }
 
     async fn initial_transfer(&mut self) -> Result<(), failure::Error> {
-        self.phase = TestPhase::InitialTransfer;
-
         log::info!(
             "Starting initial transfer. {} wei will be send to each of {} new accounts",
             self.transfer_size,
@@ -211,26 +190,18 @@ impl ScenarioExecutor {
     }
 
     async fn funds_rotation(&mut self) -> Result<(), failure::Error> {
-        self.phase = TestPhase::FundsRotation;
-
         Ok(())
     }
 
     async fn collect_funds(&mut self) -> Result<(), failure::Error> {
-        self.phase = TestPhase::CollectingFunds;
-
         Ok(())
     }
 
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
-        self.phase = TestPhase::Withdraw;
-
         Ok(())
     }
 
     async fn finish(&mut self) -> Result<(), failure::Error> {
-        self.phase = TestPhase::Finish;
-
         Ok(())
     }
 
