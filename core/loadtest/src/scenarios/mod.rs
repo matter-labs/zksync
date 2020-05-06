@@ -7,12 +7,12 @@
 use std::{path::PathBuf, str::FromStr, sync::Arc};
 // External uses
 use tokio::runtime::Runtime;
-use web3::transports::{EventLoopHandle, Http};
 // Workspace uses
 use models::config_options::ConfigurationOptions;
 // Local uses
-use super::{test_accounts::TestAccount, test_spec::TestSpec, tps_counter::TPSCounter};
+use super::tps_counter::TPSCounter;
 
+pub(crate) mod configs;
 mod execution_tps;
 mod outgoing_tps;
 mod real_life;
@@ -67,9 +67,10 @@ impl FromStr for ScenarioType {
 #[derive(Debug)]
 pub struct ScenarioContext {
     // Handle for the `web3` transport, which must not be `drop`ped for transport to work.
-    _event_loop_handle: EventLoopHandle,
-    pub test_accounts: Vec<TestAccount>,
-    pub ctx: TestSpec,
+    // _event_loop_handle: EventLoopHandle,
+    // pub test_accounts: Vec<TestAccount>,
+    pub options: ConfigurationOptions,
+    pub config_path: PathBuf,
     pub rpc_addr: String,
     pub tps_counter: Arc<TPSCounter>,
     pub rt: Runtime,
@@ -77,26 +78,16 @@ pub struct ScenarioContext {
 
 impl ScenarioContext {
     pub fn new(
-        config: ConfigurationOptions,
-        test_spec_path: PathBuf,
+        options: ConfigurationOptions,
+        config_path: PathBuf,
         rpc_addr: String,
         rt: Runtime,
     ) -> Self {
-        // Load the test spec.
-        let ctx = TestSpec::load(test_spec_path);
-
-        // Create test accounts.
-        let (_event_loop_handle, transport) =
-            Http::new(&config.web3_url).expect("http transport start");
-        let test_accounts =
-            TestAccount::construct_test_accounts(&ctx.input_accounts, transport, &config);
-
         let tps_counter = Arc::new(TPSCounter::default());
 
         Self {
-            _event_loop_handle,
-            test_accounts,
-            ctx,
+            options,
+            config_path,
             rpc_addr,
             tps_counter,
             rt,

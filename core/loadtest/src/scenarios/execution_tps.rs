@@ -16,18 +16,19 @@ use std::{
 // External uses
 use bigdecimal::BigDecimal;
 use tokio::{runtime::Handle, time};
+use web3::transports::Http;
 // Workspace uses
 use models::node::tx::TxHash;
 // Local uses
 use crate::{
     rpc_client::RpcClient,
     scenarios::{
+        configs::LoadTestConfig,
         utils::{deposit_single, rand_amount, wait_for_verify},
         ScenarioContext,
     },
     sent_transactions::SentTransactions,
     test_accounts::TestAccount,
-    test_spec::TestSpec,
     tps_counter::{run_tps_counter_printer, TPSCounter},
 };
 
@@ -37,7 +38,14 @@ const TX_EXECUTION_TIMEOUT_SEC: u64 = 5 * 60;
 /// sends the different types of transactions, and measures the TPS for the txs execution
 /// (not including the verification).
 pub fn run_scenario(mut ctx: ScenarioContext) {
-    let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec);
+    // Load config and construct test accounts
+    let config = LoadTestConfig::load(&ctx.config_path);
+    let (_event_loop_handle, transport) =
+        Http::new(&ctx.options.web3_url).expect("http transport start");
+    let test_accounts =
+        TestAccount::construct_test_accounts(&config.input_accounts, transport, &ctx.options);
+
+    let verify_timeout_sec = Duration::from_secs(config.verify_timeout_sec);
     let rpc_addr = ctx.rpc_addr.clone();
 
     let rpc_client = RpcClient::new(&rpc_addr);
@@ -51,9 +59,9 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
 
     // Send the transactions and block until all of them are sent.
     let sent_txs = ctx.rt.block_on(send_transactions(
-        ctx.test_accounts,
+        test_accounts,
         rpc_client.clone(),
-        ctx.ctx,
+        config,
         ctx.rt.handle().clone(),
         ctx.tps_counter,
     ));
@@ -69,7 +77,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
 async fn send_transactions(
     test_accounts: Vec<TestAccount>,
     rpc_client: RpcClient,
-    ctx: TestSpec,
+    ctx: LoadTestConfig,
     rt_handle: Handle,
     tps_counter: Arc<TPSCounter>,
 ) -> SentTransactions {
@@ -123,7 +131,7 @@ async fn send_transactions(
 // Sends the configured deposits, withdraws and transfer from a single account concurrently.
 async fn send_transactions_from_acc(
     test_acc: TestAccount,
-    ctx: TestSpec,
+    ctx: LoadTestConfig,
     rpc_client: RpcClient,
 ) -> Result<SentTransactions, failure::Error> {
     let mut sent_txs = SentTransactions::new();

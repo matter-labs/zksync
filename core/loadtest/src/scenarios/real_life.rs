@@ -31,6 +31,7 @@
 use std::time::Duration;
 // External deps
 use bigdecimal::BigDecimal;
+use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
 use models::{
     config_options::ConfigurationOptions,
@@ -41,6 +42,7 @@ use testkit::zksync_account::ZksyncAccount;
 use crate::{
     rpc_client::RpcClient,
     scenarios::{
+        configs::RealLifeConfig,
         utils::{deposit_single, wait_for_verify},
         ScenarioContext,
     },
@@ -68,21 +70,27 @@ struct ScenarioExecutor {
     /// Transfer amount per accounts (in wei).
     transfer_size: u64,
     /// Amount of cycles for funds rotation.
-    cycles_amount: usize,
+    cycles_amount: u32,
 
     /// Biggest supported block size (to not overload the node
     /// with too many txs at the moment)
     max_block_size: usize,
+
+    /// Event loop handle so transport for Eth account won't be invalidated.
+    _event_loop_handle: EventLoopHandle,
 }
 
 impl ScenarioExecutor {
-    pub fn new(main_account: TestAccount, rpc_client: RpcClient) -> Self {
-        // Temporary constants to be replaced with configurable values.
-        const N_ACCOUNTS: usize = 100;
-        const TRANSFER_SIZE: u64 = 100;
-        const CYCLES_AMOUNT: usize = 10;
+    pub fn new(ctx: &ScenarioContext, rpc_client: RpcClient) -> Self {
+        let config = RealLifeConfig::load(&ctx.config_path);
 
-        let accounts = (0..N_ACCOUNTS).map(|_| ZksyncAccount::rand()).collect();
+        let accounts = (0..config.n_accounts)
+            .map(|_| ZksyncAccount::rand())
+            .collect();
+
+        let (_event_loop_handle, transport) =
+            Http::new(&ctx.options.web3_url).expect("http transport start");
+        let main_account = TestAccount::from_info(&config.input_account, &transport, &ctx.options);
 
         Self {
             rpc_client,
@@ -90,10 +98,12 @@ impl ScenarioExecutor {
             main_account,
             accounts,
 
-            n_accounts: N_ACCOUNTS,
-            transfer_size: TRANSFER_SIZE,
-            cycles_amount: CYCLES_AMOUNT,
+            n_accounts: config.n_accounts,
+            transfer_size: config.transfer_size,
+            cycles_amount: config.cycles_amount,
             max_block_size: Self::get_max_supported_block_size(),
+
+            _event_loop_handle,
         }
     }
 
@@ -398,9 +408,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
 
     let rpc_client = RpcClient::new(&rpc_addr);
 
-    let mut test_accounts = ctx.test_accounts;
-
-    let mut scenario = ScenarioExecutor::new(test_accounts.pop().unwrap(), rpc_client);
+    let mut scenario = ScenarioExecutor::new(&ctx, rpc_client);
 
     // Obtain the Ethereum node JSON RPC address.
     log::info!("Starting the loadtest");
