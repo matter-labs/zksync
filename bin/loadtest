@@ -4,7 +4,9 @@ USAGE='Usage: zksync loadtest [-h|--help] [SCENARIO] [PATH_TO_CONFIG]
 where:
     -h | --help     show this message
     SCENARIO        {outgoing,execution,real-life} (outgoing by default)
-    PATH_TO_CONFIG  path to loadtest config (default is core/loadtest/src/loadtest.json)'
+    PATH_TO_CONFIG  path to loadtest config (default is 'core/loadtest/src/loadtest.json'
+                    for outgoing/execution and 'core/loadtest/src/configs/reallife.json'
+                    for real-life scenario)'
 
 if [ -z $ZKSYNC_ENV ];
 then 
@@ -13,14 +15,14 @@ then
 fi
 
 SCENARIO=${1:-outgoing}
-CONFIG=${2:-"$ZKSYNC_HOME/core/loadtest/src/loadtest.json"}
-
-echo H: $SCENARIO $CONFIG
 
 case $SCENARIO in
-  outgoing|execution|real-life|reallife|real_life)
-      echo Executing $SCENARIO loadtest scenario
-    ;;
+  outgoing | execution)
+      CONFIG=${2:-"$ZKSYNC_HOME/core/loadtest/src/configs/loadtest.json"}
+      ;;
+  real-life|reallife|real_life)
+      CONFIG=${2:-"$ZKSYNC_HOME/core/loadtest/src/configs/reallife.json"}
+      ;;
   -h | --help)
       echo "$USAGE"
       exit 0
@@ -32,6 +34,6 @@ case $SCENARIO in
     ;;
 esac
 
-
+echo "Executing $SCENARIO loadtest scenario (config path $CONFIG)"
 cd $ZKSYNC_HOME
 cargo run --release --bin loadtest -- --scenario $SCENARIO $CONFIG
