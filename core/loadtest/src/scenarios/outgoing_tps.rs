@@ -131,6 +131,9 @@ async fn send_transactions_from_acc(
         sent_txs.add_op_id(op_id);
     }
 
+    // Now when deposits are done it is time to update account id.
+    test_acc.update_account_id(&rpc_client).await?;
+
     // Create a queue for all the transactions to send.
     // First, we will create and sign all the transactions, and then we will send all the
     // prepared transactions.

@@ -28,14 +28,14 @@ fn get_account_transactions_history() {
     ];
 
     let from_account_id = 0xbabe;
-    let mut from_zksync_account = ZksyncAccount::rand();
-    from_zksync_account.account_id = Some(from_account_id);
+    let from_zksync_account = ZksyncAccount::rand();
+    from_zksync_account.set_account_id(Some(from_account_id));
     let from_account_address = from_zksync_account.address;
     let from_account_address_string = format!("{:?}", &from_account_address);
 
     let to_account_id = 0xdcba;
-    let mut to_zksync_account = ZksyncAccount::rand();
-    to_zksync_account.account_id = Some(to_account_id);
+    let to_zksync_account = ZksyncAccount::rand();
+    to_zksync_account.set_account_id(Some(to_account_id));
     let to_account_address = to_zksync_account.address;
     let to_account_address_string = format!("{:?}", &to_account_address);
 
