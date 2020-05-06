@@ -81,15 +81,21 @@ struct ScenarioExecutor {
 }
 
 impl ScenarioExecutor {
+    /// Creates a real-life scenario executor.
     pub fn new(ctx: &ScenarioContext, rpc_client: RpcClient) -> Self {
+        // Load the config for the test from JSON file.
         let config = RealLifeConfig::load(&ctx.config_path);
 
+        // Generate random accounts to rotate funds within.
         let accounts = (0..config.n_accounts)
             .map(|_| ZksyncAccount::rand())
             .collect();
 
+        // Create a transport for Ethereum account.
         let (_event_loop_handle, transport) =
             Http::new(&ctx.options.web3_url).expect("http transport start");
+
+        // Create main account to deposit money from and to return money back later.
         let main_account = TestAccount::from_info(&config.input_account, &transport, &ctx.options);
 
         Self {
@@ -107,8 +113,9 @@ impl ScenarioExecutor {
         }
     }
 
+    /// Runs the test step-by-step. Every test step is encapsulated into its own function.
     pub async fn run(&mut self) -> Result<(), failure::Error> {
-        self.start().await?;
+        self.initialize().await?;
         self.deposit().await?;
         self.initial_transfer().await?;
         self.funds_rotation().await?;
@@ -119,7 +126,8 @@ impl ScenarioExecutor {
         Ok(())
     }
 
-    async fn start(&mut self) -> Result<(), failure::Error> {
+    /// Initializes the test, preparing the main account for the interaction.
+    async fn initialize(&mut self) -> Result<(), failure::Error> {
         // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
         self.main_account
             .update_nonce_values(&self.rpc_client)
@@ -128,6 +136,7 @@ impl ScenarioExecutor {
         Ok(())
     }
 
+    /// Runs the initial deposit of the money onto the main account.
     async fn deposit(&mut self) -> Result<(), failure::Error> {
         // Amount of money we need to deposit.
         // Initialize it with the raw amount: only sum of transfers per account.
@@ -172,36 +181,8 @@ impl ScenarioExecutor {
         Ok(())
     }
 
-    /// Creates a signed transfer transaction.
-    /// Sender and receiver are chosen from the generated
-    /// accounts, determined by its indices.
-    fn sign_transfer(
-        &self,
-        from: &ZksyncAccount,
-        to: &ZksyncAccount,
-        amount: u64,
-    ) -> (FranklinTx, Option<PackedEthSignature>) {
-        let (tx, eth_signature) = from.sign_transfer(
-            0, // ETH
-            "ETH",
-            BigDecimal::from(amount),
-            BigDecimal::from(0),
-            &to.address,
-            None,
-            true,
-        );
-
-        (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
-    }
-
-    /// Generates an ID for funds transfer. The ID is the ID of the next
-    /// account, treating the accounts array like a circle buffer:
-    /// given 3 accounts, IDs returned for queries (0, 1, 2) will be
-    /// (1, 2, 0) correspondingly.
-    fn acc_for_transfer(&self, from_idx: usize) -> usize {
-        (from_idx + 1) % self.accounts.len()
-    }
-
+    /// Splits the money from the main account between the intermediate accounts
+    /// with the `TransferToNew` operations.
     async fn initial_transfer(&mut self) -> Result<(), failure::Error> {
         log::info!(
             "Starting initial transfer. {} wei will be send to each of {} new accounts",
@@ -274,6 +255,10 @@ impl ScenarioExecutor {
         Ok(())
     }
 
+    /// Performs the funds rotation phase: transfers the money between intermediate
+    /// accounts multiple times.
+    /// Sine the money amount is always the same, after execution of this step every
+    /// intermediate account should have the same balance as it has before.
     async fn funds_rotation(&mut self) -> Result<(), failure::Error> {
         for step_number in 1..=self.cycles_amount {
             log::info!("Starting funds rotation cycle {}", step_number);
@@ -284,6 +269,8 @@ impl ScenarioExecutor {
         Ok(())
     }
 
+    /// Transfers the money between intermediate accounts. For each account with
+    /// ID `N`, money are transferred to the account with ID `N + 1`.
     async fn funds_rotation_step(&mut self) -> Result<(), failure::Error> {
         let signed_transfers: Vec<_> = (0..self.n_accounts)
             .map(|from_id| {
@@ -323,6 +310,7 @@ impl ScenarioExecutor {
         Ok(())
     }
 
+    /// Transfers all the money from the intermediate accounts back to the main account.
     async fn collect_funds(&mut self) -> Result<(), failure::Error> {
         log::info!("Starting collecting funds back to the main account",);
 
@@ -362,6 +350,7 @@ impl ScenarioExecutor {
         Ok(())
     }
 
+    /// Withdraws the money from the main account back to the Ethereum.
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
         log::info!("Withdrawing funds back to the Ethereum");
 
@@ -387,6 +376,36 @@ impl ScenarioExecutor {
 
     async fn finish(&mut self) -> Result<(), failure::Error> {
         Ok(())
+    }
+
+    /// Creates a signed transfer transaction.
+    /// Sender and receiver are chosen from the generated
+    /// accounts, determined by its indices.
+    fn sign_transfer(
+        &self,
+        from: &ZksyncAccount,
+        to: &ZksyncAccount,
+        amount: u64,
+    ) -> (FranklinTx, Option<PackedEthSignature>) {
+        let (tx, eth_signature) = from.sign_transfer(
+            0, // ETH
+            "ETH",
+            BigDecimal::from(amount),
+            BigDecimal::from(0),
+            &to.address,
+            None,
+            true,
+        );
+
+        (FranklinTx::Transfer(Box::new(tx)), Some(eth_signature))
+    }
+
+    /// Generates an ID for funds transfer. The ID is the ID of the next
+    /// account, treating the accounts array like a circle buffer:
+    /// given 3 accounts, IDs returned for queries (0, 1, 2) will be
+    /// (1, 2, 0) correspondingly.
+    fn acc_for_transfer(&self, from_idx: usize) -> usize {
+        (from_idx + 1) % self.accounts.len()
     }
 
     /// Loads the biggest supported block size.
