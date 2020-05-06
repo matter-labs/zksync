@@ -12,15 +12,14 @@
     + [Data types](#data-types)
     + [Amount packing](#amount-packing)
     + [State Merkle Tree (SMT)](#state-merkle-tree)
-    + [zkSync block pub data format](#zk-sync-block-pub-data-format)
-  * [zkSync operations](#zk-sync-operations)
+    + [zkSync block pub data format](#zksync-block-pub-data-format)
+  * [zkSync operations](#zksync-operations)
     + [1. Noop operation](#1-noop-operation)
     + [2. Transfer](#2-transfer)
     + [3. Transfer to new](#3-transfer-to-new)
-    + [4. Withdraw (Partial Exit)](#4-withdraw--partial-exit-)
-    + [5. Close](#5-close)
-    + [6. Deposit](#6-deposit)
-    + [7. Full exit](#7-full-exit)
+    + [4. Withdraw (Partial Exit)](#4-withdraw-partial-exit)
+    + [5. Deposit](#5-deposit)
+    + [6. Full exit](#6-full-exit)
   * [Smart contracts API](#smart-contracts-api)
     + [Rollup contract](#rollup-contract)
       - [Deposit Ether](#deposit-ether)
@@ -30,10 +29,6 @@
       - [Censorship resistance](#censorship-resistance)
       - [Exodus mode](#exodus-mode)
       - [Rollup Operations](#rollup-operations)
-    + [Priority Queue contract](#priority-queue-contract)
-      - [Setup](#setup)
-      - [Utility methods](#utility-methods)
-      - [Exodus mode](#exodus-mode-1)
     + [Governance contract](#governance-contract)
       - [Change governor](#change-governor)
       - [Add token](#add-token)
@@ -43,11 +38,10 @@
       - [Check that token id is valid](#check-that-token-id-is-valid)
       - [Check that token address is valid](#check-that-token-address-is-valid)
   * [Block state transition circuit](#block-state-transition-circuit) 
-  * [Appendix I: Cryptographic primitives](#appendix-i--cryptographic-primitives)
-    + [Pedersen signature](#pedersen-signature)
-    + [Pedersen hash](#pedersen-hash)
+  * [Appendix I: Cryptographic primitives](#appendix-i-cryptographic-primitives)
+    + [Transaction signature](#transaction-signature)
+    + [Rescue hash](#rescue-hash)
     + [SHA256](#sha256)
-    + [EDDSA signature scheme](#eddsa-signature-scheme)
     + [Sparse Merkle Tree](#sparse-merkle-tree)
 
 <small><i><a href='http://ecotrust-canada.github.io/markdown-toc/'>Table of contents generated with markdown-toc</a></i></small>
@@ -61,7 +55,7 @@
 - **Eventually**: happening within finite time.
 - **Assets in rollup**: assets in L2 smart contract controlled by owners.
 - **Rollup key**: owner's private key used to control deposited assets.
-- **Pedersen signature**: the result of signing the owner's message, using his private key, used in Rollup internal transactions.
+- **Rescue signature**: the result of signing the owner's message, using his private key, used in Rollup internal transactions.
 
 ## Design
 
@@ -82,7 +76,7 @@ Rollup operation requires the assistance of an operator, who rolls transactions 
 Cryptography assumptions:
 
 - DLP is unbroken.
-- Pedersen hash and sha256 are collision-resistant.
+- Rescue hash and sha256 are collision-resistant.
 - ZKP scheme used in the construction is secure (subject to a separate formal proof).
 
 L1 blockchain assumptions:
@@ -97,7 +91,7 @@ Operational assumptions:
 
 ### Protocol invariant claims
 
-- [ ] 1. Continuous ownership: assets deposited in rollup are immediately under control of the specified owner.
+- [ ] 1. Continuous ownership: assets deposited in rollup are immediately under control of the specified, unique owner.
 
 - [ ] 2. Control: assets in rollup can not be transferred (change owner), change in value, disappear or be moved out of rollup, unless the owner initiates a corresponding action.
 
@@ -119,24 +113,27 @@ This includes, in particular, the following claims:
 |--|--|--|--|
 |AccountId|3|BE integer|Incremented number of accounts in Rollup. New account will have the next free id. Max value is 16777215|
 |TokenId|2|BE integer|Incremented number of tokens in Rollup, max value is 65535|
-|PackedTxAmount|5|[Parameters](#our-convertation-parameters-for-packing-amounts-and-fees)|Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantissa * 10^exponent where mantissa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368 * 10^31, providing 10 full decimal digit precision.|
-|PackedFee|2|[Parameters](#our-convertation-parameters-for-packing-amounts-and-fees)|Packed fees must be represented with 2 bytes: 5 bit for exponent, 11 bit for mantissa.|
+|PackedTxAmount|5|[Parameters](#amount-packing)|Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantissa * 10^exponent where mantissa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368 * 10^31, providing 10 full decimal digit precision.|
+|PackedFee|2|[Parameters](#amount-packing)|Packed fees must be represented with 2 bytes: 5 bit for exponent, 11 bit for mantissa.|
 |StateAmount|16|BE integer|State amount is represented as uint128 with a range from 0 to ~3.4 * 10^38. It allows to represent up to 3.4 * 10^20 "units" if standard Ethereum's 18 decimal symbols are used. This should be a sufficient range.|
-|StateFee|16|BE integer|State fee is represented as uint128 with a range from 0 to ~3.4 * 10^38. It allows to represent up to 3.4 * 10^20 "units" if standard Ethereums 18 decimal symbols are used. This thould be a sufficient range.|
-|Nonce|4|BE integer|Nonce reflects the current state of the account in the tree starting from zero. In order to apply the update of this state, it is necessary to indicate the current account nonce in the corresponding transaction, after which it will be automatically incremented. If you specify the wrong nonce, the changes will not occur.|
-|RollupPubkeyHash|20|LE integer|To make a public key hash from a Rollup [public key](#generating-rollup-key-pair) apply [Pedersen hash function](#pedersen-hash) to the key and then take the last 20 bytes of the result.|
+|StateFee|16|BE integer|State fee is represented as uint128 with a range from 0 to ~3.4 * 10^38. It allows to represent up to 3.4 * 10^20 "units" if standard Ethereum's 18 decimal symbols are used. This should be a sufficient range.|
+|Nonce|4|BE integer|Nonce is the total number of executed transactions of the account. In order to apply the update of this state, it is necessary to indicate the current account nonce in the corresponding transaction, after which it will be automatically incremented. If you specify the wrong nonce, the changes will not occur.|
+|RollupPubkeyHash|20|LE integer|To make a public key hash from a Rollup public key apply [Rescue hash function](#rescue-hash) to the `[x,y]` points of the key and then take the last 20 bytes of the result.|
 |EthAddress|20|LE integer|To make an Ethereum address from the Etherum's public key, all we need to do is to apply Keccak-256 hash function to the key and then take the last 20 bytes of the result.|
-|PackedRollupPubkey|32|LE integer|A Rollup public key is the first 32 bytes of a Rollup [public key](#generating-rollup-key-pair)|
+|PackedRollupPubkey|32|LE integer|A Rollup public key is the first 32 bytes of a Rollup public key |
 |TxHash|32|LE integer|To get hash for transaction apply [SHA256 function](#sha256) to concatenated bytes of [transaction fields](#zk-sync-operations)|
-|Signature|64|LE integer|Read [Pedersen signature](#pedersen-signature)|
+|Signature|64|LE integer|Read [transaction signature](#transaction-signature)|
 |BlockNumber|4|BE integer|Incremented number of Rollup blocks, max number is 4294967295|
-|RootHash|32|LE integer|[Merkle tree root hash](#state-sparse-merkle-tree-smt)|
+|RootHash|32|LE integer|[Merkle tree root hash](#sparse-merkle-tree)|
 
 ### Amount packing
 
 Amounts and fees are compressed in zkSync using simple [fundamentals of floating point arithmetic](https://en.wikipedia.org/wiki/Floating-point_arithmetic).
 
-A floating-point number has the following parts: a mantissa, a radix, and an exponent. The mantissa (always non-negative in our case) holds the significant digits of the floating-point number. The exponent indicates the power of the radix that the mantissa and sign should be multiplied by. The components are combined as follows to get the floating-point value:
+A floating-point number has the following parts: a mantissa, a radix, and an exponent. 
+The mantissa (always non-negative in our case) holds the significant digits of the floating-point number. 
+The exponent indicates the power of the radix that the mantissa and sign should be multiplied by. 
+The components are combined as follows to get the floating-point value:
 
 ```
 sign * mantissa * (radix ^ exponent)
@@ -156,14 +153,16 @@ Accounts and Balances trees representation:
 ![](https://i.imgur.com/itXl2UV.png)
 
 Legend:
-- Ha is account tree height.
-- Hb is balance tree height.
+- Ha is account tree height. (24)
+- Hb is balance tree height. (8)
 
 We have directly one main `Accounts tree` and its leaves `Accounts` also have subtrees `Balances tree` with their own `Balances` leaves.
 
 #### Leaf hash
 
-**The leaf hash** is the [pedersen hash](#pedersen-hash) of its fields in **LE integer representation**, that are concatenated in the order presented below. 
+**The leaf hash** is the [rescue hash](#rescue-hash) of its bit string representation described below. 
+To get bit string representation each filed is encoded as bits starting from least significant (LE order for bits) and
+concatenated in the order they are present in the structure.
 
 #### Account leaf
 
@@ -172,13 +171,15 @@ Each account is inserted into the Accounts tree as a leaf with the least free id
 |Field|Type|
 |--|--|
 |nonce|Nonce|
-|pubkey_hash|RollupAddress|
+|pubkey_hash|RollupPubkeyHash|
 |address|EthAddress|
 |state_tree_root|RootHash|
 
-`state_tree_root` is combined using Pedersen hash of the padded to 256 bit `balance_tree_root` and 256 zero bits reserved for future subtree root hash.
+`state_tree_root` is combined using [Rescue hash](#rescue-hash) of the root hash of the `balance_tree_root`(as a field element) 
+and zero field element reserved for future subtree root hash and then padded to 256 bits (by adding 0 bits in LE bit representation)
 
-An empty leaf contains: `state_tree_root` computed using empty balances subtree, all other fields equal to zero.
+An empty leaf contains: `state_tree_root` computed using empty balances subtree. Empty balances subtree of the account
+has zero in each leaf.
 
 #### Balance leaf
 
@@ -190,7 +191,7 @@ And empty leaf contains `value` equal to zero.
 
 ### zkSync block pub data format
 
-Rollup block pub data consists of [Rollup operations](#zk-sync-operations) pub data sequence. The maximum block size is a constant value. If the size of the operations included in the block is not enough to fill it completely, the remainder will be filled with empty [Noop](#1-noop-operation) operations.
+Rollup block pub data consists of [Rollup operations](#zksync-operations) pub data sequence. The maximum block size is a constant value. If the size of the operations included in the block is not enough to fill it completely, the remainder will be filled with empty [Noop](#1-noop-operation) operations.
 
 ## zkSync operations
 
@@ -202,7 +203,6 @@ Rollup transactions:
 - Transfer
 - Transfer to new
 - Withdraw (Partial exit)
-- Close account
 - Change pubkey
 
 Priority operations:
@@ -296,32 +296,39 @@ Reads as: transfer from account #4 token #2 to account #3 amount in packed repre
 |Field|Value/type|Description|
 |--|--|--|
 |type|`0x05`|Operation code|
-|from_address|ETHAddress|Unique address of the rollup account from which funds will be withdrawn (sender)|
-|to_address|ETHAddress|Unique address of the rollup account that will receive the funds (recipient)|
+|account_id|AccountId|Unique id of the sender rollup account in the state tree|
+|from|ETHAddress|Unique address of the rollup account from which funds will be withdrawn (sender)|
+|to|ETHAddress|Unique address of the rollup account that will receive the funds (recipient)|
 |token|TokenId|Unique token identifier in the rollup|
 |amount|StateAmount|Full amount of funds sent|
 |fee|StateFee|Full amount of fee paid|
 |nonce|Nonce|A one-time code that specifies the order of transactions|
-|signature|Signanture|Pedersen signature of previous fields that had been concatenated into a single bytes array. Before concatenation `amount` and `fee` fields are packed|
+|signature|Signanture|[Signature](#transaction-signature) of previous fields that had been concatenated into a single bytes array (as BE bytes). Before concatenation `amount` and `fee` fields are packed|
 
 ##### Example
 
 ```json
-type: 5,
-from: "0x03e69588c1f4155dec60da3bf5113e029911ce33",
-to: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef",
-token: 2,
-amount: "0x0000001ad3",
-fee: "0x0012",
-nonce: 5,
-signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce330124"
+{
+  "type": "Transfer",
+  "accountId": 4,
+  "from": "0x924F8F0380f415ab3DAeFF4556216da3E34fAf40",
+  "to": "0x924F8F0380f415ab3DAeFF4556216da3E34fAf40",
+  "token": 1,
+  "amount": "3000000000000000",
+  "fee": "0",
+  "nonce": 4,
+  "signature": {
+    "pubKey": "7d3e1be67b4d49a63d8673a600435434ac4f4a70e018f8bd64fe7509a4cbd5aa",
+    "signature": "2ee557b52b93cc50ea9685c4bf9d6cd7e7e1fb919c542eedbe3c4817ee07ed9be3baef6a364111ccd1071eeba891f2f5fe19fd1d47040d5110c1f5e25d089e02"
+  }
+}
 ```
 
 #### Invariants
 
 1. Transfer.token < TotalTokens
-2. from_id = get_id(Transfer.from_address) != nil
-3. to_id = get_id(Transfer.to_address) != nil
+2. from_id = get_id(Transfer.from) != nil
+3. to_id = get_id(Transfer.to) != nil
 4. verify(signature) == true
 5. Transfer.nonce == Account(from_id).nonce
 6. Account(from_id).balance(token) >= Transfer.amount + Transfer.fee
@@ -374,35 +381,42 @@ Reads as: transfer from account #4 token #2 amount in packed representation 0x00
 
 |Field|Value/type|Description|
 |--|--|--|
-|type|`0x02`|Operation code|
-|from_address|ETHAddress|Unique address of the rollup account from which funds will be withdrawn (sender)|
-|to_address|ETHAddress|Unique address of the rollup account that will receive the funds (recipient)|
+|type|`0x05`|Operation code|
+|account_id|AccountId|Unique id of the sender rollup account in the state tree|
+|from|ETHAddress|Unique address of the rollup account from which funds will be withdrawn (sender)|
+|to|ETHAddress|Unique address of the rollup account that will receive the funds (recipient)|
 |token|TokenId|Unique token identifier in the rollup|
 |amount|StateAmount|Full amount of funds sent|
 |fee|StateFee|Full amount of fee paid|
 |nonce|Nonce|A one-time code that specifies the order of transactions|
-|signature|Signanture|Pedersen signature of previous fields that had been concatenated into a single bytes array. Before concatenation `amount` and `fee` fields are packed|
+|signature|Signanture|Rescue signature of previous fields that had been concatenated into a single bytes array. Before concatenation `amount` and `fee` fields are packed|
 
 ##### Example
 
 Transfer to new request is the same as regular Transfer request:
 
 ```json
-type: 2,
-from: "0x03e69588c1f4155dec60da3bf5113e029911ce33",
-to: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef",
-token: 2,
-amount: "0x0000001ad3",
-fee: "0x0012",
-nonce: 5,
-signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce330124"
+{
+  "type": "Transfer",
+  "accountId": 4,
+  "from": "0x924F8F0380f415ab3DAeFF4556216da3E34fAf40",
+  "to": "0x11742517336Ae1b09CA275bb6CAFc6B341B6e324",
+  "token": 1,
+  "amount": "3000000000000000",
+  "fee": "30000000000000",
+  "nonce": 1,
+  "signature": {
+    "pubKey": "7d3e1be67b4d49a63d8673a600435434ac4f4a70e018f8bd64fe7509a4cbd5aa",
+    "signature": "6ac05e7422a136f1c1a4ff889fa6b713520b3f4a76379c4cea020a225184332e65e369103df2f2444cb82100d67a532facccd2a983b5f3bbb501532c3d8a6d02"
+  }
+}
 ```
 
 #### Invariants
 
 1. TransferToNew.token < TotalTokens
-2. from_id = get_id(TransferToNew.from_address) != nil
-3. to_id = get_id(TransferToNew.to_address) == nil
+2. from_id = get_id(TransferToNew.from) != nil
+3. to_id = get_id(TransferToNew.to) == nil
 4. verify(signature) == true
 5. Transfer.nonce == Account(from_id).nonce
 6. Account(from_id).balance(token) >= Transfer.amount + Transfer.fee
@@ -411,7 +425,7 @@ signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19
 
 to_id = get_lowest_free_account_id()
 
-1. Account(to_id).address = TransferToNew.to_address
+1. Account(to_id).address = TransferToNew.to
 2. Account(from_id).balance(token) -= (TransferToNew.amount + Transfer.fee)
 3. Account(from_id).nonce += 1
 4. Account(to_id).balance(token) += TransferToNew.amount
@@ -436,6 +450,7 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 |Field|Byte len|Value/type|Description|
 |--|--|--|--|
 |opcode|1|`0x03`|Operation code|
+|account_id|AccountId|Unique id of the rollup account in the state tree|
 |from_account|3|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
 |token|2|TokenId|Unique token identifier in the rollup|
 |full_amount|16|StateAmount|Full amount of funds sent|
@@ -463,19 +478,25 @@ Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb1
 |amount|StateAmount|Full amount of funds sent|
 |fee|StateFee|Full amount of fee paid|
 |nonce|Nonce|A one-time code that specifies the order of transactions|
-|signature|Signanture|Pedersen signature of previous fields that had been concatenated into a single bytes array. Before concatenation `fee` field is packed|
+|signature|Signanture|Rescue signature of previous fields that had been concatenated into a single bytes array. Before concatenation `fee` field is packed|
 
 ##### Example
 
 ```json
-type: 3,
-from: "0x03e69588c1f4155dec60da3bf5113e029911ce33",
-to: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef",
-token: 2,
-amount: "0x000000000000000002c68af0bb140000",
-fee: "0x0012",
-nonce: 5,
-signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce330124"
+{
+  "type": "Withdraw",
+  "accountId": 5,
+  "from": "0x11742517336Ae1b09CA275bb6CAFc6B341B6e324",
+  "to": "0x11742517336Ae1b09CA275bb6CAFc6B341B6e324",
+  "token": 1,
+  "amount": "500000000000000",
+  "fee": "5000000000000",
+  "nonce": 1,
+  "signature": {
+    "pubKey": "1a76f4bf2975a4190d13aed2f08f662c7c60101887c9cc53d0cad5d3ff383615",
+    "signature": "5d7001ac44a1f495725d008a48fb6120ac1faaab27145890feaf759c4d446609fa19086e1c21af35b6b494af26fd4d7046879638c035dd1b7d3d9243a9f41303"
+  }
+}
 ```
 
 #### Invariants
@@ -492,12 +513,14 @@ signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19
 2. Account(id).nonce += 1
 3. Account(fees_account_id).balance(token) += Withdraw.fee
 
-### 6. Deposit
+### 5. Deposit
 
 #### Description
 
-Deposits funds from ethereum account to the specified Rollup account.
-Deposit starts as priority operation - user calls contract method `depositEth` to deposit ethereum, or `depositErc` to deposit ERC-20 tokens. After that operator includes this operation in a block. In the account tree, the new account will be created if needed.
+Deposits funds from Ethereum account to the specified Rollup account.
+Deposit starts as priority operation - user calls contract method [`depositEth`](#deposit-ether) to deposit ethereum, 
+or [`depositERC20`](#deposit-erc-20-token) to deposit ERC-20 tokens. 
+After that operator includes this operation in a block. In the account tree, the new account will be created if needed.
 
 #### Onchain operation
 
@@ -525,50 +548,23 @@ Deposit starts as priority operation - user calls contract method `depositEth` t
 
 Reads as: deposit to account #4 token #2 amount 0x000000000000000002c68af0bb140000, account will have address 0x0809101112131415161718192021222334252628.
 
-#### User ethereum transaction
-
-##### Ethereum transction
-
-The following must be concatenated into single bytes string and placed into **transaction data field**:
-
-|Field|Value/type|Description|
-|--|--|--|
-|type|`0x01`|Operation code|
-|from_address|EthAddress|Ethereum account address from which funds will be withdrawn (sender) and sent to smart contract|
-|token|TokenId|Unique token identifier in the rollup|
-|full_amount|StateAmount|Full amount of funds sent|
-|to_address|RollupAddress|The address that will represent the rollup account that will receive the funds (recipient)|
-
-If transaction currency is Ether, provide the proper Ether amount in transaction value field.
-value is full_amount
-
-##### Example
-
-```json
-type: 1,
-from_address: "0x03e69588c1f4155dec60da3bf5113e029911ce33",
-token: 2,
-full_amount: "0x000000000000000002c68af0bb140000",
-to_address: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef",
-nonce: 5,
-signature: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef11036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce330124"
-```
-
 #### Invariants
 
 1. FullExit.token < TotalTokens
-2. id =  get_id(Deposit.account) != nil OR get_lowest_free_account_id()
+2. id =  get_id(Deposit.to) != nil OR get_lowest_free_account_id()
 
 #### Tree updates
 
-1. Account(id).pubkey_hash = Deposit.to_address
+1. Account(id).address = Deposit.to
 2. Account(id).balance(token) += Deposit.amount
 
 #### Censorship by the operator
 
-It is possible that the operator for some reason does not include this operation in the block. Then, through the number of ethereum blocks set on the smart contract, the exodus mode will be launched. It will automatically return the deposit funds to the account from which they were transferred.
+It is possible that the operator for some reason does not include this operation in the block. 
+Then, through the number of ethereum blocks set on the smart contract, the exodus mode will be launched. 
+It will allow recipient account (i.e. with `msg.sender == Deposit.to`) to withdraw funds from zkSync contract.
 
-### 7. Full exit
+### 6. Full exit
 
 #### Description
 
@@ -606,32 +602,13 @@ Reads as: full exit from account #4 with with address 0x080910111213141516171819
 
 ##### Ethereum transction
 
-The following must be concatenated into single bytes string and placed into **transaction data field**:
-
-|Field|Value/type|Description|
-|--|--|--|
-|type|`0x06`|Operation code|
-|account_id|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
-|owner|20|EthAddress|The address of the fund owner account. Also to the balance of this address the funds will be accrued(recipient)|
-|token|TokenId|Unique token identifier in the rollup|
-
-User provides `account_id` and token address (zero address for ETH), token id is determined using governance contract and 
-owner is determined using transaction sender.
-
-##### Example
-
-```json
-type: 6,
-account_id: 4
-account_address: "0x11036945fcc11c349c3a300f19cd87cb03c4f2ef",
-token: 2,
-```
+// TODO: describe user eth transaction for full exit
 
 #### Invariants
 
 1. FullExit.token < TotalTokens
-2. id = get_id(FullExit.from_account) != nil
-3. amount_to_withdraw = Account(id).balance(token) > 0
+2. id = get_id(FullExit.owner) != nil
+3. Account(id).address == FullExit.owner
 
 #### Tree updates
 
@@ -639,14 +616,14 @@ token: 2,
 
 #### Failure signal
 
-If something went wrong on the server side - full exit operation may be included in a block with 0 (zero) amount in pubdata.
+If something went wrong on the server side - full exit operation will be included in a block with 0 (zero) amount in pubdata.
 
 #### Censorship by the operator
 
 It is possible that the operator for some reason does not include this operation in the block. Then, through the number of ethereum blocks set on the smart contract, the exodus mode will be launched. After that, a user can submit exit proof to get her funds.
 Read more about censorship resistance and exodus mode in special sections.
 
-### 8. Change pubkey
+### 7. Change pubkey
 
 #### Description
 
@@ -681,10 +658,23 @@ Reads as: change pubkey, account #4, new pubkey hash sync:11036945fcc11c349c3a30
 
 #### Authorization
 
-1. Transaction can be authorized by providing signature of the message `concat[nonce, new_pubkey_hash]` (e.g. `0000000311036945fcc11c349c3a300f19cd87cb03c4f2ef` for example above) with transaction.
+1. Transaction can be authorized by providing signature of the message `pubkey_message(account_id, nonce, new_pubkey_hash)` (see definition below).
 Transaction will be verified on the contract.
 2. For users that can't sign messages it is possible to authorize this operation by calling `setAuthPubkeyHash` method of the smart contract. User should provide new pubkey hash and nonce for this transaction.
 After this transaction succeeded transaction without signature can be sent to operator.
+
+```typescript
+function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
+const pubKeyHashHex = to_hex(new_pubkey_hash); // 20 bytes as a hex
+const msgNonce = to_hex(to_be_bytes(nonce)); // nonce (4 byte BE integer) as a hex
+const msgAcccId = to_hex(to_be_bytes(account_id)); // account id (3 byte BE integer) as a hex
+return `Register zkSync pubkey:\n\n` +
+       `${pubKeyHashHex}\n` +
+       `nonce: 0x${msgNonce}\n` +
+       `account id: 0x${msgAccId}\n\n` +
+       `Only sign this message for a trusted client!`;
+}
+```
 
 #### User transaction
 
@@ -696,27 +686,30 @@ After this transaction succeeded transaction without signature can be sent to op
 |account|ETHAddress|Address of the rollup account|
 |new_pubkey_hash|20|RollupPubkeyHash|Hash of the new rollup public key|
 |nonce|Nonce|A one-time code that specifies the order of transactions|
-|signature (optional)|ETHSignanture|Ethereum signature of the message: concat[`nonce`, `new_pubkey_hash`] using keys. Null if operation was authrorized on contract. |
+|signature (optional)|ETHSignanture|Ethereum signature of the message defined above. Null if operation was authorized on contract. |
 
 ##### Example
 
 ```json
-type: 7,
-account: "0x03e69588c1f4155dec60da3bf5113e029911ce33",
-newPkHash: "sync:11036945fcc11c349c3a300f19cd87cb03c4f2ef",
-nonce: 5,
-signature: "0x8b7385c7bb8913b9fd176247efab0ccc72e3197abe8e2d4c6596ba58a32a91675f66e80560a5f1a42bd50d58da055630ac6c18875e5ba14a362e87e903f083941c"
+{
+  "type": "ChangePubKey",
+  "accountId": 5,
+  "account": "0x11742517336Ae1b09CA275bb6CAFc6B341B6e324",
+  "newPkHash": "sync:4a38f08c06ac48328029485e07d6d9a3c29155e7",
+  "nonce": 0,
+  "ethSignature": "0x40875b0ad3c5520093c8222acf293f34016c4fea9596ca02b37cc6e5c7cf007170cfa1195d3461ad17296ff80721762e6f783f195db19dbf40cf6ae58057172b1b"
+}
 ```
 
 #### Invariants
 
 1. id = get_id(ChangePubkeyHash.account) != nil
-2. address == ChangePubkeyHash.account
-4. Transfer.nonce == Account(id).nonce
+2. Account(id).address == ChangePubkeyHash.account
+4. Account(id).nonce == ChangePubkeyHash.nonce
 
 #### Tree updates
 
-1. Account(id).pubkey_hash = ChangePubkeyHash.new_pubkey_hash
+1. Account(id).pubkey_hash = ChangePubkeyHash.newPkHash
 2. Account(id).nonce += 1
 
 
@@ -727,16 +720,16 @@ signature: "0x8b7385c7bb8913b9fd176247efab0ccc72e3197abe8e2d4c6596ba58a32a91675f
 #### Deposit Ether
 Deposit Ether to Rollup - transfer Ether from user L1 address into Rollup address
 ```solidity
-depositETH(address _franklinAddr)
+depositETH(address _rollupAddr)
 ```
-- _franklinAddr: The receiver Layer 2 address
+- _rollupAddr: The receiver Layer 2 address
 
 msg.value equals amount to deposit.
 
 #### Deposit ERC-20 token
 Deposit ERC-20 token to Rollup - transfer token from user L1 address into Rollup address
 ```solidity
-depositERC20(address _token, uint128 _amount, bytes calldata _rollupAddr) payable
+depositERC20(IERC20 _token, uint128 _amount, address _rollupAddr) payable
 ```
 - _token: Token address in L1 chain
 - _amount: Amount to deposit 
@@ -754,7 +747,7 @@ withdrawETH(uint128 _amount)
 
 Withdraw ERC20 token to L1 - register withdrawal and transfer token from contract to msg.sender
 ```solidity
-withdrawERC20(address _token, uint128 _amount)
+withdrawERC20(IERC20 _token, uint128 _amount)
 ```
 - _token: Token address in L1 chain
 - _amount: Amount to withdraw
@@ -763,38 +756,42 @@ withdrawERC20(address _token, uint128 _amount)
 
 Authenticates pubkey hash change for new rollup public key.
 ```solidity
-function setAuthPubkeyHash(bytes calldata _fact, uint32 _nonce) external {
+function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external {
 ```
-- _fact: Rollup public key hash
+- _pubkey_hash: `RollupPubkeyHash`
 - _nonce: Account nonce for which this pubkey change is authorized.
 
 #### Censorship resistance
 
-Register full exit request to withdraw all token balance from the account. The user needs to call it if she believes that her transactions are censored by the validator.
+Register full exit request to withdraw all token balance from the account. 
+The user needs to call it if she believes that her transactions are censored by the validator.
 ```solidity
 fullExit (
     uint24 _accountId,
     address _token,
-) payable
+)
 ```
-- _accountId: Numerical id of the Rollup account
+- _accountId: `AccountId` of the Rollup account
 - _token: Token address in L1 chain
 
 #### Exodus mode
 
 ##### Withdraw funds
 
-Withdraws token from Rollup to L1 in case of exodus mode. User must provide proof that she owns funds.
+Withdraws token from Rollup to L1 in case of exodus mode. 
+User must provide proof that she owns funds.
 ```solidity
 exit(
-    uint16 _tokenId,
-    uint128 _amount,
-    uint256[8] calldata _proof
-)
+    uint24 _accountId, 
+    uint16 _tokenId, 
+    uint128 _amount, 
+    uint256[] calldata _proof)
 ```
-- _proof: Proof that user funds are present in the account tree
+
+- _accountId: `AccountId` of the owner account.
 - _tokenId: Verified token id
-- _amount: Token amount
+- _amount: `StateAmount` full amount of the given token that belong to `AccountId` in the last verified block.
+- _proof: Proof that user funds are present in the account tree
 
 ##### Cancel outstanding deposits
 
@@ -808,7 +805,8 @@ cancelOutstandingDepositsForExodusMode(uint64 _number)
 
 ##### Commit block
 
-Submit committed block data. Only active validator can make it. Onchain operations will be stored on contract and fulfilled on block verification.
+Submit committed block data. Only active validator can make it. 
+Onchain operations will be stored on contract and fulfilled on block verification.
 ```solidity
 commitBlock(
     uint32 _blockNumber,
@@ -816,64 +814,29 @@ commitBlock(
     bytes32 _newRoot,
     bytes calldata _publicData,
     bytes calldata _ethWitness,
-    uint64[] calldata _ethWitnessSizes
+    uint32[] calldata _ethWitnessSizes
 )
 ```
 
-- _blockNumber: Block number
-- _feeAccount: Account to collect fees
-- _newRoot: New tree root
+- _blockNumber: `BlockNumber`
+- _feeAccount: `AccountId` to collect fees
+- _newRoot: New tree root `RootHash`
 - _publicData: Operations pubdata
 - _ethWitness - data that can be used by smart contract for block commit that is posted outside of `_publicData` (e.g ETH signatures for pubkey change verification).
-- _ethWitnessSizes - number of bytes from _ethWitness that is used for each onchain operation which needed them.
+- _ethWitnessSizes - number of bytes from _ethWitness that is used for each onchain operation that needs them.
 
 ##### Verify block
 
 Submit verified block proof. Only active validator can make it. This block onchain operations will be fulfilled.
 ```solidity
-verifyBlock(uint32 _blockNumber, uint256[8] calldata _proof, bytes calldata _withdrawalsData)
+verifyBlock(uint32 _blockNumber, uint256[] calldata _proof, bytes calldata _withdrawalsData)
 ```
 
 - _blockNumber: Block number
 - _proof Block proof
 - _withdrawalsData Withdrawals data
 
-### Priority Queue contract
-
-#### Setup
-
-Sets rollup address if it has not been set before.
-```solidity
-setRollupAddress(address _rollupAddress)
-```
-
--_rollupAddress: Address of the Rollup contract
-
-#### Utility methods
-
-##### Is priority operation valid
-
-Compares Rollup operation with corresponding priority requests' operation.
-```solidity
-isPriorityOpValid(uint8 _opType, bytes calldata _pubData, uint64 _id) returns (bool)
-```
-
-- _opType: Operation type
-- _pubData: Operation pub data
-- _id: Request id
-  
-Returns: bool flag that indicates if priority operation is valid (exists in priority requests list on the specified place)
-
-##### Validate number of requests
-
-Checks if provided number is less than uncommitted requests count.
-```solidity
-validateNumberOfRequests(uint64 _number)
-```
-
-- _number: Number of requests
-
-#### Exodus mode
+#### Exodus mode trigger
 
 Checks if Exodus mode must be entered.
 Exodus mode must be entered in case of current ethereum block number is higher than the oldest of existed priority requests expiration block number.
@@ -881,7 +844,14 @@ Exodus mode must be entered in case of current ethereum block number is higher t
 triggerExodusIfNeeded() returns (bool)
 ```
 
-Returns: bool flag that indicates if exodus mode must be entered.
+#### Revert blocks
+
+Revert blocks that were not verified before deadline determined by `EXPECT_VERIFICATION_IN` constant.
+```solidity
+revertBlocks(uint32 _maxBlocksToRevert)
+```
+
+- _maxBlocksToRevert: revert up to that number of the unverified and expired blocks.
 
 ### Governance contract
 
@@ -959,7 +929,8 @@ Block circuit describes state transition function (STF) from previous state to t
 
 Public inputs:
 
-- pub_data_commitment: commitment to the state transition of the block; this is a hash that includes `old_root`, `new_root`, `block_number`, `validator_address`, `pub_data_rolling_hash` (see smart the contract code).
+- pub_data_commitment: commitment to the state transition of the block; 
+this is a hash that includes `old_root`, `new_root`, `block_number`, `validator_address`, `pub_data_rolling_hash` (see smart the contract code).
 
 Witness:
 
@@ -970,7 +941,7 @@ Witness:
 - pub_data,
 - pub_data_rolling_hash,
 - list of transactions,
-- state Merkle treees.
+- state Merkle trees.
 
 If the proof is valid (the circuit is satisfied), it means that there exists a set of transactions which transitions the state from the previous one (cryptographically fingerprinted by the Merkle root `old_root`) into the new one (cryptographically fingerprinted by the Merkle root `new_root`) such that concatenated `pub_data` of this transactions in the order of application is cryptographically fingerprinted by `pub_data_commitment`.
 
