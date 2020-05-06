@@ -13,7 +13,7 @@ import {
     ContractAddress,
     Tokens,
     TokenAddress,
-    TxEthSignature
+    TxEthSignature,
 } from "./types";
 import {
     isTokenETH,
@@ -95,6 +95,10 @@ export class Provider {
         serialId: number
     ): Promise<PriorityOperationReceipt> {
         return await this.transport.request("ethop_info", [serialId]);
+    }
+
+    async getConfirmationsForEthOpAmount(): Promise<number> {
+        return await this.transport.request("get_confirmations_for_eth_op_amount", []);
     }
 
     async notifyPriorityOp(

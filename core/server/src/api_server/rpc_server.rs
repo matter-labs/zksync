@@ -1,7 +1,5 @@
-// Built-in deps
 use std::collections::HashMap;
-use std::net::SocketAddr;
-
+use std::convert::TryInto;
 // External uses
 use bigdecimal::BigDecimal;
 use futures::{
@@ -11,23 +9,27 @@ use futures::{
 use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_http_server::ServerBuilder;
-use storage::chain::block::records::BlockDetails;
-use storage::chain::operations::records::StoredExecutedPriorityOperation;
-use storage::chain::operations_ext::records::TxReceiptResponse;
-use web3::types::Address;
 // Workspace uses
 use models::{
-    config_options::ThreadPanicNotify,
+    config_options::{ConfigurationOptions, ThreadPanicNotify},
     node::{
         closest_packable_fee_amount,
         tx::{TxEthSignature, TxHash},
-        Account, AccountId, FranklinTx, Nonce, PubKeyHash, Token, TokenId, TokenLike,
+        Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce, PriorityOp, PubKeyHash,
+        Token, TokenId, TokenLike,
     },
-    primitives::floor_big_decimal,
+    primitives::{big_decimal_to_u128, floor_big_decimal},
 };
-use storage::{ConnectionPool, StorageProcessor};
+use storage::{
+    chain::{
+        block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
+        operations_ext::records::TxReceiptResponse,
+    },
+    ConnectionPool, StorageProcessor,
+};
 // Local uses
 use crate::{
+    eth_watch::EthWatchRequest,
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
@@ -63,11 +65,63 @@ impl ResponseAccountState {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositingFunds {
+    amount: BigDecimal,
+    expected_accept_block: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DepositingAccountBalances {
+    balances: HashMap<String, DepositingFunds>,
+}
+
+impl DepositingAccountBalances {
+    pub fn from_pending_ops(
+        pending_ops: OngoingDepositsResp,
+        tokens: &HashMap<TokenId, Token>,
+    ) -> Result<Self> {
+        let mut balances = HashMap::new();
+
+        for op in pending_ops.deposits {
+            let token_symbol = if op.token_id == 0 {
+                "ETH".to_string()
+            } else {
+                tokens
+                    .get(&op.token_id)
+                    .ok_or_else(Error::internal_error)?
+                    .symbol
+                    .clone()
+            };
+
+            let expected_accept_block =
+                op.received_on_block + pending_ops.confirmations_for_eth_event;
+
+            let balance = balances
+                .entry(token_symbol)
+                .or_insert_with(DepositingFunds::default);
+
+            balance.amount += BigDecimal::from(op.amount);
+
+            // `balance.expected_accept_block` should be the greatest block number among
+            // all the deposits for a certain token.
+            if expected_accept_block > balance.expected_accept_block {
+                balance.expected_accept_block = expected_accept_block;
+            }
+        }
+
+        Ok(Self { balances })
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfoResp {
     pub address: Address,
     pub id: Option<AccountId>,
+    depositing: DepositingAccountBalances,
     pub committed: ResponseAccountState,
     pub verified: ResponseAccountState,
 }
@@ -101,6 +155,68 @@ pub struct ETHOpInfoResp {
 pub struct ContractAddressResp {
     pub main_contract: String,
     pub gov_contract: String,
+}
+
+/// Flattened `PriorityOp` object representing a deposit operation.
+/// Used in the `OngoingDepositsResp`.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OngoingDeposit {
+    received_on_block: u64,
+    token_id: u16,
+    amount: u64,
+    eth_tx_hash: String,
+}
+
+impl OngoingDeposit {
+    pub fn new(received_on_block: u64, priority_op: PriorityOp) -> Self {
+        let (token_id, amount) = match priority_op.data {
+            FranklinPriorityOp::Deposit(deposit) => (
+                deposit.token,
+                big_decimal_to_u128(&deposit.amount)
+                    .try_into()
+                    .expect("Too big deposit amount"),
+            ),
+            other => {
+                panic!("Incorrect input for OngoingDeposit: {:?}", other);
+            }
+        };
+
+        let eth_tx_hash = hex::encode(&priority_op.eth_hash);
+
+        Self {
+            received_on_block,
+            token_id,
+            amount,
+            eth_tx_hash,
+        }
+    }
+}
+
+/// Information about ongoing deposits for certain recipient address.
+///
+/// Please note that since this response is based on the events that are
+/// currently awaiting confirmations, this information is approximate:
+/// blocks on Ethereum can be reverted, and final list of executed deposits
+/// can differ from the this estimation.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OngoingDepositsResp {
+    /// Address for which response is served.
+    address: Address,
+    /// List of tuples (Eth block number, Deposit operation) of ongoing
+    /// deposit operations.
+    deposits: Vec<OngoingDeposit>,
+
+    /// Amount of confirmations required for every deposit to be processed.
+    confirmations_for_eth_event: u64,
+
+    /// Estimated block number for deposits completions:
+    /// all the deposit operations for provided address are expected to be
+    /// accepted in the zkSync network upon reaching this blocks.
+    ///
+    /// Can be `None` if there are no ongoing deposits.
+    estimated_deposits_approval_block: Option<u64>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
@@ -178,37 +294,55 @@ pub trait Rpc {
         amount: BigDecimal,
         token_like: TokenLike,
     ) -> Result<BigDecimal>;
+
+    #[rpc(name = "get_confirmations_for_eth_op_amount", returns = "u64")]
+    fn get_confirmations_for_eth_op_amount(&self) -> Result<u64>;
 }
 
+#[derive(Clone)]
 pub struct RpcApp {
     cache_of_executed_priority_operations: SharedLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_blocks_info: SharedLruCache<i64, BlockDetails>,
     cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
+
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
-    pub connection_pool: ConnectionPool,
+    pub eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     pub sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+
+    pub connection_pool: ConnectionPool,
+
+    pub confirmations_for_eth_event: u64,
     pub token_cache: TokenDBCache,
 }
 
 impl RpcApp {
     pub fn new(
+        config_options: &ConfigurationOptions,
         connection_pool: ConnectionPool,
         mempool_request_sender: mpsc::Sender<MempoolRequest>,
         state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
-        api_requests_caches_size: usize,
+        eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     ) -> Self {
         let token_cache = TokenDBCache::new(connection_pool.clone());
+
+        let api_requests_caches_size = config_options.api_requests_caches_size;
+        let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
 
         RpcApp {
             cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
             cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
             cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
+
             connection_pool,
+
             mempool_request_sender,
             state_keeper_request_sender,
             sign_verify_request_sender,
+            eth_watcher_request_sender,
+
+            confirmations_for_eth_event,
             token_cache,
         }
     }
@@ -254,11 +388,79 @@ impl RpcApp {
     }
 }
 
+pub(crate) async fn get_ongoing_priority_ops(
+    eth_watcher_request_sender: &mpsc::Sender<EthWatchRequest>,
+) -> Result<Vec<(u64, PriorityOp)>> {
+    let mut eth_watcher_request_sender = eth_watcher_request_sender.clone();
+
+    let eth_watcher_response = oneshot::channel();
+
+    // Get all the ongoing priority ops from the `EthWatcher`.
+    eth_watcher_request_sender
+        .send(EthWatchRequest::GetUnconfirmedQueueOps {
+            resp: eth_watcher_response.0,
+        })
+        .await
+        .map_err(|_| Error::internal_error())?;
+
+    eth_watcher_response
+        .1
+        .await
+        .map_err(|_| Error::internal_error())
+}
+
 impl RpcApp {
     fn access_storage(&self) -> Result<StorageProcessor> {
         self.connection_pool
             .access_storage_fragile()
             .map_err(|_| Error::internal_error())
+    }
+
+    /// Async version of `get_ongoing_deposits` which does not use old futures as a return type.
+    async fn get_ongoing_deposits_impl(&self, address: Address) -> Result<OngoingDepositsResp> {
+        let confirmations_for_eth_event = self.confirmations_for_eth_event;
+
+        let ongoing_ops = get_ongoing_priority_ops(&self.eth_watcher_request_sender).await?;
+
+        let mut max_block_number = 0;
+
+        // Filter only deposits for the requested address.
+        // `map` is used after filter to find the max block number without an
+        // additional list pass.
+        let deposits: Vec<_> = ongoing_ops
+            .into_iter()
+            .filter(|(_block, op)| {
+                if let FranklinPriorityOp::Deposit(deposit) = &op.data {
+                    // Address may be set to either sender or recipient.
+                    deposit.from == address || deposit.to == address
+                } else {
+                    false
+                }
+            })
+            .map(|(block, op)| {
+                if block > max_block_number {
+                    max_block_number = block;
+                }
+
+                OngoingDeposit::new(block, op)
+            })
+            .collect();
+
+        let estimated_deposits_approval_block = if !deposits.is_empty() {
+            // We have to wait `confirmations_for_eth_event` blocks after the most
+            // recent deposit operation.
+            Some(max_block_number + confirmations_for_eth_event)
+        } else {
+            // No ongoing deposits => no estimated block.
+            None
+        };
+
+        Ok(OngoingDepositsResp {
+            address,
+            deposits,
+            confirmations_for_eth_event,
+            estimated_deposits_approval_block,
+        })
     }
 
     // cache access functions
@@ -360,6 +562,7 @@ impl Rpc for RpcApp {
         };
 
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
+        let self_ = self.clone();
         let account_state_resp = async move {
             let state_keeper_response = oneshot::channel();
             state_keeper_request_sender
@@ -389,11 +592,15 @@ impl Rpc for RpcApp {
                 ResponseAccountState::default()
             };
 
+            let depositing_ops = self_.get_ongoing_deposits_impl(address).await?;
+            let depositing = DepositingAccountBalances::from_pending_ops(depositing_ops, &tokens)?;
+
             Ok(AccountInfoResp {
                 address,
                 id,
                 committed,
                 verified,
+                depositing,
             })
         };
 
@@ -418,6 +625,10 @@ impl Rpc for RpcApp {
                 block: None,
             }
         })
+    }
+
+    fn get_confirmations_for_eth_op_amount(&self) -> Result<u64> {
+        Ok(self.confirmations_for_eth_event)
     }
 
     fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
@@ -538,15 +749,17 @@ impl Rpc for RpcApp {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server(
-    addr: SocketAddr,
+    config_options: ConfigurationOptions,
     connection_pool: ConnectionPool,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
-    api_requests_caches_size: usize,
 ) {
+    let addr = config_options.json_rpc_http_server_address;
     std::thread::Builder::new()
         .name("json_rpc_http".to_string())
         .spawn(move || {
@@ -554,11 +767,12 @@ pub fn start_rpc_server(
             let mut io = IoHandler::new();
 
             let rpc_app = RpcApp::new(
+                &config_options,
                 connection_pool,
                 mempool_request_sender,
                 state_keeper_request_sender,
                 sign_verify_request_sender,
-                api_requests_caches_size,
+                eth_watcher_request_sender,
             );
             rpc_app.extend(&mut io);
 

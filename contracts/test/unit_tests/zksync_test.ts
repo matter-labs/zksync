@@ -304,7 +304,7 @@ describe("zkSync withdraw unit tests", function () {
 
         await zksyncContract.setBalanceToWithdraw(wallet.address, 0, withdrawAmount);
         const {revertReason} = await getCallRevertReason(async () => await performWithdraw(wallet, AddressZero, 0, withdrawAmount.add(1)));
-        expect(revertReason, "wrong revert reason").eq("frw11");
+        expect(revertReason, "wrong revert reason").eq("SafeMath: subtraction overflow");
     });
 
     it("Withdraw ERC20 success", async () => {
@@ -334,7 +334,7 @@ describe("zkSync withdraw unit tests", function () {
         await zksyncContract.setBalanceToWithdraw(wallet.address, tokenId, withdrawAmount);
 
         const {revertReason} = await getCallRevertReason(async () => await performWithdraw(wallet, tokenContract.address, tokenId, withdrawAmount.add(1)));
-        expect(revertReason, "wrong revert reason").eq("frw11");
+        expect(revertReason, "wrong revert reason").eq("SafeMath: subtraction overflow");
     });
 
     it("Withdraw ERC20 unsupported token", async () => {

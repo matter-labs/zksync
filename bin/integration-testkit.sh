@@ -27,6 +27,6 @@ elif [[ $ZKSYNC_ENV == dev ]]; then
     export WEB3_URL=http://localhost:7545
 fi
 
-cargo run --bin exodus_test --release
 cargo run --bin testkit --release
 cargo run --bin migration_test --release
+cargo run --bin exodus_test --release

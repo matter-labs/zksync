@@ -1,20 +1,23 @@
-use std::{collections::HashMap, sync::RwLock};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use models::node::{Token, TokenId, TokenLike};
 use storage::ConnectionPool;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TokenDBCache {
     db_pool: ConnectionPool,
     // TODO: handle stale entries. (edge case when we rename token after adding it)
-    tokens: RwLock<HashMap<TokenId, Token>>,
+    tokens: Arc<RwLock<HashMap<TokenId, Token>>>,
 }
 
 impl TokenDBCache {
     pub fn new(db_pool: ConnectionPool) -> Self {
         Self {
             db_pool,
-            tokens: RwLock::new(HashMap::new()),
+            tokens: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
