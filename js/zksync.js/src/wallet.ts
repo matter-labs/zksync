@@ -1,6 +1,6 @@
-import {Contract, ContractTransaction, ethers, utils} from "ethers";
-import {ETHProxy, Provider} from "./provider";
-import {Signer} from "./signer";
+import { Contract, ContractTransaction, ethers, utils } from "ethers";
+import { ETHProxy, Provider } from "./provider";
+import { Signer } from "./signer";
 import {
     AccountState,
     Address,
@@ -9,7 +9,8 @@ import {
     PriorityOperationReceipt,
     TransactionReceipt,
     PubKeyHash,
-    TxEthSignature, ChangePubKey
+    TxEthSignature,
+    ChangePubKey
 } from "./types";
 import {
     ERC20_APPROVE_TRESHOLD,
@@ -17,6 +18,7 @@ import {
     isTokenETH,
     MAX_ERC20_APPROVE_AMOUNT,
     signChangePubkeyMessage,
+    getEthSignatureType,
     SYNC_MAIN_CONTRACT_INTERFACE
 } from "./utils";
 
@@ -37,14 +39,13 @@ class ZKSyncTxError extends Error {
 export class Wallet {
     public provider: Provider;
 
-    private ethSignatureType?: "EthereumSignature" | "EIP1271Signature";
     private constructor(
         public ethSigner: ethers.Signer,
         public cachedAddress: Address,
         public signer?: Signer,
         public accountId?: number,
-    ) {
-    }
+        public ethSignatureType?: "EthereumSignature" | "EIP1271Signature"
+    ) {}
 
     connect(provider: Provider) {
         this.provider = provider;
@@ -56,16 +57,27 @@ export class Wallet {
         provider: Provider,
         signer?: Signer,
         accountId?: number,
+        ethSignatureType?: "EthereumSignature" | "EIP1271Signature"
     ): Promise<Wallet> {
-        const walletSigner = signer
-            ? signer
-            : await Signer.fromETHSignature(ethWallet);
+        if (signer == undefined) {
+            const signerResult = await Signer.fromETHSignature(ethWallet);
+            signer = signerResult.signer;
+            ethSignatureType =
+                ethSignatureType || signerResult.ethSignatureType;
+        } else if (ethSignatureType == undefined) {
+            throw new Error(
+                "If you passed signer, you must also pass ethSignatureType."
+            );
+        }
+
         const wallet = new Wallet(
             ethWallet,
             await ethWallet.getAddress(),
-            walletSigner,
+            signer,
             accountId,
+            ethSignatureType
         );
+
         wallet.connect(provider);
         return wallet;
     }
@@ -74,8 +86,15 @@ export class Wallet {
         ethWallet: ethers.Signer,
         provider: Provider,
         accountId?: number,
+        ethSignatureType?: "EthereumSignature" | "EIP1271Signature"
     ): Promise<Wallet> {
-        const wallet = new Wallet(ethWallet, await ethWallet.getAddress(), undefined, accountId);
+        const wallet = new Wallet(
+            ethWallet,
+            await ethWallet.getAddress(),
+            undefined,
+            accountId,
+            ethSignatureType,
+        );
         wallet.connect(provider);
         return wallet;
     }
@@ -84,11 +103,12 @@ export class Wallet {
         const signature = await this.ethSigner.signMessage(message);
 
         if (this.ethSignatureType == undefined) {
-            const recovered = ethers.utils.verifyMessage(message, signature).toLowerCase();
-            const address = await this.ethSigner.getAddress().then(s => s.toLowerCase());
-            this.ethSignatureType = recovered === address
-                ? "EthereumSignature"
-                : "EIP1271Signature";
+            const address = await this.ethSigner.getAddress();
+            this.ethSignatureType = getEthSignatureType(
+                message,
+                signature,
+                address
+            );
         }
 
         return { type: this.ethSignatureType, signature };
@@ -138,7 +158,9 @@ export class Wallet {
             `Fee: ${stringFee} ${stringToken}\n` +
             `Account Id: ${this.accountId}`;
 
-        const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
+        const txMessageEthSignature = await this.getEthMessageSignature(
+            humanReadableTxInfo
+        );
 
         const signedTransferTransaction = this.signer.signSyncTransfer(
             transactionData
@@ -198,7 +220,9 @@ export class Wallet {
             `Fee: ${stringFee} ${stringToken}\n` +
             `Account Id: ${this.accountId}`;
 
-        const txMessageEthSignature = await this.getEthMessageSignature(humanReadableTxInfo);
+        const txMessageEthSignature = await this.getEthMessageSignature(
+            humanReadableTxInfo
+        );
 
         const signedWithdrawTransaction = this.signer.signSyncWithdraw(
             transactionData
@@ -249,11 +273,11 @@ export class Wallet {
         const ethSignature = onchainAuth
             ? null
             : await signChangePubkeyMessage(
-                this.ethSigner,
-                newPubKeyHash,
-                numNonce,
-                this.accountId,
-            );
+                  this.ethSigner,
+                  newPubKeyHash,
+                  numNonce,
+                  this.accountId
+              );
 
         const txData: ChangePubKey = {
             type: "ChangePubKey",
@@ -425,8 +449,7 @@ export class Wallet {
             ethTransaction = await mainZkSyncContract.depositETH(
                 deposit.depositTo,
                 {
-                    value: utils
-                        .bigNumberify(deposit.amount),
+                    value: utils.bigNumberify(deposit.amount),
                     gasLimit: utils.bigNumberify("200000"),
                     gasPrice,
                     ...deposit.ethTxOptions
@@ -530,7 +553,9 @@ export class Wallet {
         if (this.accountId === undefined) {
             const accountIdFromServer = await this.getAccountId();
             if (accountIdFromServer == null) {
-                throw new Error(`Failed to ${actionName}: Account does not exist in the zkSync network`);
+                throw new Error(
+                    `Failed to ${actionName}: Account does not exist in the zkSync network`
+                );
             } else {
                 this.accountId = accountIdFromServer;
             }

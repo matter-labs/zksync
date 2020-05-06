@@ -7,7 +7,7 @@ import {
     Tokens,
     TokenSymbol
 } from "./types";
-import {serializeAccountId, serializeNonce} from "./signer";
+import { serializeAccountId, serializeNonce } from "./signer";
 
 export const IERC20_INTERFACE = new utils.Interface(
     require("../abi/IERC20.json").interface
@@ -328,7 +328,7 @@ export async function signChangePubkeyMessage(
     signer: ethers.Signer,
     pubKeyHash: PubKeyHash,
     nonce: number,
-    accountId: number,
+    accountId: number
 ): Promise<string> {
     const msgNonce = serializeNonce(nonce)
         .toString("hex")
@@ -336,11 +336,23 @@ export async function signChangePubkeyMessage(
     const msgAccId = serializeAccountId(accountId)
         .toString("hex")
         .toLowerCase();
-    const pubKeyHashHex = pubKeyHash.replace('sync:', '').toLowerCase();
-    const message = `Register zkSync pubkey:\n\n` +
-                     `${pubKeyHashHex}\n` +
-                     `nonce: 0x${msgNonce}\n` +
-                     `account id: 0x${msgAccId}\n\n` +
-                     `Only sign this message for a trusted client!`;
+    const pubKeyHashHex = pubKeyHash.replace("sync:", "").toLowerCase();
+    const message =
+        `Register zkSync pubkey:\n\n` +
+        `${pubKeyHashHex}\n` +
+        `nonce: 0x${msgNonce}\n` +
+        `account id: 0x${msgAccId}\n\n` +
+        `Only sign this message for a trusted client!`;
     return signer.signMessage(message);
+}
+
+export function getEthSignatureType(
+    message: string,
+    signature: string,
+    address: string
+): "EthereumSignature" | "EIP1271Signature" {
+    const recovered = ethers.utils.verifyMessage(message, signature);
+    return recovered.toLowerCase() === address.toLowerCase()
+        ? "EthereumSignature"
+        : "EIP1271Signature";
 }
