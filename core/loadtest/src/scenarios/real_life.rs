@@ -98,12 +98,22 @@ impl ScenarioExecutor {
     }
 
     pub async fn run(&mut self) -> Result<(), failure::Error> {
+        self.start().await?;
         self.deposit().await?;
         self.initial_transfer().await?;
         self.funds_rotation().await?;
         self.collect_funds().await?;
         self.withdraw().await?;
         self.finish().await?;
+
+        Ok(())
+    }
+
+    async fn start(&mut self) -> Result<(), failure::Error> {
+        // First of all, we have to update both the Ethereum and ZKSync accounts nonce values.
+        self.main_account
+            .update_nonce_values(&self.rpc_client)
+            .await?;
 
         Ok(())
     }
@@ -126,6 +136,26 @@ impl ScenarioExecutor {
             &self.rpc_client,
         )
         .await?;
+
+        log::info!("Deposit sent and verified");
+
+        // Now when deposits are done it is time to update account id.
+        self.main_account
+            .update_account_id(&self.rpc_client)
+            .await?;
+
+        log::info!("Main account ID set");
+
+        // ...and change the main account pubkey.
+        // We have to change pubkey after the deposit so we'll be able to use corresponding
+        // `zkSync` account.
+        let (change_pubkey_tx, eth_sign) = (self.main_account.sign_change_pubkey(), None);
+        let mut sent_txs = SentTransactions::new();
+        let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, eth_sign).await?;
+        sent_txs.add_tx_hash(tx_hash);
+        wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+
+        log::info!("Main account pubkey changed");
 
         log::info!("Deposit phase completed");
 
@@ -180,6 +210,8 @@ impl ScenarioExecutor {
         log::info!("Signed all the initial transfer transactions, sending");
 
         // Send txs by batches that can fit in one block.
+        let to_verify = signed_transfers.len();
+        let mut verified = 0;
         for tx_batch in signed_transfers.chunks(self.max_block_size) {
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
@@ -191,9 +223,41 @@ impl ScenarioExecutor {
                 sent_txs.add_tx_hash(tx_hash);
             }
 
+            verified += sent_txs.len();
+
             // Wait until all the transactions are verified.
             wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+
+            log::info!("Sent and verified {}/{} txs", verified, to_verify);
         }
+
+        log::info!("All the initial transfers are completed");
+        log::info!("Updating the accounts info and changing their public keys");
+
+        // After all the initial transfer completed, we have to update new account IDs
+        // and change public keys of accounts (so we'll be able to send transfers from them).
+        let mut sent_txs = SentTransactions::new();
+        for account in self.accounts.iter() {
+            let resp = self
+                .rpc_client
+                .account_state_info(account.address)
+                .await
+                .expect("rpc error");
+            assert!(resp.id.is_some(), "Account ID is none for new account");
+            account.set_account_id(resp.id);
+
+            let change_pubkey_tx = FranklinTx::ChangePubKey(Box::new(
+                account.create_change_pubkey_tx(None, true, false),
+            ));
+
+            let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, None).await?;
+            sent_txs.add_tx_hash(tx_hash);
+        }
+        // Calculate the estimated amount of blocks for all the txs to be processed.
+        let n_blocks = (self.accounts.len() / self.max_block_size + 1) as u32;
+        wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK * n_blocks, &self.rpc_client).await;
+
+        log::info!("All the accounts are prepared");
 
         log::info!("Initial transfers are sent and verified");
 
@@ -223,6 +287,8 @@ impl ScenarioExecutor {
         log::info!("Signed transfers, sending");
 
         // Send txs by batches that can fit in one block.
+        let to_verify = signed_transfers.len();
+        let mut verified = 0;
         for tx_batch in signed_transfers.chunks(self.max_block_size) {
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
@@ -234,8 +300,12 @@ impl ScenarioExecutor {
                 sent_txs.add_tx_hash(tx_hash);
             }
 
+            verified += sent_txs.len();
+
             // Wait until all the transactions are verified.
             wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+
+            log::info!("Sent and verified {}/{} txs", verified, to_verify);
         }
 
         log::info!("Transfers are sent and verified");
@@ -257,6 +327,8 @@ impl ScenarioExecutor {
         log::info!("Signed transfers, sending");
 
         // Send txs by batches that can fit in one block.
+        let to_verify = signed_transfers.len();
+        let mut verified = 0;
         for tx_batch in signed_transfers.chunks(self.max_block_size) {
             let mut sent_txs = SentTransactions::new();
             // Send each tx.
@@ -268,8 +340,12 @@ impl ScenarioExecutor {
                 sent_txs.add_tx_hash(tx_hash);
             }
 
+            verified += sent_txs.len();
+
             // Wait until all the transactions are verified.
             wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+
+            log::info!("Sent and verified {}/{} txs", verified, to_verify);
         }
 
         log::info!("Collecting funds completed");
