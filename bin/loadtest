@@ -3,7 +3,7 @@
 USAGE='Usage: zksync loadtest [-h|--help] [SCENARIO] [PATH_TO_CONFIG]
 where:
     -h | --help     show this message
-    SCENARIO        {outgoing,execution} (outgoing by default)
+    SCENARIO        {outgoing,execution,real-life} (outgoing by default)
     PATH_TO_CONFIG  path to loadtest config (default is core/loadtest/src/loadtest.json)'
 
 if [ -z $ZKSYNC_ENV ];
@@ -18,7 +18,7 @@ CONFIG=${2:-"$ZKSYNC_HOME/core/loadtest/src/loadtest.json"}
 echo H: $SCENARIO $CONFIG
 
 case $SCENARIO in
-  outgoing|execution)
+  outgoing|execution|real-life|reallife|real_life)
       echo Executing $SCENARIO loadtest scenario
     ;;
   -h | --help)
