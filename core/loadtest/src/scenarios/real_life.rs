@@ -16,16 +16,37 @@
 //!
 //! Schematically, scenario will look like this:
 //!
-//! Deposit  | Transfer to new  | Transfer | Collect back | Withdraw to ETH
-//!
 //! ```text
-//!                                ┗━━━━┓
-//!                      ┏━━━>Acc1━━━━━┓┗>Acc1━━━┓
-//!                    ┏━┻━━━>Acc2━━━━┓┗━>Acc2━━━┻┓
+//! Deposit  | Transfer to new  | Transfer | Collect back | Withdraw to ETH
+//!          |                  |          |              |
+//!          |                  |  ┗━━━━┓  |              |
+//!          |           ┏━━━>Acc1━━━━━┓┗>Acc1━━━┓        |
+//!          |         ┏━┻━━━>Acc2━━━━┓┗━>Acc2━━━┻┓       |
 //! ETH━━━━>InitialAcc━╋━━━━━>Acc3━━━┓┗━━>Acc3━━━━╋━>InitialAcc━>ETH
-//!                    ┗━┳━━━>Acc4━━┓┗━━━>Acc4━━━┳┛
-//!                      ┗━━━>Acc5━┓┗━━━━>Acc5━━━┛
+//!          |         ┗━┳━━━>Acc4━━┓┗━━━>Acc4━━━┳┛       |
+//!          |           ┗━━━>Acc5━┓┗━━━━>Acc5━━━┛        |
 //! ```
+//!
+//! ## Test configuration
+//!
+//! To configure the test, one should provide a JSON config with the following structure:
+//!
+//! ```json
+//! {
+//!     "n_accounts": 100,     // Amount of intermediate account to use, "breadth" of the test.
+//!     "transfer_size": 100,  // Amount of money to be used in the transfer, in wei.
+//!     "cycles_amount": 10,   // Amount of iterations to rotate funds, "length" of the test.
+//!     "block_timeout": 120,  // Amount of time to wait for one zkSync block to be verified.
+//!     "input_account": {     // Address/private key of the Ethereum account to deposit money for test from.
+//!         "address": "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049",
+//!         "private_key": "0x7726827caac94a7f9e1b160f7ea819f172f7b6f9d2a97f992c38edeab82d4110"
+//!     }
+//! }
+//! ```
+//!
+//! `configs` folder of the crate contains a `reallife.json` sample configuration optimized for
+//! running the test in development infrastructure (dummy prover, 1 second for one Ethereum block
+//! testnet Ethereum chain).
 
 // Built-in deps
 use std::time::Duration;
@@ -50,11 +71,6 @@ use crate::{
     test_accounts::TestAccount,
 };
 
-/// Transactions in this test are aligned so that we aren't sending more transactions
-/// than could fit in the block at the time.
-/// So the timeout is set to the value reasonable for one block.
-const TIMEOUT_FOR_BLOCK: Duration = Duration::from_secs(2 * 60);
-
 #[derive(Debug)]
 struct ScenarioExecutor {
     rpc_client: RpcClient,
@@ -75,6 +91,9 @@ struct ScenarioExecutor {
     /// Biggest supported block size (to not overload the node
     /// with too many txs at the moment)
     max_block_size: usize,
+
+    /// Amount of time to wait for one zkSync block to be verified.
+    verify_timeout: Duration,
 
     /// Event loop handle so transport for Eth account won't be invalidated.
     _event_loop_handle: EventLoopHandle,
@@ -108,6 +127,8 @@ impl ScenarioExecutor {
             transfer_size: config.transfer_size,
             cycles_amount: config.cycles_amount,
             max_block_size: Self::get_max_supported_block_size(),
+
+            verify_timeout: Duration::from_secs(config.block_timeout),
 
             _event_loop_handle,
         }
@@ -172,7 +193,7 @@ impl ScenarioExecutor {
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
-        wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
 
         log::info!("Main account pubkey changed");
 
@@ -217,7 +238,7 @@ impl ScenarioExecutor {
             verified += sent_txs.len();
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
 
             log::info!("Sent and verified {}/{} txs", verified, to_verify);
         }
@@ -246,7 +267,7 @@ impl ScenarioExecutor {
         }
         // Calculate the estimated amount of blocks for all the txs to be processed.
         let n_blocks = (self.accounts.len() / self.max_block_size + 1) as u32;
-        wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK * n_blocks, &self.rpc_client).await;
+        wait_for_verify(sent_txs, self.verify_timeout * n_blocks, &self.rpc_client).await;
 
         log::info!("All the accounts are prepared");
 
@@ -300,7 +321,7 @@ impl ScenarioExecutor {
             verified += sent_txs.len();
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
 
             log::info!("Sent and verified {}/{} txs", verified, to_verify);
         }
@@ -341,7 +362,7 @@ impl ScenarioExecutor {
             verified += sent_txs.len();
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
 
             log::info!("Sent and verified {}/{} txs", verified, to_verify);
         }
@@ -367,7 +388,7 @@ impl ScenarioExecutor {
             .await?;
         sent_txs.add_tx_hash(tx_hash);
 
-        wait_for_verify(sent_txs, TIMEOUT_FOR_BLOCK, &self.rpc_client).await;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
 
         log::info!("Withdrawing funds completed");
 

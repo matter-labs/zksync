@@ -52,9 +52,15 @@ impl LoadTestConfig {
 /// (amount of iterations) of the test
 #[derive(Debug, Clone, Deserialize)]
 pub struct RealLifeConfig {
+    /// Amount of intermediate accounts to use.
     pub n_accounts: usize,
+    /// Size of one transfer (in wei).
     pub transfer_size: u64,
+    /// Amount of funds rotation cycles.
     pub cycles_amount: u32,
+    /// Timeout for awaiting a block to be verified.
+    pub block_timeout: u64,
+    /// Main account to deposit ETH from.
     pub input_account: AccountInfo,
 }
 
