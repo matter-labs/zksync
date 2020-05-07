@@ -134,8 +134,29 @@ impl ScenarioExecutor {
         }
     }
 
+    /// Infallible test runner which performs the emergency exit if any step of the test
+    /// fails.
+    pub async fn run(&mut self) {
+        if let Err(error) = self.run_test().await {
+            log::error!("Loadtest erred with the following error: {}", error);
+            log::warn!("Performing the emergency_exit");
+            self.emergency_exit().await;
+        } else {
+            log::info!("Loadtest completed successfully");
+        }
+    }
+
+    /// Method to be used if the scenario will fail on the any step.
+    /// It does the following:
+    ///
+    /// 1. Stores all the zkSync account keys into a file named "emergency_output.json"
+    ///    so the funds left on accounts will not be lost.
+    /// 2. Attempts to withdraw all the balances from the both intermediate and the main
+    ///    account back to the Ethereum.
+    pub async fn emergency_exit(&self) {}
+
     /// Runs the test step-by-step. Every test step is encapsulated into its own function.
-    pub async fn run(&mut self) -> Result<(), failure::Error> {
+    pub async fn run_test(&mut self) -> Result<(), failure::Error> {
         self.initialize().await?;
         self.deposit().await?;
         self.initial_transfer().await?;
@@ -445,18 +466,12 @@ impl ScenarioExecutor {
 pub fn run_scenario(mut ctx: ScenarioContext) {
     // let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec);
     let rpc_addr = ctx.rpc_addr.clone();
-
     let rpc_client = RpcClient::new(&rpc_addr);
 
     let mut scenario = ScenarioExecutor::new(&ctx, rpc_client);
 
-    // Obtain the Ethereum node JSON RPC address.
-    log::info!("Starting the loadtest");
-
     // Run the scenario.
-    log::info!("Waiting for all transactions to be verified");
-    ctx.rt
-        .block_on(scenario.run())
-        .expect("Failed the scenario");
+    log::info!("Starting the loadtest");
+    ctx.rt.block_on(scenario.run());
     log::info!("Loadtest completed.");
 }
