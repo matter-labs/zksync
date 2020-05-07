@@ -139,7 +139,7 @@ impl ScenarioExecutor {
     pub async fn run(&mut self) {
         if let Err(error) = self.run_test().await {
             log::error!("Loadtest erred with the following error: {}", error);
-            log::warn!("Performing the emergency_exit");
+            log::warn!("Performing the emergency exit");
             self.emergency_exit().await;
         } else {
             log::info!("Loadtest completed successfully");
@@ -147,13 +147,9 @@ impl ScenarioExecutor {
     }
 
     /// Method to be used if the scenario will fail on the any step.
-    /// It does the following:
-    ///
-    /// 1. Stores all the zkSync account keys into a file named "emergency_output.json"
-    ///    so the funds left on accounts will not be lost.
-    /// 2. Attempts to withdraw all the balances from the both intermediate and the main
-    ///    account back to the Ethereum.
-    pub async fn emergency_exit(&self) {}
+    /// It stores all the zkSync account keys into a file named "emergency_output.json"
+    /// so the funds left on accounts will not be lost.
+    async fn emergency_exit(&self) {}
 
     /// Runs the test step-by-step. Every test step is encapsulated into its own function.
     pub async fn run_test(&mut self) -> Result<(), failure::Error> {
@@ -183,7 +179,16 @@ impl ScenarioExecutor {
         // Amount of money we need to deposit.
         // Initialize it with the raw amount: only sum of transfers per account.
         // Fees will be set to zero, so there is no need in any additional funds.
-        let amount_to_deposit = self.transfer_size * self.n_accounts as u64;
+        let amount_to_deposit =
+            BigDecimal::from(self.transfer_size) * BigDecimal::from(self.n_accounts as u64);
+
+        let account_balance = self.main_account.eth_acc.eth_balance().await?;
+        log::info!("Main account ETH balance: {}", account_balance);
+
+        // Ensure that account does have enough money.
+        if amount_to_deposit > account_balance {
+            panic!("Main ETH account does not have enough balance to run the test with the provided config");
+        }
 
         log::info!(
             "Starting depositing phase. Depositing {} wei to the main account",
@@ -191,12 +196,7 @@ impl ScenarioExecutor {
         );
 
         // Deposit funds and wait for operation to be executed.
-        deposit_single(
-            &self.main_account,
-            amount_to_deposit.into(),
-            &self.rpc_client,
-        )
-        .await?;
+        deposit_single(&self.main_account, amount_to_deposit, &self.rpc_client).await?;
 
         log::info!("Deposit sent and verified");
 
@@ -394,15 +394,17 @@ impl ScenarioExecutor {
 
     /// Withdraws the money from the main account back to the Ethereum.
     async fn withdraw(&mut self) -> Result<(), failure::Error> {
-        log::info!("Withdrawing funds back to the Ethereum");
-
         let mut sent_txs = SentTransactions::new();
 
-        let amount_to_withdraw = self.transfer_size * self.n_accounts as u64;
+        let amount_to_withdraw =
+            BigDecimal::from(self.transfer_size) * BigDecimal::from(self.n_accounts as u64);
 
-        let (tx, eth_sign) = self
-            .main_account
-            .sign_withdraw_single(amount_to_withdraw.into());
+        log::info!(
+            "Starting withdrawing phase. Withdrawing {} wei back to the Ethereum",
+            amount_to_withdraw
+        );
+
+        let (tx, eth_sign) = self.main_account.sign_withdraw_single(amount_to_withdraw);
         let tx_hash = self
             .rpc_client
             .send_tx(tx.clone(), eth_sign.clone())
@@ -473,5 +475,4 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Run the scenario.
     log::info!("Starting the loadtest");
     ctx.rt.block_on(scenario.run());
-    log::info!("Loadtest completed.");
 }
