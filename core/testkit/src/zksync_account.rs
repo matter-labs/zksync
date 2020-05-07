@@ -31,6 +31,7 @@ impl fmt::Debug for ZksyncAccount {
 
         f.debug_struct("ZksyncAccount")
             .field("private_key", &pk_contents)
+            .field("pubkey_hash", &self.pubkey_hash)
             .field("address", &self.address)
             .field("eth_private_key", &self.eth_private_key)
             .field("nonce", &self.nonce)

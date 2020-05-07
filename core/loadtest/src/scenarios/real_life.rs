@@ -52,6 +52,8 @@
 use std::time::Duration;
 // External deps
 use bigdecimal::BigDecimal;
+use chrono::Utc;
+use tokio::fs;
 use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
 use models::{
@@ -147,9 +149,44 @@ impl ScenarioExecutor {
     }
 
     /// Method to be used if the scenario will fail on the any step.
-    /// It stores all the zkSync account keys into a file named "emergency_output.json"
+    /// It stores all the zkSync account keys into a file named
+    /// like "emergency_output_2020_05_05_12_23_55.txt"
     /// so the funds left on accounts will not be lost.
-    async fn emergency_exit(&self) {}
+    ///
+    /// If saving the file fails, the accounts are printed to the log.
+    async fn emergency_exit(&self) {
+        // Timestamp is used to generate unique file name postfix.
+        let timestamp = Utc::now();
+        let timestamp_str = timestamp.format("%Y_%m_%d_%H_%M_%S").to_string();
+
+        let output_file_name = format!("emergency_output_{}.txt", timestamp_str);
+
+        let mut account_list = String::new();
+
+        // Add all the accounts to the string.
+        // Debug representations of account contains both zkSync and Ethereum private keys.
+        account_list += &format!("{:?}\n", self.main_account.zk_acc);
+        for account in self.accounts.iter() {
+            account_list += &format!("{:?}\n", account);
+        }
+
+        // If we're unable to save the file, print its contents to the console at least.
+        if let Err(error) = fs::write(&output_file_name, &account_list).await {
+            log::error!(
+                "Storing the account list erred with the following error: {}",
+                error
+            );
+            log::warn!(
+                "Printing the account list to the log instead: \n{}",
+                account_list
+            )
+        } else {
+            log::info!(
+                "Accounts used in this test are saved to the file '{}'",
+                &output_file_name
+            );
+        }
+    }
 
     /// Runs the test step-by-step. Every test step is encapsulated into its own function.
     pub async fn run_test(&mut self) -> Result<(), failure::Error> {
@@ -214,7 +251,7 @@ impl ScenarioExecutor {
         let mut sent_txs = SentTransactions::new();
         let tx_hash = self.rpc_client.send_tx(change_pubkey_tx, eth_sign).await?;
         sent_txs.add_tx_hash(tx_hash);
-        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
 
         log::info!("Main account pubkey changed");
 
@@ -259,7 +296,7 @@ impl ScenarioExecutor {
             verified += sent_txs.len();
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
 
             log::info!("Sent and verified {}/{} txs", verified, to_verify);
         }
@@ -288,7 +325,7 @@ impl ScenarioExecutor {
         }
         // Calculate the estimated amount of blocks for all the txs to be processed.
         let n_blocks = (self.accounts.len() / self.max_block_size + 1) as u32;
-        wait_for_verify(sent_txs, self.verify_timeout * n_blocks, &self.rpc_client).await;
+        wait_for_verify(sent_txs, self.verify_timeout * n_blocks, &self.rpc_client).await?;
 
         log::info!("All the accounts are prepared");
 
@@ -342,7 +379,7 @@ impl ScenarioExecutor {
             verified += sent_txs.len();
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
 
             log::info!("Sent and verified {}/{} txs", verified, to_verify);
         }
@@ -383,7 +420,7 @@ impl ScenarioExecutor {
             verified += sent_txs.len();
 
             // Wait until all the transactions are verified.
-            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
+            wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
 
             log::info!("Sent and verified {}/{} txs", verified, to_verify);
         }
@@ -411,7 +448,7 @@ impl ScenarioExecutor {
             .await?;
         sent_txs.add_tx_hash(tx_hash);
 
-        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await;
+        wait_for_verify(sent_txs, self.verify_timeout, &self.rpc_client).await?;
 
         log::info!("Withdrawing funds completed");
 

@@ -69,7 +69,8 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Wait until all the transactions are verified.
     log::info!("Waiting for all transactions to be verified");
     ctx.rt
-        .block_on(wait_for_verify(sent_txs, verify_timeout_sec, &rpc_client));
+        .block_on(wait_for_verify(sent_txs, verify_timeout_sec, &rpc_client))
+        .expect("Verifying failed");
     log::info!("Loadtest completed.");
 }
 

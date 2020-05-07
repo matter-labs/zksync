@@ -70,7 +70,7 @@ pub async fn wait_for_verify(
     sent_txs: SentTransactions,
     timeout: Duration,
     rpc_client: &RpcClient,
-) {
+) -> Result<(), failure::Error> {
     let serial_ids = sent_txs.op_serial_ids;
 
     let start = Instant::now();
@@ -80,16 +80,13 @@ pub async fn wait_for_verify(
     // Wait until all the transactions are verified.
     for &id in serial_ids.iter() {
         loop {
-            let state = rpc_client
-                .ethop_info(id as u64)
-                .await
-                .expect("[wait_for_verify] call ethop_info");
+            let state = rpc_client.ethop_info(id as u64).await?;
             if state.executed && state.verified {
                 log::debug!("deposit (serial_id={}) is verified", id);
                 break;
             }
             if start.elapsed() > timeout {
-                panic!("[wait_for_verify] Timeout")
+                failure::bail!("[wait_for_verify] Timeout")
             }
             timer.tick().await;
         }
@@ -98,18 +95,17 @@ pub async fn wait_for_verify(
     let tx_hashes = sent_txs.tx_hashes;
     for hash in tx_hashes.iter() {
         loop {
-            let state = rpc_client
-                .tx_info(hash.clone())
-                .await
-                .expect("[wait_for_verify] call tx_info");
+            let state = rpc_client.tx_info(hash.clone()).await?;
             if state.verified {
                 log::debug!("{} is verified", hash.to_string());
                 break;
             }
             if start.elapsed() > timeout {
-                panic!("[wait_for_verify] Timeout")
+                failure::bail!("[wait_for_verify] Timeout")
             }
             timer.tick().await;
         }
     }
+
+    Ok(())
 }
