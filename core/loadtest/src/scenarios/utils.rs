@@ -47,7 +47,7 @@ pub async fn wait_for_deposit_executed(
     // We poll the operation status twice a second until timeout is reached.
     let start = Instant::now();
     let timeout = Duration::from_secs(DEPOSIT_TIMEOUT_SEC);
-    let polling_interval = Duration::from_millis(500);
+    let polling_interval = Duration::from_millis(100);
     let mut timer = time::interval(polling_interval);
 
     // Polling cycle.
@@ -74,7 +74,7 @@ pub async fn wait_for_verify(
     let serial_ids = sent_txs.op_serial_ids;
 
     let start = Instant::now();
-    let polling_interval = Duration::from_millis(500);
+    let polling_interval = Duration::from_millis(250);
     let mut timer = time::interval(polling_interval);
 
     // Wait until all the transactions are verified.

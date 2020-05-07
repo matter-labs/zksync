@@ -1,7 +1,7 @@
 {
     "n_accounts": 100,
     "transfer_size": 100,
-    "cycles_amount": 10,
+    "cycles_amount": 5,
     "block_timeout": 120,
     "input_account": {
         "address": "0x36615Cf349d7F6344891B1e7CA7C72883F5dc049",
