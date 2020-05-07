@@ -37,10 +37,10 @@ struct OperationsQueue {
 }
 
 impl OperationsQueue {
-    fn new() -> Self {
+    fn new(last_loaded_block: BlockNumber) -> Self {
         Self {
             operations: VecDeque::new(),
-            last_loaded_block: 0,
+            last_loaded_block,
         }
     }
 
@@ -84,12 +84,8 @@ impl OperationsQueue {
     }
 
     /// Return block number of the next operation to take.
-    fn next_block_number(&self) -> Option<u32> {
-        if self.operations.is_empty() {
-            None
-        } else {
-            Some(self.operations[0].0.block.block_number)
-        }
+    fn next_block_number(&self) -> Option<BlockNumber> {
+        self.operations.front().map(|(op, _)| op.block.block_number)
     }
 
     // Whether queue is empty or not.
@@ -105,10 +101,10 @@ pub struct ProversDataPool {
 }
 
 impl ProversDataPool {
-    pub fn new(limit: i64) -> Self {
+    pub fn new(block_number: BlockNumber, limit: i64) -> Self {
         Self {
             limit,
-            op_queue: OperationsQueue::new(),
+            op_queue: OperationsQueue::new(block_number),
             prepared: HashMap::new(),
         }
     }
@@ -198,7 +194,7 @@ impl Maintainer {
 
         // Clone the required data to process it without holding the lock.
         let (mut queue, limit) = {
-            let pool = self.data.read().expect("failed to get write lock on data");
+            let pool = self.data.read().expect("failed to get read lock on data");
             (pool.op_queue.clone(), pool.limit)
         };
 

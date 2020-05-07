@@ -328,14 +328,7 @@ dev-push-geth:
 
 # Data Restore
 
-data-restore-setup-and-run: data-restore-build data-restore-restart
-
-data-restore-db-prepare: confirm_action db-reset
-
-data-restore-build:
-	@cargo build -p data_restore --release --bin data_restore
-
-data-restore-restart: confirm_action data-restore-db-prepare
+data-restore-restart: db-reset
 	@cargo run --bin data_restore --release -- --genesis
 
 data-restore-continue:

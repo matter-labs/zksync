@@ -441,8 +441,8 @@ impl<'a> BlockSchema<'a> {
     pub fn get_last_committed_block(&self) -> QueryResult<BlockNumber> {
         use crate::schema::operations::dsl::*;
         operations
-            .select(max(block_number))
             .filter(action_type.eq(&ActionType::COMMIT.to_string()))
+            .select(max(block_number))
             .get_result::<Option<i64>>(self.0.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }
@@ -450,8 +450,8 @@ impl<'a> BlockSchema<'a> {
     pub fn get_last_verified_block(&self) -> QueryResult<BlockNumber> {
         use crate::schema::operations::dsl::*;
         operations
-            .select(max(block_number))
             .filter(action_type.eq(&ActionType::VERIFY.to_string()))
+            .select(max(block_number))
             .get_result::<Option<i64>>(self.0.conn())
             .map(|max| max.unwrap_or(0) as BlockNumber)
     }

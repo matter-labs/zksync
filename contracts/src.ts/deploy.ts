@@ -271,6 +271,24 @@ export class Deployer {
         await txCall.wait();
     }
 
+    async setMoreTestValidators() {
+        const mnemonics = [
+            process.env.EXTRA_OPERATOR_MNEMONIC_1,
+            process.env.EXTRA_OPERATOR_MNEMONIC_2,
+        ];
+        const governance = this.getDeployedProxyContract('Governance');
+        for (const mnemonic of mnemonics) {
+            const wallet = ethers.Wallet.fromMnemonic(mnemonic, "m/44'/60'/0'/0/1");
+            await governance.setValidator(wallet.address, true).then(tx => tx.wait());
+            console.log();
+            console.log(`MNEMONIC="${mnemonic}"`);
+            console.log(`OPERATOR_PRIVATE_KEY=${wallet.privateKey.slice(2)}`);
+            console.log(`OPERATOR_ETH_ADDRESS=${wallet.address}`);
+            console.log(`OPERATOR_FRANKLIN_ADDRESS=${wallet.address}`);
+            console.log();
+        }
+    }
+
     async setGovernanceValidator() {
         const governance = await this.getDeployedProxyContract('Governance');
         await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
