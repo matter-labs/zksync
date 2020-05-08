@@ -164,24 +164,20 @@ impl crate::ApiClient for ApiClient {
     }
 
     fn working_on(&self, job_id: i32) -> Result<(), failure::Error> {
-        let op = || -> Result<(), failure::Error> {
-            trace!("sending working_on {}", job_id);
-            let res = self
-                .http_client
-                .post(self.working_on_url.as_str())
-                .json(&client::WorkingOnReq {
-                    prover_run_id: job_id,
-                })
-                .send()
-                .map_err(|e| format_err!("failed to send working on request: {}", e))?;
-            if res.status() != reqwest::StatusCode::OK {
-                bail!("working on request failed with status: {}", res.status())
-            } else {
-                Ok(())
-            }
-        };
-
-        Ok(self.with_retries(&op)?)
+        trace!("sending working_on {}", job_id);
+        let res = self
+            .http_client
+            .post(self.working_on_url.as_str())
+            .json(&client::WorkingOnReq {
+                prover_run_id: job_id,
+            })
+            .send()
+            .map_err(|e| format_err!("failed to send working on request: {}", e))?;
+        if res.status() != reqwest::StatusCode::OK {
+            bail!("working on request failed with status: {}", res.status())
+        } else {
+            Ok(())
+        }
     }
 
     fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
