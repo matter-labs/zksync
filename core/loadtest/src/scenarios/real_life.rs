@@ -49,11 +49,11 @@
 //! testnet Ethereum chain).
 
 // Built-in deps
-use std::time::Duration;
+use std::time::{Duration, Instant};
 // External deps
 use bigdecimal::BigDecimal;
 use chrono::Utc;
-use tokio::fs;
+use tokio::{fs, time};
 use web3::transports::{EventLoopHandle, Http};
 // Workspace deps
 use models::{
@@ -436,12 +436,16 @@ impl ScenarioExecutor {
         let amount_to_withdraw =
             BigDecimal::from(self.transfer_size) * BigDecimal::from(self.n_accounts as u64);
 
+        let current_balance = self.main_account.eth_acc.eth_balance().await?;
+
         log::info!(
             "Starting withdrawing phase. Withdrawing {} wei back to the Ethereum",
             amount_to_withdraw
         );
 
-        let (tx, eth_sign) = self.main_account.sign_withdraw_single(amount_to_withdraw);
+        let (tx, eth_sign) = self
+            .main_account
+            .sign_withdraw_single(amount_to_withdraw.clone());
         let tx_hash = self
             .rpc_client
             .send_tx(tx.clone(), eth_sign.clone())
@@ -452,10 +456,49 @@ impl ScenarioExecutor {
 
         log::info!("Withdrawing funds completed");
 
+        self.wait_for_eth_balance(current_balance, amount_to_withdraw)
+            .await?;
+
         Ok(())
     }
 
     async fn finish(&mut self) -> Result<(), failure::Error> {
+        Ok(())
+    }
+
+    /// Waits for main ETH account to receive funds on its balance.
+    /// Returns an error if funds are not received within a reasonable amount of time.
+    async fn wait_for_eth_balance(
+        &self,
+        current_balance: BigDecimal,
+        withdraw_amount: BigDecimal,
+    ) -> Result<(), failure::Error> {
+        log::info!("Awaiting for ETH funds to be received");
+
+        let expected_balance = current_balance + withdraw_amount;
+
+        let timeout_minutes = 10;
+        let timeout = Duration::from_secs(timeout_minutes * 60);
+        let start = Instant::now();
+
+        let polling_interval = Duration::from_millis(250);
+        let mut timer = time::interval(polling_interval);
+
+        loop {
+            let current_balance = self.main_account.eth_acc.eth_balance().await?;
+            if current_balance == expected_balance {
+                break;
+            }
+            if start.elapsed() > timeout {
+                failure::bail!(
+                    "ETH funds were not received for {} minutes",
+                    timeout_minutes
+                );
+            }
+            timer.tick().await;
+        }
+
+        log::info!("ETH funds received");
         Ok(())
     }
 
