@@ -375,7 +375,7 @@ fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
     request_path: web::Path<(Address, u64, u64)>,
 ) -> ActixResult<HttpResponse> {
-    let (address, offset, mut limit) = request_path.into_inner();
+    let (address, mut offset, mut limit) = request_path.into_inner();
 
     const MAX_LIMIT: u64 = 100;
     if limit > MAX_LIMIT {
@@ -402,7 +402,7 @@ fn handle_get_account_transactions_history(
     // `map` is used after filter to find the max block number without an
     // additional list pass.
     // `take` is used last to limit the amount of entries.
-    let mut ongoing_deposits_tx_history: Vec<_> = ongoing_ops
+    let mut transactions_history: Vec<_> = ongoing_ops
         .iter()
         .filter(|(_block, op)| {
             if let FranklinPriorityOp::Deposit(deposit) = &op.data {
@@ -458,7 +458,12 @@ fn handle_get_account_transactions_history(
         .take(limit as usize)
         .collect();
 
-    limit -= ongoing_deposits_tx_history.len() as u64;
+    if !transactions_history.is_empty() {
+        // We've taken at least one transaction, this means
+        // offset is consumed completely, and limit is reduced.
+        offset = 0;
+        limit -= transactions_history.len() as u64;
+    };
 
     let mut storage_transactions = storage
         .chain()
@@ -466,11 +471,9 @@ fn handle_get_account_transactions_history(
         .get_account_transactions_history(&address, offset, limit)
         .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    // storage transactions are the ones already committed
-    // and ongoing_deposits_tx_history are still to be committed, so they go after.
-    storage_transactions.append(&mut ongoing_deposits_tx_history);
+    transactions_history.append(&mut storage_transactions);
 
-    Ok(HttpResponse::Ok().json(storage_transactions))
+    Ok(HttpResponse::Ok().json(transactions_history))
 }
 
 fn handle_get_executed_transaction_by_hash(
