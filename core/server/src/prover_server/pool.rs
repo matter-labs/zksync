@@ -8,18 +8,9 @@ use futures::channel::mpsc;
 use log::info;
 // Workspace deps
 use circuit::witness::{
-    change_pubkey_offchain::{
-        apply_change_pubkey_offchain_tx, calculate_change_pubkey_offchain_from_witness,
-    },
-    close_account::{apply_close_account_tx, calculate_close_account_operations_from_witness},
-    deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness},
-    full_exit::{apply_full_exit_tx, calculate_full_exit_operations_from_witness},
-    transfer::{apply_transfer_tx, calculate_transfer_operations_from_witness},
-    transfer_to_new::{
-        apply_transfer_to_new_tx, calculate_transfer_to_new_operations_from_witness,
-    },
-    utils::{prepare_sig_data, WitnessBuilder},
-    withdraw::{apply_withdraw_tx, calculate_withdraw_operations_from_witness},
+    utils::{SigDataInput, WitnessBuilder},
+    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
+    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
 };
 use models::{
     circuit::CircuitAccountTree,
@@ -293,44 +284,18 @@ impl Maintainer {
             match op {
                 FranklinOp::Deposit(deposit) => {
                     let deposit_witness =
-                        apply_deposit_tx(&mut witness_accum.account_tree, &deposit);
+                        DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit);
 
-                    let deposit_operations =
-                        calculate_deposit_operations_from_witness(&deposit_witness);
+                    let deposit_operations = deposit_witness.calculate_operations(());
                     operations.extend(deposit_operations);
                     pub_data.extend(deposit_witness.get_pubdata());
                 }
                 FranklinOp::Transfer(transfer) => {
                     let transfer_witness =
-                        apply_transfer_tx(&mut witness_accum.account_tree, &transfer);
+                        TransferWitness::apply_tx(&mut witness_accum.account_tree, &transfer);
 
-                    let sig_packed = transfer
-                        .tx
-                        .signature
-                        .signature
-                        .serialize_packed()
-                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
-
-                    let (
-                        first_sig_msg,
-                        second_sig_msg,
-                        third_sig_msg,
-                        signature_data,
-                        signer_packed_key_bits,
-                    ) = prepare_sig_data(
-                        &sig_packed,
-                        &transfer.tx.get_bytes(),
-                        &transfer.tx.signature.pub_key,
-                    )?;
-
-                    let transfer_operations = calculate_transfer_operations_from_witness(
-                        &transfer_witness,
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature_data,
-                        &signer_packed_key_bits,
-                    );
+                    let input = SigDataInput::from_transfer_op(&transfer)?;
+                    let transfer_operations = transfer_witness.calculate_operations(input);
 
                     operations.extend(transfer_operations);
                     fees.push(CollectedFee {
@@ -340,37 +305,14 @@ impl Maintainer {
                     pub_data.extend(transfer_witness.get_pubdata());
                 }
                 FranklinOp::TransferToNew(transfer_to_new) => {
-                    let transfer_to_new_witness =
-                        apply_transfer_to_new_tx(&mut witness_accum.account_tree, &transfer_to_new);
+                    let transfer_to_new_witness = TransferToNewWitness::apply_tx(
+                        &mut witness_accum.account_tree,
+                        &transfer_to_new,
+                    );
 
-                    let sig_packed = transfer_to_new
-                        .tx
-                        .signature
-                        .signature
-                        .serialize_packed()
-                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
-
-                    let (
-                        first_sig_msg,
-                        second_sig_msg,
-                        third_sig_msg,
-                        signature_data,
-                        signer_packed_key_bits,
-                    ) = prepare_sig_data(
-                        &sig_packed,
-                        &transfer_to_new.tx.get_bytes(),
-                        &transfer_to_new.tx.signature.pub_key,
-                    )?;
-
+                    let input = SigDataInput::from_transfer_to_new_op(&transfer_to_new)?;
                     let transfer_to_new_operations =
-                        calculate_transfer_to_new_operations_from_witness(
-                            &transfer_to_new_witness,
-                            &first_sig_msg,
-                            &second_sig_msg,
-                            &third_sig_msg,
-                            &signature_data,
-                            &signer_packed_key_bits,
-                        );
+                        transfer_to_new_witness.calculate_operations(input);
 
                     operations.extend(transfer_to_new_operations);
                     fees.push(CollectedFee {
@@ -381,35 +323,10 @@ impl Maintainer {
                 }
                 FranklinOp::Withdraw(withdraw) => {
                     let withdraw_witness =
-                        apply_withdraw_tx(&mut witness_accum.account_tree, &withdraw);
+                        WithdrawWitness::apply_tx(&mut witness_accum.account_tree, &withdraw);
 
-                    let sig_packed = withdraw
-                        .tx
-                        .signature
-                        .signature
-                        .serialize_packed()
-                        .map_err(|e| format!("failed to pack transaction signature {}", e))?;
-
-                    let (
-                        first_sig_msg,
-                        second_sig_msg,
-                        third_sig_msg,
-                        signature_data,
-                        signer_packed_key_bits,
-                    ) = prepare_sig_data(
-                        &sig_packed,
-                        &withdraw.tx.get_bytes(),
-                        &withdraw.tx.signature.pub_key,
-                    )?;
-
-                    let withdraw_operations = calculate_withdraw_operations_from_witness(
-                        &withdraw_witness,
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature_data,
-                        &signer_packed_key_bits,
-                    );
+                    let input = SigDataInput::from_withdraw_op(&withdraw)?;
+                    let withdraw_operations = withdraw_witness.calculate_operations(input);
 
                     operations.extend(withdraw_operations);
                     fees.push(CollectedFee {
@@ -420,35 +337,11 @@ impl Maintainer {
                 }
                 FranklinOp::Close(close) => {
                     let close_account_witness =
-                        apply_close_account_tx(&mut witness_accum.account_tree, &close);
+                        CloseAccountWitness::apply_tx(&mut witness_accum.account_tree, &close);
 
-                    let sig_packed = close
-                        .tx
-                        .signature
-                        .signature
-                        .serialize_packed()
-                        .map_err(|e| format!("failed to pack signature: {}", e))?;
-
-                    let (
-                        first_sig_msg,
-                        second_sig_msg,
-                        third_sig_msg,
-                        signature_data,
-                        signer_packed_key_bits,
-                    ) = prepare_sig_data(
-                        &sig_packed,
-                        &close.tx.get_bytes(),
-                        &close.tx.signature.pub_key,
-                    )?;
-
-                    let close_account_operations = calculate_close_account_operations_from_witness(
-                        &close_account_witness,
-                        &first_sig_msg,
-                        &second_sig_msg,
-                        &third_sig_msg,
-                        &signature_data,
-                        &signer_packed_key_bits,
-                    );
+                    let input = SigDataInput::from_close_op(&close)?;
+                    let close_account_operations =
+                        close_account_witness.calculate_operations(input);
 
                     operations.extend(close_account_operations);
                     pub_data.extend(close_account_witness.get_pubdata());
@@ -456,23 +349,23 @@ impl Maintainer {
                 FranklinOp::FullExit(full_exit_op) => {
                     let success = full_exit_op.withdraw_amount.is_some();
 
-                    let full_exit_witness =
-                        apply_full_exit_tx(&mut witness_accum.account_tree, &full_exit_op, success);
+                    let full_exit_witness = FullExitWitness::apply_tx(
+                        &mut witness_accum.account_tree,
+                        &(*full_exit_op, success),
+                    );
 
-                    let full_exit_operations =
-                        calculate_full_exit_operations_from_witness(&full_exit_witness);
+                    let full_exit_operations = full_exit_witness.calculate_operations(());
 
                     operations.extend(full_exit_operations);
                     pub_data.extend(full_exit_witness.get_pubdata());
                 }
                 FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
-                    let change_pkhash_witness = apply_change_pubkey_offchain_tx(
+                    let change_pkhash_witness = ChangePubkeyOffChainWitness::apply_tx(
                         &mut witness_accum.account_tree,
                         &change_pkhash_op,
                     );
 
-                    let change_pkhash_operations =
-                        calculate_change_pubkey_offchain_from_witness(&change_pkhash_witness);
+                    let change_pkhash_operations = change_pkhash_witness.calculate_operations(());
 
                     operations.extend(change_pkhash_operations);
                     pub_data.extend(change_pkhash_witness.get_pubdata());

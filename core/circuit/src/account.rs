@@ -1,6 +1,8 @@
 // External deps
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-use crate::franklin_crypto::circuit::Assignment;
+use crypto_exports::franklin_crypto::{
+    bellman::{ConstraintSystem, SynthesisError},
+    circuit::Assignment,
+};
 // Workspace deps
 use crate::element::CircuitElement;
 use crypto_exports::franklin_crypto::rescue::RescueEngine;
