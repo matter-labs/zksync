@@ -11,7 +11,7 @@
     "chai": "^4.2.0",
     "ethereum-waffle": "2.0.12",
     "ethereumjs-abi": "^0.6.8",
-    "ethers": "4.0.33",
+    "ethers": "4.0.46",
     "ethjs": "^0.4.0",
     "fs": "^0.0.1-security",
     "mocha": "^6.2.0",
@@ -27,17 +27,19 @@
     "typescript": "^3.5.3",
     "zksync": "link:../js/zksync.js"
   },
+  "resolutions": {
+    "ethereum-waffle/ethers": "4.0.33"
+  },
   "scripts": {
     "build": "waffle .waffle.json",
-    "test": "yarn build && mocha -r ts-node/register test/**/*.ts",
+    "test": "yarn build && f mocha -r ts-node/register test/**/*.ts",
     "itest": "yarn build && mocha -r ts-node/register test/unit_tests/**/*.js test/fails_tests.ts",
     "unit-test": "yarn build && mocha -r ts-node/register test/unit_tests/**/*",
     "unit-test-watch": "waffle .waffle.json && mocha -r ts-node/register test/unit_tests/**/* --watch --watch-extensions ts --watch-extensions 'js'",
     "deploy": "yarn build && ts-node scripts/testnet-deploy.ts --deploy --publish",
     "deploy-no-build": "ts-node scripts/testnet-deploy.ts --deploy --publish",
-    "deploy-test-no-build": "ts-node scripts/testnet-deploy.ts --deploy --test",
+    "deploy-testkit": "ts-node scripts/testnet-deploy.ts --deploy --test --testkit",
     "publish_source": "ts-node scripts/testnet-deploy.ts --publish",
-    "print-operator-wallet": "ts-node scripts/init-operator-acc.ts",
     "submit-proof": "ts-node scripts/submit-proof.ts",
     "submit-test-proof": "yarn build && ts-node scripts/submit-test-proof.ts",
     "lint:solidity": "solhint contracts/**/*.sol",
@@ -45,5 +47,8 @@
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",
     "prettier:solidity": "prettier --write contracts/**/*.sol",
     "exampleDeposits": "ts-node scripts/exampleDeposits.ts"
+  },
+  "resolutions": {
+    "ethereum-waffle/ethers": "4.0.46"
   }
 }

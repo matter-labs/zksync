@@ -1,33 +1,48 @@
-use crate::eth_watch::EthWatchRequest;
-use crate::mempool::MempoolRequest;
-use crate::mempool::TxAddError;
-use crate::state_keeper::StateKeeperRequest;
-use bigdecimal::BigDecimal;
-use futures::channel::{mpsc, oneshot};
-use futures::{FutureExt, SinkExt, TryFutureExt};
-use jsonrpc_core::{Error, ErrorCode, Result};
-use jsonrpc_core::{IoHandler, MetaIoHandler, Metadata, Middleware};
-use jsonrpc_derive::rpc;
-use jsonrpc_http_server::ServerBuilder;
-use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
-use models::node::tx::TxEthSignature;
-use models::node::tx::TxHash;
-use models::node::{
-    closest_packable_fee_amount, Account, AccountId, FranklinPriorityOp, FranklinTx, Nonce,
-    PriorityOp, PubKeyHash, Token, TokenId, TokenLike,
-};
-use models::primitives::{big_decimal_to_u128, floor_big_decimal};
 use std::collections::HashMap;
 use std::convert::TryInto;
-use storage::{ConnectionPool, StorageProcessor};
-use web3::types::Address;
+// External uses
+use bigdecimal::BigDecimal;
+use futures::{
+    channel::{mpsc, oneshot},
+    FutureExt, SinkExt, TryFutureExt,
+};
+use jsonrpc_core::{Error, ErrorCode, IoHandler, MetaIoHandler, Metadata, Middleware, Result};
+use jsonrpc_derive::rpc;
+use jsonrpc_http_server::ServerBuilder;
+// Workspace uses
+use models::{
+    config_options::{ConfigurationOptions, ThreadPanicNotify},
+    node::{
+        closest_packable_fee_amount,
+        tx::{TxEthSignature, TxHash},
+        Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce, PriorityOp, PubKeyHash,
+        Token, TokenId, TokenLike,
+    },
+    primitives::{big_decimal_to_u128, floor_big_decimal},
+};
+use storage::{
+    chain::{
+        block::records::BlockDetails, operations::records::StoredExecutedPriorityOperation,
+        operations_ext::records::TxReceiptResponse,
+    },
+    ConnectionPool, StorageProcessor,
+};
+// Local uses
+use crate::{
+    eth_watch::EthWatchRequest,
+    mempool::{MempoolRequest, TxAddError},
+    signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
+    state_keeper::StateKeeperRequest,
+    utils::shared_lru_cache::SharedLruCache,
+    utils::token_db_cache::TokenDBCache,
+};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ResponseAccountState {
-    balances: HashMap<String, BigDecimal>,
-    nonce: Nonce,
-    pub_key_hash: PubKeyHash,
+    pub balances: HashMap<String, BigDecimal>,
+    pub nonce: Nonce,
+    pub pub_key_hash: PubKeyHash,
 }
 
 impl ResponseAccountState {
@@ -104,11 +119,11 @@ impl DepositingAccountBalances {
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfoResp {
-    address: Address,
-    id: Option<AccountId>,
+    pub address: Address,
+    pub id: Option<AccountId>,
     depositing: DepositingAccountBalances,
-    committed: ResponseAccountState,
-    verified: ResponseAccountState,
+    pub committed: ResponseAccountState,
+    pub verified: ResponseAccountState,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -210,7 +225,8 @@ pub enum TxFeeTypes {
     Transfer,
 }
 
-enum RpcErrorCodes {
+#[derive(Debug)]
+pub enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
 
@@ -250,21 +266,27 @@ pub trait Rpc {
         &self,
         addr: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send>;
+
     #[rpc(name = "ethop_info")]
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp>;
+
     #[rpc(name = "tx_info")]
     fn tx_info(&self, hash: TxHash) -> Result<TransactionInfoResp>;
+
     #[rpc(name = "tx_submit", returns = "TxHash")]
     fn tx_submit(
         &self,
         tx: Box<FranklinTx>,
         signature: Box<Option<TxEthSignature>>,
     ) -> Box<dyn futures01::Future<Item = TxHash, Error = Error> + Send>;
+
     #[rpc(name = "contract_address")]
     fn contract_address(&self) -> Result<ContractAddressResp>;
+
     /// "ETH" | #ERC20_ADDRESS => {Token}
     #[rpc(name = "tokens")]
     fn tokens(&self) -> Result<HashMap<String, Token>>;
+
     #[rpc(name = "get_tx_fee")]
     fn get_tx_fee(
         &self,
@@ -279,17 +301,90 @@ pub trait Rpc {
 
 #[derive(Clone)]
 pub struct RpcApp {
+    cache_of_executed_priority_operations: SharedLruCache<u32, StoredExecutedPriorityOperation>,
+    cache_of_blocks_info: SharedLruCache<i64, BlockDetails>,
+    cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
+
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+    pub sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+
     pub connection_pool: ConnectionPool,
 
     pub confirmations_for_eth_event: u64,
+    pub token_cache: TokenDBCache,
 }
 
 impl RpcApp {
+    pub fn new(
+        config_options: &ConfigurationOptions,
+        connection_pool: ConnectionPool,
+        mempool_request_sender: mpsc::Sender<MempoolRequest>,
+        state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+        sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+        eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+    ) -> Self {
+        let token_cache = TokenDBCache::new(connection_pool.clone());
+
+        let api_requests_caches_size = config_options.api_requests_caches_size;
+        let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
+
+        RpcApp {
+            cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
+            cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
+            cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
+
+            connection_pool,
+
+            mempool_request_sender,
+            state_keeper_request_sender,
+            sign_verify_request_sender,
+            eth_watcher_request_sender,
+
+            confirmations_for_eth_event,
+            token_cache,
+        }
+    }
+
     pub fn extend<T: Metadata, S: Middleware<T>>(self, io: &mut MetaIoHandler<T, S>) {
         io.extend_with(self.to_delegate())
+    }
+
+    fn token_symbol_from_id(&self, token_id: TokenId) -> Result<String> {
+        fn rpc_message(error: impl ToString) -> Error {
+            Error {
+                code: RpcErrorCodes::Other.into(),
+                message: error.to_string(),
+                data: None,
+            }
+        }
+
+        let symbol = self
+            .token_cache
+            .get_token(token_id)
+            .map_err(rpc_message)?
+            .map(|t| t.symbol);
+
+        match symbol {
+            Some(symbol) => Ok(symbol),
+            None => Err(rpc_message("Token not found in the DB")),
+        }
+    }
+
+    /// Returns a message that user has to sign to send the transaction.
+    /// If the transaction doesn't need a message signature, returns `None`.
+    /// If any error is encountered during the message generation, returns `jsonrpc_core::Error`.
+    fn get_tx_info_message_to_sign(&self, tx: &FranklinTx) -> Result<Option<String>> {
+        match tx {
+            FranklinTx::Transfer(tx) => Ok(Some(
+                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
+            )),
+            FranklinTx::Withdraw(tx) => Ok(Some(
+                tx.get_ethereum_sign_message(&self.token_symbol_from_id(tx.token)?),
+            )),
+            _ => Ok(None),
+        }
     }
 }
 
@@ -367,6 +462,80 @@ impl RpcApp {
             estimated_deposits_approval_block,
         })
     }
+
+    // cache access functions
+    fn get_executed_priority_operation(
+        &self,
+        serial_id: u32,
+    ) -> Result<Option<StoredExecutedPriorityOperation>> {
+        let res =
+            if let Some(executed_op) = self.cache_of_executed_priority_operations.get(&serial_id) {
+                Some(executed_op)
+            } else {
+                let storage = self.access_storage()?;
+                let executed_op = storage
+                    .chain()
+                    .operations_schema()
+                    .get_executed_priority_operation(serial_id)
+                    .map_err(|_| Error::internal_error())?;
+
+                if let Some(executed_op) = executed_op.clone() {
+                    self.cache_of_executed_priority_operations
+                        .insert(serial_id, executed_op);
+                }
+
+                executed_op
+            };
+        Ok(res)
+    }
+
+    fn get_block_info(&self, block_number: i64) -> Result<Option<BlockDetails>> {
+        let res = if let Some(block) = self.cache_of_blocks_info.get(&block_number) {
+            Some(block)
+        } else {
+            let storage = self.access_storage()?;
+            let block = storage
+                .chain()
+                .block_schema()
+                .find_block_by_height_or_hash(block_number.to_string());
+
+            if let Some(block) = block.clone() {
+                // Unverified blocks can still change, so we can't cache them.
+                if block.verified_at.is_some() {
+                    self.cache_of_blocks_info.insert(block_number, block);
+                }
+            }
+
+            block
+        };
+        Ok(res)
+    }
+
+    fn get_tx_receipt(&self, tx_hash: TxHash) -> Result<Option<TxReceiptResponse>> {
+        let res = if let Some(tx_receipt) = self
+            .cache_of_transaction_receipts
+            .get(&tx_hash.as_ref().to_vec())
+        {
+            Some(tx_receipt)
+        } else {
+            let storage = self.access_storage()?;
+            let tx_receipt = storage
+                .chain()
+                .operations_ext_schema()
+                .tx_receipt(tx_hash.as_ref())
+                .map_err(|_| Error::internal_error())?;
+
+            if let Some(tx_receipt) = tx_receipt.clone() {
+                if tx_receipt.verified {
+                    self.cache_of_transaction_receipts
+                        .insert(tx_hash.as_ref().to_vec(), tx_receipt);
+                }
+            }
+
+            tx_receipt
+        };
+        Ok(res)
+    }
 }
 
 impl Rpc for RpcApp {
@@ -402,7 +571,7 @@ impl Rpc for RpcApp {
                     state_keeper_response.0,
                 ))
                 .await
-                .expect("state keeper receiver dropped");
+                .map_err(|_| Error::internal_error())?;
             let committed_account_state = state_keeper_response
                 .1
                 .await
@@ -439,17 +608,9 @@ impl Rpc for RpcApp {
     }
 
     fn ethop_info(&self, serial_id: u32) -> Result<ETHOpInfoResp> {
-        let storage = self.access_storage()?;
-        let executed_op = storage
-            .chain()
-            .operations_schema()
-            .get_executed_priority_operation(serial_id)
-            .map_err(|_| Error::internal_error())?;
+        let executed_op = self.get_executed_priority_operation(serial_id)?;
         Ok(if let Some(executed_op) = executed_op {
-            let block = storage
-                .chain()
-                .block_schema()
-                .find_block_by_height_or_hash(executed_op.block_number.to_string());
+            let block = self.get_block_info(executed_op.block_number)?;
             ETHOpInfoResp {
                 executed: true,
                 block: Some(BlockInfo {
@@ -471,12 +632,7 @@ impl Rpc for RpcApp {
     }
 
     fn tx_info(&self, tx_hash: TxHash) -> Result<TransactionInfoResp> {
-        let storage = self.access_storage()?;
-        let stored_receipt = storage
-            .chain()
-            .operations_ext_schema()
-            .tx_receipt(tx_hash.as_ref())
-            .map_err(|_| Error::internal_error())?;
+        let stored_receipt = self.get_tx_receipt(tx_hash)?;
         Ok(if let Some(stored_receipt) = stored_receipt {
             TransactionInfoResp {
                 executed: true,
@@ -511,14 +667,24 @@ impl Rpc for RpcApp {
             }));
         }
 
+        let msg_to_sign = match self.get_tx_info_message_to_sign(&tx) {
+            Ok(res) => res,
+            Err(e) => return Box::new(futures01::future::err(e)),
+        };
+
         let mut mempool_sender = self.mempool_request_sender.clone();
+        let sign_verify_channel = self.sign_verify_request_sender.clone();
         let mempool_resp = async move {
+            let verified_tx =
+                verify_tx_info_message_signature(&tx, *signature, msg_to_sign, sign_verify_channel)
+                    .await?;
+
             let hash = tx.hash();
             let mempool_resp = oneshot::channel();
             mempool_sender
-                .send(MempoolRequest::NewTx(tx, signature, mempool_resp.0))
+                .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
                 .await
-                .expect("mempool receiver dropped");
+                .map_err(|_| Error::internal_error())?;
             let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
 
             tx_add_result.map(|_| hash).map_err(|e| Error {
@@ -538,9 +704,17 @@ impl Rpc for RpcApp {
             .load_config()
             .map_err(|_| Error::internal_error())?;
 
+        // `expect` calls below are safe, since not having the addresses in the server config
+        // means a misconfiguration, server cannot operate in this condition.
+        let main_contract = config
+            .contract_addr
+            .expect("Server config doesn't contain the main contract address");
+        let gov_contract = config
+            .gov_contract_addr
+            .expect("Server config doesn't contain the gov contract address");
         Ok(ContractAddressResp {
-            main_contract: config.contract_addr.expect("server config"),
-            gov_contract: config.gov_contract_addr.expect("server config"),
+            main_contract,
+            gov_contract,
         })
     }
 
@@ -577,29 +751,29 @@ impl Rpc for RpcApp {
 
 #[allow(clippy::too_many_arguments)]
 pub fn start_rpc_server(
-    config_options: &ConfigurationOptions,
+    config_options: ConfigurationOptions,
     connection_pool: ConnectionPool,
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     let addr = config_options.json_rpc_http_server_address;
-    let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
     std::thread::Builder::new()
         .name("json_rpc_http".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify);
             let mut io = IoHandler::new();
 
-            let rpc_app = RpcApp {
+            let rpc_app = RpcApp::new(
+                &config_options,
                 connection_pool,
                 mempool_request_sender,
                 state_keeper_request_sender,
+                sign_verify_request_sender,
                 eth_watcher_request_sender,
-
-                confirmations_for_eth_event,
-            };
+            );
             rpc_app.extend(&mut io);
 
             let server = ServerBuilder::new(io).threads(8).start_http(&addr).unwrap();
@@ -607,6 +781,51 @@ pub fn start_rpc_server(
             server.wait();
         })
         .expect("JSON-RPC http thread");
+}
+
+async fn verify_tx_info_message_signature(
+    tx: &FranklinTx,
+    signature: Option<TxEthSignature>,
+    msg_to_sign: Option<String>,
+    mut req_channel: mpsc::Sender<VerifyTxSignatureRequest>,
+) -> Result<VerifiedTx> {
+    fn rpc_message(error: TxAddError) -> Error {
+        Error {
+            code: RpcErrorCodes::from(error).into(),
+            message: error.to_string(),
+            data: None,
+        }
+    }
+
+    let eth_sign_data = match msg_to_sign {
+        Some(message_to_sign) => {
+            let signature =
+                signature.ok_or_else(|| rpc_message(TxAddError::MissingEthSignature))?;
+
+            Some((signature, message_to_sign))
+        }
+        None => None,
+    };
+
+    let resp = oneshot::channel();
+
+    let request = VerifyTxSignatureRequest {
+        tx: tx.clone(),
+        eth_sign_data,
+        response: resp.0,
+    };
+
+    // Send the check request.
+    req_channel
+        .send(request)
+        .await
+        .map_err(|_| Error::internal_error())?;
+
+    // Wait for the check result.
+    resp.1
+        .await
+        .map_err(|_| Error::internal_error())?
+        .map_err(rpc_message)
 }
 
 #[cfg(test)]

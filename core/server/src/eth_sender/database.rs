@@ -22,7 +22,7 @@ use super::transactions::ETHStats;
 pub(super) trait DatabaseAccess {
     /// Loads the unconfirmed and unprocessed operations from the database.
     /// Unconfirmed operations are Ethereum operations that were started, but not confirmed yet.
-    /// Unprocessed operations are ZK Sync operations that were not started at all.
+    /// Unprocessed operations are zkSync operations that were not started at all.
     fn restore_state(&self) -> Result<(VecDeque<ETHOperation>, Vec<Operation>), failure::Error>;
 
     /// Saves a new unconfirmed operation to the database.
@@ -51,6 +51,12 @@ pub(super) trait DatabaseAccess {
 
     /// Loads the stored Ethereum operations stats.
     fn load_stats(&self) -> Result<ETHStats, failure::Error>;
+
+    /// Loads the stored gas price limit.
+    fn load_gas_price_limit(&self) -> Result<U256, failure::Error>;
+
+    /// Updates the stored gas price limit.
+    fn update_gas_price_limit(&self, value: U256) -> Result<(), failure::Error>;
 
     /// Performs several database operations within one database transaction.
     fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>
@@ -132,6 +138,18 @@ impl DatabaseAccess for Database {
         let storage = self.db_pool.access_storage()?;
         let stats = storage.ethereum_schema().load_stats()?;
         Ok(stats.into())
+    }
+
+    fn load_gas_price_limit(&self) -> Result<U256, failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+        let limit = storage.ethereum_schema().load_gas_price_limit()?;
+        Ok(limit)
+    }
+
+    fn update_gas_price_limit(&self, value: U256) -> Result<(), failure::Error> {
+        let storage = self.db_pool.access_storage()?;
+        storage.ethereum_schema().update_gas_price_limit(value)?;
+        Ok(())
     }
 
     fn transaction<F, T>(&self, f: F) -> Result<T, failure::Error>

@@ -1,28 +1,34 @@
-use crate::account;
-use crate::account::AccountContent;
-use crate::element::CircuitElement;
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-use crate::franklin_crypto::circuit::float_point::parse_with_exponent_le;
-use crate::operation::{Operation, OperationBranch};
-use crate::utils;
+// External deps
+use crypto_exports::franklin_crypto::{
+    bellman::{
+        pairing::{ff::PrimeField, Engine},
+        ConstraintSystem, SynthesisError,
+    },
+    circuit::{
+        boolean::Boolean, float_point::parse_with_exponent_le, num::AllocatedNum, Assignment,
+    },
+    rescue::RescueEngine,
+};
+// Workspace deps
 use models::params as franklin_constants;
+// Local deps
+use crate::{
+    account::{self, AccountContent},
+    element::CircuitElement,
+    operation::{Operation, OperationBranch},
+    utils,
+};
 
-use crate::franklin_crypto::circuit::boolean::Boolean;
-use crate::franklin_crypto::circuit::num::AllocatedNum;
-
-use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
-use crate::franklin_crypto::circuit::Assignment;
-use crate::franklin_crypto::jubjub::JubjubEngine;
-pub struct AllocatedOperationBranch<E: JubjubEngine> {
+pub struct AllocatedOperationBranch<E: RescueEngine> {
     pub account: AccountContent<E>,
     pub account_audit_path: Vec<AllocatedNum<E>>, //we do not need their bit representations
-    pub account_address: CircuitElement<E>,
+    pub account_id: CircuitElement<E>,
     pub balance: CircuitElement<E>,
     pub balance_audit_path: Vec<AllocatedNum<E>>,
     pub token: CircuitElement<E>,
 }
 
-impl<E: JubjubEngine> AllocatedOperationBranch<E> {
+impl<E: RescueEngine> AllocatedOperationBranch<E> {
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
         operation_branch: &OperationBranch<E>,
@@ -57,7 +63,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
         let token = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "token"),
             || Ok(operation_branch.token.grab()?),
-            franklin_constants::BALANCE_TREE_DEPTH,
+            franklin_constants::balance_tree_depth(),
         )?;
         let token = token.pad(franklin_constants::TOKEN_BIT_WIDTH);
         let balance_audit_path = utils::allocate_numbers_vec(
@@ -66,13 +72,13 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
         )?;
         assert_eq!(
             balance_audit_path.len(),
-            franklin_constants::BALANCE_TREE_DEPTH
+            franklin_constants::balance_tree_depth()
         );
 
         Ok(AllocatedOperationBranch {
             account,
             account_audit_path,
-            account_address,
+            account_id: account_address,
             balance,
             token,
             balance_audit_path,
@@ -80,7 +86,7 @@ impl<E: JubjubEngine> AllocatedOperationBranch<E> {
     }
 }
 
-pub struct AllocatedChunkData<E: JubjubEngine> {
+pub struct AllocatedChunkData<E: Engine> {
     pub is_chunk_last: Boolean,
     pub is_chunk_first: Boolean,
     pub chunk_number: AllocatedNum<E>, //TODO: don't need bit representation here, though make sense to unify probably
@@ -88,7 +94,7 @@ pub struct AllocatedChunkData<E: JubjubEngine> {
 }
 
 #[derive(Clone)]
-pub struct AllocatedOperationData<E: JubjubEngine> {
+pub struct AllocatedOperationData<E: Engine> {
     pub amount_packed: CircuitElement<E>,
     pub fee_packed: CircuitElement<E>,
     pub amount_unpacked: CircuitElement<E>,
@@ -104,7 +110,7 @@ pub struct AllocatedOperationData<E: JubjubEngine> {
     pub b: CircuitElement<E>,
 }
 
-impl<E: JubjubEngine> AllocatedOperationData<E> {
+impl<E: RescueEngine> AllocatedOperationData<E> {
     pub fn empty_from_zero(zero_element: AllocatedNum<E>) -> Result<Self, SynthesisError> {
         let eth_address = CircuitElement::unsafe_empty_of_some_length(
             zero_element.clone(),
@@ -149,7 +155,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
 
         let third_sig_msg = CircuitElement::unsafe_empty_of_some_length(
             zero_element.clone(),
-            franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow
+            franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow
         );
 
         let new_pubkey_hash = CircuitElement::unsafe_empty_of_some_length(
@@ -192,7 +198,6 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
         op: &Operation<E>,
-        _params: &E::Params, //TODO: probably move out
     ) -> Result<AllocatedOperationData<E>, SynthesisError> {
         let eth_address = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "eth_address"),
@@ -258,7 +263,7 @@ impl<E: JubjubEngine> AllocatedOperationData<E> {
         let third_sig_msg = CircuitElement::from_fe_with_known_length(
             cs.namespace(|| "third_part_signature_message"),
             || op.third_sig_msg.grab(),
-            franklin_constants::MAX_CIRCUIT_PEDERSEN_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow
+            franklin_constants::MAX_CIRCUIT_MSG_HASH_BITS - (2 * E::Fr::CAPACITY as usize), //TODO: think of more consistent constant flow
         )?;
 
         let new_pubkey_hash = CircuitElement::from_fe_with_known_length(

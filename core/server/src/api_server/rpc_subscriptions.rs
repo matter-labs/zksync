@@ -1,23 +1,30 @@
 #![allow(clippy::needless_return)]
 
-use super::event_notify::{start_sub_notifier, EventSubscribeRequest};
-use crate::api_server::event_notify::EventNotifierRequest;
-use crate::api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp};
+// Built-in deps
+use std::sync::Arc;
+// External uses
 use crate::eth_watch::EthWatchRequest;
-use crate::mempool::MempoolRequest;
-use crate::state_keeper::{ExecutedOpsNotify, StateKeeperRequest};
 use futures::channel::mpsc;
-use jsonrpc_core::MetaIoHandler;
-use jsonrpc_core::Result;
+use jsonrpc_core::{MetaIoHandler, Result};
 use jsonrpc_derive::rpc;
 use jsonrpc_pubsub::{typed::Subscriber, PubSubHandler, Session, SubscriptionId};
 use jsonrpc_ws_server::RequestContext;
-use models::config_options::{ConfigurationOptions, ThreadPanicNotify};
-use models::node::tx::TxHash;
-use models::{ActionType, Operation};
-use std::sync::Arc;
-use storage::ConnectionPool;
 use web3::types::Address;
+// Workspace uses
+use models::{
+    config_options::{ConfigurationOptions, ThreadPanicNotify},
+    node::tx::TxHash,
+    ActionType, Operation,
+};
+use storage::ConnectionPool;
+// Local uses
+use crate::{
+    api_server::event_notify::{start_sub_notifier, EventNotifierRequest, EventSubscribeRequest},
+    api_server::rpc_server::{ETHOpInfoResp, ResponseAccountState, TransactionInfoResp},
+    mempool::MempoolRequest,
+    signature_checker::VerifyTxSignatureRequest,
+    state_keeper::{ExecutedOpsNotify, StateKeeperRequest},
+};
 
 #[rpc]
 pub trait RpcPubSub {
@@ -78,8 +85,6 @@ pub trait RpcPubSub {
         subscription: SubscriptionId,
     ) -> Result<bool>;
 }
-
-impl RpcSubApp {}
 
 impl RpcPubSub for RpcSubApp {
     type Metadata = Arc<Session>;
@@ -181,24 +186,25 @@ pub fn start_ws_server(
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     executed_tx_receiver: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
+    sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
+    each_cache_size: usize,
 ) {
     let addr = config_options.json_rpc_ws_server_address;
-    let confirmations_for_eth_event = config_options.confirmations_for_eth_event;
 
     let (event_sub_sender, event_sub_receiver) = mpsc::channel(2048);
 
     let mut io = PubSubHandler::new(MetaIoHandler::default());
 
-    let req_rpc_app = super::rpc_server::RpcApp {
+    let req_rpc_app = super::rpc_server::RpcApp::new(
+        config_options,
+        db_pool.clone(),
         mempool_request_sender,
-        state_keeper_request_sender: state_keeper_request_sender.clone(),
+        state_keeper_request_sender.clone(),
+        sign_verify_request_sender,
         eth_watcher_request_sender,
-        connection_pool: db_pool.clone(),
-
-        confirmations_for_eth_event,
-    };
+    );
     req_rpc_app.extend(&mut io);
 
     let rpc_sub_app = RpcSubApp { event_sub_sender };
@@ -212,6 +218,7 @@ pub fn start_ws_server(
         executed_tx_receiver,
         state_keeper_request_sender,
         panic_notify.clone(),
+        each_cache_size,
     );
 
     std::thread::Builder::new()

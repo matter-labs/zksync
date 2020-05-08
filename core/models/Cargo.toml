@@ -7,8 +7,8 @@ edition = "2018"
 bigdecimal = { version = "0.1.0", features = ["serde"]}
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
-ethabi = "8.0.0"
-web3 = "0.8.0"
+ethabi = "9.0.0"
+web3 = "0.10.0"
 serde = "1.0.90"
 serde_derive = "1.0.90"
 serde_bytes = "0.11.1"
@@ -17,15 +17,18 @@ lazy_static = "1.2.0"
 rayon = "1.0.3"
 fnv = "1.0.3"
 rust-crypto = "0.2"
-hex = "0.3"
+hex = "0.4"
 failure = "0.1"
 log = "0.4"
 futures = { version = "0.3", features = ["compat"] }
-ethsign = "0.7.3"
 tiny-keccak = "1.4.2"
+chrono = { version = "0.4", features = ["serde", "rustc-serialize"] }
+parity-crypto = {version = "0.5.0", features = ["publickey"] }
 
 [dev-dependencies]
 criterion = "0.3.0"
+secp256k1 = {version = "0.17.2", features = ["std", "recovery"] }
+
 
 [[bench]]
 name = "criterion"

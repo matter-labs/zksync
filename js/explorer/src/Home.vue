@@ -2,11 +2,11 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand>ZK Sync Network</b-navbar-brand>
+        <b-navbar-brand>zkSync Network</b-navbar-brand>
         <b-navbar-toggle target="nav-collapse"></b-navbar-toggle>
         <b-collapse id="nav-collapse" is-nav>
         <b-navbar-nav>
-            <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">ZK Sync Wallet</b-nav-item>
+            <b-nav-item href="/client/" target="_blank" rel="noopener noreferrer">zkSync Wallet</b-nav-item>
             <b-nav-item v-bind:href="`${blockchainExplorerAddress}/${contractAddress}`" target="_blank" rel="noopener noreferrer">
                 Contract <span style="font-size: 0.9em"><i class="fas fa-external-link-alt"></i></span>
             </b-nav-item>
@@ -22,8 +22,11 @@
     <br>
     <b-container>
         <ClosableJumbotron></ClosableJumbotron>
+        <b-alert v-if="updateError" variant="danger" show>
+            {{updateError}}. Try again later.
+        </b-alert>
         <b-card bg-variant="light" >
-            <h4>ZK Sync Devnet Block Explorer</h4> 
+            <h4>zkSync Devnet Block Explorer</h4> 
             <SearchField :searchFieldInMenu="false" />
         </b-card>
         <br>
@@ -60,16 +63,11 @@ import store from './store';
 import { Client, clientPromise } from './Client';
 import ClosableJumbotron from './ClosableJumbotron.vue';
 import SearchField from './SearchField.vue';
+import { formatDate } from './utils';
 const components = { 
     ClosableJumbotron,
     SearchField,
 };
-
-function formatTime(timeStr) {
-    return timeStr 
-        ? timeStr.toString().split('T')[0] + " " + timeStr.toString().split('T')[1].split('.')[0]
-        : null;
-}
 
 export default {
     name: 'home',
@@ -102,6 +100,8 @@ export default {
                     active: true
                 },
             ],
+
+            updateError:        null,
         };
     },
     computed: {
@@ -119,8 +119,13 @@ export default {
         },
     },
     methods: {
-        ticker() {
-            this.update(true);
+        async ticker() {
+            try {
+                await this.update(true);
+                this.updateError = null;
+            } catch (e) {
+                this.updateError = e.message || "Unknown error";
+            }
         },
         onRowClicked(item) {
             this.$router.push('/blocks/' + item.block_number);
@@ -163,8 +168,8 @@ export default {
                     block_number:   b.block_number,
                     status:         `<b>${b.verified_at ? 'Verified' : 'Committed'}</b>`,
                     new_state_root: `<code>${b.new_state_root.slice(0, 16) + '...' + b.new_state_root.slice(-16)}</code>`,
-                    committed_at:   formatTime(b.committed_at),
-                    verified_at:    formatTime(b.verified_at),
+                    committed_at:   formatDate(b.committed_at),
+                    verified_at:    formatDate(b.verified_at),
                 }));
                 this.currentPage = this.page;
                 this.ready = true;

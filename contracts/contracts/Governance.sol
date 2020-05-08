@@ -1,4 +1,4 @@
-pragma solidity 0.5.16;
+pragma solidity ^0.5.0;
 
 import "./Config.sol";
 
@@ -8,12 +8,23 @@ import "./Config.sol";
 contract Governance is Config {
 
     /// @notice Token added to Franklin net
-    event TokenAdded(
-        address token,
-        uint16 tokenId
+    event NewToken(
+        address indexed token,
+        uint16 indexed tokenId
     );
 
-    /// @notice Address which will excercise governance over the network i.e. add tokens, change validator set, conduct upgrades
+    /// @notice Governor changed
+    event NewGovernor(
+        address newGovernor
+    );
+
+    /// @notice Validator's status changed
+    event ValidatorStatusUpdate(
+        address indexed validatorAddress,
+        bool isActive
+    );
+
+    /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
     address public networkGovernor;
 
     /// @notice Total number of ERC20 tokens registered in the network (excluding ETH, which is hardcoded as tokenId = 0)
@@ -30,7 +41,7 @@ contract Governance is Config {
 
     constructor() public {}
 
-    /// @notice Governance contract initialization
+    /// @notice Governance contract initialization. Can be external because Proxy contract intercepts illegal calls of this function.
     /// @param initializationParameters Encoded representation of initialization parameters:
         /// _networkGovernor The address of network governor
     function initialize(bytes calldata initializationParameters) external {
@@ -45,6 +56,7 @@ contract Governance is Config {
     function changeGovernor(address _newGovernor) external {
         requireGovernor(msg.sender);
         networkGovernor = _newGovernor;
+        emit NewGovernor(_newGovernor);
     }
 
     /// @notice Add token to the list of networks tokens
@@ -53,10 +65,13 @@ contract Governance is Config {
         requireGovernor(msg.sender);
         require(tokenIds[_token] == 0, "gan11"); // token exists
         require(totalTokens < MAX_AMOUNT_OF_REGISTERED_TOKENS, "gan12"); // no free identifiers for tokens
-        tokenAddresses[totalTokens + 1] = _token; // Adding one because tokenId = 0 is reserved for ETH
-        tokenIds[_token] = totalTokens + 1;
+
         totalTokens++;
-        emit TokenAdded(_token, totalTokens);
+        uint16 newTokenId = totalTokens; // it is not `totalTokens - 1` because tokenId = 0 is reserved for eth
+
+        tokenAddresses[newTokenId] = _token;
+        tokenIds[_token] = newTokenId;
+        emit NewToken(_token, newTokenId);
     }
 
     /// @notice Change validator status (active or not active)
@@ -65,6 +80,7 @@ contract Governance is Config {
     function setValidator(address _validator, bool _active) external {
         requireGovernor(msg.sender);
         validators[_validator] = _active;
+        emit ValidatorStatusUpdate(_validator, _active);
     }
 
     /// @notice Check if specified address is is governor
@@ -79,9 +95,9 @@ contract Governance is Config {
         require(validators[_address], "grr21"); // validator is not active
     }
 
-    /// @notice Validate token id (must be less than total tokens amount)
+    /// @notice Validate token id (must be less than or equal to total tokens amount)
     /// @param _tokenId Token id
-    /// @return bool flag that indicates if token id is less than total tokens amount
+    /// @return bool flag that indicates if token id is less than or equal to total tokens amount
     function isValidTokenId(uint16 _tokenId) external view returns (bool) {
         return _tokenId <= totalTokens;
     }
@@ -91,8 +107,7 @@ contract Governance is Config {
     /// @return tokens id
     function validateTokenAddress(address _tokenAddr) external view returns (uint16) {
         uint16 tokenId = tokenIds[_tokenAddr];
-        require(_tokenAddr != address(0), "gvs11"); // 0 is not a valid token
-        require(tokenAddresses[tokenId] == _tokenAddr, "gvs12"); // unknown ERC20 token address
+        require(tokenId != 0, "gvs11"); // 0 is not a valid token
         return tokenId;
     }
 

@@ -1,18 +1,30 @@
 // Built-in deps
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 use std::{thread, time};
 // External deps
 use bigdecimal::BigDecimal;
-use crypto_exports::franklin_crypto::{self, bellman};
 use crypto_exports::pairing::ff::PrimeField;
 // Workspace deps
-use circuit::witness::deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness};
-use models::node::operations::DepositOp;
-use models::node::{Deposit, Engine, Fr};
-use models::params::block_chunk_sizes;
-use prover::prover_data::ProverData;
-use prover::read_circuit_params;
+use circuit::{
+    circuit::FranklinCircuit,
+    witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
+};
+use models::{
+    circuit::{account::CircuitAccount, CircuitAccountTree},
+    config_options::ConfigurationOptions,
+    node::{
+        block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
+        Engine, Fr,
+    },
+    prover_utils::EncodedProofPlonk,
+};
+// Local deps
+use prover::{
+    plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig},
+    prover_data::ProverData,
+    ProverImpl,
+};
 
 #[test]
 #[cfg_attr(not(feature = "keys-required"), ignore)]
@@ -21,25 +33,22 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     // - BabyProver sends `working_on` requests (heartbeat) over api client
     // - BabyProver stops running upon receiving data over stop channel
 
-    let block_size_chunks = block_chunk_sizes()[0];
+    let block_size_chunks = ConfigurationOptions::from_env().available_block_chunk_sizes[0];
 
     // Create a channel to notify on provers exit.
-    let (done_tx, done_rx) = mpsc::channel();
+    let (done_tx, _done_rx) = mpsc::channel();
     // Create channel to notify test about heartbeat requests.
     let (heartbeat_tx, heartbeat_rx) = mpsc::channel();
 
     // Run prover in a separate thread.
-    let stop_signal = Arc::new(AtomicBool::new(false));
-    let stop_signal_ar = Arc::clone(&stop_signal);
-    let circuit_parameters = read_circuit_params(block_size_chunks);
-    let jubjub_params = franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     thread::spawn(move || {
         // Create channel for proofs, not using in this test.
         let (tx, _) = mpsc::channel();
-        let p = prover::BabyProver::new(
-            circuit_parameters,
-            jubjub_params,
-            block_size_chunks,
+        let config = PlonkStepByStepProverConfig {
+            block_sizes: vec![block_size_chunks],
+        };
+        let p = PlonkStepByStepProver::create_from_config(
+            config,
             MockApiClient {
                 block_to_prove: Mutex::new(Some((1, 1))),
                 heartbeats_tx: Arc::new(Mutex::new(heartbeat_tx)),
@@ -47,7 +56,6 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
                 prover_data_fn: || None,
             },
             time::Duration::from_millis(100),
-            stop_signal_ar,
         );
         let (tx, rx) = mpsc::channel();
         let jh = thread::spawn(move || {
@@ -67,45 +75,25 @@ fn prover_sends_heartbeat_requests_and_exits_on_stop_signal() {
     heartbeat_rx
         .recv_timeout(timeout)
         .expect("heartbeat request is not received");
-
-    // Send stop signal.
-    let jh = thread::spawn(move || {
-        println!("waiting for first heartbeat");
-        // receive at least one heartbeat.
-        heartbeat_rx
-            .recv_timeout(timeout)
-            .expect("[heartbeat_rx] first heartbeat");
-        while let Ok(_) = heartbeat_rx.recv_timeout(timeout) {}
-        // BabyProver must be stopped.
-        done_rx.recv_timeout(timeout).expect("[done_rx] recv");
-    });
-    stop_signal.store(true, Ordering::SeqCst);
-    jh.join().expect("prover did not exit properly");
 }
 
 #[test]
 #[cfg_attr(not(feature = "keys-required"), ignore)]
 fn prover_proves_a_block_and_publishes_result() {
     // Testing [black box] the actual proof calculation by mocking genesis and +1 block.
-    let stop_signal = Arc::new(AtomicBool::new(false));
     let (proof_tx, proof_rx) = mpsc::channel();
     let prover_data = new_test_data_for_prover();
     let block_size_chunks = prover_data.operations.len();
 
-    let public_data_commitment = prover_data.public_data_commitment;
-    let circuit_params = read_circuit_params(block_size_chunks);
-    let verify_key = bellman::groth16::prepare_verifying_key(&circuit_params.vk);
-
     // Run prover in separate thread.
-    let stop_signal_ar = Arc::clone(&stop_signal);
-    let jubjub_params = franklin_crypto::alt_babyjubjub::AltJubjubBn256::new();
     thread::spawn(move || {
         // Work heartbeat channel, not used in this test.
         let (tx, _) = mpsc::channel();
-        let p = prover::BabyProver::new(
-            circuit_params,
-            jubjub_params,
-            block_size_chunks,
+        let config = PlonkStepByStepProverConfig {
+            block_sizes: vec![block_size_chunks],
+        };
+        let p = PlonkStepByStepProver::create_from_config(
+            config,
             MockApiClient {
                 block_to_prove: Mutex::new(Some((1, 1))),
                 heartbeats_tx: Arc::new(Mutex::new(tx)),
@@ -113,7 +101,6 @@ fn prover_proves_a_block_and_publishes_result() {
                 prover_data_fn: move || Some(prover_data.clone()),
             },
             time::Duration::from_secs(1),
-            stop_signal_ar,
         );
 
         let (tx, rx) = mpsc::channel();
@@ -123,21 +110,21 @@ fn prover_proves_a_block_and_publishes_result() {
         prover::start(p, tx);
     });
 
-    let timeout = time::Duration::from_secs(60 * 30);
-    let proof = proof_rx
+    let timeout = time::Duration::from_secs(60 * 10);
+    proof_rx
         .recv_timeout(timeout)
-        .expect("didn't receive proof");
-    stop_signal.store(true, Ordering::SeqCst);
-    println!("verifying proof...");
-    let verify_result =
-        bellman::groth16::verify_proof(&verify_key, &proof, &[public_data_commitment]);
-    assert!(!verify_result.is_err());
-    assert!(verify_result.unwrap(), "invalid proof");
+        .expect("didn't receive proof"); // if proof is received - then proof is verified
 }
 
 fn new_test_data_for_prover() -> ProverData {
-    use circuit::witness::test_utils::test_genesis_plasma_state;
-    let (_plasma_state, mut witness_accum) = test_genesis_plasma_state(Vec::new());
+    let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
+    let fee_account_id = 0;
+
+    // Init the fee account.
+    let fee_account = Account::default_with_address(&Address::default());
+    circuit_account_tree.insert(fee_account_id, CircuitAccount::from(fee_account));
+
+    let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let empty_account_id = 1;
     let empty_account_address = [7u8; 20].into();
@@ -151,12 +138,15 @@ fn new_test_data_for_prover() -> ProverData {
         account_id: empty_account_id,
     };
 
-    let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-    let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+    let deposit_witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+    let deposit_operations = deposit_witness.calculate_operations(());
     let pub_data_from_witness = deposit_witness.get_pubdata();
 
     witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
-    witness_accum.extend_pubdata_with_noops();
+    witness_accum.extend_pubdata_with_noops(smallest_block_size_for_chunks(
+        DepositOp::CHUNKS,
+        &ConfigurationOptions::from_env().available_block_chunk_sizes,
+    ));
     witness_accum.collect_fees(&Vec::new());
     witness_accum.calculate_pubdata_commitment();
 
@@ -173,11 +163,17 @@ fn new_test_data_for_prover() -> ProverData {
     }
 }
 
-struct MockApiClient<F: Fn() -> Option<ProverData>> {
+struct MockApiClient<F> {
     block_to_prove: Mutex<Option<(i64, i32)>>,
     heartbeats_tx: Arc<Mutex<mpsc::Sender<()>>>,
-    publishes_tx: Arc<Mutex<mpsc::Sender<bellman::groth16::Proof<Engine>>>>,
+    publishes_tx: Arc<Mutex<mpsc::Sender<EncodedProofPlonk>>>,
     prover_data_fn: F,
+}
+
+impl<F> fmt::Debug for MockApiClient<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("MockApiClient").finish()
+    }
 }
 
 impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
@@ -197,22 +193,18 @@ impl<F: Fn() -> Option<ProverData>> prover::ApiClient for MockApiClient<F> {
         Ok(())
     }
 
-    fn prover_data(&self, _block: i64) -> Result<ProverData, failure::Error> {
+    fn prover_data(&self, block: i64) -> Result<FranklinCircuit<'_, Engine>, failure::Error> {
         let block_to_prove = self.block_to_prove.lock().unwrap();
         if (*block_to_prove).is_some() {
             let v = (self.prover_data_fn)();
             if let Some(pd) = v {
-                return Ok(pd);
+                return Ok(pd.into_circuit(block));
             }
         }
         Err(failure::format_err!("mock not configured"))
     }
 
-    fn publish(
-        &self,
-        _block: i64,
-        p: bellman::groth16::Proof<Engine>,
-    ) -> Result<(), failure::Error> {
+    fn publish(&self, _block: i64, p: EncodedProofPlonk) -> Result<(), failure::Error> {
         // No more blocks to prove. We're only testing single rounds.
         let mut block_to_prove = self.block_to_prove.lock().unwrap();
         *block_to_prove = None;

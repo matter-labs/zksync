@@ -54,7 +54,7 @@ for CLUSTER_ID in $CLUSTERS_IDS; do
     fi
 
     # Generate and apply secret for env config
-    . bin/k8s-secret | kubectl apply -n $ZKSYNC_ENV -f -
+    . bin/k8s-configmap | kubectl apply -n $ZKSYNC_ENV -f -
 
     kubectl apply -f etc/kube/gen/$ZKSYNC_ENV/prover.yaml
     kubectl scale deployments/$ZKSYNC_ENV-prover --replicas=$ACTIVE_PER_REGION

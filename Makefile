@@ -1,5 +1,6 @@
 export CI_PIPELINE_ID ?= $(shell date +"%Y-%m-%d-%s")
 export SERVER_DOCKER_IMAGE ?=matterlabs/server:$(IMAGE_TAG)
+export SERVER_SUPERVISOR_DOCKER_NAME ?=matterlabs/server_supervisor:$(IMAGE_TAG)
 export PROVER_DOCKER_IMAGE ?=matterlabs/prover:$(IMAGE_TAG)
 export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
@@ -8,7 +9,11 @@ export CI_DOCKER_IMAGE ?= matterlabs/ci
 # Getting started
 
 # Check and change environment (listed here for autocomplete and documentation only)
+# next two target are hack that allows to pass arguments to makefile
 env:	
+	@bin/zkenv $(filter-out $@,$(MAKECMDGOALS))
+%:
+	@:
 
 # Get everything up and running for the first time
 init:
@@ -104,13 +109,6 @@ rust-musl-builder = @docker run $(docker-options) ekidd/rust-musl-builder
 
 # Rust: main stuff
 
-
-dummy-prover:
-	cargo run --bin dummy_prover
-
-prover:
-	@bin/provers-launch-dev
-
 server:
 	@cargo run --bin server --release
 
@@ -128,6 +126,9 @@ clean-target:
 image-server: build-target
 	@docker build -t "${SERVER_DOCKER_IMAGE}" -f ./docker/server/Dockerfile .
 
+image-server-supervisor: build-target
+	@docker build -t "${SERVER_SUPERVISOR_DOCKER_NAME}" -f ./docker/server_supervisor/Dockerfile .
+
 image-prover: build-target
 	@docker build -t "${PROVER_DOCKER_IMAGE}" -f ./docker/prover/Dockerfile .
 
@@ -135,6 +136,9 @@ image-rust: image-server image-prover
 
 push-image-server:
 	docker push "${SERVER_DOCKER_IMAGE}"
+
+push-image-server-supervisor:
+	docker push "${SERVER_SUPERVISOR_DOCKER_NAME}"
 
 push-image-prover:
 	docker push "${PROVER_DOCKER_IMAGE}"
@@ -155,24 +159,16 @@ build-contracts: confirm_action prepare-contracts
 	@bin/prepare-test-contracts.sh
 	@cd contracts && yarn build
 
-gen-keys-if-not-present:
-	test -f ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol || gen-keys
-
 prepare-contracts:
-	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}/VerificationKey.sol contracts/contracts/VerificationKey.sol || (echo "please run gen-keys" && exit 1)
+	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
 # testing
 
 ci-check:
 	@ci-check.sh
 	
-loadtest: confirm_action
-	@bin/loadtest.sh
-
 integration-testkit: build-contracts
-	cargo run --bin testkit --release
-	cargo run --bin exodus_test --release
-	cargo run --bin migration_test --release
+	@bin/integration-testkit.sh
 
 migration-test: build-contracts
 	cargo run --bin migration_test --release
@@ -194,25 +190,8 @@ integration-full-exit:
 price:
 	@node contracts/scripts/check-price.js
 
-circuit-tests:
-	cargo test --no-fail-fast --release -p circuit -- --ignored --test-threads 1
-
 prover-tests:
 	f cargo test -p prover --release -- --ignored
-
-# Loadtest
-
-run-loadtest: confirm_action
-	@cd js/franklin_lib && yarn loadtest
-
-prepare-loadtest: confirm_action
-	@node js/loadtest/loadtest.js prepare
-
-rescue: confirm_action
-	@node js/loadtest/rescue.js
-
-deposit: confirm_action
-	@node contracts/scripts/deposit.js
 
 # Devops: main
 
@@ -221,8 +200,12 @@ deposit: confirm_action
 promote-to-stage:
 	@bin/promote-to.sh stage $(ci-build)
 
-promote-to-testnet:
+promote-to-rinkeby:
+    # TODO: change testnet to rinkeby with #447 issue.
 	@bin/promote-to.sh testnet $(ci-build)
+
+promote-to-ropsten:
+	@bin/promote-to.sh ropsten $(ci-build)
 
 # (Re)deploy contracts and database
 redeploy: confirm_action stop deploy-contracts db-insert-contract
@@ -262,7 +245,7 @@ start-kube: apply-kubeconfig
 ifeq (dev,$(ZKSYNC_ENV))
 start: image-nginx image-rust start-local
 else
-start: apply-kubeconfig start-provers start-server start-nginx
+start: apply-kubeconfig start-provers start-server-supervisor start-server start-nginx
 endif
 
 ifeq (dev,$(ZKSYNC_ENV))
@@ -270,25 +253,32 @@ stop:
 else ifeq (ci,$(ZKSYNC_ENV))
 stop:
 else
-stop: confirm_action stop-provers stop-server stop-nginx
+stop: confirm_action stop-provers stop-server stop-nginx stop-server-supervisor
 endif
 
 restart: stop start
 
 start-provers:
-	@bin/provers-scale 1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-server:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=2
+
+start-server-supervisor:
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server-supervisor --namespace $(ZKSYNC_ENV) --replicas=1
+
 
 stop-provers:
-	@bin/provers-scale 0
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-server:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=0
+
+stop-server-supervisor:
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-server-supervisor --namespace $(ZKSYNC_ENV) --replicas=0
 
 stop-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=0

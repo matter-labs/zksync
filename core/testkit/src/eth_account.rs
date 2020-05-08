@@ -1,20 +1,22 @@
-use crate::external_commands::get_revert_reason;
 use bigdecimal::BigDecimal;
 use eth_client::ETHClient;
+use ethabi::ParamType;
 use failure::{ensure, format_err};
 use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
-use models::config_options::ConfigurationOptions;
 use models::node::block::Block;
 use models::node::{AccountId, Address, Nonce, PriorityOp, PubKeyHash, TokenId};
 use models::primitives::big_decimal_to_u128;
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use std::convert::TryFrom;
 use std::str::FromStr;
 use std::time::Duration;
+use web3::api::Eth;
 use web3::contract::{Contract, Options};
-use web3::types::{TransactionReceipt, H256, U128, U256, U64};
-use web3::Transport;
+use web3::types::{
+    BlockNumber, CallRequest, Transaction, TransactionId, TransactionReceipt, H256, U128, U256, U64,
+};
+use web3::{Transport, Web3};
 
 const WEB3_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
@@ -39,11 +41,8 @@ pub fn parse_ether(eth_value: &str) -> Result<BigDecimal, failure::Error> {
     Ok(BigDecimal::from_str(&string_wei_value)?)
 }
 
-fn priority_op_fee() -> BigDecimal {
-    parse_ether("0.3").unwrap()
-}
-
-/// Used to sign and post ETH transactions for the ZK Sync contracts.
+/// Used to sign and post ETH transactions for the zkSync contracts.
+#[derive(Debug, Clone)]
 pub struct EthereumAccount<T: Transport> {
     pub private_key: H256,
     pub address: Address,
@@ -64,7 +63,8 @@ impl<T: Transport> EthereumAccount<T> {
         address: Address,
         transport: T,
         contract_address: Address,
-        config: &ConfigurationOptions,
+        chain_id: u8,
+        gas_price_factor: usize,
     ) -> Self {
         let main_contract_eth_client = ETHClient::new(
             transport,
@@ -72,8 +72,8 @@ impl<T: Transport> EthereumAccount<T> {
             address,
             private_key,
             contract_address,
-            config.chain_id,
-            config.gas_price_factor,
+            chain_id,
+            gas_price_factor,
         );
 
         Self {
@@ -121,17 +121,12 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "fullExit",
                 (u64::from(account_id), token_address),
-                Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
+                Options::default(),
             )
             .await
             .map_err(|e| format_err!("Full exit send err: {}", e))?;
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("Full exit wait confirm err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         ensure!(
             receipt.status == Some(U64::from(1)),
             "Full exit submit fail"
@@ -147,33 +142,30 @@ impl<T: Transport> EthereumAccount<T> {
 
     pub async fn exit(
         &self,
+        account_id: AccountId,
         token_id: TokenId,
         amount: &BigDecimal,
-        proof: EncodedProof,
+        proof: EncodedProofPlonk,
     ) -> Result<ETHExecResult, failure::Error> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
                 "exit",
                 (
+                    u64::from(account_id),
                     u64::from(token_id),
                     U128::from(big_decimal_to_u128(amount)),
-                    proof,
+                    proof.proof,
                 ),
                 Options::default(),
             )
             .await
             .map_err(|e| format_err!("Exit send err: {}", e))?;
 
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("Exit wait confirm err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     pub async fn cancel_outstanding_deposits_for_exodus_mode(
@@ -190,20 +182,10 @@ impl<T: Transport> EthereumAccount<T> {
             .await
             .map_err(|e| format_err!("cancelOutstandingDepositsForExodusMode send err: {}", e))?;
 
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| {
-                format_err!(
-                    "cancelOutstandingDepositsForExodusMode wait confirm err: {}",
-                    e
-                )
-            })?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     pub async fn change_pubkey_priority_op(
@@ -215,17 +197,12 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "changePubKeyHash",
                 (new_pubkey_hash.data.to_vec(),),
-                Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
+                Options::default(),
             )
             .await
             .map_err(|e| format_err!("ChangePubKeyHash send err: {}", e))?;
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("ChangePubKeyHash wait confirm err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         ensure!(
             receipt.status == Some(U64::from(1)),
             "ChangePubKeyHash transaction failed"
@@ -249,21 +226,16 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "depositETH",
-                (big_dec_to_u256(amount.clone()), *to),
+                *to,
                 Options::with(|opt| {
-                    opt.value = Some(big_dec_to_u256(amount.clone() + priority_op_fee()));
+                    opt.value = Some(big_dec_to_u256(amount.clone()));
                     opt.nonce = nonce;
                 }),
             )
             .await
             .map_err(|e| format_err!("Deposit eth send err: {}", e))?;
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("Deposit eth wait confirm err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         ensure!(receipt.status == Some(U64::from(1)), "eth deposit fail");
         Ok(receipt
             .logs
@@ -311,7 +283,7 @@ impl<T: Transport> EthereumAccount<T> {
 
         Ok(contract
             .query(
-                "balancesToWithdraw",
+                "getBalanceToWithdraw",
                 (self.address, u64::from(token)),
                 None,
                 Options::default(),
@@ -349,13 +321,8 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .await
             .map_err(|e| format_err!("Approve send err: {}", e))?;
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("Approve wait confirm err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
 
         ensure!(receipt.status == Some(U64::from(1)), "erc20 approve fail");
 
@@ -375,17 +342,12 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx(
                 "depositERC20",
                 (token_contract, big_dec_to_u256(amount.clone()), *to),
-                Options::with(|opt| opt.value = Some(big_dec_to_u256(priority_op_fee()))),
+                Options::default(),
             )
             .await
             .map_err(|e| format_err!("Deposit erc20 send err: {}", e))?;
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("Deposit erc20 wait confirm err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
         ensure!(receipt.status == Some(U64::from(1)), "erc20 deposit fail");
         Ok(receipt
             .logs
@@ -415,15 +377,10 @@ impl<T: Transport> EthereumAccount<T> {
             .await
             .map_err(|e| format_err!("Commit block send err: {}", e))?;
 
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("Commit block confirm err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     // Verifies block using empty proof. (`DUMMY_VERIFIER` should be enabled on the contract).
@@ -432,19 +389,18 @@ impl<T: Transport> EthereumAccount<T> {
             .main_contract_eth_client
             .sign_call_tx(
                 "verifyBlock",
-                (u64::from(block.block_number), [U256::default(); 8]),
+                (
+                    u64::from(block.block_number),
+                    vec![U256::default(); 10],
+                    block.get_withdrawals_data(),
+                ),
                 Options::default(),
             )
             .await
             .map_err(|e| format_err!("Verify block send err: {}", e))?;
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("Verify block confirm err: {}", e))?;
-        Ok(ETHExecResult::new(receipt))
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     // Completes pending withdrawals.
@@ -459,15 +415,10 @@ impl<T: Transport> EthereumAccount<T> {
             )
             .await
             .map_err(|e| format_err!("Complete withdrawals send err: {}", e))?;
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("Complete withdrawals confirm err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     pub async fn trigger_exodus_if_needed(&self) -> Result<ETHExecResult, failure::Error> {
@@ -476,15 +427,10 @@ impl<T: Transport> EthereumAccount<T> {
             .sign_call_tx("triggerExodusIfNeeded", (), Options::default())
             .await
             .map_err(|e| format_err!("Trigger exodus if needed send err: {}", e))?;
-        let receipt = self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(signed_tx.raw_tx.into(), WEB3_POLL_INTERVAL, 1)
-            .compat()
-            .await
-            .map_err(|e| format_err!("Trigger exodus if needed confirm err: {}", e))?;
+        let eth = self.main_contract_eth_client.web3.eth();
+        let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
 
-        Ok(ETHExecResult::new(receipt))
+        Ok(ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await)
     }
 
     pub async fn eth_block_number(&self) -> Result<u64, failure::Error> {
@@ -499,23 +445,14 @@ impl<T: Transport> EthereumAccount<T> {
         let signed_tx = self
             .main_contract_eth_client
             .sign_call_tx(
-                "authPubkeyHash",
+                "setAuthPubkeyHash",
                 (fact.to_vec(), u64::from(nonce)),
                 Options::default(),
             )
             .await
             .map_err(|e| format_err!("AuthFact send err: {}", e))?;
-        Ok(self
-            .main_contract_eth_client
-            .web3
-            .send_raw_transaction_with_confirmation(
-                signed_tx.raw_tx.into(),
-                Duration::from_millis(500),
-                1,
-            )
-            .compat()
-            .await
-            .map_err(|e| format_err!("AuthFact confirm err: {}", e))?)
+        let eth = self.main_contract_eth_client.web3.eth();
+        send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await
     }
 }
 
@@ -527,12 +464,13 @@ pub struct ETHExecResult {
 }
 
 impl ETHExecResult {
-    pub fn new(receipt: TransactionReceipt) -> Self {
+    pub async fn new<T: Transport>(receipt: TransactionReceipt, web3: &Web3<T>) -> Self {
         let (success, revert_reason) = if receipt.status == Some(U64::from(1)) {
             (true, String::from(""))
         } else {
-            let hash = format!("{:#?}", &receipt.transaction_hash);
-            let reason = get_revert_reason(&hash);
+            let reason = get_revert_reason(&receipt, web3)
+                .await
+                .expect("Failed to get revert reason");
             (false, reason)
         };
 
@@ -560,6 +498,88 @@ impl ETHExecResult {
             );
         } else if self.revert_reason != code {
             panic!("Transaction failed with incorrect return code, expected: {}, found: {}, tx: 0x{:x}", code, self.revert_reason, self.receipt.transaction_hash);
+        }
+    }
+}
+
+/// Gets revert reason of failed transactions (i.e. if contract executes `require(false, "msg")` this function returns "msg")
+async fn get_revert_reason<T: Transport>(
+    receipt: &TransactionReceipt,
+    web3: &Web3<T>,
+) -> Result<String, failure::Error> {
+    let tx = web3
+        .eth()
+        .transaction(TransactionId::Hash(receipt.transaction_hash))
+        .compat()
+        .await?;
+    if let Some(Transaction {
+        from,
+        to: Some(to),
+        gas,
+        gas_price,
+        value,
+        input,
+        ..
+    }) = tx
+    {
+        // To get revert reason we have to make call to contract using the same args as function.
+        let encoded_revert_reason = web3
+            .eth()
+            .call(
+                CallRequest {
+                    from: Some(from),
+                    to,
+                    gas: Some(gas),
+                    gas_price: Some(gas_price),
+                    value: Some(value),
+                    data: Some(input),
+                },
+                receipt.block_number.clone().map(BlockNumber::Number),
+            )
+            .compat()
+            .await?;
+
+        // For some strange, reason this could happen
+        if encoded_revert_reason.0.len() < 4 {
+            return Ok("".to_string());
+        }
+        // This function returns ABI encoded retrun value for function with signature "Error(string)"
+        // we strip first 4 bytes because they encode function name "Error", the rest is encoded string.
+        let encoded_string_without_function_hash = &encoded_revert_reason.0[4..];
+        Ok(
+            ethabi::decode(&[ParamType::String], encoded_string_without_function_hash)
+                .map_err(|e| format_err!("ABI decode error {}", e))?
+                .into_iter()
+                .next()
+                .unwrap()
+                .to_string()
+                .unwrap(),
+        )
+    } else {
+        Ok("".to_string())
+    }
+}
+
+async fn send_raw_tx_wait_confirmation<T: Transport>(
+    eth: Eth<T>,
+    raw_tx: Vec<u8>,
+) -> Result<TransactionReceipt, failure::Error> {
+    let tx_hash = eth
+        .send_raw_transaction(raw_tx.into())
+        .compat()
+        .await
+        .map_err(|e| format_err!("Failed to send raw tx: {}", e))?;
+    loop {
+        if let Some(receipt) = eth
+            .transaction_receipt(tx_hash)
+            .compat()
+            .await
+            .map_err(|e| format_err!("Failed to get receipt from eth node: {}", e))?
+        {
+            return Ok(receipt);
+        } else {
+            // Ok here, because we use single threaded executor from futures
+            std::thread::sleep(WEB3_POLL_INTERVAL);
         }
     }
 }

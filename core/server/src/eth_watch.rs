@@ -1,6 +1,6 @@
 //! Ethereum watcher polls the Ethereum node for new events
 //! such as PriorityQueue events or NewToken events.
-//! New events are accepted to the ZK Sync network once they have the sufficient amount of confirmations.
+//! New events are accepted to the zkSync network once they have the sufficient amount of confirmations.
 //!
 //! Poll interval is configured using the `ETH_POLL_INTERVAL` constant.
 //! Number of confirmations is configured using the `CONFIRMATIONS_FOR_ETH_EVENT` environment variable.
@@ -8,7 +8,6 @@
 // Built-in deps
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use std::time::Duration;
 // External uses
 use failure::format_err;
 use futures::{
@@ -26,15 +25,12 @@ use models::misc::constants::EIP1271_SUCCESS_RETURN_VALUE;
 use models::node::tx::EIP1271Signature;
 use models::node::{Nonce, PriorityOp, PubKeyHash, Token, TokenId};
 use models::params::PRIORITY_EXPIRATION;
-use models::TokenAddedEvent;
+use models::NewTokenEvent;
 use storage::ConnectionPool;
 use tokio::{runtime::Runtime, time};
 use web3::transports::EventLoopHandle;
 
-const ETH_POLL_INTERVAL: Duration = Duration::from_millis(200);
-
 type EthBlockId = u64;
-
 pub enum EthWatchRequest {
     PollETHNode,
     IsPubkeyChangeAuthorized {
@@ -53,7 +49,7 @@ pub enum EthWatchRequest {
     },
     CheckEIP1271Signature {
         address: Address,
-        data: Vec<u8>,
+        message: Vec<u8>,
         signature: EIP1271Signature,
         resp: oneshot::Sender<Result<bool, failure::Error>>,
     },
@@ -149,7 +145,7 @@ impl<T: Transport> EthWatch<T> {
         let new_token_event_topic = self
             .gov_contract
             .0
-            .event("TokenAdded")
+            .event("NewToken")
             .expect("gov contract abi error")
             .signature();
         FilterBuilder::default()
@@ -164,7 +160,7 @@ impl<T: Transport> EthWatch<T> {
         &self,
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<TokenAddedEvent>, failure::Error> {
+    ) -> Result<Vec<NewTokenEvent>, failure::Error> {
         let filter = self.get_new_token_event_filter(from, to);
 
         self.web3
@@ -174,9 +170,8 @@ impl<T: Transport> EthWatch<T> {
             .await?
             .into_iter()
             .map(|event| {
-                TokenAddedEvent::try_from(event).map_err(|e| {
-                    format_err!("Failed to parse TokenAdded event log from ETH: {}", e)
-                })
+                NewTokenEvent::try_from(event)
+                    .map_err(|e| format_err!("Failed to parse NewToken event log from ETH: {}", e))
             })
             .collect()
     }
@@ -255,7 +250,7 @@ impl<T: Transport> EthWatch<T> {
         // have unconfirmed priority ops.
         let block_from_number =
             current_ethereum_block.saturating_sub(self.number_of_confirmations_for_event);
-        let block_from = BlockNumber::Number(block_from_number);
+        let block_from = BlockNumber::Number(block_from_number.into());
         let block_to = BlockNumber::Latest;
 
         let pending_events = self
@@ -289,8 +284,8 @@ impl<T: Transport> EthWatch<T> {
         // restore priority queue
         let prior_queue_events = self
             .get_priority_op_events(
-                BlockNumber::Number(previous_block_with_accepted_events),
-                BlockNumber::Number(new_block_with_accepted_events),
+                BlockNumber::Number(previous_block_with_accepted_events.into()),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await
             .expect("Failed to restore priority queue events from ETH");
@@ -304,7 +299,7 @@ impl<T: Transport> EthWatch<T> {
         let new_tokens = self
             .get_new_token_events(
                 BlockNumber::Earliest,
-                BlockNumber::Number(new_block_with_accepted_events),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await
             .expect("Failed to restore token list from ETH");
@@ -327,8 +322,8 @@ impl<T: Transport> EthWatch<T> {
         // Get new tokens
         let new_tokens = self
             .get_new_token_events(
-                BlockNumber::Number(previous_block_with_accepted_events),
-                BlockNumber::Number(new_block_with_accepted_events),
+                BlockNumber::Number(previous_block_with_accepted_events.into()),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await?;
 
@@ -341,8 +336,8 @@ impl<T: Transport> EthWatch<T> {
         // Get new priority ops
         let priority_op_events = self
             .get_priority_op_events(
-                BlockNumber::Number(previous_block_with_accepted_events),
-                BlockNumber::Number(new_block_with_accepted_events),
+                BlockNumber::Number(previous_block_with_accepted_events.into()),
+                BlockNumber::Number(new_block_with_accepted_events.into()),
             )
             .await?;
 
@@ -398,14 +393,14 @@ impl<T: Transport> EthWatch<T> {
     async fn is_eip1271_signature_correct(
         &self,
         address: Address,
-        data: Vec<u8>,
+        message: Vec<u8>,
         signature: EIP1271Signature,
     ) -> Result<bool, failure::Error> {
         let received: [u8; 4] = self
             .get_eip1271_contract(address)
             .query(
                 "isValidSignature",
-                (data, signature.0),
+                (message, signature.0),
                 None,
                 Options::default(),
                 None,
@@ -436,7 +431,7 @@ impl<T: Transport> EthWatch<T> {
             .compat()
             .await
             .map_err(|e| format_err!("Failed to query contract authFacts: {}", e))?;
-        Ok(auth_fact.as_slice() == &pub_key_hash.data[..])
+        Ok(auth_fact.as_slice() == tiny_keccak::keccak256(&pub_key_hash.data[..]))
     }
 
     pub async fn run(mut self) {
@@ -496,12 +491,12 @@ impl<T: Transport> EthWatch<T> {
                 }
                 EthWatchRequest::CheckEIP1271Signature {
                     address,
-                    data,
+                    message,
                     signature,
                     resp,
                 } => {
                     let signature_correct = self
-                        .is_eip1271_signature_correct(address, data, signature)
+                        .is_eip1271_signature_correct(address, message, signature)
                         .await;
 
                     resp.send(signature_correct).unwrap_or_default();
@@ -534,7 +529,7 @@ pub fn start_eth_watch(
     runtime.spawn(eth_watch.run());
 
     runtime.spawn(async move {
-        let mut timer = time::interval(ETH_POLL_INTERVAL);
+        let mut timer = time::interval(config_options.eth_watch_poll_interval);
 
         loop {
             timer.tick().await;

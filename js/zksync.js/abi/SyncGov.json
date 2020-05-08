@@ -1,13 +1,7 @@
 {
   "interface": [
     {
-      "inputs": [
-        {
-          "internalType": "address",
-          "name": "_networkGovernor",
-          "type": "address"
-        }
-      ],
+      "inputs": [],
       "payable": false,
       "stateMutability": "nonpayable",
       "type": "constructor"
@@ -18,17 +12,49 @@
         {
           "indexed": false,
           "internalType": "address",
+          "name": "newGovernor",
+          "type": "address"
+        }
+      ],
+      "name": "NewGovernor",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "token",
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint16",
           "name": "tokenId",
           "type": "uint16"
         }
       ],
-      "name": "TokenAdded",
+      "name": "NewToken",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "validatorAddress",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isActive",
+          "type": "bool"
+        }
+      ],
+      "name": "ValidatorStatusUpdate",
       "type": "event"
     },
     {
@@ -56,6 +82,21 @@
         }
       ],
       "name": "changeGovernor",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "initializationParameters",
+          "type": "bytes"
+        }
+      ],
+      "name": "initialize",
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",

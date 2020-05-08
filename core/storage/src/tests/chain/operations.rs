@@ -4,13 +4,9 @@ use models::ActionType;
 // Local imports
 use crate::tests::db_test;
 use crate::{
-    chain::{
-        mempool::MempoolSchema,
-        operations::{
-            records::{NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation},
-            OperationsSchema,
-        },
-        operations_ext::records::InsertTx,
+    chain::operations::{
+        records::{NewExecutedPriorityOperation, NewExecutedTransaction, NewOperation},
+        OperationsSchema,
     },
     StorageProcessor,
 };
@@ -49,21 +45,17 @@ fn executed_operations() {
         let executed_tx = NewExecutedTransaction {
             block_number: 1,
             tx_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
-            operation: None,
+            tx: Default::default(),
+            operation: Default::default(),
+            from_account: Default::default(),
+            to_account: None,
             success: true,
             fail_reason: None,
             block_index: None,
-        };
-
-        // We have to store the transaction in mempool before storing it
-        // as executed.
-        let mempool_tx = InsertTx {
-            hash: executed_tx.tx_hash.clone(),
             primary_account_address: Default::default(),
             nonce: Default::default(),
-            tx: Default::default(),
+            created_at: chrono::Utc::now(),
         };
-        MempoolSchema(&conn).insert_tx(mempool_tx)?;
 
         OperationsSchema(&conn).store_executed_operation(executed_tx.clone())?;
 
@@ -73,10 +65,18 @@ fn executed_operations() {
 
         assert_eq!(stored_operation.block_number, executed_tx.block_number);
         assert_eq!(stored_operation.tx_hash, executed_tx.tx_hash);
+        assert_eq!(stored_operation.tx, executed_tx.tx);
         assert_eq!(stored_operation.operation, executed_tx.operation);
+        assert_eq!(stored_operation.from_account, executed_tx.from_account);
+        assert_eq!(stored_operation.to_account, executed_tx.to_account);
         assert_eq!(stored_operation.success, executed_tx.success);
         assert_eq!(stored_operation.fail_reason, executed_tx.fail_reason);
         assert_eq!(stored_operation.block_index, executed_tx.block_index);
+        assert_eq!(stored_operation.nonce, executed_tx.nonce);
+        assert_eq!(
+            stored_operation.primary_account_address,
+            executed_tx.primary_account_address
+        );
 
         Ok(())
     });
@@ -92,9 +92,10 @@ fn executed_priority_operations() {
             block_number: 1,
             block_index: 1,
             operation: Default::default(),
+            from_account: Default::default(),
+            to_account: Default::default(),
             priority_op_serialid: 0,
             deadline_block: 100,
-            eth_fee: Default::default(),
             eth_hash: vec![0xDE, 0xAD, 0xBE, 0xEF],
         };
         OperationsSchema(&conn).store_executed_priority_operation(executed_tx.clone())?;
@@ -106,12 +107,13 @@ fn executed_priority_operations() {
         assert_eq!(stored_operation.block_number, executed_tx.block_number);
         assert_eq!(stored_operation.block_index, executed_tx.block_index);
         assert_eq!(stored_operation.operation, executed_tx.operation);
+        assert_eq!(stored_operation.from_account, executed_tx.from_account);
+        assert_eq!(stored_operation.to_account, executed_tx.to_account);
         assert_eq!(
             stored_operation.priority_op_serialid,
             executed_tx.priority_op_serialid
         );
         assert_eq!(stored_operation.deadline_block, executed_tx.deadline_block);
-        assert_eq!(stored_operation.eth_fee, executed_tx.eth_fee);
         assert_eq!(stored_operation.eth_hash, executed_tx.eth_hash);
 
         Ok(())

@@ -29,8 +29,10 @@ use web3::Transport;
 pub mod eth_account;
 pub mod external_commands;
 pub mod zksync_account;
-use models::EncodedProof;
+use models::prover_utils::EncodedProofPlonk;
 use web3::types::U64;
+
+pub const TESKIT_BLOCK_CHUNKS_SIZE: usize = 100;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ETHAccountId(pub usize);
@@ -84,14 +86,18 @@ impl<T: Transport> AccountSet<T> {
         let from = &self.zksync_accounts[from.0];
         let to = &self.zksync_accounts[to.0];
 
-        FranklinTx::Transfer(Box::new(from.sign_transfer(
-            token_id.0,
-            amount,
-            fee,
-            &to.address,
-            nonce,
-            increment_nonce,
-        )))
+        FranklinTx::Transfer(Box::new(
+            from.sign_transfer(
+                token_id.0,
+                "",
+                amount,
+                fee,
+                &to.address,
+                nonce,
+                increment_nonce,
+            )
+            .0,
+        ))
     }
 
     /// Create withdraw from zksync account to eth account
@@ -111,14 +117,18 @@ impl<T: Transport> AccountSet<T> {
         let from = &self.zksync_accounts[from.0];
         let to = &self.eth_accounts[to.0];
 
-        FranklinTx::Withdraw(Box::new(from.sign_withdraw(
-            token_id.0,
-            amount,
-            fee,
-            &to.address,
-            nonce,
-            increment_nonce,
-        )))
+        FranklinTx::Withdraw(Box::new(
+            from.sign_withdraw(
+                token_id.0,
+                "",
+                amount,
+                fee,
+                &to.address,
+                nonce,
+                increment_nonce,
+            )
+            .0,
+        ))
     }
 
     /// Create full exit from zksync account to eth account
@@ -174,15 +184,10 @@ impl<T: Transport> AccountSet<T> {
 
 /// Initialize plasma state with one account - fee account.
 pub fn genesis_state(fee_account_address: &Address) -> PlasmaStateInitParams {
-    let mut accounts = AccountMap::default();
     let operator_account = Account::default_with_address(fee_account_address);
-    accounts.insert(0, operator_account);
-
-    PlasmaStateInitParams {
-        accounts,
-        last_block_number: 0,
-        unprocessed_priority_op: 0,
-    }
+    let mut params = PlasmaStateInitParams::new();
+    params.insert_account(0, operator_account);
+    params
 }
 
 pub async fn state_keeper_get_account(
@@ -216,6 +221,7 @@ pub fn spawn_state_keeper(
         state_keeper_req_receiver,
         proposed_blocks_sender,
         executed_tx_notify_sender,
+        vec![TESKIT_BLOCK_CHUNKS_SIZE],
     );
 
     let (stop_state_keeper_sender, stop_state_keeper_receiver) = oneshot::channel::<()>();
@@ -342,8 +348,23 @@ pub fn perform_basic_operations(
     println!("Full exit test success, token_id: {}", token);
 }
 
+pub struct TestkitConfig {
+    pub chain_id: u8,
+    pub gas_price_factor: usize,
+    pub web3_url: String,
+}
+
+pub fn get_testkit_config_from_env() -> TestkitConfig {
+    let env_config = ConfigurationOptions::from_env();
+    TestkitConfig {
+        chain_id: env_config.chain_id,
+        gas_price_factor: env_config.gas_price_factor,
+        web3_url: env_config.web3_url,
+    }
+}
+
 pub fn perform_basic_tests() {
-    let config = ConfigurationOptions::from_env();
+    let testkit_config = get_testkit_config_from_env();
 
     let fee_account = ZksyncAccount::rand();
     let (sk_thread_handle, stop_state_keeper_sender, sk_channels) =
@@ -358,16 +379,17 @@ pub fn perform_basic_tests() {
         deploy_timer.elapsed().as_secs()
     );
 
-    let (_el, transport) = Http::new(&config.web3_url).expect("http transport start");
+    let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
+    let (test_accounts_info, commit_account_info) = get_test_accounts();
     let commit_account = EthereumAccount::new(
-        config.operator_private_key,
-        config.operator_eth_addr,
+        commit_account_info.private_key,
+        commit_account_info.address,
         transport.clone(),
         contracts.contract,
-        &config,
+        testkit_config.chain_id,
+        testkit_config.gas_price_factor,
     );
-
-    let eth_accounts = get_test_accounts()
+    let eth_accounts = test_accounts_info
         .into_iter()
         .map(|test_eth_account| {
             EthereumAccount::new(
@@ -375,7 +397,8 @@ pub fn perform_basic_tests() {
                 test_eth_account.address,
                 transport.clone(),
                 contracts.contract,
-                &config,
+                testkit_config.chain_id,
+                testkit_config.gas_price_factor,
             )
         })
         .collect::<Vec<_>>();
@@ -572,12 +595,16 @@ impl TestSetup {
     pub fn exit(
         &mut self,
         sending_account: ETHAccountId,
+        account_id: AccountId,
         token_id: Token,
         amount: &BigDecimal,
-        proof: EncodedProof,
+        proof: EncodedProofPlonk,
     ) -> ETHExecResult {
-        block_on(self.accounts.eth_accounts[sending_account.0].exit(token_id.0, amount, proof))
-            .expect("Failed to post exit tx")
+        block_on(
+            self.accounts.eth_accounts[sending_account.0]
+                .exit(account_id, token_id.0, amount, proof),
+        )
+        .expect("Failed to post exit tx")
     }
 
     pub fn full_exit(&mut self, post_by: ETHAccountId, from: ZKSyncAccountId, token: Token) {
@@ -618,6 +645,12 @@ impl TestSetup {
     }
 
     pub fn change_pubkey_with_tx(&mut self, zksync_signer: ZKSyncAccountId) {
+        let account_id = self
+            .get_zksync_account_committed_state(zksync_signer)
+            .expect("can't change pubkey, account does not exist")
+            .0;
+        self.accounts.zksync_accounts[zksync_signer.0].set_account_id(Some(account_id));
+
         let tx = self
             .accounts
             .change_pubkey_with_tx(zksync_signer, None, true);
@@ -630,6 +663,12 @@ impl TestSetup {
         eth_account: ETHAccountId,
         zksync_signer: ZKSyncAccountId,
     ) {
+        let account_id = self
+            .get_zksync_account_committed_state(zksync_signer)
+            .expect("can't change pubkey, account does not exist")
+            .0;
+        self.accounts.zksync_accounts[zksync_signer.0].set_account_id(Some(account_id));
+
         let tx =
             self.accounts
                 .change_pubkey_with_onchain_auth(eth_account, zksync_signer, None, true);
@@ -787,10 +826,15 @@ impl TestSetup {
             bail!("Block checks failed")
         }
 
+        for zk_id in 0..self.accounts.zksync_accounts.len() {
+            self.accounts.zksync_accounts[zk_id]
+                .set_account_id(self.get_zksync_account_id(ZKSyncAccountId(zk_id)));
+        }
+
         Ok(())
     }
 
-    fn get_zksync_account_committed_state(
+    pub fn get_zksync_account_committed_state(
         &self,
         zksync_id: ZKSyncAccountId,
     ) -> Option<(AccountId, Account)> {
@@ -801,6 +845,11 @@ impl TestSetup {
         ))
     }
 
+    pub fn get_zksync_account_id(&self, zksync_id: ZKSyncAccountId) -> Option<AccountId> {
+        self.get_zksync_account_committed_state(zksync_id)
+            .map(|a| a.0)
+    }
+
     fn get_zksync_balance(&self, zksync_id: ZKSyncAccountId, token: TokenId) -> BigDecimal {
         self.get_zksync_account_committed_state(zksync_id)
             .map(|(_, acc)| acc.get_balance(token))
@@ -809,12 +858,13 @@ impl TestSetup {
 
     fn get_eth_balance(&self, eth_account_id: ETHAccountId, token: TokenId) -> BigDecimal {
         let account = &self.accounts.eth_accounts[eth_account_id.0];
-        if token == 0 {
+        let result = if token == 0 {
             block_on(account.eth_balance()).expect("Failed to get eth balance")
         } else {
             block_on(account.erc20_balance(&self.tokens[&token]))
                 .expect("Failed to get erc20 balance")
-        }
+        };
+        result + self.get_balance_to_withdraw(eth_account_id, Token(token))
     }
 
     pub fn get_balance_to_withdraw(
@@ -873,10 +923,13 @@ impl TestSetup {
         accounts: AccountMap,
         fund_owner: ZKSyncAccountId,
         token: Token,
-    ) -> (EncodedProof, BigDecimal) {
-        let owner_address = self.accounts.zksync_accounts[fund_owner.0].address;
+    ) -> (EncodedProofPlonk, BigDecimal) {
+        let owner = &self.accounts.zksync_accounts[fund_owner.0];
+        let owner_id = owner
+            .get_account_id()
+            .expect("Account should have id to exit");
         // restore account state
-        prover::exit_proof::create_exit_proof(accounts, owner_address, token.0)
+        prover::exit_proof::create_exit_proof(accounts, owner_id, owner.address, token.0)
             .expect("Failed to generate exit proof")
     }
 }

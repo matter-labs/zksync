@@ -1,6 +1,7 @@
-pragma solidity 0.5.16;
+pragma solidity ^0.5.0;
 
 import "./Upgradeable.sol";
+import "./Operations.sol";
 
 
 /// @title zkSync events
@@ -8,10 +9,10 @@ import "./Upgradeable.sol";
 contract Events {
 
     /// @notice Event emitted when a block is committed
-    event BlockCommitted(uint32 indexed blockNumber);
+    event BlockCommit(uint32 indexed blockNumber);
 
     /// @notice Event emitted when a block is verified
-    event BlockVerified(uint32 indexed blockNumber);
+    event BlockVerification(uint32 indexed blockNumber);
 
     /// @notice Event emitted when user send a transaction to withdraw her funds from onchain balance
     event OnchainWithdrawal(
@@ -25,20 +26,20 @@ contract Events {
         address sender,
         uint16 tokenId,
         uint128 amount,
-        uint256 fee,
         address indexed owner
     );
 
+    /// @notice Event emitted when user sends a authentication fact (e.g. pub-key hash)
     event FactAuth(
-        address sender,
+        address indexed sender,
         uint32 nonce,
         bytes fact
     );
 
     /// @notice Event emitted when blocks are reverted
-    event BlocksReverted(
-        uint32 indexed totalBlocksVerified,
-        uint32 indexed totalBlocksCommitted
+    event BlocksRevert(
+        uint32 totalBlocksVerified,
+        uint32 totalBlocksCommitted
     );
 
     /// @notice Exodus mode entered event
@@ -48,10 +49,25 @@ contract Events {
     event NewPriorityRequest(
         address sender,
         uint64 serialId,
-        uint8 opType,
+        Operations.OpType opType,
         bytes pubData,
-        uint256 expirationBlock,
-        uint256 fee
+        uint256 expirationBlock
+    );
+
+    event DepositCommit(
+        uint32 franklinBlockId,
+        uint24 accountId,
+        address owner,
+        uint16 tokenId,
+        uint128 amount
+    );
+
+    event FullExitCommit(
+        uint32 franklinBlockId,
+        uint24 accountId,
+        address owner,
+        uint16 tokenId,
+        uint128 amount
     );
 }
 
@@ -60,23 +76,23 @@ contract Events {
 contract UpgradeEvents {
 
     /// @notice Event emitted when new upgradeable contract is added to upgrade gatekeeper's list of managed contracts
-    event UpgradeableAdded(
+    event UpgradeableAdd(
         Upgradeable upgradeable
     );
 
     /// @notice Upgrade mode enter event
-    event NoticePeriodStarted(
+    event NoticePeriodStart(
         address[] newTargets
     );
 
     /// @notice Upgrade mode cancel event
-    event UpgradeCanceled();
+    event UpgradeCancel();
 
     /// @notice Upgrade mode preparation status event
-    event PreparationStarted();
+    event PreparationStart();
 
     /// @notice Upgrade mode complete event
-    event UpgradeCompleted(
+    event UpgradeComplete(
         Upgradeable upgradeable,
         address newTargetAddress
     );

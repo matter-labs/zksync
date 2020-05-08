@@ -1,6 +1,6 @@
-pragma solidity 0.5.16;
+pragma solidity ^0.5.0;
 
-import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import "./IERC20.sol";
 
 import "./Governance.sol";
 import "./Verifier.sol";
@@ -25,8 +25,13 @@ contract Storage {
     /// @notice Governance contract. Contains the governor (the owner) of whole system, validators list, possible tokens list
     Governance internal governance;
 
-    /// @notice Root-chain balances (per owner and token id) to withdraw
-    mapping(address => mapping(uint16 => uint128)) public balancesToWithdraw;
+    struct BalanceToWithdraw {
+        uint128 balanceToWithdraw;
+        uint8 gasReserveValue; // gives user opportunity to fill storage slot with nonzero value
+    }
+
+    /// @notice Root-chain balances (per owner and token id, see packAddressAndTokenId) to withdraw
+    mapping(bytes22 => BalanceToWithdraw) public balancesToWithdraw;
 
     /// @notice verified withdrawal pending to be executed.
     struct PendingWithdrawal {
@@ -34,7 +39,7 @@ contract Storage {
         uint16 tokenId;
     }
     
-    /// @notice Verified but not executed withdrawals for addresses stored in here
+    /// @notice Verified but not executed withdrawals for addresses stored in here (key is pendingWithdrawal's index)
     mapping(uint32 => PendingWithdrawal) public pendingWithdrawals;
     uint32 public firstPendingWithdrawalIndex;
     uint32 public numberOfPendingWithdrawals;
@@ -48,20 +53,19 @@ contract Storage {
     /// @notice Rollup block data (once per block)
     /// @member validator Block producer
     /// @member committedAtBlock ETH block number at which this block was committed
-    /// @member operationStartId Index of the first operation to process for this block
-    /// @member onchainOperations Total number of operations to process for this block
+    /// @member cumulativeOnchainOperations Total number of operations in this and all previous blocks
     /// @member priorityOperations Total number of priority operations for this block
     /// @member commitment Hash of the block circuit commitment
     /// @member stateRoot New tree root hash
+    ///
+    /// Consider memory alignment when changing field order: https://solidity.readthedocs.io/en/v0.4.21/miscellaneous.html
     struct Block {
-        address validator;
         uint32 committedAtBlock;
-        uint64 operationStartId;
-        uint64 onchainOperations;
         uint64 priorityOperations;
+        uint32 chunks;
+        bytes32 withdrawalsDataHash; /// can be restricted to 16 bytes to reduce number of required storage slots
         bytes32 commitment;
         bytes32 stateRoot;
-        uint32 chunks;
     }
 
     /// @notice Blocks by Franklin block id
@@ -76,36 +80,28 @@ contract Storage {
         bytes pubData;
     }
 
-    /// @notice Total number of registered onchain operations
-    uint64 public totalOnchainOps;
-
-    /// @notice Onchain operations by index
-    mapping(uint64 => OnchainOperation) public onchainOps;
-
-    /// @notice Flag indicates that a user has exited certain token balance (per owner and tokenId)
-    mapping(address => mapping(uint16 => bool)) public exited;
+    /// @notice Flag indicates that a user has exited certain token balance (per account id and tokenId)
+    mapping(uint24 => mapping(uint16 => bool)) public exited;
 
     /// @notice Flag indicates that exodus (mass exit) mode is triggered
     /// @notice Once it was raised, it can not be cleared again, and all users must exit
     bool public exodusMode;
 
-    /// @notice User authenticated facts for some nonce.
-    mapping(address => mapping(uint32 => bytes)) public authFacts;
+    /// @notice User authenticated fact hashes for some nonce.
+    mapping(address => mapping(uint32 => bytes32)) public authFacts;
 
-        /// @notice Priority Operation container
+    /// @notice Priority Operation container
     /// @member opType Priority operation type
     /// @member pubData Priority operation public data
     /// @member expirationBlock Expiration block number (ETH block) for this request (must be satisfied before)
-    /// @member fee Validators fee
     struct PriorityOperation {
         Operations.OpType opType;
         bytes pubData;
         uint256 expirationBlock;
-        uint256 fee;
     }
 
     /// @notice Priority Requests mapping (request id - operation)
-    /// @dev Contains op type, pubdata, fee and expiration block of unsatisfied requests.
+    /// @dev Contains op type, pubdata and expiration block of unsatisfied requests.
     /// @dev Numbers are in order of requests receiving
     mapping(uint64 => PriorityOperation) public priorityRequests;
 
@@ -119,4 +115,13 @@ contract Storage {
     /// @dev Used in checks: if the request matches the operation on Rollup contract and if provided number of requests is not too big
     uint64 public totalCommittedPriorityRequests;
 
+    /// @notice Packs address and token id into single word to use as a key in balances mapping
+    function packAddressAndTokenId(address _address, uint16 _tokenId) internal pure returns (bytes22) {
+        return bytes22(uint176(uint(_address) | (_tokenId << 160)));
+    }
+
+    /// @notice Gets value from balancesToWithdraw
+    function getBalanceToWithdraw(address _address, uint16 _tokenId) public view returns (uint128) {
+        return balancesToWithdraw[packAddressAndTokenId(_address, _tokenId)].balanceToWithdraw;
+    }
 }

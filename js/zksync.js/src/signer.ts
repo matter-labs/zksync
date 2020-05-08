@@ -5,7 +5,11 @@ import {
     privateKeyToPubKeyHash
 } from "./crypto";
 import { ethers, utils } from "ethers";
-import { packAmountChecked, packFeeChecked } from "./utils";
+import {
+    packAmountChecked,
+    packFeeChecked,
+    getEthSignatureType
+} from "./utils";
 import BN = require("bn.js");
 import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw } from "./types";
 
@@ -24,6 +28,7 @@ export class Signer {
     }
 
     signSyncTransfer(transfer: {
+        accountId: number;
         from: Address;
         to: Address;
         tokenId: number;
@@ -32,6 +37,7 @@ export class Signer {
         nonce: number;
     }): Transfer {
         const type = Buffer.from([5]); // tx type
+        const accountId = serializeAccountId(transfer.accountId);
         const from = serializeAddress(transfer.from);
         const to = serializeAddress(transfer.to);
         const token = serializeTokenId(transfer.tokenId);
@@ -40,6 +46,7 @@ export class Signer {
         const nonce = serializeNonce(transfer.nonce);
         const msgBytes = Buffer.concat([
             type,
+            accountId,
             from,
             to,
             token,
@@ -52,6 +59,7 @@ export class Signer {
 
         return {
             type: "Transfer",
+            accountId: transfer.accountId,
             from: transfer.from,
             to: transfer.to,
             token: transfer.tokenId,
@@ -63,6 +71,7 @@ export class Signer {
     }
 
     signSyncWithdraw(withdraw: {
+        accountId: number;
         from: Address;
         ethAddress: string;
         tokenId: number;
@@ -71,6 +80,7 @@ export class Signer {
         nonce: number;
     }): Withdraw {
         const typeBytes = Buffer.from([3]);
+        const accountId = serializeAccountId(withdraw.accountId);
         const accountBytes = serializeAddress(withdraw.from);
         const ethAddressBytes = serializeAddress(withdraw.ethAddress);
         const tokenIdBytes = serializeTokenId(withdraw.tokenId);
@@ -79,6 +89,7 @@ export class Signer {
         const nonceBytes = serializeNonce(withdraw.nonce);
         const msgBytes = Buffer.concat([
             typeBytes,
+            accountId,
             accountBytes,
             ethAddressBytes,
             tokenIdBytes,
@@ -89,6 +100,7 @@ export class Signer {
         const signature = signTransactionBytes(this.privateKey, msgBytes);
         return {
             type: "Withdraw",
+            accountId: withdraw.accountId,
             from: withdraw.from,
             to: withdraw.ethAddress,
             token: withdraw.tokenId,
@@ -107,14 +119,26 @@ export class Signer {
         return new Signer(privateKeyFromSeed(seed));
     }
 
-    static async fromETHSignature(ethSigner: ethers.Signer): Promise<Signer> {
-        const sign = await ethSigner.signMessage(
-            "Access ZK Sync account.\n" +
-                "\n" +
-                "Only sign this message for a trusted client!"
+    static async fromETHSignature(
+        ethSigner: ethers.Signer
+    ): Promise<{
+        signer: Signer;
+        ethSignatureType: "EthereumSignature" | "EIP1271Signature";
+    }> {
+        const message =
+            "Access zkSync account.\n" +
+            "\n" +
+            "Only sign this message for a trusted client!";
+        const signature = await ethSigner.signMessage(message);
+        const address = await ethSigner.getAddress();
+        const ethSignatureType = getEthSignatureType(
+            message,
+            signature,
+            address
         );
-        const seed = Buffer.from(sign.substr(2), "hex");
-        return Signer.fromSeed(seed);
+        const seed = Buffer.from(signature.substr(2), "hex");
+        const signer = Signer.fromSeed(seed);
+        return { signer, ethSignatureType };
     }
 }
 
@@ -140,7 +164,7 @@ export function serializeAddress(address: Address | PubKeyHash): Buffer {
     return addressBytes;
 }
 
-function serializeAccountId(accountId: number): Buffer {
+export function serializeAccountId(accountId: number): Buffer {
     if (accountId < 0) {
         throw new Error("Negative account id");
     }
@@ -153,7 +177,7 @@ function serializeAccountId(accountId: number): Buffer {
     return buffer.slice(1);
 }
 
-function serializeTokenId(tokenId: number): Buffer {
+export function serializeTokenId(tokenId: number): Buffer {
     if (tokenId < 0) {
         throw new Error("Negative tokenId");
     }
@@ -165,17 +189,17 @@ function serializeTokenId(tokenId: number): Buffer {
     return buffer;
 }
 
-function serializeAmountPacked(amount: utils.BigNumberish): Buffer {
+export function serializeAmountPacked(amount: utils.BigNumberish): Buffer {
     const bnAmount = new BN(utils.bigNumberify(amount).toString());
     return packAmountChecked(bnAmount);
 }
 
-function serializeAmountFull(amount: utils.BigNumberish): Buffer {
+export function serializeAmountFull(amount: utils.BigNumberish): Buffer {
     const bnAmount = new BN(utils.bigNumberify(amount).toString());
     return bnAmount.toArrayLike(Buffer, "be", 16);
 }
 
-function serializeFeePacked(fee: utils.BigNumberish): Buffer {
+export function serializeFeePacked(fee: utils.BigNumberish): Buffer {
     const bnFee = new BN(utils.bigNumberify(fee).toString());
     return packFeeChecked(bnFee);
 }

@@ -1,28 +1,36 @@
-use crate::allocated_structures::*;
-use crate::circuit::check_account_data;
-use crate::element::CircuitElement;
-use crate::operation::{OperationBranch, OperationBranchWitness};
-use crate::witness::utils::{apply_leaf_operation, get_audits};
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
+// External deps
+use crypto::{digest::Digest, sha2::Sha256};
 use crypto_exports::franklin_crypto::{
     bellman::{
         pairing::ff::{Field, PrimeField, PrimeFieldRepr},
         Circuit, ConstraintSystem, SynthesisError,
     },
     circuit::{boolean::Boolean, num::AllocatedNum, sha256, Assignment},
-    jubjub::JubjubEngine,
+    rescue::RescueEngine,
 };
-use models::circuit::utils::{append_be_fixed_width, be_bit_vector_into_bytes};
-use models::circuit::CircuitAccountTree;
-use models::node::{AccountId, Engine, Fr, TokenId};
-use models::params::{
-    ADDRESS_WIDTH, BALANCE_BIT_WIDTH, FR_BIT_WIDTH_PADDED, SUBTREE_HASH_WIDTH_PADDED,
-    TOKEN_BIT_WIDTH,
+// Workspace deps
+use models::{
+    circuit::{
+        utils::{append_be_fixed_width, be_bit_vector_into_bytes},
+        CircuitAccountTree,
+    },
+    node::{AccountId, Engine, Fr, TokenId},
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, FR_BIT_WIDTH_PADDED,
+        SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
+    },
+};
+// Local deps
+use crate::{
+    allocated_structures::*,
+    circuit::check_account_data,
+    element::CircuitElement,
+    operation::{OperationBranch, OperationBranchWitness},
+    witness::utils::{apply_leaf_operation, get_audits},
 };
 
 #[derive(Clone)]
-pub struct ZksyncExitCircuit<'a, E: JubjubEngine> {
+pub struct ZksyncExitCircuit<'a, E: RescueEngine> {
     pub params: &'a E::Params,
     /// The old root of the tree
     pub pub_data_commitment: Option<E::Fr>,
@@ -31,7 +39,7 @@ pub struct ZksyncExitCircuit<'a, E: JubjubEngine> {
 }
 
 // Implementation of our circuit:
-impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
+impl<'a, E: RescueEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
     fn synthesize<CS: ConstraintSystem<E>>(self, cs: &mut CS) -> Result<(), SynthesisError> {
         // this is only public input to our circuit
         let public_data_commitment =
@@ -66,6 +74,7 @@ impl<'a, E: JubjubEngine> Circuit<E> for ZksyncExitCircuit<'a, E> {
             let root_hash_ce =
                 CircuitElement::from_number(cs.namespace(|| "root_hash_ce"), root_hash)?;
             initial_hash_data.extend(root_hash_ce.into_padded_be_bits(FR_BIT_WIDTH_PADDED));
+            initial_hash_data.extend(branch.account_id.get_bits_be());
             initial_hash_data.extend(branch.account.address.get_bits_be());
             initial_hash_data.extend(branch.token.get_bits_be());
             initial_hash_data.extend(branch.balance.get_bits_be());
@@ -94,7 +103,7 @@ pub fn create_exit_circuit_with_public_input(
     account_tree: &mut CircuitAccountTree,
     account_id: AccountId,
     token_id: TokenId,
-) -> (ZksyncExitCircuit<'static, Engine>, Fr) {
+) -> ZksyncExitCircuit<'static, Engine> {
     let account_address_fe = Fr::from_str(&account_id.to_string()).unwrap();
     let token_id_fe = Fr::from_str(&token_id.to_string()).unwrap();
     let root_hash = account_tree.root_hash();
@@ -113,6 +122,11 @@ pub fn create_exit_circuit_with_public_input(
         &mut pubdata_commitment,
         &root_hash,
         SUBTREE_HASH_WIDTH_PADDED,
+    );
+    append_be_fixed_width(
+        &mut pubdata_commitment,
+        &account_address_fe,
+        ACCOUNT_ID_BIT_WIDTH,
     );
     let account_address = account_tree
         .get(account_id)
@@ -136,24 +150,21 @@ pub fn create_exit_circuit_with_public_input(
 
     let pub_data_commitment = Fr::from_repr(repr).unwrap();
 
-    (
-        ZksyncExitCircuit {
-            params: &models::params::JUBJUB_PARAMS,
-            pub_data_commitment: Some(pub_data_commitment),
-            root_hash: Some(root_hash),
-            account_audit_data: OperationBranch {
-                address: Some(account_address_fe),
-                token: Some(token_id_fe),
-                witness: OperationBranchWitness {
-                    account_witness,
-                    account_path: audit_path,
-                    balance_value: Some(balance),
-                    balance_subtree_path: audit_balance_path,
-                },
+    ZksyncExitCircuit {
+        params: &models::params::RESCUE_PARAMS,
+        pub_data_commitment: Some(pub_data_commitment),
+        root_hash: Some(root_hash),
+        account_audit_data: OperationBranch {
+            address: Some(account_address_fe),
+            token: Some(token_id_fe),
+            witness: OperationBranchWitness {
+                account_witness,
+                account_path: audit_path,
+                balance_value: Some(balance),
+                balance_subtree_path: audit_balance_path,
             },
         },
-        pub_data_commitment,
-    )
+    }
 }
 
 #[cfg(test)]
@@ -177,15 +188,14 @@ mod test {
         test_account.nonce = 0xbabe;
 
         let mut circuit_account_tree =
-            CircuitAccountTree::new(models::params::account_tree_depth() as u32);
+            CircuitAccountTree::new(models::params::account_tree_depth());
         circuit_account_tree.insert(test_account_id, CircuitAccount::from(test_account));
 
         let zksync_exit_circuit = create_exit_circuit_with_public_input(
             &mut circuit_account_tree,
             test_account_id,
             token_id,
-        )
-        .0;
+        );
 
         let mut cs = TestConstraintSystem::<Engine>::new();
         zksync_exit_circuit.synthesize(&mut cs).unwrap();

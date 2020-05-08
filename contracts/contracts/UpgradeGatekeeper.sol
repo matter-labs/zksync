@@ -1,4 +1,4 @@
-pragma solidity 0.5.16;
+pragma solidity ^0.5.0;
 pragma experimental ABIEncoderV2;
 
 import "./Events.sol";
@@ -47,7 +47,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         require(upgradeStatus == UpgradeStatus.Idle, "apc11"); /// apc11 - upgradeable contract can't be added during upgrade
 
         managedContracts.push(Upgradeable(addr));
-        emit UpgradeableAdded(Upgradeable(addr));
+        emit UpgradeableAdd(Upgradeable(addr));
     }
 
     /// @notice Starts upgrade (activates notice period)
@@ -61,7 +61,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         upgradeStatus = UpgradeStatus.NoticePeriod;
         noticePeriodActivationTime = now;
         nextTargets = newTargets;
-        emit NoticePeriodStarted(newTargets);
+        emit NoticePeriodStart(newTargets);
     }
 
     /// @notice Cancels upgrade
@@ -73,22 +73,19 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
         upgradeStatus = UpgradeStatus.Idle;
         noticePeriodActivationTime = 0;
         delete nextTargets;
-        emit UpgradeCanceled();
+        emit UpgradeCancel();
     }
 
-    /// @notice Checks that preparation status is active and activates it if needed
-    /// @return Bool flag indicating that preparation status is active after this call
-    function startPreparation() public returns (bool) {
-        require(upgradeStatus != UpgradeStatus.Idle, "ugp11"); // ugp11 - unable to activate preparation status in case of not active upgrade mode
-
-        if (upgradeStatus == UpgradeStatus.Preparation) {
-            return true;
-        }
+    /// @notice Activates preparation status
+    /// @return Bool flag indicating that preparation status has been successfully activated
+    function startPreparation() external returns (bool) {
+        requireMaster(msg.sender);
+        require(upgradeStatus == UpgradeStatus.NoticePeriod, "ugp11"); // ugp11 - unable to activate preparation status in case of not active notice period status
 
         if (now >= noticePeriodActivationTime + mainContract.upgradeNoticePeriod()) {
             upgradeStatus = UpgradeStatus.Preparation;
             mainContract.upgradePreparationStarted();
-            emit PreparationStarted();
+            emit PreparationStart();
             return true;
         } else {
             return false;
@@ -108,7 +105,7 @@ contract UpgradeGatekeeper is UpgradeEvents, Ownable {
             address newTarget = nextTargets[i];
             if (newTarget != address(0)) {
                 managedContracts[i].upgradeTarget(newTarget, targetsInitializationParameters[i]);
-                emit UpgradeCompleted(managedContracts[i], newTarget);
+                emit UpgradeComplete(managedContracts[i], newTarget);
             }
         }
 

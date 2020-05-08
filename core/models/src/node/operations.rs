@@ -165,18 +165,9 @@ impl TransferToNewOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from transfer to new pubdata"))?;
         let nonce = 0; // It is unknown from pubdata
-        let signature = TxSignature::default(); // It is unknown from pubdata
 
         Ok(Self {
-            tx: Transfer {
-                from,
-                to,
-                token,
-                amount,
-                fee,
-                nonce,
-                signature,
-            },
+            tx: Transfer::new(from_id, from, to, token, amount, fee, nonce, None),
             from: from_id,
             to: to_id,
         })
@@ -234,7 +225,6 @@ impl TransferOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from transfer pubdata"))?;
         let nonce = 0; // It is unknown from pubdata
-        let signature = TxSignature::default(); // It is unknown from pubdata
         let from_id =
             bytes_slice_to_uint32(&bytes[from_offset..from_offset + ACCOUNT_ID_BIT_WIDTH / 8])
                 .ok_or_else(|| format_err!("Cant get from account id from transfer pubdata"))?;
@@ -242,15 +232,16 @@ impl TransferOp {
             .ok_or_else(|| format_err!("Cant get to account id from transfer pubdata"))?;
 
         Ok(Self {
-            tx: Transfer {
-                from: from_address,
-                to: to_address,
+            tx: Transfer::new(
+                from_id,
+                from_address,
+                to_address,
                 token,
                 amount,
                 fee,
                 nonce,
-                signature,
-            },
+                None,
+            ),
             from: from_id,
             to: to_id,
         })
@@ -266,6 +257,7 @@ pub struct WithdrawOp {
 impl WithdrawOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x03;
+    pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [1];
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -276,6 +268,15 @@ impl WithdrawOp {
         data.extend_from_slice(&pack_fee_amount(&self.tx.fee));
         data.extend_from_slice(self.tx.to.as_bytes());
         data.resize(Self::CHUNKS * 8, 0x00);
+        data
+    }
+
+    fn get_withdrawal_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&Self::WITHDRAW_DATA_PREFIX); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
+        data.extend_from_slice(self.tx.to.as_bytes());
+        data.extend_from_slice(&self.tx.token.to_be_bytes());
+        data.extend_from_slice(&big_decimal_to_u128(&self.tx.amount).to_be_bytes());
         data
     }
 
@@ -311,18 +312,9 @@ impl WithdrawOp {
         )
         .ok_or_else(|| format_err!("Cant get fee from withdraw pubdata"))?;
         let nonce = 0; // From pubdata it is unknown
-        let signature = TxSignature::default(); // From pubdata it is unknown
 
         Ok(Self {
-            tx: Withdraw {
-                from,
-                to,
-                token,
-                amount,
-                fee,
-                nonce,
-                signature,
-            },
+            tx: Withdraw::new(account_id, from, to, token, amount, fee, nonce, None),
             account_id,
         })
     }
@@ -394,11 +386,7 @@ impl ChangePubKeyOp {
 
     pub fn get_eth_witness(&self) -> Vec<u8> {
         if let Some(eth_signature) = &self.tx.eth_signature {
-            let mut data = Vec::with_capacity(65);
-            data.extend_from_slice(&eth_signature.0.r);
-            data.extend_from_slice(&eth_signature.0.s);
-            data.push(eth_signature.0.v);
-            data
+            eth_signature.serialize_packed().to_vec()
         } else {
             Vec::new()
         }
@@ -442,6 +430,7 @@ impl ChangePubKeyOp {
 
         Ok(ChangePubKeyOp {
             tx: ChangePubKey {
+                account_id,
                 account,
                 new_pk_hash,
                 nonce,
@@ -462,6 +451,7 @@ pub struct FullExitOp {
 impl FullExitOp {
     pub const CHUNKS: usize = 6;
     pub const OP_CODE: u8 = 0x06;
+    pub const WITHDRAW_DATA_PREFIX: [u8; 1] = [0];
 
     fn get_public_data(&self) -> Vec<u8> {
         let mut data = Vec::new();
@@ -473,6 +463,17 @@ impl FullExitOp {
             &big_decimal_to_u128(&self.withdraw_amount.clone().unwrap_or_default()).to_be_bytes(),
         );
         data.resize(Self::CHUNKS * 8, 0x00);
+        data
+    }
+
+    fn get_withdrawal_data(&self) -> Vec<u8> {
+        let mut data = Vec::new();
+        data.extend_from_slice(&Self::WITHDRAW_DATA_PREFIX); // first byte is a bool variable 'addToPendingWithdrawalsQueue'
+        data.extend_from_slice(self.priority_op.eth_address.as_bytes());
+        data.extend_from_slice(&self.priority_op.token.to_be_bytes());
+        data.extend_from_slice(
+            &big_decimal_to_u128(&self.withdraw_amount.clone().unwrap_or_default()).to_be_bytes(),
+        );
         data
     }
 
@@ -548,10 +549,18 @@ impl FranklinOp {
         }
     }
 
-    pub fn eth_witness(&self) -> Vec<u8> {
+    pub fn eth_witness(&self) -> Option<Vec<u8>> {
         match self {
-            FranklinOp::ChangePubKeyOffchain(op) => op.get_eth_witness(),
-            _ => Vec::new(),
+            FranklinOp::ChangePubKeyOffchain(op) => Some(op.get_eth_witness()),
+            _ => None,
+        }
+    }
+
+    pub fn withdrawal_data(&self) -> Option<Vec<u8>> {
+        match self {
+            FranklinOp::Withdraw(op) => Some(op.get_withdrawal_data()),
+            FranklinOp::FullExit(op) => Some(op.get_withdrawal_data()),
+            _ => None,
         }
     }
 

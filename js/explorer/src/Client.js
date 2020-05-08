@@ -6,7 +6,7 @@ const zksync_promise = import('zksync');
 import axios from 'axios';
 
 async function fetch(req) {
-    let r = await axios(req).catch(() => ({}));
+    let r = await axios(req);
     if (r.status == 200) {
         return r.data;
     } else {
@@ -83,11 +83,7 @@ export class Client {
             url:        `${baseUrl()}/blocks/${blockNumber}/transactions`,
         });
         
-        return txs.map(tx => {
-            let res = tx.op;
-            res.tx_hash = tx.tx_hash;
-            return res;
-        });
+        return txs;
     }
 
     searchBlock(query) {

@@ -13,7 +13,7 @@ import {
     ContractAddress,
     Tokens,
     TokenAddress,
-    TxEthSignature,
+    TxEthSignature
 } from "./types";
 import {
     isTokenETH,
@@ -98,7 +98,10 @@ export class Provider {
     }
 
     async getConfirmationsForEthOpAmount(): Promise<number> {
-        return await this.transport.request("get_confirmations_for_eth_op_amount", []);
+        return await this.transport.request(
+            "get_confirmations_for_eth_op_amount",
+            []
+        );
     }
 
     async notifyPriorityOp(
@@ -216,21 +219,5 @@ export class ETHProxy {
             }
             return tokenId;
         }
-    }
-
-    async estimateDepositFeeInETHToken(
-        token: TokenLike,
-        gasPrice?: utils.BigNumber
-    ): Promise<utils.BigNumber> {
-        gasPrice = gasPrice || (await this.ethersProvider.getGasPrice());
-        const multiplier = isTokenETH(token) ? 179000 : 214000;
-        return gasPrice.mul(2 * multiplier);
-    }
-
-    async estimateEmergencyWithdrawFeeInETHToken(
-        gasPrice?: utils.BigNumber
-    ): Promise<utils.BigNumber> {
-        gasPrice = gasPrice || (await this.ethersProvider.getGasPrice());
-        return gasPrice.mul(2 * 170000);
     }
 }

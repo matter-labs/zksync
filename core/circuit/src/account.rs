@@ -1,19 +1,21 @@
 // External deps
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-use crate::franklin_crypto::circuit::Assignment;
-use crate::franklin_crypto::jubjub::JubjubEngine;
+use crypto_exports::franklin_crypto::{
+    bellman::{ConstraintSystem, SynthesisError},
+    circuit::Assignment,
+};
 // Workspace deps
 use crate::element::CircuitElement;
+use crypto_exports::franklin_crypto::rescue::RescueEngine;
 use models::circuit::account::CircuitAccount;
 
 #[derive(Clone, Debug)]
-pub struct AccountWitness<E: JubjubEngine> {
+pub struct AccountWitness<E: RescueEngine> {
     pub nonce: Option<E::Fr>,
     pub pub_key_hash: Option<E::Fr>,
     pub address: Option<E::Fr>,
 }
 
-impl<E: JubjubEngine> AccountWitness<E> {
+impl<E: RescueEngine> AccountWitness<E> {
     pub fn from_circuit_account(circuit_account: &CircuitAccount<E>) -> Self {
         Self {
             nonce: Some(circuit_account.nonce),
@@ -23,13 +25,13 @@ impl<E: JubjubEngine> AccountWitness<E> {
     }
 }
 
-pub struct AccountContent<E: JubjubEngine> {
+pub struct AccountContent<E: RescueEngine> {
     pub nonce: CircuitElement<E>,
     pub pub_key_hash: CircuitElement<E>,
     pub address: CircuitElement<E>,
 }
 
-impl<E: JubjubEngine> AccountContent<E> {
+impl<E: RescueEngine> AccountContent<E> {
     pub fn from_witness<CS: ConstraintSystem<E>>(
         mut cs: CS,
         witness: &AccountWitness<E>,

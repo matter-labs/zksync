@@ -1,10 +1,5 @@
 import {ethers} from "ethers";
-import {
-    addTestERC20Token,
-    addTestNotApprovedERC20Token,
-    mintTestERC20Token,
-    Deployer,
-} from "../src.ts/deploy";
+import { Deployer } from "../src.ts/deploy";
 import {expect, use} from "chai";
 const { createMockProvider, getWallets, solidity } = require("ethereum-waffle");
 import {bigNumberify, hexlify, parseEther} from "ethers/utils";
@@ -57,11 +52,11 @@ describe("PLANNED FAILS", function () {
         verifierDeployedContract = await deployer.deployVerifier();
         governanceDeployedContract = await deployer.deployGovernance();
         franklinDeployedContract = await deployer.deployFranklin();
-        await governanceDeployedContract.setValidator(wallet.address, true);
-        erc20DeployedToken1 = await addTestERC20Token(wallet, governanceDeployedContract);
-        erc20DeployedToken2 = await addTestNotApprovedERC20Token(wallet);
-        await mintTestERC20Token(wallet, erc20DeployedToken1);
-        await mintTestERC20Token(wallet, erc20DeployedToken2);
+        await deployer.setGovernanceValidator();
+        erc20DeployedToken1 = await deployer.addTestERC20Token("GovernanceApprove");
+        erc20DeployedToken2 = await deployer.addTestERC20Token("GovernanceNotApprove");
+        await deployer.mintTestERC20Token(wallet.address, erc20DeployedToken1);
+        await deployer.mintTestERC20Token(wallet.address, erc20DeployedToken2);
         // Make sure that exit wallet can execute transactions.
         await wallet.sendTransaction({to: exitWallet.address, value: parseEther("1.0")});
     });
@@ -115,7 +110,7 @@ describe("PLANNED FAILS", function () {
             null,
             franklinAddress,
             correctFeeValue,
-            "gvs12",
+            "gvs11",
         );
 
         console.log(" + ERC20 deposit: Wrong token address passed");
@@ -141,7 +136,7 @@ describe("PLANNED FAILS", function () {
             erc20DeployedToken2,
             1,
             balanceToWithdraw1,
-            "gvs12",
+            "gvs11",
         );
         console.log(" + ERC20 withdraw: Wrong token address passed");
 
@@ -155,7 +150,7 @@ describe("PLANNED FAILS", function () {
             accountId,
             erc20DeployedToken2.address,
             value,
-            "gvs12",
+            "gvs11",
         );
         console.log(" + Full Exit: Wrong token address passed");
 
@@ -257,7 +252,7 @@ describe("PLANNED FAILS", function () {
             {
                 blockNumber: 1,
                 feeAcc: 22,
-                newRoot: "0x",
+                newRoot: "0000000000000000000000000000000000000000000000000000000000000000",
                 pubData: noopBlockPublicData,
                 witnessData: "0x",
                 witnessSizes: [0],
@@ -265,7 +260,7 @@ describe("PLANNED FAILS", function () {
             0,
             0,
             "0000000000000000000000000000000000000000000000000000000000000000",
-            noopBlockPublicData,
+            '',
             true,
         );
 
@@ -346,7 +341,7 @@ describe("PLANNED FAILS", function () {
         console.log("Got revert code when there are no requests to cancel");
 
         // Withdraw eth
-        const rollupBalance = await franklinDeployedContract.balancesToWithdraw(wallet.address, 0);
+        const rollupBalance = (await franklinDeployedContract.getBalancesToWithdraw(wallet.address, 0));
         await withdrawEthFromContract(
             provider,
             wallet,
@@ -591,7 +586,7 @@ describe("PLANNED FAILS", function () {
     //     const receipt = await tx.wait();
     //
     //     const event = receipt.events.pop();
-    //     if (event.event == "BlocksReverted") {
+    //     if (event.event == "BlocksRevert") {
     //         expect(await franklinDeployedContract.totalBlocksCommitted()).equal(0);
     //         reverted = true;
     //     }

@@ -15,6 +15,11 @@ pub struct PedersenHasher<E: JubjubEngine> {
     params: &'static E::Params,
 }
 
+// These implementations are OK as we only have a static reference
+// to the constant hasher params, and access is read-only.
+unsafe impl<E: JubjubEngine> Send for PedersenHasher<E> {}
+unsafe impl<E: JubjubEngine> Sync for PedersenHasher<E> {}
+
 impl<E: JubjubEngine> fmt::Debug for PedersenHasher<E> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PedersenHasher").finish()
@@ -39,6 +44,16 @@ impl<E: JubjubEngine> Hasher<E::Fr> for PedersenHasher<E> {
             .into_xy()
             .0
         // print!("Leaf hash = {}\n", hash.clone());
+    }
+
+    fn hash_elements<I: IntoIterator<Item = E::Fr>>(&self, elements: I) -> E::Fr {
+        let mut input = vec![];
+        for el in elements.into_iter() {
+            input.extend(BitIteratorLe::new(el.into_repr()).take(E::Fr::NUM_BITS as usize));
+        }
+        baby_pedersen_hash::<E, _>(Personalization::NoteCommitment, input, &self.params)
+            .into_xy()
+            .0
     }
 
     fn compress(&self, lhs: &E::Fr, rhs: &E::Fr, i: usize) -> E::Fr {

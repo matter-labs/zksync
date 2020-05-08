@@ -9,11 +9,12 @@ use futures::compat::Future01CompatExt;
 use web3::contract::tokens::Tokenize;
 use web3::contract::Options;
 use web3::types::{Address, BlockNumber, Bytes};
-use web3::types::{H160, H256, U256};
+use web3::types::{H160, H256, U256, U64};
 use web3::{Error, Transport, Web3};
 
 pub mod signer;
 
+#[derive(Clone)]
 pub struct ETHClient<T: Transport> {
     private_key: H256,
     pub sender_account: Address,
@@ -92,7 +93,7 @@ impl<T: Transport> ETHClient<T> {
             .await
     }
 
-    pub async fn block_number(&self) -> Result<U256, Error> {
+    pub async fn block_number(&self) -> Result<U64, Error> {
         self.web3.eth().block_number().compat().await
     }
 

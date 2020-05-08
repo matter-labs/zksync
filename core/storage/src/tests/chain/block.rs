@@ -1,9 +1,9 @@
 // External imports
 use web3::types::H256;
 // Workspace imports
-use crypto_exports::rand::XorShiftRng;
+use crypto_exports::{ff::PrimeField, rand::XorShiftRng};
 use models::node::{apply_updates, block::Block, AccountMap, AccountUpdate, BlockNumber, Fr};
-use models::{ethereum::OperationType, Action, Operation};
+use models::{ethereum::OperationType, fe_to_bytes, Action, Operation};
 // Local imports
 use super::utils::{acc_create_random_updates, get_operation};
 use crate::tests::{create_rng, db_test};
@@ -16,6 +16,9 @@ use crate::{
     prover::ProverSchema,
     StorageProcessor,
 };
+
+/// block size used for this tests
+const BLOCK_SIZE_CHUNKS: usize = 100;
 
 /// Creates several random updates for the provided account map,
 /// and returns the resulting account map together with the list
@@ -56,9 +59,24 @@ fn test_commit_rewind() {
             apply_random_updates(accounts_block_2.clone(), &mut rng);
 
         // Execute and commit these blocks.
-        BlockSchema(&conn).execute_operation(get_operation(1, Action::Commit, updates_block_1))?;
-        BlockSchema(&conn).execute_operation(get_operation(2, Action::Commit, updates_block_2))?;
-        BlockSchema(&conn).execute_operation(get_operation(3, Action::Commit, updates_block_3))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            1,
+            Action::Commit,
+            updates_block_1,
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            2,
+            Action::Commit,
+            updates_block_2,
+            BLOCK_SIZE_CHUNKS,
+        ))?;
+        BlockSchema(&conn).execute_operation(get_operation(
+            3,
+            Action::Commit,
+            updates_block_3,
+            BLOCK_SIZE_CHUNKS,
+        ))?;
 
         // Check that they are stored in state.
         let (block, state) = StateSchema(&conn).load_committed_state(Some(1)).unwrap();
@@ -78,6 +96,7 @@ fn test_commit_rewind() {
                 proof: Default::default(),
             },
             Vec::new(),
+            BLOCK_SIZE_CHUNKS,
         ))?;
         ProverSchema(&conn).store_proof(2, &Default::default())?;
         BlockSchema(&conn).execute_operation(get_operation(
@@ -86,6 +105,7 @@ fn test_commit_rewind() {
                 proof: Default::default(),
             },
             Vec::new(),
+            BLOCK_SIZE_CHUNKS,
         ))?;
 
         // Check that we still can get the state for these blocks.
@@ -108,7 +128,7 @@ fn test_commit_rewind() {
 
 /// Creates an unique new root hash for the block based on its number.
 fn root_hash_for_block(block_number: BlockNumber) -> Fr {
-    Fr::from_hex(format!("{:064x}", block_number).as_ref()).unwrap()
+    Fr::from_str(&block_number.to_string()).unwrap()
 }
 
 /// Creates an unique ethereum operation hash based on its number.
@@ -125,13 +145,14 @@ fn get_unique_operation(
     Operation {
         id: None,
         action,
-        block: Block {
+        block: Block::new(
             block_number,
-            new_root_hash: root_hash_for_block(block_number),
-            fee_account: 0,
-            block_transactions: Vec::new(),
-            processed_priority_ops: (0, 0),
-        },
+            root_hash_for_block(block_number),
+            0,
+            Vec::new(),
+            (0, 0),
+            100,
+        ),
         accounts_updated,
     }
 }
@@ -151,15 +172,11 @@ fn find_block_by_height_or_hash() {
     ) -> diesel::QueryResult<()> {
         let mut queries = vec![
             expected_block_detail.block_number.to_string(),
-            expected_block_detail.new_state_root.clone(),
-            expected_block_detail
-                .commit_tx_hash
-                .as_ref()
-                .unwrap()
-                .clone(),
+            hex::encode(&expected_block_detail.new_state_root),
+            hex::encode(&expected_block_detail.commit_tx_hash.as_ref().unwrap()),
         ];
         if let Some(verify_tx_hash) = expected_block_detail.verify_tx_hash.as_ref() {
-            queries.push(verify_tx_hash.clone());
+            queries.push(hex::encode(&verify_tx_hash));
         }
 
         for query in queries {
@@ -248,10 +265,9 @@ fn find_block_by_height_or_hash() {
 
             // Initialize reference sample fields.
             current_block_detail.block_number = operation.block.block_number as i64;
-            current_block_detail.new_state_root =
-                format!("sync-bl:{}", operation.block.new_root_hash.to_hex());
+            current_block_detail.new_state_root = fe_to_bytes(&operation.block.new_root_hash);
             current_block_detail.block_size = operation.block.block_transactions.len() as i64;
-            current_block_detail.commit_tx_hash = Some(format!("0x{}", hex::encode(eth_tx_hash)));
+            current_block_detail.commit_tx_hash = Some(eth_tx_hash.as_ref().to_vec());
 
             // Add verification for the block if required.
             if block_number <= n_verified {
@@ -279,8 +295,7 @@ fn find_block_by_height_or_hash() {
                     )?;
                     EthereumSchema(&conn).add_hash_entry(response.id, &eth_tx_hash)?;
                     EthereumSchema(&conn).confirm_eth_tx(&eth_tx_hash)?;
-                    current_block_detail.verify_tx_hash =
-                        Some(format!("0x{}", hex::encode(eth_tx_hash)));
+                    current_block_detail.verify_tx_hash = Some(eth_tx_hash.as_ref().to_vec());
                 }
             }
 
@@ -418,14 +433,12 @@ fn block_range() {
     });
 }
 
-/// Tests for the `load_unverified_commits_after_block` method.
+/// Tests for the `load_commits_after_block` method.
 #[test]
 #[cfg_attr(not(feature = "db_test"), ignore)]
-fn load_unverified_commits_after_block() {
+fn load_commits_after_block() {
     let _ = env_logger::try_init();
     let mut rng = create_rng();
-
-    let block_size = Block::smallest_block_size_for_chunks(0);
 
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
@@ -440,6 +453,7 @@ fn load_unverified_commits_after_block() {
                 block_id,
                 Action::Commit,
                 updates,
+                BLOCK_SIZE_CHUNKS,
             ))?;
 
             operations.push(operation);
@@ -453,31 +467,35 @@ fn load_unverified_commits_after_block() {
                 proof: Default::default(),
             },
             Vec::new(),
+            BLOCK_SIZE_CHUNKS,
         ))?;
+        ProverSchema(&conn).store_proof(3, &Default::default())?;
 
         // Now test the method.
         let empty_vec = vec![];
         let test_vector = vec![
             // Blocks 2 & 3.
-            ((1, 2), &operations[1..3]),
+            ((1, 2), &operations[1..3], vec![false, true]),
             // Block 2.
-            ((1, 1), &operations[1..2]),
+            ((1, 1), &operations[1..2], vec![false]),
             // Block 3.
-            ((2, 1), &operations[2..3]),
-            // No block (there are no unverified blocks AFTER block 3.
-            ((3, 1), &empty_vec),
+            ((2, 1), &operations[2..3], vec![true]),
+            // No block (there are no blocks AFTER block 3.
+            ((3, 1), &empty_vec, vec![]),
             // Obviously none.
-            ((4, 100), &empty_vec),
+            ((4, 100), &empty_vec, vec![]),
         ];
 
-        for ((block, limit), expected_slice) in test_vector {
-            let unverified_commits =
-                BlockSchema(&conn).load_unverified_commits_after_block(block_size, block, limit)?;
+        for ((block, limit), expected_slice, has_proof) in test_vector {
+            let commits = BlockSchema(&conn).load_commits_after_block(block, limit)?;
 
-            assert_eq!(unverified_commits.len(), expected_slice.len());
+            assert_eq!(commits.len(), expected_slice.len());
 
-            for (expected, got) in expected_slice.iter().zip(unverified_commits) {
+            for ((expected, (got, got_hash_proof)), expect_hash_proof) in
+                expected_slice.iter().zip(commits).zip(has_proof)
+            {
                 assert_eq!(expected.id, got.id);
+                assert_eq!(expect_hash_proof, got_hash_proof);
             }
         }
 

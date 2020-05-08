@@ -14,12 +14,15 @@ use jsonrpc_pubsub::{
     typed::{Sink, Subscriber},
     SubscriptionId,
 };
+use lru_cache::LruCache;
 use models::config_options::ThreadPanicNotify;
 use models::node::tx::TxHash;
 use models::node::BlockNumber;
 use models::{node::block::ExecutedOperations, node::AccountId, ActionType, Operation};
 use std::collections::BTreeMap;
 use std::str::FromStr;
+use storage::chain::operations::records::StoredExecutedPriorityOperation;
+use storage::chain::operations_ext::records::TxReceiptResponse;
 use storage::ConnectionPool;
 use web3::types::Address;
 
@@ -57,6 +60,9 @@ struct SubscriptionSender<T> {
 }
 
 struct OperationNotifier {
+    cache_of_executed_priority_operations: LruCache<u32, StoredExecutedPriorityOperation>,
+    cache_of_transaction_receipts: LruCache<Vec<u8>, TxReceiptResponse>,
+    cache_of_blocks_info: LruCache<BlockNumber, BlockInfo>,
     db_pool: ConnectionPool,
     state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
@@ -166,6 +172,70 @@ impl OperationNotifier {
         }
     }
 
+    fn get_executed_priority_operation(
+        &mut self,
+        serial_id: u32,
+    ) -> Result<Option<StoredExecutedPriorityOperation>, failure::Error> {
+        let res = if let Some(executed_op) = self
+            .cache_of_executed_priority_operations
+            .get_mut(&serial_id)
+        {
+            Some(executed_op.clone())
+        } else {
+            let storage = self.db_pool.access_storage_fragile()?;
+            let executed_op = storage
+                .chain()
+                .operations_schema()
+                .get_executed_priority_operation(serial_id)?;
+
+            if let Some(executed_op) = executed_op.clone() {
+                self.cache_of_executed_priority_operations
+                    .insert(serial_id, executed_op);
+            }
+
+            executed_op
+        };
+        Ok(res)
+    }
+
+    fn get_block_info(&mut self, block_number: u32) -> Result<BlockInfo, failure::Error> {
+        let res = if let Some(block_info) = self.cache_of_blocks_info.get_mut(&block_number) {
+            block_info.clone()
+        } else {
+            let storage = self.db_pool.access_storage_fragile()?;
+            let block_info = if let Some(block_with_op) =
+                storage.chain().block_schema().get_block(block_number)?
+            {
+                let verified = if let Some(block_verify) = storage
+                    .chain()
+                    .operations_schema()
+                    .get_operation(block_number, ActionType::VERIFY)
+                {
+                    block_verify.confirmed
+                } else {
+                    false
+                };
+
+                BlockInfo {
+                    block_number: i64::from(block_with_op.block_number),
+                    committed: true,
+                    verified,
+                }
+            } else {
+                bail!("Transaction is executed but block is not committed. (bug)");
+            };
+
+            // Unverified blocks can still change, so we can't cache them.
+            if block_info.verified {
+                self.cache_of_blocks_info
+                    .insert(block_number, block_info.clone());
+            }
+
+            block_info
+        };
+        Ok(res)
+    }
+
     async fn handle_priority_op_sub(
         &mut self,
         serial_id: u64,
@@ -204,35 +274,9 @@ impl OperationNotifier {
             }
         }
 
-        let storage = self.db_pool.access_storage_fragile()?;
-        let executed_op = storage
-            .chain()
-            .operations_schema()
-            .get_executed_priority_operation(serial_id as u32)?;
+        let executed_op = self.get_executed_priority_operation(serial_id as u32)?;
         if let Some(executed_op) = executed_op {
-            let block_info = if let Some(block_with_op) = storage
-                .chain()
-                .block_schema()
-                .get_block(executed_op.block_number as u32)?
-            {
-                let verified = if let Some(block_verify) = storage
-                    .chain()
-                    .operations_schema()
-                    .get_operation(executed_op.block_number as u32, ActionType::VERIFY)
-                {
-                    block_verify.confirmed
-                } else {
-                    false
-                };
-
-                BlockInfo {
-                    block_number: i64::from(block_with_op.block_number),
-                    committed: true,
-                    verified,
-                }
-            } else {
-                bail!("Transaction is executed but block is not committed. (bug)");
-            };
+            let block_info = self.get_block_info(executed_op.block_number as u32)?;
 
             match action {
                 ActionType::COMMIT => {
@@ -280,6 +324,34 @@ impl OperationNotifier {
         Ok(())
     }
 
+    fn get_tx_receipt(
+        &mut self,
+        hash: &TxHash,
+    ) -> Result<Option<TxReceiptResponse>, failure::Error> {
+        let res = if let Some(tx_receipt) = self
+            .cache_of_transaction_receipts
+            .get_mut(&hash.as_ref().to_vec())
+        {
+            Some(tx_receipt.clone())
+        } else {
+            let storage = self.db_pool.access_storage_fragile()?;
+            let tx_receipt = storage
+                .chain()
+                .operations_ext_schema()
+                .tx_receipt(hash.as_ref())?;
+
+            if let Some(tx_receipt) = tx_receipt.clone() {
+                if tx_receipt.verified {
+                    self.cache_of_transaction_receipts
+                        .insert(hash.as_ref().to_vec(), tx_receipt);
+                }
+            }
+
+            tx_receipt
+        };
+        Ok(res)
+    }
+
     async fn handle_transaction_sub(
         &mut self,
         hash: TxHash,
@@ -318,12 +390,9 @@ impl OperationNotifier {
             }
         }
 
-        let storage = self.db_pool.access_storage_fragile()?;
-        if let Some(receipt) = storage
-            .chain()
-            .operations_ext_schema()
-            .tx_receipt(hash.as_ref())?
-        {
+        let tx_receipt = self.get_tx_receipt(&hash)?;
+
+        if let Some(receipt) = tx_receipt {
             let tx_info_resp = TransactionInfoResp {
                 executed: true,
                 success: Some(receipt.success),
@@ -539,6 +608,7 @@ pub fn start_sub_notifier(
     mut executed_tx_stream: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     panic_notify: mpsc::Sender<bool>,
+    api_requests_caches_size: usize,
 ) {
     std::thread::Builder::new()
         .spawn(move || {
@@ -547,6 +617,9 @@ pub fn start_sub_notifier(
             let mut local_pool = executor::LocalPool::new();
 
             let mut notifier = OperationNotifier {
+                cache_of_executed_priority_operations: LruCache::new(api_requests_caches_size),
+                cache_of_transaction_receipts: LruCache::new(api_requests_caches_size),
+                cache_of_blocks_info: LruCache::new(api_requests_caches_size),
                 db_pool,
                 state_keeper_requests,
                 tx_subs: BTreeMap::new(),

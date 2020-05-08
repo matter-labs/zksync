@@ -290,10 +290,10 @@ export class WalletDecorator {
         const balances = await Promise.all(
             window.tokensList
                 .map(async token => {
-                    const amount = await contract.balancesToWithdraw(
+                    const amount = (await contract.getBalanceToWithdraw(
                         await window.ethSigner.getAddress(),
                         token.id
-                    );
+                    )).balanceToWithdraw;
     
                     return { token, amount };
                 }
@@ -508,10 +508,8 @@ export class WalletDecorator {
         try {
             yield info(`Sending deposit...`);
 
-            const maxFeeInETHToken = await this.getDepositFee(token);
             const deposit = await window.syncWallet.depositToSyncFromEthereum({
                 depositTo: window.syncWallet.address(),
-                maxFeeInETHToken,
                 token,
                 amount,
                 approveDepositAmountForERC20: true,

@@ -1,4 +1,5 @@
 use crate::mempool::MempoolRequest;
+use crate::utils::shared_lru_cache::SharedLruCache;
 use actix_cors::Cors;
 use actix_web::{
     middleware,
@@ -7,13 +8,13 @@ use actix_web::{
 };
 use futures::channel::mpsc;
 use models::config_options::ThreadPanicNotify;
-use models::node::{
-    Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp, PubKeyHash,
-};
+use models::node::{Account, AccountId, Address, ExecutedOperations, FranklinPriorityOp};
 use models::NetworkStatus;
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use storage::chain::block::records::BlockDetails;
+use storage::chain::operations_ext::records::{PriorityOpReceiptResponse, TxReceiptResponse};
 use storage::{ConnectionPool, StorageProcessor};
 use tokio::{runtime::Runtime, time};
 use web3::types::H160;
@@ -26,15 +27,73 @@ use storage::chain::operations_ext::records::TransactionsHistoryItem;
 struct SharedNetworkStatus(Arc<RwLock<NetworkStatus>>);
 
 impl SharedNetworkStatus {
-    #[allow(dead_code)]
     fn read(&self) -> NetworkStatus {
         (*self.0.as_ref().read().unwrap()).clone()
+    }
+}
+
+fn remove_prefix(query: &str) -> &str {
+    if query.starts_with("0x") {
+        &query[2..]
+    } else if query.starts_with("sync-bl:") || query.starts_with("sync-tx:") {
+        &query[8..]
+    } else {
+        &query
+    }
+}
+
+fn try_parse_address(query: &str) -> Option<Address> {
+    const ADDRESS_SIZE: usize = 20; // 20 bytes
+
+    let query = remove_prefix(query);
+    let b = hex::decode(query).ok()?;
+
+    if b.len() == ADDRESS_SIZE {
+        Some(Address::from_slice(&b))
+    } else {
+        None
+    }
+}
+
+fn try_parse_hash(query: &str) -> Option<Vec<u8>> {
+    const HASH_SIZE: usize = 32; // 32 bytes
+
+    let query = remove_prefix(query);
+    let b = hex::decode(query).ok()?;
+
+    if b.len() == HASH_SIZE {
+        Some(b)
+    } else {
+        None
+    }
+}
+
+/// Caches used by REST API server.
+#[derive(Debug, Clone)]
+struct Caches {
+    pub transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
+    pub priority_op_receipts: SharedLruCache<u32, PriorityOpReceiptResponse>,
+    pub block_executed_ops: SharedLruCache<u32, Vec<ExecutedOperations>>,
+    pub blocks_info: SharedLruCache<u32, BlockDetails>,
+    pub blocks_by_height_or_hash: SharedLruCache<String, BlockDetails>,
+}
+
+impl Caches {
+    pub fn new(caches_size: usize) -> Self {
+        Self {
+            transaction_receipts: SharedLruCache::new(caches_size),
+            priority_op_receipts: SharedLruCache::new(caches_size),
+            block_executed_ops: SharedLruCache::new(caches_size),
+            blocks_info: SharedLruCache::new(caches_size),
+            blocks_by_height_or_hash: SharedLruCache::new(caches_size),
+        }
     }
 }
 
 /// AppState is a collection of records cloned by each thread to shara data between them
 #[derive(Clone)]
 struct AppState {
+    caches: Caches,
     connection_pool: ConnectionPool,
     network_status: SharedNetworkStatus,
     contract_address: String,
@@ -65,7 +124,13 @@ impl AppState {
                     loop {
                         timer.tick().await;
 
-                        let storage = state.connection_pool.access_storage().expect("db failed");
+                        let storage = match state.connection_pool.access_storage() {
+                            Ok(storage) => storage,
+                            Err(err) => {
+                                log::warn!("Unable to update the network status. Storage access failed: {}", err);
+                                continue;
+                            }
+                        };
 
                         let last_verified = storage
                             .chain()
@@ -100,6 +165,129 @@ impl AppState {
             })
             .expect("State update thread");
     }
+
+    // cache access functions
+    fn get_tx_receipt(
+        &self,
+        transaction_hash: Vec<u8>,
+    ) -> Result<Option<TxReceiptResponse>, actix_web::error::Error> {
+        if let Some(tx_receipt) = self.caches.transaction_receipts.get(&transaction_hash) {
+            return Ok(Some(tx_receipt));
+        }
+
+        let storage = self.access_storage()?;
+        let tx_receipt = storage
+            .chain()
+            .operations_ext_schema()
+            .tx_receipt(transaction_hash.as_slice())
+            .unwrap_or(None);
+
+        if let Some(tx_receipt) = tx_receipt.clone() {
+            // Unverified blocks can still change, so we can't cache them.
+            if tx_receipt.verified {
+                self.caches
+                    .transaction_receipts
+                    .insert(transaction_hash, tx_receipt);
+            }
+        }
+
+        Ok(tx_receipt)
+    }
+
+    fn get_priority_op_receipt(
+        &self,
+        id: u32,
+    ) -> Result<PriorityOpReceiptResponse, actix_web::error::Error> {
+        if let Some(receipt) = self.caches.priority_op_receipts.get(&id) {
+            return Ok(receipt);
+        }
+
+        let storage = self.access_storage()?;
+        let receipt = storage
+            .chain()
+            .operations_ext_schema()
+            .get_priority_op_receipt(id)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+        // Unverified blocks can still change, so we can't cache them.
+        if receipt.verified {
+            self.caches.priority_op_receipts.insert(id, receipt.clone());
+        }
+
+        Ok(receipt)
+    }
+
+    fn get_block_executed_ops(
+        &self,
+        block_id: u32,
+    ) -> Result<Vec<ExecutedOperations>, actix_web::error::Error> {
+        if let Some(executed_ops) = self.caches.block_executed_ops.get(&block_id) {
+            return Ok(executed_ops);
+        }
+
+        let storage = self.access_storage()?;
+        let executed_ops = storage
+            .chain()
+            .block_schema()
+            .get_block_executed_ops(block_id)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+        if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1) {
+            // Unverified blocks can still change, so we can't cache them.
+            if !block_details.is_empty() && block_details[0].verified_at.is_some() {
+                self.caches
+                    .block_executed_ops
+                    .insert(block_id, executed_ops.clone());
+            }
+        }
+
+        Ok(executed_ops)
+    }
+
+    fn get_block_info(
+        &self,
+        block_id: u32,
+    ) -> Result<Option<BlockDetails>, actix_web::error::Error> {
+        if let Some(block) = self.caches.blocks_info.get(&block_id) {
+            return Ok(Some(block));
+        }
+
+        let storage = self.access_storage()?;
+        let mut blocks = storage
+            .chain()
+            .block_schema()
+            .load_block_range(block_id, 1)
+            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+
+        if !blocks.is_empty() && blocks[0].verified_at.is_some() {
+            self.caches.blocks_info.insert(block_id, blocks[0].clone());
+        }
+
+        Ok(blocks.pop())
+    }
+
+    fn get_block_by_height_or_hash(
+        &self,
+        query: String,
+    ) -> Result<Option<BlockDetails>, actix_web::error::Error> {
+        if let Some(block) = self.caches.blocks_by_height_or_hash.get(&query) {
+            return Ok(Some(block));
+        }
+
+        let storage = self.access_storage()?;
+        let block = storage
+            .chain()
+            .block_schema()
+            .find_block_by_height_or_hash(query.clone());
+
+        if let Some(block) = block.clone() {
+            if block.verified_at.is_some() {
+                self.caches.blocks_by_height_or_hash.insert(query, block);
+            }
+        }
+
+        Ok(block)
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -128,8 +316,11 @@ struct AccountStateResponse {
 
 fn handle_get_account_state(
     data: web::Data<AppState>,
-    account_address: web::Path<Address>,
+    account_address: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
+    let account_address =
+        try_parse_address(&account_address).ok_or_else(|| HttpResponse::BadRequest().finish())?;
+
     let storage = data.access_storage()?;
 
     let (id, verified, commited) = {
@@ -180,27 +371,14 @@ fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     Ok(HttpResponse::Ok().json(vec_tokens))
 }
 
-fn handle_get_account_transactions(
-    data: web::Data<AppState>,
-    address: web::Path<PubKeyHash>,
-) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
-    let txs = storage
-        .chain()
-        .operations_ext_schema()
-        .get_account_transactions(&address)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
-    Ok(HttpResponse::Ok().json(txs))
-}
-
 fn handle_get_account_transactions_history(
     data: web::Data<AppState>,
-    request_path: web::Path<(Address, i64, i64)>,
+    request_path: web::Path<(Address, u64, u64)>,
 ) -> ActixResult<HttpResponse> {
     let (address, mut offset, mut limit) = request_path.into_inner();
 
-    const MAX_LIMIT: i64 = 100;
-    if limit > MAX_LIMIT || limit < 0 || offset < 0 {
+    const MAX_LIMIT: u64 = 100;
+    if limit > MAX_LIMIT {
         return Err(HttpResponse::BadRequest().finish().into());
     }
 
@@ -251,7 +429,6 @@ fn handle_get_account_transactions_history(
             // will be the same as for txs from storage.
             let tx_json = serde_json::json!({
                 "account_id": account_id,
-                "eth_fee": op.eth_fee.to_string(),
                 "priority_op": {
                     "amount": deposit.amount,
                     "from": deposit.from,
@@ -261,6 +438,11 @@ fn handle_get_account_transactions_history(
                 "type": "Deposit"
             });
 
+            // As the time of creation is indefinite, we always will provide the current time.
+            let current_time = chrono::Utc::now();
+            let naitve_current_time =
+                chrono::NaiveDateTime::from_timestamp(current_time.timestamp(), 0);
+
             TransactionsHistoryItem {
                 hash: Some(hash_str),
                 pq_id,
@@ -269,6 +451,7 @@ fn handle_get_account_transactions_history(
                 fail_reason: None,
                 commited: false,
                 verified: false,
+                created_at: naitve_current_time,
             }
         })
         .skip(offset as usize)
@@ -279,10 +462,10 @@ fn handle_get_account_transactions_history(
         // We've taken at least one transaction, this means
         // offset is consumed completely, and limit is reduced.
         offset = 0;
-        limit -= transactions_history.len() as i64;
+        limit -= transactions_history.len() as u64;
     } else {
         // We didn't take any items, so we just decrement offset.
-        offset -= ongoing_ops.len() as i64;
+        offset -= ongoing_ops.len() as u64;
     };
 
     let mut storage_transactions = storage
@@ -306,12 +489,9 @@ fn handle_get_executed_transaction_by_hash(
     let transaction_hash = hex::decode(&tx_hash_hex.into_inner()[2..])
         .map_err(|_| HttpResponse::BadRequest().finish())?;
 
-    let storage = data.access_storage()?;
-    if let Ok(tx) = storage
-        .chain()
-        .operations_ext_schema()
-        .tx_receipt(transaction_hash.as_slice())
-    {
+    let tx_receipt = data.get_tx_receipt(transaction_hash)?;
+
+    if let Some(tx) = tx_receipt {
         Ok(HttpResponse::Ok().json(tx))
     } else {
         Ok(HttpResponse::Ok().json(()))
@@ -322,22 +502,8 @@ fn handle_get_tx_by_hash(
     data: web::Data<AppState>,
     hash_hex_with_prefix: web::Path<String>,
 ) -> ActixResult<HttpResponse> {
-    if hash_hex_with_prefix.len() < 2 {
-        return Err(HttpResponse::BadRequest().finish().into());
-    }
-
-    let hash = {
-        let hash = if hash_hex_with_prefix.starts_with("0x") {
-            hex::decode(&hash_hex_with_prefix.into_inner()[2..])
-        } else if hash_hex_with_prefix.starts_with("sync-tx:") {
-            hex::decode(&hash_hex_with_prefix.into_inner()[8..])
-        } else {
-            return Err(HttpResponse::BadRequest().finish().into());
-        };
-
-        hash.map_err(|_| HttpResponse::BadRequest().finish())?
-    };
-
+    let hash =
+        try_parse_hash(&hash_hex_with_prefix).ok_or_else(|| HttpResponse::BadRequest().finish())?;
     let storage = data.access_storage()?;
 
     let res = storage
@@ -353,15 +519,10 @@ fn handle_get_priority_op_receipt(
     data: web::Data<AppState>,
     id: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
+    let id = id.into_inner();
+    let receipt = data.get_priority_op_receipt(id)?;
 
-    let res = storage
-        .chain()
-        .operations_ext_schema()
-        .get_priority_op_receipt(id.into_inner())
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
-
-    Ok(HttpResponse::Ok().json(res))
+    Ok(HttpResponse::Ok().json(receipt))
 }
 
 fn handle_get_transaction_by_id(
@@ -370,15 +531,9 @@ fn handle_get_transaction_by_id(
 ) -> ActixResult<HttpResponse> {
     let (block_id, tx_id) = path.into_inner();
 
-    let storage = data.access_storage()?;
+    let exec_ops = data.get_block_executed_ops(block_id)?;
 
-    let executed_ops = storage
-        .chain()
-        .block_schema()
-        .get_block_executed_ops(block_id)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
-
-    if let Some(exec_op) = executed_ops.get(tx_id as usize) {
+    if let Some(exec_op) = exec_ops.get(tx_id as usize) {
         Ok(HttpResponse::Ok().json(exec_op))
     } else {
         Err(HttpResponse::NotFound().finish().into())
@@ -417,13 +572,9 @@ fn handle_get_block_by_id(
     data: web::Data<AppState>,
     block_id: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
-    let mut blocks = storage
-        .chain()
-        .block_schema()
-        .load_block_range(block_id.into_inner(), 1)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
-    if let Some(block) = blocks.pop() {
+    let block_id = block_id.into_inner();
+    let block = data.get_block_info(block_id)?;
+    if let Some(block) = block {
         Ok(HttpResponse::Ok().json(block))
     } else {
         Err(HttpResponse::NotFound().finish().into())
@@ -434,60 +585,32 @@ fn handle_get_block_transactions(
     data: web::Data<AppState>,
     path: web::Path<u32>,
 ) -> ActixResult<HttpResponse> {
-    let block_id = path.into_inner();
+    let block_number = path.into_inner();
 
     let storage = data.access_storage()?;
 
-    let executed_ops = storage
+    let txs = storage
         .chain()
         .block_schema()
-        .get_block_executed_ops(block_id)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?
-        .into_iter()
-        .filter(|op| match op {
-            ExecutedOperations::Tx(tx) => tx.op.is_some(),
-            _ => true,
-        })
-        .collect::<Vec<_>>();
+        .get_block_transactions(block_number)
+        .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    #[derive(Serialize)]
-    struct ExecutedOperationWithHash {
-        op: ExecutedOperations,
-        tx_hash: String,
-    };
-
-    let executed_ops_with_hashes = executed_ops
-        .into_iter()
-        .map(|op| {
-            let tx_hash = match &op {
-                ExecutedOperations::Tx(tx) => tx.tx.hash().to_string(),
-                ExecutedOperations::PriorityOp(tx) => {
-                    format!("0x{}", hex::encode(&tx.priority_op.eth_hash))
-                }
-            };
-
-            ExecutedOperationWithHash { op, tx_hash }
-        })
-        .collect::<Vec<_>>();
-
-    Ok(HttpResponse::Ok().json(executed_ops_with_hashes))
+    Ok(HttpResponse::Ok().json(txs))
 }
 
 #[derive(Deserialize)]
-struct BlockSearchQuery {
+struct BlockExplorerSearchQuery {
     query: String,
 }
 
-fn handle_block_search(
+fn handle_block_explorer_search(
     data: web::Data<AppState>,
-    query: web::Query<BlockSearchQuery>,
+    query: web::Query<BlockExplorerSearchQuery>,
 ) -> ActixResult<HttpResponse> {
-    let storage = data.access_storage()?;
-    let result = storage
-        .chain()
-        .block_schema()
-        .find_block_by_height_or_hash(query.into_inner().query);
-    if let Some(block) = result {
+    let query = query.into_inner().query;
+    let block = data.get_block_by_height_or_hash(query)?;
+
+    if let Some(block) = block {
         Ok(HttpResponse::Ok().json(block))
     } else {
         Err(HttpResponse::NotFound().finish().into())
@@ -514,10 +637,6 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                     )
                     .route("/tokens", web::get().to(handle_get_tokens))
                     .route(
-                        "/account/{id}/transactions",
-                        web::get().to(handle_get_account_transactions),
-                    )
-                    .route(
                         "/account/{address}/history/{offset}/{limit}",
                         web::get().to(handle_get_account_transactions_history),
                     )
@@ -543,7 +662,7 @@ fn start_server(state: AppState, bind_to: SocketAddr) {
                     )
                     .route("/blocks/{block_id}", web::get().to(handle_get_block_by_id))
                     .route("/blocks", web::get().to(handle_get_blocks))
-                    .route("/search", web::get().to(handle_block_search)),
+                    .route("/search", web::get().to(handle_block_explorer_search)),
             )
             // Endpoint needed for js isReachable
             .route(
@@ -565,6 +684,7 @@ pub(super) fn start_server_thread_detached(
     mempool_request_sender: mpsc::Sender<MempoolRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
+    api_requests_caches_size: usize,
 ) {
     std::thread::Builder::new()
         .name("actix-rest-api".to_string())
@@ -574,6 +694,7 @@ pub(super) fn start_server_thread_detached(
             let runtime = actix_rt::System::new("api-server");
 
             let state = AppState {
+                caches: Caches::new(api_requests_caches_size),
                 connection_pool,
                 network_status: SharedNetworkStatus::default(),
                 contract_address: format!("{:?}", contract_address),

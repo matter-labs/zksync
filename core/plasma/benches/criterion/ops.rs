@@ -11,7 +11,7 @@ use models::node::{
     account::{Account, PubKeyHash},
     priority_ops::{Deposit, FullExit},
     priv_key_from_fs,
-    tx::{ChangePubKey, PackedEthSignature, Transfer, TxSignature, Withdraw},
+    tx::{ChangePubKey, PackedEthSignature, Transfer, Withdraw},
     AccountId, AccountMap, Address, BlockNumber, FranklinPriorityOp, FranklinTx, PrivateKey,
     TokenId,
 };
@@ -55,7 +55,7 @@ fn generate_state() -> (HashMap<AccountId, (PrivateKey, H256)>, PlasmaState) {
         keys.insert(account_id, (sk, eth_sk));
     }
 
-    let state = PlasmaState::new(accounts, CURRENT_BLOCK);
+    let state = PlasmaState::from_acc_map(accounts, CURRENT_BLOCK);
 
     (keys, state)
 }
@@ -67,18 +67,17 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
 
     let from_account = state.get_account(0).expect("Can't get the account");
 
-    let mut transfer = Transfer {
-        from: from_account.address,
-        to: Address::random(),
-        token: ETH_TOKEN_ID,
-        amount: 10.into(),
-        fee: 1.into(),
-        nonce: 0,
-        signature: TxSignature::default(),
-    };
-
-    transfer.signature = TxSignature::sign_musig_sha256(&private_key, &transfer.get_bytes());
-
+    let transfer = Transfer::new_signed(
+        0,
+        from_account.address,
+        Address::random(),
+        ETH_TOKEN_ID,
+        10.into(),
+        1.into(),
+        0,
+        private_key,
+    )
+    .expect("failed to sign transfer");
     let transfer_tx = FranklinTx::Transfer(Box::new(transfer));
 
     let setup = || (state.clone(), transfer_tx.clone());
@@ -95,24 +94,24 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
 }
 
 /// Bench for `PlasmaState::apply_transfer_op`.
-fn apply_transfer_op(b: &mut Bencher<'_>) {
+fn apply_transfer_tx(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
     let (private_key, _) = keys.get(&0).expect("Can't key the private key");
 
     let from_account = state.get_account(0).expect("Can't get the account");
     let to_account = state.get_account(1).expect("Can't get the account");
 
-    let mut transfer = Transfer {
-        from: from_account.address,
-        to: to_account.address,
-        token: ETH_TOKEN_ID,
-        amount: 10.into(),
-        fee: 1.into(),
-        nonce: 0,
-        signature: TxSignature::default(),
-    };
-
-    transfer.signature = TxSignature::sign_musig_sha256(&private_key, &transfer.get_bytes());
+    let transfer = Transfer::new_signed(
+        0,
+        from_account.address,
+        to_account.address,
+        ETH_TOKEN_ID,
+        10.into(),
+        1.into(),
+        0,
+        private_key,
+    )
+    .expect("failed to sign transfer");
 
     let transfer_tx = FranklinTx::Transfer(Box::new(transfer));
 
@@ -130,7 +129,7 @@ fn apply_transfer_op(b: &mut Bencher<'_>) {
 }
 
 /// Bench for `PlasmaState::apply_full_exit_op`.
-fn apply_full_exit_op(b: &mut Bencher<'_>) {
+fn apply_full_exit_tx(b: &mut Bencher<'_>) {
     let (_, state) = generate_state();
 
     let from_account = state.get_account(0).expect("Can't get the account");
@@ -155,7 +154,7 @@ fn apply_full_exit_op(b: &mut Bencher<'_>) {
 }
 
 /// Bench for `PlasmaState::apply_deposit_op`.
-fn apply_deposit_op(b: &mut Bencher<'_>) {
+fn apply_deposit_tx(b: &mut Bencher<'_>) {
     let (_, state) = generate_state();
 
     let to_account = state.get_account(0).expect("Can't get the account");
@@ -181,23 +180,23 @@ fn apply_deposit_op(b: &mut Bencher<'_>) {
 }
 
 /// Bench for `PlasmaState::apply_withdraw_op`.
-fn apply_withdraw_op(b: &mut Bencher<'_>) {
+fn apply_withdraw_tx(b: &mut Bencher<'_>) {
     let (keys, state) = generate_state();
 
     let from_account = state.get_account(0).expect("Can't get the account");
     let (private_key, _) = keys.get(&0).expect("Can't key the private key");
 
-    let mut withdraw = Withdraw {
-        from: from_account.address,
-        to: Address::random(),
-        token: ETH_TOKEN_ID,
-        amount: 10.into(),
-        fee: 1.into(),
-        nonce: 0,
-        signature: TxSignature::default(),
-    };
-
-    withdraw.signature = TxSignature::sign_musig_sha256(&private_key, &withdraw.get_bytes());
+    let withdraw = Withdraw::new_signed(
+        0,
+        from_account.address,
+        Address::random(),
+        ETH_TOKEN_ID,
+        10.into(),
+        1.into(),
+        0,
+        private_key,
+    )
+    .expect("failed to sign withdraw");
 
     let withdraw_tx = FranklinTx::Withdraw(Box::new(withdraw));
 
@@ -227,7 +226,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     let nonce = 0;
 
     let eth_signature = {
-        let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &to_change.pub_key_hash)
+        let sign_bytes = ChangePubKey::get_eth_signed_data(0, nonce, &to_change.pub_key_hash)
             .expect("Failed to construct ChangePubKey signed message.");
         let eth_signature =
             PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
@@ -235,6 +234,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     };
 
     let change_pubkey = ChangePubKey {
+        account_id: 0,
         account: to_change.address,
         new_pk_hash: PubKeyHash::from_privkey(&new_sk),
         nonce,
@@ -285,14 +285,14 @@ pub fn bench_ops(c: &mut Criterion) {
         "PlasmaState::apply_transfer_to_new_op bench",
         apply_transfer_to_new_op,
     );
-    group.bench_function("PlasmaState::apply_transfer_op bench", apply_transfer_op);
-    group.bench_function("PlasmaState::apply_withdraw_op bench", apply_withdraw_op);
+    group.bench_function("PlasmaState::apply_transfer_tx bench", apply_transfer_tx);
+    group.bench_function("PlasmaState::apply_withdraw_tx bench", apply_withdraw_tx);
     group.bench_function(
         "PlasmaState::apply_change_pubkey_op bench",
         apply_change_pubkey_op,
     );
-    group.bench_function("PlasmaState::apply_deposit_op bench", apply_deposit_op);
-    group.bench_function("PlasmaState::apply_full_exit_op bench", apply_full_exit_op);
+    group.bench_function("PlasmaState::apply_deposit_tx bench", apply_deposit_tx);
+    group.bench_function("PlasmaState::apply_full_exit_tx bench", apply_full_exit_tx);
     group.bench_function("PlasmaState::insert_account bench", insert_account);
 
     group.finish();

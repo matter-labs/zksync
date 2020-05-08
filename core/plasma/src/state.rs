@@ -6,6 +6,7 @@ use models::node::operations::{
     WithdrawOp,
 };
 use models::node::tx::ChangePubKey;
+use models::node::Address;
 use models::node::{Account, AccountTree, FranklinPriorityOp, PubKeyHash};
 use models::node::{
     AccountId, AccountMap, AccountUpdate, AccountUpdates, BlockNumber, Fr, TokenId,
@@ -13,7 +14,6 @@ use models::node::{
 use models::node::{Close, Deposit, FranklinTx, FullExit, Transfer, Withdraw};
 use models::params;
 use std::collections::HashMap;
-use web3::types::Address;
 
 #[derive(Debug)]
 pub struct OpSuccess {
@@ -41,7 +41,7 @@ pub struct CollectedFee {
 
 impl PlasmaState {
     pub fn empty() -> Self {
-        let tree_depth = params::account_tree_depth() as u32;
+        let tree_depth = params::account_tree_depth();
         let balance_tree = AccountTree::new(tree_depth);
         Self {
             balance_tree,
@@ -50,13 +50,25 @@ impl PlasmaState {
         }
     }
 
-    pub fn new(accounts: AccountMap, current_block: u32) -> Self {
+    pub fn from_acc_map(accounts: AccountMap, current_block: BlockNumber) -> Self {
         let mut empty = Self::empty();
         empty.block_number = current_block;
         for (id, account) in accounts {
             empty.insert_account(id, account);
         }
         empty
+    }
+
+    pub fn new(
+        balance_tree: AccountTree,
+        account_id_by_address: HashMap<Address, AccountId>,
+        current_block: BlockNumber,
+    ) -> Self {
+        Self {
+            balance_tree,
+            block_number: current_block,
+            account_id_by_address,
+        }
     }
 
     pub fn get_accounts(&self) -> Vec<(u32, Account)> {
@@ -72,7 +84,7 @@ impl PlasmaState {
     }
 
     pub fn get_account(&self, account_id: AccountId) -> Option<Account> {
-        self.balance_tree.items.get(&account_id).cloned()
+        self.balance_tree.get(account_id).cloned()
     }
 
     pub fn chunks_for_tx(&self, franklin_tx: &FranklinTx) -> usize {
@@ -133,7 +145,7 @@ impl PlasmaState {
     fn apply_full_exit(&mut self, priority_op: FullExit) -> OpSuccess {
         // NOTE: Authroization of the FullExit is verified on the contract.
         assert!(
-            priority_op.token < params::TOTAL_TOKENS as TokenId,
+            priority_op.token < params::total_tokens() as TokenId,
             "Full exit token is out of range, this should be enforced by contract"
         );
         trace!("Processing {:?}", priority_op);
@@ -198,7 +210,7 @@ impl PlasmaState {
 
     fn apply_transfer(&mut self, tx: Transfer) -> Result<OpSuccess, Error> {
         ensure!(
-            tx.token < (params::TOTAL_TOKENS as TokenId),
+            tx.token < (params::total_tokens() as TokenId),
             "Token id is not supported"
         );
         let (from, from_account) = self
@@ -210,8 +222,9 @@ impl PlasmaState {
         );
         ensure!(
             tx.verify_signature() == Some(from_account.pub_key_hash),
-            "transfer signature is incorrect"
+            "Transfer signature is incorrect"
         );
+        ensure!(from == tx.account_id, "Transfer account id is incorrect");
 
         if let Some((to, _)) = self.get_account_by_address(&tx.to) {
             let transfer_op = TransferOp { tx, from, to };
@@ -237,7 +250,7 @@ impl PlasmaState {
 
     fn apply_withdraw(&mut self, tx: Withdraw) -> Result<OpSuccess, Error> {
         ensure!(
-            tx.token < (params::TOTAL_TOKENS as TokenId),
+            tx.token < (params::total_tokens() as TokenId),
             "Token id is not supported"
         );
         let (account_id, account) = self
@@ -250,6 +263,10 @@ impl PlasmaState {
         ensure!(
             tx.verify_signature() == Some(account.pub_key_hash),
             "withdraw signature is incorrect"
+        );
+        ensure!(
+            account_id == tx.account_id,
+            "Withdraw account id is incorrect"
         );
         let withdraw_op = WithdrawOp { tx, account_id };
 
@@ -288,6 +305,10 @@ impl PlasmaState {
         ensure!(
             tx.eth_signature.is_none() || tx.verify_eth_signature() == Some(account.address),
             "ChangePubKey signature is incorrect"
+        );
+        ensure!(
+            account_id == tx.account_id,
+            "ChangePubKey account id is incorrect"
         );
         let change_pk_op = ChangePubKeyOp { tx, account_id };
 
@@ -354,7 +375,7 @@ impl PlasmaState {
     fn remove_account(&mut self, id: AccountId) {
         if let Some(account) = self.get_account(id) {
             self.account_id_by_address.remove(&account.address);
-            self.balance_tree.delete(id);
+            self.balance_tree.remove(id);
         }
     }
 
@@ -496,7 +517,7 @@ impl PlasmaState {
         let mut updates = Vec::new();
         let account = self.get_account(op.account_id).unwrap();
 
-        for token in 0..params::TOTAL_TOKENS {
+        for token in 0..params::total_tokens() {
             if account.get_balance(token as TokenId) != BigDecimal::from(0) {
                 bail!("Account is not empty, token id: {}", token);
             }

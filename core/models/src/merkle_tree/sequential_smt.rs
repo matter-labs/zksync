@@ -9,16 +9,16 @@ use std::fmt::Debug;
 // Tree of depth 20 should contain 2^20 elements
 
 // [0, (2^TREE_DEPTH - 1)]
-type ItemIndex = u32;
+type ItemIndex = usize;
 
 // [0, TREE_DEPTH]
-type Depth = u32;
+type Depth = usize;
 
 // Hash index determines on what level of the tree the hash is
 // and kept as level (where zero is a root) and item in a level indexed from 0
-type HashIndex = (u32, u32);
+type HashIndex = (usize, usize);
 
-type ItemIndexPacked = u64;
+type ItemIndexPacked = usize;
 
 trait PackToIndex {
     fn pack(&self) -> ItemIndexPacked;
@@ -26,10 +26,10 @@ trait PackToIndex {
 
 impl PackToIndex for HashIndex {
     fn pack(&self) -> ItemIndexPacked {
-        let mut packed = 0u64;
-        packed += u64::from(self.0);
-        packed <<= 32u64;
-        packed += u64::from(self.1);
+        let mut packed = 0usize;
+        packed += self.0;
+        packed <<= 32usize;
+        packed += self.1;
 
         packed
     }
@@ -65,7 +65,7 @@ where
     H: Hasher<Hash>,
 {
     /// Returns the capacity of the tree (how many items can the tree hold).
-    pub fn capacity(&self) -> u32 {
+    pub fn capacity(&self) -> usize {
         1 << self.tree_depth
     }
 
@@ -318,6 +318,10 @@ mod tests {
             acc
         }
 
+        fn hash_elements<I: IntoIterator<Item = u64>>(&self, _elements: I) -> u64 {
+            unimplemented!()
+        }
+
         fn compress(&self, lhs: &u64, rhs: &u64, i: usize) -> u64 {
             11 * lhs + 17 * rhs + 1 + i as u64
             //log::debug!("compress {} {}, {} => {}", lhs, rhs, i, r);
@@ -342,15 +346,12 @@ mod tests {
         assert_eq!(tree.capacity(), 8);
 
         tree.insert(0, 1);
-        log::debug!("{:?}", tree);
         assert_eq!(tree.root_hash(), 697_516_875);
 
         tree.insert(0, 2);
-        log::debug!("{:?}", tree);
         assert_eq!(tree.root_hash(), 741_131_083);
 
         tree.insert(3, 2);
-        //log::debug!("{:?}", tree);
         assert_eq!(tree.root_hash(), 793_215_819);
     }
 
@@ -386,105 +387,85 @@ mod tests {
         assert_eq!(tree.root_hash(), 697_516_875);
     }
 
-    /// A very simple benchmark for tree.
-    ///
-    /// This is a self-made benchmark. It is disabled by default, since it's a long-runner,
-    /// but in can be run as follows:
-    ///
-    /// ```text
-    /// f cargo test tree_bench --features=run_benches -- --nocapture
-    /// ```
-    ///
-    /// Note that you have to run it in the `models` directory, as cargo does not support
-    /// `--features` flag in virtual workspaces.
+    /// Checks the correctness of the built Merkle proofs
     #[test]
-    #[cfg_attr(not(feature = "run_benches"), ignore)]
-    fn tree_bench() {
-        // Since this benchmark is temporary and will likely be replaced with a
-        // `criterion` benches or something similar, uses and internal functions
-        // are placed within this test to not interfere with other tests.
-        use std::time;
+    fn merkle_path_test() {
+        // Test vector holds pairs (index, value).
+        let test_vector = [(0, 2), (3, 2)];
+        // Pre-calculated root hash for the test vector above.
+        let expected_root_hash = 793_215_819;
 
-        use crate::circuit::account::CircuitAccount;
-        use crate::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
-        use crate::merkle_tree::PedersenHasher;
-
-        /// A simple bench stats counter.
-        #[derive(Debug, Default)]
-        struct BenchStats {
-            min_time: Option<time::Duration>,
-            max_time: Option<time::Duration>,
-            overall: time::Duration,
-            n_samples: u32,
+        // Create the tree and fill it with values.
+        let mut tree = TestSMT::new(3);
+        assert_eq!(tree.capacity(), 8);
+        for &(idx, value) in &test_vector {
+            tree.insert(idx, value);
         }
+        assert_eq!(tree.root_hash(), expected_root_hash);
 
-        impl BenchStats {
-            pub fn add_time(&mut self, time: time::Duration) {
-                if self.min_time.unwrap_or(time) >= time {
-                    self.min_time = Some(time);
-                }
-                if self.max_time.unwrap_or(time) <= time {
-                    self.max_time = Some(time);
-                }
+        // Check the proof for every element.
+        for &(idx, value) in &test_vector {
+            let merkle_proof = tree.merkle_path(idx);
 
-                self.overall += time;
-                self.n_samples += 1;
+            let hasher = TestHasher::default();
+
+            // To check the proof, we fold it starting from the hash of the value
+            // and updating with the hashes from the proof.
+            // We should obtain the root hash at the end if the proof is correct.
+            let mut level = 0;
+            let mut proof_index: ItemIndex = 0;
+            let mut aggregated_hash = hasher.hash_bits(value.get_bits_le());
+            for (hash, dir) in merkle_proof {
+                let (lhs, rhs) = if dir {
+                    proof_index |= 1 << level;
+                    (hash, aggregated_hash)
+                } else {
+                    (aggregated_hash, hash)
+                };
+
+                aggregated_hash = hasher.compress(&lhs, &rhs, level as usize);
+
+                level += 1;
             }
 
-            pub fn average(&mut self) -> time::Duration {
-                self.overall / self.n_samples
+            assert_eq!(level, tree.tree_depth);
+            assert_eq!(proof_index, idx);
+            assert_eq!(aggregated_hash, 793_215_819);
+        }
+
+        // Since sparse merkle tree is by default "filled" with default values,
+        // we can check the proofs for elements which we did not insert by ourselves.
+        // Given the tree depth 3, the tree capacity is 8 (2^3).
+        let absent_elements = [1, 2, 4, 5, 6, 7];
+        let default_value = 0;
+
+        for &idx in &absent_elements {
+            let merkle_proof = tree.merkle_path(idx);
+
+            let hasher = TestHasher::default();
+
+            // To check the proof, we fold it starting from the hash of the value
+            // and updating with the hashes from the proof.
+            // We should obtain the root hash at the end if the proof is correct.
+            let mut level = 0;
+            let mut proof_index: ItemIndex = 0;
+            let mut aggregated_hash = hasher.hash_bits(default_value.get_bits_le());
+            for (hash, dir) in merkle_proof {
+                let (lhs, rhs) = if dir {
+                    proof_index |= 1 << level;
+                    (hash, aggregated_hash)
+                } else {
+                    (aggregated_hash, hash)
+                };
+
+                aggregated_hash = hasher.compress(&lhs, &rhs, level as usize);
+
+                level += 1;
             }
+
+            assert_eq!(level, tree.tree_depth);
+            assert_eq!(proof_index, idx);
+            assert_eq!(aggregated_hash, 793_215_819);
         }
-
-        /// Function to generate an unique account.
-        fn gen_account(id: u64) -> CircuitAccount<Bn256> {
-            let mut account = CircuitAccount::<Bn256>::default();
-
-            let id_hex = format!("{:064x}", id);
-            account.address = Fr::from_hex(id_hex.as_ref()).unwrap();
-
-            account
-        }
-
-        // In this bench we want "real-life" test, so we use the actual type of
-        // the SMT.
-        type RealSMT = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
-
-        let mut create_stats = BenchStats::default();
-        let mut insert_stats = BenchStats::default();
-
-        // Create SMT.
-        let start = time::Instant::now();
-        let mut tree = RealSMT::new(crate::params::account_tree_depth() as u32);
-        let end = time::Instant::now();
-        println!("RealSMT creation time: {}ms", (end - start).as_millis());
-
-        // Add several accounts to it and measure the account generation and
-        // the insertion times.
-        // We measure account generation time, since it contains a SMT inside and
-        // since it's a part of the actual accounts SMT interaction, we want to
-        // be sure that it's a fast operation.
-        let n_samples = 10;
-        for id in 0..n_samples {
-            let start = time::Instant::now();
-            let account = gen_account(id);
-            let end = time::Instant::now();
-            create_stats.add_time(end - start);
-
-            let start = time::Instant::now();
-            tree.insert(id as u32, account);
-            let end = time::Instant::now();
-            insert_stats.add_time(end - start);
-        }
-
-        println!("Bench stats <CREATE> ({} samples):", n_samples);
-        println!("Min time: {}ms", create_stats.min_time.unwrap().as_millis());
-        println!("Max time: {}ms", create_stats.max_time.unwrap().as_millis());
-        println!("Avg time: {}ms", create_stats.average().as_millis());
-
-        println!("Bench stats <INSERT> ({} samples):", n_samples);
-        println!("Min time: {}ms", insert_stats.min_time.unwrap().as_millis());
-        println!("Max time: {}ms", insert_stats.max_time.unwrap().as_millis());
-        println!("Avg time: {}ms", insert_stats.average().as_millis());
     }
 }

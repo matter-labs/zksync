@@ -2,7 +2,7 @@
 <div>
     <b-navbar toggleable="md" type="dark" variant="info">
     <b-container>
-        <b-navbar-brand href="/">ZK Sync Network</b-navbar-brand>
+        <b-navbar-brand href="/">zkSync Network</b-navbar-brand>
         <b-navbar-nav class="ml-auto">
             <b-nav-form>
                 <SearchField :searchFieldInMenu="true" />
@@ -34,8 +34,7 @@
 <script>
 
 import store from './store';
-import { ethers } from 'ethers';
-import { readableEther, shortenHash } from './utils';
+import { readableEther, shortenHash, formatDate } from './utils';
 
 import TransactionList from './TransactionList.vue';
 import SearchField from './SearchField.vue';
@@ -48,11 +47,6 @@ const components = {
 
 function formatToken(amount, token) {
     return readableEther(amount);
-}
-
-function formatDate(date) {
-    if (date == null) return '';
-    return date.toString().split('T')[0] + " " + date.toString().split('T')[1].split('.')[0];
 }
 
 export default {
@@ -127,11 +121,7 @@ export default {
             const tokens = await client.tokensPromise;
 
             this.transactions = txs.map(tx => {
-                const type 
-                    = tx.type == "PriorityOp" ? tx.priority_op.data.type
-                    : tx.type == "Tx"         ? tx.tx.type 
-                    : null;
-
+                const type = tx.op.type;
                 let from = "";
                 let to = "";
                 let token = "";
@@ -141,66 +131,72 @@ export default {
                 let to_explorer_link = "";
                 let from_onchain_icon = "";
                 let to_onchain_icon = "";
+                let created_at = "";
 
                 switch (type) {
                     case "Deposit":
-                        from               = shortenHash(tx.priority_op.data.from, 'unknown sender');
-                        to                 = shortenHash(tx.priority_op.data.to, 'unknown account');
-                        from_explorer_link = `${this.blockchainExplorerAddress}/${tx.priority_op.data.from}`;
-                        to_explorer_link   = `${this.routerBase}accounts/${tx.priority_op.data.to}`;
+                        from               = shortenHash(tx.op.priority_op.from, 'unknown sender');
+                        to                 = shortenHash(tx.op.priority_op.to, 'unknown account');
+                        from_explorer_link = `${this.blockchainExplorerAddress}/${tx.op.priority_op.from}`;
+                        to_explorer_link   = `${this.routerBase}accounts/${tx.op.priority_op.to}`;
                         from_onchain_icon  = `<span class="onchain_icon">onchain</span>`;
                         to_onchain_icon    = '';
-                        token              = tx.priority_op.data.token;
+                        token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.priority_op.data.amount, token)} ${token}`;
-                        fee                = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
+                        amount             = `${formatToken(tx.op.priority_op.amount, token)} ${token}`;
+                        created_at         = tx.created_at;
+                        fee                = '';
                         break;
                     case "Transfer":
-                        from               = shortenHash(tx.tx.from, 'unknown from');
-                        to                 = shortenHash(tx.tx.to, 'unknown to');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.tx.from}`;
-                        to_explorer_link   = `${this.routerBase}accounts/${tx.tx.to}`;
+                        from               = shortenHash(tx.op.from, 'unknown from');
+                        to                 = shortenHash(tx.op.to, 'unknown to');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.op.from}`;
+                        to_explorer_link   = `${this.routerBase}accounts/${tx.op.to}`;
                         from_onchain_icon  = '';
                         to_onchain_icon    = '';
-                        token              = tx.tx.token;
+                        token              = tx.op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.tx.amount, token)} ${token}`;
-                        fee                = `${formatToken(tx.tx.fee, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.amount, token)} ${token}`;
+                        fee                = `${formatToken(tx.op.fee, token)} ${token}`;
+                        created_at         = tx.created_at;
                         break;
                     case "ChangePubKey":
-                        from               = shortenHash(tx.tx.account, 'unknown account address');
-                        to                 = shortenHash(tx.tx.newPkHash, 'unknown pubkey hash');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.tx.account}`;
+                        from               = shortenHash(tx.op.account, 'unknown account address');
+                        to                 = shortenHash(tx.op.newPkHash, 'unknown pubkey hash');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.op.account}`;
                         to_explorer_link   = ``;
                         from_onchain_icon  = '';
                         to_onchain_icon    = '';
                         token              = '';
                         amount             = '';
                         fee                = '';
+                        created_at         = tx.created_at;
                         break;
                     case "Withdraw":
-                        from               = shortenHash(tx.tx.from, 'unknown account');
-                        to                 = shortenHash(tx.tx.to, 'unknown ethAddress');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.tx.from}`;
-                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.tx.to}`;
+                        from               = shortenHash(tx.op.from, 'unknown account');
+                        to                 = shortenHash(tx.op.to, 'unknown ethAddress');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.op.from}`;
+                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.op.to}`;
                         from_onchain_icon  = '';
                         to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
-                        token              = tx.tx.token;
+                        token              = tx.op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.tx.amount, token)} ${token}`;
-                        fee                = `${formatToken(tx.tx.fee, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.amount, token)} ${token}`;
+                        fee                = `${formatToken(tx.op.fee, token)} ${token}`;
+                        created_at         = tx.created_at;
                         break;
                     case "FullExit":
-                        from               = shortenHash(tx.priority_op.data.eth_address, 'unknown account address');
-                        to                 = shortenHash(tx.priority_op.data.eth_address, 'unknown account address');
-                        from_explorer_link = `${this.routerBase}accounts/${tx.priority_op.data.eth_address}`;
-                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.priority_op.data.eth_address}`;
+                        from               = shortenHash(tx.op.priority_op.eth_address, 'unknown account address');
+                        to                 = shortenHash(tx.op.priority_op.eth_address, 'unknown account address');
+                        from_explorer_link = `${this.routerBase}accounts/${tx.op.priority_op.eth_address}`;
+                        to_explorer_link   = `${this.blockchainExplorerAddress}/${tx.op.priority_op.eth_address}`;
                         from_onchain_icon  = '<span class="onchain_icon">onchain</span>';
                         to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
-                        token              = tx.priority_op.data.token;
+                        token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
                         amount             = `${formatToken(tx.priority_op.withdraw_amount || 0, token)} ${token}`;
-                        fee                = `${formatToken(tx.priority_op.eth_fee, "ETH")} ETH`;
+                        created_at         = tx.created_at;
+                        fee                = '';
                         break;
                     default:
                         throw new Error('switch reached default');
@@ -223,6 +219,7 @@ export default {
                     amount,
                     fee,
                     tx_hash: tx.tx_hash,
+                    created_at: formatDate(created_at),
                 };
             });
 

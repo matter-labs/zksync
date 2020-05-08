@@ -7,7 +7,7 @@
     "@types/node": "^12.12.14",
     "array-flat-polyfill": "^1.0.1",
     "cli-progress": "^3.5.0",
-    "ethers": "4.0.33",
+    "ethers": "4.0.46",
     "openzeppelin-solidity": "^2.4.0",
     "ts-node": "^8.5.4",
     "typescript": "^3.7.4",
@@ -16,7 +16,6 @@
   "scripts": {
     "simple": "f ts-node simple-integration-test.ts",
     "full-exit": "f ts-node full-exit-inegration-test.ts",
-    "loadtest": "f ts-node loadtest.ts",
     "withdraws": "f ts-node withdraws.ts",
     "print-test-accounts": "f ts-node print-test-accounts.ts"
   }

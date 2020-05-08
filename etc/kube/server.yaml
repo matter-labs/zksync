@@ -1,8 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ${ZKSYNC_ENV}-server-supervisor
+  namespace: ${ZKSYNC_ENV}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ${ZKSYNC_ENV}-server-supervisor
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: ${ZKSYNC_ENV}-server-supervisor
+    spec:
+      containers:
+        - name: server
+          image: matterlabs/server_supervisor:${IMAGE_TAG}
+          imagePullPolicy: Always
+          envFrom:
+            - secretRef:
+                name: ${ZKSYNC_ENV}-secret
+          env:
+            - name: NAMESPACE
+              value: "${ZKSYNC_ENV}"
+---
 apiVersion: networking.k8s.io/v1beta1
 kind: Ingress
 metadata:
   name: api-ingress
   namespace: ${ZKSYNC_ENV}
+  annotations:
+    nginx.ingress.kubernetes.io/enable-cors: "true"
 spec:
   rules:
   - http:
@@ -58,12 +88,10 @@ metadata:
 spec:
   strategy:
     type: Recreate
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: ${ZKSYNC_ENV}-server
-  strategy:
-    type: Recreate
   template:
     metadata:
       labels:
@@ -74,14 +102,34 @@ spec:
           image: matterlabs/server:${IMAGE_TAG}
           imagePullPolicy: Always
           resources: ${SERVER_CONTAINER_RESOURCES}
+          readinessProbe:
+            tcpSocket:
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 100
           ports:
             - containerPort: 3000
             - containerPort: 3030
             - containerPort: 3031
             - containerPort: 8088
           envFrom:
-            - secretRef:
-                name: ${ZKSYNC_ENV}-secret
+            - configMapRef:
+                name: ${ZKSYNC_ENV}-configmap
           env:
           - name: ZKSYNC_ENV
             value: "${ZKSYNC_ENV}"
+          - name: SERVER_REPLICA_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.name
+          - name: OPERATOR_PRIVATE_KEY
+            valueFrom:
+              secretKeyRef:
+                name: ${ZKSYNC_ENV}-operator
+                key: private_key
+          - name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: ${ZKSYNC_ENV}-secret
+                key: DATABASE_URL

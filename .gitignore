@@ -19,6 +19,7 @@ npm-debug.log
 
 Cargo.lock
 !/Cargo.lock
+!/js/zksync-crypto/Cargo.lock
 
 /etc/env/*
 !/etc/env/dev.env.example
@@ -27,7 +28,9 @@ Cargo.lock
 /deploy.log
 /test.log
 /genesis.log
-/keys
+!/keys
+/keys/*
+!/keys/packed
 /tmp
 /volumes
 /logs

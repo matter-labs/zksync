@@ -3,9 +3,13 @@
 use serde::{Deserialize, Serialize};
 // Workspace
 use circuit::account::AccountWitness;
+use circuit::circuit::FranklinCircuit;
 use circuit::operation::{
     OperationArguments, OperationBranch, OperationBranchWitness, SignatureData,
 };
+use crypto_exports::ff::PrimeField;
+use crypto_exports::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
+use crypto_exports::franklin_crypto::rescue::bn256::Bn256RescueParams;
 use models::node::{Engine, Fr};
 // Local
 use crate::serialization::*;
@@ -29,6 +33,23 @@ pub struct ProverData {
     pub operations: Vec<circuit::operation::Operation<Engine>>,
     #[serde(with = "AccountWitnessDef")]
     pub validator_account: circuit::account::AccountWitness<Engine>,
+}
+
+impl ProverData {
+    pub fn into_circuit(self, block: i64) -> FranklinCircuit<'static, Engine> {
+        FranklinCircuit {
+            rescue_params: &models::params::RESCUE_PARAMS as &Bn256RescueParams,
+            jubjub_params: &models::params::JUBJUB_PARAMS as &AltJubjubBn256,
+            old_root: Some(self.old_root),
+            block_number: Fr::from_str(&block.to_string()),
+            validator_address: Some(self.validator_address),
+            pub_data_commitment: Some(self.public_data_commitment),
+            operations: self.operations,
+            validator_balances: self.validator_balances,
+            validator_audit_path: self.validator_audit_path,
+            validator_account: self.validator_account,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

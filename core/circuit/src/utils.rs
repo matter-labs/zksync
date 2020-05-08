@@ -1,18 +1,27 @@
-use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField};
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-
-use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
-use crate::franklin_crypto::circuit::num::{AllocatedNum, Num};
-use crate::franklin_crypto::circuit::Assignment;
-use crate::franklin_crypto::eddsa::Signature;
-use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
-use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
-
-use crate::operation::SignatureData;
-use crate::operation::TransactionSignature;
-use models::circuit::utils::le_bit_vector_into_field_element;
-use models::params as franklin_constants;
-use models::primitives::*;
+// External deps
+use crypto_exports::franklin_crypto::{
+    bellman::{
+        pairing::{
+            ff::{BitIterator, Field, PrimeField},
+            Engine,
+        },
+        ConstraintSystem, SynthesisError,
+    },
+    circuit::{
+        boolean::{AllocatedBit, Boolean},
+        num::{AllocatedNum, Num},
+        Assignment,
+    },
+    eddsa::{PrivateKey, PublicKey, Seed, Signature},
+    jubjub::{FixedGenerators, JubjubEngine},
+    rescue::RescueEngine,
+};
+// Workspace deps
+use models::{
+    circuit::utils::le_bit_vector_into_field_element, params as franklin_constants, primitives::*,
+};
+// Local deps
+use crate::operation::{SignatureData, TransactionSignature};
 
 pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
     bits.chunks(8)
@@ -23,6 +32,7 @@ pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
             acc
         })
 }
+
 pub fn sign_sha256<E>(
     msg_data: &[bool],
     private_key: &PrivateKey<E>,
@@ -40,6 +50,43 @@ where
     let pk = PublicKey::from_private(&private_key, p_g, params);
     let _is_valid_signature =
         pk.verify_musig_sha256(&message_bytes, &signature.clone(), p_g, params);
+
+    // TODO: handle the case where it is not valid
+    // if !is_valid_signature {
+    //     return None;
+    // }
+    let (sig_r_x, sig_r_y) = signature.r.into_xy();
+    debug!("signature.s: {}", signature.s);
+    debug!("signature.r.x: {}", sig_r_x);
+    debug!("signature.r.y: {}", sig_r_y);
+
+    convert_signature_to_representation(signature)
+}
+
+pub fn sign_rescue<E>(
+    msg_data: &[bool],
+    private_key: &PrivateKey<E>,
+    p_g: FixedGenerators,
+    rescue_params: &<E as RescueEngine>::Params,
+    jubjub_params: &<E as JubjubEngine>::Params,
+) -> SignatureData
+where
+    E: RescueEngine + JubjubEngine,
+{
+    let message_bytes = pack_bits_into_bytes(msg_data.to_vec());
+
+    let seed = Seed::deterministic_seed(&private_key, &message_bytes);
+    let signature =
+        private_key.musig_rescue_sign(&message_bytes, &seed, p_g, rescue_params, jubjub_params);
+
+    let pk = PublicKey::from_private(&private_key, p_g, jubjub_params);
+    let _is_valid_signature = pk.verify_musig_rescue(
+        &message_bytes,
+        &signature.clone(),
+        p_g,
+        rescue_params,
+        jubjub_params,
+    );
 
     // TODO: handle the case where it is not valid
     // if !is_valid_signature {
@@ -133,7 +180,8 @@ where
         s: sigs_converted,
     })
 }
-pub fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
+
+pub fn multi_and<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     x: &[Boolean],
 ) -> Result<Boolean, SynthesisError> {
@@ -150,7 +198,7 @@ pub fn multi_and<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(result)
 }
 
-pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
+pub fn allocate_sum<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     a: &AllocatedNum<E>,
     b: &AllocatedNum<E>,
@@ -170,7 +218,7 @@ pub fn allocate_sum<E: JubjubEngine, CS: ConstraintSystem<E>>(
     Ok(sum)
 }
 
-pub fn pack_bits_to_element<E: JubjubEngine, CS: ConstraintSystem<E>>(
+pub fn pack_bits_to_element<E: Engine, CS: ConstraintSystem<E>>(
     mut cs: CS,
     bits: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError> {
@@ -201,7 +249,7 @@ pub fn count_number_of_ones<E, CS>(
     a: &[Boolean],
 ) -> Result<AllocatedNum<E>, SynthesisError>
 where
-    E: JubjubEngine,
+    E: Engine,
     CS: ConstraintSystem<E>,
 {
     let mut counter = Num::zero();
@@ -228,7 +276,7 @@ pub fn allocate_numbers_vec<E, CS>(
     audit_path: &[Option<E::Fr>],
 ) -> Result<Vec<AllocatedNum<E>>, SynthesisError>
 where
-    E: JubjubEngine,
+    E: Engine,
     CS: ConstraintSystem<E>,
 {
     let mut allocated = vec![];
@@ -248,7 +296,7 @@ pub fn allocate_bits_vector<E, CS>(
     bits: &[Option<bool>],
 ) -> Result<Vec<Boolean>, SynthesisError>
 where
-    E: JubjubEngine,
+    E: Engine,
     CS: ConstraintSystem<E>,
 {
     let mut allocated = vec![];

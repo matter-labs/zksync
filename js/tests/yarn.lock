@@ -2,11 +2,6 @@
 # yarn lockfile v1
 
 
-"@types/node@^10.3.2":
-  version "10.17.17"
-  resolved "https://registry.yarnpkg.com/@types/node/-/node-10.17.17.tgz#7a183163a9e6ff720d86502db23ba4aade5999b8"
-  integrity sha512-gpNnRnZP3VWzzj5k3qrpRC6Rk3H/uclhAVo1aIvwzK5p5cOrs9yEyQ8H/HBsBY0u5rrWxXEiVPQ0dEB6pkjE8Q==
-
 "@types/node@^12.12.14":
   version "12.12.25"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-12.12.25.tgz#792c0afb798f1dd681dce9c4b4c431f7245a0a42"
@@ -131,17 +126,7 @@ diff@^4.0.1:
   resolved "https://registry.yarnpkg.com/diff/-/diff-4.0.2.tgz#60f3aecb89d5fae520c11aa19efc2bb982aade7d"
   integrity sha512-58lmxKSA4BNyLz+HHMUzlOEpg09FV+ev6ZMe3vJihgdxzgcwZ8VoEEPmALCZG9LmqfVoNMMKpttIYTVG6uDY7A==
 
-elliptic@6.3.3:
-  version "6.3.3"
-  resolved "https://registry.yarnpkg.com/elliptic/-/elliptic-6.3.3.tgz#5482d9646d54bcb89fd7d994fc9e2e9568876e3f"
-  integrity sha1-VILZZG1UvLif19mU/J4ulWiHbj8=
-  dependencies:
-    bn.js "^4.4.0"
-    brorand "^1.0.1"
-    hash.js "^1.0.0"
-    inherits "^2.0.1"
-
-elliptic@^6.5.0:
+elliptic@6.5.2, elliptic@^6.5.0:
   version "6.5.2"
   resolved "https://registry.yarnpkg.com/elliptic/-/elliptic-6.5.2.tgz#05c5678d7173c049d8ca433552224a495d0e3762"
   integrity sha512-f4x70okzZbIQl/NSRLkI/+tteV/9WqL98zx+SQ69KbXxmVrmjwsNUPn/gYJJ0sHvEak24cZgHIPegRePAtA/xw==
@@ -206,15 +191,14 @@ es6-symbol@^3.1.1, es6-symbol@~3.1.3:
     d "^1.0.1"
     ext "^1.1.2"
 
-ethers@4.0.33:
-  version "4.0.33"
-  resolved "https://registry.yarnpkg.com/ethers/-/ethers-4.0.33.tgz#f7b88d2419d731a39aefc37843a3f293e396f918"
-  integrity sha512-lAHkSPzBe0Vj+JrhmkEHLtUEKEheVktIjGDyE9gbzF4zf1vibjYgB57LraDHu4/ItqWVkztgsm8GWqcDMN+6vQ==
+ethers@4.0.46:
+  version "4.0.46"
+  resolved "https://registry.yarnpkg.com/ethers/-/ethers-4.0.46.tgz#13cd3ed099487f43ece00194b89a8a8781f71507"
+  integrity sha512-/dPMzzpInhtiip4hKFvsDiJKeRk64IhyA+Po7CtNXneQFSOCYXg8eBFt+jXbxUQyApgWnWOtYxWdfn9+CvvxDA==
   dependencies:
-    "@types/node" "^10.3.2"
     aes-js "3.0.0"
     bn.js "^4.4.0"
-    elliptic "6.3.3"
+    elliptic "6.5.2"
     hash.js "1.1.3"
     js-sha3 "0.5.7"
     scrypt-js "2.0.4"
@@ -534,10 +518,10 @@ yn@3.1.1:
   resolved "https://registry.yarnpkg.com/yn/-/yn-3.1.1.tgz#1e87401a09d767c1d5eab26a6e4c185182d2eb50"
   integrity sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==
 
-zksync-crypto@^0.0.2:
-  version "0.0.2"
-  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.0.2.tgz#a39925395b8a433e13b2742b8acea874d5e44656"
-  integrity sha512-dT6KnrNj8MtbhBRk41Xsr8S2DwSOgfWD0Ym8YmWi+gTHKF3l8/4dzCxRj4iTI8AClnhUv//FHnb6g2/ZeaaVGQ==
+zksync-crypto@^0.2.1:
+  version "0.2.1"
+  resolved "https://registry.yarnpkg.com/zksync-crypto/-/zksync-crypto-0.2.1.tgz#052bc58504a5233ee076a44946c494d283908ba8"
+  integrity sha512-U29Oa78w4+Qu+KwJAYwukmn9A7WZP6F+/QICFf+QSByhaIJJ12Oo5fnzTVrxEv6aptcZ3/KBWkbZIM4ZiR6avQ==
 
 "zksync@link:../zksync.js":
   version "0.0.0"

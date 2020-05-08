@@ -124,6 +124,7 @@ fn state_diff() {
 
     let mut rng = create_rng();
 
+    let block_size = 100;
     let conn = StorageProcessor::establish_connection().unwrap();
     db_test(conn.conn(), || {
         let mut accounts_map = AccountMap::default();
@@ -138,6 +139,7 @@ fn state_diff() {
                 block_number,
                 Action::Commit,
                 updates,
+                block_size,
             ))?;
 
             ProverSchema(&conn).store_proof(block_number, &Default::default())?;
@@ -147,6 +149,7 @@ fn state_diff() {
                     proof: Default::default(),
                 },
                 Vec::new(),
+                block_size,
             ))?;
         }
 

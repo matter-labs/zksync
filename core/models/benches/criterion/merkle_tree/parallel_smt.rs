@@ -2,25 +2,23 @@
 
 use criterion::{black_box, BatchSize, Bencher, Criterion};
 
+use crypto_exports::ff::PrimeField;
 use models::circuit::account::CircuitAccount;
-use models::franklin_crypto::bellman::pairing::bn256::{Bn256, Fr};
-use models::merkle_tree::{parallel_smt::SparseMerkleTree, PedersenHasher};
+use models::merkle_tree::{parallel_smt::SparseMerkleTree, RescueHasher};
+use models::node::{Engine, Fr};
 
 // This value should be not to high, since the bench will be run for thousands
 // of iterations. Despite the tree cloning time won't affect the bench results
 // (cloning is performed within `setup` closure), the bench will take forever to
 // be completed if the value is too big.
-const N_ACCOUNTS: usize = 100;
+const N_ACCOUNTS: u32 = 100;
 
 /// Type alias equivalent to the actually used SMT (but parallel tree is used instead of sequential).
-type RealSMT = SparseMerkleTree<CircuitAccount<Bn256>, Fr, PedersenHasher<Bn256>>;
+type RealSMT = SparseMerkleTree<CircuitAccount<Engine>, Fr, RescueHasher<Engine>>;
 
-fn gen_account(id: usize) -> CircuitAccount<Bn256> {
-    let mut account = CircuitAccount::<Bn256>::default();
-
-    let id_hex = format!("{:064x}", id);
-    account.address = Fr::from_hex(id_hex.as_ref()).unwrap();
-
+fn gen_account(id: u32) -> CircuitAccount<Engine> {
+    let mut account = CircuitAccount::<Engine>::default();
+    account.address = Fr::from_str(&id.to_string()).unwrap();
     account
 }
 
@@ -61,6 +59,7 @@ fn smt_insert_filled(b: &mut Bencher<'_>) {
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
     for (id, account) in accounts.into_iter().enumerate() {
+        let id = id as u32;
         tree.insert(id, account.clone())
     }
     let latest_account = gen_account(N_ACCOUNTS);
@@ -85,6 +84,7 @@ fn smt_root_hash(b: &mut Bencher<'_>) {
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
     for (id, account) in accounts.into_iter().enumerate() {
+        let id = id as u32;
         tree.insert(id, account.clone());
     }
 
@@ -92,7 +92,7 @@ fn smt_root_hash(b: &mut Bencher<'_>) {
 
     b.iter_batched(
         setup,
-        |mut tree| {
+        |tree| {
             let _hash = black_box(tree.root_hash());
         },
         BatchSize::SmallInput,
@@ -111,6 +111,7 @@ fn smt_root_hash_cached(b: &mut Bencher<'_>) {
     // Create a tree and fill it with some accounts.
     let mut tree = RealSMT::new(depth);
     for (id, account) in accounts.into_iter().enumerate() {
+        let id = id as u32;
         tree.insert(id, account.clone());
 
         if id == N_ACCOUNTS / 2 {
@@ -123,7 +124,7 @@ fn smt_root_hash_cached(b: &mut Bencher<'_>) {
 
     b.iter_batched(
         setup,
-        |mut tree| {
+        |tree| {
             let _hash = black_box(tree.root_hash());
         },
         BatchSize::SmallInput,

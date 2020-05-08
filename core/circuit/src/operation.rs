@@ -1,13 +1,15 @@
 // External
-use crate::franklin_crypto::bellman::pairing::ff::Field;
-use crate::franklin_crypto::jubjub::JubjubEngine;
-use crate::franklin_crypto::jubjub::{edwards, Unknown};
+use crypto_exports::franklin_crypto::{
+    bellman::pairing::ff::Field,
+    jubjub::{edwards, JubjubEngine, Unknown},
+    rescue::RescueEngine,
+};
 use serde::{Deserialize, Serialize};
 // Workspace
 use crate::account::AccountWitness;
 
 #[derive(Clone, Debug)]
-pub struct OperationBranchWitness<E: JubjubEngine> {
+pub struct OperationBranchWitness<E: RescueEngine> {
     pub account_witness: AccountWitness<E>,
     pub account_path: Vec<Option<E::Fr>>,
 
@@ -16,7 +18,7 @@ pub struct OperationBranchWitness<E: JubjubEngine> {
 }
 
 #[derive(Clone, Debug)]
-pub struct OperationBranch<E: JubjubEngine> {
+pub struct OperationBranch<E: RescueEngine> {
     pub address: Option<E::Fr>,
     pub token: Option<E::Fr>,
 
@@ -24,7 +26,7 @@ pub struct OperationBranch<E: JubjubEngine> {
 }
 
 #[derive(Clone, Debug)]
-pub struct Operation<E: JubjubEngine> {
+pub struct Operation<E: RescueEngine> {
     pub new_root: Option<E::Fr>,
     pub tx_type: Option<E::Fr>,
     pub chunk: Option<E::Fr>,
@@ -40,7 +42,7 @@ pub struct Operation<E: JubjubEngine> {
 }
 
 #[derive(Clone, Debug)]
-pub struct OperationArguments<E: JubjubEngine> {
+pub struct OperationArguments<E: RescueEngine> {
     pub a: Option<E::Fr>,
     pub b: Option<E::Fr>,
     pub amount_packed: Option<E::Fr>,

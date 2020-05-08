@@ -41,7 +41,6 @@
 //!
 //! - account, for storing and loading account data.
 //! - block, the main one, which implements the logic of the block creation.
-//! - mempool, the auxiliary wrapper over a mempool table.
 //! - operations, the transactions storage.
 //! - operations_ext, a set of getters for the operations, more specific and convenient to use than operations has.
 //! - state, basically the sidechain state manager (which includes the applying of the state changes).
@@ -93,8 +92,10 @@ pub mod connection;
 pub mod data_restore;
 pub mod diff;
 pub mod ethereum;
+pub mod leader_election;
 pub mod prover;
 pub mod tokens;
+pub mod utils;
 
 pub use crate::connection::ConnectionPool;
 
@@ -155,6 +156,11 @@ impl StorageProcessor {
     /// Gains access to the `Tokens` schema.
     pub fn tokens_schema(&self) -> tokens::TokensSchema<'_> {
         tokens::TokensSchema(self)
+    }
+
+    // Gains access to the `LeaderElection` schema.
+    pub fn leader_election_schema(&self) -> leader_election::LeaderElectionSchema<'_> {
+        leader_election::LeaderElectionSchema(self)
     }
 
     /// Performs several database operations within one database transaction.
