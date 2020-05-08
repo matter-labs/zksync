@@ -404,13 +404,12 @@ fn handle_get_account_transactions_history(
     // `take` is used last to limit the amount of entries.
     let mut transactions_history: Vec<_> = ongoing_ops
         .iter()
-        .filter(|(_block, op)| {
-            if let FranklinPriorityOp::Deposit(deposit) = &op.data {
+        .filter(|(_block, op)| match &op.data {
+            FranklinPriorityOp::Deposit(deposit) => {
                 // Address may be set to either sender or recipient.
                 deposit.from == address || deposit.to == address
-            } else {
-                false
             }
+            _ => false,
         })
         .map(|(_block, op)| {
             let deposit = op.data.try_get_deposit().unwrap();
@@ -463,7 +462,22 @@ fn handle_get_account_transactions_history(
         // offset is consumed completely, and limit is reduced.
         offset = 0;
         limit -= transactions_history.len() as u64;
-    };
+    } else {
+        // reduce offset by the number of pending deposits
+        // that are soon to be added to the db.
+        let num_account_ongoing_deposits = ongoing_ops
+            .iter()
+            .filter(|(_block, op)| match &op.data {
+                FranklinPriorityOp::Deposit(deposit) => {
+                    // Address may be set to either sender or recipient.
+                    deposit.from == address || deposit.to == address
+                }
+                _ => false,
+            })
+            .count() as u64;
+
+        offset = offset.saturating_sub(num_account_ongoing_deposits);
+    }
 
     let mut storage_transactions = storage
         .chain()
