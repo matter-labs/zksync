@@ -92,8 +92,8 @@ pub struct WitnessTestAccount {
 
 impl WitnessTestAccount {
     pub fn new(id: AccountId, balance: u64) -> Self {
-        let mut zksync_account = ZksyncAccount::rand();
-        zksync_account.account_id = Some(id);
+        let zksync_account = ZksyncAccount::rand();
+        zksync_account.set_account_id(Some(id));
 
         let account = {
             let mut account = Account::default_with_address(&zksync_account.address);
