@@ -1,15 +1,17 @@
-use crate::franklin_crypto::bellman::pairing::ff::PrimeField;
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-use crate::franklin_crypto::circuit::boolean::Boolean;
-use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
-
-use crate::franklin_crypto::bellman::pairing::Engine;
-use crate::franklin_crypto::circuit::expression::Expression;
-use crate::franklin_crypto::circuit::num::AllocatedNum;
-use crate::franklin_crypto::circuit::rescue;
-use crate::franklin_crypto::jubjub::JubjubEngine;
-use crate::franklin_crypto::rescue::RescueEngine;
+// External deps
+use crypto_exports::franklin_crypto::{
+    bellman::{
+        pairing::{ff::PrimeField, Engine},
+        ConstraintSystem, SynthesisError,
+    },
+    circuit::{boolean::Boolean, expression::Expression, num::AllocatedNum, rescue},
+    jubjub::JubjubEngine,
+    rescue::RescueEngine,
+};
+// Workspace deps
 use models::params as franklin_constants;
+// Local deps
+use crate::utils::{allocate_bits_vector, pack_bits_to_element, reverse_bytes};
 
 #[derive(Clone)]
 pub struct CircuitElement<E: Engine> {

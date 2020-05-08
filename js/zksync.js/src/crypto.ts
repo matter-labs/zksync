@@ -1,6 +1,6 @@
 import { Signature } from "./types";
 
-import { private_key_to_pubkey_hash, sign_musig} from "zksync-crypto";
+import { private_key_to_pubkey_hash, sign_musig } from "zksync-crypto";
 
 export { privateKeyFromSeed } from "zksync-crypto";
 

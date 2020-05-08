@@ -13,7 +13,7 @@ import {
     ContractAddress,
     Tokens,
     TokenAddress,
-    TxEthSignature,
+    TxEthSignature
 } from "./types";
 import {
     isTokenETH,
@@ -98,7 +98,10 @@ export class Provider {
     }
 
     async getConfirmationsForEthOpAmount(): Promise<number> {
-        return await this.transport.request("get_confirmations_for_eth_op_amount", []);
+        return await this.transport.request(
+            "get_confirmations_for_eth_op_amount",
+            []
+        );
     }
 
     async notifyPriorityOp(

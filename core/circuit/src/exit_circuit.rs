@@ -1,24 +1,32 @@
-use crate::allocated_structures::*;
-use crate::circuit::check_account_data;
-use crate::element::CircuitElement;
-use crate::operation::{OperationBranch, OperationBranchWitness};
-use crate::witness::utils::{apply_leaf_operation, get_audits};
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
-use crypto_exports::franklin_crypto::rescue::RescueEngine;
+// External deps
+use crypto::{digest::Digest, sha2::Sha256};
 use crypto_exports::franklin_crypto::{
     bellman::{
         pairing::ff::{Field, PrimeField, PrimeFieldRepr},
         Circuit, ConstraintSystem, SynthesisError,
     },
     circuit::{boolean::Boolean, num::AllocatedNum, sha256, Assignment},
+    rescue::RescueEngine,
 };
-use models::circuit::utils::{append_be_fixed_width, be_bit_vector_into_bytes};
-use models::circuit::CircuitAccountTree;
-use models::node::{AccountId, Engine, Fr, TokenId};
-use models::params::{
-    ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, FR_BIT_WIDTH_PADDED,
-    SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
+// Workspace deps
+use models::{
+    circuit::{
+        utils::{append_be_fixed_width, be_bit_vector_into_bytes},
+        CircuitAccountTree,
+    },
+    node::{AccountId, Engine, Fr, TokenId},
+    params::{
+        ACCOUNT_ID_BIT_WIDTH, ADDRESS_WIDTH, BALANCE_BIT_WIDTH, FR_BIT_WIDTH_PADDED,
+        SUBTREE_HASH_WIDTH_PADDED, TOKEN_BIT_WIDTH,
+    },
+};
+// Local deps
+use crate::{
+    allocated_structures::*,
+    circuit::check_account_data,
+    element::CircuitElement,
+    operation::{OperationBranch, OperationBranchWitness},
+    witness::utils::{apply_leaf_operation, get_audits},
 };
 
 #[derive(Clone)]
