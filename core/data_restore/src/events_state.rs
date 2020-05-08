@@ -1,5 +1,4 @@
 // External deps
-use ethabi;
 use failure::format_err;
 use futures::{compat::Future01CompatExt, executor::block_on};
 use models::NewTokenEvent;

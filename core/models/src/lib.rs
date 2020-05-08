@@ -27,7 +27,6 @@ use crate::prover_utils::EncodedProofPlonk;
 
 use failure::format_err;
 use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use serde_bytes;
 use std::convert::TryFrom;
 use web3::types::{Address, Log, U256};
 

@@ -12,6 +12,7 @@ type ChangePubKey = {
     "fail_reason"?: string,
     "tx": {
         "account": string,
+        "accountId": number,
         "ethSignature"?: string,
         "newPkHash": string,
         "nonce": number,
@@ -34,6 +35,7 @@ type Transfer = {
         "amount": string,
         "fee": string,
         "from": string,
+        "accountId": number,
         "nonce": number,
         "signature": {
             "pubKey": string,
@@ -60,6 +62,7 @@ type Withdraw = {
         "amount": string,
         "fee": string,
         "from": string,
+        "accountId": number,
         "nonce": number,
         "signature": {
             "pubKey": string,

@@ -265,13 +265,13 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
 
-    await apitype.checkBlock(1);
-    const blocks = await apitype.checkBlocks();
+    await apitype.checkBlockResponseType(1);
+    const blocks = await apitype.checkBlocksResponseType();
     for (const { block_number } of blocks.slice(-10)) {
-        await apitype.checkBlockTransactions(block_number);
+        await apitype.checkBlockTransactionsResponseType(block_number);
     }
-    await apitype.checkAccount(syncWallet1.address());
-    await apitype.checkTxHistory(syncWallet1.address());
+    await apitype.checkAccountInfoResponseType(syncWallet1.address());
+    await apitype.checkTxHistoryResponseType(syncWallet1.address());
     await testSendingWithWrongSignature(syncWallet1, syncWallet2);
 
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, withdrawFee);
@@ -280,6 +280,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
 async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: Wallet) {
     const signedTransfer: types.Transfer = syncWallet1.signer.signSyncTransfer({
+        accountId: await syncWallet1.getAccountId(),
         from: syncWallet1.address(),
         to: syncWallet2.address(),
         tokenId: 0,
@@ -305,6 +306,7 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
     }
 
     const signedWithdraw = syncWallet1.signer.signSyncWithdraw({
+        accountId: await syncWallet1.getAccountId(),
         from: syncWallet1.address(),
         ethAddress: syncWallet1.address(),
         tokenId: 0,
@@ -372,8 +374,8 @@ async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: W
         await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
         apitype.deleteUnusedGenFiles();
-        await apitype.checkStatus();
-        await apitype.checkTestnetConfig();
+        await apitype.checkStatusResponseType();
+        await apitype.checkTestnetConfigResponseType();
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");

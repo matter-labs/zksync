@@ -41,6 +41,7 @@ type Transfer = {
     "hash": string,
     "pq_id": null,
     "tx": {
+        "accountId": number,
         "amount": string,
         "fee": string,
         "from": string,
@@ -65,6 +66,7 @@ type ChangePubKey = {
     "pq_id": null,
     "tx": {
         "account": string,
+        "accountId": number,
         "ethSignature"?: string,
         "newPkHash": string,
         "nonce": number,
@@ -82,6 +84,7 @@ type Withdraw =   {
     "pq_id": null,
     "tx": {
       "amount": string,
+      "accountId": number,
       "fee": string,
       "from": string,
       "nonce": number,

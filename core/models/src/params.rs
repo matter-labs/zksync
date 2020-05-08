@@ -1,3 +1,5 @@
+#![allow(clippy::option_env_unwrap)]
+
 // Built-in deps
 use std::env;
 use std::str::FromStr;

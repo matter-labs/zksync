@@ -5,6 +5,7 @@ type Transfer = {
         "amount": string,
         "fee": string,
         "from": string,
+        "accountId": number,
         "nonce": number,
         "signature": {
             "pubKey": string,
@@ -38,6 +39,7 @@ type ChangePubKey = {
     "block_number": number,
     "op": {
         "account": string,
+        "accountId": number,
         "ethSignature"?: string,
         "newPkHash": string,
         "nonce": number,
@@ -53,6 +55,7 @@ type Withdraw = {
         "amount": string,
         "fee": string,
         "from": string,
+        "accountId": number,
         "nonce": number,
         "signature": {
             "pubKey": string,
