@@ -138,9 +138,9 @@ dependencies = [
 
 [[package]]
 name = "bigdecimal"
-version = "0.1.0"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "460825c9e21708024d67c07057cd5560e5acdccac85de0de624a81d3de51bacb"
+checksum = "1374191e2dd25f9ae02e3aa95041ed5d747fc77b3c102b49fe2dd9a8117a6244"
 dependencies = [
  "num-bigint",
  "num-integer",
@@ -294,6 +294,19 @@ name = "cfg-if"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
+
+[[package]]
+name = "chrono"
+version = "0.4.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "80094f509cf8b5ae86a4966a39b3ff66cd7e2a3e594accec3743ff3fabeab5b2"
+dependencies = [
+ "num-integer",
+ "num-traits",
+ "rustc-serialize",
+ "serde",
+ "time",
+]
 
 [[package]]
 name = "cloudabi"
@@ -617,7 +630,7 @@ checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
 [[package]]
 name = "franklin-crypto"
 version = "0.0.5"
-source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#7fc1dc81631621684115e02fadb05f19f0308ad0"
+source = "git+https://github.com/matter-labs/franklin-crypto.git?branch=check-franklin-circuit-transpile#8361d0768ea0f252e387b87c707cdc3e46a92974"
 dependencies = [
  "bellman_ce",
  "bit-vec",
@@ -1183,6 +1196,7 @@ name = "models"
 version = "0.0.1"
 dependencies = [
  "bigdecimal",
+ "chrono",
  "crypto_exports",
  "ethabi",
  "failure",
@@ -2389,9 +2403,9 @@ checksum = "373c8a200f9e67a0c95e62a4f52fbf80c23b4381c05a17845531982fa99e6b33"
 
 [[package]]
 name = "uint"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e75a4cdd7b87b28840dba13c483b9a88ee6bbf16ba5c951ee1ecfcf723078e0d"
+checksum = "173cd16430c206dc1a430af8a89a0e9c076cf15cb42b4aedb10e8cc8fee73681"
 dependencies = [
  "byteorder",
  "crunchy",

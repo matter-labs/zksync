@@ -14,7 +14,7 @@ library Operations {
         Deposit,
         TransferToNew,
         PartialExit,
-        CloseAccount,
+        _CloseAccount, // used for correct op id offset
         Transfer,
         FullExit,
         ChangePubKey
@@ -46,7 +46,7 @@ library Operations {
     // Deposit pubdata
 
     struct Deposit {
-        // uint24 accountId -- present in pubdata, ignored at serialization
+        uint24 accountId;
         uint16 tokenId;
         uint128 amount; 
         address owner;
@@ -56,16 +56,17 @@ library Operations {
         ACCOUNT_ID_BYTES + TOKEN_BYTES + AMOUNT_BYTES + ADDRESS_BYTES;
 
     /// Deserialize deposit pubdata
-    function readDepositPubdata(bytes memory _data, uint _offset) internal pure
+    function readDepositPubdata(bytes memory _data) internal pure
         returns (Deposit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = _offset + ACCOUNT_ID_BYTES;                   // accountId (ignored)
-        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset); // tokenId
-        (offset, parsed.amount) = Bytes.readUInt128(_data, offset); // amount
-        (offset, parsed.owner) = Bytes.readAddress(_data, offset);  // owner
+        uint offset = 0;
+        (offset, parsed.accountId) = Bytes.readUInt24(_data, offset); // accountId
+        (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);   // tokenId
+        (offset, parsed.amount) = Bytes.readUInt128(_data, offset);   // amount
+        (offset, parsed.owner) = Bytes.readAddress(_data, offset);    // owner
 
-        require(offset == _offset + PACKED_DEPOSIT_PUBDATA_BYTES, "rdp10"); // reading invalid deposit pubdata size
+        require(offset == PACKED_DEPOSIT_PUBDATA_BYTES, "rdp10"); // reading invalid deposit pubdata size
     }
 
     /// Serialize deposit pubdata
@@ -98,15 +99,17 @@ library Operations {
     uint public constant PACKED_FULL_EXIT_PUBDATA_BYTES = 
         ACCOUNT_ID_BYTES + ADDRESS_BYTES + TOKEN_BYTES + AMOUNT_BYTES;
 
-    function readFullExitPubdata(bytes memory _data, uint _offset) internal pure
+    function readFullExitPubdata(bytes memory _data) internal pure
         returns (FullExit memory parsed)
     {
         // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = _offset;
+        uint offset = 0;
         (offset, parsed.accountId) = Bytes.readUInt24(_data, offset);      // accountId
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);         // owner
         (offset, parsed.tokenId) = Bytes.readUInt16(_data, offset);        // tokenId
         (offset, parsed.amount) = Bytes.readUInt128(_data, offset);        // amount
+
+        require(offset == PACKED_FULL_EXIT_PUBDATA_BYTES, "rfp10"); // reading invalid full exit pubdata size
     }
 
     function writeFullExitPubdata(FullExit memory op) internal pure returns (bytes memory buf) {
@@ -160,7 +163,7 @@ library Operations {
     // ChangePubKey
 
     struct ChangePubKey {
-        // uint24 accountId; -- present in pubdata, ignored at serialization
+        uint24 accountId;
         bytes20 pubKeyHash;
         address owner;
         uint32 nonce;
@@ -171,8 +174,8 @@ library Operations {
     {
         require(PUBKEY_HASH_BYTES == 20, "rcp11"); // expected PUBKEY_HASH_BYTES to be 20
 
-        // NOTE: there is no check that variable sizes are same as constants (i.e. TOKEN_BYTES), fix if possible.
-        uint offset = _offset + ACCOUNT_ID_BYTES;                                    // accountId (ignored)
+        uint offset = _offset;
+        (offset, parsed.accountId) = Bytes.readUInt24(_data, offset);                // accountId
         (offset, parsed.pubKeyHash) = Bytes.readBytes20(_data, offset);              // pubKeyHash
         (offset, parsed.owner) = Bytes.readAddress(_data, offset);                   // owner
         (offset, parsed.nonce) = Bytes.readUInt32(_data, offset);                    // nonce

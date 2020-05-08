@@ -1,6 +1,10 @@
 pragma solidity ^0.5.0;
 
-import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import "./IERC20.sol";
+import "./ReentrancyGuard.sol";
+import "./SafeMath.sol";
+import "./SafeMathUInt128.sol";
+import "./SafeCast.sol";
 
 import "./Storage.sol";
 import "./Config.sol";
@@ -8,12 +12,12 @@ import "./Events.sol";
 
 import "./Bytes.sol";
 import "./Operations.sol";
-import "./ReentrancyGuard.sol";
-
 
 /// @title zkSync main contract
 /// @author Matter Labs
 contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard {
+    using SafeMath for uint256;
+    using SafeMathUInt128 for uint128;
 
     // Upgrade functional
 
@@ -95,12 +99,21 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _to Address of recipient
     /// @param _amount Amount of tokens to transfer
     /// @return bool flag indicating that transfer is successful
-    function sendERC20NoRevert(address _token, address _to, uint128 _amount) internal returns (bool) {
+    function sendERC20NoRevert(address _token, address _to, uint256 _amount) internal returns (bool) {
         (bool callSuccess, bytes memory callReturnValueEncoded) = _token.call.gas(ERC20_WITHDRAWAL_GAS_LIMIT)(
-            abi.encodeWithSignature("transfer(address,uint256)", _to, uint256(_amount))
+            abi.encodeWithSignature("transfer(address,uint256)", _to, _amount)
         );
         bool callReturnValue = abi.decode(callReturnValueEncoded, (bool));
         return callSuccess && callReturnValue;
+    }
+
+    /// @notice Sends ETH
+    /// @param _to Address of recipient
+    /// @param _amount Amount of tokens to transfer
+    /// @return bool flag indicating that transfer is successful
+    function sendETHNoRevert(address payable _to, uint256 _amount) internal returns (bool) {
+        (bool callSuccess,) = _to.call.gas(ETH_WITHDRAWAL_GAS_LIMIT).value(_amount)("");
+        return callSuccess;
     }
 
     /// @notice executes pending withdrawals
@@ -126,12 +139,11 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             uint128 amount = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
             // amount is zero means funds has been withdrawn with withdrawETH or withdrawERC20
             if (amount != 0) {
-                // avoid reentrancy attack by using subtract and not "= 0" and changing local state before external call
                 balancesToWithdraw[packedBalanceKey].balanceToWithdraw -= amount;
                 bool sent = false;
                 if (tokenId == 0) {
                     address payable toPayable = address(uint160(to));
-                    sent = toPayable.send(amount);
+                    sent = sendETHNoRevert(toPayable, amount);
                 } else {
                     address tokenAddr = governance.tokenAddresses(tokenId);
                     require(tokenAddr != address(0), "cwd11"); // unknown tokenId
@@ -164,7 +176,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         for (uint64 i = 0; i < toProcess; i++) {
             uint64 id = firstPriorityRequestId + i;
             if (priorityRequests[id].opType == Operations.OpType.Deposit) {
-                Operations.Deposit memory op = Operations.readDepositPubdata(priorityRequests[id].pubData, 0);
+                Operations.Deposit memory op = Operations.readDepositPubdata(priorityRequests[id].pubData);
                 bytes22 packedBalanceKey = packAddressAndTokenId(op.owner, op.tokenId);
                 balancesToWithdraw[packedBalanceKey].balanceToWithdraw += op.amount;
             }
@@ -178,14 +190,15 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @param _franklinAddr The receiver Layer 2 address
     function depositETH(address _franklinAddr) external payable nonReentrant {
         requireActive();
-        registerDeposit(0, uint128(msg.value), _franklinAddr);
+        registerDeposit(0, SafeCast.toUint128(msg.value), _franklinAddr);
     }
 
     /// @notice Withdraw ETH to Layer 1 - register withdrawal and transfer ether to sender
     /// @param _amount Ether amount to withdraw
     function withdrawETH(uint128 _amount) external nonReentrant {
         registerSingleWithdrawal(0, _amount);
-        msg.sender.transfer(_amount);
+        (bool success,) = msg.sender.call.value(_amount)("");
+        require(success, "fwe11"); // ETH withdraw failed
     }
 
     /// @notice Deposit ERC20 token to Layer 2 - transfer ERC20 tokens from user into contract, validate it, register deposit
@@ -201,10 +214,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         uint256 balance_before = _token.balanceOf(address(this));
         require(_token.transferFrom(msg.sender, address(this), _amount), "fd012"); // token transfer failed deposit
         uint256 balance_after = _token.balanceOf(address(this));
-        require(balance_after == balance_before + uint256(_amount), "det11"); // det11 - incorrect token balance diff
-        require(balance_after >= balance_before, "det12"); // det12 - token balance overflow
+        uint128 deposit_amount = SafeCast.toUint128(balance_after.sub(balance_before));
 
-        registerDeposit(tokenId, _amount, _franklinAddr);
+        registerDeposit(tokenId, deposit_amount, _franklinAddr);
     }
 
     /// @notice Withdraw ERC20 token to Layer 1 - register withdrawal and transfer ERC20 to sender
@@ -258,6 +270,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
 
         // Priority Queue request
         Operations.Deposit memory op = Operations.Deposit({
+            accountId:  0, // unknown at this point
             owner:      _owner,
             tokenId:    _token,
             amount:     _amount
@@ -279,8 +292,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     function registerSingleWithdrawal(uint16 _token, uint128 _amount) internal {
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _token);
         uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
-        require(balance >= _amount, "frw11"); // insufficient balance withdraw
-        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance - _amount;
+        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.sub(_amount);
         emit OnchainWithdrawal(
             msg.sender,
             _token,
@@ -316,7 +328,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             // Get priority operations number for this block.
             uint64 prevTotalCommittedPriorityRequests = totalCommittedPriorityRequests;
 
-            bytes32 withdrawalsDataHash = collectOnchainOps(publicData, _ethWitness, _ethWitnessSizes);
+            bytes32 withdrawalsDataHash = collectOnchainOps(_blockNumber, publicData, _ethWitness, _ethWitnessSizes);
 
             uint64 nPriorityRequestProcessed = totalCommittedPriorityRequests - prevTotalCommittedPriorityRequests;
 
@@ -362,12 +374,16 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     }
 
     /// @notice Gets operations packed in bytes array. Unpacks it and stores onchain operations.
+    /// @param _blockNumber Franklin block number
     /// @param _publicData Operations packed in bytes array
     /// @param _ethWitness Eth witness that was posted with commit
     /// @param _ethWitnessSizes Amount of eth witness bytes for the corresponding operation.
-    function collectOnchainOps(bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
+    /// Priority operations must be committed in the same order as they are in the priority queue.
+    function collectOnchainOps(uint32 _blockNumber, bytes memory _publicData, bytes memory _ethWitness, uint32[] memory _ethWitnessSizes)
         internal returns (bytes32 withdrawalsDataHash) {
         require(_publicData.length % 8 == 0, "fcs11"); // pubdata length must be a multiple of 8 because each chunk is 8 bytes
+
+        uint64 currentPriorityRequestId = firstPriorityRequestId + totalCommittedPriorityRequests;
 
         uint256 pubDataPtr = 0;
         uint256 pubDataStartPtr = 0;
@@ -407,38 +423,42 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
                     pubDataPtr += NOOP_BYTES;
                 } else if (opType == uint8(Operations.OpType.TransferToNew)) {
                     pubDataPtr += TRANSFER_TO_NEW_BYTES;
-                } else if (opType == uint8(Operations.OpType.CloseAccount)) {
-                    pubDataPtr += CLOSE_ACCOUNT_BYTES;
                 } else if (opType == uint8(Operations.OpType.Deposit)) {
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, DEPOSIT_BYTES - 1);
+
+                    Operations.Deposit memory depositData = Operations.readDepositPubdata(pubData);
+                    emit DepositCommit(_blockNumber, depositData.accountId, depositData.owner, depositData.tokenId, depositData.amount);
 
                     OnchainOperation memory onchainOp = OnchainOperation(
                         Operations.OpType.Deposit,
                         pubData
                     );
-                    commitNextPriorityOperation(onchainOp);
+                    commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
+                    currentPriorityRequestId++;
 
                     pubDataPtr += DEPOSIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.PartialExit)) {
-                    bool addToPendingWithdrawalsQueue = true;
-
                     Operations.PartialExit memory data = Operations.readPartialExitPubdata(_publicData, pubdataOffset + 1);
+
+                    bool addToPendingWithdrawalsQueue = true;
                     withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
 
                     pubDataPtr += PARTIAL_EXIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.FullExit)) {
-                    bool addToPendingWithdrawalsQueue = false;
-
                     bytes memory pubData = Bytes.slice(_publicData, pubdataOffset + 1, FULL_EXIT_BYTES - 1);
 
-                    Operations.FullExit memory data = Operations.readFullExitPubdata(pubData, 0);
-                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, data.owner, data.tokenId, data.amount));
+                    Operations.FullExit memory fullExitData = Operations.readFullExitPubdata(pubData);
+                    emit FullExitCommit(_blockNumber, fullExitData.accountId, fullExitData.owner, fullExitData.tokenId, fullExitData.amount);
+
+                    bool addToPendingWithdrawalsQueue = false;
+                    withdrawalsDataHash = keccak256(abi.encode(withdrawalsDataHash, addToPendingWithdrawalsQueue, fullExitData.owner, fullExitData.tokenId, fullExitData.amount));
 
                     OnchainOperation memory onchainOp = OnchainOperation(
                         Operations.OpType.FullExit,
                         pubData
                     );
-                    commitNextPriorityOperation(onchainOp);
+                    commitNextPriorityOperation(onchainOp, currentPriorityRequestId);
+                    currentPriorityRequestId++;
 
                     pubDataPtr += FULL_EXIT_BYTES;
                 } else if (opType == uint8(Operations.OpType.ChangePubKey)) {
@@ -448,7 +468,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
                     if (_ethWitnessSizes[processedOperationsRequiringEthWitness] != 0) {
                         bytes memory currentEthWitness = Bytes.slice(_ethWitness, ethWitnessOffset, _ethWitnessSizes[processedOperationsRequiringEthWitness]);
 
-                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner);
+                        bool valid = verifyChangePubkeySignature(currentEthWitness, op.pubKeyHash, op.nonce, op.owner, op.accountId);
                         require(valid, "fpp15"); // failed to verify change pubkey hash signature
                     } else {
                         bool valid = authFacts[op.owner][op.nonce] == keccak256(abi.encodePacked(op.pubKeyHash));
@@ -467,6 +487,9 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         require(pubDataPtr == pubDataEndPtr, "fcs12"); // last chunk exceeds pubdata
         require(ethWitnessOffset == _ethWitness.length, "fcs14"); // _ethWitness was not used completely
         require(processedOperationsRequiringEthWitness == _ethWitnessSizes.length, "fcs15"); // _ethWitnessSizes was not used completely
+
+        require(currentPriorityRequestId <= firstPriorityRequestId + totalOpenPriorityRequests, "fcs16"); // fcs16 - excess priority requests in pubdata
+        totalCommittedPriorityRequests = currentPriorityRequestId - firstPriorityRequestId;
     }
 
     /// @notice Recovers signer's address from ethereum signature for given message
@@ -488,14 +511,15 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         return ecrecover(keccak256(_message), signV, signR, signS);
     }
 
-    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress) internal pure returns (bool) {
+    function verifyChangePubkeySignature(bytes memory _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint24 _accountId) internal pure returns (bool) {
         require(_newPkHash.length == 20, "vpk11"); // unexpected hash length
 
         bytes memory signedMessage = abi.encodePacked(
-            "\x19Ethereum Signed Message:\n129",  // 129 is message length, update if changing the message
+            "\x19Ethereum Signed Message:\n150",
             "Register zkSync pubkey:\n\n",
-            Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)),
-            " nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)),
+            Bytes.bytesToHexASCIIBytes(abi.encodePacked(_newPkHash)), "\n",
+            "nonce: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt32(_nonce)), "\n",
+            "account id: 0x", Bytes.bytesToHexASCIIBytes(Bytes.toBytesFromUInt24(_accountId)),
             "\n\n",
             "Only sign this message for a trusted client!"
         );
@@ -553,11 +577,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         }
     }
 
-    function commitNextPriorityOperation(OnchainOperation memory _onchainOp) internal {
-        uint64 cachedTotalCommitedPriorityRequests = totalCommittedPriorityRequests;
-        require(totalOpenPriorityRequests > cachedTotalCommitedPriorityRequests, "vnp11"); // no more priority requests in queue
-
-        uint64 _priorityRequestId = firstPriorityRequestId + cachedTotalCommitedPriorityRequests;
+    function commitNextPriorityOperation(OnchainOperation memory _onchainOp, uint64 _priorityRequestId) internal {
         Operations.OpType priorReqType = priorityRequests[_priorityRequestId].opType;
         bytes memory priorReqPubdata = priorityRequests[_priorityRequestId].pubData;
 
@@ -570,8 +590,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         } else {
             revert("vnp15"); // invalid or non-priority operation
         }
-
-        totalCommittedPriorityRequests++;
     }
 
     /// @notice Processes onchain withdrawals. Full exit withdrawals will not be added to pending withdrawals queue
@@ -589,7 +607,10 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
         while (offset < withdrawalsData.length) {
             (bool addToPendingWithdrawalsQueue, address _to, uint16 _tokenId, uint128 _amount) = Operations.readWithdrawalData(withdrawalsData, offset);
             bytes22 packedBalanceKey = packAddressAndTokenId(_to, _tokenId);
-            balancesToWithdraw[packedBalanceKey].balanceToWithdraw += _amount;
+
+            uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
+            balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
+
             if (addToPendingWithdrawalsQueue) {
                 pendingWithdrawals[firstPendingWithdrawalIndex + numberOfPendingWithdrawals] = PendingWithdrawal(_to, _tokenId);
                 numberOfPendingWithdrawals++;
@@ -639,8 +660,6 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     /// @notice Reverts unverified blocks
     /// @param _maxBlocksToRevert the maximum number blocks that will be reverted (use if can't revert all blocks because of gas limit).
     function revertBlocks(uint32 _maxBlocksToRevert) external nonReentrant {
-        // TODO: limit who can call this method
-
         require(isBlockCommitmentExpired(), "rbs11"); // trying to revert non-expired blocks.
 
         uint32 blocksCommited = totalBlocksCommitted;
@@ -656,7 +675,7 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
             delete blocks[i];
         }
 
-        blocksCommited = blocksToRevert;
+        blocksCommited -= blocksToRevert;
         totalBlocksCommitted -= blocksToRevert;
         totalCommittedPriorityRequests -= revertedPriorityRequests;
 
@@ -692,17 +711,19 @@ contract Franklin is UpgradeableMaster, Storage, Config, Events, ReentrancyGuard
     }
 
     /// @notice Withdraws token from Franklin to root chain in case of exodus mode. User must provide proof that he owns funds
+    /// @param _accountId Id of the account in the tree
     /// @param _proof Proof
     /// @param _tokenId Verified token id
     /// @param _amount Amount for owner (must be total amount, not part of it)
-    function exit(uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external nonReentrant {
+    function exit(uint24 _accountId, uint16 _tokenId, uint128 _amount, uint256[] calldata _proof) external nonReentrant {
         bytes22 packedBalanceKey = packAddressAndTokenId(msg.sender, _tokenId);
         require(exodusMode, "fet11"); // must be in exodus mode
-        require(!exited[packedBalanceKey], "fet12"); // already exited
-        require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
+        require(!exited[_accountId][_tokenId], "fet12"); // already exited
+        require(verifier.verifyExitProof(blocks[totalBlocksVerified].stateRoot, _accountId, msg.sender, _tokenId, _amount, _proof), "fet13"); // verification failed
 
-        balancesToWithdraw[packedBalanceKey].balanceToWithdraw += _amount;
-        exited[packedBalanceKey] = true;
+        uint128 balance = balancesToWithdraw[packedBalanceKey].balanceToWithdraw;
+        balancesToWithdraw[packedBalanceKey].balanceToWithdraw = balance.add(_amount);
+        exited[_accountId][_tokenId] = true;
     }
 
     function setAuthPubkeyHash(bytes calldata _pubkey_hash, uint32 _nonce) external nonReentrant {

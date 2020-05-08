@@ -12,17 +12,49 @@
         {
           "indexed": false,
           "internalType": "address",
+          "name": "newGovernor",
+          "type": "address"
+        }
+      ],
+      "name": "NewGovernor",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "token",
           "type": "address"
         },
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "uint16",
           "name": "tokenId",
           "type": "uint16"
         }
       ],
       "name": "NewToken",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "validatorAddress",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isActive",
+          "type": "bool"
+        }
+      ],
+      "name": "ValidatorStatusUpdate",
       "type": "event"
     },
     {

@@ -68,6 +68,7 @@ fn apply_transfer_to_new_op(b: &mut Bencher<'_>) {
     let from_account = state.get_account(0).expect("Can't get the account");
 
     let transfer = Transfer::new_signed(
+        0,
         from_account.address,
         Address::random(),
         ETH_TOKEN_ID,
@@ -101,6 +102,7 @@ fn apply_transfer_tx(b: &mut Bencher<'_>) {
     let to_account = state.get_account(1).expect("Can't get the account");
 
     let transfer = Transfer::new_signed(
+        0,
         from_account.address,
         to_account.address,
         ETH_TOKEN_ID,
@@ -185,6 +187,7 @@ fn apply_withdraw_tx(b: &mut Bencher<'_>) {
     let (private_key, _) = keys.get(&0).expect("Can't key the private key");
 
     let withdraw = Withdraw::new_signed(
+        0,
         from_account.address,
         Address::random(),
         ETH_TOKEN_ID,
@@ -223,7 +226,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     let nonce = 0;
 
     let eth_signature = {
-        let sign_bytes = ChangePubKey::get_eth_signed_data(nonce, &to_change.pub_key_hash)
+        let sign_bytes = ChangePubKey::get_eth_signed_data(0, nonce, &to_change.pub_key_hash)
             .expect("Failed to construct ChangePubKey signed message.");
         let eth_signature =
             PackedEthSignature::sign(eth_private_key, &sign_bytes).expect("Signing failed");
@@ -231,6 +234,7 @@ fn apply_change_pubkey_op(b: &mut Bencher<'_>) {
     };
 
     let change_pubkey = ChangePubKey {
+        account_id: 0,
         account: to_change.address,
         new_pk_hash: PubKeyHash::from_privkey(&new_sk),
         nonce,

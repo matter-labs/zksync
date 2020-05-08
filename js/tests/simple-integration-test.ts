@@ -50,6 +50,7 @@ async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet
             approveDepositAmountForERC20: true,
         });
     console.log(`Deposit posted: ${(new Date().getTime()) - startTime} ms`);
+
     await depositHandle.awaitReceipt();
     console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
     const balanceAfterDep = await syncWallet.getBalance(token);

@@ -31,7 +31,7 @@ contract Events {
 
     /// @notice Event emitted when user sends a authentication fact (e.g. pub-key hash)
     event FactAuth(
-        address sender,
+        address indexed sender,
         uint32 nonce,
         bytes fact
     );
@@ -52,6 +52,22 @@ contract Events {
         Operations.OpType opType,
         bytes pubData,
         uint256 expirationBlock
+    );
+
+    event DepositCommit(
+        uint32 franklinBlockId,
+        uint24 accountId,
+        address owner,
+        uint16 tokenId,
+        uint128 amount
+    );
+
+    event FullExitCommit(
+        uint32 franklinBlockId,
+        uint24 accountId,
+        address owner,
+        uint16 tokenId,
+        uint128 amount
     );
 }
 

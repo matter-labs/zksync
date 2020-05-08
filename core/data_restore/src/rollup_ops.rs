@@ -131,6 +131,7 @@ mod test {
     #[test]
     fn test_part_exit() {
         let tx = Withdraw::new(
+            3,
             "7777777777777777777777777777777777777777".parse().unwrap(),
             [9u8; 20].into(),
             1,
@@ -192,6 +193,7 @@ mod test {
     #[test]
     fn test_transfer_to_new() {
         let tx = Transfer::new(
+            11,
             "7777777777777777777777777777777777777777".parse().unwrap(),
             "8888888888888888888888888888888888888888".parse().unwrap(),
             1,
@@ -217,6 +219,7 @@ mod test {
     #[test]
     fn test_transfer() {
         let tx = Transfer::new(
+            11,
             "7777777777777777777777777777777777777777".parse().unwrap(),
             "8888888888888888888888888888888888888888".parse().unwrap(),
             1,
@@ -259,6 +262,7 @@ mod test {
     #[test]
     fn test_change_pubkey_offchain() {
         let tx = ChangePubKey {
+            account_id: 11,
             account: "7777777777777777777777777777777777777777".parse().unwrap(),
             new_pk_hash: PubKeyHash::from_hex("sync:0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f")
                 .unwrap(),

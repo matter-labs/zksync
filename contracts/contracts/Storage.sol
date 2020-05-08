@@ -1,6 +1,6 @@
 pragma solidity ^0.5.0;
 
-import "../node_modules/openzeppelin-solidity/contracts/token/ERC20/IERC20.sol";
+import "./IERC20.sol";
 
 import "./Governance.sol";
 import "./Verifier.sol";
@@ -80,8 +80,8 @@ contract Storage {
         bytes pubData;
     }
 
-    /// @notice Flag indicates that a user has exited certain token balance (per owner and tokenId, see packAddressAndTokenId)
-    mapping(bytes22 => bool) public exited;
+    /// @notice Flag indicates that a user has exited certain token balance (per account id and tokenId)
+    mapping(uint24 => mapping(uint16 => bool)) public exited;
 
     /// @notice Flag indicates that exodus (mass exit) mode is triggered
     /// @notice Once it was raised, it can not be cleared again, and all users must exit

@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "ethers": "^4.0.46",
-    "ganache-cli": "6.9.1"
-  }
-}
