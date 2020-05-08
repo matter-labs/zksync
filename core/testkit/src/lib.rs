@@ -649,7 +649,7 @@ impl TestSetup {
             .get_zksync_account_committed_state(zksync_signer)
             .expect("can't change pubkey, account does not exist")
             .0;
-        self.accounts.zksync_accounts[zksync_signer.0].account_id = Some(account_id);
+        self.accounts.zksync_accounts[zksync_signer.0].set_account_id(Some(account_id));
 
         let tx = self
             .accounts
@@ -667,7 +667,7 @@ impl TestSetup {
             .get_zksync_account_committed_state(zksync_signer)
             .expect("can't change pubkey, account does not exist")
             .0;
-        self.accounts.zksync_accounts[zksync_signer.0].account_id = Some(account_id);
+        self.accounts.zksync_accounts[zksync_signer.0].set_account_id(Some(account_id));
 
         let tx =
             self.accounts
@@ -827,8 +827,8 @@ impl TestSetup {
         }
 
         for zk_id in 0..self.accounts.zksync_accounts.len() {
-            self.accounts.zksync_accounts[zk_id].account_id =
-                self.get_zksync_account_id(ZKSyncAccountId(zk_id));
+            self.accounts.zksync_accounts[zk_id]
+                .set_account_id(self.get_zksync_account_id(ZKSyncAccountId(zk_id)));
         }
 
         Ok(())
@@ -925,7 +925,9 @@ impl TestSetup {
         token: Token,
     ) -> (EncodedProofPlonk, BigDecimal) {
         let owner = &self.accounts.zksync_accounts[fund_owner.0];
-        let owner_id = owner.account_id.expect("Account should have id to exit");
+        let owner_id = owner
+            .get_account_id()
+            .expect("Account should have id to exit");
         // restore account state
         prover::exit_proof::create_exit_proof(accounts, owner_id, owner.address, token.0)
             .expect("Failed to generate exit proof")
