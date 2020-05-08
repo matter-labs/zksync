@@ -1,5 +1,3 @@
-#![allow(clippy::option_env_unwrap)]
-
 // Built-in deps
 use std::env;
 use std::str::FromStr;
@@ -24,6 +22,7 @@ pub fn account_tree_depth() -> usize {
 
     unsafe {
         if ACCOUNT_TREE_DEPTH_VALUE == 0 {
+            #[allow(clippy::option_env_unwrap)]
             let value: &'static str = option_env!("ACCOUNT_TREE_DEPTH")
                 .expect("ACCOUNT_TREE_DEPTH variable was not set during compilation. \
                         Make sure that ACCOUNT_TREE_DEPTH is set in `dev.env` file and recompile the project");
@@ -51,6 +50,7 @@ pub fn balance_tree_depth() -> usize {
 
     unsafe {
         if BALANCE_TREE_DEPTH_VALUE == 0 {
+            #[allow(clippy::option_env_unwrap)]
             let value: &'static str = option_env!("BALANCE_TREE_DEPTH")
                 .expect("BALANCE_TREE_DEPTH variable was not set during compilation. \
                         Make sure that BALANCE_TREE_DEPTH is set in `dev.env` file and recompile the project");

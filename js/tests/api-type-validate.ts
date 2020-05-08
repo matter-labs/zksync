@@ -70,7 +70,12 @@ async function validateResponseFromUrl(typeFilePath: string, url: string): Promi
 
     const serverJson = JSON.stringify(data, null, 4);
 
-    await validateTypeJSON(typeFilePath, serverJson);
+    try {
+        await validateTypeJSON(typeFilePath, serverJson);
+    } catch (e) {
+        console.error(`Error in response type of ${url}`);
+        throw e;
+    }
 
     return data;
 }
