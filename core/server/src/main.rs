@@ -11,6 +11,8 @@ use models::config_options::ConfigurationOptions;
 use models::node::config::{
     OBSERVER_MODE_PULL_INTERVAL, PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL,
 };
+use models::node::tokens::get_genesis_token_list;
+use models::node::{Token, TokenId};
 use server::api_server::start_api_server;
 use server::block_proposer::run_block_proposer_task;
 use server::committer::run_committer;
@@ -36,11 +38,36 @@ fn main() {
         .get_matches();
 
     if cli.is_present("genesis") {
+        let pool = ConnectionPool::new(Some(1));
         log::info!("Generating genesis block.");
-        PlasmaStateKeeper::create_genesis_block(
-            ConnectionPool::new(Some(1)),
-            &config_opts.operator_franklin_addr,
-        );
+        PlasmaStateKeeper::create_genesis_block(pool.clone(), &config_opts.operator_franklin_addr);
+        log::info!("Adding initial tokens to db");
+        let genesis_tokens =
+            get_genesis_token_list(&config_opts.eth_network).expect("Initial token list not found");
+        for (id, token) in genesis_tokens
+            .into_iter()
+            .enumerate()
+            .map(|(id, t)| (id + 1, t))
+        {
+            log::info!(
+                "Adding token: {}, id:{}, address: {}, precision: {}",
+                token.symbol,
+                id,
+                token.address,
+                token.precision
+            );
+            pool.access_storage()
+                .expect("failed to access db")
+                .tokens_schema()
+                .store_token(Token {
+                    id: id as TokenId,
+                    symbol: token.symbol,
+                    address: token.address[2..]
+                        .parse()
+                        .expect("failed to parse token address"),
+                })
+                .expect("failed to store token");
+        }
         return;
     }
 

@@ -9,10 +9,8 @@ zksync env
 zksync yarn || true # It can fail.
 zksync plonk-setup check || zksync plonk-setup download
 zksync verify-keys unpack
-zksync db-wait
-zksync db-setup
+zksync deploy-dev-erc20
 zksync build-contracts
-zksync db-reset
 zksync genesis
 zksync redeploy
 echo done.

@@ -4,3 +4,4 @@
 /flat_build
 /contracts/generated
 /contracts/KeysWithPlonkVerifier.sol
+/contracts/TokenInit.sol

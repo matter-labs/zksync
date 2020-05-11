@@ -3,7 +3,7 @@ use std::fs;
 use std::io;
 use std::str::FromStr;
 
-const ZKSYNC_CONTRACT_FILE: &str = "contracts/build/Franklin.json";
+const ZKSYNC_CONTRACT_FILE: &str = "contracts/build/ZkSync.json";
 const GOVERNANCE_CONTRACT_FILE: &str = "contracts/build/Governance.json";
 const IERC20_CONTRACT_FILE: &str = "contracts/build/IERC20.json";
 const IEIP1271_CONTRACT_FILE: &str = "contracts/build/IEIP1271.json";

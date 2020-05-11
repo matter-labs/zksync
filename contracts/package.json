@@ -27,9 +27,6 @@
     "typescript": "^3.5.3",
     "zksync": "link:../js/zksync.js"
   },
-  "resolutions": {
-    "ethereum-waffle/ethers": "4.0.33"
-  },
   "scripts": {
     "build": "waffle .waffle.json",
     "test": "yarn build && f mocha -r ts-node/register test/**/*.ts",
@@ -37,9 +34,10 @@
     "unit-test": "yarn build && mocha -r ts-node/register test/unit_tests/**/*",
     "unit-test-watch": "waffle .waffle.json && mocha -r ts-node/register test/unit_tests/**/* --watch --watch-extensions ts --watch-extensions 'js'",
     "deploy-no-build": "ts-node scripts/deploy.ts",
+    "deploy-dev-erc20": "ts-node scripts/deploy-dev-erc20.ts",
     "deploy-testkit": "ts-node scripts/testnet-deploy.ts --deploy all --test --testkit",
-    "submit-proof": "ts-node scripts/submit-proof.ts",
     "submit-test-proof": "yarn build && ts-node scripts/submit-test-proof.ts",
+    "publish-sources": "ts-node scripts/publish.ts",
     "lint:solidity": "solhint contracts/**/*.sol",
     "lint:ts": "tslint -c tslint.json {scripts,test}/**/*.ts",
     "lint:ts-fix": "tslint -c tslint.json --fix {scripts,test}/**/*.ts",

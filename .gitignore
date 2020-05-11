@@ -24,6 +24,7 @@ Cargo.lock
 /etc/env/*
 !/etc/env/dev.env.example
 !/etc/env/ci.env
+/etc/tokens/localhost.json
 /contracts/yarn-error.log
 /deploy.log
 /test.log

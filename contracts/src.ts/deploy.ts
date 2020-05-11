@@ -1,460 +1,235 @@
-import {deployContract} from 'ethereum-waffle';
-import {ethers} from 'ethers';
-import {BigNumber, formatEther, parseEther} from "ethers/utils";
-import Axios from "axios";
-import * as qs from 'querystring';
-import * as assert from 'assert';
+import {deployContract} from "ethereum-waffle";
+import {ethers} from "ethers";
+import {formatEther, Interface, parseEther} from "ethers/utils";
+import * as fs from "fs";
+import {
+    encodeConstructorArgs,
+    encodeProxyContstuctorArgs,
+    publishAbiToTesseracts,
+    publishSourceCodeToEtherscan,
+} from "./publish-utils";
 
-export function abiRawEncode(args, vals) {
-    return Buffer.from(ethers.utils.defaultAbiCoder.encode(args, vals).slice(2), 'hex');
+type ContractName = "Governance" | "ZkSync" | "Verifier" | "Proxy" | "UpgradeGatekeeper";
+
+export interface Contracts {
+    governance;
+    zkSync;
+    verifier;
+    proxy;
+    upgradeGatekeeper;
 }
 
-const sleep = async ms => await new Promise(resolve => setTimeout(resolve, ms));
+export interface DeployedAddresses {
+    Governance: string;
+    GovernanceTarget: string;
+    UpgradeGatekeeper: string;
+    Verifier: string;
+    VerifierTarget: string;
+    ZkSync: string;
+    ZkSyncTarget: string;
+    DeployFactory: string;
+}
 
-export const proxyContractCode = require(`../build/Proxy`);
+export interface DeployerConfig {
+    deployWallet: ethers.Wallet;
+    governorAddress?: string;
+    verbose?: boolean;
+    contracts?: Contracts;
+}
 
-export const upgradeGatekeeperContractCode = require(`../build/UpgradeGatekeeper`);
-export const franklinContractCode = require(`../build/Franklin`);
-export const verifierContractCode = require(`../build/Verifier`);
-export const governanceContractCode = require(`../build/Governance`);
-
-export const upgradeGatekeeperTestContractCode = require(`../build/UpgradeGatekeeperTest`);
-export const franklinTestContractCode = require('../build/FranklinTest');
-export const verifierTestContractCode = require('../build/VerifierTest');
-export const governanceTestContractCode = require('../build/GovernanceTest');
-
-import {ImportsFsEngine} from '@resolver-engine/imports-fs';
-import {gatherSources} from '@resolver-engine/imports';
-
-async function getSolidityInput(contractPath) {
-    let input = await gatherSources([contractPath], process.cwd(), ImportsFsEngine());
-    input = input.map(obj => ({...obj, url: obj.url.replace(`${process.cwd()}/`, '')}));
-
-    let sources: { [s: string]: {} } = {};
-    for (let file of input) {
-        sources[file.url] = {content: file.source};
+export function readContractCode(name: string) {
+    if (name === "TEST-ERC20") {
+        const contract = require("openzeppelin-solidity/build/contracts/ERC20Mintable");
+        contract.evm = {bytecode: contract.bytecode};
+        contract.interface = contract.abi;
+        return contract;
+    } else {
+        return JSON.parse(fs.readFileSync(`build/${name}.json`, {encoding: "utf-8"}));
     }
+}
 
-    let config = require('../.waffle.json');
-    let inputJSON = {
-        language: "Solidity",
-        sources,
-        settings: {
-            outputSelection: {
-                "*": {
-                    "*": [
-                        "abi",
-                        "evm.bytecode",
-                        "evm.deployedBytecode"
-                    ]
-                }
-            },
-            ...config.compilerOptions
-        }
+export function readProductionContracts(): Contracts {
+    return {
+        governance: readContractCode("Governance"),
+        zkSync: readContractCode("ZkSync"),
+        verifier: readContractCode("Verifier"),
+        proxy: readContractCode("Proxy"),
+        upgradeGatekeeper: readContractCode("UpgradeGatekeeper"),
     };
+}
 
-    return JSON.stringify(inputJSON, null, 2);
+export function readTestContracts(): Contracts {
+    return {
+        governance: readContractCode("GovernanceTest"),
+        zkSync: readContractCode("ZkSyncTest"),
+        verifier: readContractCode("VerifierTest"),
+        proxy: readContractCode("Proxy"),
+        upgradeGatekeeper: readContractCode("UpgradeGatekeeperTest"),
+    };
+}
+
+export function deployedAddressesFromEnv(): DeployedAddresses {
+    return {
+        DeployFactory: process.env.DEPLOY_FACTORY_ADDR,
+        Governance: process.env.GOVERNANCE_ADDR,
+        GovernanceTarget: process.env.GOVERNANCE_TARGET_ADDR,
+        UpgradeGatekeeper: process.env.UPGRADE_GATEKEEPER_ADDR,
+        Verifier: process.env.VERIFIER_ADDR,
+        VerifierTarget: process.env.VERIFIER_TARGET_ADDR,
+        ZkSync: process.env.CONTRACT_ADDR,
+        ZkSyncTarget: process.env.CONTRACT_TARGET_ADDR,
+    };
 }
 
 export class Deployer {
-    bytecodes: any;
-    addresses: any;
-    deployTransactionHash: any;
+    public addresses: DeployedAddresses;
+    private deployWallet;
+    private deployFactoryCode;
+    private verbose;
+    private contracts: Contracts;
+    private governorAddress: string;
 
-    constructor(public deployerWallet: ethers.Wallet, isTest: boolean, public verbose: boolean) {
-        this.bytecodes = {
-            GovernanceTarget: isTest ? governanceTestContractCode : governanceContractCode,
-            VerifierTarget: isTest ? verifierTestContractCode : verifierContractCode,
-            FranklinTarget: isTest ? franklinTestContractCode : franklinContractCode,
-            Governance: proxyContractCode,
-            Verifier: proxyContractCode,
-            Franklin: proxyContractCode,
-            UpgradeGatekeeper: isTest ? upgradeGatekeeperTestContractCode : upgradeGatekeeperContractCode,
-        };
-
-        this.addresses = {
-            GovernanceTarget: process.env.GOVERNANCE_TARGET_ADDR,
-            VerifierTarget: process.env.VERIFIER_TARGET_ADDR,
-            FranklinTarget: process.env.CONTRACT_TARGET_ADDR,
-            Governance: process.env.GOVERNANCE_ADDR,
-            Verifier: process.env.VERIFIER_ADDR,
-            Franklin: process.env.CONTRACT_ADDR,
-            UpgradeGatekeeper: process.env.UPGRADE_GATEKEEPER_ADDR,
-        };
-
-        this.deployTransactionHash = {
-            Governance: process.env.GOVERNANCE_GENESIS_TX_HASH,
-            Franklin: process.env.CONTRACT_GENESIS_TX_HASH,
-        };
+    constructor(config: DeployerConfig) {
+        this.deployWallet = config.deployWallet;
+        this.deployFactoryCode = readContractCode("DeployFactory");
+        this.verbose = config.verbose != null ? config.verbose : false;
+        this.addresses = deployedAddressesFromEnv();
+        this.contracts = config.contracts != null ? config.contracts : readProductionContracts();
+        this.governorAddress = config.governorAddress != null ? config.governorAddress : this.deployWallet.address;
     }
 
-    getDeployTransactionHash(name) {
-        return this.deployTransactionHash[name];
-    }
-
-    getDeployedProxyContract(name) {
-        return new ethers.Contract(
-            this.addresses[name],
-            this.bytecodes[name + "Target"].interface,
-            this.deployerWallet
+    public async deployGovernanceTarget(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log("Deploying governance target");
+        }
+        const govContract = await deployContract(
+            this.deployWallet,
+            this.contracts.governance, [],
+            {gasLimit: 600000, ...ethTxOptions},
         );
+        const govRec = await govContract.deployTransaction.wait();
+        const govGasUsed = govRec.gasUsed;
+        const gasPrice = govContract.deployTransaction.gasPrice;
+        if (this.verbose) {
+            console.log(`GOVERNANCE_TARGET_ADDR=${govContract.address}`);
+            console.log(`Governance target deployed, gasUsed: ${govGasUsed.toString()}, eth spent: ${formatEther(govGasUsed.mul(gasPrice))}`);
+        }
+        this.addresses.GovernanceTarget = govContract.address;
     }
 
-    getDeployedContract(name): ethers.Contract {
-        return new ethers.Contract(
-            this.addresses[name],
-            this.bytecodes[name].interface,
-            this.deployerWallet
+    public async deployVerifierTarget(ethTxOptions?: ethers.providers.TransactionRequest) {
+        if (this.verbose) {
+            console.log("Deploying verifier target");
+        }
+        const verifierContract = await deployContract(
+            this.deployWallet,
+            this.contracts.verifier, [],
+            {gasLimit: 4000000, ...ethTxOptions},
         );
-    }
-
-    initializationArgs(contractName) {
-        return {
-            'Governance': [["address"], [this.deployerWallet.address]],
-            'Verifier': [[], []],
-            'Franklin': [["address", "address", "address", "bytes32"], [
-                this.addresses.Governance,
-                this.addresses.Verifier,
-                process.env.OPERATOR_ETH_ADDRESS,
-                process.env.GENESIS_ROOT,
-            ]],
-        }[contractName];
-    }
-
-    encodedInitializationArgs(contractName) {
-        let [initArgs, initArgsValues] = this.initializationArgs(contractName);
-        return abiRawEncode(initArgs, initArgsValues);
-    }
-
-    constructorArgs(contractName) {
-        return {
-            'GovernanceTarget': [],
-            'VerifierTarget': [],
-            'FranklinTarget': [],
-            'Governance': [this.addresses.GovernanceTarget, this.encodedInitializationArgs('Governance')],
-            'Verifier': [this.addresses.VerifierTarget, this.encodedInitializationArgs('Verifier')],
-            'Franklin': [this.addresses.FranklinTarget, this.encodedInitializationArgs('Franklin')],
-            'UpgradeGatekeeper': [this.addresses.Franklin],
-        }[contractName];
-    }
-
-    encodedConstructorArgs(contractName) {
-        const args = this.constructorArgs(contractName);
-        const iface = this.bytecodes[contractName].abi.filter(i => i.type === 'constructor');
-
-        if (iface.length == 0) return null;
-
-        return ethers
-            .utils
-            .defaultAbiCoder
-            .encode(
-                iface[0].inputs,
-                args
-            )
-            .slice(2);
-    }
-
-    async deployGovernanceTarget() {
+        const verRec = await verifierContract.deployTransaction.wait();
+        const verGasUsed = verRec.gasUsed;
+        const gasPrice = verifierContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log("Deploying Governance target");
+            console.log(`VERIFIER_TARGET_ADDR=${verifierContract.address}`);
+            console.log(`Verifier target deployed, gasUsed: ${verGasUsed.toString()}, eth spent: ${formatEther(verGasUsed.mul(gasPrice))}`);
         }
-        const target = await deployContract(
-            this.deployerWallet,
-            this.bytecodes.GovernanceTarget,
-            this.constructorArgs('GovernanceTarget'),
-            {gasLimit: 3000000,},
-        );
-        const gasPrice = target.deployTransaction.gasPrice;
-        const gasUsed = (await target.deployTransaction.wait()).gasUsed;
-        if (this.verbose) {
-            console.log(`GOVERNANCE_TARGET_ADDR=${target.address}`);
-            console.log(`Governance target deployed, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`);
-        }
-        this.addresses.GovernanceTarget = target.address;
+        this.addresses.VerifierTarget = verifierContract.address;
     }
 
-    async deployGovernance() {
-        if (this.verbose) {
-            console.log("Deploying Governance");
-        }
-        const proxy = await deployContract(
-            this.deployerWallet,
-            this.bytecodes.Governance,
-            this.constructorArgs('Governance'),
-            {gasLimit: 3000000,},
-        );
-        this.addresses.Governance = proxy.address;
-        this.deployTransactionHash.Governance = proxy.deployTransaction.hash;
-        const gasPrice = proxy.deployTransaction.gasPrice;
-        const gasUsed = (await proxy.deployTransaction.wait()).gasUsed;
-        if (this.verbose) {
-            console.log(`GOVERNANCE_GENESIS_TX_HASH=${this.deployTransactionHash.Governance}`);
-            console.log(`GOVERNANCE_ADDR=${this.addresses.Governance}`);
-            console.log(`Governance deployed, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`);
-        }
-        return new ethers.Contract(proxy.address, this.bytecodes.GovernanceTarget.interface, this.deployerWallet);
-    }
-
-    async deployVerifierTarget() {
-        if (this.verbose) {
-            console.log("Deploying Verifier target");
-        }
-        const target = await deployContract(
-            this.deployerWallet,
-            this.bytecodes.VerifierTarget,
-            this.constructorArgs('VerifierTarget'),
-            {gasLimit: 5000000},
-        );
-        this.addresses.VerifierTarget = target.address;
-        const gasPrice = target.deployTransaction.gasPrice;
-        const gasUsed = (await target.deployTransaction.wait()).gasUsed;
-        if (this.verbose) {
-            console.log(`VERIFIER_TARGET_ADDR=${this.addresses.VerifierTarget}`);
-            console.log(`Verifier target deployed, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`);
-        }
-    }
-
-    async deployVerifier() {
-        if (this.verbose) {
-            console.log("Deploying Verifier");
-        }
-        const proxy = await deployContract(
-            this.deployerWallet,
-            this.bytecodes.Verifier,
-            this.constructorArgs('Verifier'),
-            {gasLimit: 3000000,},
-        );
-        this.addresses.Verifier = proxy.address;
-        const gasPrice = proxy.deployTransaction.gasPrice;
-        const gasUsed = (await proxy.deployTransaction.wait()).gasUsed;
-        if (this.verbose) {
-            console.log(`VERIFIER_ADDR=${this.addresses.Verifier}`);
-            console.log(`Verifier deployed, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`);
-        }
-        return new ethers.Contract(proxy.address, this.bytecodes.VerifierTarget.interface, this.deployerWallet);
-    }
-
-
-    async deployFranklinTarget() {
+    public async deployZkSyncTarget(ethTxOptions?: ethers.providers.TransactionRequest) {
         if (this.verbose) {
             console.log("Deploying zkSync target");
         }
-        const target = await deployContract(
-            this.deployerWallet,
-            this.bytecodes.FranklinTarget,
-            this.constructorArgs('FranklinTarget'),
-            {gasLimit: 6500000,},
+        const zksContract = await deployContract(
+            this.deployWallet,
+            this.contracts.zkSync, [],
+            {gasLimit: 5000000, ...ethTxOptions},
         );
-        this.addresses.FranklinTarget = target.address;
-        const gasPrice = target.deployTransaction.gasPrice;
-        const gasUsed = (await target.deployTransaction.wait()).gasUsed;
+        const zksRec = await zksContract.deployTransaction.wait();
+        const zksGasUsed = zksRec.gasUsed;
+        const gasPrice = zksContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log(`CONTRACT_TARGET_ADDR=${this.addresses.FranklinTarget}`);
-            console.log(`zkSync target deployed, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`);
+            console.log(`CONTRACT_TARGET_ADDR=${zksContract.address}`);
+            console.log(`zkSync target deployed, gasUsed: ${zksGasUsed.toString()}, eth spent: ${formatEther(zksGasUsed.mul(gasPrice))}`);
         }
+        this.addresses.ZkSyncTarget = zksContract.address;
     }
 
-    async deployFranklin() {
-        if (this.verbose) {
-            console.log("Deploying zkSync contract");
-        }
-        const proxy = await deployContract(
-            this.deployerWallet,
-            this.bytecodes.Franklin,
-            this.constructorArgs('Franklin'),
-            {gasLimit: 3000000,},
+    public async deployProxiesAndGatekeeper(ethTxOptions?: ethers.providers.TransactionRequest) {
+        const deployFactoryContract = await deployContract(
+            this.deployWallet,
+            this.deployFactoryCode, [this.addresses.GovernanceTarget, this.addresses.VerifierTarget,
+                this.addresses.ZkSyncTarget, process.env.GENESIS_ROOT, process.env.OPERATOR_ETH_ADDRESS,
+                this.governorAddress,
+            ],
+            {gasLimit: 5000000, ...ethTxOptions},
         );
-        this.addresses.Franklin = proxy.address;
-        this.deployTransactionHash.Franklin = proxy.deployTransaction.hash;
-        const gasPrice = proxy.deployTransaction.gasPrice;
-        const gasUsed = (await proxy.deployTransaction.wait()).gasUsed;
-        if (this.verbose) {
-            console.log(`CONTRACT_GENESIS_TX_HASH=${this.deployTransactionHash.Franklin}`);
-            console.log(`CONTRACT_ADDR=${this.addresses.Franklin}`);
-            console.log(`zkSync deployed, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`);
+        const deployFactoryTx = await deployFactoryContract.deployTransaction.wait();
+        const deployFactoryInterface = new Interface(this.deployFactoryCode.interface);
+        for (const log of deployFactoryTx.logs) {
+            const parsedLog = deployFactoryInterface.parseLog(log);
+            if (parsedLog) {
+                this.addresses.Governance = parsedLog.values.governance;
+                this.addresses.ZkSync = parsedLog.values.zksync;
+                this.addresses.Verifier = parsedLog.values.verifier;
+                this.addresses.UpgradeGatekeeper = parsedLog.values.gatekeeper;
+            }
         }
-        return new ethers.Contract(proxy.address, this.bytecodes.FranklinTarget.interface, this.deployerWallet);
-    }
-
-    async deployUpgradeGatekeeper() {
+        const govGasUsed = deployFactoryTx.gasUsed;
+        const gasPrice = deployFactoryContract.deployTransaction.gasPrice;
         if (this.verbose) {
-            console.log("Deploying Upgrade Gatekeeper contract");
-        }
-        const contract = await deployContract(
-            this.deployerWallet,
-            this.bytecodes.UpgradeGatekeeper,
-            this.constructorArgs('UpgradeGatekeeper'),
-            {gasLimit: 3000000,},
-        );
-        this.addresses.UpgradeGatekeeper = contract.address;
-        const gasPrice = contract.deployTransaction.gasPrice;
-        const gasUsed = (await contract.deployTransaction.wait()).gasUsed;
-        if (this.verbose) {
+            console.log(`DEPLOY_FACTORY_ADDR=${deployFactoryContract.address}`);
+            console.log(`GOVERNANCE_ADDR=${this.addresses.Governance}`);
+            console.log(`CONTRACT_ADDR=${this.addresses.ZkSync}`);
+            console.log(`VERIFIER_ADDR=${this.addresses.Verifier}`);
             console.log(`UPGRADE_GATEKEEPER_ADDR=${this.addresses.UpgradeGatekeeper}`);
-            console.log(`Upgrade Gatekeeper deployed, gasUsed: ${gasUsed.toString()}, eth spent: ${formatEther(gasUsed.mul(gasPrice))}`);
-        }
-        return contract;
-    }
-
-    async transferMastershipToGatekeeper() {
-        if (this.verbose) {
-            console.log("Transfering mastership of contracts to Upgrade Gatekeeper");
-        }
-        const upgradeGatekeeper = new ethers.Contract(
-            this.addresses['UpgradeGatekeeper'],
-            this.bytecodes['UpgradeGatekeeper'].interface,
-            this.deployerWallet);
-
-        for (const contractName of ['Governance', 'Verifier', 'Franklin']) {
-            if (this.verbose) {
-                console.log(`Transferring ${contractName} mastership`);
-            }
-            let tx = await this.getDeployedContract(contractName).transferMastership(this.addresses.UpgradeGatekeeper);
-            let receipt = await tx.wait();
-            let ethUsed = tx.gasPrice.mul(receipt.gasUsed);
-            tx = await upgradeGatekeeper.addUpgradeable(this.addresses[contractName]);
-            receipt = await tx.wait();
-            ethUsed = ethUsed.add(tx.gasPrice.mul(receipt.gasUsed));
-            if (this.verbose) {
-                console.log(`Done Transferring ${contractName} mastership, total eth spent: ${formatEther(ethUsed)}`);
-            }
+            console.log(`Deploy finished, gasUsed: ${govGasUsed.toString()}, eth spent: ${formatEther(govGasUsed.mul(gasPrice))}`);
         }
     }
 
-    async setGovernanceValidator() {
-        if (this.verbose) {
-            console.log("Setting operator as validator");
-        }
-        const governance = await this.getDeployedProxyContract('Governance');
-        const tx = await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
-        const receipt = await tx.wait();
-        const ethUsed = tx.gasPrice.mul(receipt.gasUsed);
-        if (this.verbose) {
-            console.log(`Done Setting operator as validator, gasUsed: ${receipt.gasUsed.toString()} eth spent: ${formatEther(ethUsed)}`);
-        }
+    public async publishSourcesToTesseracts() {
+        console.log("Publishing ABI for UpgradeGatekeeper");
+        await publishAbiToTesseracts(this.addresses.UpgradeGatekeeper, this.contracts.upgradeGatekeeper);
+        console.log("Publishing ABI for ZkSync (proxy)");
+        await publishAbiToTesseracts(this.addresses.ZkSync, this.contracts.zkSync);
+        console.log("Publishing ABI for Verifier (proxy)");
+        await publishAbiToTesseracts(this.addresses.Verifier, this.contracts.verifier);
+        console.log("Publishing ABI for Governance (proxy)");
+        await publishAbiToTesseracts(this.addresses.Governance, this.contracts.governance);
     }
 
-    // async sendEthToTestWallets() {
-    //     for (let i = 0; i < 10; ++i) {
-    //         const to = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/" + i).address;
-    //         await this.wallet.sendTransaction({to, value: parseEther("100")});
-    //         console.log(`sending ETH to ${to}`);
-    //     }
-    // }
+    public async publishSourcesToEtherscan() {
+        console.log("Publishing sourcecode for UpgradeGatekeeper");
+        await publishSourceCodeToEtherscan(this.addresses.UpgradeGatekeeper, "UpgradeGatekeeper",
+            encodeConstructorArgs(this.contracts.upgradeGatekeeper, [this.addresses.ZkSync]));
 
-    // async postContractToTesseracts(contractName) {
-    //     const address = this.addresses[contractName];
-    //     const contractCode = this.bytecodes[contractName];
-    //
-    //     let req = {
-    //         contract_source: JSON.stringify(contractCode.abi),
-    //         contract_compiler: "abi-only",
-    //         contract_name: contractName,
-    //         contract_optimized: false
-    //     };
-    //
-    //     const config = {
-    //         headers: {
-    //             'Content-Type': 'application/x-www-form-urlencoded'
-    //         }
-    //     };
-    //     await Axios.post(`http://localhost:8000/${address}/contract`, qs.stringify(req), config);
-    // }
-    //
-    // async publishSourceCodeToEtherscan(contractname) {
-    //     const contractPath = `contracts/${contractname}.sol`;
-    //     const sourceCode = await getSolidityInput(contractPath);
-    //
-    //     const network = process.env.ETH_NETWORK;
-    //     const etherscanApiUrl = network === 'mainnet' ? 'https://api.etherscan.io/api' : `https://api-${network}.etherscan.io/api`;
-    //
-    //     const constructorArguments = this.encodedConstructorArgs(contractname);
-    //     const contractaddress = this.addresses[contractname];
-    //
-    //     let data = {
-    //         apikey: process.env.ETHERSCAN_API_KEY,  // A valid API-Key is required
-    //         module: 'contract',                     // Do not change
-    //         action: 'verifysourcecode',             // Do not change
-    //         contractaddress,                                    // Contract Address starts with 0x...
-    //         sourceCode,                                         // Contract Source Code (Flattened if necessary)
-    //         codeformat: 'solidity-standard-json-input',
-    //         contractname: `${contractPath}:${contractname}`,
-    //         compilerversion: 'v0.5.16+commit.9c3226ce',      // see http://etherscan.io/solcversions for list of support versions
-    //         constructorArguements: constructorArguments         // if applicable. How nice, they have a typo in their api
-    //     };
-    //
-    //     let r = await Axios.post(etherscanApiUrl, qs.stringify(data));
-    //     let retriesLeft = 20;
-    //     if (r.data.status != 1) {
-    //         if (r.data.result.includes('Unable to locate ContractCode')) {
-    //             // waiting for etherscan backend and try again
-    //             await sleep(15000);
-    //             if (retriesLeft > 0) {
-    //                 --retriesLeft;
-    //                 await this.publishSourceCodeToEtherscan(contractname);
-    //             }
-    //         } else {
-    //             console.log(`Problem publishing ${contractname}:`, r.data);
-    //         }
-    //     } else {
-    //         let status;
-    //         let retriesLeft = 10;
-    //         while (retriesLeft-- > 0) {
-    //             status = await Axios.get(`http://api.etherscan.io/api?module=contract&&action=checkverifystatus&&guid=${r.data.result}`).then(r => r.data);
-    //
-    //             if (status.result.includes('Pending in queue') == false)
-    //                 break;
-    //
-    //             await sleep(5000);
-    //         }
-    //
-    //         console.log(`Published ${contractname} sources on https://${network}.etherscan.io/address/${contractaddress} with status`, status);
-    //     }
-    // }
-}
+        console.log("Publishing sourcecode for ZkSyncTarget");
+        await publishSourceCodeToEtherscan(this.addresses.ZkSyncTarget, "ZkSync", "");
+        console.log("Publishing sourcecode for GovernanceTarget");
+        await publishSourceCodeToEtherscan(this.addresses.GovernanceTarget, "Governance", "");
+        console.log("Publishing sourcecode for VerifierTarget");
+        await publishSourceCodeToEtherscan(this.addresses.VerifierTarget, "Verifier", "");
 
-export async function deployBySteps(deployWallet: ethers.Wallet, deployStep: number | "all", test: boolean, verbose: boolean) {
-    const deployer = new Deployer(deployWallet, test, verbose);
+        console.log("Publishing sourcecode for ZkSync (proxy)");
+        await publishSourceCodeToEtherscan(this.addresses.ZkSync, "Proxy",
+            encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.ZkSyncTarget,
+                [this.addresses.Governance, this.addresses.Verifier, process.env.GENESIS_ROOT],
+                ["address", "address", "bytes32"]));
 
-    if (deployStep === 0 || deployStep === "all") {
-        await deployer.deployGovernanceTarget();
+        console.log("Publishing sourcecode for Verifier (proxy)");
+        await publishSourceCodeToEtherscan(this.addresses.Verifier, "Proxy",
+            encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.VerifierTarget, [], []));
 
+        console.log("Publishing sourcecode for Governance (proxy)");
+        await publishSourceCodeToEtherscan(this.addresses.Governance, "Proxy",
+            encodeProxyContstuctorArgs(this.contracts.proxy, this.addresses.GovernanceTarget,
+                [this.addresses.DeployFactory], ["address"]));
     }
-    if (deployStep === 1 || deployStep === "all") {
-        await deployer.deployGovernance();
-        console.log("\n");
 
-    }
-    if (deployStep === 2 || deployStep === "all") {
-        await deployer.deployVerifierTarget();
-
-    }
-    if (deployStep === 3 || deployStep === "all") {
-        await deployer.deployVerifier();
-        console.log("\n");
-
-    }
-    if (deployStep === 4 || deployStep === "all") {
-        await deployer.deployFranklinTarget();
-
-    }
-    if (deployStep === 5 || deployStep === "all") {
-        await deployer.deployFranklin();
-        console.log("\n");
-
-    }
-    if (deployStep === 6 || deployStep === "all") {
-        await deployer.deployUpgradeGatekeeper();
-        console.log("\n");
-
-    }
-    if (deployStep === 7 || deployStep === "all") {
-        await deployer.transferMastershipToGatekeeper();
-        console.log("\n");
-
-    }
-    if (deployStep === 8 || deployStep === "all") {
-        await deployer.setGovernanceValidator();
+    public async deployAll() {
+        await this.deployZkSyncTarget();
+        await this.deployGovernanceTarget();
+        await this.deployVerifierTarget();
+        await this.deployProxiesAndGatekeeper();
     }
 }
-

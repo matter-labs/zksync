@@ -73,7 +73,7 @@ db-drop: confirm_action
 db-wait:
 	@bin/db-wait
 
-genesis: confirm_action
+genesis: confirm_action db-reset
 	@bin/genesis.sh
 
 # Frontend clients
@@ -152,6 +152,9 @@ push-image-rust: image-rust
 deploy-contracts: confirm_action build-contracts
 	@bin/deploy-contracts.sh
 
+publish-contracts: confirm_action
+	@bin/publish-contracts.sh
+
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
@@ -160,6 +163,10 @@ build-contracts: confirm_action prepare-contracts
 	@cd contracts && yarn build
 
 prepare-contracts:
+ifeq (localhost,$(ETH_NETWORK))
+	@bin/deploy-dev-erc20.sh
+endif
+	@cargo run --release --bin gen_token_add_contract
 	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
 # testing
@@ -208,9 +215,9 @@ promote-to-ropsten:
 	@bin/promote-to.sh ropsten $(ci-build)
 
 # (Re)deploy contracts and database
-redeploy: confirm_action stop deploy-contracts db-insert-contract
+redeploy: confirm_action stop init-deploy
 
-init-deploy: confirm_action deploy-contracts db-insert-contract
+init-deploy: confirm_action deploy-contracts db-insert-contract publish-contracts
 
 dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
