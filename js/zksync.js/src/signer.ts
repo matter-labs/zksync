@@ -5,7 +5,11 @@ import {
     privateKeyToPubKeyHash
 } from "./crypto";
 import { ethers, utils } from "ethers";
-import { packAmountChecked, packFeeChecked } from "./utils";
+import {
+    packAmountChecked,
+    packFeeChecked,
+    getEthSignatureType
+} from "./utils";
 import BN = require("bn.js");
 import { Address, CloseAccount, PubKeyHash, Transfer, Withdraw } from "./types";
 
@@ -24,7 +28,7 @@ export class Signer {
     }
 
     signSyncTransfer(transfer: {
-        accountId: number,
+        accountId: number;
         from: Address;
         to: Address;
         tokenId: number;
@@ -67,7 +71,7 @@ export class Signer {
     }
 
     signSyncWithdraw(withdraw: {
-        accountId: number,
+        accountId: number;
         from: Address;
         ethAddress: string;
         tokenId: number;
@@ -115,14 +119,26 @@ export class Signer {
         return new Signer(privateKeyFromSeed(seed));
     }
 
-    static async fromETHSignature(ethSigner: ethers.Signer): Promise<Signer> {
-        const sign = await ethSigner.signMessage(
+    static async fromETHSignature(
+        ethSigner: ethers.Signer
+    ): Promise<{
+        signer: Signer;
+        ethSignatureType: "EthereumSignature" | "EIP1271Signature";
+    }> {
+        const message =
             "Access zkSync account.\n" +
-                "\n" +
-                "Only sign this message for a trusted client!"
+            "\n" +
+            "Only sign this message for a trusted client!";
+        const signature = await ethSigner.signMessage(message);
+        const address = await ethSigner.getAddress();
+        const ethSignatureType = getEthSignatureType(
+            message,
+            signature,
+            address
         );
-        const seed = Buffer.from(sign.substr(2), "hex");
-        return Signer.fromSeed(seed);
+        const seed = Buffer.from(signature.substr(2), "hex");
+        const signer = Signer.fromSeed(seed);
+        return { signer, ethSignatureType };
     }
 }
 

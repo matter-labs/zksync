@@ -1,38 +1,49 @@
-use crate::account::AccountContent;
-use crate::account::AccountWitness;
-use crate::allocated_structures::*;
-use crate::element::CircuitElement;
-use crate::franklin_crypto::bellman::pairing::ff::{Field, PrimeField};
-use crate::franklin_crypto::bellman::{Circuit, ConstraintSystem, SynthesisError};
-use crate::franklin_crypto::circuit::boolean::Boolean;
-use crate::franklin_crypto::circuit::ecc;
-use crate::franklin_crypto::circuit::sha256;
-use crate::operation::Operation;
-use crate::signature::*;
-use crate::utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element};
-
-use crate::franklin_crypto::circuit::expression::Expression;
-use crate::franklin_crypto::circuit::multipack;
-use crate::franklin_crypto::circuit::num::AllocatedNum;
-use crate::franklin_crypto::circuit::polynomial_lookup::{do_the_lookup, generate_powers};
-use crate::franklin_crypto::circuit::rescue;
-use crate::franklin_crypto::circuit::Assignment;
-use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine, JubjubParams};
-use crate::franklin_crypto::rescue::RescueEngine;
-use models::node::operations::{ChangePubKeyOp, NoopOp};
-use models::node::{CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp};
-use models::params::{self, FR_BIT_WIDTH_PADDED, SIGNED_TRANSFER_BIT_WIDTH};
+// External deps
+use crypto_exports::franklin_crypto::{
+    bellman::{
+        pairing::ff::{Field, PrimeField},
+        Circuit, ConstraintSystem, SynthesisError,
+    },
+    circuit::{
+        boolean::Boolean,
+        ecc,
+        expression::Expression,
+        multipack,
+        num::AllocatedNum,
+        polynomial_lookup::{do_the_lookup, generate_powers},
+        rescue, sha256, Assignment,
+    },
+    jubjub::{FixedGenerators, JubjubEngine, JubjubParams},
+    rescue::RescueEngine,
+};
+// Workspace deps
+use models::{
+    node::{
+        operations::{ChangePubKeyOp, NoopOp},
+        CloseOp, DepositOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
+    },
+    params::{self, FR_BIT_WIDTH_PADDED, SIGNED_TRANSFER_BIT_WIDTH},
+};
+// Local deps
+use crate::{
+    account::{AccountContent, AccountWitness},
+    allocated_structures::*,
+    element::CircuitElement,
+    operation::Operation,
+    signature::{
+        unpack_point_if_possible, verify_circuit_signature, verify_signature_message_construction,
+        AllocatedSignerPubkey,
+    },
+    utils::{allocate_numbers_vec, allocate_sum, multi_and, pack_bits_to_element},
+};
 
 const DIFFERENT_TRANSACTIONS_TYPE_NUMBER: usize = 8;
 pub struct FranklinCircuit<'a, E: RescueEngine + JubjubEngine> {
     pub rescue_params: &'a <E as RescueEngine>::Params,
     pub jubjub_params: &'a <E as JubjubEngine>::Params,
-    pub operation_batch_size: usize,
     /// The old root of the tree
     pub old_root: Option<E::Fr>,
 
-    /// The new root of the tree
-    pub new_root: Option<E::Fr>,
     pub block_number: Option<E::Fr>,
     pub validator_address: Option<E::Fr>,
 
@@ -49,9 +60,7 @@ impl<'a, E: RescueEngine + JubjubEngine> std::clone::Clone for FranklinCircuit<'
         Self {
             rescue_params: self.rescue_params,
             jubjub_params: self.jubjub_params,
-            operation_batch_size: self.operation_batch_size,
             old_root: self.old_root,
-            new_root: self.new_root,
             block_number: self.block_number,
             validator_address: self.validator_address,
             pub_data_commitment: self.pub_data_commitment,
@@ -2045,7 +2054,7 @@ fn calculate_root_from_full_representation_fees<E: RescueEngine, CS: ConstraintS
 }
 
 fn generate_maxchunk_polynomial<E: JubjubEngine>() -> Vec<E::Fr> {
-    use crate::franklin_crypto::interpolation::interpolate;
+    use crypto_exports::franklin_crypto::interpolation::interpolate;
 
     let get_xy = |op_type: u8, op_chunks: usize| {
         let x = E::Fr::from_str(&op_type.to_string()).unwrap();
