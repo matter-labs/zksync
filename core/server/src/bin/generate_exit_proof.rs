@@ -3,7 +3,7 @@
 
 use clap::{App, Arg};
 use log::info;
-use models::node::{Address, TokenId, TokenLike};
+use models::node::{AccountId, Address, TokenId, TokenLike};
 use models::prover_utils::EncodedProofPlonk;
 use num::BigUint;
 use serde::Serialize;
@@ -13,7 +13,8 @@ use storage::ConnectionPool;
 #[derive(Serialize, Debug)]
 struct ExitProofData {
     token_id: TokenId,
-    owner: Address,
+    account_id: AccountId,
+    account_address: Address,
     amount: BigUint,
     proof: EncodedProofPlonk,
 }
@@ -24,11 +25,11 @@ fn main() {
     let cli = App::new("Franklin operator node")
         .author("Matter Labs")
         .arg(
-            Arg::with_name("Address")
-                .long("address")
+            Arg::with_name("Account id")
+                .long("accound_id")
                 .takes_value(true)
                 .required(true)
-                .help("Account address of the account"),
+                .help("Account id of the account"),
         )
         .arg(
             Arg::with_name("Token")
@@ -39,19 +40,13 @@ fn main() {
         )
         .get_matches();
 
-    let target_account_address: Address = {
-        let address = cli.value_of("Address").expect("required argument");
-        let value_to_parse = if address.starts_with("0x") {
-            &address[2..]
-        } else {
-            address
-        };
-        value_to_parse
-            .parse()
-            .expect("Address should be valid account address")
-    };
+    let account_id = cli
+        .value_of("Account id")
+        .expect("required argument")
+        .parse::<AccountId>()
+        .unwrap();
 
-    let target_token = {
+    let token = {
         let token = cli.value_of("Token").expect("required argument");
         serde_json::from_str::<TokenLike>(token).expect("invalid token argument")
     };
@@ -65,10 +60,17 @@ fn main() {
 
     let token_id = storage
         .tokens_schema()
-        .get_token(target_token)
+        .get_token(token)
         .expect("Db access fail")
         .expect("Token not found")
         .id;
+    let address = storage
+        .chain()
+        .account_schema()
+        .last_verified_state_for_account(account_id)
+        .expect("DB access fail")
+        .expect("Account not found in the db")
+        .address;
     let accounts = storage
         .chain()
         .state_schema()
@@ -79,12 +81,13 @@ fn main() {
     info!("Resotred state from db: {} s", timer.elapsed().as_secs());
 
     let (proof, amount) =
-        prover::exit_proof::create_exit_proof(accounts, target_account_address, token_id)
+        prover::exit_proof::create_exit_proof(accounts, account_id, address, token_id)
             .expect("Failed to generate exit proof");
 
     let proof_data = ExitProofData {
         token_id,
-        owner: target_account_address,
+        account_id,
+        account_address: address,
         amount,
         proof,
     };

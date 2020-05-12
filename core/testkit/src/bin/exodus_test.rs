@@ -12,10 +12,10 @@ use crate::eth_account::{parse_ether, EthereumAccount};
 use crate::external_commands::{deploy_test_contracts, get_test_accounts};
 use crate::zksync_account::ZksyncAccount;
 use log::*;
-use models::node::AccountMap;
+use models::node::{AccountId, AccountMap};
 use models::prover_utils::EncodedProofPlonk;
 use num::BigUint;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 use testkit::*;
 use web3::transports::Http;
 
@@ -31,15 +31,15 @@ fn create_verified_initial_state(
     zksync_accounts: &[ZKSyncAccountId],
 ) {
     info!("Creating initial state");
+    test_setup.start_block();
     for token in tokens {
         for account in zksync_accounts {
-            test_setup.start_block();
             test_setup.deposit(deposit_account, *account, *token, deposit_amount.clone());
-            test_setup
-                .execute_commit_and_verify_block()
-                .expect("Commit and verify initial block");
         }
     }
+    test_setup
+        .execute_commit_and_verify_block()
+        .expect("Commit and verify initial block");
     info!("Done creating initial state");
 }
 
@@ -71,7 +71,7 @@ fn trigger_exodus(
     assert!(!is_exodus, "Exodus should be triggered later");
 
     while test_setup.eth_block_number() - expire_count_start_block < PRIORITY_EXPIRATION {
-        std::thread::sleep(Duration::from_millis(500));
+        test_setup.trigger_exodus_if_needed(eth_account);
     }
 
     test_setup.trigger_exodus_if_needed(eth_account);
@@ -102,12 +102,13 @@ fn cancel_outstanding_deposits(
         balance_to_withdraw_after,
         "Balances after deposit cancel is not correct"
     );
-    info!("Done canceling outstangind deposits");
+    info!("Done canceling outstanging deposits");
 }
 
 fn check_exit_garbage_proof(
     test_setup: &mut TestSetup,
     send_account: ETHAccountId,
+    fund_owner: ZKSyncAccountId,
     token: Token,
     amount: &BigUint,
 ) {
@@ -117,7 +118,13 @@ fn check_exit_garbage_proof(
     );
     let proof = EncodedProofPlonk::default();
     test_setup
-        .exit(send_account, token, amount, proof)
+        .exit(
+            send_account,
+            fund_owner.0 as AccountId,
+            token,
+            amount,
+            proof,
+        )
         .expect_revert("fet13");
     info!("Done cheching exit with garbage proof");
 }
@@ -138,8 +145,17 @@ fn check_exit_correct_proof(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
     );
+    assert_eq!(
+        test_setup.accounts.zksync_accounts[fund_owner.0].address,
+        test_setup.accounts.eth_accounts[send_account.0].address,
+        "Sender should have same address",
+    );
+    let account_id = test_setup
+        .get_zksync_account_committed_state(fund_owner)
+        .expect("Account should exits")
+        .0;
     test_setup
-        .exit(send_account, token, &exit_amount, proof)
+        .exit(send_account, account_id, token, &exit_amount, proof)
         .expect_success();
 
     let balance_to_withdraw_after = test_setup.get_balance_to_withdraw(send_account, token);
@@ -168,8 +184,12 @@ fn check_exit_correct_proof_second_time(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
     );
+    let account_id = test_setup
+        .get_zksync_account_committed_state(fund_owner)
+        .expect("Account should exits")
+        .0;
     test_setup
-        .exit(send_account, token, &exit_amount, proof)
+        .exit(send_account, account_id, token, &exit_amount, proof)
         .expect_revert("fet12");
 
     let balance_to_withdraw_after = test_setup.get_balance_to_withdraw(send_account, token);
@@ -198,8 +218,12 @@ fn check_exit_correct_proof_other_token(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
     );
+    let account_id = test_setup
+        .get_zksync_account_committed_state(fund_owner)
+        .expect("Account should exits")
+        .0;
     test_setup
-        .exit(send_account, false_token, &exit_amount, proof)
+        .exit(send_account, account_id, false_token, &exit_amount, proof)
         .expect_revert("fet13");
 
     let balance_to_withdraw_after = test_setup.get_balance_to_withdraw(send_account, token);
@@ -228,8 +252,12 @@ fn check_exit_correct_proof_other_amount(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
     );
+    let account_id = test_setup
+        .get_zksync_account_committed_state(fund_owner)
+        .expect("Account should exits")
+        .0;
     test_setup
-        .exit(send_account, token, false_amount, proof)
+        .exit(send_account, account_id, token, false_amount, proof)
         .expect_revert("fet13");
 
     let balance_to_withdraw_after = test_setup.get_balance_to_withdraw(send_account, token);
@@ -257,8 +285,12 @@ fn check_exit_correct_proof_incorrect_sender(
         &exit_amount, amount,
         "Exit proof generated with unexpected amount"
     );
+    let account_id = test_setup
+        .get_zksync_account_committed_state(fund_owner)
+        .expect("Account should exits")
+        .0;
     test_setup
-        .exit(send_account, token, &exit_amount, proof)
+        .exit(send_account, account_id, token, &exit_amount, proof)
         .expect_revert("fet13");
 
     let balance_to_withdraw_after = test_setup.get_balance_to_withdraw(send_account, token);
@@ -290,6 +322,7 @@ fn exit_test() {
     let (_el, transport) = Http::new(&testkit_config.web3_url).expect("http transport start");
 
     let (test_accounts_info, commit_account_info) = get_test_accounts();
+    let test_accounts_info = test_accounts_info[0..2].to_vec();
     let commit_account = EthereumAccount::new(
         commit_account_info.private_key,
         commit_account_info.address,
@@ -312,9 +345,8 @@ fn exit_test() {
         })
         .collect::<Vec<_>>();
 
-    let zksync_accounts = {
+    let (zksync_accounts, fee_account_id) = {
         let mut zksync_accounts = Vec::new();
-        zksync_accounts.push(fee_account);
         zksync_accounts.extend(eth_accounts.iter().map(|eth_account| {
             let rng_zksync_key = ZksyncAccount::rand().private_key;
             ZksyncAccount::new(
@@ -324,20 +356,24 @@ fn exit_test() {
                 eth_account.private_key,
             )
         }));
-        zksync_accounts
+        zksync_accounts.push(fee_account);
+        let fee_account_id = zksync_accounts.len() - 1;
+        (zksync_accounts, fee_account_id)
     };
+
+    let test_accounts = (0..zksync_accounts.len())
+        .map(ZKSyncAccountId)
+        .collect::<Vec<_>>();
 
     let accounts = AccountSet {
         eth_accounts,
         zksync_accounts,
-        fee_account_id: ZKSyncAccountId(0),
+        fee_account_id: ZKSyncAccountId(fee_account_id),
     };
 
     let mut test_setup = TestSetup::new(sk_channels, accounts, &contracts, commit_account);
 
     let deposit_amount = parse_ether("0.1").unwrap();
-
-    let test_accounts = vec![ZKSyncAccountId(0), ZKSyncAccountId(1)];
     let tokens = test_setup.get_tokens();
 
     create_verified_initial_state(
@@ -360,7 +396,7 @@ fn exit_test() {
     trigger_exodus(&test_setup, ETHAccountId(1), expire_count_start_block);
     cancel_outstanding_deposits(
         &test_setup,
-        ETHAccountId(0),
+        ETHAccountId(1),
         Token(0),
         &expired_deposit_amount,
         ETHAccountId(1),
@@ -385,12 +421,19 @@ fn exit_test() {
         &deposit_amount,
         &incorrect_amount,
     );
-    check_exit_garbage_proof(&mut test_setup, ETHAccountId(1), Token(0), &deposit_amount);
+
+    check_exit_garbage_proof(
+        &mut test_setup,
+        ETHAccountId(1),
+        ZKSyncAccountId(1),
+        Token(0),
+        &deposit_amount,
+    );
 
     check_exit_correct_proof_incorrect_sender(
         &mut test_setup,
         verified_accounts_state.clone(),
-        ETHAccountId(1),
+        ETHAccountId(0),
         ZKSyncAccountId(1),
         Token(0),
         &deposit_amount,
@@ -399,7 +442,7 @@ fn exit_test() {
     check_exit_correct_proof(
         &mut test_setup,
         verified_accounts_state.clone(),
-        ETHAccountId(0),
+        ETHAccountId(1),
         ZKSyncAccountId(1),
         Token(0),
         &deposit_amount,
@@ -408,7 +451,7 @@ fn exit_test() {
     check_exit_correct_proof_second_time(
         &mut test_setup,
         verified_accounts_state,
-        ETHAccountId(0),
+        ETHAccountId(1),
         ZKSyncAccountId(1),
         Token(0),
         &deposit_amount,

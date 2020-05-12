@@ -3,7 +3,7 @@ import * as zksync from 'zksync';
 import * as utils from './utils';
 import { sleep } from 'zksync/build/utils';
 import { bigNumberify } from 'ethers/utils';
-const contractCode = require('../../contracts/build/Franklin');
+const contractCode = require('../../contracts/build/ZkSync');
 const erc20ContractCode = require('openzeppelin-solidity/build/contracts/IERC20');
 
 const ethersProvider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
@@ -354,7 +354,7 @@ export class WalletDecorator {
             ? tokensInfo[token].id
             : token;
 
-        return (await contract.balancesToWithdraw(address, tokenId)).balanceToWithdraw.then(ethers.utils.formatEther);
+        return (await contract.getBalanceToWithdraw(address, tokenId)).then(ethers.utils.formatEther);
     }
 
     async balancesToWithdraw(tokens) {

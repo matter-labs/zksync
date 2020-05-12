@@ -6,7 +6,6 @@ export NGINX_DOCKER_IMAGE ?= matterlabs/nginx:$(IMAGE_TAG)
 export GETH_DOCKER_IMAGE ?= matterlabs/geth:latest
 export DEV_TICKER_DOCKER_IMAGE ?= matterlabs/dev-ticker:latest
 export CI_DOCKER_IMAGE ?= matterlabs/ci
-export GANACHE_DOCKER_IMAGE ?= matterlabs/ganache
 
 # Getting started
 
@@ -75,7 +74,7 @@ db-drop: confirm_action
 db-wait:
 	@bin/db-wait
 
-genesis: confirm_action
+genesis: confirm_action db-reset
 	@bin/genesis.sh
 
 # Frontend clients
@@ -103,12 +102,6 @@ image-ci:
 
 push-image-ci: image-ci
 	docker push "${CI_DOCKER_IMAGE}"
-
-image-ganache:
-	@cd docker/ganache && envsubst < Dockerfile | docker build -t "${GANACHE_DOCKER_IMAGE}" . -f -
-
-push-image-ganache: image-ganache
-	docker push "${GANACHE_DOCKER_IMAGE}"
 
 # Using RUST+Linux docker image (ekidd/rust-musl-builder) to build for Linux. More at https://github.com/emk/rust-musl-builder
 docker-options = --rm -v $(shell pwd):/home/rust/src -v cargo-git:/home/rust/.cargo/git -v cargo-registry:/home/rust/.cargo/registry --env-file $(ZKSYNC_HOME)/etc/env/$(ZKSYNC_ENV).env
@@ -160,6 +153,9 @@ push-image-rust: image-rust
 deploy-contracts: confirm_action build-contracts
 	@bin/deploy-contracts.sh
 
+publish-contracts: confirm_action
+	@bin/publish-contracts.sh
+
 test-contracts: confirm_action build-contracts
 	@bin/contracts-test.sh
 
@@ -168,6 +164,7 @@ build-contracts: confirm_action prepare-contracts
 	@cd contracts && yarn build
 
 prepare-contracts:
+	@cargo run --release --bin gen_token_add_contract
 	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
 # testing
@@ -175,19 +172,8 @@ prepare-contracts:
 ci-check:
 	@ci-check.sh
 	
-integration-testkit: build-contracts
-	@bin/integration-testkit
-
-migration-test: build-contracts
-	cargo run --bin migration_test --release
-
-itest: # contracts simple integration tests
-	@bin/prepare-test-contracts.sh
-	@cd contracts && yarn itest
-
-utest: # contracts unit tests
-	@bin/prepare-test-contracts.sh
-	@cd contracts && yarn unit-test
+integration-testkit:
+	@bin/integration-testkit.sh
 
 integration-simple:
 	@cd js/tests && yarn && yarn simple
@@ -216,9 +202,9 @@ promote-to-ropsten:
 	@bin/promote-to.sh ropsten $(ci-build)
 
 # (Re)deploy contracts and database
-redeploy: confirm_action stop deploy-contracts db-insert-contract
+redeploy: confirm_action stop init-deploy
 
-init-deploy: confirm_action deploy-contracts db-insert-contract
+init-deploy: confirm_action deploy-contracts db-insert-contract publish-contracts
 
 dockerhub-push: image-nginx image-rust
 	docker push "${NGINX_DOCKER_IMAGE}"
@@ -267,7 +253,7 @@ endif
 restart: stop start
 
 start-provers:
-	@bin/kube scale deployments/$(ZKSYNC_ENV)-server --namespace $(ZKSYNC_ENV) --replicas=1
+	@bin/kube scale deployments/$(ZKSYNC_ENV)-prover --namespace $(ZKSYNC_ENV) --replicas=1
 
 start-nginx:
 	@bin/kube scale deployments/$(ZKSYNC_ENV)-nginx --namespace $(ZKSYNC_ENV) --replicas=1
@@ -316,7 +302,6 @@ nodes:
 dev-up:
 	@docker-compose up -d postgres geth dev-ticker
 	@docker-compose up -d tesseracts
-
 
 dev-down:
 	@docker-compose stop tesseracts

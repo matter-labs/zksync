@@ -4,7 +4,7 @@ import timeConstants from './timeConstants';
 import { BlockExplorerClient } from './BlockExplorerClient';
 import config from './env-config';
 const ethers = require('ethers');
-import franklin_abi from '../../../contracts/build/Franklin.json'
+import franklin_abi from '../../../contracts/build/ZkSync.json'
 import { Emitter } from './Emitter';
 
 
@@ -290,7 +290,7 @@ export class WalletDecorator {
         const balances = await Promise.all(
             window.tokensList
                 .map(async token => {
-                    const amount = (await contract.balancesToWithdraw(
+                    const amount = (await contract.getBalanceToWithdraw(
                         await window.ethSigner.getAddress(),
                         token.id
                     )).balanceToWithdraw;

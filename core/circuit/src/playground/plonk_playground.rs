@@ -1,9 +1,8 @@
 use crate::playground::get_path_in_file_dump_dir;
-use crate::witness::deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness};
-use crate::witness::test_utils::test_genesis_plasma_state;
+use crate::witness::tests::test_utils::{PlasmaStateGenerator, WitnessTestAccount};
 use crate::witness::utils::WitnessBuilder;
-use bigdecimal::BigDecimal;
-use models::node::{Account, Deposit, DepositOp, Fr};
+use crate::witness::{deposit::DepositWitness, Witness};
+use models::node::{Deposit, DepositOp, Fr};
 use models::prover_utils::fs_utils::{
     get_universal_setup_lagrange_form, get_universal_setup_monomial_form,
 };
@@ -12,12 +11,12 @@ use std::time::Instant;
 
 #[test]
 fn test_transpile_deposit_franklin_existing_account() {
-    let deposit_to_account_id = 1;
-    let deposit_to_account_address = "1111111111111111111111111111111111111111".parse().unwrap();
-    let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![(
-        deposit_to_account_id,
-        Account::default_with_address(&deposit_to_account_address),
-    )]);
+    let account = WitnessTestAccount::new_empty(1);
+
+    let deposit_to_account_id = account.id;
+    let deposit_to_account_address = account.account.address;
+    let (mut plasma_state, mut circuit_account_tree) =
+        PlasmaStateGenerator::generate(&vec![account]);
 
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
@@ -34,8 +33,8 @@ fn test_transpile_deposit_franklin_existing_account() {
 
     plasma_state.apply_deposit_op(&deposit_op);
 
-    let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-    let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+    let deposit_witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+    let deposit_operations = deposit_witness.calculate_operations(());
     let pub_data_from_witness = deposit_witness.get_pubdata();
 
     witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
@@ -96,15 +95,11 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
         NUM_DEPOSITS,
         DepositOp::CHUNKS * NUM_DEPOSITS
     );
-    let deposit_to_account_id = 1;
-    let deposit_to_account_address = "1111111111111111111111111111111111111111".parse().unwrap();
+    let account = WitnessTestAccount::new_empty(1);
 
-    // let deposit_to_account_address =
-    //         "0000000000000000000000000000000000000000".parse().unwrap();
-    let (mut plasma_state, mut circuit_tree) = test_genesis_plasma_state(vec![(
-        deposit_to_account_id,
-        Account::default_with_address(&deposit_to_account_address),
-    )]);
+    let deposit_to_account_id = account.id;
+    let deposit_to_account_address = account.account.address;
+    let (mut plasma_state, mut circuit_tree) = PlasmaStateGenerator::generate(&vec![account]);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_tree, 0, 1);
 
     let deposit_op = DepositOp {
@@ -119,8 +114,8 @@ fn test_new_transpile_deposit_franklin_existing_account_validate_only() {
 
     for _ in 0..NUM_DEPOSITS {
         plasma_state.apply_deposit_op(&deposit_op);
-        let deposit_witness = apply_deposit_tx(witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+        let deposit_witness = DepositWitness::apply_tx(witness_accum.account_tree, &deposit_op);
+        let deposit_operations = deposit_witness.calculate_operations(());
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
         witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
@@ -207,12 +202,12 @@ fn test_new_transpile_deposit_franklin_existing_account() {
         NUM_DEPOSITS,
         DepositOp::CHUNKS * NUM_DEPOSITS
     );
-    let deposit_to_account_id = 1;
-    let deposit_to_account_address = "1111111111111111111111111111111111111111".parse().unwrap();
-    let (mut plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(vec![(
-        deposit_to_account_id,
-        Account::default_with_address(&deposit_to_account_address),
-    )]);
+    let account = WitnessTestAccount::new_empty(1);
+
+    let deposit_to_account_id = account.id;
+    let deposit_to_account_address = account.account.address;
+    let (mut plasma_state, mut circuit_account_tree) =
+        PlasmaStateGenerator::generate(&vec![account]);
     let fee_account_id = 0;
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
@@ -228,8 +223,9 @@ fn test_new_transpile_deposit_franklin_existing_account() {
 
     for _ in 0..NUM_DEPOSITS {
         plasma_state.apply_deposit_op(&deposit_op);
-        let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+        let deposit_witness =
+            DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+        let deposit_operations = deposit_witness.calculate_operations(());
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
         witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);
@@ -383,12 +379,11 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
         NUM_DEPOSITS,
         DepositOp::CHUNKS * NUM_DEPOSITS
     );
-    let deposit_to_account_id = 1;
-    let deposit_to_account_address = "1111111111111111111111111111111111111111".parse().unwrap();
-    let (mut plasma_state, mut circuit_tree) = test_genesis_plasma_state(vec![(
-        deposit_to_account_id,
-        Account::default_with_address(&deposit_to_account_address),
-    )]);
+    let account = WitnessTestAccount::new_empty(1);
+
+    let deposit_to_account_id = account.id;
+    let deposit_to_account_address = account.account.address;
+    let (mut plasma_state, mut circuit_tree) = PlasmaStateGenerator::generate(&vec![account]);
     let mut witness_accum = WitnessBuilder::new(&mut circuit_tree, 0, 1);
 
     let deposit_op = DepositOp {
@@ -403,8 +398,9 @@ fn test_fma_transpile_deposit_franklin_existing_account() {
 
     for _ in 0..NUM_DEPOSITS {
         plasma_state.apply_deposit_op(&deposit_op);
-        let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-        let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+        let deposit_witness =
+            DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+        let deposit_operations = deposit_witness.calculate_operations(());
         let pub_data_from_witness = deposit_witness.get_pubdata();
 
         witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);

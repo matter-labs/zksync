@@ -1,8 +1,7 @@
 // External deps
-use ethabi;
 use failure::format_err;
 use futures::{compat::Future01CompatExt, executor::block_on};
-use models::TokenAddedEvent;
+use models::NewTokenEvent;
 use std::convert::TryFrom;
 use web3::contract::Contract;
 use web3::futures::Future;
@@ -71,10 +70,10 @@ impl EventsState {
         governance_contract: &(ethabi::Contract, Contract<T>),
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-    ) -> Result<(Vec<BlockEvent>, Vec<TokenAddedEvent>, u64), failure::Error> {
+    ) -> Result<(Vec<BlockEvent>, Vec<NewTokenEvent>, u64), failure::Error> {
         self.remove_verified_events();
 
-        let (block_events, token_events, to_block_number): (Vec<Log>, Vec<TokenAddedEvent>, u64) =
+        let (block_events, token_events, to_block_number): (Vec<Log>, Vec<NewTokenEvent>, u64) =
             EventsState::get_new_events_and_last_watched_block(
                 web3,
                 franklin_contract,
@@ -128,7 +127,7 @@ impl EventsState {
         last_watched_block_number: u64,
         eth_blocks_step: u64,
         end_eth_blocks_offset: u64,
-    ) -> Result<(Vec<Log>, Vec<TokenAddedEvent>, u64), failure::Error> {
+    ) -> Result<(Vec<Log>, Vec<NewTokenEvent>, u64), failure::Error> {
         let latest_eth_block_minus_delta =
             EventsState::get_last_block_number(web3)? - end_eth_blocks_offset;
 
@@ -181,10 +180,10 @@ impl EventsState {
         contract: &(ethabi::Contract, Contract<T>),
         from: BlockNumber,
         to: BlockNumber,
-    ) -> Result<Vec<TokenAddedEvent>, failure::Error> {
+    ) -> Result<Vec<NewTokenEvent>, failure::Error> {
         let new_token_event_topic = contract
             .0
-            .event("TokenAdded")
+            .event("NewToken")
             .expect("Governance contract abi error")
             .signature();
         let filter = FilterBuilder::default()
@@ -197,9 +196,8 @@ impl EventsState {
         block_on(web3.eth().logs(filter).compat())?
             .into_iter()
             .map(|event| {
-                TokenAddedEvent::try_from(event).map_err(|e| {
-                    format_err!("Failed to parse TokenAdded event log from ETH: {}", e)
-                })
+                NewTokenEvent::try_from(event)
+                    .map_err(|e| format_err!("Failed to parse NewToken event log from ETH: {}", e))
             })
             .collect()
     }
@@ -221,19 +219,19 @@ impl EventsState {
     ) -> Result<Vec<Log>, failure::Error> {
         let block_verified_topic = contract
             .0
-            .event("BlockVerified")
+            .event("BlockVerification")
             .expect("Main contract abi error")
             .signature();
 
         let block_comitted_topic = contract
             .0
-            .event("BlockCommitted")
+            .event("BlockCommit")
             .expect("Main contract abi error")
             .signature();
 
         let reverted_topic = contract
             .0
-            .event("BlocksReverted")
+            .event("BlocksRevert")
             .expect("Main contract abi error")
             .signature();
 
@@ -274,17 +272,17 @@ impl EventsState {
 
         let block_verified_topic = contract
             .0
-            .event("BlockVerified")
+            .event("BlockVerification")
             .expect("Main contract abi error")
             .signature();
         let block_comitted_topic = contract
             .0
-            .event("BlockCommitted")
+            .event("BlockCommit")
             .expect("Main contract abi error")
             .signature();
         let reverted_topic = contract
             .0
-            .event("BlocksReverted")
+            .event("BlocksRevert")
             .expect("Main contract abi error")
             .signature();
 

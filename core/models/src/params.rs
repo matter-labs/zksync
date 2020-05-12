@@ -1,3 +1,4 @@
+#![allow(clippy::option_env_unwrap)]
 // Built-in deps
 use std::env;
 use std::str::FromStr;
@@ -149,6 +150,27 @@ pub const PRIORITY_EXPIRATION: u64 = 250;
 pub const FR_ADDRESS_LEN: usize = 20;
 
 pub const PAD_MSG_BEFORE_HASH_BITS_LEN: usize = 736;
+
+/// Size of the data that is signed for withdraw tx
+pub const SIGNED_WITHDRAW_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + TOKEN_BIT_WIDTH
+    + BALANCE_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH;
+
+/// Size of the data that is signed for transfer tx
+pub const SIGNED_TRANSFER_BIT_WIDTH: usize = TX_TYPE_BIT_WIDTH
+    + ACCOUNT_ID_BIT_WIDTH
+    + 2 * ADDRESS_WIDTH
+    + TOKEN_BIT_WIDTH
+    + AMOUNT_EXPONENT_BIT_WIDTH
+    + AMOUNT_MANTISSA_BIT_WIDTH
+    + FEE_EXPONENT_BIT_WIDTH
+    + FEE_MANTISSA_BIT_WIDTH
+    + NONCE_BIT_WIDTH;
 
 lazy_static! {
     pub static ref JUBJUB_PARAMS: AltJubjubBn256 = AltJubjubBn256::new();

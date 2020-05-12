@@ -1,31 +1,40 @@
-use crate::account::*;
-
-use crate::circuit::FranklinCircuit;
-use crate::franklin_crypto::alt_babyjubjub::AltJubjubBn256;
-use crate::franklin_crypto::bellman::pairing::bn256::*;
-use crate::franklin_crypto::bellman::pairing::ff::Field;
-use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, PrimeField, PrimeFieldRepr};
-use crate::franklin_crypto::eddsa::PrivateKey;
-use crate::franklin_crypto::eddsa::PublicKey;
-use crate::franklin_crypto::jubjub::FixedGenerators;
-use crate::franklin_crypto::jubjub::JubjubEngine;
-use crate::franklin_crypto::rescue::bn256::Bn256RescueParams;
-use crate::operation::Operation;
-use crate::operation::SignatureData;
-use crate::rand::{Rng, SeedableRng, XorShiftRng};
-use crate::utils::*;
-use crypto::digest::Digest;
-use crypto::sha2::Sha256;
-use models::circuit::account::{Balance, CircuitAccount, CircuitAccountTree};
-use models::circuit::utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element};
-use models::merkle_tree::hasher::Hasher;
-use models::merkle_tree::{PedersenHasher, RescueHasher};
-use models::node::tx::PackedPublicKey;
-use models::node::{AccountId, BlockNumber, Engine, Fr};
-use models::params as franklin_constants;
-use models::params::total_tokens;
+// External deps
+use crypto::{digest::Digest, sha2::Sha256};
+use crypto_exports::franklin_crypto::{
+    alt_babyjubjub::AltJubjubBn256,
+    bellman::pairing::{
+        bn256::{Bn256, Fr},
+        ff::{BitIterator, Field, PrimeField, PrimeFieldRepr},
+    },
+    eddsa::{PrivateKey, PublicKey},
+    jubjub::{FixedGenerators, JubjubEngine},
+    rescue::bn256::Bn256RescueParams,
+};
+use crypto_exports::rand::{Rng, SeedableRng, XorShiftRng};
 use num::ToPrimitive;
+// Workspace deps
+use models::{
+    circuit::{
+        account::{Balance, CircuitAccount, CircuitAccountTree},
+        utils::{be_bit_vector_into_bytes, le_bit_vector_into_field_element},
+    },
+    merkle_tree::{hasher::Hasher, PedersenHasher, RescueHasher},
+    node::{
+        operations::{CloseOp, TransferOp, TransferToNewOp, WithdrawOp},
+        tx::PackedPublicKey,
+        AccountId, BlockNumber, Engine,
+    },
+    params as franklin_constants,
+    params::total_tokens,
+};
 use plasma::state::CollectedFee;
+// Local deps
+use crate::{
+    account::AccountWitness,
+    circuit::FranklinCircuit,
+    operation::{Operation, SignatureData},
+    utils::sign_rescue,
+};
 
 /// Wrapper around `CircuitAccountTree`
 /// that simplifies witness generation
@@ -97,7 +106,7 @@ impl<'a> WitnessBuilder<'a> {
             .account_tree
             .get(self.fee_account_id)
             .expect("fee account is not in the tree");
-        let mut fee_circuit_account_balances = Vec::with_capacity(models::params::total_tokens());
+        let mut fee_circuit_account_balances = Vec::with_capacity(total_tokens());
         for i in 0u32..(total_tokens() as u32) {
             let balance_value = fee_circuit_account
                 .subtree
@@ -146,13 +155,10 @@ impl<'a> WitnessBuilder<'a> {
 
     /// Finaly, creates circuit instance for given operations.
     pub fn into_circuit_instance(self) -> FranklinCircuit<'static, Engine> {
-        let operation_batch_size = self.operations.len();
         FranklinCircuit {
             rescue_params: &models::params::RESCUE_PARAMS,
             jubjub_params: &models::params::JUBJUB_PARAMS,
-            operation_batch_size,
             old_root: Some(self.initial_root_hash),
-            new_root: Some(self.root_after_fees.expect("root after fee not present")),
             operations: self.operations,
             pub_data_commitment: Some(
                 self.pubdata_commitment
@@ -455,50 +461,149 @@ pub fn fr_from_bytes(bytes: Vec<u8>) -> Fr {
     Fr::from_repr(fr_repr).unwrap()
 }
 
-pub type SigData = (Fr, Fr, Fr, SignatureData, Vec<Option<bool>>);
+/// Gathered signature data for calculating the operations in several
+/// witness structured (e.g. `TransferWitness` or `WithdrawWitness`).
+#[derive(Debug, Clone)]
+pub struct SigDataInput {
+    pub first_sig_msg: Fr,
+    pub second_sig_msg: Fr,
+    pub third_sig_msg: Fr,
+    pub signature: SignatureData,
+    pub signer_pub_key_packed: Vec<Option<bool>>,
+}
 
-pub fn prepare_sig_data(
-    sig_bytes: &[u8],
-    tx_bytes: &[u8],
-    pub_key: &PackedPublicKey,
-) -> Result<SigData, String> {
-    let (r_bytes, s_bytes) = sig_bytes.split_at(32);
-    let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(&r_bytes)
-        .iter()
-        .map(|x| Some(*x))
-        .collect();
-    let s_bits: Vec<_> = models::primitives::bytes_into_be_bits(&s_bytes)
-        .iter()
-        .map(|x| Some(*x))
-        .collect();
-    let signature = SignatureData {
-        r_packed: r_bits,
-        s: s_bits,
-    };
-    let sig_bits: Vec<bool> = models::primitives::bytes_into_be_bits(&tx_bytes);
-
-    let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(
-        &sig_bits,
-        &models::params::PEDERSEN_HASHER,
-        &models::params::JUBJUB_PARAMS,
-    );
-
-    let signer_packed_key_bytes = match pub_key.serialize_packed() {
-        Ok(v) => v,
-        Err(e) => {
-            return Err(format!("failed to prepare signature data: {}", e));
-        }
-    };
-    let signer_packed_key_bits: Vec<_> =
-        models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
+impl SigDataInput {
+    /// Creates a new `SigDataInput` from the raw tx contents, signature and public key
+    /// of the author.
+    pub fn new(
+        sig_bytes: &[u8],
+        tx_bytes: &[u8],
+        pub_key: &PackedPublicKey,
+    ) -> Result<SigDataInput, String> {
+        let (r_bytes, s_bytes) = sig_bytes.split_at(32);
+        let r_bits: Vec<_> = models::primitives::bytes_into_be_bits(&r_bytes)
             .iter()
             .map(|x| Some(*x))
             .collect();
-    Ok((
-        first_sig_msg,
-        second_sig_msg,
-        third_sig_msg,
-        signature,
-        signer_packed_key_bits,
-    ))
+        let s_bits: Vec<_> = models::primitives::bytes_into_be_bits(&s_bytes)
+            .iter()
+            .map(|x| Some(*x))
+            .collect();
+        let signature = SignatureData {
+            r_packed: r_bits,
+            s: s_bits,
+        };
+        let sig_bits: Vec<bool> = models::primitives::bytes_into_be_bits(&tx_bytes);
+
+        let (first_sig_msg, second_sig_msg, third_sig_msg) = self::generate_sig_witness(
+            &sig_bits,
+            &models::params::PEDERSEN_HASHER,
+            &models::params::JUBJUB_PARAMS,
+        );
+
+        let signer_packed_key_bytes = match pub_key.serialize_packed() {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(format!("failed to prepare signature data: {}", e));
+            }
+        };
+        let signer_pub_key_packed: Vec<_> =
+            models::primitives::bytes_into_be_bits(&signer_packed_key_bytes)
+                .iter()
+                .map(|x| Some(*x))
+                .collect();
+        Ok(SigDataInput {
+            first_sig_msg,
+            second_sig_msg,
+            third_sig_msg,
+            signature,
+            signer_pub_key_packed,
+        })
+    }
+
+    pub fn from_close_op(close_op: &CloseOp) -> Result<Self, String> {
+        let sign_packed = close_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &close_op.tx.get_bytes(),
+            &close_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_transfer_op(transfer_op: &TransferOp) -> Result<Self, String> {
+        let sign_packed = transfer_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &transfer_op.tx.get_bytes(),
+            &transfer_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_transfer_to_new_op(transfer_op: &TransferToNewOp) -> Result<Self, String> {
+        let sign_packed = transfer_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &transfer_op.tx.get_bytes(),
+            &transfer_op.tx.signature.pub_key,
+        )
+    }
+
+    pub fn from_withdraw_op(withdraw_op: &WithdrawOp) -> Result<Self, String> {
+        let sign_packed = withdraw_op
+            .tx
+            .signature
+            .signature
+            .serialize_packed()
+            .expect("signature serialize");
+        SigDataInput::new(
+            &sign_packed,
+            &withdraw_op.tx.get_bytes(),
+            &withdraw_op.tx.signature.pub_key,
+        )
+    }
+
+    /// Provides a vector of copies of this `SigDataInput` object, all with one field
+    /// set to incorrect value.
+    /// Used for circuit tests.
+    #[cfg(test)]
+    pub fn corrupted_variations(&self) -> Vec<Self> {
+        let incorrect_fr = crate::witness::tests::test_utils::incorrect_fr();
+        vec![
+            SigDataInput {
+                first_sig_msg: incorrect_fr,
+                ..self.clone()
+            },
+            SigDataInput {
+                second_sig_msg: incorrect_fr,
+                ..self.clone()
+            },
+            SigDataInput {
+                third_sig_msg: incorrect_fr,
+                ..self.clone()
+            },
+            SigDataInput {
+                signature: SignatureData::init_empty(),
+                ..self.clone()
+            },
+            SigDataInput {
+                signer_pub_key_packed: vec![Some(false); self.signer_pub_key_packed.len()],
+                ..self.clone()
+            },
+        ]
+    }
 }

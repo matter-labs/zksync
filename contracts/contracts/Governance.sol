@@ -1,4 +1,4 @@
-pragma solidity 0.5.16;
+pragma solidity ^0.5.0;
 
 import "./Config.sol";
 
@@ -8,9 +8,20 @@ import "./Config.sol";
 contract Governance is Config {
 
     /// @notice Token added to Franklin net
-    event TokenAdded(
-        address token,
-        uint16 tokenId
+    event NewToken(
+        address indexed token,
+        uint16 indexed tokenId
+    );
+
+    /// @notice Governor changed
+    event NewGovernor(
+        address newGovernor
+    );
+
+    /// @notice Validator's status changed
+    event ValidatorStatusUpdate(
+        address indexed validatorAddress,
+        bool isActive
     );
 
     /// @notice Address which will exercise governance over the network i.e. add tokens, change validator set, conduct upgrades
@@ -37,7 +48,6 @@ contract Governance is Config {
         address _networkGovernor = abi.decode(initializationParameters, (address));
 
         networkGovernor = _networkGovernor;
-        validators[_networkGovernor] = true;
     }
 
     /// @notice Change current governor
@@ -45,6 +55,7 @@ contract Governance is Config {
     function changeGovernor(address _newGovernor) external {
         requireGovernor(msg.sender);
         networkGovernor = _newGovernor;
+        emit NewGovernor(_newGovernor);
     }
 
     /// @notice Add token to the list of networks tokens
@@ -59,7 +70,7 @@ contract Governance is Config {
 
         tokenAddresses[newTokenId] = _token;
         tokenIds[_token] = newTokenId;
-        emit TokenAdded(_token, newTokenId);
+        emit NewToken(_token, newTokenId);
     }
 
     /// @notice Change validator status (active or not active)
@@ -68,6 +79,7 @@ contract Governance is Config {
     function setValidator(address _validator, bool _active) external {
         requireGovernor(msg.sender);
         validators[_validator] = _active;
+        emit ValidatorStatusUpdate(_validator, _active);
     }
 
     /// @notice Check if specified address is is governor
@@ -82,9 +94,9 @@ contract Governance is Config {
         require(validators[_address], "grr21"); // validator is not active
     }
 
-    /// @notice Validate token id (must be less than  or equal total tokens amount)
+    /// @notice Validate token id (must be less than or equal to total tokens amount)
     /// @param _tokenId Token id
-    /// @return bool flag that indicates if token id is less than total tokens amount
+    /// @return bool flag that indicates if token id is less than or equal to total tokens amount
     function isValidTokenId(uint16 _tokenId) external view returns (bool) {
         return _tokenId <= totalTokens;
     }

@@ -24,12 +24,11 @@ use crate::node::block::Block;
 use crate::node::BlockNumber;
 use crate::node::{AccountUpdates, TokenId};
 use crate::prover_utils::EncodedProofPlonk;
-use ethabi::{decode, ParamType};
+
 use failure::format_err;
 use franklin_crypto::bellman::pairing::ff::{PrimeField, PrimeFieldRepr};
-use serde_bytes;
 use std::convert::TryFrom;
-use web3::types::{Address, Log};
+use web3::types::{Address, Log, U256};
 
 /// Converts the field element into a byte array.
 pub fn fe_to_bytes<F: PrimeField>(value: &F) -> Vec<u8> {
@@ -184,25 +183,21 @@ impl std::str::FromStr for ActionType {
 }
 
 #[derive(Debug)]
-pub struct TokenAddedEvent {
+pub struct NewTokenEvent {
     pub address: Address,
     pub id: TokenId,
 }
 
-impl TryFrom<Log> for TokenAddedEvent {
+impl TryFrom<Log> for NewTokenEvent {
     type Error = failure::Error;
 
-    fn try_from(event: Log) -> Result<TokenAddedEvent, failure::Error> {
-        let mut dec_ev = decode(&[ParamType::Address, ParamType::Uint(32)], &event.data.0)
-            .map_err(|e| format_err!("Event data decode: {:?}", e))?;
-        Ok(TokenAddedEvent {
-            address: dec_ev.remove(0).to_address().unwrap(),
-            id: dec_ev
-                .remove(0)
-                .to_uint()
-                .as_ref()
-                .map(|id| id.as_u32() as TokenId)
-                .unwrap(),
+    fn try_from(event: Log) -> Result<NewTokenEvent, failure::Error> {
+        if event.topics.len() != 3 {
+            return Err(format_err!("Failed to parse NewTokenEvent: {:#?}", event));
+        }
+        Ok(NewTokenEvent {
+            address: Address::from_slice(&event.topics[1].as_fixed_bytes()[12..]),
+            id: U256::from_big_endian(&event.topics[2].as_fixed_bytes()[..]).as_u32() as u16,
         })
     }
 }

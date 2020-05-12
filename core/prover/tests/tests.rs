@@ -7,17 +7,25 @@ use crypto_exports::franklin_crypto::{self, bellman};
 use crypto_exports::pairing::ff::PrimeField;
 use num::BigUint;
 // Workspace deps
-use circuit::circuit::FranklinCircuit;
-use circuit::witness::deposit::{apply_deposit_tx, calculate_deposit_operations_from_witness};
-use circuit::witness::utils::WitnessBuilder;
-use models::config_options::ConfigurationOptions;
-use models::node::block::smallest_block_size_for_chunks;
-use models::node::operations::DepositOp;
-use models::node::{Deposit, Engine, Fr};
-use models::prover_utils::EncodedProofPlonk;
-use prover::plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig};
-use prover::prover_data::ProverData;
-use prover::ProverImpl;
+use circuit::{
+    circuit::FranklinCircuit,
+    witness::{deposit::DepositWitness, utils::WitnessBuilder, Witness},
+};
+use models::{
+    circuit::{account::CircuitAccount, CircuitAccountTree},
+    config_options::ConfigurationOptions,
+    node::{
+        block::smallest_block_size_for_chunks, operations::DepositOp, Account, Address, Deposit,
+        Engine, Fr,
+    },
+    prover_utils::EncodedProofPlonk,
+};
+// Local deps
+use prover::{
+    plonk_step_by_step_prover::{PlonkStepByStepProver, PlonkStepByStepProverConfig},
+    prover_data::ProverData,
+    ProverImpl,
+};
 
 #[test]
 #[cfg_attr(not(feature = "keys-required"), ignore)]
@@ -110,9 +118,13 @@ fn prover_proves_a_block_and_publishes_result() {
 }
 
 fn new_test_data_for_prover() -> ProverData {
-    use circuit::witness::test_utils::test_genesis_plasma_state;
-    let (_plasma_state, mut circuit_account_tree) = test_genesis_plasma_state(Vec::new());
+    let mut circuit_account_tree = CircuitAccountTree::new(models::params::account_tree_depth());
     let fee_account_id = 0;
+
+    // Init the fee account.
+    let fee_account = Account::default_with_address(&Address::default());
+    circuit_account_tree.insert(fee_account_id, CircuitAccount::from(fee_account));
+
     let mut witness_accum = WitnessBuilder::new(&mut circuit_account_tree, fee_account_id, 1);
 
     let empty_account_id = 1;
@@ -127,8 +139,8 @@ fn new_test_data_for_prover() -> ProverData {
         account_id: empty_account_id,
     };
 
-    let deposit_witness = apply_deposit_tx(&mut witness_accum.account_tree, &deposit_op);
-    let deposit_operations = calculate_deposit_operations_from_witness(&deposit_witness);
+    let deposit_witness = DepositWitness::apply_tx(&mut witness_accum.account_tree, &deposit_op);
+    let deposit_operations = deposit_witness.calculate_operations(());
     let pub_data_from_witness = deposit_witness.get_pubdata();
 
     witness_accum.add_operation_with_pubdata(deposit_operations, pub_data_from_witness);

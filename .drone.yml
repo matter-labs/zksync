@@ -1,3 +1,92 @@
+kind: pipeline
+type: docker
+name: loadtest-nightly
+
+platform:
+  os: linux
+  arch: amd64
+
+clone:
+  depth: 10
+
+steps:
+- name: restore-cache
+  image: drillster/drone-volume-cache
+  settings:
+    mount:
+    - ./target/rust-ci-cache
+    - ./keys/setup
+    restore: true
+  volumes:
+  - name: cache
+    path: /cache
+
+- name: prepare-for-loadtest
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - ci-prepare-env.sh
+  - zksync env ci
+  - zksync yarn
+  - zksync plonk-setup download monomial `get_required_plonk_setup_powers`
+  - zksync verify-keys unpack
+  - zksync db-wait
+  - zksync db-setup
+  - zksync build-contracts
+  - zksync db-reset
+  - zksync genesis
+  - zksync redeploy
+  - f cargo build --release
+  depends_on:
+  - restore-cache
+
+- name: start-server-detached
+  image: matterlabs/ci
+  detach: true
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - zksync server
+  depends_on:
+  - prepare-for-loadtest
+
+- name: start-prover-detached
+  image: matterlabs/ci
+  detach: true
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - zksync prover 10
+  depends_on:
+  - start-server-detached
+
+- name: loadtest
+  image: matterlabs/ci
+  commands:
+  - export ZKSYNC_HOME=`pwd`
+  - export PATH=$ZKSYNC_HOME/bin:$PATH
+  - sleep 30
+  - zksync loadtest execution `pwd`/etc/ci/loadtest-nightly.json
+  depends_on:
+  - start-server-detached
+  - start-prover-detached
+
+services:
+- name: geth
+  image: matterlabs/geth:latest
+
+- name: postgres
+  image: postgres:10.4
+
+volumes:
+- name: cache
+  host:
+    path: /drone-cache
+
+trigger:
+  event:
+  - cron
 ---
 kind: pipeline
 type: docker
@@ -103,13 +192,6 @@ steps:
   depends_on:
   - init
 
-- name: ganache
-  image: matterlabs/ganache
-  detach: true
-  depends_on:
-  - build-contracts
-  - run-genesis
-
 - name: redeploy-and-integration-testkit
   image: matterlabs/ci
   commands:
@@ -120,7 +202,6 @@ steps:
   depends_on:
   - run-genesis
   - build-contracts
-  - ganache
 
 - name: contract-test
   image: matterlabs/ci
@@ -142,13 +223,18 @@ steps:
   - name: cache
     path: /cache
   depends_on:
-  - redeploy-and-integration-testkit
-  - circuit-rust-tests
-  - non-circuit-rust-tests
+  - rust-build
 
 services:
 - name: geth
   image: matterlabs/geth:latest
+  settings:
+    config: standard
+
+- name: geth-fast
+  image: matterlabs/geth:latest
+  settings:
+    config: fast
 
 - name: postgres
   image: postgres:10.4
@@ -239,6 +325,8 @@ steps:
 services:
 - name: geth
   image: matterlabs/geth:latest
+  settings:
+    config: standard
 
 - name: postgres
   image: postgres:10.4

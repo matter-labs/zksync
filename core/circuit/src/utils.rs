@@ -1,20 +1,27 @@
-use crate::franklin_crypto::bellman::pairing::ff::{BitIterator, Field, PrimeField};
-use crate::franklin_crypto::bellman::pairing::Engine;
-use crate::franklin_crypto::bellman::{ConstraintSystem, SynthesisError};
-
-use crate::franklin_crypto::circuit::boolean::{AllocatedBit, Boolean};
-use crate::franklin_crypto::circuit::num::{AllocatedNum, Num};
-use crate::franklin_crypto::circuit::Assignment;
-use crate::franklin_crypto::eddsa::Signature;
-use crate::franklin_crypto::eddsa::{PrivateKey, PublicKey, Seed};
-use crate::franklin_crypto::jubjub::{FixedGenerators, JubjubEngine};
-use crate::franklin_crypto::rescue::RescueEngine;
-
-use crate::operation::SignatureData;
-use crate::operation::TransactionSignature;
-use models::circuit::utils::le_bit_vector_into_field_element;
-use models::params as franklin_constants;
-use models::primitives::*;
+// External deps
+use crypto_exports::franklin_crypto::{
+    bellman::{
+        pairing::{
+            ff::{BitIterator, Field, PrimeField},
+            Engine,
+        },
+        ConstraintSystem, SynthesisError,
+    },
+    circuit::{
+        boolean::{AllocatedBit, Boolean},
+        num::{AllocatedNum, Num},
+        Assignment,
+    },
+    eddsa::{PrivateKey, PublicKey, Seed, Signature},
+    jubjub::{FixedGenerators, JubjubEngine},
+    rescue::RescueEngine,
+};
+// Workspace deps
+use models::{
+    circuit::utils::le_bit_vector_into_field_element, params as franklin_constants, primitives::*,
+};
+// Local deps
+use crate::operation::{SignatureData, TransactionSignature};
 
 pub fn reverse_bytes<T: Clone>(bits: &[T]) -> Vec<T> {
     bits.chunks(8)

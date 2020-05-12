@@ -6,7 +6,7 @@ use itertools::Itertools;
 // Workspace imports
 use models::node::block::Block;
 use models::node::{AccountId, AccountUpdate, BlockNumber, FranklinOp, Token};
-use models::{Operation, TokenAddedEvent};
+use models::{NewTokenEvent, Operation};
 // Local imports
 use self::records::{
     NewBlockEvent, NewFranklinOp, NewLastWatchedEthBlockNumber, NewStorageState, StoredBlockEvent,
@@ -124,13 +124,13 @@ impl<'a> DataRestoreSchema<'a> {
     pub fn save_events_state(
         &self,
         block_events: &[NewBlockEvent],
-        token_events: &[TokenAddedEvent],
+        token_events: &[NewTokenEvent],
         last_watched_eth_number: &NewLastWatchedEthBlockNumber,
     ) -> QueryResult<()> {
         self.0.conn().transaction(|| {
             self.update_block_events(block_events)?;
 
-            for &TokenAddedEvent { id, address } in token_events.iter() {
+            for &NewTokenEvent { id, address } in token_events.iter() {
                 let token = Token::new(id, address, &format!("ERC20-{}", id));
                 TokensSchema(self.0).store_token(token)?;
             }

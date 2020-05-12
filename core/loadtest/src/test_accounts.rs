@@ -3,6 +3,7 @@
 use num::BigUint;
 use rand::Rng;
 use tokio::sync::Mutex;
+use tokio::time;
 use web3::transports::Http;
 // Workspace uses
 use models::{
@@ -67,15 +68,29 @@ impl TestAccount {
         *nonce = v.as_u32();
 
         // Update ZKSync nonce.
-        let zknonce = rpc_client
+        let resp = rpc_client
             .account_state_info(self.zk_acc.address)
             .await
-            .expect("rpc error")
-            .committed
-            .nonce;
-        self.zk_acc.set_nonce(zknonce);
-
+            .expect("rpc error");
+        self.zk_acc.set_nonce(resp.committed.nonce);
         Ok(())
+    }
+
+    // Updates ZKSync account id.
+    pub async fn update_account_id(&self, rpc_client: &RpcClient) -> Result<(), failure::Error> {
+        let mut ticker = time::interval(std::time::Duration::from_millis(500));
+        for _i in 1..100 {
+            let resp = rpc_client
+                .account_state_info(self.zk_acc.address)
+                .await
+                .expect("rpc error");
+            if resp.id.is_some() {
+                self.zk_acc.set_account_id(resp.id);
+                return Ok(());
+            }
+            ticker.tick().await;
+        }
+        failure::bail!("failed to update account_id: timeout")
     }
 
     pub fn sign_change_pubkey(&self) -> FranklinTx {

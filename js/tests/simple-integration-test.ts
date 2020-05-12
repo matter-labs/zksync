@@ -4,7 +4,7 @@ import {
     ETHProxy, types, utils as zkutils
 } from "zksync";
 // HACK: using require as type system work-around
-const franklin_abi = require('../../contracts/build/Franklin.json');
+const franklin_abi = require('../../contracts/build/ZkSync.json');
 import {ethers, utils, Contract} from "ethers";
 import {bigNumberify, parseEther} from "ethers/utils";
 import {IERC20_INTERFACE} from "zksync/build/utils";
@@ -48,6 +48,7 @@ async function testAutoApprovedDeposit(depositWallet: Wallet, syncWallet: Wallet
             approveDepositAmountForERC20: true,
         });
     console.log(`Deposit posted: ${(new Date().getTime()) - startTime} ms`);
+
     await depositHandle.awaitReceipt();
     console.log(`Deposit committed: ${(new Date().getTime()) - startTime} ms`);
     const balanceAfterDep = await syncWallet.getBalance(token);
@@ -164,10 +165,10 @@ async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: 
     const onchainBalanceAfterWithdraw = await withdrawTo.getEthereumBalance(token);
 
     const tokenId = await withdrawTo.provider.tokenSet.resolveTokenId(token);
-    const pendingToBeOnchainBalance = (await contract.balancesToWithdraw(
+    const pendingToBeOnchainBalance = (await contract.getBalanceToWithdraw(
         await withdrawTo.address(),
         tokenId,
-    )).balanceToWithdraw;
+    ));
 
     if (!wallet2BeforeWithdraw.sub(wallet2AfterWithdraw).eq(amount.add(fee))) {
         throw new Error("Wrong amount on wallet after WITHDRAW");
@@ -268,8 +269,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 (async () => {
     try {
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
-        const ERC20_ADDRESS = process.env.TEST_ERC20;
-        const ERC20_SYMBOL = syncProvider.tokenSet.resolveTokenSymbol(ERC20_ADDRESS);
+        // const ERC20_ADDRESS = process.env.TEST_ERC20;
+        // const ERC20_SYMBOL = syncProvider.tokenSet.resolveTokenSymbol(ERC20_ADDRESS);
 
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
@@ -279,8 +280,8 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
         ).connect(ethersProvider);
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
         await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("0.5")})).wait();
-        const erc20contract = new Contract(ERC20_ADDRESS, IERC20_INTERFACE, ethWallet);
-        await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.1"))).wait();
+        // const erc20contract = new Contract(ERC20_ADDRESS, IERC20_INTERFACE, ethWallet);
+        // await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.1"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -312,9 +313,9 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
         await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
-        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.018");
+        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
+        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");
 
         await syncProvider.disconnect();
     } catch (e) {

@@ -31,6 +31,7 @@ jsonrpc-http-server = "14.0.3"
 jsonrpc-derive = "14.0.3"
 
 tokio = { version = "0.2", features = ["full"] }
+tokio_old = { package = "tokio", version = "0.1.22" }
 futures = { version = "0.3", features = ["compat"] }
 actix-rt = "0.2.5"
 actix-cors = "0.1.0"
@@ -44,6 +45,7 @@ failure = "0.1"
 # TODO: should be removed after json rpc deps are updated is updated, current version (14.0)
 futures01 = { package = "futures", version = "0.1" }
 reqwest = "0.9.22"
+tiny-keccak = "1.4.2"
 
 lru-cache = "0.1.2"
 

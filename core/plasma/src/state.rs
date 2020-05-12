@@ -222,8 +222,9 @@ impl PlasmaState {
         );
         ensure!(
             tx.verify_signature() == Some(from_account.pub_key_hash),
-            "transfer signature is incorrect"
+            "Transfer signature is incorrect"
         );
+        ensure!(from == tx.account_id, "Transfer account id is incorrect");
 
         if let Some((to, _)) = self.get_account_by_address(&tx.to) {
             let transfer_op = TransferOp { tx, from, to };
@@ -263,6 +264,10 @@ impl PlasmaState {
             tx.verify_signature() == Some(account.pub_key_hash),
             "withdraw signature is incorrect"
         );
+        ensure!(
+            account_id == tx.account_id,
+            "Withdraw account id is incorrect"
+        );
         let withdraw_op = WithdrawOp { tx, account_id };
 
         let (fee, updates) = self.apply_withdraw_op(&withdraw_op)?;
@@ -300,6 +305,10 @@ impl PlasmaState {
         ensure!(
             tx.eth_signature.is_none() || tx.verify_eth_signature() == Some(account.address),
             "ChangePubKey signature is incorrect"
+        );
+        ensure!(
+            account_id == tx.account_id,
+            "ChangePubKey account id is incorrect"
         );
         let change_pk_op = ChangePubKeyOp { tx, account_id };
 

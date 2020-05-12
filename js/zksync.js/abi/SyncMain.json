@@ -16,7 +16,7 @@
           "type": "uint32"
         }
       ],
-      "name": "BlockCommitted",
+      "name": "BlockCommit",
       "type": "event"
     },
     {
@@ -29,7 +29,7 @@
           "type": "uint32"
         }
       ],
-      "name": "BlockVerified",
+      "name": "BlockVerification",
       "type": "event"
     },
     {
@@ -48,7 +48,44 @@
           "type": "uint32"
         }
       ],
-      "name": "BlocksReverted",
+      "name": "BlocksRevert",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
+          "internalType": "uint32",
+          "name": "franklinBlockId",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint24",
+          "name": "accountId",
+          "type": "uint24"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint16",
+          "name": "tokenId",
+          "type": "uint16"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint128",
+          "name": "amount",
+          "type": "uint128"
+        }
+      ],
+      "name": "DepositCommit",
       "type": "event"
     },
     {
@@ -61,7 +98,7 @@
       "anonymous": false,
       "inputs": [
         {
-          "indexed": false,
+          "indexed": true,
           "internalType": "address",
           "name": "sender",
           "type": "address"
@@ -87,6 +124,43 @@
       "inputs": [
         {
           "indexed": false,
+          "internalType": "uint32",
+          "name": "franklinBlockId",
+          "type": "uint32"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint24",
+          "name": "accountId",
+          "type": "uint24"
+        },
+        {
+          "indexed": false,
+          "internalType": "address",
+          "name": "owner",
+          "type": "address"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint16",
+          "name": "tokenId",
+          "type": "uint16"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint128",
+          "name": "amount",
+          "type": "uint128"
+        }
+      ],
+      "name": "FullExitCommit",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": false,
           "internalType": "address",
           "name": "sender",
           "type": "address"
@@ -99,7 +173,7 @@
         },
         {
           "indexed": false,
-          "internalType": "uint8",
+          "internalType": "enum Operations.OpType",
           "name": "opType",
           "type": "uint8"
         },
@@ -167,9 +241,9 @@
         },
         {
           "indexed": false,
-          "internalType": "uint128",
+          "internalType": "uint256",
           "name": "amount",
-          "type": "uint128"
+          "type": "uint256"
         }
       ],
       "name": "OnchainWithdrawal",
@@ -192,9 +266,9 @@
       "name": "authFacts",
       "outputs": [
         {
-          "internalType": "bytes",
+          "internalType": "bytes32",
           "name": "",
-          "type": "bytes"
+          "type": "bytes32"
         }
       ],
       "payable": false,
@@ -202,45 +276,25 @@
       "type": "function"
     },
     {
-      "constant": false,
-      "inputs": [
-        {
-          "internalType": "bytes",
-          "name": "_fact",
-          "type": "bytes"
-        },
-        {
-          "internalType": "uint32",
-          "name": "_nonce",
-          "type": "uint32"
-        }
-      ],
-      "name": "authPubkeyHash",
-      "outputs": [],
-      "payable": false,
-      "stateMutability": "nonpayable",
-      "type": "function"
-    },
-    {
       "constant": true,
       "inputs": [
         {
-          "internalType": "address",
+          "internalType": "bytes22",
           "name": "",
-          "type": "address"
-        },
-        {
-          "internalType": "uint16",
-          "name": "",
-          "type": "uint16"
+          "type": "bytes22"
         }
       ],
       "name": "balancesToWithdraw",
       "outputs": [
         {
-          "internalType": "uint128",
-          "name": "",
-          "type": "uint128"
+          "internalType": "uint256",
+          "name": "balanceToWithdraw",
+          "type": "uint256"
+        },
+        {
+          "internalType": "uint8",
+          "name": "gasReserveValue",
+          "type": "uint8"
         }
       ],
       "payable": false,
@@ -367,7 +421,7 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "address",
+          "internalType": "contract IERC20",
           "name": "_token",
           "type": "address"
         },
@@ -384,8 +438,8 @@
       ],
       "name": "depositERC20",
       "outputs": [],
-      "payable": true,
-      "stateMutability": "payable",
+      "payable": false,
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {
@@ -407,6 +461,11 @@
       "constant": false,
       "inputs": [
         {
+          "internalType": "uint24",
+          "name": "_accountId",
+          "type": "uint24"
+        },
+        {
           "internalType": "uint16",
           "name": "_tokenId",
           "type": "uint16"
@@ -417,9 +476,9 @@
           "type": "uint128"
         },
         {
-          "internalType": "uint256[8]",
+          "internalType": "uint256[]",
           "name": "_proof",
-          "type": "uint256[8]"
+          "type": "uint256[]"
         }
       ],
       "name": "exit",
@@ -432,9 +491,9 @@
       "constant": true,
       "inputs": [
         {
-          "internalType": "address",
+          "internalType": "uint24",
           "name": "",
-          "type": "address"
+          "type": "uint24"
         },
         {
           "internalType": "uint16",
@@ -515,8 +574,34 @@
       ],
       "name": "fullExit",
       "outputs": [],
-      "payable": true,
-      "stateMutability": "payable",
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": true,
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_address",
+          "type": "address"
+        },
+        {
+          "internalType": "uint16",
+          "name": "_tokenId",
+          "type": "uint16"
+        }
+      ],
+      "name": "getBalanceToWithdraw",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "payable": false,
+      "stateMutability": "view",
       "type": "function"
     },
     {
@@ -631,6 +716,26 @@
         }
       ],
       "name": "revertBlocks",
+      "outputs": [],
+      "payable": false,
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "constant": false,
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "_pubkey_hash",
+          "type": "bytes"
+        },
+        {
+          "internalType": "uint32",
+          "name": "_nonce",
+          "type": "uint32"
+        }
+      ],
+      "name": "setAuthPubkeyHash",
       "outputs": [],
       "payable": false,
       "stateMutability": "nonpayable",
@@ -816,9 +921,9 @@
           "type": "uint32"
         },
         {
-          "internalType": "uint256[8]",
+          "internalType": "uint256[]",
           "name": "_proof",
-          "type": "uint256[8]"
+          "type": "uint256[]"
         },
         {
           "internalType": "bytes",
@@ -836,14 +941,14 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "address",
+          "internalType": "contract IERC20",
           "name": "_token",
           "type": "address"
         },
         {
-          "internalType": "uint128",
+          "internalType": "uint256",
           "name": "_amount",
-          "type": "uint128"
+          "type": "uint256"
         }
       ],
       "name": "withdrawERC20",
@@ -856,9 +961,9 @@
       "constant": false,
       "inputs": [
         {
-          "internalType": "uint128",
+          "internalType": "uint256",
           "name": "_amount",
-          "type": "uint128"
+          "type": "uint256"
         }
       ],
       "name": "withdrawETH",
