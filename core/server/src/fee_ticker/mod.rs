@@ -76,29 +76,18 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
             .get_fee_from_ticker_in_wei_exact(tx_type, token)
             .await?;
 
-        let max_mantissa = BigUint::from(2u32).pow(FEE_MANTISSA_BIT_WIDTH);
-
-        let mut rounded = UnsignedRationalUtils::round_precision(&ratio, 18)
+        let rounded = UnsignedRationalUtils::round_precision(&ratio, 18)
             .ceil()
             .to_integer();
-
-        let mut cum_remainder = BigUint::from(0u32);
-        let mut current_power_mul = BigUint::from(1u32);
-        while &rounded > &max_mantissa {
-            let remainder = &rounded % 10u32;
-            cum_remainder += &remainder * &current_power_mul;
-            rounded -= &remainder;
-            rounded /= 10u32;
-            current_power_mul *= 10u32;
+        let mut rounded_radix_2 = rounded.to_radix_be(2);
+        let radix2_len = rounded_radix_2.len();
+        if (radix2_len > FEE_MANTISSA_BIT_WIDTH) {
+            rounded_radix_2.truncate(FEE_MANTISSA_BIT_WIDTH);
+            rounded_radix_2.resize(radix2_len, 0);
         }
 
-        let round_ratio = Ratio::new(cum_remainder, current_power_mul.clone());
-        if round_ratio >= Ratio::new(1u32.into(), 2u32.into()) && &rounded != &max_mantissa {
-            rounded += 1u32;
-        }
-        let res = rounded * &current_power_mul;
-
-        Ok(res)
+        Ok(BigUint::from_radix_be(&rounded_radix_2, 2)
+            .expect("Failed to convert fee from rounded value radix 2"))
     }
 
     async fn get_fee_from_ticker_in_wei_exact(
@@ -122,8 +111,10 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
         let gas_price_wei = self.api.get_gas_price_gwei().await? * BigUint::from(10u32).pow(6u32);
         let wei_price_usd = self.api.get_last_quote(TokenLike::Id(0)).await?.usd_price
             / BigUint::from(10u32).pow(18u32);
+
+        let token_precision = self.api.get_token(token.clone()).precision;
         let token_price_usd = self.api.get_last_quote(token.clone()).await?.usd_price
-            / BigUint::from(10u32).pow(18u32); // TODO: add token precision here
+            / BigUint::from(10u32).pow(u32::from(token_precision)); // TODO: add token precision here
 
         Ok(
             ((zkp_cost_chunk * op_chunks + wei_price_usd * gas_cost_tx * gas_price_wei)
@@ -138,20 +129,22 @@ mod test {
     use super::*;
     use crate::fee_ticker::ticker_api::{TokenPrice, UnsignedRationalUtils};
     use crate::state_keeper::ExecutedOpId::Transaction;
+    use bigdecimal::BigDecimal;
     use futures::executor::block_on;
     use futures::Future;
     use models::node::block::ExecutedOperations::Tx;
-    use models::node::{is_fee_amount_packable, TokenId};
+    use models::node::{is_fee_amount_packable, Address, Token, TokenId};
 
     #[derive(Debug, Clone)]
     struct TestToken {
         id: TokenLike,
         price_usd: Ratio<BigUint>,
         risk_factor: Option<Ratio<BigUint>>,
+        precision: u8,
     }
 
     impl TestToken {
-        fn new(id: TokenId, price_usd: f64, risk_factor: Option<f64>) -> Self {
+        fn new(id: TokenId, price_usd: f64, risk_factor: Option<f64>, precision: u8) -> Self {
             Self {
                 id: TokenLike::Id(id),
                 price_usd: UnsignedRationalUtils::deserialize_for_str_with_dot(
@@ -162,6 +155,7 @@ mod test {
                     UnsignedRationalUtils::deserialize_for_str_with_dot(&risk_factor.to_string())
                         .unwrap()
                 }),
+                precision,
             }
         }
 
@@ -172,14 +166,14 @@ mod test {
         }
 
         fn eth() -> Self {
-            Self::new(0, 182.0, None)
+            Self::new(0, 182.0, None, 18)
         }
 
         fn cheap() -> Self {
-            Self::new(1, 0.0016789, Some(2.5))
+            Self::new(1, 0.0016789, Some(2.5), 6)
         }
         fn expensive() -> Self {
-            Self::new(2, 173_134.1923, Some(0.9))
+            Self::new(2, 173_134.1923, Some(0.9), 18)
         }
 
         fn all_tokens() -> Vec<Self> {
@@ -222,7 +216,7 @@ mod test {
                     return Box::new(futures::future::ok(token_price));
                 }
             }
-            unreachable!()
+            unreachable!("incorrect token input")
         }
 
         /// Get current gas price in ETH
@@ -230,6 +224,17 @@ mod test {
             &self,
         ) -> Box<dyn Future<Output = Result<BigUint, failure::Error>> + Unpin> {
             Box::new(futures::future::ok(BigUint::from(10u32))) // 10 Gwei
+        }
+
+        fn get_token(&self, token: TokenLike) -> Token {
+            for test_token in TestToken::all_tokens() {
+                if test_token.id == token {
+                    if let TokenLike::Id(token_id) = test_token.id {
+                        return Token::new(token_id, Address::default(), "", test_token.precision);
+                    }
+                }
+            }
+            unreachable!("incorrect token input")
         }
     }
 
@@ -243,10 +248,11 @@ mod test {
             let fee_in_token =
                 block_on(ticker.get_fee_from_ticker_in_wei_rounded(tx_type, token.clone()))
                     .expect("failed to get fee in token");
+            let token_precision = MockApiProvider.get_token(token.clone()).precision;
             let fee_in_usd = block_on(MockApiProvider.get_last_quote(token.clone()))
                 .expect("failed to get fee in usd")
                 .usd_price
-                / BigUint::from(10u32).pow(18u32)
+                / BigUint::from(10u32).pow(u32::from(token_precision))
                 * fee_in_token;
             fee_in_usd
         };
@@ -276,7 +282,18 @@ mod test {
                 * risk_factor_eth
         };
 
-        let threshold = Ratio::from_integer(BigUint::from(10u32).pow(5u32)).inv();
+        let threshold = UnsignedRationalUtils::ratio_to_big_decimal(
+            &Ratio::new(
+                BigUint::from(2u32),
+                BigUint::from(2u32).pow(FEE_MANTISSA_BIT_WIDTH),
+            ),
+            6,
+        );
+        let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {
+            let max = std::cmp::max(a.clone(), b.clone());
+            let min = std::cmp::min(a.clone(), b.clone());
+            UnsignedRationalUtils::ratio_to_big_decimal(&((&max - &min) / max), 6)
+        };
 
         {
             let expected_price_of_eth_token_transfer_usd =
@@ -288,8 +305,7 @@ mod test {
                 let transfer_fee = get_token_fee_in_usd(TxFeeTypes::Transfer, token.id.clone());
                 let expected_fee =
                     expected_price_of_eth_token_transfer_usd.clone() * token.risk_factor();
-                let transfer_diff = std::cmp::max(&transfer_fee, &expected_fee)
-                    - std::cmp::min(&transfer_fee, &expected_fee);
+                let transfer_diff = get_relative_diff(&transfer_fee, &expected_fee);
                 assert!(
                     transfer_diff <= threshold.clone(),
                     "token transfer fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>", token.id, 
@@ -300,8 +316,7 @@ mod test {
                 let withdraw_fee = get_token_fee_in_usd(TxFeeTypes::Withdraw, token.id.clone());
                 let expected_fee =
                     expected_price_of_eth_token_withdraw_usd.clone() * token.risk_factor();
-                let withdraw_diff = std::cmp::max(&withdraw_fee, &expected_fee)
-                    - std::cmp::min(&withdraw_fee, &expected_fee);
+                let withdraw_diff = get_relative_diff(&withdraw_fee, &expected_fee);
                 assert!(
                     withdraw_diff <= threshold.clone(),
                     "token withdraw fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>", token.id,

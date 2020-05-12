@@ -3,7 +3,7 @@ use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use failure::Fail;
 use futures::Future;
-use models::node::TokenLike;
+use models::node::{Token, TokenLike};
 use num::bigint::{ToBigInt, ToBigUint};
 use num::rational::Ratio;
 use num::traits::Pow;
@@ -96,6 +96,8 @@ pub trait FeeTickerAPI {
     fn get_gas_price_gwei(
         &self,
     ) -> Box<dyn Future<Output = Result<BigUint, failure::Error>> + Unpin>;
+
+    fn get_token(&self, token: TokenLike) -> Token;
 }
 
 impl From<CoinmarketcapQuote> for TokenPrice {
@@ -128,6 +130,10 @@ impl FeeTickerAPI for TickerApi {
         &self,
     ) -> Box<dyn Future<Output = Result<BigUint, failure::Error>> + Unpin> {
         unimplemented!()
+    }
+
+    fn get_token(&self, token: TokenLike) -> Token {
+        unimplemented!();
     }
 }
 
