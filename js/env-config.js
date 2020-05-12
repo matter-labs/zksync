@@ -11,7 +11,14 @@ export default {
        WS_API_ADDR: "wss://stage-api.zksync.dev/jsrpc-ws",
        HTTP_RPC_API_ADDR: "https://stage-api.zksync.dev/jsrpc",
     },
+    // TODO: remove this entry when migrate to zkscan.io
     "https://demo.zksync.dev": {
+        API_SERVER: "https://testnet.zksync.dev",
+        ETH_NETWORK: "rinkeby",
+        WS_API_ADDR: "wss://testnet.zksync.dev/jsrpc-ws",
+        HTTP_RPC_API_ADDR: "https://testnet.zksync.dev/jsrpc",
+    },
+    "https://rinkeby.zkscan.io": {
         API_SERVER: "https://testnet.zksync.dev",
         ETH_NETWORK: "rinkeby",
         WS_API_ADDR: "wss://testnet.zksync.dev/jsrpc-ws",
