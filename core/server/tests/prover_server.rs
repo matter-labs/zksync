@@ -324,7 +324,7 @@ fn api_server_publish_dummy() {
     let rounds_interval = time::Duration::from_secs(10);
     let addr = spawn_server(prover_timeout, rounds_interval);
 
-    let client = reqwest::Client::new();
+    let client = reqwest::blocking::Client::new();
     let res = client
         .post(&format!("http://{}/publish", &addr))
         .json(&client::PublishReq {

@@ -14,87 +14,58 @@ use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TokenPrice {
+pub(super) async fn fetch_coimarketcap_data(
+    client: &reqwest::Client,
+    base_url: Url,
+    token_symbol: &str,
+) -> Result<CoinmarketCapResponse, failure::Error> {
+    let request_url = base_url
+        .join(&format!(
+            "cryptocurrency/quotes/latest?symbol={}&aux=",
+            token_symbol
+        ))
+        .expect("failed to join url path");
+    Ok(client.get(request_url).send().await?.json().await?)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
+pub(super) struct CoinmarketcapQuote {
     #[serde(with = "UnsignedRatioSerializeAsDecimal")]
-    pub usd_price: Ratio<BigUint>,
+    pub price: Ratio<BigUint>,
     pub last_updated: DateTime<Utc>,
 }
 
-/// Api responsible for querying for TokenPrices
-pub trait FeeTickerAPI {
-    /// Get last price from ticker
-    fn get_last_quote(
-        &self,
-        token: TokenLike,
-    ) -> Box<dyn Future<Output = Result<TokenPrice, failure::Error>> + Unpin>;
-
-    /// Get current gas price in ETH
-    fn get_gas_price_gwei(
-        &self,
-    ) -> Box<dyn Future<Output = Result<BigUint, failure::Error>> + Unpin>;
-
-    fn get_token(&self, token: TokenLike) -> Token;
-}
-
-impl From<CoinmarketcapQuote> for TokenPrice {
-    fn from(quote: CoinmarketcapQuote) -> TokenPrice {
-        TokenPrice {
-            usd_price: quote.price,
-            last_updated: quote.last_updated,
-        }
-    }
-}
-
-struct TickerApi {
-    api_base_url: Url,
-    token_db_cache: TokenDBCache,
-}
-
-impl FeeTickerAPI for TickerApi {
-    /// Get last price from ticker
-    fn get_last_quote(
-        &self,
-        token: TokenLike,
-    ) -> Box<dyn Future<Output = Result<TokenPrice, failure::Error>> + Unpin> {
-        // let async_func = async move { Err(failure::format_err!("tt")) };
-
-        unimplemented!()
-    }
-
-    /// Get current gas price in ETH
-    fn get_gas_price_gwei(
-        &self,
-    ) -> Box<dyn Future<Output = Result<BigUint, failure::Error>> + Unpin> {
-        unimplemented!()
-    }
-
-    fn get_token(&self, token: TokenLike) -> Token {
-        unimplemented!();
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-struct CoinmarketcapQuote {
-    #[serde(with = "UnsignedRatioSerializeAsDecimal")]
-    price: Ratio<BigUint>,
-    last_updated: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
-struct CoinmarketcapTokenInfo {
-    quote: HashMap<TokenLike, CoinmarketcapQuote>,
+pub(super) struct CoinmarketcapTokenInfo {
+    pub quote: HashMap<TokenLike, CoinmarketcapQuote>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct CoinmarketCapResponce {
-    data: HashMap<TokenLike, CoinmarketcapTokenInfo>,
+pub(super) struct CoinmarketCapResponse {
+    pub data: HashMap<TokenLike, CoinmarketcapTokenInfo>,
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use models::config_options::{get_env, parse_env};
     use std::str::FromStr;
+
+    #[test]
+    // Should be run in the dev environment
+    fn test_fetch_coinmarketcap_data() {
+        let mut runtime = tokio::runtime::Builder::new()
+            .basic_scheduler()
+            .enable_all()
+            .build()
+            .expect("tokio runtime");
+        let ticker_url = parse_env("TICKER_URL");
+        let client = reqwest::Client::new();
+        runtime
+            .block_on(fetch_coimarketcap_data(&client, ticker_url, "ERC-1"))
+            .expect("Failed to get data from ticker");
+    }
+
     #[test]
     fn parse_coinmarket_cap_responce() {
         let example = r#"{
@@ -138,7 +109,7 @@ mod test {
     }
 }"#;
         let resp =
-            serde_json::from_str::<CoinmarketCapResponce>(example).expect("serialization failed");
+            serde_json::from_str::<CoinmarketCapResponse>(example).expect("serialization failed");
         let token_data = resp
             .data
             .get(&TokenLike::Symbol("ETH".to_string()))
