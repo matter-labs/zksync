@@ -29,12 +29,10 @@ steps:
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
-  - zksync plonk-setup download monomial `get_required_plonk_setup_powers`
+  - zksync plonk-setup check || zksync plonk-setup download
   - zksync verify-keys unpack
-  - zksync db-wait
-  - zksync db-setup
+  - zksync deploy-dev-erc20
   - zksync build-contracts
-  - zksync db-reset
   - zksync genesis
   - zksync redeploy
   - f cargo build --release
@@ -120,10 +118,9 @@ steps:
   - zksync dummy-prover ensure-disabled
   - zksync env ci
   - zksync yarn
-  - zksync db-wait
-  - zksync db-setup
   - zksync plonk-setup check || zksync plonk-setup download
   - zksync verify-keys unpack
+  - zksync deploy-dev-erc20
   - zksync dummy-prover ensure-disabled
   depends_on:
   - restore-cache
