@@ -28,10 +28,10 @@ struct OperationsQueue {
 }
 
 impl OperationsQueue {
-    fn new() -> Self {
+    fn new(last_loaded_block: BlockNumber) -> Self {
         Self {
             operations: VecDeque::new(),
-            last_loaded_block: 0,
+            last_loaded_block,
         }
     }
 
@@ -96,10 +96,10 @@ pub struct ProversDataPool {
 }
 
 impl ProversDataPool {
-    pub fn new(limit: i64) -> Self {
+    pub fn new(last_loaded_block: BlockNumber, limit: i64) -> Self {
         Self {
             limit,
-            op_queue: OperationsQueue::new(),
+            op_queue: OperationsQueue::new(last_loaded_block),
             prepared: HashMap::new(),
         }
     }
