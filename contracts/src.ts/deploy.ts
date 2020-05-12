@@ -227,14 +227,18 @@ export class Deployer {
                 [this.addresses.DeployFactory], ["address"]));
     }
 
-    public async deployAll() {
-        await this.deployZkSyncTarget();
-        await this.deployGovernanceTarget();
-        await this.deployVerifierTarget();
-        await this.deployProxiesAndGatekeeper();
+    public async deployAll(ethTxOptions?: ethers.providers.TransactionRequest) {
+        await this.deployZkSyncTarget(ethTxOptions);
+        await this.deployGovernanceTarget(ethTxOptions);
+        await this.deployVerifierTarget(ethTxOptions);
+        await this.deployProxiesAndGatekeeper(ethTxOptions);
     }
 
     public governanceContract(signerOrProvider: Signer | Provider): Contract {
         return new ethers.Contract(this.addresses.Governance, this.contracts.governance.abi, signerOrProvider);
+    }
+
+    public zkSyncContract(signerOrProvider: Signer | Provider): Contract {
+        return new ethers.Contract(this.addresses.ZkSync, this.contracts.zkSync.abi, signerOrProvider);
     }
 }
