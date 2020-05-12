@@ -2,7 +2,6 @@
 use std::str::FromStr;
 use std::time::{self, Duration};
 // External deps
-use backoff;
 use backoff::Operation;
 use failure::bail;
 use failure::format_err;
