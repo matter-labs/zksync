@@ -1,22 +1,16 @@
 import {deployContract} from "ethereum-waffle";
 import {ethers, Wallet} from "ethers";
 import {parseEther} from "ethers/utils";
+import {readContractCode} from "../src.ts/deploy";
 
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
-
-const ERC20MintableContract = function() {
-    const contract = require("openzeppelin-solidity/build/contracts/ERC20Mintable");
-    contract.evm = {bytecode: contract.bytecode};
-    contract.interface = contract.abi;
-    return contract;
-}();
 
 async function main() {
     const wallet = Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
 
     const erc20 = await deployContract(
         wallet,
-        ERC20MintableContract, [],
+        readContractCode("TEST-ERC20"), [],
         {gasLimit: 5000000},
     );
 

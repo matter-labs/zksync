@@ -6,4 +6,4 @@ then
 fi
 
 cd contracts;
-yarn deploy-testkit | tee ../deploy.log;
+yarn deploy-testkit

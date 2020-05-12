@@ -2,11 +2,14 @@ import {ArgumentParser} from "argparse";
 import {deployContract} from "ethereum-waffle";
 import {ethers} from "ethers";
 import {AddressZero} from "ethers/constants";
+import {readContractCode, readTestContracts} from "../src.ts/deploy";
 
 const {performance} = require("perf_hooks");
 const {expect} = require("chai");
 
 export const FranklinTestNoInitContractCode = require(`../build/ZkSyncTestNoInit`);
+
+const testContracts = readTestContracts();
 
 async function main() {
     try {
@@ -33,13 +36,13 @@ async function main() {
 
         const proxyContract = new ethers.Contract(
             args.contractAddress,
-            proxyContractCode.interface,
+            testContracts.proxy.interface,
             wallet,
         );
 
         const upgradeGatekeeper = new ethers.Contract(
             args.upgradeGatekeeperAddress,
-            upgradeGatekeeperTestContractCode.interface,
+            testContracts.upgradeGatekeeper.interface,
             wallet,
         );
 

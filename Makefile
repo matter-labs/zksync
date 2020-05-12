@@ -163,9 +163,6 @@ build-contracts: confirm_action prepare-contracts
 	@cd contracts && yarn build
 
 prepare-contracts:
-ifeq (localhost,$(ETH_NETWORK))
-	@bin/deploy-dev-erc20.sh
-endif
 	@cargo run --release --bin gen_token_add_contract
 	@cp ${KEY_DIR}/account-${ACCOUNT_TREE_DEPTH}_balance-${BALANCE_TREE_DEPTH}/KeysWithPlonkVerifier.sol contracts/contracts/ || (echo "please download keys" && exit 1)
 
@@ -174,11 +171,8 @@ endif
 ci-check:
 	@ci-check.sh
 	
-integration-testkit: build-contracts
+integration-testkit:
 	@bin/integration-testkit.sh
-
-migration-test: build-contracts
-	cargo run --bin migration_test --release
 
 itest: # contracts simple integration tests
 	@bin/prepare-test-contracts.sh
@@ -315,7 +309,6 @@ nodes:
 dev-up:
 	@docker-compose up -d postgres geth
 	@docker-compose up -d tesseracts
-
 
 dev-down:
 	@docker-compose stop tesseracts

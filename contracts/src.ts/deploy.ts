@@ -1,5 +1,5 @@
 import {deployContract} from "ethereum-waffle";
-import {ethers} from "ethers";
+import {Contract, ethers, Signer} from "ethers";
 import {formatEther, Interface, parseEther} from "ethers/utils";
 import * as fs from "fs";
 import {
@@ -8,6 +8,7 @@ import {
     publishAbiToTesseracts,
     publishSourceCodeToEtherscan,
 } from "./publish-utils";
+import {Provider} from "ethers/providers";
 
 type ContractName = "Governance" | "ZkSync" | "Verifier" | "Proxy" | "UpgradeGatekeeper";
 
@@ -231,5 +232,9 @@ export class Deployer {
         await this.deployGovernanceTarget();
         await this.deployVerifierTarget();
         await this.deployProxiesAndGatekeeper();
+    }
+
+    public governanceContract(signerOrProvider: Signer | Provider): Contract {
+        return new ethers.Contract(this.addresses.Governance, this.contracts.governance.abi, signerOrProvider);
     }
 }
