@@ -65,6 +65,7 @@ fn main() {
                     address: token.address[2..]
                         .parse()
                         .expect("failed to parse token address"),
+                    precision: token.precision,
                 })
                 .expect("failed to store token");
         }

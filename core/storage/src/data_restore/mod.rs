@@ -131,7 +131,8 @@ impl<'a> DataRestoreSchema<'a> {
             self.update_block_events(block_events)?;
 
             for &NewTokenEvent { id, address } in token_events.iter() {
-                let token = Token::new(id, address, &format!("ERC20-{}", id));
+                // TODO: don't add tokens using ETH events.
+                let token = Token::new(id, address, &format!("ERC20-{}", id), 18);
                 TokensSchema(self.0).store_token(token)?;
             }
 

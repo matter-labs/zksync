@@ -362,7 +362,8 @@ impl<T: Transport> EthWatch<T> {
             .access_storage()
             .map(|storage| {
                 for (&id, &address) in &self.eth_state.tokens {
-                    let token = Token::new(id, address, &format!("ERC20-{}", id));
+                    // TODO: don't add tokens using ETH events.
+                    let token = Token::new(id, address, &format!("ERC20-{}", id), 18);
                     if let Err(e) = storage.tokens_schema().store_token(token) {
                         warn!("Failed to add token to db: {:?}", e);
                     }
