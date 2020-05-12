@@ -3,7 +3,6 @@ use std::fmt;
 use std::sync::{mpsc, Arc, Mutex};
 use std::{thread, time};
 // External deps
-use crypto_exports::franklin_crypto::{self, bellman};
 use crypto_exports::pairing::ff::PrimeField;
 use num::BigUint;
 // Workspace deps

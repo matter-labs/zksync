@@ -1,10 +1,10 @@
-use crate::fee_ticker::ticker_api::UnsignedRationalUtils;
 use chrono::{DateTime, Utc};
 use futures::channel::mpsc::{self, Receiver};
 use models::node::{
     closest_packable_fee_amount, is_fee_amount_packable, TokenLike, TransferOp, WithdrawOp,
 };
 use models::params::{FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH};
+use models::primitives::round_precision;
 use num::bigint::ToBigUint;
 use num::rational::Ratio;
 use num::traits::{Inv, Pow};
@@ -76,9 +76,7 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
             .get_fee_from_ticker_in_wei_exact(tx_type, token)
             .await?;
 
-        let rounded = UnsignedRationalUtils::round_precision(&ratio, 18)
-            .ceil()
-            .to_integer();
+        let rounded = round_precision(&ratio, 18).ceil().to_integer();
         let mut rounded_radix_2 = rounded.to_radix_be(2);
         let radix2_len = rounded_radix_2.len();
         if (radix2_len > FEE_MANTISSA_BIT_WIDTH) {
@@ -127,13 +125,14 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::fee_ticker::ticker_api::{TokenPrice, UnsignedRationalUtils};
+    use crate::fee_ticker::ticker_api::TokenPrice;
     use crate::state_keeper::ExecutedOpId::Transaction;
     use bigdecimal::BigDecimal;
     use futures::executor::block_on;
     use futures::Future;
     use models::node::block::ExecutedOperations::Tx;
     use models::node::{is_fee_amount_packable, Address, Token, TokenId};
+    use models::primitives::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
 
     #[derive(Debug, Clone)]
     struct TestToken {
@@ -147,13 +146,15 @@ mod test {
         fn new(id: TokenId, price_usd: f64, risk_factor: Option<f64>, precision: u8) -> Self {
             Self {
                 id: TokenLike::Id(id),
-                price_usd: UnsignedRationalUtils::deserialize_for_str_with_dot(
+                price_usd: UnsignedRatioSerializeAsDecimal::deserialize_for_str_with_dot(
                     &price_usd.to_string(),
                 )
                 .unwrap(),
                 risk_factor: risk_factor.map(|risk_factor| {
-                    UnsignedRationalUtils::deserialize_for_str_with_dot(&risk_factor.to_string())
-                        .unwrap()
+                    UnsignedRatioSerializeAsDecimal::deserialize_for_str_with_dot(
+                        &risk_factor.to_string(),
+                    )
+                    .unwrap()
                 }),
                 precision,
             }
@@ -183,8 +184,10 @@ mod test {
 
     fn get_test_ticker_config() -> TickerConfig {
         TickerConfig {
-            zkp_cost_chunk_usd: UnsignedRationalUtils::deserialize_for_str_with_dot("0.001")
-                .unwrap(),
+            zkp_cost_chunk_usd: UnsignedRatioSerializeAsDecimal::deserialize_for_str_with_dot(
+                "0.001",
+            )
+            .unwrap(),
             gas_cost_tx: vec![
                 (TxFeeTypes::Transfer, BigUint::from(350u32)),
                 (TxFeeTypes::Withdraw, BigUint::from(10000u32)),
@@ -282,7 +285,7 @@ mod test {
                 * risk_factor_eth
         };
 
-        let threshold = UnsignedRationalUtils::ratio_to_big_decimal(
+        let threshold = ratio_to_big_decimal(
             &Ratio::new(
                 BigUint::from(2u32),
                 BigUint::from(2u32).pow(FEE_MANTISSA_BIT_WIDTH),
@@ -292,7 +295,7 @@ mod test {
         let get_relative_diff = |a: &Ratio<BigUint>, b: &Ratio<BigUint>| -> BigDecimal {
             let max = std::cmp::max(a.clone(), b.clone());
             let min = std::cmp::min(a.clone(), b.clone());
-            UnsignedRationalUtils::ratio_to_big_decimal(&((&max - &min) / max), 6)
+            ratio_to_big_decimal(&((&max - &min) / max), 6)
         };
 
         {
@@ -309,8 +312,8 @@ mod test {
                 assert!(
                     transfer_diff <= threshold.clone(),
                     "token transfer fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>", token.id, 
-                    UnsignedRationalUtils::serialize_to_str_with_dot(&transfer_fee,6),
-                    UnsignedRationalUtils::serialize_to_str_with_dot(&expected_fee,6),
+                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&transfer_fee,6),
+                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&expected_fee,6),
                     transfer_diff, &threshold);
 
                 let withdraw_fee = get_token_fee_in_usd(TxFeeTypes::Withdraw, token.id.clone());
@@ -320,8 +323,8 @@ mod test {
                 assert!(
                     withdraw_diff <= threshold.clone(),
                     "token withdraw fee is above eth fee threshold: <{:?}: {}, ETH: {}, diff: {}, threshold: {}>", token.id,
-                    UnsignedRationalUtils::serialize_to_str_with_dot(&withdraw_fee,6),
-                    UnsignedRationalUtils::serialize_to_str_with_dot(&expected_fee,6),
+                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&withdraw_fee,6),
+                    UnsignedRatioSerializeAsDecimal::serialize_to_str_with_dot(&expected_fee,6),
                     withdraw_diff, &threshold);
             }
         }

@@ -4,7 +4,6 @@ use serde_json::value::Value;
 // Workspace imports
 // Local imports
 use crate::schema::*;
-use crate::utils::StoredBigUint;
 
 #[derive(Debug, Clone, Insertable)]
 #[table_name = "operations"]

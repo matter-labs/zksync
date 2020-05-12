@@ -7,7 +7,6 @@ use models::node::priority_ops::FranklinPriorityOp;
 use models::node::priority_ops::PriorityOp;
 use models::node::tx::FranklinTx;
 use models::node::{AccountId, AccountMap, AccountUpdates, Fr};
-use num::BigUint;
 use plasma::state::{CollectedFee, OpSuccess, PlasmaState};
 use web3::types::Address;
 

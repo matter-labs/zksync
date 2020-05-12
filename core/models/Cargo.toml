@@ -5,6 +5,7 @@ edition = "2018"
 
 [dependencies]
 num = { version = "0.2", features = ["serde"] }
+bigdecimal = { version = "0.1", features = ["serde"]}
 crypto_exports = { path = "../crypto_exports", version = "0.1.0" }
 
 ethabi = "9.0.0"
