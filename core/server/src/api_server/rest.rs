@@ -618,36 +618,11 @@ fn handle_block_explorer_search(
 }
 
 fn start_server(state: AppState, bind_to: SocketAddr) {
+    let logger_format = crate::api_server::loggers::rest::get_logger_format();
     HttpServer::new(move || {
         App::new()
             .data(state.clone())
-            .wrap(middleware::Logger::new(
-                "\
-            %a %t \"%r\" %s %b %T
-            { \
-            \"referrer\": \"%{referrer}i\", \
-            \"host\": \"%{host}i\", \
-            \"x-request-id\": \"%{x-request-id}i\", \
-            \"x-real-ip\": \"%{x-real-ip}i\", \
-            \"x-forwarded-for\": \"%{x-forwarded-for}i\", \
-            \"x-forwarded-host\": \"%{x-forwarded-host}i\", \
-            \"x-forwarded-port\": \"%{x-forwarded-port}i\", \
-            \"x-forwarded-proto\": \"%{x-forwarded-proto}i\", \
-            \"x-original-uri\": \"%{x-original-uri}i\", \
-            \"x-scheme\": \"%{x-scheme}i\", \
-            \"x-original-forwarded-for\": \"%{x-original-forwarded-for}i\", \
-            \"content-length\": \"%{content-length}i\", \
-            \"accept-encoding\": \"%{accept-encoding}i\", \
-            \"cf-ipcountry\": \"%{cf-ipcountry}i\", \
-            \"cf-ray\": \"%{cf-ray}i\", \
-            \"cf-visitor\": \"%{cf-visitor}i\", \
-            \"accept\": \"%{accept}i\", \
-            \"content-type\": \"%{content-type}i\", \
-            \"user-agent\": \"%{user-agent}i\", \
-            \"cf-request-id\": \"%{cf-request-id}i\", \
-            \"cf-connecting-ip\": \"%{cf-connecting-ip}i\" \
-            }",
-            ))
+            .wrap(middleware::Logger::new(&logger_format))
             .wrap(Cors::new().send_wildcard().max_age(3600))
             .service(
                 web::scope("/api/v0.1")

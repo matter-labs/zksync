@@ -268,8 +268,7 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
 (async () => {
     try {
-        // syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
-        syncProvider = await Provider.newHttpProvider(process.env.HTTP_RPC_API_ADDR);
+        syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
         const ERC20_ADDRESS = process.env.TEST_ERC20;
         const ERC20_SYMBOL = syncProvider.tokenSet.resolveTokenSymbol(ERC20_ADDRESS);
 

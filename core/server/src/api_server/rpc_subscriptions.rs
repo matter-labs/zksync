@@ -178,32 +178,6 @@ struct RpcSubApp {
     event_sub_sender: mpsc::Sender<EventNotifierRequest>,
 }
 
-mod logs {
-    use jsonrpc_ws_server::ws::Request;
-    use jsonrpc_ws_server::ws::Response;
-    use serde_json::to_string;
-    use std::collections::HashMap;
-
-    pub(super) fn request_middleware(request: &Request) -> Option<Response> {
-        let mut headers = HashMap::new();
-
-        for (k, v) in request.headers() {
-            match std::str::from_utf8(&v) {
-                Ok(v) => {
-                    headers.insert(k, v);
-                }
-                Err(e) => error!("Error decoding {}: {}", k, e),
-            }
-        }
-        info!(
-            "WS handshake headers: {}",
-            serde_json::to_string(&headers).expect("hashmap with string keys")
-        );
-
-        None
-    }
-}
-
 #[allow(clippy::too_many_arguments)]
 pub fn start_ws_server(
     config_options: &ConfigurationOptions,
@@ -261,7 +235,7 @@ pub fn start_ws_server(
                 io,
                 |context: &RequestContext| Arc::new(Session::new(context.sender())),
             )
-            .request_middleware(logs::request_middleware)
+            .request_middleware(super::loggers::ws_rpc::request_middleware)
             .event_loop_executor(task_executor.executor())
             .start(&addr)
             .expect("Unable to start RPC ws server");
