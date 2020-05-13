@@ -22,10 +22,10 @@ export interface AccountState {
             // Token are indexed by their symbol (e.g. "ETH")
             [token: string]: {
                 // Sum of pending deposits for the token.
-                amount: utils.BigNumberish,
+                amount: utils.BigNumberish;
                 // Value denoting the block number when the funds are expected
                 // to be received by zkSync network.
-                expectedAcceptBlock: number,
+                expectedAcceptBlock: number;
             };
         };
     };
@@ -59,7 +59,7 @@ export interface Signature {
 
 export interface Transfer {
     type: "Transfer";
-    accountId: number,
+    accountId: number;
     from: Address;
     to: Address;
     token: number;
@@ -71,7 +71,7 @@ export interface Transfer {
 
 export interface Withdraw {
     type: "Withdraw";
-    accountId: number,
+    accountId: number;
     from: Address;
     to: Address;
     token: number;
@@ -83,7 +83,7 @@ export interface Withdraw {
 
 export interface ChangePubKey {
     type: "ChangePubKey";
-    accountId: number,
+    accountId: number;
     account: Address;
     newPkHash: PubKeyHash;
     nonce: number;

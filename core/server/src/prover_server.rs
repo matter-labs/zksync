@@ -176,7 +176,10 @@ pub fn start_prover_server(
         .name("prover_server".to_string())
         .spawn(move || {
             let _panic_sentinel = ThreadPanicNotify(panic_notify.clone());
-            let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new(10)));
+            let data_pool = Arc::new(RwLock::new(pool::ProversDataPool::new(
+                tree_block_number,
+                10,
+            )));
 
             // Start pool maintainer thread.
             let pool_maintainer = pool::Maintainer::new(

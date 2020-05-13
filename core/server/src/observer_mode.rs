@@ -2,13 +2,10 @@
 //! The state is then fed to other actors when server transitions to the leader mode.
 
 use crate::state_keeper::PlasmaStateInitParams;
-use circuit::witness::change_pubkey_offchain::apply_change_pubkey_offchain_tx;
-use circuit::witness::close_account::apply_close_account_tx;
-use circuit::witness::deposit::apply_deposit_tx;
-use circuit::witness::full_exit::apply_full_exit_tx;
-use circuit::witness::transfer::apply_transfer_tx;
-use circuit::witness::transfer_to_new::apply_transfer_to_new_tx;
-use circuit::witness::withdraw::apply_withdraw_tx;
+use circuit::witness::{
+    ChangePubkeyOffChainWitness, CloseAccountWitness, DepositWitness, FullExitWitness,
+    TransferToNewWitness, TransferWitness, WithdrawWitness, Witness,
+};
 use log::info;
 use models::circuit::account::CircuitAccount;
 use models::circuit::CircuitAccountTree;
@@ -109,26 +106,32 @@ impl ObservedState {
         for op in ops {
             match op {
                 FranklinOp::Deposit(deposit) => {
-                    apply_deposit_tx(&mut self.circuit_acc_tree, &deposit);
+                    DepositWitness::apply_tx(&mut self.circuit_acc_tree, &deposit);
                 }
                 FranklinOp::Transfer(transfer) => {
-                    apply_transfer_tx(&mut self.circuit_acc_tree, &transfer);
+                    TransferWitness::apply_tx(&mut self.circuit_acc_tree, &transfer);
                 }
                 FranklinOp::TransferToNew(transfer_to_new) => {
-                    apply_transfer_to_new_tx(&mut self.circuit_acc_tree, &transfer_to_new);
+                    TransferToNewWitness::apply_tx(&mut self.circuit_acc_tree, &transfer_to_new);
                 }
                 FranklinOp::Withdraw(withdraw) => {
-                    apply_withdraw_tx(&mut self.circuit_acc_tree, &withdraw);
+                    WithdrawWitness::apply_tx(&mut self.circuit_acc_tree, &withdraw);
                 }
                 FranklinOp::Close(close) => {
-                    apply_close_account_tx(&mut self.circuit_acc_tree, &close);
+                    CloseAccountWitness::apply_tx(&mut self.circuit_acc_tree, &close);
                 }
                 FranklinOp::FullExit(full_exit_op) => {
                     let success = full_exit_op.withdraw_amount.is_some();
-                    apply_full_exit_tx(&mut self.circuit_acc_tree, &full_exit_op, success);
+                    FullExitWitness::apply_tx(
+                        &mut self.circuit_acc_tree,
+                        &(*full_exit_op, success),
+                    );
                 }
                 FranklinOp::ChangePubKeyOffchain(change_pkhash_op) => {
-                    apply_change_pubkey_offchain_tx(&mut self.circuit_acc_tree, &change_pkhash_op);
+                    ChangePubkeyOffChainWitness::apply_tx(
+                        &mut self.circuit_acc_tree,
+                        &change_pkhash_op,
+                    );
                 }
                 FranklinOp::Noop(_) => {}
             }

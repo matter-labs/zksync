@@ -108,23 +108,16 @@ export default {
                 let onchainBalances          =       window.walletDecorator.onchainBalancesAsRenderableList();
                 let franklinBalances         =       window.walletDecorator.franklinBalancesAsRenderableList();
                 let franklinBalancesWithInfo =       window.walletDecorator.franklinBalancesAsRenderableListWithInfo();
-                let pendingOps               = await window.walletDecorator.pendingOperationsAsRenderableList();
-
                 this.walletInfo = {
                     onchainBalances,
                     franklinBalances,
                     franklinBalancesWithInfo,
-                    pendingOps,
+                    pendingOps: null,
                 };
 
             } catch (e) {
                 console.log('updateaccountinfo error:', e);
                 let message = e.message;
-                let franklinServerReachable = await isReachable(this.config.API_SERVER);
-                if (franklinServerReachable == false) {
-                    message = "zkSync server unavailable, check your internet connection.";
-                }
-                
                 this.displayAlert({
                     message: message,
                     variant: 'danger',
