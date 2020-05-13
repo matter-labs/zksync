@@ -215,7 +215,7 @@ Legend:
 
 - Transaction: what users can submit to the operator directly.
 - Priority operation: what users can submit to the zkSync smart contract.
-- Rollup operation: what operator creates from `Transaction` or `Priority operation` and use to create witness for circuit.
+- Rollup operation: part of the rollup block representing `Transaction` or `Priority operation`.
 - Onchain operation: what the operator can put into the rollup block pubdata (operation pubdata).
 - Node implementation: node model that describes an operation.
 - Circuit implementation: circuit model that describes the operation and its witness.
@@ -225,33 +225,32 @@ Legend:
 
 ### 0. Rollup operation lifecycle
 
-1. User creates `Transaction` or `Priority operation`.
-2. Operator after processing it creates `Rollup operation` and executes them.
-3. Group of `Rollup operations` are committed the zkSync smart contract as a block and some checks are enforced for some `Rollup operations`.
-4. Proof for the block is posted to the zkSync smart contract and state after applying `Rollup operations` is considered final.
+1. User creates a `Transaction` or a `Priority operation`.
+2. After processing this request, operator creates a `Rollup operation` and adds it to the block.
+3. Once the block is complete, operator submits it to the zkSync smart contract as a block commitment. Part of the logic of some `Rollup operations` is checked by the smart contract.
+4. The proof for the block is submitted to the zkSync smart contract as the block verification. If the verification succeeds, the new state is considered finalized.
 
-#### Definition used in circuit description
+#### Definitions used in circuit description
 
-Circuit invariants and updates are written in python-like pseudocode for simplicity.
-And describes invariants that should be preserved after rollup operation execution and
+Critical circuit logic is described below in a python-like pseudocode for simplicity of comprehension.
+It describes invariants that should be preserved after rollup operation execution and
 account tree updates that should be performed if this invariants are true.
 
-There are two main invariant function `tree_invariants` and `pubdata_invariants`. Each of the
-boolean expressions in this functions should evaluate to true.
+There are two main invariant functions: `tree_invariants` and `pubdata_invariants`. Each predicate in these functions should evaluate to true.
 
 Functions and data structures used in this pseudocode language:
 ```
-# returns account in the account tree given its id, it always returns something, since account tree is filled by empty account by default.
+# Returns account in the account tree given its id; it always returns something, since account tree is filled by empty account by default.
 get_account_tree(account_id) -> Account 
 
-# unpacks packed amount or fee, this functions are implicit invariants that ammount and fee is packable
+# Unpacks packed amount or fee; these functions implicitly enforce the invariant that amount and fee is packable
 unpack_amount(packed_amount) -> StateAmount
 unpack_fee(packed_fee) -> StateAmount
 
 # Checks if account is empty: address, pubkey_hash, nonce and all balances are 0.
 is_account_empty(Account) -> bool
 
-# returns signer for the given transaction
+# Returns signer for the given transaction
 recover_signer_pubkey_hash(tx) -> RollupPubkeyHash 
 
 # Account data structure
@@ -346,12 +345,12 @@ Reads as: transfer from account #4 token #2 to account #3 amount in packed repre
 |amount|PackedTxAmount|Amount of funds sent|
 |fee|PackedFee|Amount of fee paid|
 |nonce|Nonce|A one-time code that specifies the order of transactions|
-|signature|Signanture|[Signature](#Transaction-Singature) of previous fields, see spec below|
+|signature|Signanture|[Signature](#Transaction-Singature) of previous fields, see the spec below|
 
 ##### Example
 
 User transaction representation. 
-(NOTE: this representation looks different compared to actual transaction representation which is determined by signed values).
+(NOTE: tx bytecode differs slightly from this representation due to data packing, see the spec below).
 
 ```json
 {
@@ -590,7 +589,7 @@ Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb1
 ##### Example
 
 User transaction representation. 
-(NOTE: this representation looks different compared to actual transaction representation which is determined by signed values).
+(NOTE: tx bytecode differs slightly from this representation due to data packing, see the spec below)..
 
 ```json
 {
@@ -1341,5 +1340,4 @@ Algorithm: SHA-256 according to [RFC4634](https://tools.ietf.org/html/rfc4634).
 2. Basics of SMT [Fichter K.: What’s a Sparse Merkle Tree? (2018)](https://medium.com/@kelvinfichter/whats-a-sparse-merkle-tree-acda70aeb837)
 
 In zkSync we use a sparse Merkle tree with a flexible hashing strategy. We can change its depth depending on how many accounts we want to have.
-
 
