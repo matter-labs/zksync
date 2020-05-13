@@ -92,10 +92,10 @@ pub struct ProversDataPool {
 }
 
 impl ProversDataPool {
-    pub fn new(block_number: BlockNumber, limit: i64) -> Self {
+    pub fn new(last_loaded_block: BlockNumber, limit: i64) -> Self {
         Self {
             limit,
-            op_queue: OperationsQueue::new(block_number),
+            op_queue: OperationsQueue::new(last_loaded_block),
             prepared: HashMap::new(),
         }
     }

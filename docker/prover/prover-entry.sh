@@ -19,7 +19,8 @@ echo Downloading setup powers $REQUIRED_SETUP_POWS
 
 /bin/plonk-setup download monomial $REQUIRED_SETUP_POWS
 # key dir is mounted as volume on kubernetes, so we have to copy packed keys from somewhere else
-cp -r /keys-packed/* $ZKSYNC_HOME/keys/packed/
+rm -rf $ZKSYNC_HOME/keys/packed
+mv /keys-packed $ZKSYNC_HOME/keys/packed
 /bin/verify-keys unpack
 
 echo key download complete, starting prover
