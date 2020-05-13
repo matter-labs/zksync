@@ -66,9 +66,6 @@ impl FromStr for ScenarioType {
 
 #[derive(Debug)]
 pub struct ScenarioContext {
-    // Handle for the `web3` transport, which must not be `drop`ped for transport to work.
-    // _event_loop_handle: EventLoopHandle,
-    // pub test_accounts: Vec<TestAccount>,
     pub options: ConfigurationOptions,
     pub config_path: PathBuf,
     pub rpc_addr: String,

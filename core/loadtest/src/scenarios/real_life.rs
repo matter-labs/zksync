@@ -542,17 +542,15 @@ impl ScenarioExecutor {
     }
 }
 
-/// Runs the outgoing TPS scenario:
-/// sends the different types of transactions, and measures the TPS for the sending
-/// process (in other words, speed of the ZKSync node mempool).
+/// Runs the real-life test scenario.
+/// For description, see the module doc-comment.
 pub fn run_scenario(mut ctx: ScenarioContext) {
-    // let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec);
     let rpc_addr = ctx.rpc_addr.clone();
     let rpc_client = RpcClient::new(&rpc_addr);
 
     let mut scenario = ScenarioExecutor::new(&ctx, rpc_client);
 
     // Run the scenario.
-    log::info!("Starting the loadtest");
+    log::info!("Starting the real-life test");
     ctx.rt.block_on(scenario.run());
 }
