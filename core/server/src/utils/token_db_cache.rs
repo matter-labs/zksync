@@ -21,6 +21,23 @@ impl TokenDBCache {
         }
     }
 
+    /// Loads all the tokens from database and replaces existing cache.
+    pub fn reload_all_tokens(&self) -> Result<(), failure::Error> {
+        let storage = self
+            .db_pool
+            .access_storage_fragile()
+            .map_err(|e| failure::format_err!("Failed to access storage: {}", e))?;
+
+        let db_tokens = storage
+            .tokens_schema()
+            .load_tokens()
+            .map_err(|e| failure::format_err!("Tokens load failed: {}", e))?;
+
+        *self.tokens.write().expect("Expected write lock") = db_tokens;
+
+        Ok(())
+    }
+
     pub fn get_token(
         &self,
         token_query: impl Into<TokenLike>,

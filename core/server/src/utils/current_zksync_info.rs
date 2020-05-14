@@ -20,10 +20,10 @@ impl CurrentZksyncInfo {
             .get_last_verified_block()
             .expect("Can't get the last verified block");
 
-        Self::with_block_numbers(last_verified_block)
+        Self::with_block_number(last_verified_block)
     }
 
-    pub fn with_block_numbers(last_verified_block: BlockNumber) -> Self {
+    pub fn with_block_number(last_verified_block: BlockNumber) -> Self {
         let last_verified_block = Arc::new(RwLock::new(last_verified_block));
 
         Self {

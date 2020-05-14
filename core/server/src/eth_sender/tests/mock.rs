@@ -400,7 +400,7 @@ fn build_eth_sender(
         tx_poll_period: Default::default(),
     };
 
-    let current_zksync_info = CurrentZksyncInfo::with_block_numbers(0);
+    let current_zksync_info = CurrentZksyncInfo::with_block_number(0);
     let eth_sender = ETHSender::new(
         options,
         db,

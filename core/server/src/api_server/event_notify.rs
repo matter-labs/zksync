@@ -1,6 +1,7 @@
 use super::rpc_server::{ETHOpInfoResp, TransactionInfoResp};
 use crate::api_server::rpc_server::{BlockInfo, ResponseAccountState};
 use crate::state_keeper::{ExecutedOpId, ExecutedOpsNotify, StateKeeperRequest};
+use crate::utils::token_db_cache::TokenDBCache;
 use failure::{bail, format_err};
 use futures::task::LocalSpawnExt;
 use futures::{
@@ -63,6 +64,8 @@ struct OperationNotifier {
     cache_of_executed_priority_operations: LruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_transaction_receipts: LruCache<Vec<u8>, TxReceiptResponse>,
     cache_of_blocks_info: LruCache<BlockNumber, BlockInfo>,
+    tokens_cache: TokenDBCache,
+
     db_pool: ConnectionPool,
     state_keeper_requests: mpsc::Sender<StateKeeperRequest>,
     tx_subs: BTreeMap<(TxHash, ActionType), Vec<SubscriptionSender<TransactionInfoResp>>>,
@@ -466,8 +469,7 @@ impl OperationNotifier {
         }
         .map(|(_, a)| a)
         {
-            let tokens = storage.tokens_schema().load_tokens()?;
-            ResponseAccountState::try_to_restore(account, &tokens)?
+            ResponseAccountState::try_to_restore(account, &self.tokens_cache)?
         } else {
             ResponseAccountState::default()
         };
@@ -558,7 +560,6 @@ impl OperationNotifier {
         )?;
 
         let updated_accounts = op.accounts_updated.iter().map(|(id, _)| *id);
-        let tokens = storage.tokens_schema().load_tokens()?;
 
         for id in updated_accounts {
             if let Some(subs) = self.account_subs.remove(&(id, action)) {
@@ -574,7 +575,9 @@ impl OperationNotifier {
                 };
 
                 let account = if let Some(account) = stored_account {
-                    if let Ok(result) = ResponseAccountState::try_to_restore(account, &tokens) {
+                    if let Ok(result) =
+                        ResponseAccountState::try_to_restore(account, &self.tokens_cache)
+                    {
                         result
                     } else {
                         warn!(
@@ -616,10 +619,13 @@ pub fn start_sub_notifier(
 
             let mut local_pool = executor::LocalPool::new();
 
+            let tokens_cache = TokenDBCache::new(db_pool.clone());
+
             let mut notifier = OperationNotifier {
                 cache_of_executed_priority_operations: LruCache::new(api_requests_caches_size),
                 cache_of_transaction_receipts: LruCache::new(api_requests_caches_size),
                 cache_of_blocks_info: LruCache::new(api_requests_caches_size),
+                tokens_cache,
                 db_pool,
                 state_keeper_requests,
                 tx_subs: BTreeMap::new(),
