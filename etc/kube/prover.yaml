@@ -27,27 +27,10 @@ spec:
         - name: keys-dir
           mountPath: /keys
           readOnly: false
+        envFrom:
+          - configMapRef:
+              name: ${ZKSYNC_ENV}-configmap
         env:
-        - name: SUPPORTED_BLOCK_CHUNKS_SIZES
-          value: "${SUPPORTED_BLOCK_CHUNKS_SIZES}"
-        - name: SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS
-          value: "${SUPPORTED_BLOCK_CHUNKS_SIZES_SETUP_POWERS}"
-        - name: BLOCK_CHUNK_SIZES
-          value: "${BLOCK_CHUNK_SIZES}"
-        - name: KEY_DIR
-          value: "${KEY_DIR}"
-        - name: ACCOUNT_TREE_DEPTH
-          value: "${ACCOUNT_TREE_DEPTH}"
-        - name: BALANCE_TREE_DEPTH
-          value: "${BALANCE_TREE_DEPTH}"
-        - name: PROVER_SERVER_URL
-          value: "${PROVER_SERVER_URL}"
-        - name: REQ_SERVER_TIMEOUT
-          value: "${REQ_SERVER_TIMEOUT}"
-        - name: RUST_BACKTRACE
-          value: "${RUST_BACKTRACE}"
-        - name: RUST_LOG
-          value: "${RUST_LOG}"
         - name: NODE_NAME
           valueFrom:
             fieldRef:

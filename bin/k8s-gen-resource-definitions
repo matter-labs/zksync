@@ -5,6 +5,7 @@ mkdir -p etc/kube/gen/$ZKSYNC_ENV
 envsubst < etc/kube/server.yaml > etc/kube/gen/$ZKSYNC_ENV/server.yaml
 envsubst < etc/kube/nginx.yaml > etc/kube/gen/$ZKSYNC_ENV/nginx.yaml
 envsubst < etc/kube/prover.yaml > etc/kube/gen/$ZKSYNC_ENV/prover.yaml
+envsubst < etc/kube/ingress.yaml > etc/kube/gen/$ZKSYNC_ENV/ingress.yaml
 
 # Generate and apply configmap for env config
 bash bin/k8s-configmap > etc/kube/gen/$ZKSYNC_ENV/configmap.yaml

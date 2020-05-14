@@ -20,36 +20,11 @@ spec:
           image: matterlabs/server_supervisor:${IMAGE_TAG}
           imagePullPolicy: Always
           envFrom:
-            - secretRef:
-                name: ${ZKSYNC_ENV}-secret
+            - configMapRef:
+                name: ${ZKSYNC_ENV}-configmap
           env:
             - name: NAMESPACE
               value: "${ZKSYNC_ENV}"
----
-apiVersion: networking.k8s.io/v1beta1
-kind: Ingress
-metadata:
-  name: api-ingress
-  namespace: ${ZKSYNC_ENV}
-  annotations:
-    nginx.ingress.kubernetes.io/enable-cors: "true"
-spec:
-  rules:
-  - http:
-      paths:
-      - path: /
-        backend:
-          serviceName: ${ZKSYNC_ENV}-server
-          servicePort: 3000
-      - path: /jsrpc
-        backend:
-          serviceName: ${ZKSYNC_ENV}-server
-          servicePort: 3030
-      - path: /jsrpc-ws
-        backend:
-          serviceName: ${ZKSYNC_ENV}-server
-          servicePort: 3031
-    host: ${SERVER_API_HOST}
 ---
 apiVersion: v1
 kind: Service
@@ -128,8 +103,3 @@ spec:
               secretKeyRef:
                 name: ${ZKSYNC_ENV}-operator
                 key: private_key
-          - name: DATABASE_URL
-            valueFrom:
-              secretKeyRef:
-                name: ${ZKSYNC_ENV}-secret
-                key: DATABASE_URL
