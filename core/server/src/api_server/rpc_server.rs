@@ -15,8 +15,8 @@ use models::{
     node::{
         closest_packable_fee_amount,
         tx::{TxEthSignature, TxHash},
-        Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce, PriorityOp, PubKeyHash,
-        Token, TokenId, TokenLike,
+        Account, AccountId, Address, BlockNumber, FranklinPriorityOp, FranklinTx, Nonce,
+        PriorityOp, PubKeyHash, Token, TokenId, TokenLike,
     },
     primitives::{big_decimal_to_u128, floor_big_decimal},
 };
@@ -33,6 +33,7 @@ use crate::{
     mempool::{MempoolRequest, TxAddError},
     signature_checker::{VerifiedTx, VerifyTxSignatureRequest},
     state_keeper::StateKeeperRequest,
+    utils::current_zksync_info::CurrentZksyncInfo,
     utils::shared_lru_cache::SharedLruCache,
     utils::token_db_cache::TokenDBCache,
 };
@@ -46,6 +47,28 @@ pub struct ResponseAccountState {
 }
 
 impl ResponseAccountState {
+    pub fn try_to_restore_2(account: Account, tokens: &TokenDBCache) -> Result<Self> {
+        let mut balances = HashMap::new();
+        for (token_id, balance) in account.get_nonzero_balances() {
+            if token_id == 0 {
+                balances.insert("ETH".to_string(), balance);
+            } else {
+                let token = tokens
+                    .get_token(token_id)
+                    .ok()
+                    .flatten()
+                    .ok_or_else(Error::internal_error)?;
+                balances.insert(token.symbol.clone(), balance);
+            }
+        }
+
+        Ok(Self {
+            balances,
+            nonce: account.nonce,
+            pub_key_hash: account.pub_key_hash,
+        })
+    }
+
     pub fn try_to_restore(account: Account, tokens: &HashMap<TokenId, Token>) -> Result<Self> {
         let mut balances = HashMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
@@ -81,7 +104,7 @@ pub struct DepositingAccountBalances {
 impl DepositingAccountBalances {
     pub fn from_pending_ops(
         pending_ops: OngoingDepositsResp,
-        tokens: &HashMap<TokenId, Token>,
+        tokens: &TokenDBCache,
     ) -> Result<Self> {
         let mut balances = HashMap::new();
 
@@ -90,10 +113,10 @@ impl DepositingAccountBalances {
                 "ETH".to_string()
             } else {
                 tokens
-                    .get(&op.token_id)
+                    .get_token(op.token_id)
+                    .map_err(|_| Error::internal_error())?
                     .ok_or_else(Error::internal_error)?
                     .symbol
-                    .clone()
             };
 
             let expected_accept_block =
@@ -304,6 +327,7 @@ pub struct RpcApp {
     cache_of_executed_priority_operations: SharedLruCache<u32, StoredExecutedPriorityOperation>,
     cache_of_blocks_info: SharedLruCache<i64, BlockDetails>,
     cache_of_transaction_receipts: SharedLruCache<Vec<u8>, TxReceiptResponse>,
+    cache_of_verified_account_states: SharedLruCache<Address, (BlockNumber, ResponseAccountState)>,
 
     pub mempool_request_sender: mpsc::Sender<MempoolRequest>,
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
@@ -314,6 +338,7 @@ pub struct RpcApp {
 
     pub confirmations_for_eth_event: u64,
     pub token_cache: TokenDBCache,
+    pub current_zksync_info: CurrentZksyncInfo,
 }
 
 impl RpcApp {
@@ -324,6 +349,7 @@ impl RpcApp {
         state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+        current_zksync_info: CurrentZksyncInfo,
     ) -> Self {
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
@@ -334,6 +360,7 @@ impl RpcApp {
             cache_of_executed_priority_operations: SharedLruCache::new(api_requests_caches_size),
             cache_of_blocks_info: SharedLruCache::new(api_requests_caches_size),
             cache_of_transaction_receipts: SharedLruCache::new(api_requests_caches_size),
+            cache_of_verified_account_states: SharedLruCache::new(api_requests_caches_size),
 
             connection_pool,
 
@@ -344,6 +371,7 @@ impl RpcApp {
 
             confirmations_for_eth_event,
             token_cache,
+            current_zksync_info,
         }
     }
 
@@ -543,24 +571,6 @@ impl Rpc for RpcApp {
         &self,
         address: Address,
     ) -> Box<dyn futures01::Future<Item = AccountInfoResp, Error = Error> + Send> {
-        let (account, tokens) = if let Ok((account, tokens)) = (|| -> Result<_> {
-            let storage = self.access_storage()?;
-            let account = storage
-                .chain()
-                .account_schema()
-                .account_state_by_address(&address)
-                .map_err(|_| Error::internal_error())?;
-            let tokens = storage
-                .tokens_schema()
-                .load_tokens()
-                .map_err(|_| Error::internal_error())?;
-            Ok((account, tokens))
-        })() {
-            (account, tokens)
-        } else {
-            return Box::new(futures01::done(Err(Error::internal_error())));
-        };
-
         let mut state_keeper_request_sender = self.state_keeper_request_sender.clone();
         let self_ = self.clone();
         let account_state_resp = async move {
@@ -577,23 +587,60 @@ impl Rpc for RpcApp {
                 .await
                 .map_err(|_| Error::internal_error())?;
 
-            let (id, committed) = if let Some((id, account)) = committed_account_state {
-                (
+            let (id, committed) = match committed_account_state {
+                Some((id, account)) => (
                     Some(id),
-                    ResponseAccountState::try_to_restore(account, &tokens)?,
-                )
-            } else {
-                (None, ResponseAccountState::default())
+                    ResponseAccountState::try_to_restore_2(account, &self_.token_cache)?,
+                ),
+                None => (None, ResponseAccountState::default()),
             };
 
-            let verified = if let Some((_, account)) = account.verified {
-                ResponseAccountState::try_to_restore(account, &tokens)?
-            } else {
-                ResponseAccountState::default()
+            let verified = {
+                let verified_block_number =
+                    self_.current_zksync_info.get_last_verified_block_number();
+
+                let get_verified_state_and_insert_in_cache = || -> Result<_> {
+                    let storage = self_.access_storage()?;
+                    let account = storage
+                        .chain()
+                        .account_schema()
+                        .account_state_by_address(&address)
+                        .map_err(|_| Error::internal_error())?;
+
+                    let verified = if let Some((_, account)) = account.verified {
+                        ResponseAccountState::try_to_restore_2(account, &self_.token_cache)?
+                    } else {
+                        ResponseAccountState::default()
+                    };
+
+                    self_
+                        .cache_of_verified_account_states
+                        .insert(address.clone(), (verified_block_number, verified.clone()));
+
+                    Ok(verified)
+                };
+
+                let verified = match self_.cache_of_verified_account_states.get(&address) {
+                    Some((block_number, acc_state)) => {
+                        if block_number == verified_block_number {
+                            acc_state
+                        } else {
+                            get_verified_state_and_insert_in_cache()?
+                        }
+                    }
+                    None => get_verified_state_and_insert_in_cache()?,
+                };
+
+                self_
+                    .cache_of_verified_account_states
+                    .insert(address.clone(), (verified_block_number, verified.clone()));
+
+                verified
             };
 
             let depositing_ops = self_.get_ongoing_deposits_impl(address).await?;
-            let depositing = DepositingAccountBalances::from_pending_ops(depositing_ops, &tokens)?;
+            let depositing =
+                DepositingAccountBalances::from_pending_ops(depositing_ops, &self_.token_cache)?;
 
             Ok(AccountInfoResp {
                 address,
@@ -758,6 +805,7 @@ pub fn start_rpc_server(
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
+    current_zksync_info: CurrentZksyncInfo,
 ) {
     let addr = config_options.json_rpc_http_server_address;
     std::thread::Builder::new()
@@ -773,6 +821,7 @@ pub fn start_rpc_server(
                 state_keeper_request_sender,
                 sign_verify_request_sender,
                 eth_watcher_request_sender,
+                current_zksync_info,
             );
             rpc_app.extend(&mut io);
 

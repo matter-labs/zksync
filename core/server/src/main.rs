@@ -18,6 +18,7 @@ use server::eth_watch::start_eth_watch;
 use server::mempool::run_mempool_task;
 use server::prover_server::start_prover_server;
 use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
+use server::utils::current_zksync_info::CurrentZksyncInfo;
 use server::{eth_sender, leader_election, observer_mode};
 use storage::ConnectionPool;
 
@@ -65,6 +66,8 @@ fn main() {
             contract_addr, config_opts.contract_eth_addr
         );
     }
+
+    let current_zksync_info = CurrentZksyncInfo::new(&connection_pool);
 
     // Start observing the state and try to become leader.
     let (stop_observer_mode_tx, stop_observer_mode_rx) = std::sync::mpsc::channel();
@@ -139,6 +142,7 @@ fn main() {
         zksync_commit_notify_sender.clone(), // eth sender sends only verify blocks notifications
         eth_send_request_receiver,
         config_opts.clone(),
+        current_zksync_info.clone(),
     );
 
     run_committer(
@@ -158,6 +162,7 @@ fn main() {
         state_keeper_req_sender.clone(),
         eth_watch_req_sender.clone(),
         config_opts.clone(),
+        current_zksync_info,
     );
     start_prover_server(
         connection_pool.clone(),

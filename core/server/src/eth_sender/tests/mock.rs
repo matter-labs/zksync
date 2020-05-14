@@ -19,6 +19,7 @@ use super::ETHSender;
 use crate::eth_sender::database::DatabaseAccess;
 use crate::eth_sender::ethereum_interface::EthereumInterface;
 use crate::eth_sender::transactions::{ETHStats, ExecutedTxStatus};
+use crate::utils::current_zksync_info::CurrentZksyncInfo;
 
 const CHANNEL_CAPACITY: usize = 16;
 
@@ -399,7 +400,15 @@ fn build_eth_sender(
         tx_poll_period: Default::default(),
     };
 
-    let eth_sender = ETHSender::new(options, db, ethereum, operation_receiver, notify_sender);
+    let current_zksync_info = CurrentZksyncInfo::with_block_numbers(0);
+    let eth_sender = ETHSender::new(
+        options,
+        db,
+        ethereum,
+        operation_receiver,
+        notify_sender,
+        current_zksync_info,
+    );
 
     (eth_sender, operation_sender, notify_receiver)
 }

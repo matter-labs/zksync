@@ -15,6 +15,7 @@ use crate::{
     mempool::MempoolRequest,
     signature_checker,
     state_keeper::{ExecutedOpsNotify, StateKeeperRequest},
+    utils::current_zksync_info::CurrentZksyncInfo,
 };
 
 mod event_notify;
@@ -32,6 +33,7 @@ pub fn start_api_server(
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     config_options: ConfigurationOptions,
+    current_zksync_info: CurrentZksyncInfo,
 ) {
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(8192);
 
@@ -61,6 +63,7 @@ pub fn start_api_server(
         eth_watcher_request_sender.clone(),
         panic_notify.clone(),
         config_options.api_requests_caches_size,
+        current_zksync_info.clone(),
     );
 
     rpc_server::start_rpc_server(
@@ -71,5 +74,6 @@ pub fn start_api_server(
         sign_check_sender,
         eth_watcher_request_sender,
         panic_notify,
+        current_zksync_info,
     );
 }

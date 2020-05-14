@@ -24,6 +24,7 @@ use crate::{
     mempool::MempoolRequest,
     signature_checker::VerifyTxSignatureRequest,
     state_keeper::{ExecutedOpsNotify, StateKeeperRequest},
+    utils::current_zksync_info::CurrentZksyncInfo,
 };
 
 #[rpc]
@@ -190,6 +191,7 @@ pub fn start_ws_server(
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     panic_notify: mpsc::Sender<bool>,
     each_cache_size: usize,
+    current_zksync_info: CurrentZksyncInfo,
 ) {
     let addr = config_options.json_rpc_ws_server_address;
 
@@ -204,6 +206,7 @@ pub fn start_ws_server(
         state_keeper_request_sender.clone(),
         sign_verify_request_sender,
         eth_watcher_request_sender,
+        current_zksync_info,
     );
     req_rpc_app.extend(&mut io);
 
