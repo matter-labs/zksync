@@ -3,15 +3,19 @@ use std::collections::HashMap;
 // External imports
 use diesel::prelude::*;
 // Workspace imports
-use models::node::{Token, TokenId, TokenLike};
+use models::node::{Token, TokenId, TokenLike, TokenPrice};
 // Local imports
-use self::records::DbToken;
+use self::records::{DbTickerPrice, DbToken};
 use crate::schema::*;
 use crate::tokens::utils::address_to_stored_string;
 use crate::StorageProcessor;
+use models::primitives::ratio_to_big_decimal;
 
 pub mod records;
 mod utils;
+
+/// Precision of the USD price per token
+const STORED_USD_PRICE_PRECISION: usize = 6;
 
 /// Tokens schema handles the `tokens` table, providing methods to
 /// get and store new tokens.
@@ -65,5 +69,38 @@ impl<'a> TokensSchema<'a> {
                 .optional(),
         }?;
         Ok(db_token.map(|t| t.into()))
+    }
+
+    pub fn get_historical_ticker_price(
+        &self,
+        token_id: TokenId,
+    ) -> QueryResult<Option<TokenPrice>> {
+        let db_price = ticker_price::table
+            .find(i32::from(token_id))
+            .first::<DbTickerPrice>(self.0.conn())
+            .optional()?;
+        Ok(db_price.map(|p| p.into()))
+    }
+
+    pub fn update_historical_ticker_price(
+        &self,
+        token_id: TokenId,
+        price: TokenPrice,
+    ) -> QueryResult<()> {
+        let usd_price_rounded = ratio_to_big_decimal(&price.usd_price, STORED_USD_PRICE_PRECISION);
+        diesel::insert_into(ticker_price::table)
+            .values(&DbTickerPrice {
+                token_id: token_id as i32,
+                usd_price: usd_price_rounded.clone(),
+                last_updated: price.last_updated.clone(),
+            })
+            .on_conflict(ticker_price::token_id)
+            .do_update()
+            .set((
+                ticker_price::usd_price.eq(usd_price_rounded),
+                ticker_price::last_updated.eq(price.last_updated),
+            ))
+            .execute(self.0.conn())
+            .map(drop)
     }
 }

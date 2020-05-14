@@ -1,5 +1,8 @@
 use crate::config_options::parse_env;
 use crate::node::{Address, TokenId};
+use crate::primitives::UnsignedRatioSerializeAsDecimal;
+use chrono::{DateTime, Utc};
+use num::{rational::Ratio, BigUint};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
@@ -61,4 +64,17 @@ pub fn get_genesis_token_list(network: &str) -> Result<Vec<TokenGenesisListItem>
     file_path.push(network);
     file_path.set_extension("json");
     Ok(serde_json::from_str(&read_to_string(file_path)?)?)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenPrice {
+    #[serde(with = "UnsignedRatioSerializeAsDecimal")]
+    pub usd_price: Ratio<BigUint>,
+    pub last_updated: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Hash, Eq)]
+pub enum TxFeeTypes {
+    Withdraw,
+    Transfer,
 }

@@ -10,6 +10,7 @@ use futures::channel::mpsc;
 use models::{config_options::ConfigurationOptions, Operation};
 use storage::ConnectionPool;
 // Local uses
+use crate::fee_ticker::TickerRequest;
 use crate::{
     eth_watch::EthWatchRequest,
     mempool::MempoolRequest,
@@ -31,6 +32,7 @@ pub fn start_api_server(
     executed_tx_receiver: mpsc::Receiver<ExecutedOpsNotify>,
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+    ticker_request_sender: mpsc::Sender<TickerRequest>,
     config_options: ConfigurationOptions,
 ) {
     let (sign_check_sender, sign_check_receiver) = mpsc::channel(8192);
@@ -59,6 +61,7 @@ pub fn start_api_server(
         state_keeper_request_sender.clone(),
         sign_check_sender.clone(),
         eth_watcher_request_sender.clone(),
+        ticker_request_sender.clone(),
         panic_notify.clone(),
         config_options.api_requests_caches_size,
     );
@@ -70,6 +73,7 @@ pub fn start_api_server(
         state_keeper_request_sender,
         sign_check_sender,
         eth_watcher_request_sender,
+        ticker_request_sender,
         panic_notify,
     );
 }

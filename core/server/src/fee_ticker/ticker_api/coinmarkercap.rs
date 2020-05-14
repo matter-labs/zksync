@@ -1,9 +1,10 @@
 use crate::utils::token_db_cache::TokenDBCache;
 use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
+use failure::format_err;
 use failure::Fail;
 use futures::Future;
-use models::node::{Token, TokenLike};
+use models::node::{Token, TokenLike, TokenPrice};
 use models::primitives::UnsignedRatioSerializeAsDecimal;
 use num::bigint::{ToBigInt, ToBigUint};
 use num::rational::Ratio;
@@ -16,16 +17,33 @@ use std::str::FromStr;
 
 pub(super) async fn fetch_coimarketcap_data(
     client: &reqwest::Client,
-    base_url: Url,
+    base_url: &Url,
     token_symbol: &str,
-) -> Result<CoinmarketCapResponse, failure::Error> {
+) -> Result<TokenPrice, failure::Error> {
     let request_url = base_url
         .join(&format!(
             "cryptocurrency/quotes/latest?symbol={}&aux=",
             token_symbol
         ))
         .expect("failed to join url path");
-    Ok(client.get(request_url).send().await?.json().await?)
+    let mut api_response = client
+        .get(request_url)
+        .send()
+        .await?
+        .json::<CoinmarketCapResponse>()
+        .await?;
+    let mut token_info = api_response
+        .data
+        .remove(&TokenLike::Symbol(token_symbol.to_string()))
+        .ok_or_else(|| format_err!("Could not found token in response"))?;
+    let usd_quote = token_info
+        .quote
+        .remove(&TokenLike::Symbol("USD".to_string()))
+        .ok_or_else(|| format_err!("Could not found usd quote in response"))?;
+    Ok(TokenPrice {
+        usd_price: usd_quote.price,
+        last_updated: usd_quote.last_updated,
+    })
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
@@ -62,7 +80,7 @@ mod test {
         let ticker_url = parse_env("TICKER_URL");
         let client = reqwest::Client::new();
         runtime
-            .block_on(fetch_coimarketcap_data(&client, ticker_url, "ERC-1"))
+            .block_on(fetch_coimarketcap_data(&client, &ticker_url, "ERC-1"))
             .expect("Failed to get data from ticker");
     }
 

@@ -107,7 +107,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> GasAdjuster<ETH, DB> {
         std::cmp::min(price, limit)
     }
 
-    fn get_current_max_price(&self) -> U256 {
+    /// Returns current max gas price that can be used to send transactions.
+    pub fn get_current_max_price(&self) -> U256 {
         self.statistics.get_limit()
     }
 }

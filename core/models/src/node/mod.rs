@@ -24,7 +24,7 @@ pub use self::operations::{
     CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
-pub use self::tokens::{Token, TokenGenesisListItem, TokenLike};
+pub use self::tokens::{Token, TokenGenesisListItem, TokenLike, TokenPrice, TxFeeTypes};
 pub use self::tx::{Close, FranklinTx, Transfer, Withdraw};
 
 pub type Engine = bn256::Bn256;

@@ -226,6 +226,14 @@ table! {
 }
 
 table! {
+    ticker_price (token_id) {
+        token_id -> Int4,
+        usd_price -> Numeric,
+        last_updated -> Timestamptz,
+    }
+}
+
+table! {
     tokens (id) {
         id -> Int4,
         address -> Text,
@@ -240,6 +248,7 @@ joinable!(balances -> tokens (coin_id));
 joinable!(eth_ops_binding -> eth_operations (eth_op_id));
 joinable!(eth_ops_binding -> operations (op_id));
 joinable!(eth_tx_hashes -> eth_operations (eth_op_id));
+joinable!(ticker_price -> tokens (token_id));
 
 allow_tables_to_appear_in_same_query!(
     account_balance_updates,
@@ -264,5 +273,6 @@ allow_tables_to_appear_in_same_query!(
     proofs,
     prover_runs,
     server_config,
+    ticker_price,
     tokens,
 );

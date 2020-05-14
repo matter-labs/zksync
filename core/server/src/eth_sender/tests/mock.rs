@@ -19,6 +19,7 @@ use super::ETHSender;
 use crate::eth_sender::database::DatabaseAccess;
 use crate::eth_sender::ethereum_interface::EthereumInterface;
 use crate::eth_sender::transactions::{ETHStats, ExecutedTxStatus};
+use crate::eth_sender::ETHSenderRequest;
 
 const CHANNEL_CAPACITY: usize = 16;
 
@@ -342,7 +343,7 @@ impl EthereumInterface for MockEthereum {
 /// Returns the `ETHSender` itself along with communication channels to interact with it.
 pub(in crate::eth_sender) fn default_eth_sender() -> (
     ETHSender<MockEthereum, MockDatabase>,
-    mpsc::Sender<Operation>,
+    mpsc::Sender<ETHSenderRequest>,
     mpsc::Receiver<Operation>,
 ) {
     build_eth_sender(1, Vec::new(), Default::default())
@@ -355,7 +356,7 @@ pub(in crate::eth_sender) fn concurrent_eth_sender(
     max_txs_in_flight: u64,
 ) -> (
     ETHSender<MockEthereum, MockDatabase>,
-    mpsc::Sender<Operation>,
+    mpsc::Sender<ETHSenderRequest>,
     mpsc::Receiver<Operation>,
 ) {
     build_eth_sender(max_txs_in_flight, Vec::new(), Default::default())
@@ -368,7 +369,7 @@ pub(in crate::eth_sender) fn restored_eth_sender(
     stats: ETHStats,
 ) -> (
     ETHSender<MockEthereum, MockDatabase>,
-    mpsc::Sender<Operation>,
+    mpsc::Sender<ETHSenderRequest>,
     mpsc::Receiver<Operation>,
 ) {
     const MAX_TXS_IN_FLIGHT: u64 = 1;
@@ -383,7 +384,7 @@ fn build_eth_sender(
     stats: ETHStats,
 ) -> (
     ETHSender<MockEthereum, MockDatabase>,
-    mpsc::Sender<Operation>,
+    mpsc::Sender<ETHSenderRequest>,
     mpsc::Receiver<Operation>,
 ) {
     let ethereum = MockEthereum::default();

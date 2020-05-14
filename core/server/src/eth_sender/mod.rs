@@ -6,11 +6,15 @@
 // Built-in deps
 use std::collections::VecDeque;
 // External uses
-use futures::channel::mpsc;
+use futures::{
+    channel::{mpsc, oneshot},
+    future::select,
+    pin_mut, StreamExt,
+};
 use tokio::runtime::Runtime;
-use tokio::time;
+use tokio::time::timeout;
 use web3::contract::Options;
-use web3::types::{TransactionReceipt, H256};
+use web3::types::{TransactionReceipt, H256, U256};
 // Workspace uses
 use eth_client::SignedCallResult;
 use models::{
@@ -37,6 +41,12 @@ mod tx_queue;
 
 #[cfg(test)]
 mod tests;
+
+#[derive(Debug)]
+pub enum ETHSenderRequest {
+    SendOperation(Operation),
+    GetGasPriceLimit(oneshot::Sender<U256>),
+}
 
 /// `TxCheckMode` enum determines the policy on the obtaining the tx status.
 /// The latest sent transaction can be pending (we're still waiting for it),
@@ -111,7 +121,7 @@ struct ETHSender<ETH: EthereumInterface, DB: DatabaseAccess> {
     /// Ethereum intermediator.
     ethereum: ETH,
     /// Channel for receiving operations to commit.
-    rx_for_eth: mpsc::Receiver<Operation>,
+    rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
     /// Channel to notify about committed operations.
     op_notify: mpsc::Sender<Operation>,
     /// Queue for ordered transaction processing.
@@ -127,7 +137,7 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
         options: EthSenderOptions,
         db: DB,
         ethereum: ETH,
-        rx_for_eth: mpsc::Receiver<Operation>,
+        rx_for_eth: mpsc::Receiver<ETHSenderRequest>,
         op_notify: mpsc::Sender<Operation>,
     ) -> Self {
         let (ongoing_ops, unprocessed_ops) = db.restore_state().expect("Can't restore state");
@@ -172,12 +182,8 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
-        let mut timer = time::interval(self.options.tx_poll_period);
-
         loop {
-            // Update the incoming operations.
-            self.retrieve_operations();
-            timer.tick().await;
+            timeout(self.options.tx_poll_period, self.process_requests()).await;
 
             // ...and proceed them.
             self.proceed_next_operations();
@@ -189,15 +195,22 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
 
     /// Gets the incoming operations from the channel and adds them to the
     /// transactions queue.
-    fn retrieve_operations(&mut self) {
-        while let Ok(Some(operation)) = self.rx_for_eth.try_next() {
-            info!(
-                "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
-                operation.id.expect("ID must be set"),
-                operation.action.to_string(),
-                operation.block.block_number
-            );
-            self.add_operation_to_queue(operation);
+    async fn process_requests(&mut self) {
+        while let Some(request) = self.rx_for_eth.next().await {
+            match request {
+                ETHSenderRequest::SendOperation(operation) => {
+                    info!(
+                        "Adding ZKSync operation <id {}; action: {}; block: {}> to queue",
+                        operation.id.expect("ID must be set"),
+                        operation.action.to_string(),
+                        operation.block.block_number
+                    );
+                    self.add_operation_to_queue(operation);
+                }
+                ETHSenderRequest::GetGasPriceLimit(response_sender) => response_sender
+                    .send(self.gas_adjuster.get_current_max_price())
+                    .unwrap_or_default(),
+            }
         }
     }
 
@@ -645,7 +658,7 @@ pub fn start_eth_sender(
     pool: ConnectionPool,
     panic_notify: mpsc::Sender<bool>,
     op_notify_sender: mpsc::Sender<Operation>,
-    send_requst_receiver: mpsc::Receiver<Operation>,
+    send_request_receiver: mpsc::Receiver<ETHSenderRequest>,
     config_options: ConfigurationOptions,
 ) {
     std::thread::Builder::new()
@@ -665,7 +678,7 @@ pub fn start_eth_sender(
                 eth_sender_options,
                 db,
                 ethereum,
-                send_requst_receiver,
+                send_request_receiver,
                 op_notify_sender,
             );
             runtime.block_on(eth_sender.run());

@@ -46,6 +46,7 @@ failure = "0.1"
 futures01 = { package = "futures", version = "0.1" }
 reqwest = { version = "0.10", features = ["blocking"] }
 tiny-keccak = "1.4.2"
+async-trait = "0.1.31"
 
 lru-cache = "0.1.2"
 

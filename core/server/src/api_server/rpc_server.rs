@@ -28,6 +28,7 @@ use storage::{
 };
 
 // Local uses
+use crate::fee_ticker::TickerRequest;
 use crate::{
     eth_watch::EthWatchRequest,
     mempool::{MempoolRequest, TxAddError},
@@ -36,6 +37,7 @@ use crate::{
     utils::shared_lru_cache::SharedLruCache,
     utils::token_db_cache::TokenDBCache,
 };
+use models::node::TxFeeTypes;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -217,12 +219,6 @@ pub struct OngoingDepositsResp {
     estimated_deposits_approval_block: Option<u64>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-pub enum TxFeeTypes {
-    Withdraw,
-    Transfer,
-}
-
 #[derive(Debug)]
 pub enum RpcErrorCodes {
     NonceMismatch = 101,
@@ -285,13 +281,13 @@ pub trait Rpc {
     #[rpc(name = "tokens")]
     fn tokens(&self) -> Result<HashMap<String, Token>>;
 
-    #[rpc(name = "get_tx_fee")]
+    #[rpc(name = "get_tx_fee", returns = "BigUint")]
     fn get_tx_fee(
         &self,
         tx_type: TxFeeTypes,
         amount: BigUint,
         token_like: TokenLike,
-    ) -> Result<BigUint>;
+    ) -> Box<dyn futures01::Future<Item = BigUint, Error = Error> + Send>;
 
     #[rpc(name = "get_confirmations_for_eth_op_amount", returns = "u64")]
     fn get_confirmations_for_eth_op_amount(&self) -> Result<u64>;
@@ -307,6 +303,7 @@ pub struct RpcApp {
     pub state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     pub eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
     pub sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
+    pub ticker_request_sender: mpsc::Sender<TickerRequest>,
 
     pub connection_pool: ConnectionPool,
 
@@ -322,6 +319,7 @@ impl RpcApp {
         state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
         sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
         eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+        ticker_request_sender: mpsc::Sender<TickerRequest>,
     ) -> Self {
         let token_cache = TokenDBCache::new(connection_pool.clone());
 
@@ -339,6 +337,7 @@ impl RpcApp {
             state_keeper_request_sender,
             sign_verify_request_sender,
             eth_watcher_request_sender,
+            ticker_request_sender,
 
             confirmations_for_eth_event,
             token_cache,
@@ -736,11 +735,25 @@ impl Rpc for RpcApp {
 
     fn get_tx_fee(
         &self,
-        _tx_type: TxFeeTypes,
+        tx_type: TxFeeTypes,
         amount: BigUint,
-        _token_like: TokenLike,
-    ) -> Result<BigUint> {
-        unimplemented!()
+        token: TokenLike,
+    ) -> Box<dyn futures01::Future<Item = BigUint, Error = Error> + Send> {
+        let mut ticker_request_sender = self.ticker_request_sender.clone();
+        let tx_fee_future = async move {
+            let req = oneshot::channel();
+            ticker_request_sender
+                .send(TickerRequest::GetTxFee {
+                    tx_type,
+                    amount,
+                    token,
+                    response: req.0,
+                })
+                .await;
+            let resp = req.1.await.map_err(|_| Error::internal_error())?;
+            resp.map_err(|_| Error::internal_error())
+        };
+        Box::new(tx_fee_future.boxed().compat())
     }
 }
 
@@ -752,6 +765,7 @@ pub fn start_rpc_server(
     state_keeper_request_sender: mpsc::Sender<StateKeeperRequest>,
     sign_verify_request_sender: mpsc::Sender<VerifyTxSignatureRequest>,
     eth_watcher_request_sender: mpsc::Sender<EthWatchRequest>,
+    ticker_request_sender: mpsc::Sender<TickerRequest>,
     panic_notify: mpsc::Sender<bool>,
 ) {
     let addr = config_options.json_rpc_http_server_address;
@@ -768,6 +782,7 @@ pub fn start_rpc_server(
                 state_keeper_request_sender,
                 sign_verify_request_sender,
                 eth_watcher_request_sender,
+                ticker_request_sender,
             );
             rpc_app.extend(&mut io);
 

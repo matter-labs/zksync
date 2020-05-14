@@ -1,4 +1,6 @@
 // External uses
+use tokio::runtime::Builder;
+use tokio::time::timeout;
 // Workspace uses
 use models::ethereum::ETHOperation;
 // Local uses
@@ -10,12 +12,32 @@ use super::{
     transactions::{ETHStats, ExecutedTxStatus, TxCheckOutcome},
     ETHSender, TxCheckMode,
 };
+use crate::eth_sender::database::DatabaseAccess;
+use crate::eth_sender::ethereum_interface::EthereumInterface;
+use crate::eth_sender::ETHSenderRequest;
+use std::time::Duration;
 
 const EXPECTED_WAIT_TIME_BLOCKS: u64 = 30;
 const WAIT_CONFIRMATIONS: u64 = 1;
 
 pub mod mock;
 mod test_data;
+
+fn retrieve_all_operations<ETH: EthereumInterface, DB: DatabaseAccess>(
+    eth_sender: &mut ETHSender<ETH, DB>,
+) {
+    let mut runtime = Builder::new()
+        .basic_scheduler()
+        .enable_time()
+        .build()
+        .expect("Tokio runtime build");
+    async fn process_with_timeout<ETH2: EthereumInterface, DB2: DatabaseAccess>(
+        eth_sender: &mut ETHSender<ETH2, DB2>,
+    ) {
+        timeout(Duration::from_secs(1), eth_sender.process_requests()).await;
+    }
+    runtime.block_on(process_with_timeout(eth_sender));
+}
 
 /// Basic test that `ETHSender` creation does not panic and initializes correctly.
 #[test]
@@ -195,10 +217,12 @@ fn operation_commitment_workflow() {
         let nonce = eth_op_id as i64;
 
         // Send an operation to `ETHSender`.
-        sender.try_send(operation.clone()).unwrap();
+        sender
+            .try_send(ETHSenderRequest::SendOperation(operation.clone()))
+            .unwrap();
 
         // Retrieve it there and then process.
-        eth_sender.retrieve_operations();
+        retrieve_all_operations(&mut eth_sender);
         eth_sender.proceed_next_operations();
 
         // Now we should see that transaction is stored in the database and sent to the Ethereum.
@@ -276,9 +300,11 @@ fn stuck_transaction() {
 
     // Workflow for the test is similar to `operation_commitment_workflow`.
     let operation = test_data::commit_operation(0);
-    sender.try_send(operation.clone()).unwrap();
+    sender
+        .try_send(ETHSenderRequest::SendOperation(operation.clone()))
+        .unwrap();
 
-    eth_sender.retrieve_operations();
+    retrieve_all_operations(&mut eth_sender);
     eth_sender.proceed_next_operations();
 
     let eth_op_id = 0;
@@ -386,9 +412,11 @@ fn operations_order() {
     }
 
     for operation in operations.iter() {
-        sender.try_send(operation.clone()).unwrap();
+        sender
+            .try_send(ETHSenderRequest::SendOperation(operation.clone()))
+            .unwrap();
     }
-    eth_sender.retrieve_operations();
+    retrieve_all_operations(&mut eth_sender);
 
     // Then we go through the operations and check that the order of operations is preserved.
     for mut tx in expected_txs.into_iter() {
@@ -426,14 +454,16 @@ fn transaction_failure() {
 
     // Workflow for the test is similar to `operation_commitment_workflow`.
     let operation = test_data::commit_operation(0);
-    sender.try_send(operation.clone()).unwrap();
+    sender
+        .try_send(ETHSenderRequest::SendOperation(operation.clone()))
+        .unwrap();
 
     let eth_op_id = 0;
     let nonce = 0;
     let deadline_block = eth_sender.get_deadline_block(eth_sender.ethereum.block_number);
     let failing_tx = create_signed_tx(eth_op_id, &eth_sender, &operation, deadline_block, nonce);
 
-    eth_sender.retrieve_operations();
+    retrieve_all_operations(&mut eth_sender);
     eth_sender.proceed_next_operations();
 
     eth_sender
@@ -516,9 +546,11 @@ fn confirmations_independence() {
     let (mut eth_sender, mut sender, _) = default_eth_sender();
 
     let operation = test_data::commit_operation(0);
-    sender.try_send(operation.clone()).unwrap();
+    sender
+        .try_send(ETHSenderRequest::SendOperation(operation.clone()))
+        .unwrap();
 
-    eth_sender.retrieve_operations();
+    retrieve_all_operations(&mut eth_sender);
     eth_sender.proceed_next_operations();
 
     let eth_op_id = 0;
@@ -630,9 +662,13 @@ fn concurrent_operations_order() {
         // If we'll send all the operations together, the order will be "commit-verify-commit-verify-withdraw",
         // since withdraw is only sent after verify operation is confirmed.
         let (commit_op, verify_op) = operations_iter.next().unwrap();
-        sender.try_send(commit_op.clone()).unwrap();
-        sender.try_send(verify_op.clone()).unwrap();
-        eth_sender.retrieve_operations();
+        sender
+            .try_send(ETHSenderRequest::SendOperation(commit_op.clone()))
+            .unwrap();
+        sender
+            .try_send(ETHSenderRequest::SendOperation(verify_op.clone()))
+            .unwrap();
+        retrieve_all_operations(&mut eth_sender);
 
         // Call `proceed_next_operations`. Several txs should be sent.
         eth_sender.proceed_next_operations();

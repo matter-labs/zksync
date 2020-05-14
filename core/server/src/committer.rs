@@ -4,6 +4,7 @@ use std::time::Duration;
 use futures::channel::mpsc::{Receiver, Sender};
 use futures::{SinkExt, StreamExt};
 // Workspace uses
+use crate::eth_sender::ETHSenderRequest;
 use crate::mempool::MempoolRequest;
 use models::{Action, CommitRequest, Operation};
 use storage::ConnectionPool;
@@ -13,7 +14,7 @@ const PROOF_POLL_INTERVAL: Duration = Duration::from_secs(1);
 
 async fn handle_new_commit_task(
     mut rx_for_ops: Receiver<CommitRequest>,
-    mut tx_for_eth: Sender<Operation>,
+    mut tx_for_eth: Sender<ETHSenderRequest>,
     mut op_notify_sender: Sender<Operation>,
     mut mempool_req_sender: Sender<MempoolRequest>,
     pool: ConnectionPool,
@@ -55,7 +56,7 @@ async fn handle_new_commit_task(
             .expect("committer must commit the op into db");
 
         tx_for_eth
-            .send(op.clone())
+            .send(ETHSenderRequest::SendOperation(op.clone()))
             .await
             .expect("must send an operation for commitment to ethereum");
 
@@ -74,7 +75,7 @@ async fn handle_new_commit_task(
     }
 }
 
-async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: ConnectionPool) {
+async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<ETHSenderRequest>, pool: ConnectionPool) {
     let mut last_verified_block = {
         let storage = pool
             .access_storage()
@@ -118,7 +119,7 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
                     .execute_operation(op.clone())
                     .expect("committer must commit the op into db");
                 tx_for_eth
-                    .send(op)
+                    .send(ETHSenderRequest::SendOperation(op))
                     .await
                     .expect("must send an operation for verification to ethereum");
                 last_verified_block += 1;
@@ -131,7 +132,7 @@ async fn poll_for_new_proofs_task(mut tx_for_eth: Sender<Operation>, pool: Conne
 
 pub fn run_committer(
     rx_for_ops: Receiver<CommitRequest>,
-    tx_for_eth: Sender<Operation>,
+    tx_for_eth: Sender<ETHSenderRequest>,
     op_notify_sender: Sender<Operation>,
     mempool_req_sender: Sender<MempoolRequest>,
     pool: ConnectionPool,
