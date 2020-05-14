@@ -1,3 +1,33 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pod-supervisor
+  namespace: ${ZKSYNC_ENV}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: ${ZKSYNC_ENV}
+  name: pod-reader
+rules:
+  - apiGroups: [""] # "" indicates the core API group
+    resources: ["pods"]
+    verbs: ["get", "watch", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: read-pods
+  namespace: ${ZKSYNC_ENV}
+subjects:
+  - kind: ServiceAccount
+    name: pod-supervisor
+    apiGroup: ""
+roleRef:
+  kind: Role
+  name: pod-reader
+  apiGroup: rbac.authorization.k8s.io
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,6 +45,7 @@ spec:
       labels:
         app: ${ZKSYNC_ENV}-server-supervisor
     spec:
+      serviceAccountName: pod-supervisor
       containers:
         - name: server
           image: matterlabs/server_supervisor:${IMAGE_TAG}
