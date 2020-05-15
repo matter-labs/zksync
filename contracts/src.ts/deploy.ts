@@ -1,7 +1,8 @@
 import { deployContract } from 'ethereum-waffle';
 import { ethers } from 'ethers';
-import { bigNumberify, parseEther } from "ethers/utils";
+import { bigNumberify, parseEther, BigNumberish, BigNumber } from "ethers/utils";
 import Axios from "axios";
+import * as zksync from 'zksync';
 import * as qs from 'querystring';
 import * as url from 'url';
 import * as fs from 'fs';
@@ -251,10 +252,7 @@ export class Deployer {
             this.wallet,
             this.bytecodes.ERC20,
             [],
-            {
-                gasLimit: 3000000,
-
-            }
+            { gasLimit: 3000000, }
         );
         this.addresses.ERC20 = erc20.address;
         await erc20.mint(this.wallet.address, parseEther("3000000000"));
@@ -265,21 +263,22 @@ export class Deployer {
         return erc20;
     }
 
-    async mintTestERC20Token(address, erc20?: ethers.Contract) {
+    async mintTestERC20Token(address, erc20?: ethers.Contract, amount?: BigNumber) {
         erc20 = erc20 || this.getDeployedContract("ERC20");
-        const txCall = await erc20.mint(address, parseEther("3000000000"));
+        amount = amount || parseEther("3000000000");
+        const txCall = await erc20.mint(address, amount, { gasLimit: 1000000 });
         await txCall.wait();
     }
 
     async setMoreTestValidators() {
         const mnemonics = [
             process.env.EXTRA_OPERATOR_MNEMONIC_1,
-            process.env.EXTRA_OPERATOR_MNEMONIC_2,
         ];
         const governance = this.getDeployedProxyContract('Governance');
         for (const mnemonic of mnemonics) {
             const wallet = ethers.Wallet.fromMnemonic(mnemonic, "m/44'/60'/0'/0/1");
-            await governance.setValidator(wallet.address, true).then(tx => tx.wait());
+
+            await governance.setValidator(wallet.address, true, { gasLimit: 1000000 }).then(tx => tx.wait());
             console.log();
             console.log(`MNEMONIC="${mnemonic}"`);
             console.log(`OPERATOR_PRIVATE_KEY=${wallet.privateKey.slice(2)}`);
@@ -291,7 +290,7 @@ export class Deployer {
 
     async setGovernanceValidator() {
         const governance = await this.getDeployedProxyContract('Governance');
-        await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true);
+        await governance.setValidator(process.env.OPERATOR_ETH_ADDRESS, true, { gasLimit: 1000000 });
     }
 
     async sendEthToTestWallets() {
@@ -299,6 +298,15 @@ export class Deployer {
             const to = ethers.Wallet.fromMnemonic(process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/" + i).address;
             await this.wallet.sendTransaction({ to, value: parseEther("100") });
             console.log(`sending ETH to ${to}`);
+        }
+    }
+
+    async sendFundsToWallets(wallets: ethers.Wallet[], amount: BigNumberish) {
+        amount = bigNumberify(amount);
+        for (const wallet of wallets) {
+            await this.wallet.sendTransaction({ to: wallet.address, value: amount });
+
+            await this.mintTestERC20Token(wallet.address, null, amount);
         }
     }
 
