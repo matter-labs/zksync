@@ -6,6 +6,9 @@ metadata:
   labels:
     app: ${ZKSYNC_ENV}-prover
 spec:
+  strategy:
+    type: Recreate
+  replicas: 1
   selector:
     matchLabels:
       app: ${ZKSYNC_ENV}-prover

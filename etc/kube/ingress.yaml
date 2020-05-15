@@ -10,10 +10,10 @@ spec:
   tls:
     - hosts:
       - ${SERVER_API_HOST}
-      secretName: zksync-dev
+      secretName: ${SERVER_API_HOST_CERT}
     - hosts:
       - ${EXPLORER_HOST}
-      secretName: zksync-dev
+      secretName: ${EXPLORER_HOST_CERT}
   rules:
     - host: ${SERVER_API_HOST}
       http:
