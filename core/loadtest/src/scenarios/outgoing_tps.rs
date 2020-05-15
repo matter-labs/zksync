@@ -7,34 +7,37 @@
 //! TPS as the transactions get accepted in the mempool.
 
 // Built-in import
-use std::{
-    ops::Mul,
-    sync::Arc,
-    time::{Duration, Instant},
-};
+use std::{ops::Mul, sync::Arc, time::Duration};
 // External uses
 use bigdecimal::BigDecimal;
-use rand::Rng;
-use tokio::{runtime::Handle, time};
-use web3::types::U256;
+use tokio::runtime::Handle;
+use web3::transports::Http;
 // Workspace uses
 // Local uses
 use crate::{
     rpc_client::RpcClient,
-    scenarios::ScenarioContext,
+    scenarios::{
+        configs::LoadTestConfig,
+        utils::{deposit_single, rand_amount, wait_for_verify},
+        ScenarioContext,
+    },
     sent_transactions::SentTransactions,
     test_accounts::TestAccount,
-    test_spec::TestSpec,
     tps_counter::{run_tps_counter_printer, TPSCounter},
 };
-
-const DEPOSIT_TIMEOUT_SEC: u64 = 5 * 60;
 
 /// Runs the outgoing TPS scenario:
 /// sends the different types of transactions, and measures the TPS for the sending
 /// process (in other words, speed of the ZKSync node mempool).
 pub fn run_scenario(mut ctx: ScenarioContext) {
-    let verify_timeout_sec = Duration::from_secs(ctx.ctx.verify_timeout_sec);
+    // Load config and construct test accounts
+    let config = LoadTestConfig::load(&ctx.config_path);
+    let (_event_loop_handle, transport) =
+        Http::new(&ctx.options.web3_url).expect("http transport start");
+    let test_accounts =
+        TestAccount::construct_test_accounts(&config.input_accounts, transport, &ctx.options);
+
+    let verify_timeout_sec = Duration::from_secs(config.verify_timeout_sec);
     let rpc_addr = ctx.rpc_addr.clone();
 
     let rpc_client = RpcClient::new(&rpc_addr);
@@ -48,9 +51,9 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
 
     // Send the transactions and block until all of them are sent.
     let sent_txs = ctx.rt.block_on(send_transactions(
-        ctx.test_accounts,
+        test_accounts,
         rpc_client.clone(),
-        ctx.ctx,
+        config,
         ctx.rt.handle().clone(),
         ctx.tps_counter,
     ));
@@ -58,7 +61,8 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
     // Wait until all the transactions are verified.
     log::info!("Waiting for all transactions to be verified");
     ctx.rt
-        .block_on(wait_for_verify(sent_txs, verify_timeout_sec, &rpc_client));
+        .block_on(wait_for_verify(sent_txs, verify_timeout_sec, &rpc_client))
+        .expect("Verifying failed");
     log::info!("Loadtest completed.");
 }
 
@@ -66,7 +70,7 @@ pub fn run_scenario(mut ctx: ScenarioContext) {
 async fn send_transactions(
     test_accounts: Vec<TestAccount>,
     rpc_client: RpcClient,
-    ctx: TestSpec,
+    ctx: LoadTestConfig,
     rt_handle: Handle,
     tps_counter: Arc<TPSCounter>,
 ) -> SentTransactions {
@@ -101,7 +105,7 @@ async fn send_transactions(
 // Sends the configured deposits, withdraws and transfer from a single account concurrently.
 async fn send_transactions_from_acc(
     test_acc: TestAccount,
-    ctx: TestSpec,
+    ctx: LoadTestConfig,
     rpc_client: RpcClient,
     tps_counter: Arc<TPSCounter>,
 ) -> Result<SentTransactions, failure::Error> {
@@ -183,100 +187,4 @@ async fn send_transactions_from_acc(
     log::info!("Account: {}: all the transactions are sent", addr_hex);
 
     Ok(sent_txs)
-}
-
-// generates random amount for transaction within given range [from, to).
-fn rand_amount(from: u64, to: u64) -> BigDecimal {
-    let amount = rand::thread_rng().gen_range(from, to);
-    BigDecimal::from(amount)
-}
-
-/// Deposits to contract and waits for node to execute it.
-async fn deposit_single(
-    test_acc: &TestAccount,
-    deposit_amount: BigDecimal,
-    rpc_client: &RpcClient,
-) -> Result<u64, failure::Error> {
-    let nonce = {
-        let mut n = test_acc.eth_nonce.lock().await;
-        *n += 1;
-        Some(U256::from(*n - 1))
-    };
-    let priority_op = test_acc
-        .eth_acc
-        .deposit_eth(deposit_amount, &test_acc.zk_acc.address, nonce)
-        .await?;
-    wait_for_deposit_executed(priority_op.serial_id, &rpc_client).await
-}
-
-/// Waits until the deposit priority operation is executed.
-async fn wait_for_deposit_executed(
-    serial_id: u64,
-    rpc_client: &RpcClient,
-) -> Result<u64, failure::Error> {
-    let mut executed = false;
-    // We poll the operation status twice a second until timeout is reached.
-    let start = Instant::now();
-    let timeout = Duration::from_secs(DEPOSIT_TIMEOUT_SEC);
-    let polling_interval = Duration::from_millis(500);
-    let mut timer = time::interval(polling_interval);
-
-    // Polling cycle.
-    while !executed && start.elapsed() < timeout {
-        timer.tick().await;
-        let state = rpc_client.ethop_info(serial_id).await?;
-        executed = state.executed;
-    }
-
-    // Check for the successful execution.
-    if !executed {
-        failure::bail!("Deposit operation timeout");
-    }
-
-    Ok(serial_id)
-}
-
-/// Waits for all the priority operations and transactions to become a part of some block and get verified.
-async fn wait_for_verify(sent_txs: SentTransactions, timeout: Duration, rpc_client: &RpcClient) {
-    let serial_ids = sent_txs.op_serial_ids;
-
-    let start = Instant::now();
-    let polling_interval = Duration::from_millis(500);
-    let mut timer = time::interval(polling_interval);
-
-    // Wait until all the transactions are verified.
-    for &id in serial_ids.iter() {
-        loop {
-            let state = rpc_client
-                .ethop_info(id as u64)
-                .await
-                .expect("[wait_for_verify] call ethop_info");
-            if state.executed && state.verified {
-                log::debug!("deposit (serial_id={}) is verified", id);
-                break;
-            }
-            if start.elapsed() > timeout {
-                panic!("[wait_for_verify] Timeout")
-            }
-            timer.tick().await;
-        }
-    }
-
-    let tx_hashes = sent_txs.tx_hashes;
-    for hash in tx_hashes.iter() {
-        loop {
-            let state = rpc_client
-                .tx_info(hash.clone())
-                .await
-                .expect("[wait_for_verify] call tx_info");
-            if state.verified {
-                log::debug!("{} is verified", hash.to_string());
-                break;
-            }
-            if start.elapsed() > timeout {
-                panic!("[wait_for_verify] Timeout")
-            }
-            timer.tick().await;
-        }
-    }
 }

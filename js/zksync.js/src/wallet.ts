@@ -93,7 +93,7 @@ export class Wallet {
             await ethWallet.getAddress(),
             undefined,
             accountId,
-            ethSignatureType,
+            ethSignatureType
         );
         wallet.connect(provider);
         return wallet;

@@ -7,19 +7,24 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use tokio::runtime::Runtime;
 use web3::types::H160;
 // Workspace uses
-use models::config_options::ConfigurationOptions;
-use models::node::config::{
-    OBSERVER_MODE_PULL_INTERVAL, PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL,
+use models::{
+    config_options::{ConfigurationOptions, ProverOptions},
+    node::config::OBSERVER_MODE_PULL_INTERVAL,
 };
-use server::api_server::start_api_server;
-use server::block_proposer::run_block_proposer_task;
-use server::committer::run_committer;
-use server::eth_watch::start_eth_watch;
-use server::mempool::run_mempool_task;
-use server::prover_server::start_prover_server;
-use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
-use server::{eth_sender, leader_election, observer_mode};
 use storage::ConnectionPool;
+// Local uses
+use server::{
+    api_server::start_api_server,
+    block_proposer::run_block_proposer_task,
+    committer::run_committer,
+    eth_sender,
+    eth_watch::start_eth_watch,
+    leader_election,
+    mempool::run_mempool_task,
+    observer_mode,
+    prover_server::start_prover_server,
+    state_keeper::{start_state_keeper, PlasmaStateKeeper},
+};
 
 fn main() {
     env_logger::init();
@@ -159,11 +164,13 @@ fn main() {
         eth_watch_req_sender.clone(),
         config_opts.clone(),
     );
+
+    let prover_options = ProverOptions::from_env();
     start_prover_server(
         connection_pool.clone(),
         config_opts.prover_server_address,
-        PROVER_GONE_TIMEOUT,
-        PROVER_PREPARE_DATA_INTERVAL,
+        prover_options.gone_timeout,
+        prover_options.prepare_data_interval,
         stop_signal_sender,
         observer_mode_final_state.circuit_acc_tree,
         observer_mode_final_state.circuit_tree_block,
