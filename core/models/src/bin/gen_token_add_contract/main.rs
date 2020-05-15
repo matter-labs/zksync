@@ -1,3 +1,13 @@
+//! This executable is used to generate TokenDeployInit contract for DeployFactory.
+//!
+//! TokenDeployInit contract contains list of tokens that we add to the Governance contract when
+//! we first deploy it.
+//!
+//! List of tokens for initial deployment depends on current `ETH_NETWORK` and is available in the
+//! `etc/tokens/${ETH_NETWORK}.json`
+//!
+//! For localhost network we deploy test ERC20 token and generate token list file in the `zksync init` script.
+
 use handlebars::{to_json, Handlebars};
 use models::config_options::{get_env, parse_env};
 use models::node::tokens::get_genesis_token_list;

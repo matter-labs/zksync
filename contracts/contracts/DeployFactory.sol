@@ -31,27 +31,30 @@ contract DeployFactory is TokenDeployInit {
     event Addresses(address governance, address zksync, address verifier, address gatekeeper);
 
 
-    function deployProxyContracts(Governance _gov, Verifier _ver, ZkSync _zks, bytes32 _genesisRoot, address _validator, address _governor) internal {
+    function deployProxyContracts(
+        Governance _governanceTarget, Verifier _verifierTarget, ZkSync _zksyncTarget,
+        bytes32 _genesisRoot, address _validator, address _governor
+    ) internal {
 
-        Proxy gov = new Proxy(address(_gov), abi.encode(this));
+        Proxy governance = new Proxy(address(_governanceTarget), abi.encode(this));
         // set this contract as governor
-        Proxy ver = new Proxy(address(_ver), abi.encode());
-        Proxy zks = new Proxy(address(_zks), abi.encode(address(gov), address(ver), _genesisRoot));
+        Proxy verifier = new Proxy(address(_verifierTarget), abi.encode());
+        Proxy zkSync = new Proxy(address(_zksyncTarget), abi.encode(address(governance), address(verifier), _genesisRoot));
 
-        UpgradeGatekeeper gk = new UpgradeGatekeeper(zks);
+        UpgradeGatekeeper upgradeGatekeeper = new UpgradeGatekeeper(zkSync);
 
-        gov.transferMastership(address(gk));
-        gk.addUpgradeable(address(gov));
+        governance.transferMastership(address(upgradeGatekeeper));
+        upgradeGatekeeper.addUpgradeable(address(governance));
 
-        ver.transferMastership(address(gk));
-        gk.addUpgradeable(address(ver));
+        verifier.transferMastership(address(upgradeGatekeeper));
+        upgradeGatekeeper.addUpgradeable(address(verifier));
 
-        zks.transferMastership(address(gk));
-        gk.addUpgradeable(address(zks));
+        zkSync.transferMastership(address(upgradeGatekeeper));
+        upgradeGatekeeper.addUpgradeable(address(zkSync));
 
-        emit Addresses(address(gov), address(zks), address(ver), address(gk));
+        emit Addresses(address(governance), address(zkSync), address(verifier), address(upgradeGatekeeper));
 
-        finalizeGovernance(Governance(address(gov)), _validator, _governor);
+        finalizeGovernance(Governance(address(governance)), _validator, _governor);
     }
 
     function finalizeGovernance(Governance _governance, address _validator, address _finalGovernor) internal {
