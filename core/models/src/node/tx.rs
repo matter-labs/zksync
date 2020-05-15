@@ -937,6 +937,115 @@ mod test {
         (pk, messages)
     }
 
+    fn gen_account_id<T: Rng>(rng: &mut T) -> AccountId {
+        let mut bytes = rng.gen::<u32>().to_be_bytes();
+        bytes[0] = 0;
+        u32::from_be_bytes(bytes)
+    }
+
+    #[test]
+    fn test_print_transfer_for_protocol() {
+        let mut rng = XorShiftRng::from_seed([1, 2, 3, 4]);
+        let key = gen_pk_and_msg().0;
+        let transfer = Transfer::new_signed(
+            gen_account_id(&mut rng),
+            Address::from(rng.gen::<[u8; 20]>()),
+            Address::from(rng.gen::<[u8; 20]>()),
+            rng.gen(),
+            BigDecimal::from(12_340_000_000_000u64),
+            BigDecimal::from(56_700_000_000u64),
+            rng.gen(),
+            &key,
+        )
+        .expect("failed to sign transfer");
+
+        println!(
+            "User representation:\n{}\n",
+            serde_json::to_string_pretty(&transfer).expect("json serialize")
+        );
+
+        println!("Signer:");
+        println!("Private key: {}", key.0.to_string());
+        let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
+        println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
+
+        let signed_fields = vec![
+            ("type", vec![Transfer::TX_TYPE]),
+            ("accountId", transfer.account_id.to_be_bytes()[1..].to_vec()),
+            ("from", transfer.from.as_bytes().to_vec()),
+            ("to", transfer.to.as_bytes().to_vec()),
+            ("token", transfer.token.to_be_bytes().to_vec()),
+            ("amount", pack_token_amount(&transfer.amount)),
+            ("fee", pack_fee_amount(&transfer.fee)),
+            ("nonce", transfer.nonce.to_be_bytes().to_vec()),
+        ];
+        println!("Signed transaction fields:");
+        let mut field_concat = Vec::new();
+        for (field, value) in signed_fields.into_iter() {
+            println!("{}: 0x{}", field, hex::encode(&value));
+            field_concat.extend(value.into_iter());
+        }
+        println!("Signed bytes: 0x{}", hex::encode(&field_concat));
+        assert_eq!(
+            field_concat,
+            transfer.get_bytes(),
+            "Protocol serialization mismatch"
+        );
+    }
+
+    #[test]
+    fn test_print_withdraw_for_protocol() {
+        let mut rng = XorShiftRng::from_seed([2, 2, 3, 4]);
+        let key = gen_pk_and_msg().0;
+        let withdraw = Withdraw::new_signed(
+            gen_account_id(&mut rng),
+            Address::from(rng.gen::<[u8; 20]>()),
+            Address::from(rng.gen::<[u8; 20]>()),
+            rng.gen(),
+            BigDecimal::from(12_340_000_000_000u64),
+            BigDecimal::from(56_700_000_000u64),
+            rng.gen(),
+            &key,
+        )
+        .expect("failed to sign withdraw");
+
+        println!(
+            "User representation:\n{}\n",
+            serde_json::to_string_pretty(&withdraw).expect("json serialize")
+        );
+
+        println!("Signer:");
+        println!("Private key: {}", key.0.to_string());
+        let (pk_x, pk_y) = public_key_from_private(&key).0.into_xy();
+        println!("Public key: x: {}, y: {}\n", pk_x, pk_y);
+
+        let signed_fields = vec![
+            ("type", vec![Withdraw::TX_TYPE]),
+            ("accountId", withdraw.account_id.to_be_bytes()[1..].to_vec()),
+            ("from", withdraw.from.as_bytes().to_vec()),
+            ("to", withdraw.to.as_bytes().to_vec()),
+            ("token", withdraw.token.to_be_bytes().to_vec()),
+            (
+                "fullAmount",
+                big_decimal_to_u128(&withdraw.amount).to_be_bytes().to_vec(),
+            ),
+            ("fee", pack_fee_amount(&withdraw.fee)),
+            ("nonce", withdraw.nonce.to_be_bytes().to_vec()),
+        ];
+        println!("Signed transaction fields:");
+        let mut field_concat = Vec::new();
+        for (field, value) in signed_fields.into_iter() {
+            println!("{}: 0x{}", field, hex::encode(&value));
+            field_concat.extend(value.into_iter());
+        }
+        println!("Signed bytes: 0x{}", hex::encode(&field_concat));
+        assert_eq!(
+            field_concat,
+            withdraw.get_bytes(),
+            "Protocol serialization mismatch"
+        );
+    }
+
     #[test]
     fn test_musig_rescue_signing_verification() {
         let (pk, messages) = gen_pk_and_msg();

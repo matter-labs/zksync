@@ -39,7 +39,7 @@
       - [Check that token address is valid](#check-that-token-address-is-valid)
   * [Block state transition circuit](#block-state-transition-circuit) 
   * [Appendix I: Cryptographic primitives](#appendix-i-cryptographic-primitives)
-    + [Transaction signature](#transaction-signature)
+    + [Transaction signature](#Transaction-signature)
     + [Rescue hash](#rescue-hash)
     + [SHA256](#sha256)
     + [Sparse Merkle Tree](#sparse-merkle-tree)
@@ -116,7 +116,6 @@ This includes, in particular, the following claims:
 |PackedTxAmount|5|[Parameters](#amount-packing)|Packed transactions amounts are represented with 40 bit (5 byte) values, encoded as mantissa * 10^exponent where mantissa is represented with 35 bits, exponent is represented with 5 bits. This gives a range from 0 to 34359738368 * 10^31, providing 10 full decimal digit precision.|
 |PackedFee|2|[Parameters](#amount-packing)|Packed fees must be represented with 2 bytes: 5 bit for exponent, 11 bit for mantissa.|
 |StateAmount|16|BE integer|State amount is represented as uint128 with a range from 0 to ~3.4 * 10^38. It allows to represent up to 3.4 * 10^20 "units" if standard Ethereum's 18 decimal symbols are used. This should be a sufficient range.|
-|StateFee|16|BE integer|State fee is represented as uint128 with a range from 0 to ~3.4 * 10^38. It allows to represent up to 3.4 * 10^20 "units" if standard Ethereum's 18 decimal symbols are used. This should be a sufficient range.|
 |Nonce|4|BE integer|Nonce is the total number of executed transactions of the account. In order to apply the update of this state, it is necessary to indicate the current account nonce in the corresponding transaction, after which it will be automatically incremented. If you specify the wrong nonce, the changes will not occur.|
 |RollupPubkeyHash|20|LE integer|To make a public key hash from a Rollup public key apply [Rescue hash function](#rescue-hash) to the `[x,y]` points of the key and then take the last 20 bytes of the result.|
 |EthAddress|20|LE integer|To make an Ethereum address from the Etherum's public key, all we need to do is to apply Keccak-256 hash function to the key and then take the last 20 bytes of the result.|
@@ -214,13 +213,56 @@ Full list: https://docs.google.com/spreadsheets/d/1ejK1MJfVehcwjgjVDFD3E2k1EZ7au
 
 Legend:
 
-- User transaction: what users can submit to the operator (body of Http request / input for contract method).
+- Transaction: what users can submit to the operator directly.
+- Priority operation: what users can submit to the zkSync smart contract.
+- Rollup operation: part of the rollup block representing `Transaction` or `Priority operation`.
 - Onchain operation: what the operator can put into the rollup block pubdata (operation pubdata).
 - Node implementation: node model that describes an operation.
 - Circuit implementation: circuit model that describes the operation and its witness.
 - Chunk: the dimension of the operation. Each chunk has its own part of the public data (8 bytes) given through witnesses.
 - Significant bytes: how many bytes, of all bytes occupied by the operation, are significant (including operation number).
 - Hash: the result of SHA-256 function with operation's pubdata as input. Used for operation identification.
+
+### 0. Rollup operation lifecycle
+
+1. User creates a `Transaction` or a `Priority operation`.
+2. After processing this request, operator creates a `Rollup operation` and adds it to the block.
+3. Once the block is complete, operator submits it to the zkSync smart contract as a block commitment. Part of the logic of some `Rollup operations` is checked by the smart contract.
+4. The proof for the block is submitted to the zkSync smart contract as the block verification. If the verification succeeds, the new state is considered finalized.
+
+#### Definitions used in circuit description
+
+Critical circuit logic is described below in a python-like pseudocode for simplicity of comprehension.
+It describes invariants that should be preserved after rollup operation execution and
+account tree updates that should be performed if this invariants are true.
+
+There are two main invariant functions: `tree_invariants` and `pubdata_invariants`. Each predicate in these functions should evaluate to true.
+
+Functions and data structures used in this pseudocode language:
+```
+# Returns account in the account tree given its id; it always returns something, since account tree is filled by empty account by default.
+get_account_tree(account_id) -> Account 
+
+# Unpacks packed amount or fee; these functions implicitly enforce the invariant that amount and fee is packable
+unpack_amount(packed_amount) -> StateAmount
+unpack_fee(packed_fee) -> StateAmount
+
+# Checks if account is empty: address, pubkey_hash, nonce and all balances are 0.
+is_account_empty(Account) -> bool
+
+# Returns signer for the given transaction
+recover_signer_pubkey_hash(tx) -> RollupPubkeyHash 
+
+# Account data structure
+Account.balance[token_id] -> StateAmount # returns account balance of the given token
+Account.nonce -> Nonce # Nonce of the account
+Account.address -> EthAddress # Address of the account
+Account.pubkey_hash -> RollupPubkeyHash # Hash of the public key set for the account
+
+# Constants
+MAX_TOKENS = 2**16 # maximum number of tokens in the Rollup(including "ETH" token) 
+MAX_NONCE = 2**32 # max possible nonce
+```
 
 ### 1. Noop operation
 
@@ -300,45 +342,106 @@ Reads as: transfer from account #4 token #2 to account #3 amount in packed repre
 |from|ETHAddress|Unique address of the rollup account from which funds will be withdrawn (sender)|
 |to|ETHAddress|Unique address of the rollup account that will receive the funds (recipient)|
 |token|TokenId|Unique token identifier in the rollup|
-|amount|StateAmount|Full amount of funds sent|
-|fee|StateFee|Full amount of fee paid|
+|amount|PackedTxAmount|Amount of funds sent|
+|fee|PackedFee|Amount of fee paid|
 |nonce|Nonce|A one-time code that specifies the order of transactions|
-|signature|Signanture|[Signature](#transaction-signature) of previous fields that had been concatenated into a single bytes array (as BE bytes). Before concatenation `amount` and `fee` fields are packed|
+|signature|Signanture|[Signature](#Transaction-Singature) of previous fields, see the spec below|
 
 ##### Example
 
+User transaction representation. 
+(NOTE: tx bytecode differs slightly from this representation due to data packing, see the spec below).
+
 ```json
 {
-  "type": "Transfer",
-  "accountId": 4,
-  "from": "0x924F8F0380f415ab3DAeFF4556216da3E34fAf40",
-  "to": "0x924F8F0380f415ab3DAeFF4556216da3E34fAf40",
-  "token": 1,
-  "amount": "3000000000000000",
-  "fee": "0",
-  "nonce": 4,
+  "accountId": 2061,
+  "from": "0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb",
+  "to": "0x05e3066450dfcd4ee9ca4f2039d58883631f0460",
+  "token": 60896,
+  "amount": "12340000000000",
+  "fee": "56700000000",
+  "nonce": 784793056,
   "signature": {
-    "pubKey": "7d3e1be67b4d49a63d8673a600435434ac4f4a70e018f8bd64fe7509a4cbd5aa",
-    "signature": "2ee557b52b93cc50ea9685c4bf9d6cd7e7e1fb919c542eedbe3c4817ee07ed9be3baef6a364111ccd1071eeba891f2f5fe19fd1d47040d5110c1f5e25d089e02"
+    "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
+    "signature": "c16d3ea71a9c878dd49904cfe95fe1360864c43fdf7bb22f446941474d4e5686a71d837687b16caa564c7197d511517f26117def38f2a1dd3f7ccbef59628003"
   }
 }
 ```
 
-#### Invariants
+Signed transaction representation.
 
-1. Transfer.token < TotalTokens
-2. from_id = get_id(Transfer.from) != nil
-3. to_id = get_id(Transfer.to) != nil
-4. verify(signature) == true
-5. Transfer.nonce == Account(from_id).nonce
-6. Account(from_id).balance(token) >= Transfer.amount + Transfer.fee
+```
+Signed using:
+Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
+Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-#### Tree updates
+type: 0x05
+accountId: 0x00080d
+from: 0x1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb
+to: 0x05e3066450dfcd4ee9ca4f2039d58883631f0460
+token: 0xede0
+amount: 0x5bf0aea003
+fee: 0x46e8
+nonce: 0x2ec6fde0
 
-1. Account(from_id).balance(token) -= (Transfer.amount + Transfer.fee)
-3. Account(from_id).nonce += 1
-2. Account(to_id).balance(token) += Transfer.amount
-4. Account(fees_account_id).balance(token) += Transfer.fee
+Signed bytes: 0x0500080d1f04204dba8e9e8bf90f5889fe4bdc0f37265dbb05e3066450dfcd4ee9ca4f2039d58883631f0460ede05bf0aea00346e82ec6fde0
+```
+
+
+
+#### Rollup operation
+
+##### Structure
+
+|Field|Value/type|Description|
+|--|--|--|
+|tx|TransferTx| Signed transfer transaction defined above |
+|from_account_id|AccountId|Unique id of the sender rollup account in the state tree|
+|to_account_id|AccountId|Unique id of the recipient rollup account in the state tree|
+
+
+#### Circuit constraints
+
+```python
+# TransferOp - Rollup operation described above
+# Block - block where this Rollup operation is executed
+# OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
+
+from_account = get_account_tree(TransferOp.from_account_id)
+to_account = get_account_tree(TransferOp.to_account_id)
+fee_account = get_account_tree(Block.fee_account)
+
+amount = unpack_amount(TransferOp.tx.packed_amount)
+fee = unpack_fee(TransferOp.tx.packed_fee)
+
+def tree_invariants():
+    TransferOp.token < TOTAL_TOKENS
+    
+    from_account.id == TransferOp.tx.from_account_id;
+    from_account.nonce == TransferOp.tx.nonce
+    from_account.nonce < MAX_NONCE
+    from_account.balance(TransferOp.tx.token) >= (amount + fee)
+    from_account.pubkey_hash == recover_signer_pubkey_hash(TransferOp.tx)
+    from_account.address == TransferOp.tx.from_address
+
+    to_account.address == TransferOp.tx.to_address
+
+def tree_updates():
+    from_account.balance[TransferOp.tx.token] -= (amount + fee)
+    from_account.nonce += 1
+
+    to_acccount.balance[TransferOp.tx.token] += amount
+
+    fee_account.balance[TransferOp.tx.token] += fee
+
+def pubdata_invariants():
+    OnhcainOp.opcode == 0x05
+    OnchainOp.from_account == TransferOp.from_account_id
+    OnchainOp.token == TransferOp.tx.token
+    OnchainOp.to_account == TransferOp.to_account_id
+    OnhcainOp.packed_amount == TransferOp.tx.packed_amount
+    OnhcainOp.packed_fee == TransferOp.tx.packed_fee
+```
 
 ### 3. Transfer to new
 
@@ -377,59 +480,62 @@ Reads as: transfer from account #4 token #2 amount in packed representation 0x00
 
 #### User transaction
 
+Same as [Transfer](#2-transfer)
+
+#### Rollup operation
+
 ##### Structure
 
 |Field|Value/type|Description|
 |--|--|--|
-|type|`0x05`|Operation code|
-|account_id|AccountId|Unique id of the sender rollup account in the state tree|
-|from|ETHAddress|Unique address of the rollup account from which funds will be withdrawn (sender)|
-|to|ETHAddress|Unique address of the rollup account that will receive the funds (recipient)|
-|token|TokenId|Unique token identifier in the rollup|
-|amount|StateAmount|Full amount of funds sent|
-|fee|StateFee|Full amount of fee paid|
-|nonce|Nonce|A one-time code that specifies the order of transactions|
-|signature|Signanture|Rescue signature of previous fields that had been concatenated into a single bytes array. Before concatenation `amount` and `fee` fields are packed|
+|tx|TransferTx| Signed transfer transaction defined above |
+|from_account_id|AccountId|Unique id of the sender rollup account in the state tree|
+|to_account_id|AccountId|Unique id of the recipient rollup account in the state tree|
 
-##### Example
+#### Circuit constraints
 
-Transfer to new request is the same as regular Transfer request:
+```python
+# TransferToNewOp - Rollup operation described above
+# Block - block where this Rollup operation is executed
+# OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
 
-```json
-{
-  "type": "Transfer",
-  "accountId": 4,
-  "from": "0x924F8F0380f415ab3DAeFF4556216da3E34fAf40",
-  "to": "0x11742517336Ae1b09CA275bb6CAFc6B341B6e324",
-  "token": 1,
-  "amount": "3000000000000000",
-  "fee": "30000000000000",
-  "nonce": 1,
-  "signature": {
-    "pubKey": "7d3e1be67b4d49a63d8673a600435434ac4f4a70e018f8bd64fe7509a4cbd5aa",
-    "signature": "6ac05e7422a136f1c1a4ff889fa6b713520b3f4a76379c4cea020a225184332e65e369103df2f2444cb82100d67a532facccd2a983b5f3bbb501532c3d8a6d02"
-  }
-}
+from_account = get_account_tree(TransferToNewOp.from_account_id)
+to_account = get_account_tree(TransferToNewOp.to_account_id)
+fee_account = get_account_tree(Block.fee_account)
+
+amount = unpack_amount(TransferToNewOp.tx.packed_amount)
+fee = unpack_fee(TransferToNewOp.tx.packed_fee)
+
+def tree_invariants():
+    TransferToNewOp.token < TOTAL_TOKENS
+    
+    from_account.id == TransferToNewOp.tx.from_account_id;
+    from_account.nonce == TransferToNewOp.tx.nonce
+    from_account.nonce < MAX_NONCE
+    from_account.balance[TransferToNewOp.tx.token] >= (amount + fee)
+    from_account.pubkey_hash == recover_signer_pubkey_hash(TransferToNewOp.tx)
+    from_account.address == TransferToNewOp.tx.from_address
+    
+    is_account_empty(to_account) == True
+
+def tree_updates():
+    from_account.balance[TransferOp.tx.token] -= (amount + fee)
+    from_account.nonce += 1
+
+    to_acccount.address = TransferToNewOp.to_address
+    to_acccount.balance[TransferOp.tx.token] += amount
+
+    fee_account.balance[TransferOp.tx.token] += fee
+
+def pubdata_invariants():
+    OnhcainOp.opcode == 0x02
+    OnchainOp.from_account == TransferToNewOp.from_account_id
+    OnchainOp.token == TransferToNewOp.tx.token
+    OnhcainOp.packed_amount == TransferToNewOp.tx.packed_amount
+    OnchainOp.to_address == TransferToNewOp.tx.to_address
+    OnchainOp.to_account == TransferToNewOp.to_account_id
+    OnhcainOp.packed_fee == TransferToNewOp.tx.packed_fee
 ```
-
-#### Invariants
-
-1. TransferToNew.token < TotalTokens
-2. from_id = get_id(TransferToNew.from) != nil
-3. to_id = get_id(TransferToNew.to) == nil
-4. verify(signature) == true
-5. Transfer.nonce == Account(from_id).nonce
-6. Account(from_id).balance(token) >= Transfer.amount + Transfer.fee
-
-#### Tree updates
-
-to_id = get_lowest_free_account_id()
-
-1. Account(to_id).address = TransferToNew.to
-2. Account(from_id).balance(token) -= (TransferToNew.amount + Transfer.fee)
-3. Account(from_id).nonce += 1
-4. Account(to_id).balance(token) += TransferToNew.amount
-5. Account(fees_account_id).balance(token) += TransferToNew.fee
 
 ### 4. Withdraw (Partial Exit)
 
@@ -450,7 +556,6 @@ Withdraws funds from Rollup account to appropriate balance of the indicated Ethe
 |Field|Byte len|Value/type|Description|
 |--|--|--|--|
 |opcode|1|`0x03`|Operation code|
-|account_id|AccountId|Unique id of the rollup account in the state tree|
 |from_account|3|AccountId|Unique identifier of the rollup account from which funds will be withdrawn (sender)|
 |token|2|TokenId|Unique token identifier in the rollup|
 |full_amount|16|StateAmount|Full amount of funds sent|
@@ -472,46 +577,99 @@ Reads as: transfer from account #4 token #2 amount 0x000000000000000002c68af0bb1
 |Field|Value/type|Description|
 |--|--|--|
 |type|`0x03`|Operation code|
+|account_id|AccountId|Unique id of the sender rollup account in the state tree|
 |from_address|ETHAddress|Unique address of the rollup account from which funds will be withdrawn (sender)|
 |to_address|EthAddress|The address of Ethereum account, to the balance of which the funds will be accrued(recipient)|
 |token|TokenId|Unique token identifier in the rollup|
 |amount|StateAmount|Full amount of funds sent|
-|fee|StateFee|Full amount of fee paid|
+|fee|PackedFee|Packed amount of fee paid|
 |nonce|Nonce|A one-time code that specifies the order of transactions|
 |signature|Signanture|Rescue signature of previous fields that had been concatenated into a single bytes array. Before concatenation `fee` field is packed|
 
 ##### Example
 
+User transaction representation. 
+(NOTE: tx bytecode differs slightly from this representation due to data packing, see the spec below)..
+
 ```json
 {
-  "type": "Withdraw",
-  "accountId": 5,
-  "from": "0x11742517336Ae1b09CA275bb6CAFc6B341B6e324",
-  "to": "0x11742517336Ae1b09CA275bb6CAFc6B341B6e324",
-  "token": 1,
-  "amount": "500000000000000",
-  "fee": "5000000000000",
-  "nonce": 1,
+  "accountId": 4118,
+  "from": "0x041f3b8db956854839d7434f3e53c7141a236b16",
+  "to": "0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513",
+  "token": 9888,
+  "amount": "12340000000000",
+  "fee": "56700000000",
+  "nonce": 352676723,
   "signature": {
-    "pubKey": "1a76f4bf2975a4190d13aed2f08f662c7c60101887c9cc53d0cad5d3ff383615",
-    "signature": "5d7001ac44a1f495725d008a48fb6120ac1faaab27145890feaf759c4d446609fa19086e1c21af35b6b494af26fd4d7046879638c035dd1b7d3d9243a9f41303"
+    "pubKey": "0e1390d3e86881117979db2b37e40eaf46b6f8f38d2509ff3ecfaf229c717b9d",
+    "signature": "ff74636ba00f6c3724c247f55b26f3400de4ce5c3a70568cc8da67ae0baa11a5290895cd80e394983659e406641d188c24acf5b3435f1157fd866390ac597c05"
   }
 }
 ```
 
-#### Invariants
+Signed transaction representation.
 
-1. Withdraw.token < TotalTokens
-2. id = get_id(Withdraw.from_address) != nil
-3. verify(signature) == true
-4. Transfer.nonce == Account(id).nonce
-5. Account(id).balance(token) >= (Withdraw.amount + Withdraw.fee)
+```
+Signed using:
+Private key: Fs(0x057afe7e950189b17eedfd749f5537a88eb3ed4981467636a115e5c3efcce0f4)
+Public key: x: Fr(0x0e63e65569365f7d2db43642f9cb15781120364f5e993cd6822cbab3f86be4d3), y: Fr(0x1d7b719c22afcf3eff09258df3f8b646af0ee4372bdb7979118168e8d390130e)
 
-#### Tree updates
+type: 0x03
+account_id: 0x001016
+from_address: 0x041f3b8db956854839d7434f3e53c7141a236b16
+to_address: 0xdc8f1d4d7b5b4cde2dbc793c1d458f8916cb0513
+token: 0x26a0
+amount: 0x000000000000000000000b3921510800
+fee: 0x46e8
+nonce: 0x15056b73
 
-1. Account(id).balance(token) -= (Withdraw.amount + Withdraw.fee)
-2. Account(id).nonce += 1
-3. Account(fees_account_id).balance(token) += Withdraw.fee
+Signed bytes: 0x03001016041f3b8db956854839d7434f3e53c7141a236b16dc8f1d4d7b5b4cde2dbc793c1d458f8916cb051326a0000000000000000000000b392151080046e815056b73
+```
+
+
+#### Rollup operation
+
+##### Structure
+
+|Field|Value/type|Description|
+|--|--|--|
+|tx|WithdrawTx| Signed withdraw transaction defined above |
+
+#### Circuit constraints
+
+```python
+# WithdrawOp - Rollup operation described above
+# Block - block where this Rollup operation is executed
+# OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
+
+account = get_tree_account(WithdrawOp.tx.account_id)
+fee_account = get_tree_account(Block.fee_account)
+
+fee = unpack_fee(WithdrawOp.tx.packed_fee)
+
+def tree_invariants():
+    WithdrawOp.token < TOTAL_TOKENS
+
+    account.nonce == WithdrawOp.nonce
+    account.nonce < MAX_NONCE
+    account.balance[WithdrawOp.tx.token] >= (amount + fee)
+    account.pubkey_hash == recover_signer_pubkey_hash(WithdrawOp.tx)
+    
+
+def tree_updates():
+    account.balance[WithdrawOp.tx.token] -= (amount + fee)
+    account.nonce += 1
+
+    fee_account.balance[WithdrawOp.token] += fee
+
+def pubdata_invariants():
+    OnhcainOp.opcode == 0x03
+    OnchainOp.from_account == WithdrawOp.tx.account_id
+    OnchainOp.token == WithdrawOp.tx.token
+    OnhcainOp.full_amount == WithdrawOp.tx.amount
+    OnhcainOp.packed_fee == WithdrawOp.tx.packed_fee
+    OnchainOp.to_address == WithdrawOp.tx.to_address
+```
 
 ### 5. Deposit
 
@@ -548,15 +706,53 @@ After that operator includes this operation in a block. In the account tree, the
 
 Reads as: deposit to account #4 token #2 amount 0x000000000000000002c68af0bb140000, account will have address 0x0809101112131415161718192021222334252628.
 
-#### Invariants
+#### Priority operation
 
-1. FullExit.token < TotalTokens
-2. id =  get_id(Deposit.to) != nil OR get_lowest_free_account_id()
+##### Structure
 
-#### Tree updates
+|Field|Byte len|Value/type|Description|
+|--|--|--|--|
+|token|2|TokenId|Unique token identifier in the rollup|
+|full_amount|16|StateAmount|Full amount of funds sent|
+|to_address|20|ETHAddress|The address that will represent the rollup account that will receive the funds (recipient)|
 
-1. Account(id).address = Deposit.to
-2. Account(id).balance(token) += Deposit.amount
+
+#### Rollup operation
+
+##### Structure
+
+|Field|Value/type|Description|
+|--|--|--|
+|op|DepositPriorityOp| Priority operation defined above |
+|to_account_id|AccountId|Unique identifier of the rollup account that will receive the funds (recipient)|
+
+#### Circuit constraints
+
+```python
+# DepositOp - Rollup operation described above
+# OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
+
+account = get_account_tree(DepositOp.to_account_id)
+
+def tree_invariants():
+    DepositOp.token < TOTAL_TOKENS
+    
+    is_account_empty(account) == True or account.address == DepositOp.op.to_address
+    
+
+def tree_updates():
+    if is_account_empty(account):
+        account.address = DepositOp.op.to_address
+        
+    account.balance[DepositOp.op.token] += DepositOp.op.full_amount
+
+def pubdata_invariants():
+    OnhcainOp.opcode == 0x01
+    OnchainOp.to_account == DepositOp.to_account_id
+    OnchainOp.token == DepositOp.op.token
+    OnhcainOp.full_amount == DepositOp.op.amount
+    OnchainOp.to_address == DepositOp.op.to_address
+```
 
 #### Censorship by the operator
 
@@ -598,21 +794,50 @@ It starts as a priority operation - user calls contract method `fullExit`. After
 
 Reads as: full exit from account #4 with with address 0x0809101112131415161718192021222334252628, token #2, amount is 0x000000000000000002c68af0bb140000.
 
-#### User ethereum transaction
+#### Priority operation
 
-##### Ethereum transction
+##### Structure
 
-// TODO: describe user eth transaction for full exit
+|Field|Byte len|Value/type|Description|
+|--|--|--|--|
+|account_id|3|AccountId|Unique identifier of the rollup account|
+|eth_address|20|ETHAddress|The address of the account|
+|token|2|TokenId|Unique token identifier in the rollup|
 
-#### Invariants
 
-1. FullExit.token < TotalTokens
-2. id = get_id(FullExit.owner) != nil
-3. Account(id).address == FullExit.owner
+#### Rollup operation
 
-#### Tree updates
+##### Structure
 
-1. Account(id).balance(token) -= amount_to_withdraw
+|Field|Value/type|Description|
+|--|--|--|
+|op|FullExitPriorityOp| Priority operation defined above |
+
+#### Circuit constraints
+
+```python
+# FullExitOp - Rollup operation described above
+# OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
+
+account = get_account_tree(FullExitOp.op.account_id)
+withdrawn_amount = 0
+
+def tree_invariants():
+    FullExitOp.op.token < TOTAL_TOKENS
+    account.id == FullExitOp.op.id
+
+def tree_updates():
+    if account.address == FullExitOp.op.eth_address:
+        withdrawn_amount = account.balance[FullExitOp.op.token]
+        account.balance[FullExitOp.op.token] = 0
+
+def pubdata_invariants():
+    OnhcainOp.opcode == 0x06
+    OnchainOp.account_id == FullExitOp.op.account_id
+    OnhcainOp.owner == FullExitOp.op.eth_address
+    OnchainOp.token == FullExitOp.op.token
+    OnchainOp.full_amount == withdrawn_amount
+```
 
 #### Failure signal
 
@@ -654,9 +879,9 @@ with ethereum keys for which address is the same as account address.
 0700000411036945fcc11c349c3a300f19cd87cb03c4f2ef03e69588c1f4155dec60da3bf5113e029911ce3300000003
 ```
 
-Reads as: change pubkey, account #4, new pubkey hash sync:11036945fcc11c349c3a300f19cd87cb03c4f2ef, address: 03e69588c1f4155dec60da3bf5113e029911ce33, nonce: 3.
+Reads as: change pubkey, account #4, new pubkey hash 0x11036945fcc11c349c3a300f19cd87cb03c4f2ef, address: 0x03e69588c1f4155dec60da3bf5113e029911ce33, nonce: 3.
 
-#### Authorization
+#### Auth
 
 1. Transaction can be authorized by providing signature of the message `pubkey_message(account_id, nonce, new_pubkey_hash)` (see definition below).
 Transaction will be verified on the contract.
@@ -665,14 +890,14 @@ After this transaction succeeded transaction without signature can be sent to op
 
 ```typescript
 function pubkey_message(account_id, nonce: number, new_pubkey_hash): string {
-const pubKeyHashHex = to_hex(new_pubkey_hash); // 20 bytes as a hex
-const msgNonce = to_hex(to_be_bytes(nonce)); // nonce (4 byte BE integer) as a hex
-const msgAcccId = to_hex(to_be_bytes(account_id)); // account id (3 byte BE integer) as a hex
-return `Register zkSync pubkey:\n\n` +
-       `${pubKeyHashHex}\n` +
-       `nonce: 0x${msgNonce}\n` +
-       `account id: 0x${msgAccId}\n\n` +
-       `Only sign this message for a trusted client!`;
+    const pubKeyHashHex = to_hex(new_pubkey_hash); // 20 bytes as a hex
+    const msgNonce = to_hex(to_be_bytes(nonce)); // nonce (4 byte BE integer) as a hex
+    const msgAccId = to_hex(to_be_bytes(account_id)); // account id (3 byte BE integer) as a hex
+    return `Register zkSync pubkey:\n\n` +
+           `${pubKeyHashHex}\n` +
+           `nonce: 0x${msgNonce}\n` +
+           `account id: 0x${msgAccId}\n\n` +
+           `Only sign this message for a trusted client!`;
 }
 ```
 
@@ -683,6 +908,7 @@ return `Register zkSync pubkey:\n\n` +
 |Field|Value/type|Description|
 |--|--|--|
 |type|`0x07`|Operation code|
+|account_id|AccountId| Unique id of the rollup account |
 |account|ETHAddress|Address of the rollup account|
 |new_pubkey_hash|20|RollupPubkeyHash|Hash of the new rollup public key|
 |nonce|Nonce|A one-time code that specifies the order of transactions|
@@ -701,16 +927,43 @@ return `Register zkSync pubkey:\n\n` +
 }
 ```
 
-#### Invariants
+#### Rollup operation
 
-1. id = get_id(ChangePubkeyHash.account) != nil
-2. Account(id).address == ChangePubkeyHash.account
-4. Account(id).nonce == ChangePubkeyHash.nonce
+##### Structure
 
-#### Tree updates
+|Field|Value/type|Description|
+|--|--|--|
+|tx|ChangePubkeyTx| Transaction defined above |
 
-1. Account(id).pubkey_hash = ChangePubkeyHash.newPkHash
-2. Account(id).nonce += 1
+#### Circuit constraints
+
+```python
+# ChangePkOp - Rollup operation described above
+# OnchainOp - public data created after executing this rollup operation and posted to the Ethereum
+
+account = get_account_tree(ChankgePkOp.tx.account_id)
+
+def tree_invariants():
+    account.id == ChangePkOp.tx.id
+    account.address == ChangePkOp.tx.account
+    account.nonce < MAX_NONCE
+    account.nonce == ChangPkOp.tx.nonce
+
+def tree_updates():
+    account.pubkey_hash = ChangePkOp.tx.new_pubkey_hash
+    account.nonce += 1
+
+def pubdata_invariants():
+    OnhcainOp.opcode == 0x07
+    OnchainOp.account_id == ChanePkOp.tx.account_id
+    OnhcainOp.new_pubkey_hash == ChangePkOp.tx.new_pubkey_hash
+    OnchainOp.account_address == ChangePkOp.tx.account
+    OnchainOp.nonce == ChangePkOp.tx.nonce
+```
+
+#### Signature validity
+
+Signature validity is verified when transaction is committed to the Ethereum.
 
 
 ## Smart contracts API
