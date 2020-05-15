@@ -1,3 +1,4 @@
+---
 kind: pipeline
 type: docker
 name: loadtest-nightly
@@ -85,6 +86,7 @@ volumes:
 trigger:
   event:
   - cron
+
 ---
 kind: pipeline
 type: docker
@@ -120,6 +122,7 @@ steps:
   - zksync yarn
   - zksync plonk-setup check || zksync plonk-setup download
   - zksync verify-keys unpack
+  - zksync db-setup
   - zksync deploy-dev-erc20
   - zksync dummy-prover ensure-disabled
   depends_on:
@@ -372,6 +375,7 @@ steps:
   - zksync env stage
   - zksync yarn
   - zksync plonk-setup check || zksync plonk-setup download
+  - zksync db-setup
   - zksync verify-keys unpack
   - zksync build-contracts
   environment:
