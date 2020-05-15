@@ -194,7 +194,7 @@ export default {
                         to_onchain_icon    = `<span class="onchain_icon">onchain</span>`;
                         token              = tx.op.priority_op.token;
                         token              = tokens[token].syncSymbol;
-                        amount             = `${formatToken(tx.priority_op.withdraw_amount || 0, token)} ${token}`;
+                        amount             = `${formatToken(tx.op.priority_op.withdraw_amount || 0, token)} ${token}`;
                         created_at         = tx.created_at;
                         fee                = '';
                         break;

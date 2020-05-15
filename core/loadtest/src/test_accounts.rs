@@ -12,7 +12,7 @@ use models::{
 };
 use testkit::{eth_account::EthereumAccount, zksync_account::ZksyncAccount};
 // Local uses
-use crate::{rpc_client::RpcClient, test_spec::AccountInfo};
+use crate::{rpc_client::RpcClient, scenarios::configs::AccountInfo};
 
 #[derive(Debug)]
 pub struct TestAccount {
@@ -22,6 +22,33 @@ pub struct TestAccount {
 }
 
 impl TestAccount {
+    pub fn from_info(
+        acc_info: &AccountInfo,
+        transport: &Http,
+        config: &ConfigurationOptions,
+    ) -> Self {
+        let addr = acc_info.address;
+        let pk = acc_info.private_key;
+        let eth_acc = EthereumAccount::new(
+            pk,
+            addr,
+            transport.clone(),
+            config.contract_eth_addr,
+            config.chain_id,
+            config.gas_price_factor,
+        );
+        Self {
+            zk_acc: ZksyncAccount::new(
+                ZksyncAccount::rand().private_key,
+                0,
+                eth_acc.address,
+                eth_acc.private_key,
+            ),
+            eth_acc,
+            eth_nonce: Mutex::new(0),
+        }
+    }
+
     // Parses and builds a new accounts list.
     pub fn construct_test_accounts(
         input_accs: &[AccountInfo],
@@ -30,28 +57,7 @@ impl TestAccount {
     ) -> Vec<Self> {
         input_accs
             .iter()
-            .map(|acc_info| {
-                let addr = acc_info.address;
-                let pk = acc_info.private_key;
-                let eth_acc = EthereumAccount::new(
-                    pk,
-                    addr,
-                    transport.clone(),
-                    config.contract_eth_addr,
-                    config.chain_id,
-                    config.gas_price_factor,
-                );
-                Self {
-                    zk_acc: ZksyncAccount::new(
-                        ZksyncAccount::rand().private_key,
-                        0,
-                        eth_acc.address,
-                        eth_acc.private_key,
-                    ),
-                    eth_acc,
-                    eth_nonce: Mutex::new(0),
-                }
-            })
+            .map(|acc_info| Self::from_info(acc_info, &transport, config))
             .collect()
     }
 
