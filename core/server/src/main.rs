@@ -51,11 +51,7 @@ fn main() {
         log::info!("Adding initial tokens to db");
         let genesis_tokens =
             get_genesis_token_list(&config_opts.eth_network).expect("Initial token list not found");
-        for (id, token) in genesis_tokens
-            .into_iter()
-            .enumerate()
-            .map(|(id, t)| (id + 1, t))
-        {
+        for (id, token) in (1..).zip(genesis_tokens) {
             log::info!(
                 "Adding token: {}, id:{}, address: {}, precision: {}",
                 token.symbol,

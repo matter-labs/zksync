@@ -280,10 +280,10 @@ steps:
   - ci-prepare-env.sh
   - zksync env ci
   - zksync yarn
-  - zksync db-wait
-  - zksync db-setup
+  - zksync plonk-setup check || zksync plonk-setup download
   - zksync verify-keys unpack
-  - zksync genesis
+  - zksync db-setup
+  - zksync deploy-dev-erc20
   - zksync dummy-prover enable
   - f cargo build --release --bin server
   - f cargo build --release --bin dummy_prover

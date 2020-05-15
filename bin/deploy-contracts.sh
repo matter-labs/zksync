@@ -4,7 +4,7 @@ set -e
 # Redeploy current contracts
 # NOTE: this script does not build contracts, to build them use `zksync redeploy`
 
-echo "redeploying for the db $DATABASE_URL"
+echo "Redeploying contracts, results will be inserted to the db $DATABASE_URL"
 
 
 replace_env_variable() {
