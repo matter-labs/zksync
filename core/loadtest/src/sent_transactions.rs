@@ -26,4 +26,8 @@ impl SentTransactions {
     pub fn add_tx_hash(&mut self, v: TxHash) {
         self.tx_hashes.push(v);
     }
+
+    pub fn len(&self) -> usize {
+        self.op_serial_ids.len() + self.tx_hashes.len()
+    }
 }
