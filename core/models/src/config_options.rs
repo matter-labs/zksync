@@ -78,6 +78,33 @@ impl EthSenderOptions {
 }
 
 #[derive(Debug, Clone)]
+pub struct ProverOptions {
+    pub prepare_data_interval: Duration,
+    pub heartbeat_interval: Duration,
+    pub cycle_wait: Duration,
+    pub gone_timeout: Duration,
+}
+
+impl ProverOptions {
+    /// Parses the configuration options values from the environment variables.
+    /// Panics if any of options is missing or has inappropriate value.
+    pub fn from_env() -> Self {
+        let prepare_data_interval =
+            Duration::from_millis(parse_env("PROVER_PREPARE_DATA_INTERVAL"));
+        let heartbeat_interval = Duration::from_millis(parse_env("PROVER_HEARTBEAT_INTERVAL"));
+        let cycle_wait = Duration::from_millis(parse_env("PROVER_CYCLE_WAIT"));
+        let gone_timeout = Duration::from_millis(parse_env("PROVER_GONE_TIMEOUT"));
+
+        Self {
+            prepare_data_interval,
+            heartbeat_interval,
+            cycle_wait,
+            gone_timeout,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct ConfigurationOptions {
     pub replica_name: String,
     pub rest_api_server_address: SocketAddr,

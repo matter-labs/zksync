@@ -8,7 +8,9 @@ const franklin_abi = require('../../contracts/build/Franklin.json');
 import {ethers, utils, Contract} from "ethers";
 import {bigNumberify, parseEther} from "ethers/utils";
 import {IERC20_INTERFACE} from "zksync/build/utils";
-
+import { TokenLike } from "zksync/build/types";
+import * as apitype from "./api-type-validate";
+import * as assert from "assert";
 
 const WEB3_URL = process.env.WEB3_URL;
 // Mnemonic for eth wallet.
@@ -262,8 +264,66 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Transfer to self no fee ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
+
+    await apitype.checkBlockResponseType(1);
+    const blocks = await apitype.checkBlocksResponseType();
+    for (const { block_number } of blocks.slice(-10)) {
+        await apitype.checkBlockTransactionsResponseType(block_number);
+    }
+    await apitype.checkAccountInfoResponseType(syncWallet1.address());
+    await apitype.checkTxHistoryResponseType(syncWallet1.address());
+    await testSendingWithWrongSignature(syncWallet1, syncWallet2);
+
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, withdrawFee);
     console.log(`Withdraw ok, Token: ${token}`);
+}
+
+async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: Wallet) {
+    const signedTransfer: types.Transfer = syncWallet1.signer.signSyncTransfer({
+        accountId: await syncWallet1.getAccountId(),
+        from: syncWallet1.address(),
+        to: syncWallet2.address(),
+        tokenId: 0,
+        amount: utils.parseEther('0.001'),
+        fee: utils.parseEther('0.001'),
+        nonce: await syncWallet1.getNonce(),
+    });
+
+    const ETH_SIGNATURE_LENGTH_PREFIXED = 132;
+    const fakeEthSignature: types.TxEthSignature = {
+        signature: "0x".padEnd(ETH_SIGNATURE_LENGTH_PREFIXED, '0'),
+        type: "EthereumSignature"
+    };
+
+    try {
+        await syncWallet1.provider.submitTx(signedTransfer, fakeEthSignature);
+        assert(false, "sending tx with incorrect eth signature must throw");
+    } catch (e) {
+        assert(
+            e.jrpcError.message == 'Eth signature is incorrect',
+            "sending tx with incorrect eth signature must fail"
+        );
+    }
+
+    const signedWithdraw = syncWallet1.signer.signSyncWithdraw({
+        accountId: await syncWallet1.getAccountId(),
+        from: syncWallet1.address(),
+        ethAddress: syncWallet1.address(),
+        tokenId: 0,
+        amount: utils.parseEther('0.001'),
+        fee: utils.parseEther('0.001'),
+        nonce: await syncWallet1.getNonce(),
+    })
+
+    try {
+        await syncWallet1.provider.submitTx(signedWithdraw, fakeEthSignature);
+        assert(false, "sending tx with incorrect eth signature must throw");
+    } catch (e) {
+        assert(
+            e.jrpcError.message == 'Eth signature is incorrect',
+            "sending tx with incorrect eth signature must fail"
+        );
+    }
 }
 
 (async () => {
@@ -312,6 +372,10 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
         );
 
         await testThrowingErrorOnTxFail(zksyncDepositorWallet);
+
+        apitype.deleteUnusedGenFiles();
+        await apitype.checkStatusResponseType();
+        await apitype.checkTestnetConfigResponseType();
 
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");

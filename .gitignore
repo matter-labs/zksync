@@ -37,3 +37,5 @@ Cargo.lock
 /loadtest-config
 
 .ipynb_checkpoints
+
+emergency_output_*
