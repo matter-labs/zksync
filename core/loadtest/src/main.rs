@@ -37,7 +37,6 @@ mod rpc_client;
 mod scenarios;
 mod sent_transactions;
 mod test_accounts;
-mod test_spec;
 mod tps_counter;
 
 fn main() {
