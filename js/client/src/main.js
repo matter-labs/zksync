@@ -47,6 +47,7 @@ new Vue({
             let net = ({
                 '1': 'mainnet',
                 '4': 'rinkeby',
+                '3': 'ropsten',
                 '9': 'localhost',
             })[window.ethereum.networkVersion]
             || 'unknown';
