@@ -279,8 +279,6 @@ impl<'a> OperationsExtSchema<'a> {
         offset: u64,
         limit: u64,
     ) -> QueryResult<Vec<TransactionsHistoryItem>> {
-        // TODO: txs are not ordered
-
         // This query does the following:
         // - creates a union of data above and the `executed_priority_operations`
         // - unifies the information to match the `TransactionsHistoryItem`
@@ -334,7 +332,7 @@ impl<'a> OperationsExtSchema<'a> {
                         or
                         to_account = address_bytes) t
                 order by
-                    block_number desc
+                    block_number desc, created_at desc
                 offset 
                     {offset}
                 limit 

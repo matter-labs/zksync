@@ -332,3 +332,6 @@ data-restore-restart: confirm_action data-restore-db-prepare
 
 data-restore-continue:
 	@cargo run --bin data_restore --release -- --continue
+
+api-type-validate:
+	@cd js/tests && yarn && yarn api-type-validate --test
