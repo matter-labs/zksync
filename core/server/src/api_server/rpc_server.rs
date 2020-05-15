@@ -47,7 +47,7 @@ pub struct ResponseAccountState {
 }
 
 impl ResponseAccountState {
-    pub fn try_to_restore(account: Account, tokens: &TokenDBCache) -> Result<Self> {
+    pub fn try_restore(account: Account, tokens: &TokenDBCache) -> Result<Self> {
         let mut balances = HashMap::new();
         for (token_id, balance) in account.get_nonzero_balances() {
             if token_id == 0 {
@@ -547,25 +547,32 @@ impl RpcApp {
         Ok(res)
     }
 
-    fn get_verified_account_state(&self, address: Address) -> Result<ResponseAccountState> {
+    fn get_verified_account_state(&self, address: &Address) -> Result<ResponseAccountState> {
         let verified_block_number = self.current_zksync_info.get_last_verified_block_number();
-        let storage = self.access_storage()?;
-        let account = storage
-            .chain()
-            .account_schema()
-            .account_state_by_address(&address)
-            .map_err(|_| Error::internal_error())?;
+        Ok(match self.cache_of_verified_account_states.get(address) {
+            Some((block_number, acc_state)) if block_number == verified_block_number => acc_state,
+            _ => {
+                let storage = self.access_storage()?;
+                let account = storage
+                    .chain()
+                    .account_schema()
+                    .account_state_by_address(address)
+                    .map_err(|_| Error::internal_error())?;
 
-        let verified = if let Some((_, account)) = account.verified {
-            ResponseAccountState::try_to_restore(account, &self.token_cache)?
-        } else {
-            ResponseAccountState::default()
-        };
+                let verified = account
+                    .verified
+                    .map(|(_, account)| {
+                        ResponseAccountState::try_restore(account, &self.token_cache)
+                    })
+                    .transpose()?
+                    .unwrap_or_default();
 
-        self.cache_of_verified_account_states
-            .insert(address.clone(), (verified_block_number, verified.clone()));
+                self.cache_of_verified_account_states
+                    .insert(*address, (verified_block_number, verified.clone()));
 
-        Ok(verified)
+                verified
+            }
+        })
     }
 }
 
@@ -590,21 +597,16 @@ impl Rpc for RpcApp {
                 .await
                 .map_err(|_| Error::internal_error())?;
 
-            let (id, committed) = match committed_account_state {
-                Some((id, account)) => (
-                    Some(id),
-                    ResponseAccountState::try_to_restore(account, &self_.token_cache)?,
-                ),
-                None => (None, ResponseAccountState::default()),
-            };
+            let (id, committed) = committed_account_state
+                .map(|(id, account)| {
+                    let restored_state =
+                        ResponseAccountState::try_restore(account, &self_.token_cache)?;
+                    Ok((Some(id), restored_state))
+                })
+                .transpose()?
+                .unwrap_or_default();
 
-            let verified_block_number = self_.current_zksync_info.get_last_verified_block_number();
-            let verified = match self_.cache_of_verified_account_states.get(&address) {
-                Some((block_number, acc_state)) if block_number == verified_block_number => {
-                    acc_state
-                }
-                _ => self_.get_verified_account_state(address)?,
-            };
+            let verified = self_.get_verified_account_state(&address)?;
 
             let depositing_ops = self_.get_ongoing_deposits_impl(address).await?;
             let depositing =

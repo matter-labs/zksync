@@ -469,7 +469,7 @@ impl OperationNotifier {
         }
         .map(|(_, a)| a)
         {
-            ResponseAccountState::try_to_restore(account, &self.tokens_cache)?
+            ResponseAccountState::try_restore(account, &self.tokens_cache)?
         } else {
             ResponseAccountState::default()
         };
@@ -576,7 +576,7 @@ impl OperationNotifier {
 
                 let account = if let Some(account) = stored_account {
                     if let Ok(result) =
-                        ResponseAccountState::try_to_restore(account, &self.tokens_cache)
+                        ResponseAccountState::try_restore(account, &self.tokens_cache)
                     {
                         result
                     } else {

@@ -1,13 +1,16 @@
 use models::node::BlockNumber;
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Arc,
+};
 use storage::ConnectionPool;
 
-/// This struct knows current verified block number
+/// This struct knows current verified block number.
 /// It's like storage, but in memory.
-/// In the future, more fields might be added
-#[derive(Clone)]
+/// In the future, more fields might be added.
+#[derive(Debug, Clone)]
 pub struct CurrentZksyncInfo {
-    last_verified_block: Arc<RwLock<BlockNumber>>,
+    last_verified_block: Arc<AtomicU32>,
 }
 
 impl CurrentZksyncInfo {
@@ -24,7 +27,7 @@ impl CurrentZksyncInfo {
     }
 
     pub fn with_block_number(last_verified_block: BlockNumber) -> Self {
-        let last_verified_block = Arc::new(RwLock::new(last_verified_block));
+        let last_verified_block = Arc::new(last_verified_block.into());
 
         Self {
             last_verified_block,
@@ -32,10 +35,10 @@ impl CurrentZksyncInfo {
     }
 
     pub fn get_last_verified_block_number(&self) -> BlockNumber {
-        *self.last_verified_block.read().unwrap()
+        self.last_verified_block.load(Ordering::SeqCst)
     }
 
     pub fn set_new_verified_block(&self, new_block: BlockNumber) {
-        *self.last_verified_block.write().unwrap() = new_block;
+        self.last_verified_block.store(new_block, Ordering::SeqCst);
     }
 }
