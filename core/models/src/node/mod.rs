@@ -13,6 +13,7 @@ pub mod block;
 pub mod config;
 pub mod operations;
 pub mod priority_ops;
+pub mod tokens;
 pub mod tx;
 
 pub use web3::types::{H256, U128, U256};
@@ -23,6 +24,7 @@ pub use self::operations::{
     CloseOp, DepositOp, FranklinOp, FullExitOp, TransferOp, TransferToNewOp, WithdrawOp,
 };
 pub use self::priority_ops::{Deposit, FranklinPriorityOp, FullExit, PriorityOp};
+pub use self::tokens::{Token, TokenGenesisListItem, TokenLike};
 pub use self::tx::{Close, FranklinTx, Transfer, Withdraw};
 
 pub type Engine = bn256::Bn256;
@@ -36,43 +38,6 @@ pub type AccountTree = SparseMerkleTree<Account, Fr, RescueHasher<Engine>>;
 pub type PrivateKey = PrivateKeyImport<Engine>;
 pub type PublicKey = PublicKeyImport<Engine>;
 pub type Address = web3::types::Address;
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-#[serde(untagged)]
-/// Order of the fields are important (from more specific types to less specific types)
-pub enum TokenLike {
-    Id(TokenId),
-    Address(Address),
-    Symbol(String),
-}
-
-impl From<TokenId> for TokenLike {
-    fn from(id: TokenId) -> Self {
-        Self::Id(id)
-    }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
-/// Token supported in zkSync protocol
-pub struct Token {
-    /// id is used for tx signature and serialization
-    pub id: TokenId,
-    /// Contract address of ERC20 token or Address::zero() for "ETH"
-    pub address: Address,
-    /// Token symbol (e.g. "ETH" or "USDC")
-    pub symbol: String,
-}
-
-impl Token {
-    pub fn new(id: TokenId, address: Address, symbol: &str) -> Self {
-        Self {
-            id,
-            address,
-            symbol: symbol.to_string(),
-        }
-    }
-}
 
 pub fn priv_key_from_fs(fs: Fs) -> PrivateKey {
     PrivateKeyImport(fs)
