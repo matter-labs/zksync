@@ -38,7 +38,7 @@ async function reconnectServer() {
         ]))
     );
 
-    deployer = new Deployer(ethW1, false);
+    deployer = new Deployer({deployWallet: ethW1});
 }
 
 async function test() {
@@ -50,10 +50,10 @@ async function test() {
     await reconnectServer();
 
     //* Make sure extra validator has enough funds.
-    await deployer.sendFundsToWallets([ethW2], parseEther('1.0'));
+    await ethW1.sendTransaction({ to: ethW2.address, value: parseEther('1.0') });
 
     //* Deposit for extra validator to add it to the account tree.
-    for (const token of ['ETH', process.env.TEST_ERC20]) {
+    for (const token of ['ETH'/* , process.env.TEST_ERC20 */]) {
         console.log('Balance of ' + token + ': ' + formatEther(await syncW2.getEthereumBalance(token)));
         const deposit = await syncW2.depositToSyncFromEthereum({
             depositTo: syncW2.address(),
@@ -77,8 +77,18 @@ async function test() {
 
     console.log(`Now let's add extra validator to Governance.`);
     console.log("Copy these lines:");
-    await deployer.setMoreTestValidators();
+    console.log();
+    console.log(`MNEMONIC="${process.env.EXTRA_OPERATOR_MNEMONIC_1}"`);
+    console.log(`OPERATOR_PRIVATE_KEY=${ethW2.privateKey.slice(2)}`);
+    console.log(`OPERATOR_ETH_ADDRESS=${ethW2.address}`);
+    console.log(`OPERATOR_FRANKLIN_ADDRESS=${ethW2.address}`);
+    console.log();
     console.log("to the end of dev.env");
+
+    await deployer.governanceContract(ethW1)
+        .setValidator(ethW2.address, true)
+        .then(tx => tx.wait());
+
     console.log();
     console.log("Turn off server, provers.");
     console.log();
@@ -92,7 +102,7 @@ async function test() {
     await reconnectServer();
 
     //* now let's make a withdraw from operator account
-    for (const token of ['ETH', process.env.TEST_ERC20]) {
+    for (const token of ['ETH'/* , process.env.TEST_ERC20 */]) {
         const before = await syncW2.getBalance(token, "verified");
         
         const withdraw = await syncW2.withdrawFromSyncToEthereum({
