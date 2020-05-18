@@ -401,7 +401,16 @@ pub(crate) async fn get_ongoing_priority_ops(
             resp: eth_watcher_response.0,
         })
         .await
-        .map_err(|_| Error::internal_error())?;
+        .map_err(|err| {
+            log::error!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
+                file!(),
+                line!(),
+                column!(),
+                err
+            );
+            Error::internal_error()
+        })?;
 
     eth_watcher_response
         .1
@@ -477,7 +486,17 @@ impl RpcApp {
                     .chain()
                     .operations_schema()
                     .get_executed_priority_operation(serial_id)
-                    .map_err(|_| Error::internal_error())?;
+                    .map_err(|err| {
+                        log::error!(
+                            "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                            file!(),
+                            line!(),
+                            column!(),
+                            err,
+                            serial_id,
+                        );
+                        Error::internal_error()
+                    })?;
 
                 if let Some(executed_op) = executed_op.clone() {
                     self.cache_of_executed_priority_operations
@@ -523,7 +542,17 @@ impl RpcApp {
                 .chain()
                 .operations_ext_schema()
                 .tx_receipt(tx_hash.as_ref())
-                .map_err(|_| Error::internal_error())?;
+                .map_err(|err| {
+                    log::error!(
+                        "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                        file!(),
+                        line!(),
+                        column!(),
+                        err,
+                        tx_hash.to_string(),
+                    );
+                    Error::internal_error()
+                })?;
 
             if let Some(tx_receipt) = tx_receipt.clone() {
                 if tx_receipt.verified {
@@ -549,11 +578,27 @@ impl Rpc for RpcApp {
                 .chain()
                 .account_schema()
                 .account_state_by_address(&address)
-                .map_err(|_| Error::internal_error())?;
-            let tokens = storage
-                .tokens_schema()
-                .load_tokens()
-                .map_err(|_| Error::internal_error())?;
+                .map_err(|err| {
+                    log::error!(
+                        "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                        file!(),
+                        line!(),
+                        column!(),
+                        err,
+                        address,
+                    );
+                    Error::internal_error()
+                })?;
+            let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
+                log::error!(
+                    "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
+                    file!(),
+                    line!(),
+                    column!(),
+                    err,
+                );
+                Error::internal_error()
+            })?;
             Ok((account, tokens))
         })() {
             (account, tokens)
@@ -571,11 +616,28 @@ impl Rpc for RpcApp {
                     state_keeper_response.0,
                 ))
                 .await
-                .map_err(|_| Error::internal_error())?;
-            let committed_account_state = state_keeper_response
-                .1
-                .await
-                .map_err(|_| Error::internal_error())?;
+                .map_err(|err| {
+                    log::error!(
+                        "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                        file!(),
+                        line!(),
+                        column!(),
+                        err,
+                        address,
+                    );
+                    Error::internal_error()
+                })?;
+            let committed_account_state = state_keeper_response.1.await.map_err(|err| {
+                log::error!(
+                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                    file!(),
+                    line!(),
+                    column!(),
+                    err,
+                    address,
+                );
+                Error::internal_error()
+            })?;
 
             let (id, committed) = if let Some((id, account)) = committed_account_state {
                 (
@@ -675,16 +737,31 @@ impl Rpc for RpcApp {
         let mut mempool_sender = self.mempool_request_sender.clone();
         let sign_verify_channel = self.sign_verify_request_sender.clone();
         let mempool_resp = async move {
-            let verified_tx =
-                verify_tx_info_message_signature(&tx, *signature, msg_to_sign, sign_verify_channel)
-                    .await?;
+            let verified_tx = verify_tx_info_message_signature(
+                &tx,
+                *signature.clone(),
+                msg_to_sign,
+                sign_verify_channel,
+            )
+            .await?;
 
             let hash = tx.hash();
             let mempool_resp = oneshot::channel();
             mempool_sender
                 .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
                 .await
-                .map_err(|_| Error::internal_error())?;
+                .map_err(|err| {
+                    log::error!(
+                        "[{}:{}:{}] Internal Server Error: '{}'; input: <Tx: '{:?}', signature: '{:?}'>",
+                        file!(),
+                        line!(),
+                        column!(),
+                        err,
+                        tx,
+                        signature,
+                    );
+                    Error::internal_error()
+                })?;
             let tx_add_result = mempool_resp.1.await.unwrap_or(Err(TxAddError::Other));
 
             tx_add_result.map(|_| hash).map_err(|e| Error {
@@ -699,10 +776,16 @@ impl Rpc for RpcApp {
 
     fn contract_address(&self) -> Result<ContractAddressResp> {
         let storage = self.access_storage()?;
-        let config = storage
-            .config_schema()
-            .load_config()
-            .map_err(|_| Error::internal_error())?;
+        let config = storage.config_schema().load_config().map_err(|err| {
+            log::error!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
+                file!(),
+                line!(),
+                column!(),
+                err
+            );
+            Error::internal_error()
+        })?;
 
         // `expect` calls below are safe, since not having the addresses in the server config
         // means a misconfiguration, server cannot operate in this condition.
@@ -720,10 +803,16 @@ impl Rpc for RpcApp {
 
     fn tokens(&self) -> Result<HashMap<String, Token>> {
         let storage = self.access_storage()?;
-        let mut tokens = storage
-            .tokens_schema()
-            .load_tokens()
-            .map_err(|_| Error::internal_error())?;
+        let mut tokens = storage.tokens_schema().load_tokens().map_err(|err| {
+            log::error!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
+                file!(),
+                line!(),
+                column!(),
+                err
+            );
+            Error::internal_error()
+        })?;
         Ok(tokens
             .drain()
             .map(|(id, token)| {
@@ -816,15 +905,30 @@ async fn verify_tx_info_message_signature(
     };
 
     // Send the check request.
-    req_channel
-        .send(request)
-        .await
-        .map_err(|_| Error::internal_error())?;
+    req_channel.send(request).await.map_err(|err| {
+        log::error!(
+            "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
+            file!(),
+            line!(),
+            column!(),
+            err
+        );
+        Error::internal_error()
+    })?;
 
     // Wait for the check result.
     resp.1
         .await
-        .map_err(|_| Error::internal_error())?
+        .map_err(|err| {
+            log::error!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
+                file!(),
+                line!(),
+                column!(),
+                err
+            );
+            Error::internal_error()
+        })?
         .map_err(rpc_message)
 }
 
