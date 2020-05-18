@@ -498,6 +498,40 @@ impl UnsignedRatioSerializeAsDecimal {
     }
 }
 
+/// Used to serialize BigUint as radix 10 string.
+#[derive(Clone, Debug)]
+pub struct BigUintSerdeWrapper(pub BigUint);
+
+impl Serialize for BigUintSerdeWrapper {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let big_dec = BigDecimal::from(self.0.to_bigint().unwrap());
+        BigDecimal::serialize(&big_dec, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for BigUintSerdeWrapper {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use serde::de::Error;
+        BigDecimal::deserialize(deserializer).and_then(|bigdecimal| {
+            let big_int = bigdecimal
+                .to_bigint()
+                .ok_or_else(|| Error::custom("Expected integer value"))?;
+            big_int
+                .to_biguint()
+                .map(BigUintSerdeWrapper)
+                .ok_or_else(|| Error::custom("Expected positive value"))
+        })
+    }
+}
+
+impl From<BigUint> for BigUintSerdeWrapper {}
+
 impl UnsignedRatioSerializeAsDecimal {
     pub fn deserialize_for_str_with_dot(input: &str) -> Result<Ratio<BigUint>, failure::Error> {
         big_decimal_to_ratio(&BigDecimal::from_str(input)?)
