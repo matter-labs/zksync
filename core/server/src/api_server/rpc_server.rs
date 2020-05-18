@@ -221,6 +221,7 @@ pub struct OngoingDepositsResp {
 pub enum RpcErrorCodes {
     NonceMismatch = 101,
     IncorrectTx = 103,
+    FeeTooLow = 104,
 
     MissingEthSignature = 200,
     EIP1271SignatureVerificationFail = 201,
@@ -236,6 +237,7 @@ impl From<TxAddError> for RpcErrorCodes {
         match error {
             TxAddError::NonceMismatch => Self::NonceMismatch,
             TxAddError::IncorrectTx => Self::IncorrectTx,
+            TxAddError::TxFeeTooLow => Self::FeeTooLow,
             TxAddError::MissingEthSignature => Self::MissingEthSignature,
             TxAddError::EIP1271SignatureVerificationFail => Self::EIP1271SignatureVerificationFail,
             TxAddError::IncorrectEthSignature => Self::IncorrectEthSignature,
@@ -531,6 +533,26 @@ impl RpcApp {
         };
         Ok(res)
     }
+
+    async fn ticker_request(
+        mut ticker_request_sender: mpsc::Sender<TickerRequest>,
+        tx_type: TxFeeTypes,
+        amount: BigUint,
+        token: TokenLike,
+    ) -> Result<BigUint> {
+        let req = oneshot::channel();
+        ticker_request_sender
+            .send(TickerRequest::GetTxFee {
+                tx_type,
+                amount,
+                token,
+                response: req.0,
+            })
+            .await
+            .map_err(|_| Error::internal_error())?;
+        let resp = req.1.await.map_err(|_| Error::internal_error())?;
+        resp.map_err(|_| Error::internal_error())
+    }
 }
 
 impl Rpc for RpcApp {
@@ -667,9 +689,38 @@ impl Rpc for RpcApp {
             Err(e) => return Box::new(futures01::future::err(e)),
         };
 
+        let tx_fee_info = match tx.as_ref() {
+            FranklinTx::Withdraw(withdraw) => Some((
+                TxFeeTypes::Withdraw,
+                TokenLike::Id(withdraw.token),
+                withdraw.amount.clone(),
+                withdraw.fee.clone(),
+            )),
+            FranklinTx::Transfer(transfer) => Some((
+                TxFeeTypes::Transfer,
+                TokenLike::Id(transfer.token),
+                transfer.amount.clone(),
+                transfer.fee.clone(),
+            )),
+            _ => None,
+        };
+
         let mut mempool_sender = self.mempool_request_sender.clone();
         let sign_verify_channel = self.sign_verify_request_sender.clone();
+        let ticker_request_sender = self.ticker_request_sender.clone();
         let mempool_resp = async move {
+            if let Some((tx_type, token, amount, provided_fee)) = tx_fee_info {
+                let required_fee =
+                    Self::ticker_request(ticker_request_sender, tx_type, amount, token).await?;
+                if required_fee < provided_fee {
+                    return Err(Error {
+                        code: RpcErrorCodes::from(TxAddError::TxFeeTooLow).into(),
+                        message: TxAddError::TxFeeTooLow.to_string(),
+                        data: None,
+                    });
+                }
+            }
+
             let verified_tx =
                 verify_tx_info_message_signature(&tx, *signature, msg_to_sign, sign_verify_channel)
                     .await?;
@@ -737,22 +788,11 @@ impl Rpc for RpcApp {
         amount: BigUint,
         token: TokenLike,
     ) -> Box<dyn futures01::Future<Item = BigUint, Error = Error> + Send> {
-        let mut ticker_request_sender = self.ticker_request_sender.clone();
-        let tx_fee_future = async move {
-            let req = oneshot::channel();
-            ticker_request_sender
-                .send(TickerRequest::GetTxFee {
-                    tx_type,
-                    amount,
-                    token,
-                    response: req.0,
-                })
-                .await
-                .map_err(|_| Error::internal_error())?;
-            let resp = req.1.await.map_err(|_| Error::internal_error())?;
-            resp.map_err(|_| Error::internal_error())
-        };
-        Box::new(tx_fee_future.boxed().compat())
+        Box::new(
+            Self::ticker_request(self.ticker_request_sender.clone(), tx_type, amount, token)
+                .boxed()
+                .compat(),
+        )
     }
 }
 

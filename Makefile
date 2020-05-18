@@ -300,7 +300,7 @@ nodes:
 # Dev environment
 
 dev-up:
-	@docker-compose up -d postgres geth dev-ticker
+	@docker-compose up -d postgres geth
 	@docker-compose up -d tesseracts
 
 dev-down:

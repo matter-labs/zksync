@@ -10,7 +10,7 @@ async function main() {
 
     const result = [];
 
-    for (const token of [{symbol: "ERC-1", precision: 18}, {symbol: "ERC-2", precision: 6}]) {
+    for (const token of [{symbol: "DAI", precision: 18}, {symbol: "wBTC", precision: 8}]) {
         const erc20 = await deployContract(
             wallet,
             readContractCode("TEST-ERC20"), [],
