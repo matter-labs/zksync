@@ -402,7 +402,7 @@ pub(crate) async fn get_ongoing_priority_ops(
         })
         .await
         .map_err(|err| {
-            log::error!(
+            log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
                 file!(),
                 line!(),
@@ -487,7 +487,7 @@ impl RpcApp {
                     .operations_schema()
                     .get_executed_priority_operation(serial_id)
                     .map_err(|err| {
-                        log::error!(
+                        log::warn!(
                             "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                             file!(),
                             line!(),
@@ -543,7 +543,7 @@ impl RpcApp {
                 .operations_ext_schema()
                 .tx_receipt(tx_hash.as_ref())
                 .map_err(|err| {
-                    log::error!(
+                    log::warn!(
                         "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                         file!(),
                         line!(),
@@ -579,7 +579,7 @@ impl Rpc for RpcApp {
                 .account_schema()
                 .account_state_by_address(&address)
                 .map_err(|err| {
-                    log::error!(
+                    log::warn!(
                         "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                         file!(),
                         line!(),
@@ -590,7 +590,7 @@ impl Rpc for RpcApp {
                     Error::internal_error()
                 })?;
             let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-                log::error!(
+                log::warn!(
                     "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
                     file!(),
                     line!(),
@@ -617,7 +617,7 @@ impl Rpc for RpcApp {
                 ))
                 .await
                 .map_err(|err| {
-                    log::error!(
+                    log::warn!(
                         "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                         file!(),
                         line!(),
@@ -628,7 +628,7 @@ impl Rpc for RpcApp {
                     Error::internal_error()
                 })?;
             let committed_account_state = state_keeper_response.1.await.map_err(|err| {
-                log::error!(
+                log::warn!(
                     "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                     file!(),
                     line!(),
@@ -751,7 +751,7 @@ impl Rpc for RpcApp {
                 .send(MempoolRequest::NewTx(Box::new(verified_tx), mempool_resp.0))
                 .await
                 .map_err(|err| {
-                    log::error!(
+                    log::warn!(
                         "[{}:{}:{}] Internal Server Error: '{}'; input: <Tx: '{:?}', signature: '{:?}'>",
                         file!(),
                         line!(),
@@ -777,7 +777,7 @@ impl Rpc for RpcApp {
     fn contract_address(&self) -> Result<ContractAddressResp> {
         let storage = self.access_storage()?;
         let config = storage.config_schema().load_config().map_err(|err| {
-            log::error!(
+            log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
                 file!(),
                 line!(),
@@ -804,7 +804,7 @@ impl Rpc for RpcApp {
     fn tokens(&self) -> Result<HashMap<String, Token>> {
         let storage = self.access_storage()?;
         let mut tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-            log::error!(
+            log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
                 file!(),
                 line!(),
@@ -906,7 +906,7 @@ async fn verify_tx_info_message_signature(
 
     // Send the check request.
     req_channel.send(request).await.map_err(|err| {
-        log::error!(
+        log::warn!(
             "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
             file!(),
             line!(),
@@ -920,7 +920,7 @@ async fn verify_tx_info_message_signature(
     resp.1
         .await
         .map_err(|err| {
-            log::error!(
+            log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
                 file!(),
                 line!(),

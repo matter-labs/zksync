@@ -106,7 +106,7 @@ impl AppState {
         self.connection_pool
             .access_storage_fragile()
             .map_err(|err| {
-                log::error!(
+                log::warn!(
                     "[{}:{}:{}] DB await timeout: '{}';",
                     file!(),
                     line!(),
@@ -217,7 +217,7 @@ impl AppState {
             .operations_ext_schema()
             .get_priority_op_receipt(id)
             .map_err(|err| {
-                log::error!(
+                log::warn!(
                     "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                     file!(),
                     line!(),
@@ -250,7 +250,7 @@ impl AppState {
             .block_schema()
             .get_block_executed_ops(block_id)
             .map_err(|err| {
-                log::error!(
+                log::warn!(
                     "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                     file!(),
                     line!(),
@@ -287,7 +287,7 @@ impl AppState {
             .block_schema()
             .load_block_range(block_id, 1)
             .map_err(|err| {
-                log::error!(
+                log::warn!(
                     "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                     file!(),
                     line!(),
@@ -368,7 +368,7 @@ fn handle_get_account_state(
             .account_schema()
             .account_state_by_address(&account_address)
             .map_err(|err| {
-                log::error!(
+                log::warn!(
                     "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                     file!(),
                     line!(),
@@ -410,7 +410,7 @@ fn handle_get_account_state(
 fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
     let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-        log::error!(
+        log::warn!(
             "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
             file!(),
             line!(),
@@ -441,7 +441,7 @@ fn handle_get_account_transactions_history(
 
     let storage = data.access_storage()?;
     let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
-        log::error!(
+        log::warn!(
             "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {}, {})",
             file!(),
             line!(),
@@ -459,7 +459,7 @@ fn handle_get_account_transactions_history(
         get_ongoing_priority_ops(&eth_watcher_request_sender).await
     })
     .map_err(|err| {
-        log::error!(
+        log::warn!(
             "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {}, {})",
             file!(),
             line!(),
@@ -562,7 +562,7 @@ fn handle_get_account_transactions_history(
         .operations_ext_schema()
         .get_account_transactions_history(&address, offset, limit)
         .map_err(|err| {
-            log::error!(
+            log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {}, {})",
                 file!(),
                 line!(),
@@ -612,7 +612,7 @@ fn handle_get_tx_by_hash(
         .operations_ext_schema()
         .get_tx_by_hash(hash.as_slice())
         .map_err(|err| {
-            log::error!(
+            log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                 file!(),
                 line!(),
@@ -673,7 +673,7 @@ fn handle_get_blocks(
         .block_schema()
         .load_block_range(max_block, limit)
         .map_err(|err| {
-            log::error!(
+            log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {})",
                 file!(),
                 line!(),
@@ -713,7 +713,7 @@ fn handle_get_block_transactions(
         .block_schema()
         .get_block_transactions(block_number)
         .map_err(|err| {
-            log::error!(
+            log::warn!(
                 "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
                 file!(),
                 line!(),
