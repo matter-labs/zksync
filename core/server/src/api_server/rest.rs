@@ -396,7 +396,9 @@ fn handle_get_account_transactions_history(
     })
     .map_err(|_| HttpResponse::InternalServerError().finish())?;
 
-    ongoing_ops.sort_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
+    // Sort operations by block number in a reverse order (so the newer ones are on top).
+    // Note that we call `cmp` on `rhs` to achieve that.
+    ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
 
     // Filter only deposits for the requested address.
     // `map` is used after filter to find the max block number without an
