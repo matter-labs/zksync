@@ -105,7 +105,16 @@ impl AppState {
     fn access_storage(&self) -> ActixResult<StorageProcessor> {
         self.connection_pool
             .access_storage_fragile()
-            .map_err(|_| HttpResponse::RequestTimeout().finish().into())
+            .map_err(|err| {
+                log::warn!(
+                    "[{}:{}:{}] DB await timeout: '{}';",
+                    file!(),
+                    line!(),
+                    column!(),
+                    err,
+                );
+                HttpResponse::RequestTimeout().finish().into()
+            })
     }
 
     // Spawns future updating SharedNetworkStatus in the current `actix::System`
@@ -207,7 +216,17 @@ impl AppState {
             .chain()
             .operations_ext_schema()
             .get_priority_op_receipt(id)
-            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+            .map_err(|err| {
+                log::warn!(
+                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                    file!(),
+                    line!(),
+                    column!(),
+                    err,
+                    id,
+                );
+                HttpResponse::InternalServerError().finish()
+            })?;
 
         // Unverified blocks can still change, so we can't cache them.
         if receipt.verified {
@@ -230,7 +249,17 @@ impl AppState {
             .chain()
             .block_schema()
             .get_block_executed_ops(block_id)
-            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+            .map_err(|err| {
+                log::warn!(
+                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                    file!(),
+                    line!(),
+                    column!(),
+                    err,
+                    block_id,
+                );
+                HttpResponse::InternalServerError().finish()
+            })?;
 
         if let Ok(block_details) = storage.chain().block_schema().load_block_range(block_id, 1) {
             // Unverified blocks can still change, so we can't cache them.
@@ -257,7 +286,17 @@ impl AppState {
             .chain()
             .block_schema()
             .load_block_range(block_id, 1)
-            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+            .map_err(|err| {
+                log::warn!(
+                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                    file!(),
+                    line!(),
+                    column!(),
+                    err,
+                    block_id,
+                );
+                HttpResponse::InternalServerError().finish()
+            })?;
 
         if !blocks.is_empty() && blocks[0].verified_at.is_some() {
             self.caches.blocks_info.insert(block_id, blocks[0].clone());
@@ -328,7 +367,17 @@ fn handle_get_account_state(
             .chain()
             .account_schema()
             .account_state_by_address(&account_address)
-            .map_err(|_| HttpResponse::InternalServerError().finish())?;
+            .map_err(|err| {
+                log::warn!(
+                    "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                    file!(),
+                    line!(),
+                    column!(),
+                    err,
+                    account_address,
+                );
+                HttpResponse::InternalServerError().finish()
+            })?;
 
         let empty_state = |address: &Address| {
             let mut acc = Account::default();
@@ -360,10 +409,16 @@ fn handle_get_account_state(
 
 fn handle_get_tokens(data: web::Data<AppState>) -> ActixResult<HttpResponse> {
     let storage = data.access_storage()?;
-    let tokens = storage
-        .tokens_schema()
-        .load_tokens()
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
+        log::warn!(
+            "[{}:{}:{}] Internal Server Error: '{}'; input: N/A",
+            file!(),
+            line!(),
+            column!(),
+            err
+        );
+        HttpResponse::InternalServerError().finish()
+    })?;
 
     let mut vec_tokens = tokens.values().cloned().collect::<Vec<_>>();
     vec_tokens.sort_by_key(|t| t.id);
@@ -385,18 +440,41 @@ fn handle_get_account_transactions_history(
     let eth_watcher_request_sender = data.eth_watcher_request_sender.clone();
 
     let storage = data.access_storage()?;
-    let tokens = storage
-        .tokens_schema()
-        .load_tokens()
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    let tokens = storage.tokens_schema().load_tokens().map_err(|err| {
+        log::warn!(
+            "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {}, {})",
+            file!(),
+            line!(),
+            column!(),
+            err,
+            address,
+            offset,
+            limit,
+        );
+        HttpResponse::InternalServerError().finish()
+    })?;
 
     // Fetch ongoing deposits, since they must be reported within the transactions history.
     let mut ongoing_ops = futures::executor::block_on(async move {
         get_ongoing_priority_ops(&eth_watcher_request_sender).await
     })
-    .map_err(|_| HttpResponse::InternalServerError().finish())?;
+    .map_err(|err| {
+        log::warn!(
+            "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {}, {})",
+            file!(),
+            line!(),
+            column!(),
+            err,
+            address,
+            offset,
+            limit,
+        );
+        HttpResponse::InternalServerError().finish()
+    })?;
 
-    ongoing_ops.sort_by(|lhs, rhs| lhs.0.cmp(&rhs.0));
+    // Sort operations by block number in a reverse order (so the newer ones are on top).
+    // Note that we call `cmp` on `rhs` to achieve that.
+    ongoing_ops.sort_by(|lhs, rhs| rhs.0.cmp(&lhs.0));
 
     // Filter only deposits for the requested address.
     // `map` is used after filter to find the max block number without an
@@ -483,7 +561,19 @@ fn handle_get_account_transactions_history(
         .chain()
         .operations_ext_schema()
         .get_account_transactions_history(&address, offset, limit)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        .map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {}, {})",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                address,
+                offset,
+                limit,
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
 
     transactions_history.append(&mut storage_transactions);
 
@@ -521,7 +611,17 @@ fn handle_get_tx_by_hash(
         .chain()
         .operations_ext_schema()
         .get_tx_by_hash(hash.as_slice())
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        .map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                hex::encode(&hash),
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
 
     Ok(HttpResponse::Ok().json(res))
 }
@@ -572,8 +672,16 @@ fn handle_get_blocks(
         .chain()
         .block_schema()
         .load_block_range(max_block, limit)
-        .map_err(|e| {
-            warn!("handle_get_blocks db fail: {}", e);
+        .map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: ({}, {})",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                max_block,
+                limit,
+            );
             HttpResponse::InternalServerError().finish()
         })?;
     Ok(HttpResponse::Ok().json(resp))
@@ -604,7 +712,17 @@ fn handle_get_block_transactions(
         .chain()
         .block_schema()
         .get_block_transactions(block_number)
-        .map_err(|_| HttpResponse::InternalServerError().finish())?;
+        .map_err(|err| {
+            log::warn!(
+                "[{}:{}:{}] Internal Server Error: '{}'; input: {}",
+                file!(),
+                line!(),
+                column!(),
+                err,
+                block_number,
+            );
+            HttpResponse::InternalServerError().finish()
+        })?;
 
     Ok(HttpResponse::Ok().json(txs))
 }
