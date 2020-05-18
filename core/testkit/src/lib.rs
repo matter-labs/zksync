@@ -284,24 +284,22 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
     test_setup.change_pubkey_with_onchain_auth(ETHAccountId(0), ZKSyncAccountId(1));
 
     //transfer to self should work
-    // test_setup.transfer(
-    //     ZKSyncAccountId(1),
-    //     ZKSyncAccountId(1),
-    //     Token(token),
-    //     // &deposit_amount / &BigUint::from(8u32),
-    //     // &deposit_amount / &BigUint::from(8),
-    // );
-    unimplemented!();
+    test_setup.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(1),
+        Token(token),
+        &deposit_amount / BigUint::from(8u32),
+        &deposit_amount / BigUint::from(8u32),
+    );
 
     //should be executed as a transfer
-    // test_setup.transfer(
-    //     ZKSyncAccountId(1),
-    //     ZKSyncAccountId(2),
-    //     Token(token),
-    //     &deposit_amount / &BigDecimal::from(8),
-    //     &deposit_amount / &BigDecimal::from(8),
-    // );
-    unimplemented!();
+    test_setup.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(2),
+        Token(token),
+        &deposit_amount / BigUint::from(8u32),
+        &deposit_amount / BigUint::from(8u32),
+    );
 
     let nonce = test_setup.accounts.zksync_accounts[1].nonce();
     let incorrect_nonce_transfer = test_setup.accounts.transfer(
@@ -316,25 +314,23 @@ pub fn perform_basic_operations(token: u16, test_setup: &mut TestSetup, deposit_
     test_setup.execute_incorrect_tx(incorrect_nonce_transfer);
 
     //should be executed as a transfer to new
-    // test_setup.transfer(
-    //     ZKSyncAccountId(1),
-    //     ZKSyncAccountId(2),
-    //     Token(token),
-    //     &deposit_amount / &BigDecimal::from(4),
-    //     &deposit_amount / &BigDecimal::from(4),
-    // );
-    unimplemented!();
+    test_setup.transfer(
+        ZKSyncAccountId(1),
+        ZKSyncAccountId(2),
+        Token(token),
+        &deposit_amount / BigUint::from(4u32),
+        &deposit_amount / BigUint::from(4u32),
+    );
 
     test_setup.change_pubkey_with_tx(ZKSyncAccountId(2));
 
-    // test_setup.withdraw(
-    //     ZKSyncAccountId(2),
-    //     ETHAccountId(0),
-    //     Token(token),
-    //     &deposit_amount / &BigDecimal::from(4),
-    //     &deposit_amount / &BigDecimal::from(4),
-    // );
-    unimplemented!();
+    test_setup.withdraw(
+        ZKSyncAccountId(2),
+        ETHAccountId(0),
+        Token(token),
+        &deposit_amount / BigUint::from(4u32),
+        &deposit_amount / BigUint::from(4u32),
+    );
     test_setup
         .execute_commit_and_verify_block()
         .expect("Block execution failed");

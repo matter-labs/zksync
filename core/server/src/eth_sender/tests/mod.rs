@@ -34,7 +34,9 @@ fn retrieve_all_operations<ETH: EthereumInterface, DB: DatabaseAccess>(
     async fn process_with_timeout<ETH2: EthereumInterface, DB2: DatabaseAccess>(
         eth_sender: &mut ETHSender<ETH2, DB2>,
     ) {
-        timeout(Duration::from_secs(1), eth_sender.process_requests()).await;
+        timeout(Duration::from_secs(1), eth_sender.process_requests())
+            .await
+            .unwrap_or_default()
     }
     runtime.block_on(process_with_timeout(eth_sender));
 }

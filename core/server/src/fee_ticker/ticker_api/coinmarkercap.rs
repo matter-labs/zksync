@@ -1,19 +1,12 @@
-use crate::utils::token_db_cache::TokenDBCache;
-use bigdecimal::BigDecimal;
 use chrono::{DateTime, Utc};
 use failure::format_err;
-use failure::Fail;
-use futures::Future;
-use models::node::{Token, TokenLike, TokenPrice};
+use models::node::{TokenLike, TokenPrice};
 use models::primitives::UnsignedRatioSerializeAsDecimal;
-use num::bigint::{ToBigInt, ToBigUint};
 use num::rational::Ratio;
-use num::traits::Pow;
-use num::{BigUint, Signed, Zero};
+use num::BigUint;
 use reqwest::Url;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::str::FromStr;
 
 pub(super) async fn fetch_coimarketcap_data(
     client: &reqwest::Client,
@@ -66,7 +59,7 @@ pub(super) struct CoinmarketCapResponse {
 #[cfg(test)]
 mod test {
     use super::*;
-    use models::config_options::{get_env, parse_env};
+    use models::config_options::parse_env;
     use std::str::FromStr;
 
     #[test]

@@ -1,17 +1,14 @@
 import {ethers} from "ethers";
 import {Interface} from "ethers/utils";
-import {
-    deployFactoryContractCode,
-    franklinContractCode,
-    governanceContractCode,
-    verifierContractCode,
-} from "../src.ts/deploy";
+import {readContractCode, readProductionContracts} from "../src.ts/deploy";
 const provider = new ethers.providers.JsonRpcProvider(process.env.WEB3_URL);
 const wallet = ethers.Wallet.fromMnemonic(process.env.MNEMONIC, "m/44'/60'/0'/0/1").connect(provider);
-const franklinInterface = new Interface(franklinContractCode.interface);
-const governanceInterface = new Interface(governanceContractCode.interface);
-const verifierInterface = new Interface(verifierContractCode.interface);
-const deployFactoryInterface = new Interface(deployFactoryContractCode.interface);
+
+const contracts = readProductionContracts();
+const franklinInterface = new Interface(contracts.zkSync.interface);
+const governanceInterface = new Interface(contracts.governance.interface);
+const verifierInterface = new Interface(contracts.governance.interface);
+const deployFactoryInterface = new Interface(readContractCode("DeployFactory").interface);
 
 function hex_to_ascii(str1) {
 	const hex  = str1.toString();

@@ -1,22 +1,16 @@
 use crate::eth_sender::ETHSenderRequest;
 use crate::fee_ticker::ticker_api::TickerApi;
-use chrono::{DateTime, Utc};
 use futures::channel::mpsc::{self, Receiver};
 use futures::channel::oneshot;
 use futures::StreamExt;
-use models::node::{
-    closest_packable_fee_amount, is_fee_amount_packable, TokenId, TokenLike, TransferOp,
-    TxFeeTypes, WithdrawOp,
-};
-use models::params::{FEE_EXPONENT_BIT_WIDTH, FEE_MANTISSA_BIT_WIDTH};
+use models::node::{TokenId, TokenLike, TransferOp, TxFeeTypes, WithdrawOp};
+use models::params::FEE_MANTISSA_BIT_WIDTH;
 use models::primitives::round_precision;
-use num::bigint::ToBigUint;
 use num::rational::Ratio;
 use num::traits::{Inv, Pow};
-use num::{BigInt, BigUint};
+use num::BigUint;
 use reqwest::Url;
 use std::collections::HashMap;
-use std::str::FromStr;
 use storage::ConnectionPool;
 use ticker_api::FeeTickerAPI;
 use tokio::runtime::Runtime;
@@ -158,13 +152,11 @@ impl<API: FeeTickerAPI> FeeTicker<API> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::state_keeper::ExecutedOpId::Transaction;
     use async_trait::async_trait;
     use bigdecimal::BigDecimal;
+    use chrono::Utc;
     use futures::executor::block_on;
-    use futures::Future;
-    use models::node::block::ExecutedOperations::Tx;
-    use models::node::{is_fee_amount_packable, Address, Token, TokenId, TokenPrice};
+    use models::node::{Address, Token, TokenId, TokenPrice};
     use models::primitives::{ratio_to_big_decimal, UnsignedRatioSerializeAsDecimal};
 
     #[derive(Debug, Clone)]

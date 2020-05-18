@@ -2,24 +2,16 @@ use crate::eth_sender::ETHSenderRequest;
 use crate::fee_ticker::ticker_api::coinmarkercap::{fetch_coimarketcap_data, CoinmarketcapQuote};
 use crate::utils::token_db_cache::TokenDBCache;
 use async_trait::async_trait;
-use bigdecimal::BigDecimal;
-use chrono::{DateTime, Utc};
-use failure::{format_err, Fail};
+use chrono::Utc;
+use failure::format_err;
 use futures::{
     channel::{mpsc, oneshot},
-    future::{FutureExt, TryFutureExt},
-    Future, SinkExt,
+    SinkExt,
 };
 use models::node::{Token, TokenId, TokenLike, TokenPrice};
-use models::primitives::UnsignedRatioSerializeAsDecimal;
-use num::bigint::{ToBigInt, ToBigUint};
-use num::rational::Ratio;
-use num::traits::Pow;
-use num::{BigUint, Signed, Zero};
+use num::BigUint;
 use reqwest::Url;
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
-use std::str::FromStr;
 use std::time::{Duration, Instant};
 use storage::ConnectionPool;
 use tokio::sync::Mutex;
@@ -175,7 +167,8 @@ impl FeeTickerAPI for TickerApi {
                 .await
                 .map_err(|e| warn!("Failed to get price from coinmarketcap: {}", e));
         if let Ok(coinmarkercap_price) = coinmarkercap_price {
-            self.update_stored_value(token.id, coinmarkercap_price.clone(), false);
+            self.update_stored_value(token.id, coinmarkercap_price.clone(), false)
+                .await;
             return Ok(coinmarkercap_price);
         }
 
@@ -194,7 +187,8 @@ impl FeeTickerAPI for TickerApi {
             .map_err(|e| warn!("Failed to get historical ticker price: {}", e));
 
         if let Ok(Some(historical_price)) = historical_price {
-            self.update_stored_value(token.id, historical_price.clone(), true);
+            self.update_stored_value(token.id, historical_price.clone(), true)
+                .await;
             return Ok(historical_price);
         }
 
@@ -216,7 +210,8 @@ impl FeeTickerAPI for TickerApi {
         self.eth_sender_request_sender
             .clone()
             .send(ETHSenderRequest::GetGasPriceLimit(eth_sender_req.0))
-            .await;
+            .await
+            .expect("Eth sender receiver dropped");
         let eth_sender_resp = BigUint::from(eth_sender_req.1.await?.as_u128());
 
         *cached_value = Some((eth_sender_resp.clone(), Instant::now()));

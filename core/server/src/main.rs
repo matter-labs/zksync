@@ -7,22 +7,29 @@ use futures::{channel::mpsc, executor::block_on, SinkExt, StreamExt};
 use tokio::runtime::Runtime;
 use web3::types::H160;
 // Workspace uses
-use models::config_options::ConfigurationOptions;
-use models::node::config::{
-    OBSERVER_MODE_PULL_INTERVAL, PROVER_GONE_TIMEOUT, PROVER_PREPARE_DATA_INTERVAL,
+use models::{
+    config_options::{ConfigurationOptions, ProverOptions},
+    node::{
+        config::OBSERVER_MODE_PULL_INTERVAL,
+        tokens::{get_genesis_token_list, Token},
+        TokenId,
+    },
 };
-use models::node::tokens::get_genesis_token_list;
-use models::node::{Token, TokenId};
-use server::api_server::start_api_server;
-use server::block_proposer::run_block_proposer_task;
-use server::committer::run_committer;
-use server::eth_watch::start_eth_watch;
-use server::fee_ticker::run_ticker_task;
-use server::mempool::run_mempool_task;
-use server::prover_server::start_prover_server;
-use server::state_keeper::{start_state_keeper, PlasmaStateKeeper};
-use server::{eth_sender, leader_election, observer_mode};
 use storage::ConnectionPool;
+// Local uses
+use server::{
+    api_server::start_api_server,
+    block_proposer::run_block_proposer_task,
+    committer::run_committer,
+    eth_sender,
+    eth_watch::start_eth_watch,
+    fee_ticker::run_ticker_task,
+    leader_election,
+    mempool::run_mempool_task,
+    observer_mode,
+    prover_server::start_prover_server,
+    state_keeper::{start_state_keeper, PlasmaStateKeeper},
+};
 
 fn main() {
     env_logger::init();
@@ -45,11 +52,7 @@ fn main() {
         log::info!("Adding initial tokens to db");
         let genesis_tokens =
             get_genesis_token_list(&config_opts.eth_network).expect("Initial token list not found");
-        for (id, token) in genesis_tokens
-            .into_iter()
-            .enumerate()
-            .map(|(id, t)| (id + 1, t))
-        {
+        for (id, token) in (1..).zip(genesis_tokens) {
             log::info!(
                 "Adding token: {}, id:{}, address: {}, precision: {}",
                 token.symbol,
@@ -193,11 +196,13 @@ fn main() {
         ticker_request_sender,
         config_opts.clone(),
     );
+
+    let prover_options = ProverOptions::from_env();
     start_prover_server(
         connection_pool.clone(),
         config_opts.prover_server_address,
-        PROVER_GONE_TIMEOUT,
-        PROVER_PREPARE_DATA_INTERVAL,
+        prover_options.gone_timeout,
+        prover_options.prepare_data_interval,
         stop_signal_sender,
         observer_mode_final_state.circuit_acc_tree,
         observer_mode_final_state.circuit_tree_block,

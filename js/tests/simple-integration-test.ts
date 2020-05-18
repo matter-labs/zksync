@@ -7,12 +7,12 @@ import {
 const franklin_abi = require('../../contracts/build/ZkSync.json');
 import {ethers, utils, Contract} from "ethers";
 import {bigNumberify, parseEther} from "ethers/utils";
-import {IERC20_INTERFACE} from "zksync/build/utils";
-
+import {IERC20_INTERFACE} from "zksync/src/utils";
+import {TokenLike} from "zksync/build/types";
+import * as apitype from "./api-type-validate";
+import * as assert from "assert";
 
 const WEB3_URL = process.env.WEB3_URL;
-// Mnemonic for eth wallet.
-const MNEMONIC = process.env.TEST_MNEMONIC;
 
 const network = process.env.ETH_NETWORK == "localhost" ? "localhost" : "testnet";
 console.log("Running integration test on the ", network, " network");
@@ -63,13 +63,13 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
 
     const startTime = new Date().getTime();
     if (!zkutils.isTokenETH(token)) {
-        if (await depositWallet.isERC20DepositsApproved(token)){
+        if (await depositWallet.isERC20DepositsApproved(token)) {
             throw new Error("Token should not be approved");
         }
         const approveERC20 = await depositWallet.approveERC20TokenDeposits(token);
         await approveERC20.wait();
         console.log(`Deposit approved: ${(new Date().getTime()) - startTime} ms`);
-        if (!await depositWallet.isERC20DepositsApproved(token)){
+        if (!await depositWallet.isERC20DepositsApproved(token)) {
             throw new Error("Token be approved");
         }
     }
@@ -85,7 +85,7 @@ async function testDeposit(depositWallet: Wallet, syncWallet: Wallet, token: typ
     const balanceAfterDep = await syncWallet.getBalance(token);
 
     if (!zkutils.isTokenETH(token)) {
-        if (!await depositWallet.isERC20DepositsApproved(token)){
+        if (!await depositWallet.isERC20DepositsApproved(token)) {
             throw new Error("Token should still be approved");
         }
     }
@@ -182,27 +182,27 @@ async function testWithdraw(contract: Contract, withdrawTo: Wallet, syncWallet: 
 }
 
 async function testChangePubkeyOnchain(syncWallet: Wallet) {
-    if (! await syncWallet.isSigningKeySet()) {
+    if (!await syncWallet.isSigningKeySet()) {
         const startTime = new Date().getTime();
         await (await syncWallet.onchainAuthSigningKey("committed")).wait();
         const changePubkeyHandle = await syncWallet.setSigningKey("committed", true);
         console.log(`Change pubkey onchain posted: ${(new Date().getTime()) - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey onchain committed: ${(new Date().getTime()) - startTime} ms`);
-        if (! await syncWallet.isSigningKeySet()) {
+        if (!await syncWallet.isSigningKeySet()) {
             throw new Error("Change pubkey onchain failed");
         }
     }
 }
 
 async function testChangePubkeyOffchain(syncWallet: Wallet) {
-    if (! await syncWallet.isSigningKeySet()) {
+    if (!await syncWallet.isSigningKeySet()) {
         const startTime = new Date().getTime();
         const changePubkeyHandle = await syncWallet.setSigningKey();
         console.log(`Change pubkey offchain posted: ${(new Date().getTime()) - startTime} ms`);
         await changePubkeyHandle.awaitReceipt();
         console.log(`Change pubkey offchain committed: ${(new Date().getTime()) - startTime} ms`);
-        if (! await syncWallet.isSigningKeySet()) {
+        if (!await syncWallet.isSigningKeySet()) {
             throw new Error("Change pubkey offchain failed");
         }
     }
@@ -216,7 +216,7 @@ async function testThrowingErrorOnTxFail(zksyncDepositorWallet: Wallet) {
         ethWallet,
         syncProvider,
     );
-    
+
     try {
         const tx = await syncWallet.syncTransfer({
             to: zksyncDepositorWallet.address(),
@@ -262,26 +262,87 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
     console.log(`Transfer to self no fee ok, Token: ${token}`);
     await testChangePubkeyOffchain(syncWallet2);
     console.log(`Change pubkey offchain ok`);
+
+    await apitype.checkBlockResponseType(1);
+    const blocks = await apitype.checkBlocksResponseType();
+    for (const {block_number} of blocks.slice(-10)) {
+        await apitype.checkBlockTransactionsResponseType(block_number);
+    }
+    await apitype.checkAccountInfoResponseType(syncWallet1.address());
+    await apitype.checkTxHistoryResponseType(syncWallet1.address());
+    await testSendingWithWrongSignature(syncWallet1, syncWallet2);
+
     await testWithdraw(contract, syncWallet2, syncWallet2, token, withdrawAmount, withdrawFee);
     console.log(`Withdraw ok, Token: ${token}`);
+}
+
+async function testSendingWithWrongSignature(syncWallet1: Wallet, syncWallet2: Wallet) {
+    const signedTransfer: types.Transfer = syncWallet1.signer.signSyncTransfer({
+        accountId: await syncWallet1.getAccountId(),
+        from: syncWallet1.address(),
+        to: syncWallet2.address(),
+        tokenId: 0,
+        amount: utils.parseEther('0.001'),
+        fee: utils.parseEther('0.001'),
+        nonce: await syncWallet1.getNonce(),
+    });
+
+    const ETH_SIGNATURE_LENGTH_PREFIXED = 132;
+    const fakeEthSignature: types.TxEthSignature = {
+        signature: "0x".padEnd(ETH_SIGNATURE_LENGTH_PREFIXED, '0'),
+        type: "EthereumSignature"
+    };
+
+    try {
+        await syncWallet1.provider.submitTx(signedTransfer, fakeEthSignature);
+        assert(false, "sending tx with incorrect eth signature must throw");
+    } catch (e) {
+        assert(
+            e.jrpcError.message == 'Eth signature is incorrect',
+            "sending tx with incorrect eth signature must fail"
+        );
+    }
+
+    const signedWithdraw = syncWallet1.signer.signSyncWithdraw({
+        accountId: await syncWallet1.getAccountId(),
+        from: syncWallet1.address(),
+        ethAddress: syncWallet1.address(),
+        tokenId: 0,
+        amount: utils.parseEther('0.001'),
+        fee: utils.parseEther('0.001'),
+        nonce: await syncWallet1.getNonce(),
+    })
+
+    try {
+        await syncWallet1.provider.submitTx(signedWithdraw, fakeEthSignature);
+        assert(false, "sending tx with incorrect eth signature must throw");
+    } catch (e) {
+        assert(
+            e.jrpcError.message == 'Eth signature is incorrect',
+            "sending tx with incorrect eth signature must fail"
+        );
+    }
 }
 
 (async () => {
     try {
         syncProvider = await Provider.newWebsocketProvider(process.env.WS_API_ADDR);
-        // const ERC20_ADDRESS = process.env.TEST_ERC20;
-        // const ERC20_SYMBOL = syncProvider.tokenSet.resolveTokenSymbol(ERC20_ADDRESS);
+        const ERC20_SYMBOL = "ERC20-1";
+        const ERC20_ADDRESS = syncProvider.tokenSet.resolveTokenAddress(ERC20_SYMBOL);
 
         const ethProxy = new ETHProxy(ethersProvider, syncProvider.contractAddress);
 
         const ethWallet = ethers.Wallet.fromMnemonic(
-            MNEMONIC,
-            "m/44'/60'/0'/0/0"
+            process.env.TEST_MNEMONIC, "m/44'/60'/0'/0/0"
         ).connect(ethersProvider);
+        const erc20= new Contract(
+            ERC20_ADDRESS,
+            IERC20_INTERFACE,
+            ethWallet,
+        );
         const syncDepositorWallet = ethers.Wallet.createRandom().connect(ethersProvider);
         await (await ethWallet.sendTransaction({to: syncDepositorWallet.address, value: parseEther("0.5")})).wait();
-        // const erc20contract = new Contract(ERC20_ADDRESS, IERC20_INTERFACE, ethWallet);
-        // await (await erc20contract.transfer(syncDepositorWallet.address, parseEther("0.1"))).wait();
+        await (await erc20.transfer(syncDepositorWallet.address, parseEther("0.5"))).wait();
         const zksyncDepositorWallet = await Wallet.fromEthSigner(syncDepositorWallet, syncProvider);
 
         const syncWalletSigner = ethers.Wallet.createRandom().connect(ethersProvider);
@@ -313,9 +374,13 @@ async function moveFunds(contract: Contract, ethProxy: ETHProxy, depositWallet: 
 
         await testThrowingErrorOnTxFail(zksyncDepositorWallet);
 
+        apitype.deleteUnusedGenFiles();
+        await apitype.checkStatusResponseType();
+        await apitype.checkTestnetConfigResponseType();
+
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
+        await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");
         await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet3, "ETH", "0.018");
-        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_ADDRESS, "0.018");
-        // await moveFunds(contract, ethProxy, zksyncDepositorWallet, syncWallet, syncWallet2, ERC20_SYMBOL, "0.018");
 
         await syncProvider.disconnect();
     } catch (e) {

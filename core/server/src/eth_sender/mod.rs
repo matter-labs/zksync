@@ -8,8 +8,7 @@ use std::collections::VecDeque;
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
-    future::select,
-    pin_mut, StreamExt,
+    StreamExt,
 };
 use tokio::runtime::Runtime;
 use tokio::time::timeout;
@@ -183,7 +182,9 @@ impl<ETH: EthereumInterface, DB: DatabaseAccess> ETHSender<ETH, DB> {
     /// Main routine of `ETHSender`.
     pub async fn run(mut self) {
         loop {
-            timeout(self.options.tx_poll_period, self.process_requests()).await;
+            timeout(self.options.tx_poll_period, self.process_requests())
+                .await
+                .unwrap_or_default();
 
             // ...and proceed them.
             self.proceed_next_operations();

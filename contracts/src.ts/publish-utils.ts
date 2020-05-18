@@ -5,10 +5,14 @@ import {gatherSources} from "@resolver-engine/imports";
 import {ImportsFsEngine} from "@resolver-engine/imports-fs";
 
 export async function publishSourceCodeToEtherscan(address: string, contractName: string, constructorArguments) {
+    const SUPPORTED_NETWORKS = ["mainnet", "rinkeby", "ropsten"];
     const contractPath = `contracts/${contractName}.sol`;
     const sourceCode = await getSolidityInput(contractPath);
 
     const network = process.env.ETH_NETWORK;
+    if (SUPPORTED_NETWORKS.find((supportedNetwork) => supportedNetwork === network) == null) {
+        throw new Error(`Current network ${network} is not supported by etherscan, should be one of the ${SUPPORTED_NETWORKS.toString()}`);
+    }
     const etherscanApiUrl = network === "mainnet" ? "https://api.etherscan.io/api" : `https://api-${network}.etherscan.io/api`;
 
     const data = {
@@ -31,6 +35,10 @@ export async function publishSourceCodeToEtherscan(address: string, contractName
 }
 
 export async function publishAbiToTesseracts(address: string, contractCode) {
+    const network = process.env.ETH_NETWORK;
+    if (network !== "localhost") {
+        throw new Error("Only localhost network is supported by Tesseracts");
+    }
     const req = {
         contract_source: JSON.stringify(contractCode.abi),
         contract_compiler: "abi-only",

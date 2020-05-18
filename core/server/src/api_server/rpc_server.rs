@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-use std::convert::TryInto;
 // External uses
 use futures::{
     channel::{mpsc, oneshot},
@@ -13,7 +12,6 @@ use num::{BigUint, ToPrimitive};
 use models::{
     config_options::{ConfigurationOptions, ThreadPanicNotify},
     node::{
-        closest_packable_fee_amount,
         tx::{TxEthSignature, TxHash},
         Account, AccountId, Address, FranklinPriorityOp, FranklinTx, Nonce, PriorityOp, PubKeyHash,
         Token, TokenId, TokenLike,
@@ -749,7 +747,8 @@ impl Rpc for RpcApp {
                     token,
                     response: req.0,
                 })
-                .await;
+                .await
+                .map_err(|_| Error::internal_error())?;
             let resp = req.1.await.map_err(|_| Error::internal_error())?;
             resp.map_err(|_| Error::internal_error())
         };

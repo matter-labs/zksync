@@ -2013,6 +2013,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "loadtest"
 version = "0.1.0"
 dependencies = [
+ "chrono 0.4.11 (registry+https://github.com/rust-lang/crates.io-index)",
  "env_logger 0.6.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "failure 0.1.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)",

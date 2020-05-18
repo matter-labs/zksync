@@ -6,10 +6,9 @@ use num::{rational::Ratio, BigUint};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
-#[serde(rename_all = "camelCase")]
-#[serde(untagged)]
 /// Order of the fields are important (from more specific types to less specific types)
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
+#[serde(untagged, rename_all = "camelCase")]
 pub enum TokenLike {
     Id(TokenId),
     Address(Address),
@@ -22,8 +21,8 @@ impl From<TokenId> for TokenLike {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 /// Token supported in zkSync protocol
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq)]
 pub struct Token {
     /// id is used for tx signature and serialization
     pub id: TokenId,
