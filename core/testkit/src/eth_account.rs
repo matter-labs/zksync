@@ -1,7 +1,7 @@
 use bigdecimal::BigDecimal;
 use eth_client::ETHClient;
 use ethabi::ParamType;
-use failure::{ensure, format_err};
+use failure::{bail, ensure, format_err};
 use futures::compat::Future01CompatExt;
 use models::abi::{erc20_contract, zksync_contract};
 use models::node::block::Block;
@@ -348,7 +348,8 @@ impl<T: Transport> EthereumAccount<T> {
             .map_err(|e| format_err!("Deposit erc20 send err: {}", e))?;
         let eth = self.main_contract_eth_client.web3.eth();
         let receipt = send_raw_tx_wait_confirmation(eth, signed_tx.raw_tx).await?;
-        ensure!(receipt.status == Some(U64::from(1)), "erc20 deposit fail");
+        let exec_result = ETHExecResult::new(receipt, &self.main_contract_eth_client.web3).await;
+        let receipt = exec_result.success_result()?;
         Ok(receipt
             .logs
             .into_iter()
@@ -481,13 +482,20 @@ impl ETHExecResult {
         }
     }
 
-    pub fn expect_success(self) {
-        if !self.success {
-            panic!(
-                "Expected transaction success, revert reason: {}, tx: 0x{:x}",
-                self.revert_reason, self.receipt.transaction_hash
+    pub fn success_result(self) -> Result<TransactionReceipt, failure::Error> {
+        if self.success {
+            Ok(self.receipt)
+        } else {
+            bail!(
+                "revert reason: {}, tx: 0x{:x}",
+                self.revert_reason,
+                self.receipt.transaction_hash
             );
         }
+    }
+
+    pub fn expect_success(self) {
+        self.success_result().expect("Expected transaction success");
     }
 
     pub fn expect_revert(self, code: &str) {

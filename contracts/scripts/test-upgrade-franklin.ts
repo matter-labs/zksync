@@ -1,25 +1,27 @@
-import {ethers} from "ethers";
 import {ArgumentParser} from "argparse";
-import {proxyContractCode, upgradeGatekeeperTestContractCode} from "../src.ts/deploy";
 import {deployContract} from "ethereum-waffle";
+import {ethers} from "ethers";
 import {AddressZero} from "ethers/constants";
+import {readContractCode, readTestContracts} from "../src.ts/deploy";
 
-const {performance} = require('perf_hooks');
-const {expect} = require("chai")
+const {performance} = require("perf_hooks");
+const {expect} = require("chai");
 
-export const FranklinTestNoInitContractCode = require(`../build/FranklinTestNoInit`);
+export const FranklinTestNoInitContractCode = require(`../build/ZkSyncTestNoInit`);
+
+const testContracts = readTestContracts();
 
 async function main() {
     try {
         const parser = new ArgumentParser({
-            version: '0.0.1',
+            version: "0.0.1",
             addHelp: true,
-            description: 'Contract upgrade',
+            description: "Contract upgrade",
         });
-        parser.addArgument('contractAddress');
-        parser.addArgument('upgradeGatekeeperAddress');
+        parser.addArgument("contractAddress");
+        parser.addArgument("upgradeGatekeeperAddress");
         const args = parser.parseArgs(process.argv.slice(2));
-        if (process.env.ETH_NETWORK !== 'localhost') {
+        if (process.env.ETH_NETWORK !== "localhost") {
             console.log("Upgrading test contract not on localhost is not allowed");
             return;
         }
@@ -34,13 +36,13 @@ async function main() {
 
         const proxyContract = new ethers.Contract(
             args.contractAddress,
-            proxyContractCode.interface,
-            wallet
+            testContracts.proxy.interface,
+            wallet,
         );
 
         const upgradeGatekeeper = new ethers.Contract(
             args.upgradeGatekeeperAddress,
-            upgradeGatekeeperTestContractCode.interface,
+            testContracts.upgradeGatekeeper.interface,
             wallet,
         );
 
@@ -57,7 +59,7 @@ async function main() {
         // wait notice period
         console.log("Waiting notice period");
         while (parseInt(await upgradeGatekeeper.upgradeStatus()) !== 2/*Preparation*/) {
-            await new Promise(r => setTimeout(r, 1000));
+            await new Promise((r) => setTimeout(r, 1000));
             await (await upgradeGatekeeper.startPreparation({gasLimit: 300000})).wait();
         }
 

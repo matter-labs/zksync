@@ -55,15 +55,19 @@ fn get_contract_address(deploy_script_out: &str) -> Option<(String, Address)> {
 
 pub fn deploy_test_contracts() -> Contracts {
     let result = Command::new("sh")
-        .arg("execute-deploy-testkit.sh")
+        .arg("deploy-testkit.sh")
         .output()
         .expect("failed to execute contract deploy script");
 
-    if !result.status.success() {
-        panic!("failed to run contract deploy script")
-    }
-
     let stdout = String::from_utf8(result.stdout).expect("stdout is not valid utf8");
+    let stderr = String::from_utf8(result.stderr).expect("stderr is not valid utf8");
+
+    if !result.status.success() {
+        panic!(
+            "failed to run contract deploy script:\nstdout: {}\nstderr: {}",
+            stdout, stderr
+        );
+    }
 
     let mut contracts = HashMap::new();
     for std_out_line in stdout.split_whitespace().collect::<Vec<_>>() {
@@ -124,15 +128,13 @@ pub fn get_test_accounts() -> (Vec<ETHAccountInfo>, ETHAccountInfo) {
     }
     let stdout = String::from_utf8(result.stdout).expect("stdout is not valid utf8");
 
-    for std_out_line in stdout.split_whitespace().collect::<Vec<_>>() {
-        if let Ok(mut parsed) = serde_json::from_str::<Vec<ETHAccountInfo>>(std_out_line) {
-            let commit_account = parsed.remove(0);
-            assert!(
-                !parsed.is_empty(),
-                "can't use testkit without test accounts"
-            );
-            return (parsed, commit_account);
-        }
+    if let Ok(mut parsed) = serde_json::from_str::<Vec<ETHAccountInfo>>(&stdout) {
+        let commit_account = parsed.remove(0);
+        assert!(
+            !parsed.is_empty(),
+            "can't use testkit without test accounts"
+        );
+        return (parsed, commit_account);
     }
 
     panic!("Print test accounts script output is not parsed correctly")
