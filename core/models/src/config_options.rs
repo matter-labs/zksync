@@ -125,6 +125,7 @@ pub struct ConfigurationOptions {
     pub api_requests_caches_size: usize,
     pub available_block_chunk_sizes: Vec<usize>,
     pub eth_watch_poll_interval: Duration,
+    pub eth_network: String,
 }
 
 impl ConfigurationOptions {
@@ -155,6 +156,7 @@ impl ConfigurationOptions {
             eth_watch_poll_interval: Duration::from_millis(parse_env::<u64>(
                 "ETH_WATCH_POLL_INTERVAL",
             )),
+            eth_network: parse_env("ETH_NETWORK"),
         }
     }
 }

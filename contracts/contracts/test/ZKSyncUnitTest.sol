@@ -1,9 +1,9 @@
 pragma solidity ^0.5.0;
 
-import "../generated/FranklinTest.sol";
+import "../generated/ZkSyncTest.sol";
 
 
-contract ZKSyncUnitTest is FranklinTest {
+contract ZKSyncUnitTest is ZkSyncTest {
 
     function changePubkeySignatureCheck(bytes calldata _signature, bytes20 _newPkHash, uint32 _nonce, address _ethAddress, uint24 _accountId) external pure returns (bool) {
         return verifyChangePubkeySignature(_signature, _newPkHash, _nonce, _ethAddress, _accountId);
