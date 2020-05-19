@@ -277,8 +277,9 @@ CREATE TABLE eth_tx_hashes (
 -- Mempool section --
 -- --------------- --
 CREATE TABLE mempool_txs (
+    id bigserial PRIMARY KEY,
     -- Hash of the transaction
-    tx_hash TEXT PRIMARY KEY NOT NULL,
+    tx_hash TEXT NOT NULL,
     -- Transaction contents
     tx jsonb NOT NULL
 );
@@ -293,6 +294,7 @@ CREATE INDEX blocks_root_hash_index ON blocks (root_hash);
 CREATE INDEX tokens_symbol_index ON tokens (symbol);
 CREATE INDEX eth_ops_binding_op_id_index ON eth_ops_binding (op_id);
 CREATE INDEX eth_tx_hashes_eth_op_id_index ON eth_tx_hashes (eth_op_id);
+CREATE INDEX mempool_txs_hash_index ON mempool_txs (tx_hash);
 
 CREATE INDEX accounts_block_index ON accounts (last_block);
 CREATE INDEX accounts_address_index ON accounts (address);

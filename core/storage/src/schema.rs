@@ -190,7 +190,8 @@ table! {
 }
 
 table! {
-    mempool_txs (tx_hash) {
+    mempool_txs (id) {
+        id -> Int8,
         tx_hash -> Text,
         tx -> Jsonb,
     }

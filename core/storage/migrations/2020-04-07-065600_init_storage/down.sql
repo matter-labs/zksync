@@ -4,6 +4,7 @@ DROP INDEX blocks_root_hash_index;
 DROP INDEX tokens_symbol_index;
 DROP INDEX eth_ops_binding_op_id_index;
 DROP INDEX eth_tx_hashes_eth_op_id_index;
+DROP INDEX mempool_txs_hash_index;
 
 DROP INDEX accounts_block_index;
 DROP INDEX accounts_address_index;

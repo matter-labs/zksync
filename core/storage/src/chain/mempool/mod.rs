@@ -3,9 +3,9 @@ use std::collections::VecDeque;
 // External imports
 use diesel::prelude::*;
 // Workspace imports
-use models::node::FranklinTx;
+use models::node::{tx::TxHash, FranklinTx};
 // Local imports
-use self::records::MempoolTx;
+use self::records::{MempoolTx, NewMempoolTx};
 use crate::{schema::*, StorageProcessor};
 
 pub mod records;
@@ -31,7 +31,7 @@ impl<'a> MempoolSchema<'a> {
         let tx_hash = tx_data.hash().to_string();
         let tx = serde_json::to_value(tx_data)?;
 
-        let db_entry = MempoolTx { tx_hash, tx };
+        let db_entry = NewMempoolTx { tx_hash, tx };
 
         diesel::insert_into(mempool_txs::table)
             .values(db_entry)
@@ -40,8 +40,8 @@ impl<'a> MempoolSchema<'a> {
         Ok(())
     }
 
-    pub fn remove_txs(&self, txs: &[FranklinTx]) -> Result<(), failure::Error> {
-        let tx_hashes: Vec<_> = txs.iter().map(|tx| tx.hash().to_string()).collect();
+    pub fn remove_txs(&self, txs: &[TxHash]) -> Result<(), failure::Error> {
+        let tx_hashes: Vec<_> = txs.iter().map(ToString::to_string).collect();
 
         diesel::delete(mempool_txs::table.filter(mempool_txs::tx_hash.eq_any(&tx_hashes)))
             .execute(self.0.conn())?;
@@ -70,7 +70,9 @@ impl<'a> MempoolSchema<'a> {
                 .is_some()
         });
 
-        self.remove_txs(&txs_to_remove)?;
+        let tx_hashes: Vec<_> = txs_to_remove.into_iter().map(|tx| tx.hash()).collect();
+
+        self.remove_txs(&tx_hashes)?;
 
         Ok(())
     }
