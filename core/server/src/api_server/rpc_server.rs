@@ -249,6 +249,7 @@ impl From<TxAddError> for RpcErrorCodes {
             TxAddError::IncorrectEthSignature => Self::IncorrectEthSignature,
             TxAddError::ChangePkNotAuthorized => Self::ChangePkNotAuthorized,
             TxAddError::Other => Self::Other,
+            TxAddError::DbError => Self::Other,
         }
     }
 }
