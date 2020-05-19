@@ -30,7 +30,7 @@ const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
         const erc20 = await deployContract(
             wallet,
             contractCode, constructorArgs,
-            {gasLimit: 800000, gasPrice: parseUnits("100", "gwei")},
+            {gasLimit: 800000},
         );
 
         const testnetToken = token;
