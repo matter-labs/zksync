@@ -59,8 +59,6 @@ const mainnetTokens = require(`${process.env.ZKSYNC_HOME}/etc/tokens/mainnet`);
     const result = [];
 
     for (const token of mainnetTokens) {
-
-
         const constructorArgs = [`${token.name} (${process.env.ETH_NETWORK})`, token.symbol, token.decimals];
 
         console.log(`Deploying testnet ERC20: ${constructorArgs.toString()}`);
