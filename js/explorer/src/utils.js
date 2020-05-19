@@ -36,5 +36,5 @@ export function shortenHash(str, fallback) {
 
 export function formatDate(timeStr) {
     if (timeStr == null) return '';
-    return timeStr.toString().split('T')[0] + " " + timeStr.toString().split('T')[1].split('.')[0] + " UTC";
+    return timeStr.toString().split('T')[0] + " " + timeStr.toString().split('T')[1].slice(0, 8) + " UTC";
 }
