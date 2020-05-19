@@ -247,7 +247,6 @@ impl Mempool {
 
     fn prepare_tx_for_block(&mut self, mut chunks_left: usize) -> (usize, Vec<FranklinTx>) {
         let mut txs_for_commit = Vec::new();
-        let mut tx_for_reinsert = None;
 
         while let Some(tx) = self.mempool_state.ready_txs.pop_front() {
             let chunks_for_tx = self.mempool_state.chunks_for_tx(&tx);
@@ -255,13 +254,10 @@ impl Mempool {
                 txs_for_commit.push(tx);
                 chunks_left -= chunks_for_tx;
             } else {
-                tx_for_reinsert = Some(tx);
+                // Push the taken tx back, it does not fit.
+                self.mempool_state.ready_txs.push_front(tx);
                 break;
             }
-        }
-
-        if let Some(tx) = tx_for_reinsert {
-            self.mempool_state.ready_txs.push_front(tx);
         }
 
         (chunks_left, txs_for_commit)
