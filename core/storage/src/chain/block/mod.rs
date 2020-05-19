@@ -11,10 +11,6 @@ use models::node::{
 use models::{fe_from_bytes, fe_to_bytes, Action, ActionType, Operation};
 // Local imports
 use self::records::{BlockDetails, BlockTransactionItem, StorageBlock};
-use crate::prover::records::StoredProof;
-use crate::prover::ProverSchema;
-use crate::schema::*;
-use crate::StorageProcessor;
 use crate::{
     chain::{
         operations::{
@@ -27,6 +23,9 @@ use crate::{
         state::StateSchema,
     },
     ethereum::records::ETHBinding,
+    prover::{records::StoredProof, ProverSchema},
+    schema::*,
+    StorageProcessor,
 };
 
 mod conversion;

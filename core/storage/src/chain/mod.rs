@@ -1,5 +1,6 @@
 pub mod account;
 pub mod block;
+pub mod mempool;
 pub mod operations;
 pub mod operations_ext;
 pub mod state;
@@ -35,5 +36,9 @@ impl<'a> ChainIntermediator<'a> {
 
     pub fn stats_schema(self) -> stats::StatsSchema<'a> {
         stats::StatsSchema(self.0)
+    }
+
+    pub fn mempool_schema(self) -> mempool::MempoolSchema<'a> {
+        mempool::MempoolSchema(self.0)
     }
 }

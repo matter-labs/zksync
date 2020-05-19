@@ -190,6 +190,13 @@ table! {
 }
 
 table! {
+    mempool_txs (tx_hash) {
+        tx_hash -> Text,
+        tx -> Jsonb,
+    }
+}
+
+table! {
     operations (id) {
         id -> Int8,
         block_number -> Int8,
@@ -259,6 +266,7 @@ allow_tables_to_appear_in_same_query!(
     executed_priority_operations,
     executed_transactions,
     leader_election,
+    mempool_txs,
     operations,
     proofs,
     prover_runs,

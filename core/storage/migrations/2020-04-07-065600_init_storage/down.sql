@@ -59,3 +59,6 @@ DROP TABLE IF EXISTS eth_stats;
 DROP TABLE IF EXISTS eth_ops_binding;
 DROP TABLE IF EXISTS eth_tx_hashes;
 DROP TABLE IF EXISTS data_restore_last_watched_eth_block;
+
+-- Clear mempool section
+DROP TABLE IF EXISTS mempool_txs;

@@ -152,9 +152,9 @@ CREATE TABLE balances (
     PRIMARY KEY (account_id, coin_id)
 );
 
--- ------------- --
+-- -------------------- --
 -- Data restore section --
--- ------------- --
+-- -------------------- --
 
 CREATE TABLE data_restore_events_state (
     id SERIAL PRIMARY KEY,
@@ -271,6 +271,16 @@ CREATE TABLE eth_tx_hashes (
     id bigserial PRIMARY KEY,
     eth_op_id bigserial NOT NULL REFERENCES eth_operations(id),
     tx_hash bytea NOT NULL
+);
+
+-- --------------- --
+-- Mempool section --
+-- --------------- --
+CREATE TABLE mempool_txs (
+    -- Hash of the transaction
+    tx_hash TEXT PRIMARY KEY NOT NULL,
+    -- Transaction contents
+    tx jsonb NOT NULL
 );
 
 -- --------------- --
