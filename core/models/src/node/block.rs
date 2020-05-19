@@ -40,6 +40,13 @@ impl ExecutedOperations {
         }
     }
 
+    pub fn get_executed_tx(&self) -> Option<&ExecutedTx> {
+        match self {
+            ExecutedOperations::Tx(exec_tx) => Some(exec_tx),
+            ExecutedOperations::PriorityOp(_) => None,
+        }
+    }
+
     pub fn get_eth_public_data(&self) -> Vec<u8> {
         self.get_executed_op()
             .map(FranklinOp::public_data)

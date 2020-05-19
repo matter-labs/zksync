@@ -71,6 +71,22 @@ async fn handle_new_commit_task(
             .await
             .map_err(|e| warn!("Failed notify mempool about account updates: {}", e))
             .unwrap_or_default();
+
+        let block_tx_hashes: Vec<_> = op
+            .block
+            .block_transactions
+            .into_iter()
+            .filter_map(|op| {
+                op.get_executed_tx()
+                    .map(|executed_tx| executed_tx.tx.hash())
+            })
+            .collect();
+
+        mempool_req_sender
+            .send(MempoolRequest::RemoveCommittedTxs(block_tx_hashes))
+            .await
+            .map_err(|e| warn!("Failed notify mempool about account updates: {}", e))
+            .unwrap_or_default();
     }
 }
 

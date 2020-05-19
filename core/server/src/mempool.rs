@@ -28,8 +28,8 @@ use futures::{
 use tokio::runtime::Runtime;
 // Workspace uses
 use models::node::{
-    AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp, TransferOp,
-    TransferToNewOp,
+    tx::TxHash, AccountId, AccountUpdate, AccountUpdates, Address, FranklinTx, Nonce, PriorityOp,
+    TransferOp, TransferToNewOp,
 };
 use storage::ConnectionPool;
 // Local uses
@@ -94,6 +94,8 @@ pub enum MempoolRequest {
     UpdateNonces(AccountUpdates),
     /// Get transactions from the mempool.
     GetBlock(GetBlockRequest),
+    /// Remove committed txs from the persistent mempool storage.
+    RemoveCommittedTxs(Vec<TxHash>),
 }
 
 struct MempoolState {
@@ -216,20 +218,12 @@ impl Mempool {
                     // Generate proposed block.
                     let proposed_block =
                         self.propose_new_block(block.last_priority_op_number).await;
-                    let block_txs = proposed_block.txs.clone();
 
                     // Send the proposed block to the request initiator.
                     block
                         .response_sender
                         .send(proposed_block)
                         .expect("mempool proposed block response send failed");
-
-                    // Remove the transactions included into the block from the database.
-                    // Warning: we should not remove transactions from the database until we're
-                    // sure that request initiator received them.
-                    if let Err(err) = self.remove_txs_from_mempool(&block_txs) {
-                        log::warn!("Unable to remove processed txs from the database: {}", err);
-                    }
                 }
                 MempoolRequest::UpdateNonces(updates) => {
                     for (id, update) in updates {
@@ -263,6 +257,14 @@ impl Mempool {
                         }
                     }
                 }
+                MempoolRequest::RemoveCommittedTxs(tx_hashes) => {
+                    // Remove the transactions included into the block from the database.
+                    // Warning: we should not remove transactions from the database until we're
+                    // sure that all the transactions are committed to the database.
+                    if let Err(err) = self.remove_txs_from_mempool(&tx_hashes) {
+                        log::warn!("Unable to remove processed txs from the database: {}", err);
+                    }
+                }
             }
         }
     }
@@ -270,7 +272,7 @@ impl Mempool {
     /// Removes the transactions from the database persistent pool.
     /// This method is used to remove transactions that will be included in the next block
     /// and thus aren't a part of mempool anymore.
-    fn remove_txs_from_mempool(&self, txs: &[FranklinTx]) -> Result<(), failure::Error> {
+    fn remove_txs_from_mempool(&self, txs: &[TxHash]) -> Result<(), failure::Error> {
         let storage = self.db_pool.access_storage().map_err(|err| {
             log::warn!("Mempool storage access error: {}", err);
             TxAddError::DbError
