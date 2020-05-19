@@ -149,6 +149,11 @@ impl MempoolState {
             .load_txs()
             .expect("Attempt to restore mempool txs from DB failed");
 
+        log::info!(
+            "{} transactions were restored from the persistent mempool storage",
+            ready_txs.len()
+        );
+
         Self {
             account_nonces,
             account_ids,
