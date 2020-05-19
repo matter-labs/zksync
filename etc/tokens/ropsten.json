@@ -1,12 +1,12 @@
 [
   {
     "address": "0xFab46E002BbF0b4509813474841E0716E6730136",
-    "precision": 18,
+    "decimals": 18,
     "symbol": "FAU"
   },
   {
-    "address": "0xad6d458402f60fd3bd25163575031acdce07538d",
-    "precision": 18,
+    "address": "0xaD6D458402F60fD3Bd25163575031ACDce07538D",
+    "decimals": 18,
     "symbol": "DAI"
   }
 ]

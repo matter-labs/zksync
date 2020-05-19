@@ -1,15 +1,9 @@
 [
   {
-    "address": "0x3B00Ef435fA4FcFF5C209a37d1f3dcff37c705aD",
-    "decimals": 6,
-    "symbol": "USDT",
-    "name": "Tether USD"
-  },
-  {
-    "address": "0xeb8f08a975Ab53E34D8a0330E0D34de942C95926",
-    "decimals": 6,
-    "symbol": "USDC",
-    "name": "USD Coin"
+    "address": "0x8ecE0cb8B5cf0e2d49f135703B6436EFA26393c9",
+    "decimals": 18,
+    "symbol": "DAI",
+    "name": "Dai Stablecoin"
   },
   {
     "address": "0x4da8d0795830f75BE471F072a034d42c369B5d0A",
@@ -96,22 +90,10 @@
     "name": "Reputation"
   },
   {
-    "address": "0x8098165d982765097E4aa17138816e5b95f9fDb5",
-    "decimals": 8,
-    "symbol": "STORJ",
-    "name": "StorjToken"
-  },
-  {
     "address": "0x02d01f0835B7FDfa5d801A8f5f74c37F2BB1aE6a",
     "decimals": 18,
     "symbol": "NEXO",
     "name": "Nexo"
-  },
-  {
-    "address": "0xd93adDB2921b8061B697C2Ab055979BbEFE2B7AC",
-    "decimals": 8,
-    "symbol": "MCO",
-    "name": "MCO"
   },
   {
     "address": "0x290EBa6EC56EcC9fF81C72E8eccc77D2c2BF63eB",
